@@ -75,7 +75,12 @@ O #1 e o #3 estão integrados (merged) e o seu código está no `main`.
 
 ### 4. Acessos e configuração do repositório
 
-- Colaboradores e permissões.
+- Colaboradores e permissões. **Feito:** `ValentinoCanguele` tem acesso de escrita
+  (2026-11-03). Num repositório de conta pessoal o GitHub só aceita `pull` e `push` para
+  colaboradores — `triage`, `maintain` e `admin` são exclusivos de organizações, e o `admin`
+  fica sempre reservado ao dono (`fernandotunas6-bot`). Com este acesso **já não é preciso
+  manter a conta `fernandotunas6-bot` activa no `gh`**, o que evita o efeito colateral de
+  trocar a conta activa para toda a máquina.
 - Protecção de ramos / rulesets no `main`.
 - Ramo por omissão: confirmar que é `main`.
 - Descrição e tópicos do repositório.
@@ -83,26 +88,69 @@ O #1 e o #3 estão integrados (merged) e o seu código está no `main`.
 - **Visibilidade: privado.** Se algum dia passar a público, rever o histórico antes — ele
   guarda tudo o que já lá esteve.
 
-### 5. Cloudflare Pages
+### 5. Cloudflare — mudança de conta pendente
 
-Ambos os projectos vivem na conta `canguelev@fata.adventist.org` e publicam por Wrangler, que
-não depende do GitHub. Se alguma vez se ligar o Pages directamente ao Git, é o repositório
-novo que tem de ser autorizado.
+Hoje os dois projectos vivem na conta **`canguelev@fata.adventist.org`** e publicam por
+Wrangler, que não depende do GitHub:
 
-- `livraria-editora-adventista` — criado a 2026-11-03 para receber o domínio
-  `livrariaadventista.ao`. Ainda sem deploy nenhum.
-- `livraria-adventista` — continua a servir produção até o domínio estar activo.
+- `livraria-editora-adventista` — criado a 2026-11-03, ainda sem deploy nenhum.
+- `livraria-adventista` — continua a servir produção em `livraria-adventista.pages.dev`.
+
+**A decisão (2026-11-03) é mudar tudo para a conta `valentinocanguele@gmail.com`**, a mesma
+que já tem o projecto `siga-plus`, e é lá que o domínio `livrariaadventista.ao` vai ficar. Isso
+**não foi feito** porque o `wrangler` desta máquina está autenticado na conta `fata` e só
+alcança essa; o `wrangler login` é um OAuth no browser e tem de ser corrido por uma pessoa:
+
+```bash
+npx wrangler@4 logout && npx wrangler@4 login
+npx wrangler@4 whoami   # confirmar a conta e guardar o Account ID
+```
+
+Com a conta certa autenticada, recriar os projectos e publicar:
+
+```bash
+npx wrangler@4 pages project create livraria-editora-adventista --production-branch main
+CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site
+```
+
+Se a conta tiver mais do que um Account ID, o Wrangler pede para escolher: exportar
+`CLOUDFLARE_ACCOUNT_ID` para não publicar na conta errada.
+
+O projecto na conta `fata` fica como está por agora (está vazio, não custa nada), mas **dois
+projectos com o mesmo nome em contas diferentes confundem-se com facilidade** — confirmar
+sempre o `whoami` antes de publicar.
 
 A variável `CLOUDFLARE_PAGES_PROJECT` do Actions (secção 1) tem de dizer
-`livraria-editora-adventista`, senão o deploy automático publica no projecto antigo.
+`livraria-editora-adventista`, e o `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` passam a ser
+da conta nova.
 
-O domínio `livrariaadventista.ao` **não está registado** e não se compra no Cloudflare —
-passos em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
+O domínio `livrariaadventista.ao` **não está registado** — ver secção 7.
 
 ### 6. Supabase
 
-Nada a mudar: o projecto `bggqkjjqbjhbjsckzopj` não conhece o repositório. Só o
-`deploy-supabase.yml` o toca, e esse depende dos segredos da secção 1.
+O projecto `bggqkjjqbjhbjsckzopj` não conhece o repositório — só o `deploy-supabase.yml` o
+toca, e esse depende dos segredos da secção 1.
+
+Por fazer: **convidar `valentinocanguele@gmail.com` para a organização "Colpotor"**
+(Organization settings → Team → Invite). Tem de ser no painel.
+
+### 7. Domínio `livrariaadventista.ao`
+
+**Não está registado.** Verificado a 2026-11-03 perguntando directamente aos servidores
+autoritativos do registo `.ao`, que devolvem `NXDOMAIN`:
+
+```bash
+dig +norecurse @a.ns.ao. livrariaadventista.ao NS | grep status:
+# ->>HEADER<<- ... status: NXDOMAIN      → não existe
+# comparar com: dig +norecurse @a.ns.ao. dns.ao NS   → status: NOERROR
+```
+
+Isto é mais fiável do que olhar para a ausência de registos NS ou A, que também acontece num
+domínio registado mas ainda sem delegação.
+
+Enquanto devolver `NXDOMAIN` não há nada a fazer no Cloudflare: não se pode adicionar a zona
+nem associar o domínio ao Pages. Os passos do registo, da delegação e do que muda a seguir no
+Supabase Auth e no OAuth da Google estão em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
 
 ## Cópias de trabalho locais
 
@@ -127,11 +175,14 @@ causa. Depois de qualquer `remote rename`, confirmar:
 git for-each-ref --format='%(refname:short) -> %(upstream:short)' refs/heads
 ```
 
-A conta activa do `gh` nesta máquina passou para `fernandotunas6-bot` (`gh auth switch`), que é
-o que faz o `git` autenticar-se no repositório novo — o `gh auth setup-git` está configurado no
-`~/.gitconfig` e usa sempre a conta activa. **Isto é global:** comandos `gh` e pushes para
-repositórios de outras contas, noutros projectos desta máquina, passam a usar esta conta.
-Trocar com `gh auth switch -u <conta>`.
+Sobre a autenticação: o `~/.gitconfig` desta máquina tem `gh auth setup-git` para o github.com,
+que usa sempre a **conta activa** do `gh`. Durante a migração foi preciso trocá-la para
+`fernandotunas6-bot`, mas isso é **global** — afecta os comandos `gh` e os pushes de todos os
+outros projectos da máquina. Depois de a `ValentinoCanguele` passar a colaboradora (secção 4),
+a conta activa voltou a ser a `ValentinoCanguele` e o acesso continua a funcionar. É a
+configuração a manter: só o dono do repositório precisa da conta `fernandotunas6-bot`, e essa
+usa-se pontualmente com `GH_TOKEN="$(gh auth token --user fernandotunas6-bot)"` em vez de
+trocar a conta activa.
 
 Noutra máquina, ou num clone novo:
 

@@ -9,9 +9,9 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Item | Detalhe |
 |------|---------|
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
-| Cloudflare | Conta `canguelev@fata.adventist.org`; projecto Pages `livraria-editora-adventista` (já criado) |
+| Cloudflare | A passar para `valentinocanguele@gmail.com` (hoje em `canguelev@fata.adventist.org`); projecto Pages `livraria-editora-adventista` |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
-| Domínio | `livrariaadventista.ao` — **por registar** (ver secção 7) |
+| Domínio | `livrariaadventista.ao` — **por registar**, o registo `.ao` devolve `NXDOMAIN` (ver secção 7) |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
 | Email | Servidor SMTP (Hostinger, Brevo…) ou SendGrid |
 | Google Cloud | ID de cliente OAuth para o login com Google |
