@@ -265,6 +265,26 @@ lint limpo, **250 testes** (eram 244), build e `deno check` da Edge Function.
 - Segredos locais (`api-keys-*.csv`, `client_secret_*.json`, `.env`) estão no `.gitignore`.
 - `npm audit`: as 4 altas são do gRPC, que o Firebase só usa no servidor; não entra no site.
 
+### Segunda leva (2026-11-03, noite)
+
+- **O checkout nunca enviava a sessão.** O `initializeCheckout` fazia o `fetch` sem
+  `Authorization`, por isso o servidor tratava toda a encomenda como anónima: o
+  `customer_id` do `075bfa3` ficava sempre vazio, **mesmo depois de publicar a função**.
+  Agora envia o token quando há sessão (sem sessão segue como antes).
+- **O GPS da entrega nunca chegava.** O carrinho passava `deliveryGpsLat/Lng`, mas a função
+  só reenviava os campos que nomeia. As 6 encomendas na base de dados têm 0/0. Corrigido;
+  4 testes novos (`checkoutRequest.test.js`) falham com o código antigo.
+- **Testes no CI.** Sem o `.env` (que não está no git) quatro ficheiros de teste nem
+  carregavam. O `vitest.config.js` fixa um projecto fictício: 254 testes passam com e sem
+  `.env`.
+- **Sitemap com livros e colecções.** `scripts/gerar-sitemap.mjs` corre no deploy e junta
+  as 102 páginas de livro e as 4 de colecção às 8 fixas (lê só o que é público). Se a base
+  de dados não responder, publica com as fixas.
+
+Fica por decidir: o servidor ainda aceita entrega ao domicílio sem conta (a regra só está
+no carrinho). **Só se pode exigir depois de o site novo estar publicado** — antes disso, o
+site antigo não envia a sessão e todas as entregas seriam recusadas.
+
 ### Por fazer (precisa de autorização ou do dono)
 
 - **Publicar a Edge Function.** A publicada é de 2026-11-02 13:59 e não tem o

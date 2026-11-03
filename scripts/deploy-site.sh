@@ -56,6 +56,11 @@ npm run build --silent
 # é a do endereço antigo. Reescreve-se no build, não no código-fonte, para o mesmo commit
 # poder ir para qualquer destino.
 SOURCE_URL="https://livraria-adventista.pages.dev"
+# Livros e colecções no sitemap. Gerado com o endereço de origem, para a reescrita a seguir
+# o trocar junto com o resto.
+if [ "$mode" = "production" ]; then
+  node scripts/gerar-sitemap.mjs dist/app/web/sitemap.xml "$SOURCE_URL"
+fi
 if [ "$mode" = "production" ] && [ "$SITE_URL" != "$SOURCE_URL" ]; then
   for f in index.html sitemap.xml robots.txt; do
     file="dist/app/web/$f"

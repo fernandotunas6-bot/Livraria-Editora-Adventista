@@ -1,5 +1,5 @@
 import pb from '@/lib/dataClient';
-import { APP_API_URL, mediaUrl } from '@/lib/supabaseClient';
+import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
@@ -295,10 +295,18 @@ export async function initializeCheckout({
   deliveryProvince, deliveryProvinceId, deliveryMunicipality, deliveryMunicipalityId,
   deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
+  deliveryGpsLat, deliveryGpsLng,
 }) {
+  // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
+  // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
+  // Sem o cabeçalho, toda a encomenda chegava como anónima, com ou sem sessão iniciada.
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
   const res = await fetch(`${APP_API_URL}/checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({
       items, successUrl, customerEmail, customerName,
       phone, address, city,
@@ -313,6 +321,9 @@ export async function initializeCheckout({
       deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
       deliveryRelativeName, deliveryRelativePhone,
       checkoutSignature,
+      // O carrinho já mandava as coordenadas, mas esta função só reenviava os campos que
+      // nomeia, e estes não estavam na lista: nenhuma encomenda chegou a ter GPS.
+      deliveryGpsLat, deliveryGpsLng,
     }),
   });
 

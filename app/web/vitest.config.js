@@ -22,5 +22,13 @@ export default defineConfig({
     // Inclui também os módulos de email da Edge Function: são TypeScript sem nada de Deno,
     // e assim o `npm test` (que o deploy usa como gate) cobre o HTML enviado aos clientes.
     include: ['src/**/*.test.{js,jsx}', '../../supabase/functions/**/*.test.ts'],
+    // Vários módulos criam o cliente Supabase ao serem importados, e o `createClient` rebenta
+    // sem URL. O `app/web/.env` não está no git, por isso num checkout limpo (o CI) quatro
+    // ficheiros de teste nem carregavam. Os testes usam sempre um projecto fictício: correm
+    // igual com e sem `.env` e nunca falam com a base de dados real.
+    env: {
+      VITE_SUPABASE_URL: 'https://projecto-de-teste.supabase.invalid',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'chave-de-teste',
+    },
   },
 });
