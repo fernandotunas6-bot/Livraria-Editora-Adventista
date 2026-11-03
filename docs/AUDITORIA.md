@@ -330,6 +330,14 @@ alavanca é fazer menos consultas em série:
 - **`security_spec.md`** reescrito para o Supabase (era do Firestore), com os casos de ataque
   à lista de desejos e o teste em `docs/testes/seguranca_wishlists.sql`.
 
+- **Página inicial 309 → 241 KB comprimidos (−22 %)**, e o JavaScript a executar de ~916 para
+  ~695 KB. O `vite.config.js` voltara a ter uma regra geral (`return 'vendor-core'`) que
+  metia na página inicial as dependências do Recharts (`lodash`, `react-smooth`,
+  `decimal.js-light`… ~80 KB): a regra apanhava-as antes de o Rollup as juntar ao bloco dos
+  gráficos. Ficam fixos só os blocos que todas as páginas usam (React com o router, Supabase,
+  animações). Medido pelo source map; confirmado num Chrome sem interface que a página
+  inicial, a loja e a página de partilha de um livro arrancam e mostram o conteúdo.
+
 ### Ordem de publicação (importa)
 
 1. **Site** (`deploy-site.sh` ou Actions): passa a enviar a sessão e o GPS no checkout e lê

@@ -24,17 +24,23 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
-        // Divide os pacotes pesados em chunks dedicados para reduzir o payload inicial e
-        // evitar que o bundle principal fique dominado por panel, gráficos e integrações.
+        // Blocos fixos só para o que TODAS as páginas usam — o React com o router, o Supabase e
+        // as animações. Ficam com o mesmo nome entre deploys e o browser reaproveita-os.
+        //
+        // Tudo o resto fica com o Rollup, que põe cada pacote junto do código que o usa: os
+        // gráficos e as suas dependências (lodash, react-smooth, decimal.js…) no painel, o
+        // Firebase no seu bloco, carregado a pedido. Um `return 'vendor-core'` para os
+        // restantes pacotes metia tudo isso na página inicial: ~80 KB das dependências do
+        // Recharts iam para todas as visitas, porque a regra geral as apanhava antes de o
+        // Rollup as juntar ao bloco dos gráficos.
+        //
+        // As expressões são exactas de propósito: `id.includes('/react')` apanhava também o
+        // `react-smooth` (dos gráficos) e arrastava-o para o bloco do React.
         manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-
-          if (id.includes('/recharts') || id.includes('/d3')) return 'vendor-charts';
-          if (id.includes('/firebase') || id.includes('/@firebase')) return 'vendor-firebase';
-          if (id.includes('@supabase')) return 'vendor-supabase';
-          if (id.includes('/framer-motion')) return 'vendor-motion';
-
-          return 'vendor-core';
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/.test(id)) return 'vendor-react';
+          if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return 'vendor-supabase';
+          if (/[\\/]node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'vendor-motion';
+          return undefined;
         },
       },
     },
