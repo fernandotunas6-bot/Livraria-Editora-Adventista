@@ -29,6 +29,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Sem variáveis de ambiente de propósito: os valores do Supabase para os testes estão
+      # fixos no `test.env` do app/web/vitest.config.js. Os testes são unitários e não tocam a
+      # rede, por isso não dependem de segredos nem do app/web/.env, que é gitignored e não
+      # existe num checkout.
       - name: Testes
         run: npm test
 

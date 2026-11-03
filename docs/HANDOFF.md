@@ -68,16 +68,16 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
   - `ci.yml` corre lint, **testes**, build e `deno check` em cada PR para o `main`.
   - Os deploys confirmam os segredos antes de começar.
   - O deploy do Cloudflare cria o projecto Pages se não existir.
-  - **⚠️ O passo `Testes` está quebrado num checkout limpo** — ver a secção seguinte.
+  - O passo `Testes` esteve quebrado num checkout limpo até 2026-11-03 — ver a secção seguinte.
 
-## ⚠️ O passo `Testes` do `ci.yml` falha num checkout limpo
+## O passo `Testes` do `ci.yml` falhava num checkout limpo — corrigido
 
-Encontrado a 2026-11-03 ao verificar a ponta do ramo para o PR novo.
+Encontrado a 2026-11-03 ao verificar a ponta do ramo, e corrigido no mesmo dia.
 
-O passo corre `npm test` **sem** `VITE_SUPABASE_URL` nem `VITE_SUPABASE_PUBLISHABLE_KEY`. O
-`app/web/.env` é gitignored, logo num checkout do GitHub (ou em qualquer worktree novo) não
-existe. Quatro ficheiros de teste importam módulos que criam o cliente Supabase **no momento do
-import** e falham a carregar antes de correr um único teste:
+**O que estava mal.** O passo corria `npm test` sem `VITE_SUPABASE_URL` nem
+`VITE_SUPABASE_PUBLISHABLE_KEY`. O `app/web/.env` é gitignored, logo num checkout do GitHub (ou
+em qualquer worktree novo) não existe. Quatro ficheiros de teste importam módulos que criam o
+cliente Supabase **no momento do import** e falhavam a carregar antes de correr um único teste:
 
 ```
 Error: supabaseUrl is required.
@@ -86,27 +86,30 @@ FAIL src/lib/apiCompat.test.js · src/hooks/useReviews.test.js
      src/hooks/useProductFilters.test.js · src/lib/secureInboxApi.test.js
 ```
 
-Reproduzido nos dois sentidos, no mesmo commit (`38df5ad`):
+**Porque passou tanto tempo escondido.** O Actions nunca arrancou — a conta antiga estava
+bloqueada por facturação — e localmente o `.env` existe sempre. E o relatório engana: diz "232
+testes a passar", porque um ficheiro que falha a carregar não conta testes nenhuns. **Olhar para
+a linha `Test Files`, não só para `Tests`.**
+
+**A correcção** está no `test.env` do `app/web/vitest.config.js`, com valores fixos
+(`http://supabase.invalid`). Não no `ci.yml`, e não no `supabaseClient.js`:
+
+- Dar as variáveis ao `ci.yml` resolvia só o CI, e **continuaria quebrado** até alguém criar as
+  *repository variables* no repositório novo — que ainda não existem.
+- No `vitest.config.js` o `npm test` dá o mesmo resultado em qualquer máquina, sem configuração
+  nem segredos, e nenhum teste toca a rede. É código de teste, não de produção.
+
+Nenhum teste dependia dos valores reais (verificado: o `imageUrl.test.js` usa o URL do Supabase
+como texto literal de entrada, e o `imageUrl.js` não lê o ambiente).
+
+**Verificado nos dois ambientes**, no commit da correcção:
 
 | | Ficheiros | Testes |
 |---|---|---|
-| sem as variáveis (como o CI corre) | 4 falham, 13 passam | 232 passam |
-| com as variáveis | **17 passam** | **250 passam** |
+| worktree sem `.env` e sem variáveis (a condição do CI) | **17 passam** | **250 passam** |
+| árvore local com `.env` | **17 passam** | **250 passam** |
 
-**Não é regressão de nenhum ramo:** está assim desde que os testes entraram no `ci.yml`, e ficou
-escondido porque o Actions nunca arrancou — a conta antiga estava bloqueada por facturação. Com
-o repositório na conta nova, se o Actions correr, isto aparece.
-
-Duas saídas:
-
-1. Dar as variáveis ao passo `Testes`, a partir das *repository variables*, como o
-   `deploy-cloudflare.yml` já faz. Resolve o CI mas mantém os testes dependentes de
-   configuração de ambiente.
-2. **Melhor:** dar valores de teste ao `supabaseClient.js` quando corre em modo de teste. São
-   testes unitários e não deviam precisar de um URL real nem de chave nenhuma. Também torna o
-   `npm test` fiável num clone novo, sem passos manuais.
-
-Não foi corrigido: muda o comportamento do CI e está fora do âmbito do PR onde apareceu.
+Antes da correcção, na condição do CI: 4 ficheiros falhavam, 13 passavam, 232 testes.
 
 ## Análise crítica e correcções (2026-11-01, segunda passagem)
 
