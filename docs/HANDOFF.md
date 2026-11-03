@@ -86,12 +86,12 @@ FAIL src/lib/apiCompat.test.js · src/hooks/useReviews.test.js
      src/hooks/useProductFilters.test.js · src/lib/secureInboxApi.test.js
 ```
 
-Reproduzido nos dois sentidos, no mesmo commit (`b5851fc`):
+Reproduzido nos dois sentidos, no mesmo commit (`38df5ad`):
 
 | | Ficheiros | Testes |
 |---|---|---|
-| sem as variáveis (como o CI corre) | 4 falham, 12 passam | 226 passam |
-| com as variáveis | **16 passam** | **244 passam** |
+| sem as variáveis (como o CI corre) | 4 falham, 13 passam | 232 passam |
+| com as variáveis | **17 passam** | **250 passam** |
 
 **Não é regressão de nenhum ramo:** está assim desde que os testes entraram no `ci.yml`, e ficou
 escondido porque o Actions nunca arrancou — a conta antiga estava bloqueada por facturação. Com

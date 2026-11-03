@@ -77,7 +77,7 @@ O #1 e o #3 do repositório antigo estão integrados (merged) e o seu código es
 reaberto o ramo tinha **55**, acumulados entre 2026-11-02 e 2026-11-03 — autenticação, emails,
 fila e agendador, CSP, desempenho, acessibilidade, telemóvel, marca, atendimento e os 8 commits
 da própria migração. Deixou de ser um PR de um assunto. A verificação da ponta do ramo
-(`b5851fc`, em worktree limpo) deu lint limpo, 16 ficheiros e 244 testes a passar e build limpo;
+(`38df5ad`, em worktree limpo) deu lint limpo, 17 ficheiros e 250 testes a passar e build limpo;
 o `deno check` não foi corrido porque o Deno não está nesta máquina.
 
 ### 4. Acessos e configuração do repositório
