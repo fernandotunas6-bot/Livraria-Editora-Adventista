@@ -274,7 +274,8 @@ lint limpo, **250 testes** (eram 244), build e `deno check` da Edge Function.
 - **Índices das 11 chaves estrangeiras** sem índice:
   `docs/migracoes-pendentes/3_indices_chaves_estrangeiras.sql` (só acrescenta índices).
 - **Primeiro deploy no projecto novo** `livraria-editora-adventista` (hoje responde 522).
-- Conteúdo: IBAN de exemplo (`AO06 0000…`), telefone `+244 923 000 000` e das lojas
+- ~~IBAN de exemplo~~: corrigido a 2026-11-03 para o IBAN real da Livraria e Editora Adventista (BAI), confirmado na rota pública `/payment-methods`.
+- Conteúdo: telefone `+244 923 000 000` e das lojas
   provisórios, emails de encomenda desligados (sem SMTP), 100 de 102 livros sem descrição,
   12 esgotados, 3 linhas em `site_settings` e 3 `unitel_money` repetidas, e o nome da loja
   "LIvraria Adventista - Huambo" com gralha e sem telefone.

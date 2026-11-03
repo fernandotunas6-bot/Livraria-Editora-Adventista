@@ -224,7 +224,9 @@ O cliente preenchia morada, pagamento e assinatura por uma frincha de 288 px.
   antes do envio"** ou **"paga na entrega"**, pela mesma regra que o servidor usa para
   exigir referência.
 
-### Dado por preencher, visível ao cliente
+### ~~Dado por preencher, visível ao cliente~~ — resolvido a 2026-11-03
+
+O IBAN real (titular Livraria e Editora Adventista) foi gravado em Pagamentos → Transferência Bancária. O texto abaixo fica como histórico.
 
 A "Transferência Bancária" mostra no checkout `IBAN: AO06 0000 0000 0000 0000 0000 0` —
 o valor de exemplo, todo a zeros. Quem escolher transferência vê um IBAN falso. Corrigir em
