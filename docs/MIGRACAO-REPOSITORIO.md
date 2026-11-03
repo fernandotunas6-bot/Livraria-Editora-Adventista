@@ -58,15 +58,18 @@ se o workflow arranca. Se não arrancar, é da conta nova — ver [HANDOFF.md](H
 "Bloqueios". Enquanto isso, o gate real é `npm run deploy:site`, que corre lint, testes e
 build antes de publicar.
 
-### 3. Pull requests abertos
+### 3. Pull requests
 
-Ficaram no repositório antigo e **não se transferem**:
+Os PRs não se transferem. Os dois que estavam abertos no repositório antigo foram fechados a
+2026-11-03, cada um com uma nota a explicar a migração, antes de o repositório ser arquivado
+(um repositório arquivado fica só de leitura — depois não dá para fechar nada):
 
 - **#2** — "Migração do backend: PocketBase → Supabase + deploy no Cloudflare Pages"
-  (`supabase/migracao`). O conteúdo já está no `main`; pode fechar-se.
+  (`supabase/migracao`). O conteúdo já estava no `main`, pelo #3.
 - **#4** — "Autenticação verificada no arranque e sistema de emails transaccionais"
-  (`claude/youthful-heisenberg-rq5gnw`). **Trabalho vivo.** O ramo migrou com o código;
-  abrir o PR de novo no repositório novo, contra o `main`.
+  (`claude/youthful-heisenberg-rq5gnw`). **Fechado por migração, não por rejeição — o trabalho
+  continua válido.** O ramo migrou com o código: **falta reabrir este PR no repositório novo**,
+  contra o `main`.
 
 O #1 e o #3 estão integrados (merged) e o seu código está no `main`.
 
@@ -160,6 +163,10 @@ Se acontecer com frequência, fixar: `git config --global http.version HTTP/1.1`
 
 ## O repositório antigo
 
-`ValentinoCanguele/livraria_Cunhinga` fica como está, público e com o histórico até à
-migração. Decidir se arquivar (Settings → Archive this repository) para deixar claro que o
-trabalho passou para cá.
+`ValentinoCanguele/livraria_Cunhinga` foi **arquivado** a 2026-11-03: continua público e
+legível, com o histórico até à migração, mas só de leitura. A descrição diz para onde foi o
+desenvolvimento, porque num repositório arquivado já não se mudam as configurações — se for
+preciso alterar algo lá, tem de se desarquivar primeiro (Settings → Unarchive).
+
+Não foi apagado de propósito: é o único sítio onde ficam as discussões dos PRs #1 a #4 e o
+registo de quem fez o quê antes da migração.
