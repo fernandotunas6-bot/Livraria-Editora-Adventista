@@ -108,6 +108,11 @@
     font-feature-settings: 'kern' 1, 'liga' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* As animações de entrada (x: ±30) passam uns instantes da largura do ecrã. O `clip`
+       corta-as sem criar um contentor de deslocamento; o Safari anterior ao iOS 16 não o
+       conhece e deixava a página arrastar para o lado — fica com o `hidden`. O overflow do
+       body passa para a janela, por isso o cabeçalho `sticky` continua a funcionar. */
+    overflow-x: hidden;
     overflow-x: clip;
   }
 

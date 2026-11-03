@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  SlidersHorizontal, Search, X, LayoutGrid, List, Sparkles,
+  SlidersHorizontal, X, LayoutGrid, List, Sparkles,
   Layers, Star, ChevronRight, ChevronLeft, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
 import FilterPanel from '@/components/FilterPanel.jsx';
 import AdvancedSearchPanel from '@/components/AdvancedSearchPanel.jsx';
-import Header, { openHeaderSearch } from '@/components/Header.jsx';
+import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import ShopHeroBackground from '@/components/ShopHeroBackground';
@@ -225,7 +225,7 @@ const ShopPage = () => {
         <div className="border-b border-border bg-muted/10">
           <CategoryBookMarqueeSkeleton
             title="Disponíveis para Encomenda"
-            description="Deslize sem fim — toque para pausar · Toque para pausar"
+            description="Deslize sem fim · Toque para pausar"
           />
         </div>
       )}
@@ -233,7 +233,7 @@ const ShopPage = () => {
         <div className="border-b border-border bg-muted/10">
           <CategoryBookMarquee
             title="Disponíveis para Encomenda"
-            description="Deslize sem fim — toque para pausar"
+            description="Deslize sem fim"
             products={inStockProducts}
             direction="ltr"
             viewMode="marquee"
@@ -352,7 +352,9 @@ const ShopPage = () => {
       )}
 
       <main className="container-custom py-10 min-h-screen">
-        {/* Dynamic Breadcrumbs */}
+        {/* Caminho com os filtros activos. Sem filtros repetia o "Início › Loja" do topo da
+            página, por isso só aparece quando acrescenta alguma coisa. */}
+        {(activeFilters.categories?.length > 0 || activeFilters.collection || activeFilters.search) && (
         <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground mb-6 bg-card border border-border/80 px-4 py-3 rounded-xl shadow-xs shrink-0" id="shop-breadcrumbs">
           <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors font-medium">Início</Link>
           <ChevronRight className="h-3.5 w-3.5 opacity-60" />
@@ -380,6 +382,7 @@ const ShopPage = () => {
             </>
           )}
         </div>
+        )}
 
         <AdvancedSearchPanel
           className="mb-6"
@@ -416,10 +419,7 @@ const ShopPage = () => {
             {/* Barra de ferramentas */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-card border border-border p-4 rounded-2xl shadow-sm">
               <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={openHeaderSearch}>
-                  <Search className="h-4 w-4 mr-1" />
-                  Pesquisar
-                </Button>
+                {/* Sem botão "Pesquisar" aqui: o campo de pesquisa completo está logo acima. */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setIsMobileFilterOpen(true)}>

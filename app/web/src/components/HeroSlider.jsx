@@ -225,10 +225,12 @@ const HeroSlider = () => {
 
       {slides.length > 1 && (
         <>
-          <button type="button" onClick={prev} className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Slide anterior">
+          {/* No telemóvel as setas ficam em baixo, ao lado dos pontos: a meio tapavam o
+              subtítulo do slide. */}
+          <button type="button" onClick={prev} className="absolute left-4 bottom-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Slide anterior">
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <button type="button" onClick={next} className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Próximo slide">
+          <button type="button" onClick={next} className="absolute right-4 bottom-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Próximo slide">
             <ChevronRight className="h-6 w-6" />
           </button>
           {/* O ponto mede 8px: em vez de o engordar, o botão à volta dele passa a medir 24,

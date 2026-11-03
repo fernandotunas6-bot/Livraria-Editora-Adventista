@@ -48,7 +48,7 @@ export default function PwaInstallBanner() {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm">Instalar App</p>
-        <p className="text-xs text-muted-foreground mb-2">Adicione {settings.pwa_short_name || settings.site_name} ao ecrã inicial</p>
+        <p className="text-xs text-muted-foreground mb-2">Adicione {settings.site_name || settings.pwa_short_name || 'a Livraria Adventista'} ao ecrã inicial</p>
         <Button size="sm" className="btn-primary h-8" onClick={install}>Instalar</Button>
       </div>
       <button type="button" onClick={dismiss} className="text-muted-foreground hover:text-foreground p-1">
