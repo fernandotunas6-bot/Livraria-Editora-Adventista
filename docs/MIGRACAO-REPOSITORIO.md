@@ -103,11 +103,16 @@ Nada a mudar: o projecto `bggqkjjqbjhbjsckzopj` não conhece o repositório. Só
 
 ## Cópias de trabalho locais
 
-Nesta máquina a troca já está feita (2026-11-03, com nenhum deploy a correr):
+Nesta máquina a troca já está feita (2026-11-03, com nenhum deploy a correr): **`origin` é o
+único remoto** e aponta para `fernandotunas6-bot/Livraria-Editora-Adventista`. O remoto do
+repositório antigo foi removido depois de se confirmar que nenhum dos seus cinco ramos tinha
+commits fora do repositório novo:
 
-- `origin` → `fernandotunas6-bot/Livraria-Editora-Adventista`
-- `antigo` → `ValentinoCanguele/livraria_Cunhinga` (fica para consulta; pode remover-se com
-  `git remote remove antigo`)
+```bash
+for r in $(git for-each-ref --format='%(refname:short)' refs/remotes/antigo); do
+  echo "$r: $(git rev-list --count "$r" --not --remotes=origin)"
+done
+```
 
 O `git remote rename` reescreve o upstream dos ramos, que passaram todos para `antigo/…` e
 tiveram de ser repontados para `origin/…` um a um. **Isto é fácil de não notar:** o
