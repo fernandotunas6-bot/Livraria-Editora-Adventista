@@ -1766,12 +1766,20 @@ route("POST", "/contacts/import-sources", async ({ auth }) => {
 
 route("GET", "/contacts/stats", async ({ auth }) => {
   requireCrm(auth);
+  const settings = await getSettings();
+  // O painel precisa de três coisas que não se vêem nas tabelas: se o agendador está mesmo a
+  // correr, o que cada canal consegue entregar, e quantos membros de grupos ficaram órfãos.
+  // Sem a primeira, o separador mostra campanhas pendentes sem dizer que ninguém as vai
+  // disparar. Sem a segunda, mostra-as pendentes sem dizer que o canal não entrega.
+  const { data: scheduler } = await db.rpc("contact_campaigns_scheduler_status");
   return json({
     total: await countRows("contacts"),
     google: await countRows("contacts", (q) => q.eq("source", "google")),
     buyers: await countRows("contacts", (q) => q.eq("is_buyer", true)),
     groups: await countRows("contact_groups"),
     active_campaigns: await countRows("contact_campaigns", (q) => q.eq("is_active", true)),
+    delivery: { email: emailEntrega(settings), whatsapp: !!(await getWhatsAppConfig()) },
+    scheduler: scheduler || null,
   });
 });
 

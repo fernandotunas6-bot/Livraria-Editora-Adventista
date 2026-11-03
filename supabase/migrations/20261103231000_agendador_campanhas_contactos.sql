@@ -99,7 +99,16 @@ declare
   v_job record;
   v_has_secrets boolean := false;
 begin
-  if not ((select private.has_permission('manage_users')) or (select private.has_permission('manage_marketing'))) then
+  -- A service role vem da Edge Function, que já verificou a permissão de quem pediu. Sem esta
+  -- excepção a função respondia sempre "Sem permissão.": `has_permission` lê o utilizador do
+  -- token, e numa chamada com service role não há utilizador. É o mesmo erro que foi
+  -- encontrado e corrigido em `20261102160000_estado_agendador_service_role.sql` para a fila
+  -- de emails. A verificação continua a valer para chamadas directas pela API, com sessão.
+  if coalesce((select auth.role()), '') <> 'service_role'
+     and not (
+       coalesce((select private.has_permission('manage_users')), false)
+       or coalesce((select private.has_permission('manage_marketing')), false)
+     ) then
     raise exception 'Sem permissão.';
   end if;
 
@@ -131,5 +140,5 @@ begin
 end;
 $$;
 
-revoke execute on function public.contact_campaigns_scheduler_status() from anon;
-grant execute on function public.contact_campaigns_scheduler_status() to authenticated;
+revoke execute on function public.contact_campaigns_scheduler_status() from public, anon;
+grant execute on function public.contact_campaigns_scheduler_status() to authenticated, service_role;
