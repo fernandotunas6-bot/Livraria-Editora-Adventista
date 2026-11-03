@@ -67,11 +67,18 @@ Os PRs não se transferem. Os dois que estavam abertos no repositório antigo fo
 - **#2** — "Migração do backend: PocketBase → Supabase + deploy no Cloudflare Pages"
   (`supabase/migracao`). O conteúdo já estava no `main`, pelo #3.
 - **#4** — "Autenticação verificada no arranque e sistema de emails transaccionais"
-  (`claude/youthful-heisenberg-rq5gnw`). **Fechado por migração, não por rejeição — o trabalho
-  continua válido.** O ramo migrou com o código: **falta reabrir este PR no repositório novo**,
-  contra o `main`.
+  (`claude/youthful-heisenberg-rq5gnw`). Fechado por migração, não por rejeição.
+  **Reaberto aqui como [#1](https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista/pull/1)**
+  a 2026-11-03, sem conflitos.
 
-O #1 e o #3 estão integrados (merged) e o seu código está no `main`.
+O #1 e o #3 do repositório antigo estão integrados (merged) e o seu código está no `main`.
+
+**O âmbito cresceu muito.** O #4 original descrevia-se como "quatro commits"; quando foi
+reaberto o ramo tinha **55**, acumulados entre 2026-11-02 e 2026-11-03 — autenticação, emails,
+fila e agendador, CSP, desempenho, acessibilidade, telemóvel, marca, atendimento e os 8 commits
+da própria migração. Deixou de ser um PR de um assunto. A verificação da ponta do ramo
+(`b5851fc`, em worktree limpo) deu lint limpo, 16 ficheiros e 244 testes a passar e build limpo;
+o `deno check` não foi corrido porque o Deno não está nesta máquina.
 
 ### 4. Acessos e configuração do repositório
 
@@ -115,6 +122,17 @@ CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site
 
 Se a conta tiver mais do que um Account ID, o Wrangler pede para escolher: exportar
 `CLOUDFLARE_ACCOUNT_ID` para não publicar na conta errada.
+
+**Publicar num destino novo exige o `SITE_URL`:**
+
+```bash
+SITE_URL=https://livrariaadventista.ao CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site
+```
+
+O `canonical`, as etiquetas `og:`/`twitter:`, o `sitemap.xml` e o `robots.txt` têm fixo o
+endereço do projecto que serviu produção primeiro. O script reescreve-os no build quando o
+`SITE_URL` difere desse endereço — sem isso, o site publicado no destino novo diz aos motores
+de busca e às partilhas no WhatsApp que a página "a sério" é a antiga.
 
 O projecto na conta `fata` fica como está por agora (está vazio, não custa nada), mas **dois
 projectos com o mesmo nome em contas diferentes confundem-se com facilidade** — confirmar

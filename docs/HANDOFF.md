@@ -15,7 +15,7 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
   - Foi publicado à mão com o Wrangler porque o Actions está bloqueado.
   - Cada ramo tem o seu URL de pré-visualização (`<ramo>.livraria-adventista.pages.dev`, ver `wrangler pages deployment list`). O `main` antigo (PocketBase) está em `main-pocketbase`, e esse e os ramos `cursor/*` não têm backend.
   - Publicar à mão: `npm run deploy:site` (produção) ou `npm run deploy:site -- --preview`. O script recusa publicar se o HEAD não for a ponta do ramo remoto, faz lint, testes e build, publica e confirma que o último deploy de produção é esse commit e que o site responde. Várias sessões publicam no mesmo projecto: nunca publicar um build antigo. As variáveis `VITE_SUPABASE_*` vêm de `app/web/.env`.
-  - Para publicar no projecto novo: `CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site`. Com um domínio próprio, acrescentar `SITE_URL=https://livrariaadventista.ao` para a verificação final bater no domínio e não no `.pages.dev`.
+  - Para publicar no projecto novo: `CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site`. Com um domínio próprio, acrescentar `SITE_URL=https://livrariaadventista.ao`: além de a verificação final bater no domínio em vez do `.pages.dev`, o script reescreve no build o `canonical`, as etiquetas `og:`/`twitter:`, o `sitemap.xml` e o `robots.txt`, que têm fixo o endereço do projecto que serviu produção primeiro. Sem isso, o site publicado noutro destino diz aos motores de busca e às partilhas que a página "a sério" é a do endereço antigo.
   - Workers, KV, D1 e R2 continuam por usar.
 
 ## Bloqueios (só o dono da conta resolve)
@@ -65,9 +65,48 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
   - Ficheiros: `app/web/src/components/admin/users/`, `app/web/src/lib/usersApi.js`, a função SQL `public.admin_users_list` (só service role) e as rotas `/admin/users` (listar), `/admin/users/orders`, `/create`, `/update`, `/status`, `/access-link` e `/delete`.
   - Regras: gestores com `manage_users` gerem clientes; equipa, papéis e permissões só admin; ninguém se apaga nem se suspende a si próprio; fica sempre pelo menos um administrador activo.
 - **CI:**
-  - `ci.yml` corre lint, build e `deno check` em cada PR.
+  - `ci.yml` corre lint, **testes**, build e `deno check` em cada PR para o `main`.
   - Os deploys confirmam os segredos antes de começar.
   - O deploy do Cloudflare cria o projecto Pages se não existir.
+  - **⚠️ O passo `Testes` está quebrado num checkout limpo** — ver a secção seguinte.
+
+## ⚠️ O passo `Testes` do `ci.yml` falha num checkout limpo
+
+Encontrado a 2026-11-03 ao verificar a ponta do ramo para o PR novo.
+
+O passo corre `npm test` **sem** `VITE_SUPABASE_URL` nem `VITE_SUPABASE_PUBLISHABLE_KEY`. O
+`app/web/.env` é gitignored, logo num checkout do GitHub (ou em qualquer worktree novo) não
+existe. Quatro ficheiros de teste importam módulos que criam o cliente Supabase **no momento do
+import** e falham a carregar antes de correr um único teste:
+
+```
+Error: supabaseUrl is required.
+ ❯ src/lib/supabaseClient.js:14:37
+FAIL src/lib/apiCompat.test.js · src/hooks/useReviews.test.js
+     src/hooks/useProductFilters.test.js · src/lib/secureInboxApi.test.js
+```
+
+Reproduzido nos dois sentidos, no mesmo commit (`b5851fc`):
+
+| | Ficheiros | Testes |
+|---|---|---|
+| sem as variáveis (como o CI corre) | 4 falham, 12 passam | 226 passam |
+| com as variáveis | **16 passam** | **244 passam** |
+
+**Não é regressão de nenhum ramo:** está assim desde que os testes entraram no `ci.yml`, e ficou
+escondido porque o Actions nunca arrancou — a conta antiga estava bloqueada por facturação. Com
+o repositório na conta nova, se o Actions correr, isto aparece.
+
+Duas saídas:
+
+1. Dar as variáveis ao passo `Testes`, a partir das *repository variables*, como o
+   `deploy-cloudflare.yml` já faz. Resolve o CI mas mantém os testes dependentes de
+   configuração de ambiente.
+2. **Melhor:** dar valores de teste ao `supabaseClient.js` quando corre em modo de teste. São
+   testes unitários e não deviam precisar de um URL real nem de chave nenhuma. Também torna o
+   `npm test` fiável num clone novo, sem passos manuais.
+
+Não foi corrigido: muda o comportamento do CI e está fora do âmbito do PR onde apareceu.
 
 ## Análise crítica e correcções (2026-11-01, segunda passagem)
 
