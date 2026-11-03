@@ -146,8 +146,8 @@ livraria/
 ### 1. Clonar e instalar
 
 ```bash
-git clone https://github.com/ValentinoCanguele/livraria_Cunhinga.git
-cd livraria_Cunhinga
+git clone https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista.git
+cd Livraria-Editora-Adventista
 npm install
 ```
 
@@ -195,7 +195,7 @@ Entra-se com email e palavra-passe ou com Google (Supabase Auth). Os papéis est
 As permissões são verificadas também no servidor (políticas RLS com `private.has_permission` e a Edge Function).
 Contas e papéis geram-se em **Admin → Utilizadores e Clientes**. Para dar acesso de administrador a alguém que ainda não tem conta, acrescente o email a `private.admin_emails` no Supabase: a conta fica admin quando for confirmada.
 
-> Nunca escreva credenciais reais neste repositório: é público.
+> Nunca escreva credenciais reais neste repositório. É privado, mas o histórico do git é permanente e a visibilidade pode mudar.
 
 ---
 
@@ -261,7 +261,7 @@ Configuração no GitHub (Settings → Secrets and variables → Actions):
 |------|------|-------|
 | Variável | `VITE_SUPABASE_URL` | URL do projecto Supabase |
 | Variável | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave publishable |
-| Variável | `CLOUDFLARE_PAGES_PROJECT` | `livraria-adventista` |
+| Variável | `CLOUDFLARE_PAGES_PROJECT` | `livraria-editora-adventista` |
 | Variável | `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
 | Secret | `CLOUDFLARE_API_TOKEN` | Token com permissão *Cloudflare Pages: Edit* |
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare |
@@ -276,7 +276,7 @@ O ficheiro `app/web/public/_redirects` encaminha todas as rotas para `index.html
 
 - Nunca commitar `.env` — use `.env.example` como referência
 - A chave `service_role` só existe dentro das Edge Functions do Supabase
-- Nunca escrever credenciais reais no repositório (é público)
+- Nunca escrever credenciais reais no repositório (é privado, mas o histórico do git guarda tudo para sempre)
 - Activar HTTPS em produção
 - Rever as políticas RLS e os avisos em Supabase → Advisors
 
@@ -284,7 +284,7 @@ O ficheiro `app/web/public/_redirects` encaminha todas as rotas para `index.html
 
 ## Contribuir
 
-1. Faça fork do repositório
+1. Peça acesso de colaborador (o repositório é privado) e clone-o
 2. Crie uma branch: `git checkout -b feature/minha-funcionalidade`
 3. Commit: `git commit -m "feat: descrição clara"`
 4. Push: `git push origin feature/minha-funcionalidade`
