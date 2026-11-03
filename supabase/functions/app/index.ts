@@ -20,6 +20,7 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1798,29 +1799,75 @@ route("POST", "/contacts/notify", async ({ auth, body }) => {
   return json({ message: "Notificações processadas.", results, skipped_opt_out: skipped, whatsapp_api: !!(await getWhatsAppConfig()) });
 });
 
-route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
-  const staff = requireCrm(auth);
+/**
+ * Os ids dos membros de um grupo.
+ *
+ * Lê de `contact_group_members`, que é a fonte da verdade desde a migração
+ * `20261103230000`. Recua para o `member_ids` quando a tabela ainda não existe: a Edge
+ * Function é publicada à parte das migrações, por isso há sempre uma janela em que a versão
+ * nova da função corre contra a base de dados antiga.
+ */
+async function groupMemberIds(groupId: string): Promise<string[]> {
+  const { data, error } = await db
+    .from("contact_group_members").select("contact_id").eq("group_id", groupId);
+  if (!error) return (data || []).map((r: Row) => r.contact_id).filter(Boolean);
+  const { data: g } = await db
+    .from("contact_groups").select("member_ids").eq("id", groupId).maybeSingle();
+  return Array.isArray(g?.member_ids) ? g!.member_ids : [];
+}
+
+/**
+ * Corre as campanhas activas cuja data já chegou.
+ *
+ * `agendado` distingue os dois chamadores, e a diferença não é cosmética:
+ *
+ * - **Painel** (`agendado: false`): há uma pessoa à frente do ecrã. Um canal sem entrega
+ *   continua a produzir links `wa.me` para ela clicar, que é o processo de sempre.
+ * - **`pg_cron`** (`agendado: true`): não há ninguém. Uma campanha cujo canal não entrega é
+ *   **saltada sem avançar o `next_send_at`**, para voltar a ser tentada quando o canal ficar
+ *   configurado. Avançar a data marcá-la-ia como enviada sem ninguém ter recebido nada.
+ */
+async function runDueCampaigns(ownerId: string | null, agendado: boolean) {
   const now = nowISO();
   const { data: campaigns } = await db.from("contact_campaigns").select("*").eq("is_active", true).limit(50);
   const digest = await getNewBooksDigest();
   const settings = await getSettings();
+  const entrega = { email: emailEntrega(settings), whatsapp: !!(await getWhatsAppConfig()) };
   let processed = 0;
-  const notifications = [];
+  const notifications: Row[] = [];
+  const saltadas: Row[] = [];
+
   for (const camp of campaigns || []) {
     if (camp.next_send_at && camp.next_send_at > now) continue;
-    if (!camp.group) continue;
-    const { data: group } = await db.from("contact_groups").select("*").eq("id", camp.group).maybeSingle();
-    const memberIds: string[] = group?.member_ids || [];
-    if (!memberIds.length) continue;
+    if (!camp.group) {
+      saltadas.push({ campaign: camp.name, reason: "campanha sem grupo associado" });
+      continue;
+    }
+    const memberIds = await groupMemberIds(camp.group);
+    if (!memberIds.length) {
+      saltadas.push({ campaign: camp.name, reason: "o grupo não tem membros" });
+      continue;
+    }
+
+    const plano = planearCanais(camp.channel, entrega);
+    const canal = canalDeEnvio(plano);
+    if (agendado && !canal) {
+      saltadas.push({ campaign: camp.name, reason: plano.motivo, blocked: plano.bloqueados });
+      continue;
+    }
+    // No painel, um canal sem entrega continua a valer: o link manual é para alguém clicar.
+    const canalFinal = canal || camp.channel || "whatsapp";
+
     let text = camp.message_template || "";
     if (camp.include_new_books && digest) text = text ? `${text}\n\n${digest}` : digest;
-    const channel = camp.channel || "whatsapp";
     const subject = camp.subject || "Novidades — Livraria Adventista";
+
     const { data: contacts } = await db.from("contacts").select("*").in("id", memberIds);
     for (const contact of contacts || []) {
       if (isOptedOut(contact)) continue;
       const r = await notifyContact(contact, {
-        channel, subject, body: text, settings, owner: staff.id, groupId: camp.group, campaignId: camp.id,
+        channel: canalFinal, subject, body: text, settings,
+        owner: ownerId, groupId: camp.group, campaignId: camp.id,
       });
       notifications.push({ campaign: camp.name, contact: contact.name, whatsapp_url: r.waUrl, status: r.status });
     }
@@ -1828,8 +1875,38 @@ route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
       last_sent_at: now, next_send_at: calcNextSendAt(camp.frequency || "weekly"),
     }).eq("id", camp.id);
     processed++;
+    // Um canal parcialmente bloqueado (um `both` com só o email configurado) sai pelo que
+    // entrega, mas o painel tem de o saber: a campanha consta como enviada e metade dos
+    // destinatários não foi contactada por esse meio.
+    if (plano.bloqueados.length && canal) {
+      saltadas.push({ campaign: camp.name, reason: plano.motivo, blocked: plano.bloqueados, partial: true });
+    }
   }
-  return json({ message: "Campanhas processadas.", processed, notifications });
+  return { processed, notifications, skipped: saltadas, delivery: entrega };
+}
+
+route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
+  const staff = requireCrm(auth);
+  const r = await runDueCampaigns(staff.id, false);
+  return json({ message: "Campanhas processadas.", ...r });
+});
+
+/**
+ * O mesmo, chamado pelo `pg_cron` (migração `20261103231000`), sem sessão.
+ *
+ * Autenticado pelo mesmo token da fila de emails: é a mesma fronteira de confiança, quem pode
+ * disparar o agendador. Sem o token configurado responde **404** e não "falta configurar" —
+ * uma rota que se anuncia diz a quem passa que há aqui algo por fechar.
+ */
+route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-campaigns", ip, 30)) throw bad("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const r = await runDueCampaigns(null, true);
+  console.log("Campanhas (cron):", JSON.stringify({ processed: r.processed, skipped: r.skipped }));
+  return json(r);
 });
 
 route("POST", "/newsletter", async ({ body, ip }) => {
