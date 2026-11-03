@@ -338,6 +338,13 @@ alavanca é fazer menos consultas em série:
   animações). Medido pelo source map; confirmado num Chrome sem interface que a página
   inicial, a loja e a página de partilha de um livro arrancam e mostram o conteúdo.
 
+- **Fontes sem cadeia de pedidos**: o `@import` do Google Fonts estava dentro do CSS, e o
+  browser só o descobria depois de descarregar o CSS da loja (mais dois pedidos em série).
+  Passou para o `<head>` com `preconnect`. Saíram também cinco dependências que nada
+  importava (`@hookform/resolvers`, `date-fns`, `esbuild`, `next-themes`, `zod`).
+- **Por fazer:** versões mais pequenas das imagens do slider para telemóvel (hoje 1920×1080,
+  42–149 KB); esta máquina não tem ferramenta para gravar WebP.
+
 ### Ordem de publicação (importa)
 
 1. **Site** (`deploy-site.sh` ou Actions): passa a enviar a sessão e o GPS no checkout e lê

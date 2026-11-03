@@ -10,6 +10,12 @@
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="apple-mobile-web-app-title" content="Livraria Adventista" />
 		<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+		<!-- Fontes: pedidas aqui, e não com @import dentro do CSS. Com o @import o browser só as
+		     descobria depois de descarregar e ler o CSS da loja, e fazia mais dois pedidos em série
+		     (0,2–0,4 s cada a partir de Angola). O preconnect abre já as ligações. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" />
 		<meta name="description" content="Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio." />
 		<title>Livraria Adventista</title>
 		<link rel="canonical" href="https://livraria-adventista.pages.dev/" />
