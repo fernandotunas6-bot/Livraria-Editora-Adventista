@@ -46,9 +46,10 @@ const DEFAULT_SETTINGS = {
   assets_version: '',
 };
 
-export async function getSiteSettings() {
+export async function getSiteSettings({ fresh = false } = {}) {
   try {
-    const res = await fetch(`${APP_API_URL}/settings`);
+    // `no-cache` revalida no servidor e actualiza a cópia do browser; ver PUBLIC_CACHE na Edge Function.
+    const res = await fetch(`${APP_API_URL}/settings`, fresh ? { cache: 'no-cache' } : undefined);
     if (!res.ok) return DEFAULT_SETTINGS;
     const merged = { ...DEFAULT_SETTINGS, ...await res.json() };
     merged.shop_bg_mode = resolveShopBgMode(merged);

@@ -50,6 +50,21 @@ npm run lint --silent
 npm test --silent
 npm run build --silent
 
+# O `canonical`, as etiquetas `og:`/`twitter:`, o sitemap e o robots.txt têm o endereço do
+# projecto que serviu produção primeiro. Publicado noutro sítio (o projecto novo, o domínio
+# .ao), o site dizia aos motores de busca e às partilhas no WhatsApp que a página "a sério"
+# é a do endereço antigo. Reescreve-se no build, não no código-fonte, para o mesmo commit
+# poder ir para qualquer destino.
+SOURCE_URL="https://livraria-adventista.pages.dev"
+if [ "$mode" = "production" ] && [ "$SITE_URL" != "$SOURCE_URL" ]; then
+  for f in index.html sitemap.xml robots.txt; do
+    file="dist/app/web/$f"
+    grep -q "$SOURCE_URL" "$file" || fail "$f não tem $SOURCE_URL: o build mudou e este passo tem de ser revisto."
+    sed -i.orig "s#$SOURCE_URL#${SITE_URL%/}#g" "$file" && rm "$file.orig"
+  done
+  echo "→ endereços públicos reescritos para $SITE_URL"
+fi
+
 target="main"
 [ "$mode" = "preview" ] && target="${upstream#origin/}"
 echo "→ a publicar em $PROJECT (ramo Pages: $target)"

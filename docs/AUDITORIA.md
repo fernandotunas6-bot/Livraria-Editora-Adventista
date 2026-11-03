@@ -225,6 +225,61 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
   detecta a falta e recua para o limite local (comportamento anterior, sem regressão).
   Aplicar com `supabase db push` ou pelo painel.
 
+## 9.2 Passagem de produção (2026-11-03)
+
+Feita a partir da ponta `cc57236`, depois da migração para o repositório novo. Gate:
+lint limpo, **250 testes** (eram 244), build e `deno check` da Edge Function.
+
+### Corrigido
+
+- **Capas das colecções em branco.** As quatro capas estão em `images.unsplash.com`, e o
+  `img-src` do CSP só aceitava Supabase e Google: o navegador bloqueava-as. O próprio painel
+  diz para colar "um link directo (CDN, Unsplash)". O `img-src` passou a `https:` — uma
+  imagem não executa código; os scripts continuam fechados.
+- **Slides presos ao projecto antigo.** A galeria do painel gravava
+  `window.location.origin + caminho`, por isso os quatro slides têm
+  `https://livraria-adventista.pages.dev/images/…`. No projecto novo ou no domínio `.ao`
+  isso é outra origem (bloqueada pelo CSP) e desaparece quando o projecto antigo for
+  desligado. Agora a galeria grava o caminho relativo, `normalizeImageUrl` converte
+  endereços do próprio site em caminhos (`toSiteRelativeUrl`), e os slides já gravados são
+  convertidos na leitura — sem mexer nos dados.
+- **`canonical`, `og:`, sitemap e robots com o endereço antigo.** O `deploy-site.sh`
+  reescreve-os no build para o `SITE_URL` de destino; o mesmo commit serve para qualquer
+  projecto ou domínio.
+- **`favicon.ico`** criado (antes devolvia a página HTML).
+- **Edge Function não passava no `deno check`** (`headers` do `List-Unsubscribe` sem tipo).
+  O CI teria ficado vermelho no primeiro PR.
+- **Rotas públicas sem cache.** `/settings`, `/stores`, `/book-collections`,
+  `/payment-methods` e `/geo/*` (≈1 s cada, em todas as páginas) passam a
+  `Cache-Control: public, max-age=30, stale-while-revalidate=300`. O painel, ao gravar,
+  pede com `no-cache`, para ver logo o que gravou. **Só tem efeito depois de publicar a
+  Edge Function.**
+
+### Verificado sem problemas
+
+- As 13 funções `SECURITY DEFINER` que o advisor aponta como chamáveis por utilizadores com
+  sessão verificam todas a permissão no início (`has_permission`, `assert_can_manage_user`,
+  `is_admin`, `auth.uid()`). `book_review_helpfulness` é pública de propósito (contagem de
+  votos). `private.admin_emails` sem políticas é intencional: só o service role lê.
+- Migrações: as 33 do repositório coincidem com as da base de dados.
+- Segredos locais (`api-keys-*.csv`, `client_secret_*.json`, `.env`) estão no `.gitignore`.
+- `npm audit`: as 4 altas são do gRPC, que o Firebase só usa no servidor; não entra no site.
+
+### Por fazer (precisa de autorização ou do dono)
+
+- **Publicar a Edge Function.** A publicada é de 2026-11-02 13:59 e não tem o
+  `customer_id` no checkout (commit `075bfa3`): as encomendas novas de clientes com sessão
+  ficam sem conta e **não geram as notificações do centro de atendimento**. Leva também a
+  cache e a correcção de tipos acima.
+- **Índices das 11 chaves estrangeiras** sem índice:
+  `docs/migracoes-pendentes/3_indices_chaves_estrangeiras.sql` (só acrescenta índices).
+- **Primeiro deploy no projecto novo** `livraria-editora-adventista` (hoje responde 522).
+- Conteúdo: IBAN de exemplo (`AO06 0000…`), telefone `+244 923 000 000` e das lojas
+  provisórios, emails de encomenda desligados (sem SMTP), 100 de 102 livros sem descrição,
+  12 esgotados, 3 linhas em `site_settings` e 3 `unitel_money` repetidas, e o nome da loja
+  "LIvraria Adventista - Huambo" com gralha e sem telefone.
+- Protecção contra palavras-passe vazadas: exige o plano Pro do Supabase.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

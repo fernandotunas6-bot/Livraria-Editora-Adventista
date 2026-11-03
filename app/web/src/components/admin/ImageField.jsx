@@ -11,8 +11,6 @@ import { uploadPublicImage } from '@/lib/mediaUpload';
 
 // Galeria de imagens do site (feitas com as capas reais do catálogo), em public/images/site/opcoes.
 const GALLERY_URL = '/images/site/opcoes/galeria.json';
-// O admin só grava URLs https:// (sanitizeImageUrlForSave); em desenvolvimento aponta para o site publicado.
-const SITE_URL = /^(localhost|127\.)/.test(window.location.hostname) ? 'https://livraria-adventista.pages.dev' : window.location.origin;
 const TAB_COLS = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
 
 /**
@@ -175,7 +173,10 @@ export default function ImageField({
   }, [mode, galleryItems, gallery]);
 
   const selectGalleryItem = (item) => {
-    const url = SITE_URL + item.url;
+    // Caminho relativo (`/images/site/…`): a imagem é do próprio site e tem de continuar a
+    // carregar quando o site mudar de projecto ou de domínio. Com `origin + caminho` ficava
+    // presa ao endereço onde foi escolhida.
+    const url = item.url;
     setPreview(url);
     onChange(url);
     onFileChange?.(null);

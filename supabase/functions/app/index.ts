@@ -51,6 +51,19 @@ type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+// Rotas públicas que todas as páginas pedem (definições, lojas, colecções, pagamentos, geo).
+// Cada pedido levava ~1 s (Edge Function + base de dados em Estocolmo) e repetia-se em cada
+// página aberta. O browser guarda a resposta 30 s e, depois disso, ainda a usa até 5 min
+// enquanto pede a nova em segundo plano — a página não espera. Uma alteração no painel
+// chega aos visitantes no máximo uns minutos depois; o próprio painel pede com `no-cache`.
+// Só para respostas iguais para toda a gente: nunca usar em rotas com sessão.
+const PUBLIC_CACHE = "public, max-age=30, stale-while-revalidate=300";
+const publicJson = (body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": PUBLIC_CACHE },
+  });
+
 // ---------------------------------------------------------------------------
 // Utilitários
 // ---------------------------------------------------------------------------
@@ -445,7 +458,7 @@ async function sendLetter(settings: Row | null, to: string, letter: Letter, meta
   // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
   // pedido ao endereço, sem o utilizador ter de confirmar noutra página.
   const unsubscribe = letter.doc.unsubscribeUrl || "";
-  const headers = unsubscribe
+  const headers: Record<string, string> = unsubscribe
     ? { "List-Unsubscribe": `<${unsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
     : {};
   return sendTransactionalEmail(settings, to, letter.subject, html, meta, text, headers);
@@ -851,7 +864,7 @@ route("GET", "/settings", async () => {
   if (bgMode === "video" && !rec.shop_bg_video_url) bgMode = "gradient";
   if (!["gradient", "image", "video", "slides"].includes(bgMode)) bgMode = "gradient";
   const orTrue = (v: unknown) => (v == null ? true : !!v);
-  return json({
+  return publicJson({
     site_name: rec.site_name || "Livraria Adventista",
     tagline: rec.tagline || "",
     primary_color: rec.primary_color || "#0ea5c9",
@@ -979,7 +992,7 @@ route("GET", "/admin/drive-images", async ({ auth, url }) => {
 
 route("GET", "/stores", async () => {
   const { data } = await db.from("physical_stores").select("*").eq("active", true).order("sort_order").order("name");
-  return json({
+  return publicJson({
     stores: (data || []).map((r) => ({
       id: r.id, name: r.name, province: r.province, address: r.address, phone: r.phone || "",
       hours: r.hours || "", image_url: r.image_url || fileUrl("physical_stores", r, "image"),
@@ -991,7 +1004,7 @@ route("GET", "/stores", async () => {
 
 route("GET", "/book-collections", async () => {
   const { data } = await db.from("book_collections").select("*").eq("active", true).order("sort_order").order("created");
-  return json({
+  return publicJson({
     collections: (data || []).map((r) => ({
       id: r.id, title: r.title, slug: r.slug || "", description: r.description || "",
       cover: r.cover || fileUrl("book_collections", r, "cover_image"), featured: !!r.featured,
@@ -1002,7 +1015,7 @@ route("GET", "/book-collections", async () => {
 
 route("GET", "/payment-methods", async () => {
   const { data } = await db.from("payment_methods").select("*").eq("enabled", true).order("sort_order").limit(50);
-  return json({
+  return publicJson({
     methods: (data || []).map((r) => ({
       id: r.id, name: r.name, code: r.code, type: r.type || "offline", instructions: r.instructions || "",
       account_info: r.account_info || "", qr_url: r.qr_url || fileUrl("payment_methods", r, "qr_code"), icon: r.icon || "",
@@ -1050,7 +1063,7 @@ route("POST", "/track", async ({ body, ip }) => {
 route("GET", "/geo/provinces", async () => {
   const { data } = await db.from("angola_provinces").select("id, name, slug, capital, sort_order").order("sort_order").limit(500);
   const provinces = data || [];
-  return json({ provinces, version: "RGPH-2024", count: provinces.length });
+  return publicJson({ provinces, version: "RGPH-2024", count: provinces.length });
 });
 
 route("GET", "/geo/municipalities", async ({ url }) => {
@@ -1061,7 +1074,7 @@ route("GET", "/geo/municipalities", async ({ url }) => {
   const { data } = await db.from("angola_municipalities").select("id, name, slug, sort_order, province")
     .eq("province", provinceId).order("sort_order").limit(500);
   const municipalities = data || [];
-  return json({ municipalities, count: municipalities.length });
+  return publicJson({ municipalities, count: municipalities.length });
 });
 
 route("GET", "/geo/localities", async ({ url }) => {
@@ -1070,7 +1083,7 @@ route("GET", "/geo/localities", async ({ url }) => {
   const { data } = await db.from("angola_localities").select("id, name, type, sort_order, municipality")
     .eq("municipality", municipalityId).order("sort_order").limit(500);
   const localities = data || [];
-  return json({ localities, count: localities.length });
+  return publicJson({ localities, count: localities.length });
 });
 
 route("POST", "/confirm-delivery", async ({ body, ip }) => {

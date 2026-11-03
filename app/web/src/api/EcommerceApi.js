@@ -2,6 +2,7 @@ import pb from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { toSiteRelativeUrl } from '@/lib/imageUrl';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -140,7 +141,8 @@ function mapSlideRecord(s) {
     id: s.id,
     title: s.title,
     subtitle: s.subtitle || '',
-    image: s.image,
+    // Os slides já gravados têm o endereço completo do projecto antigo; ver toSiteRelativeUrl.
+    image: toSiteRelativeUrl(s.image),
     cta_text: s.cta_text || 'Explorar',
     cta_link: s.cta_link || '/shop',
     template: s.template || 'classic',
@@ -148,14 +150,14 @@ function mapSlideRecord(s) {
     body_html: s.body_html || '',
     promo_badge: s.promo_badge || '',
     promo_price: s.promo_price ?? null,
-    book_cover: s.book_cover || '',
+    book_cover: toSiteRelativeUrl(s.book_cover || ''),
     book_title: s.book_title || '',
     book_author: s.book_author || '',
     placement: s.placement || 'home',
     is_primary: !!s.is_primary,
     transition: s.transition || 'fade',
     media_type: s.media_type || 'image',
-    video_url: s.video_url || '',
+    video_url: toSiteRelativeUrl(s.video_url || ''),
     duration_ms: s.duration_ms ?? null,
     sort_order: s.sort_order ?? 0,
   };

@@ -35,9 +35,12 @@ export function SiteSettingsProvider({ children }) {
     applyShopTheme(THEME_DEFAULTS);
   }, []);
 
-  const refresh = useCallback(async () => {
+  // Chamado sem argumentos (o painel, depois de gravar) vai sempre ao servidor: a resposta
+  // pública do `/settings` fica uns segundos em cache no browser, e o admin tem de ver logo
+  // o que acabou de gravar. No arranque aceita-se a cópia em cache.
+  const refresh = useCallback(async ({ fresh = true } = {}) => {
     try {
-      const data = await getSiteSettings();
+      const data = await getSiteSettings({ fresh });
       const merged = { ...THEME_DEFAULTS, ...data };
       setSettings((prev) => ({ ...prev, ...merged }));
       applyShopTheme(merged);
@@ -68,7 +71,7 @@ export function SiteSettingsProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh({ fresh: false }); }, [refresh]);
 
   return (
     <SiteSettingsContext.Provider value={{ settings, loading, refresh }}>
