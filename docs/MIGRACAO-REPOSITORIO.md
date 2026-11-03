@@ -103,16 +103,27 @@ Nada a mudar: o projecto `bggqkjjqbjhbjsckzopj` não conhece o repositório. Só
 
 ## Cópias de trabalho locais
 
-Nesta máquina o repositório novo já está como remoto `novo`; o `origin` continua a apontar
-para o antigo, de propósito: havia uma sessão a publicar e trocar o `origin` por baixo dela
-parte o `deploy-site.sh`, que faz `git fetch origin` e exige que o HEAD seja a ponta do ramo
-remoto. Quando não houver nenhum deploy a correr, trocar:
+Nesta máquina a troca já está feita (2026-11-03, com nenhum deploy a correr):
+
+- `origin` → `fernandotunas6-bot/Livraria-Editora-Adventista`
+- `antigo` → `ValentinoCanguele/livraria_Cunhinga` (fica para consulta; pode remover-se com
+  `git remote remove antigo`)
+
+O `git remote rename` reescreve o upstream dos ramos, que passaram todos para `antigo/…` e
+tiveram de ser repontados para `origin/…` um a um. **Isto é fácil de não notar:** o
+`deploy-site.sh` lê o upstream do ramo e compara-o com `origin/<ramo>`, por isso um upstream em
+`antigo/` faz o script recusar publicar em produção com uma mensagem que não aponta para a
+causa. Depois de qualquer `remote rename`, confirmar:
 
 ```bash
-git remote rename origin antigo
-git remote rename novo origin
-git fetch origin
+git for-each-ref --format='%(refname:short) -> %(upstream:short)' refs/heads
 ```
+
+A conta activa do `gh` nesta máquina passou para `fernandotunas6-bot` (`gh auth switch`), que é
+o que faz o `git` autenticar-se no repositório novo — o `gh auth setup-git` está configurado no
+`~/.gitconfig` e usa sempre a conta activa. **Isto é global:** comandos `gh` e pushes para
+repositórios de outras contas, noutros projectos desta máquina, passam a usar esta conta.
+Trocar com `gh auth switch -u <conta>`.
 
 Noutra máquina, ou num clone novo:
 
@@ -123,8 +134,9 @@ git fetch origin
 
 Dois avisos:
 
-- **Autenticação.** O repositório é privado e da conta `fernandotunas6-bot`. Um `git` com
-  credenciais de outra conta do GitHub guardadas leva 403. Resolve-se com
+- **Autenticação.** O repositório é privado e da conta `fernandotunas6-bot`. Com outra conta
+  activa, o GitHub responde **`Repository not found`** em vez de falar de permissões — parece
+  um repositório inexistente, é falta de acesso. Resolve-se com
   `gh auth switch -u fernandotunas6-bot && gh auth setup-git`.
 - **O `main` local.** Em cópias antigas ainda aponta para a era PocketBase, 114 commits atrás
   do `origin/main`. Usar sempre `origin/main` como referência, e nunca publicar a partir de um
