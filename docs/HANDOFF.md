@@ -20,10 +20,16 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 
 ## Bloqueios (só o dono da conta resolve)
 
-1. **GitHub Actions: confirmar se a conta nova corre workflows.** Na conta antiga (`ValentinoCanguele`) nenhum workflow arrancava: a anotação dizia "The job was not started because your account is locked due to a billing issue" — um cartão guardado cuja autorização falhou, no plano Free e sem subscrições pagas. A solução era remover o cartão em Settings → Faturamento e licenciamento → Informações de pagamento, ou abrir um pedido em support.github.com. **Com a mudança para `fernandotunas6-bot` isto tem de ser verificado de novo:** se os workflows arrancarem, o bloqueio desapareceu com a migração; se não, o problema é da conta nova e resolve-se da mesma maneira. Enquanto não arrancarem, o gate real é o `scripts/deploy-site.sh`, que corre lint, testes e build antes de publicar.
-2. **Segredos e variáveis do GitHub Actions** (Settings → Secrets and variables → Actions). **Não migram com o código: têm de ser criados à mão no repositório novo.**
-   - Segredos: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`
-   - Variáveis: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `CLOUDFLARE_PAGES_PROJECT`, `SUPABASE_PROJECT_REF` (= `bggqkjjqbjhbjsckzopj`)
+1. ~~GitHub Actions bloqueado por facturação.~~ **Resolvido pela migração** (confirmado a 2026-11-03): na conta `fernandotunas6-bot` os workflows arrancam e correm até ao fim. O bloqueio era da conta `ValentinoCanguele` ("The job was not started because your account is locked due to a billing issue", um cartão guardado cuja autorização falhou). O `scripts/deploy-site.sh` continua a ser um gate válido, mas já não é o único.
+
+   > **Consequência a ter em conta.** Com o Actions a funcionar, cada push para o `main` passa a publicar no Cloudflare Pages, e cada push que toque em `supabase/` passa a correr `supabase db push` e a publicar a Edge Function — **automaticamente**. Durante meses isto nunca aconteceu. Ao integrar o PR #1 há migrações por aplicar, e elas vão ser aplicadas sozinhas. Rever o que está em `supabase/migrations/` antes do merge.
+
+2. **Segredos do GitHub Actions** (Settings → Secrets and variables → Actions). Não migram com o código.
+   - **Variáveis: criadas a 2026-11-03.** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `CLOUDFLARE_PAGES_PROJECT` (= `livraria-editora-adventista`) e `SUPABASE_PROJECT_REF` (= `bggqkjjqbjhbjsckzopj`). A chave *publishable* é pública por desenho (vai no bundle do frontend), por isso é variável e não segredo.
+   - **Segredos: por criar** — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`. Os valores não estão em parte alguma desta máquina. Criam-se sem os expor com
+     `GH_TOKEN="$(gh auth token --user fernandotunas6-bot)" gh secret set <NOME> --repo fernandotunas6-bot/Livraria-Editora-Adventista`, que pede o valor sem o mostrar. É preciso o token do dono: a `ValentinoCanguele` só tem escrita, e segredos exigem admin.
+   - **Os dois do Cloudflare devem esperar pela mudança de conta.** Têm de ser da conta `valentinocanguele@gmail.com`, não da `canguelev@fata.adventist.org` — pôr os da conta antiga faz o deploy publicar no sítio errado.
+   - Estado hoje: o `deploy-cloudflare.yml` falha no primeiro passo ("Confirmar segredos e variáveis") a cada push para o `main`. É ruído esperado até os segredos existirem, não um problema novo.
 3. **Supabase → Authentication:**
    - Activar o fornecedor Google, com o Client ID e o Secret da Google Cloud. O URI de redireccionamento é `https://bggqkjjqbjhbjsckzopj.supabase.co/auth/v1/callback`.
    - Pôr o domínio do site no Site URL e nos Redirect URLs.
@@ -110,6 +116,18 @@ como texto literal de entrada, e o `imageUrl.js` não lê o ambiente).
 | árvore local com `.env` | **17 passam** | **250 passam** |
 
 Antes da correcção, na condição do CI: 4 ficheiros falhavam, 13 passavam, 232 testes.
+
+**E confirmado no Actions a sério**, assim que a conta nova o destrancou. O passo `Testes`
+falhou em cinco execuções seguidas (`b5851fc`, `43b84d0`, `38df5ad`, `4c6548c`, `ae06816`) e o
+primeiro verde é no commit da correcção, `2c9a89d`. O `deno check` da Edge Function também
+passa no Actions — o que nesta máquina não dá para verificar, por falta de Deno.
+
+**Duas sessões corrigiram o mesmo defeito ao mesmo tempo.** Logo depois do `2c9a89d`, outra
+sessão acrescentou um segundo bloco `env` no `vitest.config.js` com o mesmo propósito
+(`6de14ad`, "testes sem .env"), o que quebrou o **lint** e fez o passo `Testes` ser saltado;
+foi removido em `b515730`. A configuração que sobreviveu é a do `2c9a89d`, com um só bloco
+`env`. Antes de corrigir algo que já está documentado como conhecido, vale fazer
+`git fetch && git log origin/<ramo>` — pode já estar feito.
 
 ## Análise crítica e correcções (2026-11-01, segunda passagem)
 

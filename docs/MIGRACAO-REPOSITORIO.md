@@ -35,28 +35,52 @@ precisam (secção 1).
 ### 1. Segredos e variáveis do Actions
 
 Settings → Secrets and variables → Actions. Sem isto, `deploy-cloudflare.yml` e
-`deploy-supabase.yml` param logo no passo que confirma os segredos.
+`deploy-supabase.yml` param no primeiro passo, que confirma os segredos.
 
-| Tipo | Nome | Valor |
-|------|------|-------|
-| Variável | `VITE_SUPABASE_URL` | `https://bggqkjjqbjhbjsckzopj.supabase.co` |
-| Variável | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave *publishable* (Supabase → API Keys) |
-| Variável | `CLOUDFLARE_PAGES_PROJECT` | `livraria-adventista` |
-| Variável | `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
-| Secret | `CLOUDFLARE_API_TOKEN` | Token com *Cloudflare Pages: Edit* |
-| Secret | `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare |
-| Secret | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase |
-| Secret | `SUPABASE_DB_PASSWORD` | Palavra-passe da base de dados |
+**Variáveis — criadas a 2026-11-03:**
 
-Os valores estão na conta de cada serviço, não neste repositório. Detalhe em
-[LANCAMENTO.md](LANCAMENTO.md), secção 2.
+| Nome | Valor |
+|------|-------|
+| `VITE_SUPABASE_URL` | `https://bggqkjjqbjhbjsckzopj.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | a chave *publishable* (pública por desenho: vai no bundle do frontend, logo é variável e não segredo) |
+| `CLOUDFLARE_PAGES_PROJECT` | `livraria-editora-adventista` |
+| `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
 
-### 2. Actions: verificar se a conta nova corre workflows
+**Segredos — por criar.** Os valores não existem nesta máquina; vêm da conta de cada serviço:
 
-Na conta antiga o Actions estava bloqueado por um problema de facturação. Fazer um push e ver
-se o workflow arranca. Se não arrancar, é da conta nova — ver [HANDOFF.md](HANDOFF.md),
-"Bloqueios". Enquanto isso, o gate real é `npm run deploy:site`, que corre lint, testes e
-build antes de publicar.
+| Nome | Onde se obtém |
+|------|---------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens, com *Cloudflare Pages: Edit* |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare → Workers & Pages → Account ID, ou `wrangler whoami` |
+| `SUPABASE_ACCESS_TOKEN` | Supabase → Account → Access Tokens |
+| `SUPABASE_DB_PASSWORD` | Supabase → Project Settings → Database |
+
+Criam-se sem expor o valor em sítio nenhum — o comando pede-o e não o mostra:
+
+```bash
+GH_TOKEN="$(gh auth token --user fernandotunas6-bot)" gh secret set CLOUDFLARE_API_TOKEN --repo fernandotunas6-bot/Livraria-Editora-Adventista
+```
+
+O `GH_TOKEN` do dono é necessário: segredos exigem admin, e a `ValentinoCanguele` só tem
+escrita.
+
+**Os dois do Cloudflare devem esperar pela mudança de conta** (secção 5): têm de ser da conta
+`valentinocanguele@gmail.com`. Pôr os da `canguelev@fata.adventist.org` faz o deploy automático
+publicar na conta errada.
+
+Até os segredos existirem, o `deploy-cloudflare.yml` falha a cada push para o `main`, no passo
+"Confirmar segredos e variáveis". É ruído esperado.
+
+### 2. Actions — a migração destrancou-o
+
+Na conta antiga o Actions estava bloqueado por facturação e **nenhum** workflow arrancava.
+**Na conta nova corre** (confirmado a 2026-11-03: o `ci.yml` do PR #1 correu até ao fim, com o
+`deno check` incluído).
+
+> **Isto muda o comportamento do projecto.** Cada push para o `main` passa a publicar no
+> Cloudflare Pages, e cada push que toque em `supabase/` passa a correr `supabase db push` e a
+> publicar a Edge Function — sem ninguém pedir. Durante meses nada disto aconteceu e tudo foi
+> publicado à mão. Há migrações por aplicar no PR #1: ao integrá-lo, serão aplicadas sozinhas.
 
 ### 3. Pull requests
 
