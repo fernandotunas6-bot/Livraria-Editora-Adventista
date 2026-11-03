@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = {
   logo_url: '',
   favicon_url: '',
   contact_email: 'contacto@livrariaadventista.ao',
-  contact_phone: '+244 923 000 000',
+  contact_phone: '',
   contact_address: 'Luanda, Angola',
   pwa_enabled: true,
   pwa_theme_color: '#0c4a6e',

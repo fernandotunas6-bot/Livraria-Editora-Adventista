@@ -11,7 +11,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Calendar, Sparkles, Trash2, ThumbsUp
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -78,88 +78,12 @@ function ProductDetailPage() {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const isWish = product ? isInWishlist(product.id) : false;
 
-  // Reviews and Google Calendar Events hooks and state
+  // Avaliações
   const { isAuthed, user } = useAuth();
   const { reviews, loading: loadingReviews, stats, hasPurchased, submitReview, deleteReview, userReview, submitting, helpfulVotesEnabled, votingReviewId, toggleHelpfulVote } = useReviews(product?.id);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [editingReview, setEditingReview] = useState(false);
-  const [addingCalendarEvent, setAddingCalendarEvent] = useState(false);
-
-  const handleAddLaunchToCalendar = async () => {
-    try {
-      setAddingCalendarEvent(true);
-      // O Google Workspace traz o SDK do Firebase (154 KB gzip). A página do livro é das
-      // mais visitadas da loja: só carrega isto quem clica em juntar ao calendário.
-      const { signInWithGoogleWorkspace, getCachedGoogleToken, createCalendarEvent } =
-        await import('@/lib/googleAuth');
-      let token = getCachedGoogleToken();
-      if (!token) {
-        toast({
-          title: 'Google OAuth',
-          description: 'A ligar à sua conta Google Workspace...',
-        });
-        const res = await signInWithGoogleWorkspace();
-        token = res.token;
-      }
-
-      const upcomingDate = new Date();
-      upcomingDate.setDate(upcomingDate.getDate() + 7); // Exactly 1 week from now
-      upcomingDate.setHours(18, 0, 0, 0);
-
-      const endDate = new Date(upcomingDate);
-      endDate.setHours(20, 0, 0, 0);
-
-      const eventDetails = {
-        summary: `Lançamento: ${product.title}`,
-        location: 'Livraria Aurora, Luanda, Angola',
-        description: `Sessão de lançamento oficial e autógrafos do livro "${product.title}" (${product.subtitle || 'Aurora'}). Junte-se a nós para este grande evento literário!`,
-        start: {
-          dateTime: upcomingDate.toISOString(),
-          timeZone: 'Africa/Luanda',
-        },
-        end: {
-          dateTime: endDate.toISOString(),
-          timeZone: 'Africa/Luanda',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 30 },
-          ],
-        },
-      };
-
-      await createCalendarEvent(token, eventDetails);
-      toast({
-        title: 'Sucesso',
-        description: 'Evento de lançamento adicionado ao seu Google Calendar com sucesso!',
-      });
-    } catch (err) {
-      console.error(err);
-      toast({
-        variant: 'destructive',
-        title: 'Erro de Calendário',
-        description: 'Não foi possível adicionar o evento ao seu calendário. Verifique a sua ligação Google.',
-      });
-    } finally {
-      setAddingCalendarEvent(false);
-    }
-  };
-
-  const handleWhatsAppLaunchReminder = () => {
-    const phoneNumber = '923000000'; // Brand's official contact number
-    const launchText = `Olá! Quero agendar lembretes para o lançamento do livro "${product.title}" no dia 16 de Julho às 18:00 (Hora de Luanda). Por favor, registem o meu número de WhatsApp! Nome: ${user?.name || 'Cliente'}`;
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    const num = cleanPhone.startsWith('244') ? cleanPhone : `244${cleanPhone}`;
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(launchText)}`, '_blank', 'noopener,noreferrer');
-    
-    toast({
-      title: 'Pedido Enviado',
-      description: 'Mensagem de agendamento gerada! Envie-a no WhatsApp para confirmar o seu registo de lembrete.',
-    });
-  };
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
@@ -561,48 +485,6 @@ function ProductDetailPage() {
               </Button>
             )}
 
-            {/* Google Calendar Book Launch Event Integration */}
-            {product && (
-              <div className="mt-6 border border-primary/20 rounded-xl p-5 bg-primary/5 flex flex-col gap-3">
-                <div className="flex gap-2 items-center text-primary">
-                  <Calendar className="h-5 w-5" />
-                  <h4 className="font-bold text-sm">Evento de Lançamento Virtual</h4>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Junte-se a nós para a apresentação exclusiva e sessão de leitura de <strong>"{product.title}"</strong> com o autor, no dia <strong>16 de Julho às 18:00 (Hora de Luanda)</strong>.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddLaunchToCalendar}
-                  disabled={addingCalendarEvent}
-                  className="w-full text-xs h-9 bg-background border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/10 hover:text-primary hover:border-[#0ea5c9]"
-                >
-                  {addingCalendarEvent ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
-                      A adicionar ao calendário...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4 text-primary" />
-                      Adicionar ao Google Calendar
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleWhatsAppLaunchReminder}
-                  className="w-full text-xs h-9 bg-background border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500"
-                >
-                  <svg className="mr-2 h-4 w-4 fill-current text-emerald-500" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.717-1.458L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.859-4.42 9.863-9.864.002-2.634-1.02-5.11-2.881-6.973C16.69 1.904 14.212.861 11.58.861 6.143.861 1.72 5.281 1.716 10.72c-.001 1.67.438 3.3 1.27 4.733l-.988 3.61 3.702-.97.647.386zM17.16 14.93c-.29-.145-1.716-.847-1.982-.944-.265-.097-.459-.145-.652.145-.193.29-.747.944-.915 1.137-.168.193-.336.218-.626.073-1.638-.818-2.735-1.424-3.82-3.284-.287-.492.287-.457.822-1.52.09-.18.045-.337-.023-.482-.068-.145-.652-1.572-.893-2.152-.234-.564-.472-.488-.652-.497-.169-.008-.362-.01-.555-.01s-.506.072-.77.362c-.265.29-1.012.99-1.012 2.415 0 1.424 1.036 2.801 1.18 2.995.145.193 2.038 3.112 4.937 4.364 2.188.944 3.1 1.054 4.225.888.755-.112 2.327-.95 2.658-1.87.33-.92.33-1.71.233-1.87-.097-.16-.36-.255-.65-.4z" />
-                  </svg>
-                  Lembrar-me por WhatsApp
-                </Button>
-              </div>
-            )}
 
             {isStockManaged && canAddToCart && product.purchasable && (
               <p className="text-sm text-brand-ink flex items-center justify-center gap-2 mb-4">

@@ -259,7 +259,7 @@ const GoogleWorkspaceHub = () => {
 
   // Filter lists
   const startEmailToContact = (emailAddress) => {
-    setNewMail({ to: emailAddress, subject: 'Contacto - Livraria Aurora', body: '' });
+    setNewMail({ to: emailAddress, subject: 'Contacto - Livraria Adventista', body: '' });
     setSubTab('gmail');
   };
 

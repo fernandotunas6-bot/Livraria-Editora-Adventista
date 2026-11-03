@@ -3,7 +3,9 @@ export const BRAND = {
   shortName: 'LA',
   tagline: 'Literatura que edifica e transforma',
   email: 'contacto@livrariaadventista.ao',
-  phone: '+244 923 000 000',
+  // Sem telefone por omissão: o verdadeiro vem de Configurações (contact_phone). Um número
+  // provisório aqui aparecia aos clientes, e os botões de WhatsApp levavam-nos a ele.
+  phone: '',
   address: 'Luanda, Angola',
 };
 

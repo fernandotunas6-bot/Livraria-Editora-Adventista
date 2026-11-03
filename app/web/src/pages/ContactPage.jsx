@@ -13,8 +13,16 @@ import ShoppingCart from '@/components/ShoppingCart.jsx';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import { pageTitle, BRAND } from '@/lib/brand';
 import { APP_API_URL } from '@/lib/supabaseClient';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { displayAngolaPhone } from '@/lib/angolaPhone';
 
 const ContactPage = () => {
+  // Os contactos vêm de Configurações, como no rodapé. A página mostrava os valores fixos do
+  // código — incluindo o telefone provisório — mesmo depois de o painel ter os verdadeiros.
+  const { settings } = useSiteSettings();
+  const contactEmail = settings.contact_email || BRAND.email;
+  const contactPhone = settings.contact_phone || '';
+  const contactAddress = settings.contact_address || BRAND.address;
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -156,19 +164,21 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <h3 className="font-medium mb-1 text-foreground">Email</h3>
-                      <p className="text-muted-foreground">{BRAND.email}</p>
+                      <p className="text-muted-foreground">{contactEmail}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Phone className="h-5 w-5 text-primary" />
+                  {contactPhone && (
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Phone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 text-foreground">Telefone</h3>
+                        <p className="text-muted-foreground">{displayAngolaPhone(contactPhone)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium mb-1 text-foreground">Telefone</h3>
-                      <p className="text-muted-foreground">{BRAND.phone}</p>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -176,7 +186,7 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <h3 className="font-medium mb-1 text-foreground">Morada</h3>
-                      <p className="text-muted-foreground">{BRAND.address}</p>
+                      <p className="text-muted-foreground">{contactAddress}</p>
                     </div>
                   </div>
                 </div>

@@ -72,9 +72,15 @@ Riscos aceites:
 - **Imagens:** o CSP aceita `img-src https:` (o painel permite colar links de CDN). Uma
   imagem não executa código; os scripts continuam limitados à própria origem e ao Google.
 
+- **Link de acesso** (`/admin/users/access-link`): deixou de ser devolvido a quem o pede. Só
+  volta quando o email não saiu e quem pede é administrador; um gestor com `manage_users` já
+  não consegue entrar na conta de um cliente. Na criação de contas o link continua a voltar
+  (conta nova, sem histórico).
+- **Google Workspace da equipa**: permissões à medida do que o painel faz — `gmail.readonly`
+  + `gmail.send` em vez de `mail.google.com` (que permitia apagar mensagens),
+  `calendar.events` e `contacts.readonly`. Se o ecrã de consentimento da Google Cloud
+  listar as permissões antigas, acrescentar estas.
+
 ## 4. Por resolver
 
 - Protecção contra palavras-passe vazadas (HaveIBeenPwned): exige o plano Pro do Supabase.
-- O link de recuperação devolvido em `/admin/users/access-link` a quem tem `manage_users`, e
-  o scope `https://mail.google.com/` pedido no login Google: decisões do dono, ver
-  `docs/AUDITORIA.md`.

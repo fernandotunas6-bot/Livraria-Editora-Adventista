@@ -865,7 +865,7 @@ route("GET", "/settings", async () => {
   if (!rec) {
     return json({
       site_name: "Livraria Adventista", tagline: "Literatura que edifica e transforma", primary_color: "#0ea5c9",
-      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "+244 923 000 000",
+      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "",
       contact_address: "Luanda, Angola", pwa_enabled: true, pwa_theme_color: "#0c4a6e", shipping_free_threshold: 20000,
       shipping_cost: 1500, maintenance_mode: false, google_oauth_enabled: false,
       header_welcome_logged: "Bem-vindo de volta, {nome}",
@@ -2182,7 +2182,14 @@ route("POST", "/admin/users/access-link", async ({ auth, body }) => {
   assertCanManage(auth, target);
   if (!target.email) throw bad("Esta conta não tem email.");
   const access = await sendAccessLink(target.email, target.name, "reset", body.origin);
-  return json(access);
+  // O link dá entrada directa na conta de outra pessoa, com o histórico de encomendas, as
+  // moradas e os dados dela. Devolvê-lo a quem pede deixava qualquer gestor com
+  // `manage_users` entrar como um cliente — mesmo quando o email já tinha seguido para o
+  // próprio cliente. Só volta quando o email NÃO saiu (por exemplo, SMTP desligado: alguém
+  // tem de o mandar por WhatsApp) e só a um administrador. O gestor fica a saber se o email
+  // seguiu; se não seguiu, pede a um administrador.
+  const canSeeLink = !access.emailSent && auth!.role === "admin";
+  return json({ emailSent: access.emailSent, link: canSeeLink ? access.link : "", link_withheld: !access.emailSent && !canSeeLink });
 });
 
 route("POST", "/admin/users/delete", async ({ auth, body }) => {

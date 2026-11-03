@@ -17,11 +17,19 @@ export const googleAuth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
 
-// Add Workspace scopes requested
+// Permissões pedidas à conta Google da equipa, à medida do que o separador Google Workspace
+// faz. Antes pedia-se `https://mail.google.com/` (acesso total ao Gmail, incluindo apagar
+// mensagens), `calendar` (todos os calendários e definições) e `contacts` (ler e alterar):
+//  - Gmail: só listar mensagens e enviar → gmail.readonly + gmail.send;
+//  - Calendário: listar, criar e apagar eventos → calendar.events;
+//  - Contactos: só ler → contacts.readonly;
+//  - Drive: o painel lista, envia e apaga ficheiros → fica `drive`.
+// Ao acrescentar uma função nova, acrescentar só a permissão de que ela precisa.
 googleProvider.addScope('https://www.googleapis.com/auth/drive');
-googleProvider.addScope('https://www.googleapis.com/auth/calendar');
-googleProvider.addScope('https://mail.google.com/');
-googleProvider.addScope('https://www.googleapis.com/auth/contacts');
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+googleProvider.addScope('https://www.googleapis.com/auth/contacts.readonly');
 
 let cachedToken = null;
 let authStateListener = null;
