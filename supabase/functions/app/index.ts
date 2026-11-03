@@ -19,6 +19,7 @@ import {
   unsubscribeUrlFor,
   type Letter,
 } from "./emailTemplates.ts";
+import { createMemo, runAfterResponse } from "./runtime.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -160,10 +161,29 @@ function requireCrm(auth: Auth) {
 }
 
 // O registo de configuração activo é o mais antigo (o mesmo que o PocketBase usava).
-async function getSettings(): Promise<Row | null> {
+// ---------------------------------------------------------------------------
+// Cache curta por instância
+// ---------------------------------------------------------------------------
+// As definições do site, as integrações e o dono por omissão do CRM são lidos em quase
+// todos os pedidos e mudam raramente. Cada leitura era uma ida à base de dados, que está em
+// Estocolmo enquanto a função corre perto de quem pede (medido a partir de Angola: a
+// função em Paris, 0,1–0,2 s por consulta). Uma instância quente guarda-os uns segundos, e
+// pedidos simultâneos partilham a mesma leitura. Falhas e resultados vazios não ficam
+// guardados: o pedido seguinte volta a tentar.
+// As rotas do painel que dependem do que acabou de ser gravado (testar o SMTP ou o WhatsApp,
+// pré-visualizar um email) pedem `fresh`; quem grava pela função chama `forgetCached`.
+const SHORT_TTL_MS = 15_000;
+const { cached, forget: forgetCached } = createMemo();
+
+async function loadSettings(): Promise<Row | null> {
   const { data } = await db.from("site_settings").select("*")
     .order("created", { ascending: true }).order("id", { ascending: false }).limit(1);
   return data?.[0] || null;
+}
+/** Definições do site (em cache curta). Cópia rasa: alterar o objecto não mexe na cache. */
+async function getSettings(fresh = false): Promise<Row | null> {
+  const rec = await cached("settings", SHORT_TTL_MS, loadSettings, fresh);
+  return rec ? { ...rec } : null;
 }
 
 // Regras da loja configuráveis pelo admin (Configurações → Regras da loja), sempre dentro de limites seguros.
@@ -182,9 +202,12 @@ function storeRules(settings: Row | null) {
   };
 }
 
-async function getIntegration(code: string): Promise<Row | null> {
-  const { data } = await db.from("app_integrations").select("*").eq("code", code).limit(1);
-  return data?.[0] || null;
+async function getIntegration(code: string, fresh = false): Promise<Row | null> {
+  const rec = await cached(`integration:${code}`, SHORT_TTL_MS, async () => {
+    const { data } = await db.from("app_integrations").select("*").eq("code", code).limit(1);
+    return (data?.[0] || null) as Row | null;
+  }, fresh);
+  return rec ? { ...rec } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +390,7 @@ async function enqueueEmail(job: {
  * enviarem a mesma mensagem duas vezes ao mesmo cliente.
  */
 async function processEmailQueue(limit = 10) {
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   const summary = { claimed: 0, sent: 0, retrying: 0, failed: 0 };
   if (!settings) return summary;
 
@@ -525,8 +548,8 @@ async function sendPaymentConfirmedEmail(order: Row, settings: Row | null) {
 // ---------------------------------------------------------------------------
 // WhatsApp Business (Meta Cloud API)
 // ---------------------------------------------------------------------------
-async function getWhatsAppConfig(): Promise<Row | null> {
-  const rec = await getIntegration("whatsapp_business");
+async function getWhatsAppConfig(fresh = false): Promise<Row | null> {
+  const rec = await getIntegration("whatsapp_business", fresh);
   if (!rec?.enabled) return null;
   const cfg = rec.config || {};
   if (!cfg.access_token || !cfg.phone_number_id) return null;
@@ -705,8 +728,11 @@ async function upsertContact(item: Row, ownerId: string | null) {
 }
 
 async function getDefaultOwnerId() {
-  const { data } = await db.from("profiles").select("id").eq("role", "admin").order("created").limit(1);
-  return data?.[0]?.id || null;
+  // O primeiro administrador quase nunca muda; cinco minutos chegam.
+  return await cached("default-owner", 5 * 60_000, async () => {
+    const { data } = await db.from("profiles").select("id").eq("role", "admin").order("created").limit(1);
+    return (data?.[0]?.id || null) as string | null;
+  });
 }
 
 async function countRows(table: string, filter?: (q: any) => any) {
@@ -952,7 +978,7 @@ route("GET", "/integrations", async () => {
 
 route("GET", "/admin/media-config", async ({ auth }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
-  const drive = await getIntegration("google_drive");
+  const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ google_drive: { enabled: false, config: {} } });
   const config = drive.config || {};
   return json({
@@ -970,7 +996,7 @@ route("GET", "/admin/media-config", async ({ auth }) => {
 
 route("GET", "/admin/drive-images", async ({ auth, url }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
-  const drive = await getIntegration("google_drive");
+  const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ files: [] });
   const config = drive.config || {};
   const apiKey = config.api_key || "";
@@ -1356,23 +1382,24 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   });
   if (error) throw bad(error.message);
 
-  let emailSent = false;
-  let whatsappSent = false;
-  try {
-    emailSent = await sendOrderConfirmationEmail(saved, settings);
-    whatsappSent = await sendOrderWhatsAppConfirmation(saved, settings);
-  } catch (err) {
-    console.log("Post-checkout messaging:", err);
-  }
-  try {
+  // O email de confirmação (SMTP, 1–3 s quando ligado) e o contacto no CRM (várias consultas)
+  // saíam antes da resposta: o cliente esperava por eles para ver a encomenda confirmada.
+  // Vão depois da resposta. O WhatsApp fica antes, porque o carrinho usa `whatsapp_sent`
+  // para decidir se ainda abre o WhatsApp à mão.
+  if (email) runAfterResponse("Post-checkout email", () => sendOrderConfirmationEmail(saved, settings));
+  runAfterResponse("Post-checkout CRM", async () => {
     await upsertContact({
       name, email, phone, source: "checkout", is_buyer: true,
       tags: ["comprador", saleChannel || "web_purchase"],
       notes: `Encomenda ${orderNum} · ${fmtMoneyKz(saved.total)}`,
       metadata: { last_order_id: saved.id, last_order_number: orderNum },
     }, await getDefaultOwnerId());
+  });
+  let whatsappSent = false;
+  try {
+    whatsappSent = await sendOrderWhatsAppConfirmation(saved, settings);
   } catch (err) {
-    console.log("Post-checkout CRM:", err);
+    console.log("Post-checkout WhatsApp:", err);
   }
 
   const successUrl = data.successUrl || "/success";
@@ -1385,15 +1412,16 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     payment_status: saved.payment_status,
     order_type: saved.order_type,
     sale_channel: saleChannel,
-    email_sent: emailSent,
+    // O email segue depois da resposta: aqui só se sabe se foi pedido.
+    email_queued: !!(email && settings?.order_email_enabled),
     whatsapp_sent: whatsappSent,
   });
 });
 
 route("GET", "/messaging/status", async () => {
-  const settings = await getSettings();
-  const waRec = await getIntegration("whatsapp_business");
-  const waCfg = await getWhatsAppConfig();
+  const [settings, waRec, waCfg] = await Promise.all([
+    getSettings(), getIntegration("whatsapp_business"), getWhatsAppConfig(),
+  ]);
   return json({
     whatsapp: {
       enabled: !!waRec?.enabled,
@@ -1451,7 +1479,7 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
   requirePermission(auth, "manage_settings");
   const phone = String(body.phone || "").trim();
   if (!phone) throw bad("Indique um número de teste.");
-  const config = await getWhatsAppConfig();
+  const config = await getWhatsAppConfig(true);
   if (!config) throw bad("WhatsApp Business API não está activa ou configurada.");
   const text = "✅ Teste — Livraria Adventista\n\nA integração WhatsApp Business API está funcional. Mensagens automáticas activas.";
   const result = await sendWhatsAppMessage(phone, text, config, { bodyParams: ["Teste", "OK", "0 Kz"] }, { context: "test" });
@@ -1494,12 +1522,12 @@ route("POST", "/unsubscribe", async ({ body, ip }) => {
 /** Categorias opcionais de email, para o painel ligar e desligar. */
 route("GET", "/admin/email/categories", async ({ auth }) => {
   requirePermission(auth, "manage_settings");
-  return json({ categories: categoryStates(await getSettings()) });
+  return json({ categories: categoryStates(await getSettings(true)) });
 });
 
 route("POST", "/admin/email/categories", async ({ auth, body }) => {
   requirePermission(auth, "manage_settings");
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   if (!settings) throw bad("Configurações do site em falta.");
   // Só as chaves conhecidas entram: um valor qualquer vindo do pedido não pode ficar
   // guardado a fingir-se de categoria.
@@ -1510,6 +1538,7 @@ route("POST", "/admin/email/categories", async ({ auth, body }) => {
   }
   const { error } = await db.from("site_settings").update({ email_categories: next }).eq("id", settings.id);
   if (error) throw error;
+  forgetCached("settings");
   return json({ categories: categoryStates({ ...settings, email_categories: next }) });
 });
 
@@ -1590,7 +1619,7 @@ route("POST", "/admin/email/queue/retry", async ({ auth, body }) => {
 
 route("GET", "/admin/email/templates", async ({ auth }) => {
   requirePermission(auth, "manage_settings");
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   const brand = emailBrand(settings);
   const templates = Object.entries(PREVIEW_TEMPLATES).map(([key, t]) => ({
     key, label: t.label, group: t.group, subject: t.build(brand).subject,
@@ -1620,7 +1649,7 @@ route("GET", "/admin/email/preview", async ({ auth, url }) => {
   const key = String(url.searchParams.get("template") || "");
   const template = PREVIEW_TEMPLATES[key];
   if (!template) throw bad("Modelo desconhecido.");
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   const brand = emailBrand(settings);
   const letter = template.build(brand);
   const { html, text } = emailDocument(brand, letter.doc);
@@ -1646,7 +1675,7 @@ route("POST", "/admin/email/resend", async ({ auth, body }) => {
   // consentimento ter sido verificado outra vez.
   if (log.context === "campaign") throw bad("As campanhas não se reenviam a partir do registo.");
   if (!log.content) throw bad("Este registo não guardou o conteúdo da mensagem.");
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   const ok = await sendTransactionalEmail(settings, log.recipient, log.subject || "", log.content, {
     context: log.context, customer_name: log.customer_name, order_number: log.order_number,
   });
@@ -1658,7 +1687,7 @@ route("POST", "/admin/email/test", async ({ auth, body }) => {
   requirePermission(auth, "manage_settings");
   const to = normalizeEmail(body.to || auth?.email || "");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw bad("Indique um email de teste válido.");
-  const settings = await getSettings();
+  const settings = await getSettings(true);
   const ok = await sendLetter(settings, to, testLetter(emailBrand(settings)), { context: "test" });
   if (!ok) throw bad("O email não foi enviado. Veja o motivo no registo de comunicações.");
   return json({ message: `Email de teste enviado para ${to}.` });
@@ -1809,7 +1838,10 @@ route("POST", "/newsletter", async ({ body, ip }) => {
   return json({ message: "Subscrição realizada!" });
 });
 
-route("GET", "/catalog/summary", async () => {
+// Resumo do catálogo para a equipa. Era público e dizia a qualquer pessoa o stock e as vendas
+// de cada livro; nada no site o usa sem sessão.
+route("GET", "/catalog/summary", async ({ auth }) => {
+  requirePermission(auth, "manage_catalog");
   const { data: books } = await db.from("stock_books")
     .select("id, title, book_code, stock, stock_low, genre, featured, cover, cover_image, sales_count").eq("active", true).order("title").limit(500);
   const genres: Record<string, Row> = {};
@@ -2207,10 +2239,9 @@ route("POST", "/chat", async ({ body, ip }) => {
   if (!message) throw bad("Mensagem vazia.");
   if (message.length > 800) throw bad("Mensagem demasiado longa.");
 
-  const settings = await getSettings();
+  const [settings, books] = await Promise.all([getSettings(), searchBooks(message, 8)]);
   if (settings && settings.chat_enabled === false) throw bad("Assistente temporariamente indisponível.");
 
-  const books = await searchBooks(message, 8);
   const keys = chatKeys(settings);
   const pref = settings ? (settings.chat_provider || "gemini") : "faq";
   const model = settings?.chat_model || "";

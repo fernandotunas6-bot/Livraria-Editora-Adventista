@@ -329,7 +329,7 @@ export async function initializeCheckout({
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error || 'Erro no checkout');
-  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_sent: data.email_sent, whatsapp_sent: data.whatsapp_sent };
+  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
 }
 
 export async function subscribeNewsletter(email) {
