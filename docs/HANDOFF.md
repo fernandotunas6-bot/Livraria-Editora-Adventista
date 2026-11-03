@@ -310,18 +310,24 @@ sem o ponto exacto.
 Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema das encomendas
 é arriscado e merece uma decisão:
 
-- **Três campos para o método de pagamento:** `payment_method` (herdado, só preenchido para
-  "entrega" e "transferencia"), `payment_method_code` e `payment_method_name`. Quem lê tem
-  de tentar os três em cadeia (ver `receipt.js`). Deviam ser um `code` + o nome resolvido na
-  leitura.
+- ~~**Três campos para o método de pagamento**~~ — **tratado a 2026-11-03.** Todos os ecrãs,
+  emails e o recibo do WhatsApp lêem por `orderPaymentLabel`/`orderPaymentCode`
+  (`orderUtils.js`) e `paymentLabel` (`orderFields.ts`); antes, o recibo mostrava o nome e a
+  exportação o código. O checkout deixa de gravar `payment_method` e grava sempre um nome.
+  Falta aplicar `docs/migracoes-pendentes/4_campos_encomendas.sql` (preenche as antigas) e,
+  depois, apagar `payment_method`.
 - **`order_type` é derivado de `sale_channel`** (`whatsapp_order` ⇔ `whatsapp`): dois campos
   para a mesma verdade, que podem divergir.
-- **`payment_category`:** zero utilizações na Edge Function, uma no site. Coluna morta.
+- **`payment_category`:** coluna morta (vazia em todas as encomendas). O painel deixou de a
+  pedir; falta apagá-la (ver o README de `docs/migracoes-pendentes`).
 - **`delivery_recipient_id`:** o `/confirm-delivery` guarda o número do documento de quem
   recebe, e **nada o lê**. É recolher um documento de identificação sem uso — ou passa a
   aparecer no painel, ou deixa de ser pedido.
-- **Morada em dobro:** `address`/`city` convivem com `delivery_address_full`,
-  `delivery_municipality` e companhia.
+- ~~**Morada em dobro**~~ — **tratado a 2026-11-03.** Leitura por `orderDeliveryAddress`,
+  `orderPickupStore` e `orderLocality` (e `deliveryAddressLine`/`pickupStoreName` na
+  função). O painel mostrava a loja dos levantamentos duas vezes ("Levantamento: X, X"). O
+  checkout deixa de gravar `address`; `city` continua, porque o trigger `orders_before_update`
+  o usa como local do seguimento — a migração `4_campos_encomendas.sql` muda isso.
 
 ## Regras para continuar
 

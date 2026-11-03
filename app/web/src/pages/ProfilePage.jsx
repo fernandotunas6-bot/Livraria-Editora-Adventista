@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserAvatar from '@/components/UserAvatar';
 import { getUserDisplayName } from '@/lib/userUtils';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, PAYMENT_METHODS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone, formatAngolaPhone } from '@/lib/angolaPhone';
 import PhoneInput from '@/components/PhoneInput';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
@@ -355,17 +355,17 @@ const ProfilePage = () => {
                                   <Phone className="h-3 w-3" /> {displayAngolaPhone(o.phone)}
                                 </p>
                               )}
-                              {(o.payment_method_name || o.payment_method || o.payment_method_code) && (
+                              {orderPaymentLabel(o) && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {o.payment_method_name || PAYMENT_METHODS[o.payment_method] || o.payment_method_code || o.payment_method}
+                                  {orderPaymentLabel(o)}
                                   {o.payment_status && (
                                     <> · {getPaymentStatusLabel(o.payment_status)}</>
                                   )}
                                 </p>
                               )}
-                              {(o.delivery_municipality || o.delivery_province) && (
+                              {orderLocality(o) && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {[o.delivery_locality, o.delivery_municipality, o.delivery_province].filter(Boolean).join(', ')}
+                                  {orderLocality(o, ', ')}
                                 </p>
                               )}
                               {o.tracking_number && (

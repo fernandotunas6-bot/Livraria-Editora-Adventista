@@ -9,6 +9,7 @@
  * levantamento na loja. Não há produtos digitais, licenças nem vendedores no esquema da base
  * de dados, por isso não há aqui modelos para isso — seriam ficheiros que nada chamaria.
  */
+import { deliveryAddressLine, paymentLabel, pickupStoreName } from "./orderFields.ts";
 import { formatKz, type Brand, type EmailDoc, type SafeSymbol, type Step } from "./emails.ts";
 
 type Row = Record<string, any>;
@@ -54,13 +55,14 @@ function orderTotals(order: Row) {
 function deliveryDetails(order: Row) {
   const details = [{ label: "Encomenda", value: orderRef(order) }];
   if (order.created) details.push({ label: "Data", value: dateLong(order.created) });
-  if (order.payment_method_name || order.payment_method) {
-    details.push({ label: "Pagamento", value: String(order.payment_method_name || order.payment_method) });
-  }
+  const payment = paymentLabel(order);
+  if (payment) details.push({ label: "Pagamento", value: payment });
   if (isPickup(order)) {
-    if (order.pickup_store) details.push({ label: "Levantamento", value: String(order.pickup_store) });
-  } else if (order.delivery_address_full || order.address) {
-    details.push({ label: "Entrega", value: String(order.delivery_address_full || order.address) });
+    const store = pickupStoreName(order);
+    if (store) details.push({ label: "Levantamento", value: store });
+  } else {
+    const address = deliveryAddressLine(order);
+    if (address) details.push({ label: "Entrega", value: address });
   }
   return details;
 }
@@ -197,7 +199,7 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = ""): 
       stepsTitle: "Estado da encomenda",
       steps: orderSteps(order, paid ? "confirmed" : "received"),
       cta: paymentLink && !paid
-        ? { label: `Pagar com ${order.payment_method_name || "o método escolhido"}`, url: paymentLink }
+        ? { label: `Pagar com ${paymentLabel(order) || "o método escolhido"}`, url: paymentLink }
         : (trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined),
       secondaryCta: paymentLink && !paid && trackUrl(brand.siteUrl)
         ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) }

@@ -1,3 +1,5 @@
+import { isPickupOrder, orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
+
 function escapeCsv(val) {
   const s = String(val ?? '');
   if (s.includes(',') || s.includes('"') || s.includes('\n')) {
@@ -26,16 +28,17 @@ function orderRow(o) {
     o.customer_name || '',
     o.customer_email || '',
     o.phone || '',
-    o.address || '',
-    o.city || '',
+    orderDeliveryAddress(o),
+    isPickupOrder(o) ? '' : (o.delivery_municipality || o.city || ''),
     o.shipping_method === 'pickup' ? 'Levantamento' : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio',
-    o.pickup_store || '',
+    orderPickupStore(o),
     subtotal.toFixed(2),
     shipping.toFixed(2),
     Number(o.total || 0).toFixed(2),
     o.status || '',
     o.payment_status || '',
-    o.payment_method || o.payment_method_code || '',
+    // O nome, como no recibo (antes saía o código: "entrega", "balcao").
+    orderPaymentLabel(o),
     o.delivery_status || '',
     fmtItems(items),
     o.notes || '',

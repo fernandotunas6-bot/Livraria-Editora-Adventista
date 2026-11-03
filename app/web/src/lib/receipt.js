@@ -1,5 +1,6 @@
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { fetchMessagingStatus, sendReceiptViaWhatsAppApi, isWhatsAppApiActive } from '@/lib/messaging';
+import { orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
 
 const SITE_NAME = 'Livraria Adventista';
 
@@ -231,17 +232,18 @@ export function receiptFromOrder(o) {
     signerName: o.customer_name,
     email: o.customer_email,
     phone: o.phone,
-    address: o.delivery_address_full || o.address,
-    city: o.delivery_address_full ? '' : o.city,
+    // A morada já vem numa linha (a cidade das encomendas antigas incluída).
+    address: orderDeliveryAddress(o),
+    city: '',
     deliveryRelativeName: o.delivery_relative_name || '',
     deliveryRelativePhone: o.delivery_relative_phone || '',
     shippingMethod: o.shipping_method,
-    pickupStore: o.pickup_store,
+    pickupStore: orderPickupStore(o),
     items,
     subtotal,
     shippingCost: Number(o.shipping_cost) || 0,
     total: Number(o.total) || 0,
-    paymentMethod: o.payment_method_name || o.payment_method_code || o.payment_method || '',
+    paymentMethod: orderPaymentLabel(o),
     paymentReference: o.payment_reference || '',
     paymentStatus: o.payment_status || '',
     checkoutSignature: o.checkout_signature_data || '',

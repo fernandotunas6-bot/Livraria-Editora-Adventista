@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, PAYMENT_METHODS, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
@@ -48,7 +48,7 @@ const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'))
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
   'items', 'total', 'shipping_cost', 'status', 'payment_status', 'payment_method',
-  'payment_method_code', 'payment_method_name', 'payment_reference', 'payment_category',
+  'payment_method_code', 'payment_method_name', 'payment_reference',
   'delivery_status', 'tracking_number', 'carrier', 'estimated_delivery',
   'address', 'city', 'notes', 'order_type', 'sale_channel', 'shipping_method', 'pickup_store',
   'delivery_province', 'delivery_municipality', 'delivery_locality', 'delivery_street',
@@ -311,7 +311,7 @@ const AdminPage = () => {
   const pendingCount = orders.filter((o) => o.status === 'pending').length;
   // Pagamentos por P2P/transferência que o cliente diz ter feito e falta confirmar.
   const awaitingPaymentCount = orders.filter((o) => o.payment_status === 'awaiting_confirmation' && o.status !== 'cancelled').length;
-  const paymentLabelOf = (o) => o.payment_method_name || PAYMENT_METHODS[o.payment_method] || o.payment_method_code || o.payment_method || '';
+  const paymentLabelOf = orderPaymentLabel;
   const totalRevenue = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
 
   const bookMetrics = [
@@ -785,15 +785,15 @@ const AdminPage = () => {
                                   </span>
                                 </p>
                               )}
-                              {(o.delivery_address_full || o.address) && (
+                              {/* Só entregas: o levantamento aparece em "Envio", mais abaixo. Antes, a loja
+                                  dos levantamentos saía aqui duas vezes ("Levantamento: X, X"). */}
+                              {orderDeliveryAddress(o) && (
                                 <p className="flex items-start gap-2 text-muted-foreground">
                                   <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                                   <span>
-                                    {o.delivery_address_full || `${o.address}${o.city ? `, ${o.city}` : ''}`}
-                                    {o.delivery_province && (
-                                      <span className="block text-xs mt-0.5">
-                                        {[o.delivery_locality, o.delivery_municipality, o.delivery_province].filter(Boolean).join(' · ')}
-                                      </span>
+                                    {orderDeliveryAddress(o)}
+                                    {orderLocality(o) && (
+                                      <span className="block text-xs mt-0.5">{orderLocality(o)}</span>
                                     )}
                                     {o.delivery_reference && <span className="block text-xs text-primary">Ref: {o.delivery_reference}</span>}
                                     {o.delivery_confirmed_at && (
@@ -828,7 +828,7 @@ const AdminPage = () => {
                               )}
                               {o.shipping_method && (
                                 <p className="text-muted-foreground">
-                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${o.pickup_store || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio'}
+                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${orderPickupStore(o) || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio'}
                                 </p>
                               )}
                             </div>

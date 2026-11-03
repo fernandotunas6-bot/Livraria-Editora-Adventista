@@ -19,7 +19,7 @@ import DeliveryConfirmPanel from '@/components/DeliveryConfirmPanel';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import {
   getOrderStatusLabel, getOrderStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor,
-  getPaymentStatusLabel, getPaymentStatusColor,
+  getPaymentStatusLabel, getPaymentStatusColor, orderDeliveryAddress,
 } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 
@@ -203,7 +203,7 @@ export default function TrackOrderPage() {
                     <div className="sm:col-span-2 flex items-start gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                       <div>
-                        <p>{order.delivery_address_full || order.address}{!order.delivery_address_full && order.city ? `, ${order.city}` : ''}</p>
+                        <p>{orderDeliveryAddress(order)}</p>
                         {order.delivery_province && (
                           <p className="text-xs mt-1">
                             {[order.delivery_locality, order.delivery_municipality, order.delivery_province].filter(Boolean).join(' · ')}

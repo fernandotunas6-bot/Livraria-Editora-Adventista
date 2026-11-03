@@ -20,6 +20,7 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1069,10 +1070,11 @@ route("POST", "/track", async ({ body, ip }) => {
     order_number: order.order_number, status: order.status, delivery_status: order.delivery_status || "received",
     total: order.total, customer_name: order.customer_name, phone: order.phone || "",
     delivery_relative_name: order.delivery_relative_name || "", delivery_relative_phone: order.delivery_relative_phone || "",
-    address: order.address, city: order.city, delivery_province: order.delivery_province || "",
+    delivery_province: order.delivery_province || "",
     delivery_municipality: order.delivery_municipality || "", delivery_locality: order.delivery_locality || "",
     delivery_street: order.delivery_street || "", delivery_reference: order.delivery_reference || "",
-    delivery_address_full: order.delivery_address_full || order.address || "",
+    // A morada numa linha, também nas encomendas antigas (que só tinham address/city).
+    delivery_address_full: deliveryAddressLine(order),
     delivery_confirmed_at: order.delivery_confirmed_at || "", delivery_confirmed_by: order.delivery_confirmed_by || "",
     delivery_recipient_name: order.delivery_recipient_name || "",
     // A imagem da assinatura não sai daqui: basta o número da encomenda e o email para
@@ -1309,7 +1311,8 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const isP2P = paidUpfront;
   const saleChannel = clip(data.saleChannel || data.orderType || "web_purchase", 40);
   const isWhatsApp = saleChannel === "whatsapp";
-  const deliveryAddress = shippingMethod === "pickup" ? `Levantamento: ${pickupStore || "Loja física"}` : (clip(data.deliveryAddressFull, 600) || address);
+  // Morada de entrega numa linha (o levantamento não tem morada: tem a loja, em pickup_store).
+  const deliveryAddress = clip(data.deliveryAddressFull, 600) || address;
   const deliveryCity = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.city, 120) || "Luanda");
   const timelineLocation = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.deliveryProvince, 120) || "Angola");
   // Hora + 3 caracteres aleatórios: evita números repetidos em compras simultâneas e números fáceis de adivinhar.
@@ -1322,14 +1325,17 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     customer_email: email,
     customer_name: name,
     phone,
-    address: deliveryAddress,
+    // `city` continua: o trigger orders_before_update usa-o como local de cada passo do
+    // seguimento, até à migração docs/migracoes-pendentes/4_campos_encomendas.sql.
+    // `address` deixou de ser gravado: era uma cópia de delivery_address_full (entrega) ou
+    // de pickup_store (levantamento).
     city: deliveryCity,
     checkout_signature_data: signatureOk ? signature : "",
     checkout_signature_at: signatureOk ? nowISO() : null,
     shipping_method: shippingMethod,
     pickup_store: pickupStore,
     payment_method_code: paymentCode,
-    payment_method_name: paymentMethodRow?.name || "",
+    payment_method_name: paymentMethodRow?.name || LEGACY_PAYMENT_LABELS[paymentCode] || paymentCode,
     payment_reference: clip(data.paymentReference, 120),
     payment_status: isP2P ? "awaiting_confirmation" : "pending",
     delivery_status: "received",
@@ -1352,7 +1358,6 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     order.delivery_gps_lat = gpsLat;
     order.delivery_gps_lng = gpsLng;
   }
-  if (paymentCode === "entrega" || paymentCode === "transferencia") order.payment_method = paymentCode;
   if (data.notes && rules.notesMax > 0) order.notes = clip(data.notes, rules.notesMax);
   if (shippingMethod !== "pickup") {
     Object.assign(order, {
@@ -1364,7 +1369,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
       delivery_locality: clip(data.deliveryLocality, 120),
       delivery_street: clip(data.deliveryStreet, 300),
       delivery_reference: clip(data.deliveryReference, 300),
-      delivery_address_full: clip(data.deliveryAddressFull, 600) || deliveryAddress,
+      delivery_address_full: deliveryAddress,
       delivery_relative_name: clip(data.deliveryRelativeName, 120),
       delivery_relative_phone: clip(data.deliveryRelativePhone, 40),
     });
@@ -1445,7 +1450,7 @@ function buildReceiptText(order: Row, siteName: string, paymentLink = "") {
   ];
   if (Number(order.shipping_cost)) lines.push(`Portes: ${fmtMoneyKz(order.shipping_cost)}`);
   lines.push("", `*Total: ${fmtMoneyKz(order.total)}*`);
-  if (order.payment_method_name || order.payment_method) lines.push(`Pagamento: ${order.payment_method_name || order.payment_method}`);
+  if (paymentLabel(order)) lines.push(`Pagamento: ${paymentLabel(order)}`);
   if (paymentLink) lines.push(`Link de pagamento: ${paymentLink}`);
   lines.push("", "Obrigado pela sua compra! 📚");
   return lines.join("\n");
