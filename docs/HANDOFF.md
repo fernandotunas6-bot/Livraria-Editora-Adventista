@@ -43,7 +43,11 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
   entrega:** sem a API do WhatsApp, "enviar" só produz links manuais, por isso o caminho
   automático salta esses canais sem avançar a data, em vez de marcar como enviada uma campanha
   que ninguém recebeu. Falta um segredo no Vault (`contact_campaigns_url`) e falta o painel
-  mostrar o estado. Detalhe em [CONTACTOS-E-CAMPANHAS.md](CONTACTOS-E-CAMPANHAS.md).
+  mostrar o estado — **o painel já mostra**: o estado do agendador numa frase (incluindo o caso
+  traiçoeiro de estar agendado sem segredos, em que corre e não chama nada), o motivo por
+  campanha quando o canal não entrega, e a lista do que foi saltado no último envio. Falta o
+  segredo `contact_campaigns_url` no Vault. Detalhe em
+  [CONTACTOS-E-CAMPANHAS.md](CONTACTOS-E-CAMPANHAS.md).
 - **Membros dos grupos de contactos com integridade referencial** (tabela
   `contact_group_members`): o `member_ids` jsonb deixava ids órfãos ao apagar um contacto, e o
   envio ia buscar 40 membros, encontrava 37 e seguia em silêncio. O `member_ids` continua

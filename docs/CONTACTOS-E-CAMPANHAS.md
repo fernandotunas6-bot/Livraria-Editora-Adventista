@@ -84,8 +84,35 @@ de emails (`email_queue_token`), porque é a mesma fronteira de confiança: quem
 agendador. Sem os dois, a função não faz nada e di-lo no registo — que é o estado normal logo
 após o deploy.
 
-Diagnóstico: `select public.contact_campaigns_scheduler_status();` responde se o `pg_cron` está
-disponível, se o trabalho está agendado e se os segredos existem. Falhas aparecem em
+### O que o painel mostra
+
+O separador **Campanhas** mostra o estado do agendador numa frase, e distingue três situações
+que de fora se parecem:
+
+| Estado | O que significa |
+|--------|-----------------|
+| `pg_cron` indisponível | o projecto não tem a extensão; as campanhas só saem com o botão |
+| instalado mas não activo | o trabalho existe e está desligado |
+| **agendado sem segredos** | o `pg_cron` corre de 15 em 15 minutos, a função devolve logo, e **nada parece errado** — as campanhas é que nunca saem |
+| activo | sai sozinho, com o horário à vista |
+
+O terceiro é o que justifica mostrar isto: foi exactamente assim que o agendador dos emails
+reportou sucesso durante meia hora sem enviar nada.
+
+Cada campanha activa cujo canal não entrega diz-no na própria linha, separando "o agendador não
+envia esta campanha" de "sai só por um dos canais". E depois de "Enviar pendentes", a lista do
+que foi saltado fica à vista, com o motivo — não passa num toast.
+
+A regra dos canais existe em dois módulos: `app/web/src/lib/campaignChannels.js` (vai no bundle)
+e `supabase/functions/app/campaigns.ts` (corre no Deno e é quem envia).
+`campaignChannels.test.js` importa os dois e confirma que não divergem em nenhuma combinação —
+é a convenção que o projecto já usa para o `orderFields`. Sem isso, o painel podia dizer
+"entrega" e o agendador saltar a campanha.
+
+Diagnóstico por SQL: `select public.contact_campaigns_scheduler_status();` responde se o
+`pg_cron` está disponível, se o trabalho está agendado e se os segredos existem. Aceita a
+service role, porque é a Edge Function que a chama — e quem chega por lá já passou pela
+verificação de permissão. Falhas aparecem em
 `cron.job_run_details` — **não** são engolidas, que foi o erro que deixou o agendador dos emails
 a reportar sucesso durante meia hora sem enviar nada.
 
@@ -106,8 +133,6 @@ Duas origens, diferentes no mecanismo:
 
 ## Por fazer
 
-- O painel ainda não mostra o estado do agendador nem os motivos de `skipped`. Os dados já vêm
-  na resposta e a função de diagnóstico já existe; falta mostrá-los.
 - A importação da Google é sempre completa. Podia ser incremental (`syncToken` da People API) e
   dizer com clareza o que criou e o que actualizou.
 - O `ContactsManager.jsx` tem mais de mil linhas e está em três sítios. Separá-lo por aba, sem
