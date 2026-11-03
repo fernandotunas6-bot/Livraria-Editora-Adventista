@@ -21,6 +21,7 @@ export default defineConfig({
     },
     // Inclui também os módulos de email da Edge Function: são TypeScript sem nada de Deno,
     // e assim o `npm test` (que o deploy usa como gate) cobre o HTML enviado aos clientes.
-    include: ['src/**/*.test.{js,jsx}', '../../supabase/functions/**/*.test.ts'],
+    // E os scripts de publicação (scripts/*.test.mjs): o pós-build de SEO corre em cada deploy.
+    include: ['src/**/*.test.{js,jsx}', '../../supabase/functions/**/*.test.ts', '../../scripts/**/*.test.mjs'],
   },
 });

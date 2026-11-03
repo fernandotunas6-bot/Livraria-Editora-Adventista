@@ -7,8 +7,10 @@
 # Variáveis para escolher o destino:
 #   CLOUDFLARE_PAGES_PROJECT → projecto Pages (por omissão livraria-adventista, o que serve
 #                              produção hoje; o novo é livraria-editora-adventista)
-#   SITE_URL                 → o que a verificação final testa (por omissão <projecto>.pages.dev;
-#                              com domínio próprio, ex. https://livrariaadventista.ao)
+#   SITE_URL                 → o endereço público (por omissão <projecto>.pages.dev; com domínio
+#                              próprio, ex. https://livrariaadventista.ao). Vai para o canonical,
+#                              as etiquetas de partilha, o sitemap e o robots.txt (ver
+#                              scripts/seo-catalogo.mjs), e é o que a verificação final testa.
 #
 # Garante que se publica exactamente a ponta do ramo remoto: várias sessões trabalham no
 # mesmo ramo e um build antigo publicado por cima apaga correcções já em produção.
@@ -50,25 +52,10 @@ npm run lint --silent
 npm test --silent
 npm run build --silent
 
-# O `canonical`, as etiquetas `og:`/`twitter:`, o sitemap e o robots.txt têm o endereço do
-# projecto que serviu produção primeiro. Publicado noutro sítio (o projecto novo, o domínio
-# .ao), o site dizia aos motores de busca e às partilhas no WhatsApp que a página "a sério"
-# é a do endereço antigo. Reescreve-se no build, não no código-fonte, para o mesmo commit
-# poder ir para qualquer destino.
-SOURCE_URL="https://livraria-adventista.pages.dev"
-# Livros e colecções no sitemap. Gerado com o endereço de origem, para a reescrita a seguir
-# o trocar junto com o resto.
-if [ "$mode" = "production" ]; then
-  node scripts/gerar-sitemap.mjs dist/app/web/sitemap.xml "$SOURCE_URL"
-fi
-if [ "$mode" = "production" ] && [ "$SITE_URL" != "$SOURCE_URL" ]; then
-  for f in index.html sitemap.xml robots.txt; do
-    file="dist/app/web/$f"
-    grep -q "$SOURCE_URL" "$file" || fail "$f não tem $SOURCE_URL: o build mudou e este passo tem de ser revisto."
-    sed -i.orig "s#$SOURCE_URL#${SITE_URL%/}#g" "$file" && rm "$file.orig"
-  done
-  echo "→ endereços públicos reescritos para $SITE_URL"
-fi
+# Pós-build de SEO e partilha (o mesmo passo do deploy-cloudflare.yml): endereços públicos
+# trocados para o SITE_URL, livros e colecções no sitemap, e uma página de partilha por livro
+# e por colecção, com a capa e o título para o WhatsApp. Ver scripts/seo-catalogo.mjs.
+node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL" || fail "O pós-build de SEO falhou (ver acima)."
 
 target="main"
 [ "$mode" = "preview" ] && target="${upstream#origin/}"
@@ -86,5 +73,12 @@ if [ "$mode" = "production" ]; then
     code="$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$path")"
     [ "$code" = "200" ] || fail "$SITE_URL$path respondeu $code."
   done
+  # A página de um livro tem de ser a de partilha gerada no pós-build (og:type book), e não
+  # o index.html genérico: é o que o WhatsApp lê.
+  sample="$(ls dist/app/web/product 2>/dev/null | head -1)"
+  if [ -n "$sample" ]; then
+    curl -s "$SITE_URL/product/${sample%.html}" | grep -q 'property="og:type" content="book"' \
+      || fail "$SITE_URL/product/${sample%.html} não serve a página de partilha do livro."
+  fi
   echo "✔ Produção em $short: $SITE_URL"
 fi

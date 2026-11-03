@@ -277,7 +277,7 @@ lint limpo, **250 testes** (eram 244), build e `deno check` da Edge Function.
 - **Testes no CI.** Sem o `.env` (que não está no git) quatro ficheiros de teste nem
   carregavam. O `vitest.config.js` fixa um projecto fictício: 254 testes passam com e sem
   `.env`.
-- **Sitemap com livros e colecções.** `scripts/gerar-sitemap.mjs` corre no deploy e junta
+- **Sitemap com livros e colecções.** `scripts/seo-catalogo.mjs` (antes `gerar-sitemap.mjs`) corre no deploy e junta
   as 102 páginas de livro e as 4 de colecção às 8 fixas (lê só o que é público). Se a base
   de dados não responder, publica com as fixas.
 
@@ -300,6 +300,46 @@ site antigo não envia a sessão e todas as entregas seriam recusadas.
   12 esgotados, 3 linhas em `site_settings` e 3 `unitel_money` repetidas, e o nome da loja
   "LIvraria Adventista - Huambo" com gralha e sem telefone.
 - Protecção contra palavras-passe vazadas: exige o plano Pro do Supabase.
+
+## 9.3 Backend mais leve, encomendas e partilha (2026-11-03, noite)
+
+Medido a partir de Angola: a Edge Function corre em Paris (`eu-west-3`) e a base de dados em
+Estocolmo; um pedido sem base de dados leva ~0,36 s (rede) e cada consulta em série
+acrescenta 0,1–0,2 s. Fixar a função na região da base de dados não mudou nada mensurável. A
+alavanca é fazer menos consultas em série:
+
+- **Cache curta por instância** (`runtime.ts`, 11 testes): definições e integrações 15 s,
+  dono do CRM 5 min; pedidos simultâneos partilham a leitura; o painel lê fresco onde testa
+  o que acabou de gravar. `/messaging/status` e `/chat` fazem as leituras em paralelo.
+- **Checkout sem esperar** pelo email (SMTP, 1–3 s quando ligado) nem pelo CRM: vão depois
+  da resposta (`EdgeRuntime.waitUntil`). O WhatsApp fica antes, porque o carrinho usa
+  `whatsapp_sent`.
+- **`/catalog/summary`** passa a exigir `manage_catalog` (mostrava stock e vendas a todos).
+- **Campos repetidos das encomendas**: um só critério de leitura no site (`orderUtils.js`) e
+  na função (`orderFields.ts`), com um teste que confirma que dizem o mesmo. Corrige o
+  painel, que repetia a loja dos levantamentos, e a exportação, que mostrava o código do
+  método em vez do nome. O checkout deixa de gravar `payment_method` e `address`.
+  SQL por aplicar: `docs/migracoes-pendentes/4_campos_encomendas.sql` (testado num bloco
+  anulado).
+- **Partilha dos livros no WhatsApp**: `scripts/seo-catalogo.mjs` gera no deploy uma página
+  estática por livro (`product/<id>.html`) e por colecção, com o título, a capa e a
+  descrição. Escolheu-se ficheiro estático em vez de Pages Function: não custa nada por
+  visita e mantém os cabeçalhos do `_headers` — as respostas de uma Function não os levam
+  (documentação do Cloudflare). O mesmo passo troca os endereços públicos e põe o catálogo
+  no sitemap, e corre agora **também no deploy pelo Actions**, que antes o saltava.
+- **`security_spec.md`** reescrito para o Supabase (era do Firestore), com os casos de ataque
+  à lista de desejos e o teste em `docs/testes/seguranca_wishlists.sql`.
+
+### Ordem de publicação (importa)
+
+1. **Site** (`deploy-site.sh` ou Actions): passa a enviar a sessão e o GPS no checkout e lê
+   as encomendas por um só critério. Funciona com a função antiga e com a nova.
+2. **`4_campos_encomendas.sql`** e **`3_indices_chaves_estrangeiras.sql`**.
+3. **Edge Function**: deixa de gravar `payment_method`/`address`, liga a encomenda à conta, e
+   traz a cache e o checkout sem esperas. Publicada antes do site, o painel antigo deixava de
+   mostrar a morada das encomendas novas.
+4. Depois de confirmado: exigir conta no servidor para entrega ao domicílio, e apagar as
+   colunas herdadas (ver o README de `docs/migracoes-pendentes`).
 
 ## 10. Não verificado nesta auditoria
 
