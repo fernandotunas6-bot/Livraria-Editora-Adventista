@@ -37,6 +37,18 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 
 ## O que já está feito
 
+- **Campanhas de contactos agendadas a sério** (2026-11-03): `pg_cron` de 15 em 15 minutos a
+  chamar `/cron/contact-campaigns`. Antes o `next_send_at` era calculado e nada o disparava —
+  as campanhas saíam quando alguém carregava num botão. **O agendador não agenda o que não
+  entrega:** sem a API do WhatsApp, "enviar" só produz links manuais, por isso o caminho
+  automático salta esses canais sem avançar a data, em vez de marcar como enviada uma campanha
+  que ninguém recebeu. Falta um segredo no Vault (`contact_campaigns_url`) e falta o painel
+  mostrar o estado. Detalhe em [CONTACTOS-E-CAMPANHAS.md](CONTACTOS-E-CAMPANHAS.md).
+- **Membros dos grupos de contactos com integridade referencial** (tabela
+  `contact_group_members`): o `member_ids` jsonb deixava ids órfãos ao apagar um contacto, e o
+  envio ia buscar 40 membros, encontrava 37 e seguia em silêncio. O `member_ids` continua
+  actualizado por trigger para não quebrar os leitores antigos.
+
 - **Migrações alinhadas com a base de dados:**
   - Cada ficheiro em `supabase/migrations/` tem a mesma versão e o mesmo SQL que `supabase_migrations.schema_migrations` no projecto (verificado por md5).
   - Já estão aplicadas: `base_perfis`, `tabelas`, `regras_rls_storage`, `funcoes_privadas`, `painel_vendas`, `lojas_levantamento_whatsapp`, `notification_logs`, `admins_pre_autorizados` (20261101163522), `modulo_utilizadores` (20261101164811) e `desejos_avaliacoes` (20261101165942).

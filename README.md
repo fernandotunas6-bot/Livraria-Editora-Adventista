@@ -232,6 +232,7 @@ Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 
 O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), implementada sobre o Supabase em `app/web/src/lib/dataClient.js`.
 
+> Contactos e campanhas: [docs/CONTACTOS-E-CAMPANHAS.md](docs/CONTACTOS-E-CAMPANHAS.md)  
 > Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · Passagem de trabalho: [docs/HANDOFF.md](docs/HANDOFF.md) · Migração do repositório: [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md)  
 > O login (email e Google) é do Supabase Auth. O Firebase fica só para as ferramentas do Google Workspace no painel.
 
