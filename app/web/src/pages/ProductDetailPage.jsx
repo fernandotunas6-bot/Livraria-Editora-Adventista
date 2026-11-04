@@ -27,6 +27,7 @@ import SampleReaderModal from '@/components/SampleReaderModal';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
+import { MOTION } from '@/lib/motion';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -41,7 +42,7 @@ const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
           <Star
             key={star}
             size={size}
-            className={`transition-colors duration-150 ${
+            className={`transition-colors duration-fast ${
               isFilled ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/30'
             } ${interactive ? 'cursor-pointer hover:scale-110' : ''}`}
             onClick={() => interactive && onChange && onChange(star)}
@@ -272,7 +273,7 @@ function ProductDetailPage() {
             className="min-w-0"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: MOTION.base }}
           >
             <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] sm:aspect-square mb-4">
               <img
@@ -331,7 +332,7 @@ function ProductDetailPage() {
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: MOTION.base, delay: 0.2 }}
             className="flex flex-col min-w-0"
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">{product.title}</h1>
@@ -460,7 +461,7 @@ function ProductDetailPage() {
                 onClick={() => toggleWishlist(product)}
                 size="lg"
                 variant="outline"
-                className={`px-4 py-6 border-2 transition-all duration-300 ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
+                className={`px-4 py-6 border-2 transition-all duration-base ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
                 title={isWish ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
               >
                 <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />

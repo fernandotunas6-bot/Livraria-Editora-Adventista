@@ -25,6 +25,7 @@ import { pageTitle } from '@/lib/brand';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { applyShopTheme, shopDefaults } from '@/lib/shopTheme';
 import { getSearchRelevance } from '@/lib/searchUtils';
+import { MOTION } from '@/lib/motion';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destaques' },
@@ -531,7 +532,7 @@ const ShopPage = () => {
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
+              transition={{ duration: MOTION.base, ease: MOTION.ease }}
               className={viewMode === 'grid' ? `[&_.product-grid]:grid-cols-2 md:[&_.product-grid]:grid-cols-3 ${gridClass}` : ''}
             >
               <ProductsList

@@ -30,7 +30,7 @@ function MarqueeBookCard({ product, onSelect, accent }) {
       className="flex-shrink-0 w-[132px] sm:w-40 text-left group/card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0ea5c9] rounded-xl"
     >
       <div
-        className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-card shadow-md transition-all duration-300 group-hover/card:scale-[1.03] group-hover/card:shadow-lg group-active/card:scale-100"
+        className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-card shadow-md transition-all duration-base group-hover/card:scale-[1.03] group-hover/card:shadow-lg group-active/card:scale-100"
         style={{ borderColor: `${accent}33` }}
       >
         <img

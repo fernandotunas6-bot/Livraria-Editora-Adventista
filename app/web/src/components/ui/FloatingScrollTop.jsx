@@ -69,7 +69,7 @@ export function FloatingScrollTop({
           whileHover={{ y: -3 }}
           whileTap={{ scale: 0.9 }}
         >
-          <span className="text-xs font-semibold hidden sm:inline max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-300 whitespace-nowrap">
+          <span className="text-xs font-semibold hidden sm:inline max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-base whitespace-nowrap">
             {label}
           </span>
           <ArrowUp className="h-5 w-5 stroke-[2.5] shrink-0" />

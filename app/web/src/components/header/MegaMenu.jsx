@@ -11,6 +11,7 @@ import { getCollections, getPhysicalStores } from '@/api/PlatformApi';
 import { SHOWCASE_CATEGORIES, CATEGORY_SHOP_FILTERS } from '@/lib/catalogCategories';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useAuth } from '@/hooks/useAuth';
+import { MOTION } from '@/lib/motion';
 
 const OPEN_DELAY = 90;
 const CLOSE_DELAY = 160;
@@ -58,7 +59,7 @@ function ImageCard({ to, image, title, subtitle, onNavigate, tall = false }) {
             src={image}
             alt=""
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+            className="w-full h-full object-cover transition-transform duration-slow group-hover/card:scale-105"
             onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
           />
         ) : (
@@ -400,7 +401,7 @@ export default function MegaMenu() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            transition={{ duration: MOTION.fast, ease: MOTION.ease }}
             className="absolute left-0 right-0 top-full z-50 pt-0"
             onMouseEnter={() => clearTimeout(timer.current)}
           >
@@ -412,7 +413,7 @@ export default function MegaMenu() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.12 }}
+                    transition={{ duration: MOTION.fast }}
                   >
                     {active.panel}
                   </motion.div>

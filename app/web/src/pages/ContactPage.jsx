@@ -15,6 +15,7 @@ import { pageTitle, BRAND } from '@/lib/brand';
 import { APP_API_URL } from '@/lib/supabaseClient';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
+import { MOTION } from '@/lib/motion';
 
 const ContactPage = () => {
   // Os contactos vêm de Configurações, como no rodapé. A página mostrava os valores fixos do
@@ -88,7 +89,7 @@ const ContactPage = () => {
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: MOTION.base, delay: 0.2 }}
             >
               <h2 className="text-2xl font-semibold mb-6 text-foreground">Envie-nos uma mensagem</h2>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -152,7 +153,7 @@ const ContactPage = () => {
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: MOTION.base, delay: 0.4 }}
               className="space-y-8"
             >
               <div>

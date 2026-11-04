@@ -246,7 +246,7 @@ const HeroSlider = () => {
                 className="group grid h-6 place-items-center px-2"
                 aria-label={`Ir para slide ${i + 1}${s.is_primary ? ' (principal)' : ''}`}
               >
-                <span className={`block h-2 rounded-full transition-all duration-300 ${i === current ? 'w-8 bg-white' : 'w-2 bg-white/40 group-hover:bg-white/60'}`} />
+                <span className={`block h-2 rounded-full transition-all duration-base ${i === current ? 'w-8 bg-white' : 'w-2 bg-white/40 group-hover:bg-white/60'}`} />
               </button>
             ))}
           </div>

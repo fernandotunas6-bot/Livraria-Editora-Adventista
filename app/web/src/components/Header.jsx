@@ -171,7 +171,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
         // Onde a página abre com conteúdo normal — ficha de livro, perfil, confirmação de
         // encomenda — não há imagem para descobrir, e escondê-lo só deixava o texto colado
         // ao topo, sem navegação. Aí fica `sticky`, no fluxo, como sempre esteve.
-        pinned ? 'sticky' : 'fixed inset-x-0 transition-transform duration-300 ease-out',
+        pinned ? 'sticky' : 'fixed inset-x-0 transition-transform duration-base ease-brand',
         // Com o menu aberto o cabeçalho pode passar da altura do ecrã; aí desloca-se por
         // dentro em vez de cortar o fim da lista.
         mobileOpen && 'max-h-dvh overflow-y-auto',
@@ -266,13 +266,13 @@ const Header = ({ onCartOpen, pinned = false }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden rounded-full text-white hover:bg-white/10 transition-transform duration-200 active:scale-95"
+              className="lg:hidden rounded-full text-white hover:bg-white/10 transition-transform duration-base active:scale-95"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-expanded={mobileOpen}
               aria-controls="mobile-navigation-menu"
               aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
             >
-              {mobileOpen ? <X className="h-5 w-5 animate-in spin-in-90 duration-200" /> : <Menu className="h-5 w-5" />}
+              {mobileOpen ? <X className="h-5 w-5 animate-in spin-in-90 duration-base" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
@@ -284,7 +284,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
           role="search"
           aria-label="Pesquisa de livros"
           aria-hidden={!searchOpen}
-          className={`relative grid transition-[grid-template-rows,opacity] duration-300 ${
+          className={`relative grid transition-[grid-template-rows,opacity] duration-base ${
             searchOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
           }`}
         >

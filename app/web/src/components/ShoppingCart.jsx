@@ -26,6 +26,7 @@ import SignaturePad from '@/components/SignaturePad';
 import PhoneInput from '@/components/PhoneInput';
 import { normalizeAngolaPhone, isValidAngolaPhone } from '@/lib/angolaPhone';
 import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
+import { MOTION } from '@/lib/motion';
 
 const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { toast } = useToast();
@@ -359,7 +360,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            transition={MOTION.spring}
             className="absolute right-0 top-0 h-full w-full max-w-md bg-card text-card-foreground shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
             role="dialog"

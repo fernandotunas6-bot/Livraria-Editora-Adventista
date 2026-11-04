@@ -7,6 +7,7 @@ import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { pageTitle } from '@/lib/brand';
 import PageBannerSlider from '@/components/PageBannerSlider';
+import { MOTION } from '@/lib/motion';
 
 const ShippingReturnsPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -32,7 +33,7 @@ const ShippingReturnsPage = () => {
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              transition={{ duration: MOTION.base, delay: 0.1 }}
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -65,7 +66,7 @@ const ShippingReturnsPage = () => {
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: MOTION.base, delay: 0.2 }}
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -87,7 +88,7 @@ const ShippingReturnsPage = () => {
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: MOTION.base, delay: 0.3 }}
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -137,7 +138,7 @@ const ShippingReturnsPage = () => {
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: MOTION.base, delay: 0.4 }}
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -160,7 +161,7 @@ const ShippingReturnsPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ duration: MOTION.base, delay: 0.5 }}
             className="mt-12 text-center bg-muted/30 rounded-xl p-8"
           >
             <h3 className="text-xl font-semibold mb-3 text-foreground">Questions about shipping or returns?</h3>

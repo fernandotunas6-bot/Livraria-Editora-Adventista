@@ -61,6 +61,17 @@ module.exports = {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
+      // As mesmas fichas de movimento do `index.css`, para as classes do Tailwind. Sem isto
+      // cada componente escolhia um `duration-` à sorte e o mesmo gesto demorava tempos
+      // diferentes conforme o sítio onde se tocava.
+      transitionDuration: {
+        fast: "var(--motion-fast)",
+        base: "var(--motion-base)",
+        slow: "var(--motion-slow)",
+      },
+      transitionTimingFunction: {
+        brand: "var(--ease-out)",
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

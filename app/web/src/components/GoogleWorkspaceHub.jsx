@@ -298,7 +298,7 @@ const GoogleWorkspaceHub = () => {
             <button
               onClick={handleConnect}
               disabled={actionLoading}
-              className="gsi-material-button w-full sm:w-auto px-6 py-2.5 flex items-center justify-center gap-3 border shadow-sm rounded-lg hover:bg-muted/10 transition-all duration-200"
+              className="gsi-material-button w-full sm:w-auto px-6 py-2.5 flex items-center justify-center gap-3 border shadow-sm rounded-lg hover:bg-muted/10 transition-all duration-base"
             >
               <div className="gsi-material-button-icon">
                 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: 'block', width: '22px', height: '22px' }}>

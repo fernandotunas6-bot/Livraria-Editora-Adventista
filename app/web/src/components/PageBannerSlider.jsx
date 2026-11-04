@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { MOTION } from '@/lib/motion';
 
 export const SHOP_BANNER_IMAGES = [
   '/images/site/loja-banner.webp',
@@ -63,7 +64,7 @@ export default function PageBannerSlider({
             initial={{ opacity: 0, scale: reducedMotion ? 1 : 1.03 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: reducedMotion ? 0 : 0.8, ease: 'easeInOut' }}
+            transition={{ duration: reducedMotion ? 0 : 0.8, ease: MOTION.ease }}
             loading="eager"
             onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
           />

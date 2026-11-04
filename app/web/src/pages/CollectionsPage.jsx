@@ -171,7 +171,7 @@ export default function CollectionsPage() {
                       className="group block bg-card border rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
                     >
                       {col.cover ? (
-                        <img src={col.cover} alt={col.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img src={col.cover} alt={col.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-base" />
                       ) : (
                         <div className="w-full h-44 bg-gradient-to-br from-primary/20 to-[#0c4a6e]/20 flex items-center justify-center">
                           <BookOpen className="h-12 w-12 text-primary/50" />
@@ -247,7 +247,7 @@ export default function CollectionsPage() {
                 {/* Mobile Slide-out Drawer */}
                 {mobileFilterOpen && (
                   <div className="fixed inset-0 z-50 bg-black/60 lg:hidden flex justify-end">
-                    <div className="bg-background w-80 h-full p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="bg-background w-80 h-full p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-base">
                       <div className="flex items-center justify-between border-b pb-4 mb-6">
                         <h3 className="text-lg font-bold text-foreground">Filtrar por Categoria</h3>
                         <Button variant="ghost" size="icon" onClick={() => setMobileFilterOpen(false)}>

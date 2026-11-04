@@ -163,7 +163,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
           layout
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="transition-all duration-300"
+          className="transition-all duration-base"
         >
           <ProductGrid products={displayList} isLoading={false} onCartOpen={onCartOpen} viewMode={viewMode} onQuickView={onQuickView} />
         </motion.div>

@@ -4,6 +4,7 @@ import { X, BookOpen, ChevronLeft, ChevronRight, Type, CheckCircle, ShoppingCart
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
+import { MOTION } from '@/lib/motion';
 
 export default function BookPreviewModal({ product, open, onClose, onCartOpen }) {
   const { addToCart } = useCart();
@@ -202,13 +203,13 @@ export default function BookPreviewModal({ product, open, onClose, onCartOpen })
 
   return (
     <AnimatePresence>
-      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${isImmersive ? 'p-0 bg-background' : 'p-2 sm:p-4 bg-black/75 backdrop-blur-xs'}`} id="book-preview-overlay">
+      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-base ${isImmersive ? 'p-0 bg-background' : 'p-2 sm:p-4 bg-black/75 backdrop-blur-xs'}`} id="book-preview-overlay">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          transition={{ duration: 0.3 }}
-          className={`flex flex-col bg-background overflow-hidden transition-all duration-300 ${
+          transition={{ duration: MOTION.base }}
+          className={`flex flex-col bg-background overflow-hidden transition-all duration-base ${
             isImmersive 
               ? "w-screen h-screen rounded-none border-none" 
               : "w-full max-w-4xl h-[90vh] md:h-[80vh] rounded-2xl shadow-2xl border border-border"
@@ -216,7 +217,7 @@ export default function BookPreviewModal({ product, open, onClose, onCartOpen })
           onClick={(e) => e.stopPropagation()}
         >
           {/* Top Header */}
-          <div className={`flex items-center justify-between px-6 py-4 border-b border-border bg-card transition-all duration-300 ${isImmersive ? 'opacity-90 py-3 shadow-xs' : ''}`}>
+          <div className={`flex items-center justify-between px-6 py-4 border-b border-border bg-card transition-all duration-base ${isImmersive ? 'opacity-90 py-3 shadow-xs' : ''}`}>
             <div className="flex items-center gap-3">
               <BookOpen className="h-5 w-5 text-primary animate-pulse" />
               <div>
@@ -289,15 +290,15 @@ export default function BookPreviewModal({ product, open, onClose, onCartOpen })
           </div>
 
           {/* Main Book Content Body */}
-          <div className={`flex-1 overflow-y-auto px-6 py-10 md:px-16 transition-all duration-300 ${currentThemeClass} ${isImmersive ? 'py-16 md:py-24' : ''}`}>
-            <div className={`mx-auto h-full flex flex-col justify-center transition-all duration-300 ${isImmersive ? 'max-w-2xl px-4 md:px-8' : 'max-w-2xl'}`}>
+          <div className={`flex-1 overflow-y-auto px-6 py-10 md:px-16 transition-all duration-base ${currentThemeClass} ${isImmersive ? 'py-16 md:py-24' : ''}`}>
+            <div className={`mx-auto h-full flex flex-col justify-center transition-all duration-base ${isImmersive ? 'max-w-2xl px-4 md:px-8' : 'max-w-2xl'}`}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentPage}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: MOTION.base }}
                   className="space-y-6"
                 >
                   {pages[currentPage].title && (
@@ -331,7 +332,7 @@ export default function BookPreviewModal({ product, open, onClose, onCartOpen })
                 <button
                   key={idx}
                   onClick={() => setCurrentPage(idx)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
+                  className={`h-2 rounded-full transition-all duration-base ${
                     currentPage === idx ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
                   }`}
                   aria-label={`Ir para página ${idx + 1}`}
