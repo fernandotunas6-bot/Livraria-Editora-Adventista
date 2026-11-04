@@ -10,15 +10,15 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
 |---|---|---|---|
 | 1 | Sanitização de HTML contornável (injecção de código nas descrições e slides) | Crítica | ✅ |
 | 2 | Edge Function publicada desactualizada: módulo de utilizadores partido em produção | Alta | ✅ publicada (2026-11-01 23:21) |
-| 3 | GitHub Actions bloqueado por pagamento (CI e deploys automáticos não correm) | Alta | ⏳ dono da conta |
+| 3 | GitHub Actions bloqueado por pagamento (CI e deploys automáticos não correm) | Alta | ✅ corre na conta nova; faltam segredos (ver 9.5) |
 | 4 | Service worker serve HTML antigo depois de cada deploy (risco de ecrã branco) | Alta | ✅ |
 | 5 | 100 de 102 livros sem descrição; 17 capas em branco; capas trocadas | Alta (negócio) | ⏳ conteúdo |
 | 6 | Carregamento inicial pesado (Firebase e Recharts em todas as páginas) | Média | ✅ 580 → 331 KB |
 | 7 | Contactos provisórios no site (telefone `+244 923 000 000`, WhatsApp vazio) | Média | ⏳ Configurações |
 | 8 | Emails de confirmação de encomenda desligados (sem SMTP) | Média | ⏳ Configurações |
-| 9 | Sem `robots.txt`, `sitemap.xml`, `favicon.ico`, etiquetas `og:` | Média | ✅ (falta só o `favicon.ico`) |
-| 10 | Sem cabeçalhos de segurança (CSP, X-Frame-Options, HSTS) | Média | ✅ excepto CSP |
-| 11 | 11 vulnerabilidades em dependências (10 altas, impacto prático baixo) | Média | ⏳ |
+| 9 | Sem `robots.txt`, `sitemap.xml`, `favicon.ico`, etiquetas `og:` | Média | ✅ |
+| 10 | Sem cabeçalhos de segurança (CSP, X-Frame-Options, HSTS) | Média | ✅ |
+| 11 | 11 vulnerabilidades em dependências (10 altas, impacto prático baixo) | Média | ✅ nada vulnerável no site publicado (ver 9.5) |
 | 12 | Stock: 96 de 102 livros esgotados ou com 1–4 unidades | Média (negócio) | ⏳ conferir |
 | 13 | API lenta (0,85–1,5 s por pedido, Supabase em Estocolmo, sem cache) | Média | ⏳ |
 | 14 | 53 botões só com ícone sem nome acessível | Baixa | ✅ |
@@ -28,7 +28,7 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
 | 18 | Três bugs de runtime que o gate desligado escondia (criar livro no painel rebentava) | Alta | ✅ |
 | 19 | `/track` devolvia a assinatura manuscrita a quem soubesse nº da encomenda + email | Alta | ✅ |
 | 20 | `/admin` descarregava todas as encomendas com `select *`, assinaturas base64 incluídas | Média | ✅ |
-| 21 | Limite de pedidos em memória por isolate: na prática não limitava nada | Alta | ⏳ migração por aplicar |
+| 21 | Limite de pedidos em memória por isolate: na prática não limitava nada | Alta | ✅ migração aplicada |
 
 ## 1. Repositório e deploy
 
@@ -595,9 +595,8 @@ Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do
 - **Base de dados:** as migrações até `20261104095000` estão aplicadas em produção (pela outra
   sessão, com as versões dos ficheiros). Confirmado por consulta: MFA nas três funções de
   permissão, triggers dos segredos e das conversas, índice de idempotência, índices das
-  chaves estrangeiras, agendadores só com trabalho. **Falta a `20261104120000`** (um índice em
-  `contact_group_members.added_by`): a aplicação foi recusada nesta sessão; entra com o
-  `supabase db push` do Actions, ou à mão no SQL Editor.
+  chaves estrangeiras, agendadores só com trabalho. A `20261104120000` (índice em
+  `contact_group_members.added_by`) também já está aplicada (confirmado a 2026-11-04, ver 9.5).
 - **Edge Function:** a versão publicada é a final (verificado pelos cabeçalhos `X-Request-Id`,
   `Cache-Control: no-store` e a cache de `/integrations`).
 - **Site:** publicado em produção a partir de `6361ec1` (`deploy-site.sh`), verificado em
@@ -606,6 +605,42 @@ Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do
   no telemóvel.
 - **Advisors depois do deploy:** nada novo de gravidade; `private.site_secrets` sem políticas é
   intencional (só a service role lhe chega).
+
+## 9.5 Correcção auditada (2026-11-04, tarde)
+
+Releitura de cada ponto ⏳ contra o estado real, com comandos. Vários estavam já resolvidos e
+a tabela não tinha sido actualizada.
+
+### Verificado
+
+| Ponto | Evidência |
+|---|---|
+| 21 e a `20261104120000` | `list_migrations` no projecto `bggqkjjqbjhbjsckzopj`: as 42 migrações de `supabase/migrations` estão todas aplicadas, de `20261101131516` a `20261104120000`, incluindo `20261102013223_limites_pedidos`. |
+| 3 | `gh run list`: a verificação dos PRs corre (última a 2026-11-04 13:32, com sucesso). Só existe o segredo `SUPABASE_DB_PASSWORD`; os outros quatro continuam por criar. |
+| 9 | `https://livrariaadventista.com/favicon.ico` responde 200 `image/vnd.microsoft.icon`. |
+| 10 | A resposta da página inicial traz `content-security-policy`, `strict-transport-security` e `x-frame-options: SAMEORIGIN`. |
+| Próximo passo 6 | Scope do Gmail: `googleAuth.js` pede só `gmail.readonly` e `gmail.send` (já não `mail.google.com`). `access-link`: o link só volta a um administrador e só quando o email não seguiu. |
+
+### Corrigido
+
+- **Dependências (achado 11).** `npm audit fix` sem `--force`: só subidas dentro das versões
+  pedidas no `package.json` (`vite` 7.3.6 → 7.3.7, `eslint` 9.39.4 → 9.39.5, `browserslist`,
+  `js-yaml`, `brace-expansion`, `baseline-browser-mapping`, entre outras). Antes 16 avisos
+  (8 altos), agora 11 (4 altos). Lint limpo, 48/48 ficheiros e 416/416 testes, build sem erros.
+- **O que fica, e porquê:**
+  - `@grpc/grpc-js` (os 4 altos) chega pelo `firebase` → `@firebase/firestore`. O site não
+    importa o Firestore (só o Auth, em `firebaseClient.js` e `googleAuth.js`), e o gRPC só
+    corre em Node: `grep -i grpc` no `dist/` dá zero ficheiros. A versão mais recente do
+    Firebase (13.2.0) continua presa a `~1.9`, por isso subir não resolve; o `--force`
+    trocaria o Firebase por uma versão maior sem ganho.
+  - `minimatch` (moderados) vem do ESLint e dos plugins: só na máquina de quem desenvolve,
+    nunca no site. O `--force` exige versões maiores dos plugins.
+
+### Continua por fazer (dono ou autorização)
+
+Os pontos 5, 7, 8, 12 e 16, e a lista de 9.4 (email do domínio, `site_settings` com três
+linhas e `site_url` antigo, projecto antigo no `pages.dev`, MFA, DNSSEC, alertas, segredos do
+Actions e o primeiro backup). Nada disto se resolve no código.
 
 ## 10. Não verificado nesta auditoria
 
@@ -616,11 +651,9 @@ Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do
 
 ## Próximos passos, por ordem
 
-1. Aplicar a migração `limites_pedidos` e o SQL de `docs/migracoes-pendentes/`. (A Edge Function já está publicada e os advisors já correram: ver 9.1.)
-2. Desbloquear o GitHub (pagamento) → CI e deploys automáticos.
+1. Segredos do Actions em falta (só existe `SUPABASE_DB_PASSWORD`), incluindo `BACKUP_PASSPHRASE`.
+2. `site_settings`: corrigir o `site_url` e apagar as duas linhas a mais (ver 9.4, pontos 2 e 10).
 3. Conteúdo: descrições, capas em branco ou trocadas, stock real, contactos, SMTP.
-4. Content-Security-Policy, com o browser aberto para confirmar cada fluxo (ver 9.1).
-5. `npm audit fix` e remover as dependências sem uso.
-6. Decisões do dono: o scope `https://mail.google.com/` (acesso total ao Gmail) pedido no
-   login Google, e o link de recuperação devolvido na resposta de `/admin/users/access-link`
-   (quem tem `manage_users` pode ler o link de qualquer cliente).
+4. Decisão do dono sobre `1_loja_talatona_para_huambo.sql` (o id é hoje Catumbela) e publicar
+   `4_campos_encomendas.sql` pela ordem do README de `docs/migracoes-pendentes/`.
+5. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4).
