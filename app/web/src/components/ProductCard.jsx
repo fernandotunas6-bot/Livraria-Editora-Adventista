@@ -1,6 +1,6 @@
 import React, { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Loader2, Eye, MessageCircle, Heart, Star, AlertTriangle, Check } from 'lucide-react';
+import { ShoppingCart, Loader2, Eye, MessageCircle, Heart, Star, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { shareBookOnWhatsApp } from '@/lib/whatsapp';
 import QuickViewModal from '@/components/QuickViewModal';
 import { MOTION } from '@/lib/motion';
+import { PRODUCT_GRID_CLASS, discountPercent } from '@/lib/productGrid';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -133,7 +134,8 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
     </div>
   );
 
-  return (
+  // Modo lista: o cartão de sempre, sem mudanças.
+  const listCard = (
     <div className={`group h-full flex ${isList ? 'flex-row gap-4' : 'flex-col'}`}>
       <div className={`bg-card rounded-xl overflow-hidden surface-raise border border-border h-full flex flex-1 ${isList ? 'flex-row' : 'flex-col'}`}>
           <div className={`relative overflow-hidden bg-muted shrink-0 ${isList ? 'w-28 h-36' : 'aspect-[2/3] sm:aspect-[3/4]'}`}>
@@ -253,6 +255,155 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
       )}
     </div>
   );
+
+  if (isList) return listCard;
+
+  // Cartão da grelha, compacto como nas grandes lojas: capa inteira (2:3, a proporção das
+  // capas), favoritos e partilha sobre a capa, título em duas linhas, preço em destaque e as
+  // acções dentro do cartão. Tudo o que o cartão fazia continua: favoritos, visualização
+  // rápida, partilha no WhatsApp, comprar, ver detalhes, destaque, stock baixo, esgotado e
+  // promoção.
+  const discount = discountPercent(variant);
+  const iconButton = 'tap-target flex h-8 w-8 items-center justify-center rounded-full shadow-sm control-press';
+
+  return (
+    <div className="group h-full">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card surface-raise transition-shadow duration-base hover:shadow-md">
+        <div className="relative aspect-[2/3] shrink-0 overflow-hidden bg-muted">
+          <Link to={`/product/${product.id}`} onClick={handleQuickView} className="block h-full" tabIndex={-1} aria-hidden="true">
+            <img
+              src={product.image || PLACEHOLDER}
+              alt=""
+              className="media-zoom h-full w-full object-cover"
+              loading={index < 6 ? 'eager' : 'lazy'}
+              decoding="async"
+              onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER; }}
+            />
+          </Link>
+
+          <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-1.5">
+            {product.featured && (
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm" title="Destaque">
+                <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                <span className="sr-only">Destaque</span>
+              </span>
+            )}
+            {discount > 0 && inStock && (
+              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white shadow-sm tabular-nums">−{discount}%</span>
+            )}
+            {isLowStock && (
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm"
+                title={qty > 0 ? `Últimas ${qty} unidades` : 'Poucas unidades'}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="sr-only">{qty > 0 ? `Últimas ${qty} unidades` : 'Poucas unidades'}</span>
+              </span>
+            )}
+            {product.ribbon_text && inStock && !isLowStock && !discount
+              && product.ribbon_text.trim().toLowerCase() !== 'destaque' && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                {product.ribbon_text}
+              </span>
+            )}
+          </div>
+
+          <div className="absolute right-2 top-2 z-20 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => toggleWishlist(product)}
+              className={`${iconButton} bg-background/90 backdrop-blur-sm hover:bg-background`}
+              aria-label={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+              title={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+            >
+              <Heart className={`h-4 w-4 transition-colors ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+            </button>
+            {waPhone && (
+              <button
+                type="button"
+                onClick={handleShare}
+                className={`${iconButton} bg-green-700 text-white hover:bg-green-800`}
+                aria-label="Partilhar no WhatsApp"
+                title="Partilhar no WhatsApp"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {!inStock && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+              <span className="rounded-full bg-destructive px-3 py-1 text-xs font-bold text-white">Esgotado</span>
+            </div>
+          )}
+
+          {/* Visualização rápida: aparece ao passar o rato (e ao focar com o teclado). No
+              telemóvel, tocar no cartão já a abre onde ela existe. */}
+          <button
+            type="button"
+            onClick={handleQuickView}
+            className="absolute inset-x-2 bottom-2 z-20 hidden items-center justify-center gap-1.5 rounded-lg bg-background/95 py-1.5 text-xs font-medium shadow-sm backdrop-blur-sm transition-opacity duration-base hover:bg-background focus-visible:opacity-100 sm:flex sm:opacity-0 sm:group-hover:opacity-100"
+            aria-label={`Visualização rápida de ${product.title}`}
+          >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Visualização rápida
+          </button>
+        </div>
+
+        <Link to={`/product/${product.id}`} onClick={handleQuickView} className="flex flex-1 flex-col px-2.5 pt-2 sm:px-3 sm:pt-2.5">
+          {product.book_code && <code className="mb-0.5 font-mono text-[10px] text-brand-ink/80">{product.book_code}</code>}
+          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground transition-colors [font-family:inherit] group-hover:text-primary sm:text-sm">
+            {product.title}
+          </h3>
+          {product.subtitle && (
+            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-xs">{product.subtitle}</p>
+          )}
+          {product.type?.value && (
+            <p className="mt-0.5 hidden line-clamp-1 text-[11px] text-muted-foreground/80 sm:block">{product.type.value}</p>
+          )}
+          <div className="mt-auto flex flex-wrap items-baseline gap-x-1.5 pt-1.5">
+            <span className="text-[15px] font-bold text-brand-ink tabular-nums sm:text-base">{price}</span>
+            {originalPrice && <span className="text-[11px] text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
+          </div>
+          {inStock && isLowStock && qty > 0 && (
+            <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400">Restam {qty}</span>
+          )}
+        </Link>
+
+        <div className="px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3">
+          {inStock ? (
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className={`h-10 flex-1 rounded-lg px-2 text-xs sm:h-8 ${added ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-primary/30 hover:bg-primary/10'}`}
+                onClick={handleAddToCart}
+                disabled={adding}
+              >
+                {adding
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : added
+                    ? <Check className="mr-1 h-4 w-4" />
+                    : <ShoppingCart className="mr-1 h-4 w-4" />}
+                {added ? 'No carrinho' : 'Comprar'}
+              </Button>
+              {/* Página do livro: só o ícone, para caber ao lado de "Comprar" num cartão de
+                  cinco colunas (com texto, "Detalhes" ficava cortado). Em ecrã estreito fica só
+                  "Comprar": tocar no cartão já abre o livro. */}
+              <Button asChild size="sm" variant="secondary" className="hidden h-8 w-8 shrink-0 rounded-lg p-0 hover:bg-primary/10 hover:text-primary sm:inline-flex">
+                <Link to={`/product/${product.id}`} aria-label={`Ver detalhes de ${product.title}`} title="Ver detalhes">
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <Button asChild size="sm" variant="outline" className="h-10 w-full rounded-lg text-xs border-primary/30 hover:bg-primary/10 hover:text-primary sm:h-8">
+              <Link to={`/product/${product.id}`}>Ver detalhes</Link>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const gridContainerVariants = {
@@ -293,9 +444,9 @@ export function ProductGrid({ products, isLoading, onCartOpen, viewMode = 'grid'
 
   if (isLoading) {
     return (
-      <div className={`product-grid grid gap-6 ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+      <div className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}>
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="animate-pulse bg-muted rounded-xl aspect-[3/4]" />
+          <div key={i} className="animate-pulse bg-muted rounded-xl aspect-[2/3]" />
         ))}
       </div>
     );
@@ -307,7 +458,7 @@ export function ProductGrid({ products, isLoading, onCartOpen, viewMode = 'grid'
         variants={gridContainerVariants}
         initial="hidden"
         animate="show"
-        className={`product-grid grid gap-6 ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}
+        className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}
       >
         {products.map((product, index) => (
           <motion.div key={product.id} variants={gridItemVariants}>

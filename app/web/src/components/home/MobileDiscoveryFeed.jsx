@@ -74,7 +74,7 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
             Loja <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
-        <div className="[&_.product-grid]:gap-3">
+        <div>
           <ProductsList
             embedded
             products={ordered.slice(0, infinite.count)}

@@ -30,6 +30,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useInfiniteList } from '@/hooks/useInfiniteList';
 import { useScrollMemory } from '@/hooks/useScrollMemory';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
+import { PRODUCT_GRID_CLASS, SHOP_DENSITY_OPTIONS, shopDensityClass } from '@/lib/productGrid';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destaques' },
@@ -196,11 +197,8 @@ const ShopPage = () => {
   // filtros abre ou a página muda.
   const handleCartOpen = useCallback(() => setIsCartOpen(true), []);
 
-  const gridClass = {
-    2: 'xl:grid-cols-2',
-    3: 'xl:grid-cols-3',
-    4: 'xl:grid-cols-4',
-  }[gridCols] || 'xl:grid-cols-4';
+  // Densidade no desktop largo (ver lib/productGrid.js): a grelha é a mesma do resto do site.
+  const gridClass = shopDensityClass(gridCols);
 
   const inStockProducts = useMemo(
     () => allProducts.filter((p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0),
@@ -300,7 +298,7 @@ const ShopPage = () => {
                 Ver todos <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className={PRODUCT_GRID_CLASS}>
               {featuredProducts.map((product, i) => (
                 <ProductCard
                   key={product.id}
@@ -470,22 +468,20 @@ const ShopPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                {/* Só onde a escolha muda alguma coisa: a densidade aplica-se a partir de 1280 px. */}
                 {viewMode === 'grid' && (
-                  <div className="flex border rounded-lg overflow-hidden">
-                    {[
-                      { cols: 2, label: '2 colunas' },
-                      { cols: 3, label: '3 colunas' },
-                      { cols: 4, label: '4 colunas' },
-                    ].map(({ cols, label }) => (
+                  <div className="hidden xl:flex border rounded-lg overflow-hidden">
+                    {SHOP_DENSITY_OPTIONS.map(({ value, columns }) => (
                       <Button
-                        key={cols}
-                        variant={gridCols === cols ? 'secondary' : 'ghost'}
+                        key={value}
+                        variant={gridCols === value ? 'secondary' : 'ghost'}
                         size="icon"
                         className="h-11 w-11 sm:h-9 sm:w-9 rounded-none"
-                        onClick={() => setGridCols(cols)}
-                        title={label}
+                        onClick={() => setGridCols(value)}
+                        title={`${columns} colunas`}
+                        aria-pressed={gridCols === value}
                       >
-                        <span className="text-[10px] font-bold">{cols}</span>
+                        <span className="text-[10px] font-bold">{columns}</span>
                       </Button>
                     ))}
                   </div>
@@ -566,7 +562,7 @@ const ShopPage = () => {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: MOTION.base, ease: MOTION.ease }}
-              className={viewMode === 'grid' ? `[&_.product-grid]:grid-cols-2 md:[&_.product-grid]:grid-cols-3 ${gridClass}` : ''}
+              className={viewMode === 'grid' ? gridClass : ''}
             >
               <ProductsList
                 embedded

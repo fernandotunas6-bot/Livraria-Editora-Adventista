@@ -14,7 +14,7 @@ export default function RelatedProducts({ products, author, onCartOpen }) {
           {author ? `Mais de ${author}` : 'Também pode gostar'}
         </h2>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-4 sm:gap-y-6">
         {products.slice(0, 4).map((product, index) => (
           <ProductCard key={product.id} product={product} onCartOpen={onCartOpen} index={index} />
         ))}

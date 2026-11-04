@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import ProductCard from '@/components/ProductCard';
+import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
 import QuickViewModal from '@/components/QuickViewModal';
 import { pageTitle } from '@/lib/brand';
 import { getCollections } from '@/api/PlatformApi';
@@ -288,7 +289,7 @@ export default function CollectionsPage() {
               {/* Books Grid */}
               <div className="flex-1">
                 {filteredBooks.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className={PRODUCT_GRID_CLASS}>
                     {filteredBooks.map((book) => (
                       <ProductCard 
                         key={book.id} 

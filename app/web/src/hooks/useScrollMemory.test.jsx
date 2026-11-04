@@ -21,6 +21,12 @@ const app = (props) => (
   </MemoryRouter>
 );
 const frames = () => act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+// Espera pela condição em vez de um tempo fixo: com a máquina carregada, 20 ms não chegavam.
+async function waitUntil(check, timeout = 5000) {
+  const start = Date.now();
+  while (!check() && Date.now() - start < timeout) await frames();
+  return check();
+}
 const scroll = async (y) => {
   scrollY = y;
   window.dispatchEvent(new Event('scroll'));
@@ -55,7 +61,7 @@ describe('useScrollMemory', () => {
     await frames();
     expect(scrollTo).not.toHaveBeenCalled();
     act(() => root.render(app({ ready: true, count: 72 })));
-    await frames();
+    expect(await waitUntil(() => scrollTo.mock.calls.length > 0)).toBe(true);
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 2400 }));
   });
 
@@ -69,6 +75,7 @@ describe('useScrollMemory', () => {
   it('depois de repor, volta a gravar a posição ao deslizar', async () => {
     mount({ ready: true, count: 48 });
     await scroll(900);
+    expect(await waitUntil(() => readPlace('/shop?search=fé')?.y === 900)).toBe(true);
     expect(readPlace('/shop?search=fé')).toMatchObject({ y: 900, count: 48 });
   });
 });

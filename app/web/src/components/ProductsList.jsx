@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, BookOpen, X } from 'lucide-react';
 import { ProductGrid } from '@/components/ProductCard';
+import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -72,13 +73,13 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
           </div>
         )}
         <div
-          className={`product-grid grid gap-6 ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}
+          className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}
           aria-busy="true"
           aria-label="A carregar livros"
         >
           {Array.from({ length: skeletonCount }, (_, i) => (
             <div key={i} className="space-y-4">
-              <Skeleton className="aspect-[3/4] w-full rounded-xl" />
+              <Skeleton className="aspect-[2/3] w-full rounded-xl" />
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="h-4 w-1/3" />
             </div>
