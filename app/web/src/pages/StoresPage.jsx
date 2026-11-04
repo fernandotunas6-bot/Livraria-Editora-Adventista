@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pageTitle } from '@/lib/brand';
-import { displayAngolaPhone } from '@/lib/angolaPhone';
+import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink } from '@/lib/stores';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import StoreThumb from '@/components/StoreThumb';
@@ -176,7 +176,7 @@ export default function StoresPage() {
                           {active && (
                             <div className="px-4 pb-4 space-y-3">
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                                {s.phone && <a href={`tel:${s.phone}`} className="flex items-center gap-1.5 py-1 hover:text-primary"><Phone className="h-4 w-4 text-primary" />{displayAngolaPhone(s.phone)}</a>}
+                                {s.phone && <a href={`tel:+244${localDigits(s.phone)}`} className="flex items-center gap-1.5 py-1 hover:text-primary"><Phone className="h-4 w-4 text-primary" />{displayAngolaPhone(s.phone)}</a>}
                                 {s.email && <a href={`mailto:${s.email}`} className="flex items-center gap-1.5 py-1 hover:text-primary"><Mail className="h-4 w-4 text-primary" />{s.email}</a>}
                               </div>
                               {s.pickup_enabled && (
