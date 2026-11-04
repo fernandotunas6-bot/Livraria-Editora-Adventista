@@ -30,7 +30,12 @@ function ShopSlideMedia({ slide }) {
 
 export default function ShopHeroBackground({ settings, children }) {
   const mode = resolveShopBgMode(settings);
-  const overlay = Number(settings.shop_bg_overlay) ?? 0.55;
+  // `Number(undefined)` é `NaN`, e `NaN ?? 0.55` continua `NaN`: o `??` só apanha `null` e
+  // `undefined`. O valor por omissão nunca entrava e saía `rgba(12, 74, 110, NaN)` — cor
+  // inválida, véu nenhum, e o texto branco do herói directamente sobre a fotografia. Limita-se
+  // também ao intervalo útil, porque o painel aceita o número escrito à mão.
+  const overlayPedido = Number(settings.shop_bg_overlay);
+  const overlay = Number.isFinite(overlayPedido) ? Math.min(1, Math.max(0, overlayPedido)) : 0.55;
   const [slides, setSlides] = useState([]);
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -74,13 +79,22 @@ export default function ShopHeroBackground({ settings, children }) {
     background: 'linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-primary) 100%)',
   };
 
+  // Um fundo que não se pinta deixa o texto branco do herói sobre o fundo claro da página:
+  // ilegível, e sem nada que o denuncie. Em vez de listar os casos que correm bem — eram
+  // três blocos iguais a repetir o mesmo gradiente —, pergunta-se o contrário: pintou-se
+  // alguma coisa? O modo `image` com o endereço vazio não caía em ramo nenhum e dava
+  // exactamente esse ecrã partido. Assim, qualquer modo que se acrescente amanhã e se
+  // esqueça de pintar cai aqui em segurança.
+  const pintouFundo = (mode === 'video' && Boolean(settings.shop_bg_video_url))
+    || (mode === 'slides' && slides.length > 0 && Boolean(slide));
+
   return (
     <section
       className="text-white py-14 md:py-20 relative overflow-hidden"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {mode === 'gradient' && (
+      {!pintouFundo && (
         <>
           <div className="absolute inset-0" style={gradientStyle} />
           <ShopHeroMotion />
@@ -103,19 +117,7 @@ export default function ShopHeroBackground({ settings, children }) {
         </AnimatePresence>
       )}
 
-      {mode === 'slides' && slides.length === 0 && (
-        <>
-          <div className="absolute inset-0" style={gradientStyle} />
-          <ShopHeroMotion />
-        </>
-      )}
 
-      {mode === 'video' && !settings.shop_bg_video_url && (
-        <>
-          <div className="absolute inset-0" style={gradientStyle} />
-          <ShopHeroMotion />
-        </>
-      )}
 
       <div className="container-custom relative z-10">{children}</div>
 

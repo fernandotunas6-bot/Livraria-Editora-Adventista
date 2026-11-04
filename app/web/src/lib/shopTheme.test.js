@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, ensureContrastOnWhite, hexToRgb, relativeLuminance } from '@/lib/shopTheme';
+import { contrastRatio, ensureContrastOnWhite, hexToRgb, relativeLuminance, resolveShopBgMode } from '@/lib/shopTheme';
 
 const BRANCO = { r: 255, g: 255, b: 255 };
 const PRETO = { r: 0, g: 0, b: 0 };
@@ -90,5 +90,40 @@ describe('ensureContrastOnWhite', () => {
     expect(() => ensureContrastOnWhite(null)).not.toThrow();
     expect(() => ensureContrastOnWhite('')).not.toThrow();
     expect(() => ensureContrastOnWhite('#abc')).not.toThrow();
+  });
+});
+
+describe('resolveShopBgMode', () => {
+  // Esta função é a rede de segurança do herói da loja: é ela que garante que nenhuma
+  // configuração deixa o fundo por pintar. Sem fundo, o texto branco do herói fica sobre o
+  // fundo claro da página e não se lê — e nada no ecrã denuncia a causa.
+  it('aceita os quatro modos quando têm o que precisam', () => {
+    expect(resolveShopBgMode({ shop_bg_mode: 'gradient' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 'image', shop_bg_image_url: '/a.webp' })).toBe('image');
+    expect(resolveShopBgMode({ shop_bg_mode: 'video', shop_bg_video_url: 'https://v/a.mp4' })).toBe('video');
+    expect(resolveShopBgMode({ shop_bg_mode: 'slides' })).toBe('slides');
+  });
+
+  it('volta ao gradiente quando falta a imagem ou o vídeo', () => {
+    // O painel deixa escolher o modo e limpar o endereço em passos separados, por isso este
+    // par existe mesmo: modo escolhido, media por preencher.
+    expect(resolveShopBgMode({ shop_bg_mode: 'image' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 'image', shop_bg_image_url: '' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 'video' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 'video', shop_bg_video_url: '' })).toBe('gradient');
+  });
+
+  it('não se deixa levar por um modo que não conhece', () => {
+    // Um valor escrito à mão na base de dados, ou um modo de uma versão futura.
+    expect(resolveShopBgMode({ shop_bg_mode: 'carrossel' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 'IMAGE' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: 123 })).toBe('gradient');
+  });
+
+  it('aguenta não receber nada', () => {
+    expect(resolveShopBgMode()).toBe('gradient');
+    expect(resolveShopBgMode({})).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: '' })).toBe('gradient');
+    expect(resolveShopBgMode({ shop_bg_mode: null })).toBe('gradient');
   });
 });
