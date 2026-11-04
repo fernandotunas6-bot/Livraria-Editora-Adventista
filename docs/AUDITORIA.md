@@ -387,15 +387,15 @@ automático), e não apenas lido no código.
 | Validação no servidor | Existente; refinado | Checkout com lista explícita de campos, tamanhos e preço calculado na base de dados; faltava validar a forma do email |
 | XSS | Existente; refinado | DOMPurify na loja, CSP sem `unsafe-inline` nos scripts; o editor do painel não sanitizava (corrigido) |
 | Segredos no repositório | Existente e validado | Histórico completo: só a configuração Web da Firebase (pública por desenho). CSV de chaves e `client_secret` locais nunca foram commitados |
-| Segredos na base de dados | Necessita de refinamento | `site_settings` tem colunas para palavra-passe SMTP, chave SendGrid, chave privada VAPID e chaves de IA, legíveis por quem tem "Configurações". **Hoje estão todas vazias** |
+| Segredos na base de dados | Refinado (por publicar) | Estavam em colunas de `site_settings` legíveis por quem tem "Configurações" (hoje vazias). Passam para `private.site_secrets`, fora da API; o painel só vê "definida / não definida" |
 | Palavras-passe | Existente e validado | Só o Supabase Auth (bcrypt); não há hashing próprio |
 | Palavras-passe vazadas (HIBP) | Ausente | Advisor de segurança |
-| MFA | Ausente | 3 contas, todas admin, 0 factores; o site não tem ecrã de MFA |
+| MFA | Implementado (por publicar) | TOTP: activação no perfil e código pedido à entrada. Exigido na base de dados e na Edge Function para contas com factor; 3 admins, 0 factores hoje |
 | Confirmação de email | Existente e validado | 0 contas por confirmar com sessão iniciada (a política de encomendas confia no email do JWT) |
 | Limites de pedidos | Existente e validado; refinado | Contador partilhado na base de dados. **IP fiável testado:** um `X-Forwarded-For` forjado ficou registado com o IP real. Respondia 400; passa a 429 com `Retry-After` |
 | Enumeração no `/track` | Existente e validado | O número leva os últimos 6 dígitos base36 do tempo **em milissegundos** (repetem só a cada ~25 dias) mais 3 aleatórios: adivinhar exige o milissegundo da compra |
 | Pagamento marcado só pelo servidor | Existente e validado | Checkout grava sempre `pending`/`awaiting_confirmation`; só `manage_orders` marca `paid` |
-| Idempotência do checkout | Parcialmente implementado | Botão trancado antes do pedido (`a40fbfc`); o servidor não tem chave de idempotência |
+| Idempotência do checkout | Implementado (por publicar) | Botão trancado (`a40fbfc`) e chave por tentativa no servidor, com índice único para pedidos simultâneos |
 | Crons (`/cron/*`) | Existente e validado | Segredo comparado em tempo constante e limite por IP |
 | Fuga de erros internos | Necessitava de refinamento | Erros não previstos (Postgres incluído) iam para o browser com estado 400 (corrigido) |
 | Cabeçalhos HTTP e TLS | Existente e validado | HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` nos dois hostnames; TLS 1.3, TLS 1.1 recusado; certificado até Fev. 2027; HTTP → HTTPS 301 |
@@ -405,7 +405,8 @@ automático), e não apenas lido no código.
 | API do Supabase fora do WAF | Por desenho | O `*.supabase.co` não passa pelo Cloudflare do domínio; a protecção é o RLS e os limites da função |
 | Backups e PITR | Não foi possível verificar | Depende do plano do Supabase; não há acesso à faturação |
 | Observabilidade | Parcialmente implementado | Web Analytics do Cloudflare e registos do Supabase; sem id de correlação (acrescentado) e sem alertas |
-| CI | Existente; refinado | Lint, 311 testes, build e `deno check`; acrescentada auditoria de dependências críticas |
+| CI | Existente; refinado | Lint, 341 testes, build e `deno check`; acrescentadas a detecção de segredos e a auditoria de dependências críticas |
+| Tamanho dos pedidos | Refinado | O corpo era lido inteiro, sem tecto; passa a 1 MB (413) |
 | Balanceamento de carga | Não aplicável | Pages e Edge Functions são geridos; não há origens próprias |
 
 ### Corrigido nesta passagem
@@ -435,7 +436,38 @@ automático), e não apenas lido no código.
   sua conversa segura; já não a reabre nem lhe muda o grupo, o livro ou a avaliação. O site
   nunca actualiza esta tabela e ela tem 0 linhas.
 
-**As duas migrações não foram corridas contra um Postgres.** Esta máquina não tem Postgres, e
+### Segunda ronda (mesmo dia)
+
+- **Checkout idempotente** (`20261104092000_idempotencia_checkout`, `lib/checkoutIdempotency.js`).
+  Se a rede cai depois de o servidor gravar a encomenda, o cliente vê erro e carrega outra vez:
+  ficavam duas encomendas e o stock descontado duas vezes. O site manda uma chave por tentativa
+  (a mesma enquanto o pedido não mudar; nova se mudar o carrinho, a morada ou o pagamento), e a
+  função devolve a encomenda que a chave já criou, sem stock nem avisos repetidos. Dois pedidos
+  simultâneos: o índice único deixa passar um, e o outro recebe a mesma encomenda. Sem a
+  migração a função ignora a chave.
+- **Verificação em dois passos** (`20261104093000_verificacao_dois_passos_equipa`, `mfa.ts`,
+  `MfaGate`, `MfaSettings`). Activação no perfil → Segurança (QR e chave escrita), código pedido
+  depois de entrar. **A exigência está no servidor:** numa conta com factor verificado,
+  `is_admin`, `is_staff` e `has_permission` (e com elas todas as políticas RLS, o Storage e as
+  funções de utilizadores) e a Edge Function só reconhecem a equipa numa sessão `aal2`. Sem
+  isto a palavra-passe chegava para chamar a API REST e saltar o ecrã. Contas sem factor não
+  mudam. O diálogo vai num bloco à parte: a página inicial passou de 241,9 para 243,0 KB gzip
+  (medido no build; numa primeira versão eram +9,7 KB, por isso foi separado).
+  **Recuperação** se um admin perder o telemóvel: outro admin, ou Supabase → Authentication →
+  Users → remover o factor.
+- **Segredos fora da API** (`20261104094000_segredos_fora_da_api`, `lib/siteSecrets.js`). Ver a
+  tabela acima. Um trigger apanha o valor quando o painel o grava, por isso um painel antigo
+  continua a funcionar; a Edge Function junta-os às definições ao lê-las.
+- **Corpo dos pedidos limitado a 1 MB** e **referência curta** (`ref. 1a2b3c4d`) na mensagem de
+  erro inesperado, para o cliente a passar à loja.
+- **Detecção de segredos** (`scripts/verificar-segredos.mjs`) no CI e no `deploy-site.sh`: chaves
+  com prefixo próprio e JWT `service_role`; a chave Web da Firebase fica de fora (é pública).
+
+**Ordem de publicação:** as cinco migrações primeiro (o Actions fá-lo no merge), depois a Edge
+Function, depois o site. Qualquer outra ordem funciona sem erros — cada parte detecta a falta
+da outra —, mas só com as três a protecção fica completa.
+
+**As migrações não foram corridas contra um Postgres.** Esta máquina não tem Postgres, e
 o teste dentro de uma transacção anulada na base de dados de produção foi recusado nesta
 sessão. A primeira só cria índices com `if not exists`.
 
@@ -451,13 +483,13 @@ sessão. A primeira só cria índices com `if not exists`.
    depois de confirmar qual é a activa.
 3. **Projecto antigo `livraria-adventista.pages.dev`**: serve um build antigo ligado à mesma
    base de dados. Redireccionar para o domínio novo ou desligar.
-4. **MFA para os admins** (TOTP do Supabase Auth): falta o ecrã de inscrição e exigir `aal2`
-   nas políticas de escrita do painel. É trabalho de produto, não uma opção a ligar.
+4. **Activar o MFA nas três contas de admin**, depois de publicado (perfil → Segurança). Antes,
+   confirmar no Supabase → Authentication → Multi-Factor que o TOTP está ligado (é o padrão).
 5. **Protecção de palavras-passe vazadas**: Supabase → Authentication → Policies. Disponível
    a partir do plano Pro.
-6. **Segredos**: ao configurar o email, usar `supabase secrets set SMTP_PASSWORD=…` em vez do
-   campo do painel. Mais tarde, retirar as colunas de segredos de `site_settings`. Antes disso
-   o painel tem de deixar de as ler (`select *`), senão parte o ecrã de Configurações.
+6. **Segredos**: com a migração aplicada, o painel já não os expõe. Mais tarde, apagar as
+   cinco colunas de `site_settings` (ficam sempre vazias): primeiro o painel tem de deixar de
+   as enviar, senão o PostgREST recusa a gravação.
 7. **DNSSEC**: activar no Cloudflare e colar o registo DS no painel da Hostinger. Por esta
    ordem, nunca ao contrário.
 8. **WAF, regras de rate limiting e alertas do Cloudflare**: verificar com o conector
@@ -466,8 +498,10 @@ sessão. A primeira só cria índices com `if not exists`.
 9. **Backups**: confirmar o plano. O Free não tem backups descarregáveis nem PITR. Com 6
    encomendas o risco é baixo; quando houver vendas reais, decidir RPO/RTO e testar um restauro
    num projecto à parte.
-10. **Idempotência do checkout no servidor** (chave por tentativa e índice único), para o caso de
-    o browser repetir o pedido depois de a rede cair a meio.
+10. **`site_url` nas configurações** — a correcção foi recusada nesta sessão (alteração a dados
+    de produção). Em Configurações → endereço do site, ou no SQL Editor:
+    `update public.site_settings set site_url = 'https://livrariaadventista.com' where site_url = 'https://livraria-adventista.pages.dev';`
+    Para reverter, o mesmo com os endereços trocados.
 
 ### Rollback
 
@@ -477,6 +511,12 @@ sessão. A primeira só cria índices com `if not exists`.
 - Migrações: `drop index if exists …` para cada um dos 11 índices;
   `drop trigger secure_support_threads_guard on public.secure_support_threads` e
   `drop function private.secure_support_threads_guard()`.
+- Idempotência: `drop index orders_idempotency_key_key` e `alter table orders drop column idempotency_key`
+  (a função passa a ignorar a chave sozinha).
+- MFA: recriar `is_admin`, `is_staff` e `has_permission` sem `and private.mfa_satisfied()`
+  (definições em `20261101131748_funcoes_privadas.sql` / `20261101131516_base_perfis.sql`).
+- Segredos: `drop trigger site_settings_capture_secrets on public.site_settings`; os valores
+  ficam em `private.site_secrets` para repor nas colunas.
 
 ### Custos
 
