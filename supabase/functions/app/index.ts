@@ -20,6 +20,7 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 
@@ -150,6 +151,12 @@ async function getAuth(req: Request): Promise<Auth> {
   const { data, error } = await db.auth.getUser(token);
   if (error || !data?.user) return null;
   const { data: profile } = await db.from("profiles").select("role, permissions").eq("id", data.user.id).maybeSingle();
+  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1): vale como
+  // cliente até introduzir o código. É a mesma regra das funções de permissão na base de
+  // dados; ver mfa.ts. Contas sem factor verificado não são afectadas.
+  if (mfaPending(data.user.factors, token)) {
+    return { id: data.user.id, email: data.user.email || "", role: "member", permissions: {} };
+  }
   return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
 }
 

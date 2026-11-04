@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { BookLoader } from '@/components/ui/book-loader';
+import MfaGate from '@/components/MfaGate.jsx';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -181,6 +182,7 @@ function App() {
           </Suspense>
         </RouteErrorBoundary>
         <Toaster />
+        <MfaGate />
         <GlobalWidgets />
       </Router>
     </CartProvider>

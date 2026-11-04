@@ -24,6 +24,7 @@ import { getUserDisplayName } from '@/lib/userUtils';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone, formatAngolaPhone } from '@/lib/angolaPhone';
 import PhoneInput from '@/components/PhoneInput';
+import MfaSettings from '@/components/MfaSettings';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
 import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -499,6 +500,7 @@ const ProfilePage = () => {
                     </Button>
                   </form>
                 </div>
+                <MfaSettings isStaff={canAccessAdmin} />
               </TabsContent>
 
               <TabsContent value="wishlist">
