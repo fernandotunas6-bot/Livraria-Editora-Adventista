@@ -135,6 +135,10 @@ export default function CategoryBookMarquee({
   products,
   direction = 'ltr',
   viewMode = 'marquee',
+  // A faixa anda sozinha ou é o leitor que a desloca. Na página inicial são nove faixas ao
+  // mesmo tempo: todas em movimento, o olho não pousa em livro nenhum. Fica para onde há
+  // uma só — a loja —, que é onde o movimento mostra que há mais à direita sem incomodar.
+  autoScroll = true,
   onBookSelect,
   onCartOpen,
   categoryFilter,
@@ -158,6 +162,8 @@ export default function CategoryBookMarquee({
   const duration = Math.max(55, Math.min(products.length, MARQUEE_MAX_ITEMS) * 4.5);
   const animClass = direction === 'rtl' ? 'catalog-marquee-rtl' : 'catalog-marquee-ltr';
   const track = useMemo(() => buildMarqueeTrack(products), [products]);
+  // Anda sozinha só quando lho pedem e quando o sistema não pede movimento reduzido.
+  const anda = autoScroll && !reducedMotion;
 
   const shopLink = categoryFilter
     ? `/shop?${categoryFilter}`
@@ -194,12 +200,12 @@ export default function CategoryBookMarquee({
             <h3 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h3>
             <p className="text-sm text-muted-foreground mt-1">
               {description || `${products.length} título${products.length !== 1 ? 's' : ''}`}
-              {viewMode === 'marquee' && !reducedMotion && ' · Toque para pausar'}
+              {viewMode === 'marquee' && (anda ? ' · Toque para pausar' : ' · Deslize para ver mais')}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {viewMode === 'marquee' && !reducedMotion && (
+          {viewMode === 'marquee' && anda && (
             <Button
               type="button"
               variant="outline"
@@ -246,7 +252,7 @@ export default function CategoryBookMarquee({
         </div>
       ) : (
         <div
-          className="relative overflow-hidden select-none"
+          className={`relative select-none ${anda ? 'overflow-hidden' : 'overflow-x-auto overscroll-x-contain snap-x snap-mandatory scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
@@ -255,22 +261,22 @@ export default function CategoryBookMarquee({
           <div className="pointer-events-none absolute inset-y-0 left-0 w-16 md:w-28 bg-gradient-to-r from-background via-background/90 to-transparent z-10" />
           <div className="pointer-events-none absolute inset-y-0 right-0 w-16 md:w-28 bg-gradient-to-l from-background via-background/90 to-transparent z-10" />
 
-          {paused && !reducedMotion && (
+          {paused && anda && (
             <div className="absolute top-2 right-4 z-20 text-[10px] font-medium px-2 py-1 rounded-full bg-background/90 border shadow-sm text-muted-foreground flex items-center gap-1">
               <Pause className="h-3 w-3" /> Pausado
             </div>
           )}
 
           <div
-            className={`flex gap-4 md:gap-5 w-max will-change-transform ${reducedMotion ? '' : animClass}`}
-            style={reducedMotion ? undefined : {
+            className={`flex gap-4 md:gap-5 w-max ${anda ? `will-change-transform ${animClass}` : 'px-4 md:px-6 [&>*]:snap-start'}`}
+            style={!anda ? undefined : {
               animationDuration: `${duration}s`,
               animationPlayState: paused ? 'paused' : 'running',
             }}
           >
-            {(reducedMotion ? products : track).map((item, i) => {
-              const product = reducedMotion ? item : item.product;
-              const key = reducedMotion ? product.id : `${product.id}-${item.copy}`;
+            {(anda ? track : products).map((item, i) => {
+              const product = anda ? item.product : item;
+              const key = anda ? `${product.id}-${item.copy}` : product.id;
               return (
                 <MarqueeBookCard
                   key={key}

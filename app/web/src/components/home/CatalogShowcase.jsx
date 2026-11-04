@@ -162,6 +162,7 @@ export default function CatalogShowcase({ onCartOpen }) {
               products={cat.books}
               direction={index % 2 === 0 ? 'ltr' : 'rtl'}
               viewMode={viewMode}
+              autoScroll={false}
               onBookSelect={setSelected}
               onCartOpen={onCartOpen}
               categoryFilter={CATEGORY_SHOP_FILTERS[cat.id]}
