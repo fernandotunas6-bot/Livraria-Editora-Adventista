@@ -9,7 +9,7 @@ const DEFAULT_SETTINGS = {
   primary_color: '#0ea5c9',
   logo_url: '',
   favicon_url: '',
-  contact_email: 'contacto@livrariaadventista.ao',
+  contact_email: '',
   contact_phone: '',
   contact_address: 'Luanda, Angola',
   pwa_enabled: true,

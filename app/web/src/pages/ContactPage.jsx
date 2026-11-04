@@ -21,7 +21,7 @@ const ContactPage = () => {
   // Os contactos vêm de Configurações, como no rodapé. A página mostrava os valores fixos do
   // código — incluindo o telefone provisório — mesmo depois de o painel ter os verdadeiros.
   const { settings } = useSiteSettings();
-  const contactEmail = settings.contact_email || BRAND.email;
+  const contactEmail = settings.contact_email || '';
   const contactPhone = settings.contact_phone || '';
   const contactAddress = settings.contact_address || BRAND.address;
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -159,15 +159,17 @@ const ContactPage = () => {
               <div>
                 <h2 className="text-2xl font-semibold mb-6 text-foreground">Informações de Contacto</h2>
                 <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Mail className="h-5 w-5 text-primary" />
+                  {contactEmail && (
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mail className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 text-foreground">Email</h3>
+                        <p className="text-muted-foreground">{contactEmail}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium mb-1 text-foreground">Email</h3>
-                      <p className="text-muted-foreground">{contactEmail}</p>
-                    </div>
-                  </div>
+                  )}
 
                   {contactPhone && (
                     <div className="flex items-start gap-4">
