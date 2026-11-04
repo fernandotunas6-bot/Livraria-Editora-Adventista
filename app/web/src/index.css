@@ -423,7 +423,14 @@
    cartões com ícones enormes a competir com a capa do livro.
    44px é o mínimo que a Apple recomenda; a Google pede 48dp. Fica nos 44 porque
    é o que cabe entre dois ícones nos cantos de um cartão sem eles se tocarem. */
-.tap-target {
+/* `:where()` não tem especificidade nenhuma, de propósito. A regra e o `.absolute` do
+   Tailwind são os dois um selector de classe, e à mesma especificidade ganha quem vier
+   depois no ficheiro — que é esta, por estar fora das camadas. No login isso punha o
+   botão de ver a palavra-passe em fluxo normal, fora da caixa e à esquerda dela, e, ao
+   aumentar a altura do contentor, arrastava o cadeado para baixo do centro. Com
+   `:where()`, quem escrever uma posição ganha sempre; quem não escrever nenhuma continua
+   a receber `relative`, que é o que o pseudo-elemento do alvo de toque precisa. */
+:where(.tap-target) {
   position: relative;
 }
 
