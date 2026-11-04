@@ -156,6 +156,49 @@ const Header = ({ onCartOpen, pinned = false }) => {
   };
 
   return (
+    <>
+      {/* Barra fina por cima do herói.
+          O cabeçalho completo sai de cena no topo da página para a imagem de entrada se ver
+          inteira (ver `useHeaderReveal`) — mas isso deixava quem acaba de chegar sem
+          navegação nenhuma: nem logótipo, nem conta, nem carrinho, até rolar duzentos
+          pixels. Esta barra ocupa esse lugar com o mínimo indispensável, sobre um véu que a
+          mantém legível por cima de qualquer imagem, e sai de cena quando o cabeçalho
+          verdadeiro entra. Monta e desmonta em vez de ficar escondida, para não deixar
+          botões invisíveis no caminho de quem navega pelo teclado. */}
+      {!pinned && !revealed && (
+        <div className="safe-top fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base">
+          <div className="container-custom flex h-14 items-center justify-between gap-3">
+            <BrandLogo variant="light" collapseToIcon />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative rounded-full text-white hover:bg-white/15"
+                onClick={onCartOpen}
+                aria-label={`Carrinho com ${cartCount} itens`}
+              >
+                <ShoppingCart className="h-5 w-5" aria-hidden="true" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-[#dc2626] text-white text-[10px] font-bold rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </Button>
+              {isAuthed ? (
+                <Link to="/profile" aria-label="Minha conta">
+                  <UserAvatar user={user} size="sm" className="ring-2 ring-white/40" />
+                </Link>
+              ) : (
+                <Link to="/login" aria-label="Entrar ou criar conta">
+                  <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/15">
+                    <User className="h-5 w-5" aria-hidden="true" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     <header
       ref={headerRef}
       onFocusCapture={() => setHasFocus(true)}
@@ -463,6 +506,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
         </div>
       </div>
     </header>
+    </>
   );
 };
 
