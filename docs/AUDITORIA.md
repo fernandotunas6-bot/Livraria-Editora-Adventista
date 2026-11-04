@@ -403,8 +403,8 @@ automático), e não apenas lido no código.
 | DNSSEC | Ausente | `DNSSEC: unsigned` no registo (Hostinger) |
 | WAF e regras do Cloudflare | Não foi possível verificar | O conector do Cloudflare precisa de autorização nesta sessão |
 | API do Supabase fora do WAF | Por desenho | O `*.supabase.co` não passa pelo Cloudflare do domínio; a protecção é o RLS e os limites da função |
-| Backups e PITR | Não foi possível verificar | Depende do plano do Supabase; não há acesso à faturação |
-| Observabilidade | Parcialmente implementado | Web Analytics do Cloudflare e registos do Supabase; sem id de correlação (acrescentado) e sem alertas |
+| Backups e PITR | Implementado (falta um segredo) | Plano **Free**: sem backups do Supabase nem PITR. Novo backup semanal cifrado pelo Actions (`docs/BACKUPS.md`); corre quando existir `BACKUP_PASSPHRASE` |
+| Observabilidade | Parcialmente implementado | Web Analytics do Cloudflare e registos do Supabase (latência por rota em `function_edge_logs`, usada abaixo); id de correlação acrescentado; sem alertas |
 | CI | Existente; refinado | Lint, 341 testes, build e `deno check`; acrescentadas a detecção de segredos e a auditoria de dependências críticas |
 | Tamanho dos pedidos | Refinado | O corpo era lido inteiro, sem tecto; passa a 1 MB (413) |
 | Balanceamento de carga | Não aplicável | Pages e Edge Functions são geridos; não há origens próprias |
@@ -463,7 +463,52 @@ automático), e não apenas lido no código.
 - **Detecção de segredos** (`scripts/verificar-segredos.mjs`) no CI e no `deploy-site.sh`: chaves
   com prefixo próprio e JWT `service_role`; a chave Web da Firebase fica de fora (é pública).
 
-**Ordem de publicação:** as cinco migrações primeiro (o Actions fá-lo no merge), depois a Edge
+### Terceira ronda (mesmo dia): evidências, desempenho e continuidade
+
+**Isolamento, testado em produção como visitante anónimo** (só leituras, com a chave pública que
+vai no site):
+
+- As 24 tabelas privadas devolvem **0 linhas** ou **401**: `orders`, `profiles`, `site_settings`,
+  `app_integrations`, as 4 do CRM, `newsletter`, `notification_logs`, `email_queue`, o painel de
+  vendas, `stock_movements`, `push_subscriptions`, as 6 do atendimento e das conversas,
+  `wishlists`, `book_review_helpful_votes`, `e2ee_device_keys`.
+- As públicas por desenho devolvem o esperado: 102 livros, 4 métodos de pagamento activos, 3
+  lojas, 4 slides, 4 colecções.
+- As funções sensíveis recusam o anónimo com 401, **mesmo com argumentos válidos**:
+  `place_order`, `check_rate_limit`, `users_admin_list`, `admin_users_list`, `claim_email_jobs`,
+  `email_queue_scheduler_status`, `e2ee_admin_key_packages`, `current_role_name`.
+- Entre clientes com sessão (cliente A a ler dados do cliente B) **não foi testado**: exigia criar
+  contas em produção. As políticas foram lidas uma a uma (todas por `auth.uid()`), mas falta o
+  teste; `docs/testes/seguranca_wishlists.sql` é o modelo a seguir num projecto de testes.
+
+**Linha de base da API** (`function_edge_logs`, 24 h até 2026-11-04, sem um único 5xx):
+
+| Rota | Pedidos | p50 | p95 | p99 |
+|---|---|---|---|---|
+| `GET /payment-methods` | 326 | 334 ms | 958 ms | 1 437 ms |
+| `POST /cron/email-queue` | 287 | 1 968 ms | 2 878 ms | 3 514 ms |
+| `GET /integrations` | 237 | 665 ms | 1 398 ms | 2 723 ms |
+| `GET /chat/config` | 230 | 330 ms | 1 105 ms | 2 181 ms |
+| `GET /settings` | 225 | 542 ms | 1 205 ms | 2 376 ms |
+
+O que mudou a partir daqui (efeito por medir depois de publicar, com a mesma consulta):
+
+- **Agendadores só com trabalho** (`20261104095000`, e a migração das campanhas ainda por
+  aplicar). O `/cron/email-queue` arrancava a função 287 vezes por dia, ~2 s cada, com a fila
+  vazia. Agora a base de dados confirma primeiro se há trabalho, com o mesmo critério do
+  `claim_email_jobs`. Esperado: 0 chamadas enquanto não houver emails.
+- **`/integrations` e `/chat/config` com a cache curta** de `/settings` (30 s, e até 5 min em
+  segundo plano). São iguais para todos os visitantes; o painel pede com `no-cache` depois de
+  gravar.
+- **`/admin/media-config` só para a equipa.** Era pedido em cada página por qualquer cliente
+  com sessão, e sempre recusado.
+
+**Continuidade:** organização no plano **Free**. Não há backups do Supabase nem PITR, e um
+projecto Free pode ser pausado por inactividade. Backup semanal cifrado pelo Actions, com RPO de
+7 dias e RTO de ~1 h, e o restauro descrito em `docs/BACKUPS.md`. O restauro **nunca foi
+testado**: precisa do segredo `BACKUP_PASSPHRASE` e de um projecto à parte.
+
+**Ordem de publicação:** as migrações primeiro (seis desta auditoria, mais as duas do CRM) (o Actions fá-lo no merge), depois a Edge
 Function, depois o site. Qualquer outra ordem funciona sem erros — cada parte detecta a falta
 da outra —, mas só com as três a protecção fica completa.
 
@@ -495,9 +540,9 @@ sessão. A primeira só cria índices com `if not exists`.
 8. **WAF, regras de rate limiting e alertas do Cloudflare**: verificar com o conector
    autorizado. Para alertas sem custo: notificação de picos de tráfego e de erros 5xx no
    Cloudflare, e um alerta no Supabase para falhas da função.
-9. **Backups**: confirmar o plano. O Free não tem backups descarregáveis nem PITR. Com 6
-   encomendas o risco é baixo; quando houver vendas reais, decidir RPO/RTO e testar um restauro
-   num projecto à parte.
+9. **Backups**: criar o segredo `BACKUP_PASSPHRASE` (comando em `docs/BACKUPS.md`), correr o
+   workflow à mão uma vez e fazer o primeiro teste de restauro num projecto à parte. Quando
+   houver vendas reais, decidir se 7 dias de RPO chegam (backup diário sem custo, ou plano Pro).
 10. **`site_url` nas configurações** — a correcção foi recusada nesta sessão (alteração a dados
     de produção). Em Configurações → endereço do site, ou no SQL Editor:
     `update public.site_settings set site_url = 'https://livrariaadventista.com' where site_url = 'https://livraria-adventista.pages.dev';`

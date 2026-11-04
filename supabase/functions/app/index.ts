@@ -1013,7 +1013,9 @@ route("GET", "/integrations", async () => {
     if (!out.google_oauth) out.google_oauth = { enabled: false, config: {} };
     out.google_oauth.enabled = !!settings.google_oauth_enabled;
   }
-  return json({ integrations: out });
+  // Igual para todos os visitantes (configuração já filtrada por sanitizeIntegrationConfig) e
+  // pedida em cada página: ~0,7 s de mediana sem cache. O painel pede com `no-cache`.
+  return publicJson({ integrations: out });
 });
 
 route("GET", "/admin/media-config", async ({ auth }) => {
@@ -2312,7 +2314,8 @@ route("GET", "/chat/config", async () => {
   if (provider === "gemini" && keys.gemini) { ai = true; active = "gemini"; }
   else if (provider === "deepseek" && keys.deepseek) { ai = true; active = "deepseek"; }
   else if (keys.gemini) { ai = true; active = "gemini"; }
-  return json({ enabled: settings ? settings.chat_enabled !== false : true, ai, provider: active, welcome: settings?.chat_welcome || "" });
+  // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
+  return publicJson({ enabled: settings ? settings.chat_enabled !== false : true, ai, provider: active, welcome: settings?.chat_welcome || "" });
 });
 
 function bookToChatItem(b: Row) {

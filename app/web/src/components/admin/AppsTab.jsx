@@ -280,7 +280,7 @@ export default function AppsTab() {
     try {
       await pb.collection('app_integrations').update(app.id, { enabled });
       setApps((prev) => prev.map((a) => (a.id === app.id ? { ...a, enabled } : a)));
-      await refreshIntegrations();
+      await refreshIntegrations({ fresh: true });
       toast({ title: enabled ? 'Integração activada' : 'Integração desactivada' });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Não foi possível alterar', description: pbErrorMessage(err) });
@@ -292,7 +292,7 @@ export default function AppsTab() {
       const payload = typeof config === 'string' ? JSON.parse(config || '{}') : config;
       await pb.collection('app_integrations').update(app.id, { config: payload });
       setApps((prev) => prev.map((a) => (a.id === app.id ? { ...a, config: payload } : a)));
-      await refreshIntegrations();
+      await refreshIntegrations({ fresh: true });
       toast({ title: 'Configuração guardada com sucesso!' });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Não foi possível guardar', description: pbErrorMessage(err) });

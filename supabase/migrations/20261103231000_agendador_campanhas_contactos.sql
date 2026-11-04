@@ -43,6 +43,16 @@ declare
   v_url text;
   v_token text;
 begin
+  -- Só chama a função quando há campanha devida, com o mesmo critério da rota
+  -- (activa, e sem data ou com a data já passada). Sem isto, eram 96 arranques da Edge
+  -- Function por dia para nada — o que se mediu na fila de emails (20261104095000).
+  if not exists (
+    select 1 from public.contact_campaigns c
+    where c.is_active and (c.next_send_at is null or c.next_send_at <= now())
+  ) then
+    return;
+  end if;
+
   select decrypted_secret into v_url
   from vault.decrypted_secrets where name = 'contact_campaigns_url' limit 1;
 

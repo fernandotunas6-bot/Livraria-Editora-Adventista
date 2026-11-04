@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+// Margem acima dos 5 s por omissão: estes testes montam diálogos do Radix e esperam por
+// efeitos assíncronos, e numa máquina carregada passavam dos 5 s sem nada estar errado.
+vi.setConfig({ testTimeout: 30000 });
 
 const mfa = {
   getAuthenticatorAssuranceLevel: vi.fn(),
@@ -20,6 +23,10 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user, logout }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 const { default: MfaGate } = await import('./MfaGate');
+// O MfaGate carrega o diálogo por import dinâmico. Carregá-lo aqui primeiro faz com que, no
+// teste, esse import resolva da cache em vez de compilar a meio do teste — com a máquina
+// carregada era isso que esgotava o tempo.
+await import('./MfaChallengeDialog');
 const { default: MfaSettings } = await import('./MfaSettings');
 
 let root;
@@ -41,15 +48,18 @@ function type(input, value) {
   });
 }
 // O diálogo chega por import dinâmico: espera-se por ele em vez de contar ciclos.
-async function waitFor(selector, timeout = 3000) {
+// Espera por uma condição em vez de contar ciclos: com a máquina carregada (o conjunto
+// inteiro de testes em paralelo), um ciclo não chegava e o teste falhava de vez em quando.
+async function waitUntil(check, timeout = 15000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    const el = document.querySelector(selector);
-    if (el) return el;
+    const value = check();
+    if (value) return value;
     await flush();
   }
-  return null;
+  return check();
 }
+const waitFor = (selector, timeout) => waitUntil(() => document.querySelector(selector), timeout);
 const byText = (text) => [...document.querySelectorAll('button')].find((b) => b.textContent.includes(text));
 
 beforeEach(() => {
@@ -81,15 +91,14 @@ describe('MfaGate', () => {
     mfa.challengeAndVerify.mockResolvedValueOnce({ data: null, error: new Error('Invalid TOTP code entered') });
     type(input, '111 111');
     await act(async () => byText('Confirmar').click());
-    await flush();
-    expect(document.querySelector('[role="alert"]').textContent).toMatch(/Código incorrecto/);
+    const alert = await waitFor('[role="alert"]');
+    expect(alert.textContent).toMatch(/Código incorrecto/);
     expect(mfa.challengeAndVerify).toHaveBeenLastCalledWith({ factorId: 'f1', code: '111111' });
 
     mfa.challengeAndVerify.mockResolvedValueOnce({ data: {}, error: null });
     type(document.querySelector('#mfa-code'), '222222');
     await act(async () => byText('Confirmar').click());
-    await flush();
-    expect(document.querySelector('#mfa-code')).toBeNull();
+    expect(await waitUntil(() => !document.querySelector('#mfa-code'))).toBe(true);
   });
 
   it('"Sair da conta" termina a sessão', async () => {
@@ -108,17 +117,17 @@ describe('MfaSettings', () => {
     mfa.listFactors.mockResolvedValue({ data: { totp: [], all: [] }, error: null });
     mfa.enroll.mockResolvedValue({ data: { id: 'novo', totp: { qr_code: 'data:image/svg+xml;utf-8,<svg/>', secret: 'SEGREDO' } }, error: null });
     await mount(<MfaSettings isStaff />);
+    await waitUntil(() => byText('Activar com aplicação autenticadora'));
 
     await act(async () => byText('Activar com aplicação autenticadora').click());
-    await flush();
-    expect(document.querySelector('img[alt*="QR"]')).not.toBeNull();
+    expect(await waitFor('img[alt*="QR"]')).not.toBeNull();
     expect(document.body.textContent).toContain('SEGREDO');
 
     mfa.challengeAndVerify.mockResolvedValue({ data: {}, error: null });
     mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: 'novo', status: 'verified', friendly_name: 'Autenticador' }], all: [] }, error: null });
     type(document.querySelector('#mfa-enroll-code'), '123456');
     await act(async () => byText('Activar').click());
-    await flush();
+    expect(await waitUntil(() => !document.querySelector('#mfa-enroll-code'))).toBe(true);
     expect(mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: 'novo', code: '123456' });
     expect(document.body.textContent).toContain('Activa');
   });
@@ -128,10 +137,11 @@ describe('MfaSettings', () => {
     mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: 'f1', status: 'verified' }], all: [] }, error: null });
     mfa.unenroll.mockResolvedValue({ data: {}, error: null });
     await mount(<MfaSettings />);
+    await waitUntil(() => byText('Retirar a verificação'));
     await act(async () => byText('Retirar a verificação').click());
     expect(mfa.unenroll).not.toHaveBeenCalled();
     await act(async () => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Retirar').click());
-    await flush();
+    expect(await waitUntil(() => mfa.unenroll.mock.calls.length > 0)).toBe(true);
     expect(mfa.unenroll).toHaveBeenCalledWith({ factorId: 'f1' });
   });
 });
