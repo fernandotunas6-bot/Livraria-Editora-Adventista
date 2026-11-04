@@ -115,12 +115,16 @@ export default function LivrariaAssistant() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.85 }}
             onClick={() => setOpen(true)}
-            className="pointer-events-auto flex items-center gap-2 pl-3.5 pr-4 py-3.5 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#0ea5c9]"
+            title="Ajuda"
+            className="pointer-events-auto flex items-center gap-2 p-3.5 2xl:pl-3.5 2xl:pr-4 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#0ea5c9]"
             aria-label={showSupportTab ? 'Ajuda, notificações e atendimento' : 'Assistente da livraria'}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}
           >
-            <span className="text-xs font-semibold hidden sm:inline">Ajuda</span>
+            {/* A etiqueta só onde cabe na margem lateral: em 1366 px o botão com texto (~94 px)
+                ficava por cima da capa do livro e das grelhas; só o ícone (48 px) cabe nos ~75 px
+                de margem. O nome continua no aria-label e na dica. */}
+            <span className="text-xs font-semibold hidden 2xl:inline">Ajuda</span>
             {showSupportTab ? (
               <span className="relative">
                 <MessageCircle className="h-5 w-5 shrink-0" />

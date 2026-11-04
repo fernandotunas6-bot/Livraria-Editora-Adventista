@@ -13,8 +13,11 @@ export function useChatPosition() {
   const fixedStyle = {
     position: 'fixed',
     zIndex: 45,
-    bottom: 'calc(24px + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px))',
-    left: 'calc(24px + env(safe-area-inset-left, 0px))',
+    // + o aviso "Instalar App" quando ocupa a largura toda (telemóvel); ver installPrompt.js.
+    bottom: 'calc(24px + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px) + var(--aviso-instalar, 0px))',
+    // 16 px do canto: o botão (48 px) acaba nos 64 px e cabe na margem do conteúdo em 1366 px
+    // (75 px). A 24 px tocava na capa do livro e nas grelhas.
+    left: 'calc(16px + env(safe-area-inset-left, 0px))',
   };
 
   return { fixedStyle };

@@ -281,7 +281,9 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             />
           </Link>
 
-          <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-1.5">
+          {/* right-12: as etiquetas quebram linha antes da coluna de favoritos/WhatsApp, em vez
+              de passarem por baixo dela num cartão estreito. */}
+          <div className="pointer-events-none absolute left-2 right-12 top-2 z-10 flex flex-wrap items-center gap-1.5">
             {product.featured && (
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm" title="Destaque">
                 <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />

@@ -408,7 +408,7 @@
    Em classe própria e não na sintaxe arbitrária do Tailwind: `calc()` com `env()` e `var()`
    leva vírgulas, e o que saía dali não chegava a gerar regra nenhuma. */
 .float-above-bar {
-  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px));
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px) + var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px));
 }
 
 /* Para quem está preso ao fundo com `bottom`: afasta-se do indicador de gestos
