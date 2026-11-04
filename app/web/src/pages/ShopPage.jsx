@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   SlidersHorizontal, X, LayoutGrid, List, Sparkles,
@@ -28,7 +28,7 @@ import { getSearchRelevance } from '@/lib/searchUtils';
 import { MOTION } from '@/lib/motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useInfiniteList } from '@/hooks/useInfiniteList';
-import { useScrollMemory } from '@/hooks/useScrollMemory';
+import { readPlace, useScrollMemory } from '@/hooks/useScrollMemory';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import { PRODUCT_GRID_CLASS, SHOP_DENSITY_OPTIONS, shopDensityClass } from '@/lib/productGrid';
 
@@ -77,9 +77,16 @@ const ShopPage = () => {
     shop_show_low_stock: settings.shop_show_low_stock !== false,
   };
 
-  const [sortBy, setSortBy] = useState(shop.shop_default_sort || 'featured');
-  const [viewMode, setViewMode] = useState('grid');
-  const [gridCols, setGridCols] = useState(shop.shop_grid_columns || 4);
+  // Ao voltar de um livro, a ordenação, a vista e a densidade voltam como estavam (não vivem
+  // no URL). Lidas antes de criar o estado, para a lista começar já na ordem certa: mudar a
+  // ordem depois reiniciava a lista e a posição reposta apontava para outros livros.
+  const location = useLocation();
+  const navType = useNavigationType();
+  const [initialPlace] = useState(() => (navType === 'POP' ? readPlace(`${location.pathname}${location.search}`) : null));
+
+  const [sortBy, setSortBy] = useState(initialPlace?.sortBy || shop.shop_default_sort || 'featured');
+  const [viewMode, setViewMode] = useState(initialPlace?.viewMode === 'list' ? 'list' : 'grid');
+  const [gridCols, setGridCols] = useState(Number(initialPlace?.gridCols) || shop.shop_grid_columns || 4);
   const [quickView, setQuickView] = useState(null);
   const [modalProduct, setModalProduct] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -98,8 +105,11 @@ const ShopPage = () => {
   }, [isMobileFilterOpen]);
 
   useEffect(() => {
+    // A ordem reposta ao voltar atrás ganha sempre à de omissão das configurações, mesmo
+    // que estas cheguem depois do primeiro desenho.
+    if (initialPlace?.sortBy) return;
     setSortBy(shop.shop_default_sort || 'featured');
-  }, [shop.shop_default_sort]);
+  }, [shop.shop_default_sort, initialPlace?.sortBy]);
 
   useEffect(() => {
     if (!quickView) {
@@ -144,7 +154,6 @@ const ShopPage = () => {
   // filtros escolhidos (o URL) e a ordenação — nunca os dados, para a chegada dos livros não
   // apagar o lugar reposto ao voltar atrás.
   const isMobile = useIsMobile();
-  const location = useLocation();
   const infinite = useInfiniteList({
     total: sortedProducts.length,
     batch: perPage,
@@ -154,7 +163,7 @@ const ShopPage = () => {
   // Ao voltar de um livro: os mesmos cartões, a mesma página e a mesma posição no ecrã.
   const savedPlace = useScrollMemory({
     ready: !isLoading && sortedProducts.length > 0,
-    snapshot: { count: infinite.count, page: currentPage },
+    snapshot: { count: infinite.count, page: currentPage, sortBy, viewMode, gridCols },
   });
   const { setCount: setInfiniteCount } = infinite;
   useEffect(() => {

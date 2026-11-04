@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUp, BookOpen, Loader2 } from 'lucide-react';
+import { ArrowUp, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -17,10 +17,21 @@ export default function CatalogInfiniteTail({ sentinelRef, hasMore, loadMore, sh
     return (
       <div className="mt-6 flex flex-col items-center gap-3">
         <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
-        <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-          {shown} de {total} livros
-        </p>
+        {/* Quanto já se viu, em barra: o indicador que girava sempre dizia "a carregar" mesmo
+            parado — os livros já estão no browser, o lote seguinte aparece de imediato. */}
+        <div className="w-40" aria-live="polite">
+          <p className="mb-1.5 text-center text-xs text-muted-foreground">{shown} de {total} livros</p>
+          <div
+            className="h-1 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label="Livros vistos"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={shown}
+          >
+            <div className="h-full rounded-full bg-primary transition-[width] duration-base" style={{ width: `${Math.round((shown / total) * 100)}%` }} />
+          </div>
+        </div>
         <Button variant="outline" size="sm" className="h-11 rounded-full px-6" onClick={loadMore}>
           Mostrar mais livros
         </Button>

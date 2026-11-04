@@ -2,12 +2,14 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { savePlace } from '@/hooks/useScrollMemory';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const getProducts = vi.fn();
 vi.mock('@/api/EcommerceApi', () => ({ getProducts: (...a) => getProducts(...a) }));
-vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => true }));
+let mobile = true;
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mobile }));
 vi.mock('@/components/ProductsList.jsx', () => ({
   default: ({ products, isLoading }) => (isLoading ? <p>a carregar</p> : <ul>{products.map((p) => <li key={p.id}>{p.title}</li>)}</ul>),
 }));
@@ -36,6 +38,8 @@ describe('MobileDiscoveryFeed', () => {
   let host;
   beforeEach(() => {
     observers = [];
+    mobile = true;
+    sessionStorage.clear();
     getProducts.mockReset();
     globalThis.IntersectionObserver = class {
       constructor(cb, opts) { this.cb = cb; this.opts = opts; observers.push(this); }
@@ -63,5 +67,18 @@ describe('MobileDiscoveryFeed', () => {
     expect(getProducts).toHaveBeenCalledTimes(1);
     expect(host.querySelectorAll('li')).toHaveLength(12);
     expect(host.textContent).toContain('12 de 30 livros');
+  });
+
+  it('no desktop não aparece nem pede livros, mesmo ao voltar atrás com um lugar guardado', async () => {
+    mobile = false;
+    savePlace('/', { count: 24, y: 3000 });
+    getProducts.mockResolvedValue({ products: [] });
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () => root.render(<MemoryRouter initialEntries={['/']}><MobileDiscoveryFeed /></MemoryRouter>));
+    await act(async () => { await Promise.resolve(); });
+    expect(host.textContent).toBe('');
+    expect(getProducts).not.toHaveBeenCalled();
   });
 });

@@ -134,8 +134,9 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
     </div>
   );
 
-  // Modo lista: o cartão de sempre, sem mudanças.
-  const listCard = (
+  // Modo lista: o cartão de sempre, sem mudanças. Só é construído quando é lista: antes era
+  // montado em todos os cartões da grelha e deitado fora.
+  if (isList) return (
     <div className={`group h-full flex ${isList ? 'flex-row gap-4' : 'flex-col'}`}>
       <div className={`bg-card rounded-xl overflow-hidden surface-raise border border-border h-full flex flex-1 ${isList ? 'flex-row' : 'flex-col'}`}>
           <div className={`relative overflow-hidden bg-muted shrink-0 ${isList ? 'w-28 h-36' : 'aspect-[2/3] sm:aspect-[3/4]'}`}>
@@ -256,7 +257,6 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
     </div>
   );
 
-  if (isList) return listCard;
 
   // Cartão da grelha, compacto como nas grandes lojas: capa inteira (2:3, a proporção das
   // capas), favoritos e partilha sobre a capa, título em duas linhas, preço em destaque e as

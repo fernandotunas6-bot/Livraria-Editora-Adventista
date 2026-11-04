@@ -3,6 +3,7 @@ import { useLocation, useNavigationType } from 'react-router-dom';
 
 const PREFIX = 'livraria:lugar:';
 const MAX_AGE_MS = 30 * 60 * 1000;
+const SAVE_EVERY_MS = 150;
 
 /** Lê o lugar guardado para esta lista (ou null). Nunca lança. */
 export function readPlace(key, now = Date.now()) {
@@ -71,19 +72,21 @@ export function useScrollMemory({ ready, snapshot }) {
     savePlace(key, { ...snapshotRef.current, y: Math.round(window.scrollY) });
   }, [key]);
 
+  // Grava no máximo de 150 em 150 ms (e uma última vez quando o deslize pára): a cada frame
+  // eram dezenas de escritas no sessionStorage por segundo de deslize, para guardar um número.
   useEffect(() => {
-    let frame = 0;
+    let timer = 0;
     const onScroll = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = 0;
         save();
-      });
+      }, SAVE_EVERY_MS);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', onScroll);
-      if (frame) cancelAnimationFrame(frame);
+      if (timer) clearTimeout(timer);
     };
   }, [save]);
 

@@ -28,6 +28,9 @@ describe('CatalogInfiniteTail', () => {
     const loadMore = vi.fn();
     const el = mount({ total: 102, shown: 24, hasMore: true, loadMore });
     expect(el.textContent).toContain('24 de 102 livros');
+    const bar = el.querySelector('[role="progressbar"]');
+    expect(bar.getAttribute('aria-valuenow')).toBe('24');
+    expect(bar.firstElementChild.style.width).toBe('24%');
     act(() => [...el.querySelectorAll('button')].find((b) => b.textContent.includes('Mostrar mais')).click());
     expect(loadMore).toHaveBeenCalledOnce();
   });

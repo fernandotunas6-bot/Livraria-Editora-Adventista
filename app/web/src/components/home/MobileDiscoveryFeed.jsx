@@ -29,8 +29,8 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
 
   // Quem volta de um livro estava no meio do feed: carrega já, sem esperar pela aproximação.
   useEffect(() => {
-    if (saved?.y) setNear(true);
-  }, [saved]);
+    if (isMobile && saved?.y) setNear(true);
+  }, [isMobile, saved]);
 
   useEffect(() => {
     if (!isMobile || near) return undefined;
@@ -48,7 +48,8 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
   }, [isMobile, near]);
 
   useEffect(() => {
-    if (!near || products) return undefined;
+    // Só no telemóvel: no desktop o feed não aparece, e o pedido seria para nada.
+    if (!isMobile || !near || products) return undefined;
     let active = true;
     getProducts({})
       .then(({ products: list }) => {
@@ -59,7 +60,7 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
       })
       .catch(() => { if (active) setProducts([]); });
     return () => { active = false; };
-  }, [near, products]);
+  }, [isMobile, near, products]);
 
   if (!isMobile) return null;
 
