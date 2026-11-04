@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { initializeCheckout } from '@/api/EcommerceApi';
+import { nextCheckoutAttempt } from '@/lib/checkoutIdempotency';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -51,6 +52,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const signatureRef = useRef(null);
+  // Tentativa de checkout em curso: { fingerprint, key }. Fica entre carregamentos do botão
+  // e só é limpa quando a encomenda é confirmada.
+  const checkoutAttemptRef = useRef(null);
   // Coordenadas da morada, como a página de lojas faz. As colunas delivery_gps_lat/lng
   // existiam desde o início e nunca eram escritas: o estafeta ficava só com a referência.
   const [gps, setGps] = useState(null);
@@ -270,7 +274,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         ? { address: `Levantamento: ${form.pickupStore || 'Loja física'}`, city: form.pickupStore || 'Loja física' }
         : angolaAddressToPayload(deliveryAddress);
 
-      const { orderId, total, orderNumber, order_type, whatsapp_sent } = await initializeCheckout({
+      const checkoutPayload = {
         items,
         successUrl: `${window.location.origin}/success`,
         customerEmail: form.email.trim(),
@@ -286,7 +290,15 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         pickupStore: form.pickupStore,
         checkoutSignature,
         ...(gps && form.shippingMethod !== 'pickup' ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng } : {}),
+      };
+      // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
+      // servidor gravar), a chave repete-se e o servidor devolve essa encomenda em vez de outra.
+      checkoutAttemptRef.current = nextCheckoutAttempt(checkoutAttemptRef.current, checkoutPayload);
+      const { orderId, total, orderNumber, order_type, whatsapp_sent } = await initializeCheckout({
+        ...checkoutPayload,
+        idempotencyKey: checkoutAttemptRef.current.key,
       });
+      checkoutAttemptRef.current = null;
 
       const isWhatsApp = viaWhatsApp || order_type === 'whatsapp_order';
       const waPhone = settings.whatsapp || settings.contact_phone;

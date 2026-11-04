@@ -61,4 +61,13 @@ describe('initializeCheckout', () => {
     await initializeCheckout({ ...base, deliveryGpsLat: -8.83, deliveryGpsLng: 13.23 });
     expect(sent().body).toMatchObject({ deliveryGpsLat: -8.83, deliveryGpsLng: 13.23 });
   });
+
+  it('a chave de idempotência chega ao servidor, e só quando existe', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    await initializeCheckout({ ...base, idempotencyKey: '0b6f3c1e-9a7d-4c2b-8e1f-5d4a3b2c1d0e' });
+    expect(sent().body.idempotencyKey).toBe('0b6f3c1e-9a7d-4c2b-8e1f-5d4a3b2c1d0e');
+    fetchMock.mockClear();
+    await initializeCheckout(base);
+    expect(sent().body).not.toHaveProperty('idempotencyKey');
+  });
 });

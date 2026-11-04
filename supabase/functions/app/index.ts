@@ -1266,6 +1266,43 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   return json({ timeline: saved.delivery_timeline, email_sent: emailSent });
 });
 
+// ---------------------------------------------------------------------------
+// Idempotência do checkout
+// ---------------------------------------------------------------------------
+// A rede cai muitas vezes entre o servidor gravar a encomenda e a resposta chegar ao
+// telemóvel. O cliente vê um erro, o carrinho continua cheio, carrega outra vez — e ficavam
+// duas encomendas, com o stock descontado duas vezes. O site manda agora uma chave por
+// tentativa (a mesma enquanto o conteúdo não mudar), e uma chave já usada devolve a
+// encomenda que ela criou, sem descontar stock nem enviar avisos outra vez.
+// Sem a migração `idempotencia_checkout` a coluna não existe: a leitura falha e é ignorada,
+// e o `place_order` deixa cair a chave (só grava as colunas que existem). Nada parte.
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9-]{16,64}$/;
+
+async function orderByIdempotencyKey(key: string): Promise<Row | null> {
+  if (!key) return null;
+  const { data, error } = await db.from("orders").select("*").eq("idempotency_key", key).limit(1);
+  if (error) return null;
+  return data?.[0] || null;
+}
+
+function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: boolean; whatsappSent: boolean; replayed?: boolean }) {
+  const isWhatsApp = saved.order_type === "whatsapp_order";
+  const sep = successUrl.includes("?") ? "&" : "?";
+  return json({
+    url: `${successUrl}${sep}orderId=${saved.id}&orderNumber=${saved.order_number}&total=${saved.total}&type=${isWhatsApp ? "whatsapp" : "purchase"}`,
+    orderId: saved.id,
+    orderNumber: saved.order_number,
+    total: saved.total,
+    payment_status: saved.payment_status,
+    order_type: saved.order_type,
+    sale_channel: saved.sale_channel,
+    // O email segue depois da resposta: aqui só se sabe se foi pedido.
+    email_queued: extra.emailQueued,
+    whatsapp_sent: extra.whatsappSent,
+    ...(extra.replayed ? { replayed: true } : {}),
+  });
+}
+
 route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const settings = await getSettings();
   const rules = storeRules(settings);
@@ -1396,6 +1433,15 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     });
   }
 
+  const successUrl = data.successUrl || "/success";
+  const idempotencyKey = IDEMPOTENCY_KEY.test(String(data.idempotencyKey || "")) ? String(data.idempotencyKey) : "";
+  const emailQueued = !!(email && settings?.order_email_enabled);
+  if (idempotencyKey) {
+    const previous = await orderByIdempotencyKey(idempotencyKey);
+    if (previous) return checkoutResponse(previous, successUrl, { emailQueued, whatsappSent: false, replayed: true });
+    order.idempotency_key = idempotencyKey;
+  }
+
   const { data: saved, error } = await db.rpc("place_order", {
     p_order: order,
     p_items: cartItems,
@@ -1411,6 +1457,12 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   // Outro erro do Postgres diria nomes de colunas e restrições a quem está a comprar.
   if (error) {
     if (error.code === "P0001") throw bad(error.message);
+    // Dois pedidos com a mesma chave ao mesmo tempo: o índice único deixa passar um só, e o
+    // outro devolve a encomenda que esse criou (o stock do segundo é reposto pelo rollback).
+    if (error.code === "23505" && idempotencyKey) {
+      const previous = await orderByIdempotencyKey(idempotencyKey);
+      if (previous) return checkoutResponse(previous, successUrl, { emailQueued, whatsappSent: false, replayed: true });
+    }
     throw error;
   }
 
@@ -1434,20 +1486,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     console.log("Post-checkout WhatsApp:", err);
   }
 
-  const successUrl = data.successUrl || "/success";
-  const sep = successUrl.includes("?") ? "&" : "?";
-  return json({
-    url: `${successUrl}${sep}orderId=${saved.id}&orderNumber=${orderNum}&total=${saved.total}&type=${isWhatsApp ? "whatsapp" : "purchase"}`,
-    orderId: saved.id,
-    orderNumber: orderNum,
-    total: saved.total,
-    payment_status: saved.payment_status,
-    order_type: saved.order_type,
-    sale_channel: saleChannel,
-    // O email segue depois da resposta: aqui só se sabe se foi pedido.
-    email_queued: !!(email && settings?.order_email_enabled),
-    whatsapp_sent: whatsappSent,
-  });
+  return checkoutResponse(saved, successUrl, { emailQueued, whatsappSent });
 });
 
 route("GET", "/messaging/status", async () => {
@@ -2411,6 +2450,8 @@ route("POST", "/chat", async ({ body, ip }) => {
 // ---------------------------------------------------------------------------
 // Mensagem para quem não é da equipa quando algo falha sem ser um erro previsto.
 const UNEXPECTED_ERROR = "Ocorreu um erro inesperado. Tente novamente dentro de momentos.";
+// 1 MB: folga sobre a assinatura da confirmação de entrega (600 KB) e o checkout (200 KB).
+const MAX_BODY_BYTES = 1_000_000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -2426,7 +2467,20 @@ Deno.serve(async (req) => {
   let auth: Auth = null;
   try {
     let body: Row = {};
-    if (req.method === "POST") body = await req.json().catch(() => ({}));
+    if (req.method === "POST") {
+      // O maior pedido legítimo é a confirmação de entrega (assinatura até 600 KB). Sem tecto,
+      // um corpo de dezenas de MB era lido e analisado inteiro antes de qualquer validação.
+      const declared = Number(req.headers.get("content-length") || 0);
+      if (declared > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      const raw = await req.text();
+      if (raw.length > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      try {
+        const parsed = raw ? JSON.parse(raw) : {};
+        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        body = {};
+      }
+    }
     // O gateway do Supabase reescreve este cabeçalho com o IP real (verificado a 2026-11-04:
     // um X-Forwarded-For forjado ficou registado em private.rate_limits com o IP de origem),
     // por isso o primeiro valor é fiável para os limites de pedidos.
@@ -2445,8 +2499,11 @@ Deno.serve(async (req) => {
     // A equipa continua a vê-la no painel, onde ajuda a perceber o que falhou; os outros
     // recebem uma frase e o id para a equipa procurar nos registos.
     const detail = (err as { message?: string })?.message || String(err);
+    // A referência curta vai na própria frase: é o que o cliente copia para o WhatsApp da
+    // loja, e os primeiros 8 caracteres chegam para encontrar o pedido nos registos.
+    const publicMessage = `${UNEXPECTED_ERROR} (ref. ${requestId.slice(0, 8)})`;
     return json(
-      { message: isStaff(auth) ? detail : UNEXPECTED_ERROR, ref: requestId, status: 500 },
+      { message: isStaff(auth) ? detail : publicMessage, ref: requestId, status: 500 },
       500,
       { "X-Request-Id": requestId },
     );

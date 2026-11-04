@@ -26,6 +26,10 @@ jobs:
 
       - run: npm ci
 
+      # Antes de tudo: uma credencial no PR tem de ser revogada, e quanto mais cedo melhor.
+      - name: Segredos nos ficheiros versionados
+        run: node scripts/verificar-segredos.mjs
+
       - name: Lint
         run: npm run lint
 

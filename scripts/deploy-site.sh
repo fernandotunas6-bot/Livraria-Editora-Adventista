@@ -51,6 +51,7 @@ grep -q '^VITE_SUPABASE_URL=.' app/web/.env 2>/dev/null && grep -q '^VITE_SUPABA
   || fail "app/web/.env sem VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY."
 
 echo "→ lint, testes e build de $(git rev-parse --short HEAD) ($branch)"
+node scripts/verificar-segredos.mjs
 npm run lint --silent
 npm test --silent
 npm run build --silent

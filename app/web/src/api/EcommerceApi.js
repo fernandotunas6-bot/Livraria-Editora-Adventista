@@ -296,6 +296,7 @@ export async function initializeCheckout({
   deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
   deliveryGpsLat, deliveryGpsLng,
+  idempotencyKey,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -324,6 +325,9 @@ export async function initializeCheckout({
       // O carrinho já mandava as coordenadas, mas esta função só reenviava os campos que
       // nomeia, e estes não estavam na lista: nenhuma encomenda chegou a ter GPS.
       deliveryGpsLat, deliveryGpsLng,
+      // A mesma em cada repetição da mesma compra: o servidor devolve a encomenda já criada
+      // em vez de fazer outra (ver lib/checkoutIdempotency.js).
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     }),
   });
 
