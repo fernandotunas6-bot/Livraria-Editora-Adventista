@@ -191,10 +191,27 @@ function requireCrm(auth: Auth) {
 const SHORT_TTL_MS = 15_000;
 const { cached, forget: forgetCached } = createMemo();
 
+/**
+ * Segredos das configurações (palavra-passe SMTP, chaves SendGrid e de IA) guardados fora da
+ * API, em private.site_secrets (migração `segredos_fora_da_api`). Sem a migração a função não
+ * existe e fica-se com o que estiver nas colunas de site_settings, como antes.
+ */
+async function loadSecrets(): Promise<Row> {
+  const { data, error } = await db.rpc("site_secret_values");
+  if (error || !data || typeof data !== "object") return {};
+  return Object.fromEntries(Object.entries(data as Row).filter(([, v]) => typeof v === "string" && v));
+}
+
 async function loadSettings(): Promise<Row | null> {
-  const { data } = await db.from("site_settings").select("*")
-    .order("created", { ascending: true }).order("id", { ascending: false }).limit(1);
-  return data?.[0] || null;
+  const [{ data }, secrets] = await Promise.all([
+    db.from("site_settings").select("*")
+      .order("created", { ascending: true }).order("id", { ascending: false }).limit(1),
+    loadSecrets(),
+  ]);
+  const row = data?.[0] || null;
+  // Os segredos entram no mesmo objecto, por isso o resto da função não muda. Nenhuma rota
+  // devolve este objecto inteiro: /settings escolhe campo a campo o que é público.
+  return row ? { ...row, ...secrets } : null;
 }
 /** Definições do site (em cache curta). Cópia rasa: alterar o objecto não mexe na cache. */
 async function getSettings(fresh = false): Promise<Row | null> {

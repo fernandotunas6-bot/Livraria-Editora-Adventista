@@ -17,6 +17,42 @@ import { pbErrorMessage } from '@/lib/mediaSave';
 import { isUploadPending } from '@/lib/mediaUpload';
 import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone } from '@/lib/angolaPhone';
+import { clearSecret, loadSecretStatus, secretsForSave, withoutSecrets } from '@/lib/siteSecrets';
+
+/**
+ * Campo de palavra-passe ou chave. Com a migração `segredos_fora_da_api` o valor guardado
+ * nunca volta ao browser: o campo vem vazio, diz se há valor definido, e gravar vazio mantém-no.
+ */
+export function SecretField({ id, label, value, onChange, status, placeholder, className, onClear }) {
+  const known = status !== null && status !== undefined;
+  const isSet = known && !!status?.set;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={id}>{label}</Label>
+        {known && (
+          <span className={isSet ? 'text-xs font-medium text-emerald-700 dark:text-emerald-400' : 'text-xs text-muted-foreground'}>
+            {isSet ? 'Definida' : 'Não definida'}
+          </span>
+        )}
+      </div>
+      <Input
+        id={id}
+        type="password"
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={isSet ? 'Guardada — escreva só para substituir' : placeholder}
+        className={className}
+      />
+      {isSet && (
+        <button type="button" className="text-xs text-destructive hover:underline" onClick={onClear}>
+          Retirar o valor guardado
+        </button>
+      )}
+    </div>
+  );
+}
 
 const empty = {
   site_name: 'Livraria Adventista',
@@ -140,11 +176,17 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Que segredos estão guardados (sem os valores). `null` = base de dados sem a migração.
+  const [secretStatus, setSecretStatus] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await pb.collection('site_settings').getFullList();
+      const [list, status] = await Promise.all([
+        pb.collection('site_settings').getFullList(),
+        loadSecretStatus().catch(() => null),
+      ]);
+      setSecretStatus(status);
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
@@ -245,6 +287,25 @@ export default function SettingsTab() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const removeSecret = async (key, label) => {
+    try {
+      await clearSecret(key);
+      setSecretStatus(await loadSecretStatus().catch(() => null));
+      set(key, '');
+      toast({ title: `${label} retirada` });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: pbErrorMessage(err) });
+    }
+  };
+  const secretProps = (key, label) => ({
+    id: `secret-${key}`,
+    label,
+    value: form[key],
+    onChange: (v) => set(key, v),
+    status: secretStatus ? secretStatus[key] || { set: false } : null,
+    onClear: () => removeSecret(key, label),
+  });
+
   // Equipa da página Sobre
   const teamSet = (index, key, value) => setForm((f) => {
     const team = [...(f.about_team || [])];
@@ -336,10 +397,12 @@ export default function SettingsTab() {
         data.favicon_url = '';
       }
 
+      // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
+      const payload = { ...withoutSecrets(data), ...secretsForSave(form, secretStatus) };
       if (id) {
-        await pb.collection('site_settings').update(id, data);
+        await pb.collection('site_settings').update(id, payload);
       } else {
-        const created = await pb.collection('site_settings').create(data);
+        const created = await pb.collection('site_settings').create(payload);
         id = created.id;
         setRecordId(id);
       }
@@ -619,18 +682,12 @@ export default function SettingsTab() {
                   <Label>Utilizador SMTP</Label>
                   <Input value={form.smtp_user} onChange={(e) => set('smtp_user', e.target.value)} placeholder="noreply@dominio.ao" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Password SMTP</Label>
-                  <Input type="password" value={form.smtp_password} onChange={(e) => set('smtp_password', e.target.value)} />
-                </div>
+                <SecretField {...secretProps('smtp_password', 'Password SMTP')} />
               </div>
             </div>
           )}
           {form.email_provider === 'sendgrid' && (
-            <div className="space-y-2">
-              <Label>SendGrid API Key</Label>
-              <Input type="password" value={form.sendgrid_api_key} onChange={(e) => set('sendgrid_api_key', e.target.value)} placeholder="SG...." className="font-mono text-sm" />
-            </div>
+            <SecretField {...secretProps('sendgrid_api_key', 'Chave SendGrid')} placeholder="SG...." className="font-mono text-sm" />
           )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -655,10 +712,7 @@ export default function SettingsTab() {
             <Label>Chave pública VAPID</Label>
             <Input value={form.vapid_public_key} onChange={(e) => set('vapid_public_key', e.target.value)} className="font-mono text-xs" />
           </div>
-          <div className="space-y-2">
-            <Label>Chave privada VAPID (servidor)</Label>
-            <Input type="password" value={form.vapid_private_key} onChange={(e) => set('vapid_private_key', e.target.value)} className="font-mono text-xs" />
-          </div>
+          <SecretField {...secretProps('vapid_private_key', 'Chave privada VAPID')} className="font-mono text-xs" />
 
           <div className="border-t pt-6">
             <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
@@ -683,14 +737,8 @@ export default function SettingsTab() {
           </div>
           {form.chat_provider !== 'faq' && (
             <>
-              <div className="space-y-2">
-                <Label>Chave API Gemini</Label>
-                <Input type="password" value={form.gemini_api_key} onChange={(e) => set('gemini_api_key', e.target.value)} placeholder="AIza… ou variável GEMINI_API_KEY" className="font-mono text-xs" />
-              </div>
-              <div className="space-y-2">
-                <Label>Chave API DeepSeek (opcional)</Label>
-                <Input type="password" value={form.deepseek_api_key} onChange={(e) => set('deepseek_api_key', e.target.value)} placeholder="sk-… ou variável DEEPSEEK_API_KEY" className="font-mono text-xs" />
-              </div>
+              <SecretField {...secretProps('gemini_api_key', 'Chave Gemini')} placeholder="AIza… ou variável GEMINI_API_KEY" className="font-mono text-xs" />
+              <SecretField {...secretProps('deepseek_api_key', 'Chave DeepSeek')} placeholder="sk-… ou variável DEEPSEEK_API_KEY (opcional)" className="font-mono text-xs" />
               <div className="space-y-2">
                 <Label>Modelo (opcional)</Label>
                 <Input value={form.chat_model} onChange={(e) => set('chat_model', e.target.value)} placeholder="gemini-2.0-flash-lite ou deepseek-chat" className="font-mono text-xs" />
