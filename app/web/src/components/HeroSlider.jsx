@@ -206,7 +206,11 @@ const HeroSlider = () => {
           {!isSplit && (
             <>
               <SlideMedia slide={slide} eager={current === 0} />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/20" />
+              {/* O véu é mais carregado no telemóvel: aí o texto atravessa o ecrã todo e a ponta
+                  direita do subtítulo e do botão cai sobre a zona clara da imagem — em cima das
+                  capas, que são o que há de mais claro. No computador o texto ocupa o terço
+                  esquerdo e o gradiente original chega, por isso fica como estava. */}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/50 md:from-black/75 md:via-black/45 md:to-black/20" />
             </>
           )}
           {isSplit && <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand-dark)] to-[var(--brand-primary)]" />}
@@ -225,12 +229,16 @@ const HeroSlider = () => {
 
       {slides.length > 1 && (
         <>
-          {/* No telemóvel as setas ficam em baixo, ao lado dos pontos: a meio tapavam o
-              subtítulo do slide. */}
-          <button type="button" onClick={prev} className="absolute left-4 bottom-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Slide anterior">
+          {/* As setas ficam em baixo, ao lado dos pontos, em todos os tamanhos. A meio
+              tapavam o texto do slide — e não era só no telemóvel: a seta acaba sempre a
+              56px da margem, e o `container-custom` só se afasta da borda acima dos 1280px
+              que tem de largura máxima, por isso em tudo abaixo de ~1392px (um portátil de
+              1366 incluído) a seta assentava em cima do título. Em baixo não há largura em
+              que colida. */}
+          <button type="button" onClick={prev} className="absolute left-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Slide anterior">
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <button type="button" onClick={next} className="absolute right-4 bottom-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Próximo slide">
+          <button type="button" onClick={next} className="absolute right-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Próximo slide">
             <ChevronRight className="h-6 w-6" />
           </button>
           {/* O ponto mede 8px: em vez de o engordar, o botão à volta dele passa a medir 24,
