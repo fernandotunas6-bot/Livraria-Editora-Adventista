@@ -97,14 +97,19 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     getPaymentMethods().then((res) => {
       const methods = res.methods || [];
       setPaymentMethods(methods);
-      if (methods.length > 0 && !methods.find((m) => m.code === form.paymentMethod)) {
-        setForm((f) => ({ ...f, paymentMethod: methods[0].code }));
-      }
+      // Só se escolhe o primeiro método quando o que está escolhido não existe na lista que
+      // acabou de chegar — e lê-se o valor actual aqui dentro, em vez de o efeito depender
+      // dele. Com a dependência, o efeito corria outra vez a cada escolha do cliente, e cada
+      // volta eram dois pedidos ao servidor (métodos e lojas) sem nada de novo para trazer.
+      // Devolver o mesmo objecto quando não há nada a mudar evita um render inútil.
+      setForm((f) => (methods.length > 0 && !methods.some((m) => m.code === f.paymentMethod)
+        ? { ...f, paymentMethod: methods[0].code }
+        : f));
     }).catch(() => setPaymentMethods([]));
 
     // Só as lojas que aceitam levantamento aparecem no checkout.
     getPhysicalStores().then((list) => setPhysicalStores(list.filter((st) => st.pickup_enabled))).catch(() => setPhysicalStores([]));
-  }, [isCartOpen, form.paymentMethod]);
+  }, [isCartOpen]);
 
   const subtotalCents = getCartTotalCents();
   const FREE_SHIPPING_THRESHOLD = (Number(settings.shipping_free_threshold) || 20000) * 100;
@@ -237,19 +242,25 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       return;
     }
 
-    // Última confirmação: se preço, stock ou disponibilidade mudaram, o cliente revê antes de pagar.
-    const cartChanges = await refreshCart().catch(() => []);
-    if (cartChanges.length) {
-      toast({
-        variant: 'destructive',
-        title: 'O carrinho mudou — reveja antes de confirmar',
-        description: cartChanges.slice(0, 3).join(' '),
-      });
-      return;
-    }
-
+    // Trancar antes da ida à rede, não depois. O `refreshCart` aqui abaixo é um pedido ao
+    // servidor; enquanto corria, o `checkingOut` ainda era falso, por isso os dois botões de
+    // submissão ficavam activos e sem sinal nenhum de espera. Quem carrega e não vê nada
+    // acontecer carrega outra vez — e cada carregada era um `handleCheckout` novo a caminho do
+    // `initializeCheckout`, ou seja, duas encomendas. A saída antecipada abaixo cai no mesmo
+    // `finally`, que repõe o estado.
     setCheckingOut(true);
     try {
+      // Última confirmação: se preço, stock ou disponibilidade mudaram, o cliente revê antes de pagar.
+      const cartChanges = await refreshCart().catch(() => []);
+      if (cartChanges.length) {
+        toast({
+          variant: 'destructive',
+          title: 'O carrinho mudou — reveja antes de confirmar',
+          description: cartChanges.slice(0, 3).join(' '),
+        });
+        return;
+      }
+
       const items = cartItems.map((item) => ({
         variant_id: item.variant.id,
         quantity: item.quantity,
