@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
+import { useCatalogWindow } from '@/hooks/useCatalogWindow';
 import FilterPanel from '@/components/FilterPanel.jsx';
 import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
@@ -44,6 +46,14 @@ const CategoryPage = () => {
     if (sortBy === 'price-low') return a.price_in_cents - b.price_in_cents;
     if (sortBy === 'price-high') return b.price_in_cents - a.price_in_cents;
     return (a.order || 0) - (b.order || 0);
+  });
+
+  // Telemóvel: lista contínua, como a loja. Desktop: a lista inteira, como sempre.
+  const location = useLocation();
+  const catalog = useCatalogWindow({
+    items: sortedProducts,
+    ready: !isLoading,
+    resetKey: `${category}|${location.search}|${sortBy}`,
   });
 
   return (
@@ -122,7 +132,23 @@ const CategoryPage = () => {
                 </div>
               </div>
             ) : (
-              <ProductsList products={sortedProducts} isLoading={isLoading} />
+              catalog.isMobile ? (
+                <>
+                  <ProductsList embedded products={catalog.visible} isLoading={isLoading} />
+                  {!isLoading && (
+                    <CatalogInfiniteTail
+                      sentinelRef={catalog.infinite.sentinelRef}
+                      hasMore={catalog.infinite.hasMore}
+                      loadMore={catalog.infinite.loadMore}
+                      shown={catalog.visible.length}
+                      total={sortedProducts.length}
+                      onClearFilters={filterCount > 0 ? clearFilters : undefined}
+                    />
+                  )}
+                </>
+              ) : (
+                <ProductsList products={sortedProducts} isLoading={isLoading} />
+              )
             )}
           </div>
         </div>

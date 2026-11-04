@@ -4,23 +4,14 @@ import { ArrowRight } from 'lucide-react';
 import ProductsList from '@/components/ProductsList.jsx';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import { getProducts } from '@/api/EcommerceApi';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useInfiniteList } from '@/hooks/useInfiniteList';
+import { useCatalogWindow } from '@/hooks/useCatalogWindow';
+import { discoveryOrder, hasInterest, interestFromRecent } from '@/lib/discovery';
+import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 const LOTE = 12;
 
-/**
- * Ordem do feed: primeiro os destaques, depois os disponíveis (os mais recentes à frente), e
- * só no fim os esgotados. Cada livro uma vez. Sem "mais vendidos" nem recomendações
- * inventadas: só o que os dados dizem de facto.
- */
-export function discoveryOrder(products = []) {
-  const seen = new Set();
-  const unique = products.filter((p) => p?.id && !seen.has(p.id) && seen.add(p.id));
-  const stock = (p) => (p.purchasable === false ? 0 : (p.variants?.[0]?.inventory_quantity ?? 1));
-  const rank = (p) => (p.featured && stock(p) > 0 ? 0 : stock(p) > 0 ? 1 : 2);
-  return [...unique].sort((a, b) => rank(a) - rank(b) || (b.order || 0) - (a.order || 0));
-}
+// A ordem vive em lib/discovery.js; reexportada para os testes deste componente.
+export { discoveryOrder };
 
 /**
  * Fim da página inicial no telemóvel: o catálogo continua, em lotes, enquanto se desliza.
@@ -28,10 +19,18 @@ export function discoveryOrder(products = []) {
  * paga o pedido. No desktop não aparece: a página inicial fica como sempre foi.
  */
 export default function MobileDiscoveryFeed({ onCartOpen }) {
-  const isMobile = useIsMobile();
   const sectionRef = useRef(null);
   const [near, setNear] = useState(false);
   const [products, setProducts] = useState(null);
+  const [personal, setPersonal] = useState(false);
+  const ordered = useMemo(() => products || [], [products]);
+  // Lotes, e o lugar reposto ao voltar de um livro (com a página inicial como chave).
+  const { isMobile, saved, infinite } = useCatalogWindow({ items: ordered, ready: !!products, batch: LOTE });
+
+  // Quem volta de um livro estava no meio do feed: carrega já, sem esperar pela aproximação.
+  useEffect(() => {
+    if (saved?.y) setNear(true);
+  }, [saved]);
 
   useEffect(() => {
     if (!isMobile || near) return undefined;
@@ -52,13 +51,15 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
     if (!near || products) return undefined;
     let active = true;
     getProducts({})
-      .then(({ products: list }) => { if (active) setProducts(discoveryOrder(list || [])); })
+      .then(({ products: list }) => {
+        if (!active) return;
+        const interest = interestFromRecent(getRecentlyViewed(), list || []);
+        setPersonal(hasInterest(interest));
+        setProducts(discoveryOrder(list || [], interest));
+      })
       .catch(() => { if (active) setProducts([]); });
     return () => { active = false; };
   }, [near, products]);
-
-  const ordered = useMemo(() => products || [], [products]);
-  const infinite = useInfiniteList({ total: ordered.length, batch: LOTE, enabled: isMobile && !!products });
 
   if (!isMobile) return null;
 
@@ -68,7 +69,9 @@ export default function MobileDiscoveryFeed({ onCartOpen }) {
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
             <h2 id="titulo-descobrir" className="text-2xl font-bold">Continue a descobrir</h2>
-            <p className="text-sm text-muted-foreground">Todos os livros da livraria</p>
+            <p className="text-sm text-muted-foreground">
+              {personal ? 'Primeiro, livros parecidos com os que viu; depois, todo o catálogo' : 'Todos os livros da livraria'}
+            </p>
           </div>
           <Link to="/shop" className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
             Loja <ArrowRight className="h-4 w-4" aria-hidden="true" />

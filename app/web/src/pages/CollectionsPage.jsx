@@ -8,6 +8,8 @@ import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import ProductCard from '@/components/ProductCard';
 import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
+import { useCatalogWindow } from '@/hooks/useCatalogWindow';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import QuickViewModal from '@/components/QuickViewModal';
 import { pageTitle } from '@/lib/brand';
 import { getCollections } from '@/api/PlatformApi';
@@ -118,6 +120,13 @@ export default function CollectionsPage() {
       return allowed.includes(g);
     });
   }, [books, selectedCategory]);
+
+  // Telemóvel: a coleção cresce ao deslizar, como a loja; desktop: inteira, como sempre.
+  const catalog = useCatalogWindow({
+    items: filteredBooks,
+    ready: !loading,
+    resetKey: `${slug || ''}|${selectedCategory}`,
+  });
 
   return (
     <>
@@ -289,16 +298,28 @@ export default function CollectionsPage() {
               {/* Books Grid */}
               <div className="flex-1">
                 {filteredBooks.length > 0 ? (
-                  <div className={PRODUCT_GRID_CLASS}>
-                    {filteredBooks.map((book) => (
-                      <ProductCard 
-                        key={book.id} 
-                        product={bookToProduct(book)} 
-                        onQuickView={setQuickView}
-                        onCartOpen={() => setIsCartOpen(true)}
+                  <>
+                    <div className={PRODUCT_GRID_CLASS}>
+                      {catalog.visible.map((book) => (
+                        <ProductCard
+                          key={book.id}
+                          product={bookToProduct(book)}
+                          onQuickView={setQuickView}
+                          onCartOpen={() => setIsCartOpen(true)}
+                        />
+                      ))}
+                    </div>
+                    {catalog.isMobile && (
+                      <CatalogInfiniteTail
+                        sentinelRef={catalog.infinite.sentinelRef}
+                        hasMore={catalog.infinite.hasMore}
+                        loadMore={catalog.infinite.loadMore}
+                        shown={catalog.visible.length}
+                        total={filteredBooks.length}
+                        onClearFilters={selectedCategory !== 'all' ? () => setSelectedCategory('all') : undefined}
                       />
-                    ))}
-                  </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-20 bg-card border rounded-2xl">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/60 mb-3" />
@@ -323,7 +344,10 @@ export default function CollectionsPage() {
         onCartOpen={() => setIsCartOpen(true)} 
       />
 
-      <Footer />
+      {/* Como na loja: no telemóvel a coleção segue sem rodapé. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 }
