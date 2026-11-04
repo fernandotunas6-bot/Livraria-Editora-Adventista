@@ -1,7 +1,19 @@
 import { isPickupOrder, orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
 
-function escapeCsv(val) {
+/**
+ * Célula de CSV segura para abrir no Excel. Um texto começado por = + - @ (ou tabulação) é
+ * lido como fórmula — e a exportação leva texto escrito pelos clientes (nome, morada,
+ * notas): `=HYPERLINK(…)` numa nota virava um link no computador da equipa. O apóstrofo
+ * à frente fá-lo ficar texto (recomendação da OWASP); os telefones +244… também, que o Excel
+ * tentava calcular.
+ */
+export function csvSafeText(val) {
   const s = String(val ?? '');
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+function escapeCsv(val) {
+  const s = csvSafeText(val);
   if (s.includes(',') || s.includes('"') || s.includes('\n')) {
     return `"${s.replace(/"/g, '""')}"`;
   }

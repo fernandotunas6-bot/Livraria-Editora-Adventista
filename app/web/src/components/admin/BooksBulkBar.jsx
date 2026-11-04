@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { effectivePrice, fromLocalInput, isBookVisible } from '@/lib/pricing';
+import { csvSafeText } from '@/lib/orderExport';
 
 /** Actualiza vários livros, 8 de cada vez; devolve quantos falharam. */
 async function updateMany(books, patchFor) {
@@ -29,7 +30,7 @@ function exportCsv(books) {
     ['visivel', 'Visível'], ['featured', 'Destaque'],
   ];
   const esc = (v) => {
-    const t = v == null ? '' : String(v);
+    const t = csvSafeText(v);
     return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
   const num = (v) => Number(v || 0).toFixed(2).replace('.', ',');

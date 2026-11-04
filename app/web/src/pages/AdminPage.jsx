@@ -138,6 +138,19 @@ const AdminPage = () => {
         throw new Error('A promoção tem de terminar depois de começar.');
       }
       if (editingBook) {
+        // O formulário leva o stock que leu ao abrir. Uma venda feita entretanto (o checkout
+        // desconta-o na base de dados) era apagada ao gravar outra coisa qualquer, como a
+        // descrição. Stock não mexido não vai no pedido; stock mexido confere primeiro o actual.
+        const openedWith = Number(editingBook.stock) || 0;
+        if (payload.stock === openedWith) {
+          delete payload.stock;
+        } else {
+          const { stock: current } = await pb.collection('stock_books').getOne(editingBook.id, { fields: 'id,stock' });
+          if ((Number(current) || 0) !== openedWith
+            && !confirm(`O stock deste livro mudou desde que abriu o formulário (era ${openedWith}, agora é ${Number(current) || 0} — provavelmente uma venda).\n\nGravar ${payload.stock} na mesma?`)) {
+            return;
+          }
+        }
         await pb.collection('stock_books').update(editingBook.id, payload);
         toast({ title: 'Livro atualizado', description: `Código: ${payload.book_code || editingBook.book_code}` });
       } else {
