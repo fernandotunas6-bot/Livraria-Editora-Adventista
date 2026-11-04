@@ -356,6 +356,138 @@ alavanca é fazer menos consultas em série:
 4. Depois de confirmado: exigir conta no servidor para entrega ao domicílio, e apagar as
    colunas herdadas (ver o README de `docs/migracoes-pendentes`).
 
+## 9.4 Segurança, rede e continuidade (2026-11-04)
+
+Feita a partir da ponta `1ea225e` do ramo. Tudo o que está marcado como validado foi visto a
+funcionar (consulta à base de dados de produção só de leitura, pedido HTTP real, ou teste
+automático), e não apenas lido no código.
+
+### Arquitectura encontrada
+
+- **Site**: SPA React/Vite no Cloudflare Pages (`livrariaadventista.com` e `www`, projecto
+  `livraria-editora-adventista` com sufixo `-ben` no `pages.dev`). O projecto antigo
+  `livraria-adventista.pages.dev` **continua no ar com um build antigo**.
+- **API**: uma Edge Function do Supabase (`app`, `verify_jwt = false`, autenticação feita na
+  função) e o PostgREST com RLS. Base de dados Postgres 17 em `eu-north-1`.
+- **Autenticação**: Supabase Auth (email + palavra-passe com confirmação, Google OAuth). A
+  Firebase só serve o login Google Workspace do painel.
+- **Sem servidores próprios**: não há origem a esconder, nem balanceador a configurar. A
+  distribuição e o failover são os do Cloudflare e do Supabase.
+- **Pagamentos**: sem gateway. O cliente indica a referência e a equipa confirma no painel.
+
+### Estado de cada controlo
+
+| Controlo | Estado | Evidência |
+|---|---|---|
+| SQL sem concatenação de valores | Existente e validado | `place_order` monta colunas com `quote_ident` a partir do catálogo e passa os valores em `$1`; filtros PostgREST escapados (`likeExact`, `JSON.stringify` no `.or`) |
+| RLS nas tabelas expostas | Existente e validado | As 33 tabelas de `public` e o `storage.objects` com RLS; `private.rate_limits` sem RLS mas fora da API e sem grants |
+| Funções `SECURITY DEFINER` | Existente e validado | Todas com `search_path = ''`; li as 6 novas do atendimento: verificam `auth.uid()` e a permissão antes de escrever |
+| Privilégios no próprio perfil | Existente e validado | Trigger `protect_profile_privileges` repõe `role`, `permissions` e `email` |
+| Isolamento entre clientes | Existente; refinado | Encomendas, desejos, avaliações e notificações por `auth.uid()`. As conversas seguras deixavam o cliente reabrir e alterar a conversa (corrigido abaixo) |
+| Validação no servidor | Existente; refinado | Checkout com lista explícita de campos, tamanhos e preço calculado na base de dados; faltava validar a forma do email |
+| XSS | Existente; refinado | DOMPurify na loja, CSP sem `unsafe-inline` nos scripts; o editor do painel não sanitizava (corrigido) |
+| Segredos no repositório | Existente e validado | Histórico completo: só a configuração Web da Firebase (pública por desenho). CSV de chaves e `client_secret` locais nunca foram commitados |
+| Segredos na base de dados | Necessita de refinamento | `site_settings` tem colunas para palavra-passe SMTP, chave SendGrid, chave privada VAPID e chaves de IA, legíveis por quem tem "Configurações". **Hoje estão todas vazias** |
+| Palavras-passe | Existente e validado | Só o Supabase Auth (bcrypt); não há hashing próprio |
+| Palavras-passe vazadas (HIBP) | Ausente | Advisor de segurança |
+| MFA | Ausente | 3 contas, todas admin, 0 factores; o site não tem ecrã de MFA |
+| Confirmação de email | Existente e validado | 0 contas por confirmar com sessão iniciada (a política de encomendas confia no email do JWT) |
+| Limites de pedidos | Existente e validado; refinado | Contador partilhado na base de dados. **IP fiável testado:** um `X-Forwarded-For` forjado ficou registado com o IP real. Respondia 400; passa a 429 com `Retry-After` |
+| Enumeração no `/track` | Existente e validado | O número leva os últimos 6 dígitos base36 do tempo **em milissegundos** (repetem só a cada ~25 dias) mais 3 aleatórios: adivinhar exige o milissegundo da compra |
+| Pagamento marcado só pelo servidor | Existente e validado | Checkout grava sempre `pending`/`awaiting_confirmation`; só `manage_orders` marca `paid` |
+| Idempotência do checkout | Parcialmente implementado | Botão trancado antes do pedido (`a40fbfc`); o servidor não tem chave de idempotência |
+| Crons (`/cron/*`) | Existente e validado | Segredo comparado em tempo constante e limite por IP |
+| Fuga de erros internos | Necessitava de refinamento | Erros não previstos (Postgres incluído) iam para o browser com estado 400 (corrigido) |
+| Cabeçalhos HTTP e TLS | Existente e validado | HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` nos dois hostnames; TLS 1.3, TLS 1.1 recusado; certificado até Fev. 2027; HTTP → HTTPS 301 |
+| SPF, DKIM, DMARC, MX | Ausente | `livrariaadventista.com` sem MX, SPF nem DMARC: qualquer pessoa pode enviar email em nome do domínio |
+| DNSSEC | Ausente | `DNSSEC: unsigned` no registo (Hostinger) |
+| WAF e regras do Cloudflare | Não foi possível verificar | O conector do Cloudflare precisa de autorização nesta sessão |
+| API do Supabase fora do WAF | Por desenho | O `*.supabase.co` não passa pelo Cloudflare do domínio; a protecção é o RLS e os limites da função |
+| Backups e PITR | Não foi possível verificar | Depende do plano do Supabase; não há acesso à faturação |
+| Observabilidade | Parcialmente implementado | Web Analytics do Cloudflare e registos do Supabase; sem id de correlação (acrescentado) e sem alertas |
+| CI | Existente; refinado | Lint, 311 testes, build e `deno check`; acrescentada auditoria de dependências críticas |
+| Balanceamento de carga | Não aplicável | Pages e Edge Functions são geridos; não há origens próprias |
+
+### Corrigido nesta passagem
+
+- **Erros internos fora do browser** (`index.ts`, despachante). Um erro não previsto devolvia a
+  mensagem interna, com nomes de colunas e restrições, e estado 400. Passa a 500 com uma frase
+  e o id do pedido; a equipa continua a ver o detalhe no painel. No checkout só as mensagens
+  escritas para o comprador (`raise exception`, código P0001, como "Stock insuficiente") saem
+  tal como estão.
+- **Id de correlação**: `X-Request-Id` em todas as respostas e em cada registo de erro, exposto
+  ao browser pelo CORS.
+- **429 com `Retry-After`** nos 12 limites de pedidos. O site lê só a mensagem, qualquer que seja
+  o estado, por isso nada muda para quem compra.
+- **Forma do email** validada no servidor no checkout (quando há email), na newsletter e no
+  formulário de contacto, que também passou a ter tamanhos máximos. Função `isEmail` em
+  `emails.ts`, com testes. As rotas do painel mantêm a validação que já tinham.
+- **Segredos de email fora da tabela**: `SMTP_PASSWORD` e `SENDGRID_API_KEY` como segredos da
+  Edge Function ganham ao valor do painel, como já acontecia com as chaves de IA. Sem segredo
+  definido, tudo funciona como antes.
+- **Editor do painel** (`RichTextEditor.jsx`): o HTML da base de dados ia para `innerHTML` sem
+  sanitizar. Quem tem permissão de catálogo escreve pela API sem passar pelo editor, por isso um
+  `<img onerror>` corria na sessão do admin que abrisse o livro. O CSP já o travava; passa a
+  haver também o sanitizador. 3 testes, dois dos quais falham com o código antigo.
+- **Migração `20261104090000_indices_chaves_estrangeiras`**: o SQL de índices que estava em
+  `docs/migracoes-pendentes/` passou a migração, para o Actions a aplicar no merge.
+- **Migração `20261104091000_conversas_seguras_cliente_so_fecha`**: o cliente só pode fechar a
+  sua conversa segura; já não a reabre nem lhe muda o grupo, o livro ou a avaliação. O site
+  nunca actualiza esta tabela e ela tem 0 linhas.
+
+**As duas migrações não foram corridas contra um Postgres.** Esta máquina não tem Postgres, e
+o teste dentro de uma transacção anulada na base de dados de produção foi recusado nesta
+sessão. A primeira só cria índices com `if not exists`.
+
+### Por fazer (precisa do dono ou de autorização)
+
+1. **Email do domínio** (Cloudflare → DNS). Enquanto o domínio não envia nem recebe email:
+   `MX 0 .`, `TXT "v=spf1 -all"` e `_dmarc TXT "v=DMARC1; p=reject; rua=mailto:<caixa>"`.
+   Quando se ligar o SMTP ou o Email Routing, trocar o SPF pelo do fornecedor **antes** de
+   enviar o primeiro email. Para reverter, basta apagar os registos.
+2. **`site_settings` com três linhas**, todas com `site_url = https://livraria-adventista.pages.dev`.
+   A função lê a mais antiga; os links dos emails (incluindo o de cancelar a subscrição) vão
+   para o projecto antigo. Corrigir o URL em Configurações e apagar as duas linhas a mais
+   depois de confirmar qual é a activa.
+3. **Projecto antigo `livraria-adventista.pages.dev`**: serve um build antigo ligado à mesma
+   base de dados. Redireccionar para o domínio novo ou desligar.
+4. **MFA para os admins** (TOTP do Supabase Auth): falta o ecrã de inscrição e exigir `aal2`
+   nas políticas de escrita do painel. É trabalho de produto, não uma opção a ligar.
+5. **Protecção de palavras-passe vazadas**: Supabase → Authentication → Policies. Disponível
+   a partir do plano Pro.
+6. **Segredos**: ao configurar o email, usar `supabase secrets set SMTP_PASSWORD=…` em vez do
+   campo do painel. Mais tarde, retirar as colunas de segredos de `site_settings`. Antes disso
+   o painel tem de deixar de as ler (`select *`), senão parte o ecrã de Configurações.
+7. **DNSSEC**: activar no Cloudflare e colar o registo DS no painel da Hostinger. Por esta
+   ordem, nunca ao contrário.
+8. **WAF, regras de rate limiting e alertas do Cloudflare**: verificar com o conector
+   autorizado. Para alertas sem custo: notificação de picos de tráfego e de erros 5xx no
+   Cloudflare, e um alerta no Supabase para falhas da função.
+9. **Backups**: confirmar o plano. O Free não tem backups descarregáveis nem PITR. Com 6
+   encomendas o risco é baixo; quando houver vendas reais, decidir RPO/RTO e testar um restauro
+   num projecto à parte.
+10. **Idempotência do checkout no servidor** (chave por tentativa e índice único), para o caso de
+    o browser repetir o pedido depois de a rede cair a meio.
+
+### Rollback
+
+- Edge Function: voltar a publicar a versão anterior (`git checkout 1ea225e -- supabase/functions/app`
+  e `supabase functions deploy app --no-verify-jwt`). Não há migração de que dependa.
+- Site: o painel do Cloudflare Pages permite promover o deploy anterior.
+- Migrações: `drop index if exists …` para cada um dos 11 índices;
+  `drop trigger secure_support_threads_guard on public.secure_support_threads` e
+  `drop function private.secure_support_threads_guard()`.
+
+### Custos
+
+Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do Supabase.
+
+### Estado de publicação
+
+Nada foi publicado nesta passagem: nem o site, nem a Edge Function, nem as migrações. As
+alterações estão no ramo do PR #1; o Actions aplica as migrações e publica no merge para o
+`main`, quando existirem os quatro segredos em falta.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

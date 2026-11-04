@@ -39,6 +39,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Dependências do site com vulnerabilidade crítica conhecida param o PR. Só "critical":
+      # as 4 "high" de hoje são do gRPC, que o Firebase usa no servidor e não entra no bundle
+      # (ver docs/AUDITORIA.md), e um gate que fica sempre vermelho deixa de ser lido.
+      - name: Auditoria de dependências
+        run: npm audit --omit=dev --audit-level=critical
+
   edge-function:
     name: Verificar Edge Function "app"
     runs-on: ubuntu-latest
