@@ -88,7 +88,13 @@ const publicJson = (body: unknown) =>
 // O limite de pedidos está em `rateLimit.ts`, com testes. Aqui fica só a ligação à base de
 // dados — o módulo não sabe nada de Supabase, e é isso que o torna testável.
 const checkRateLimit = createRateLimit({
-  rpc: (fn, args) => db.rpc(fn, args),
+  // `db.rpc()` devolve um construtor de consulta, não o resultado: só depois de esperado é
+  // que dá `{ data, error }`. Espera-se aqui e devolve-se a forma exacta que o módulo
+  // declara — em vez de lhe passar um objecto com mais coisas lá dentro.
+  rpc: async (fn, args) => {
+    const { data, error } = await db.rpc(fn, args);
+    return { data, error };
+  },
   log: (...a) => console.log(...a),
 });
 
