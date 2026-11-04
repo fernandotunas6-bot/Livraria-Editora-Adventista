@@ -23,6 +23,7 @@ import { createMemo, runAfterResponse } from "./runtime.ts";
 import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
+import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -56,7 +57,6 @@ const bad = (msg: string) => new HttpError(400, msg);
 const tooMany = (msg: string) => new HttpError(429, msg, { "Retry-After": "60" });
 
 type Row = Record<string, any>;
-type Auth = { id: string; email: string; role: string; permissions: Row } | null;
 type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
 
 // Por omissão nada se guarda: estas respostas têm dados pessoais (rastreio, painel, contas)
@@ -166,19 +166,14 @@ async function getAuth(req: Request): Promise<Auth> {
   return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
 }
 
-const isStaff = (auth: Auth) => !!auth && (auth.role === "admin" || auth.role === "manager");
-
-// Igual a private.has_permission() na base de dados: admin pode tudo; gestor só o que tiver activo.
-const PERMISSION_KEYS = ["manage_catalog", "manage_orders", "manage_settings", "manage_users", "manage_payments", "manage_marketing"];
-const can = (auth: Auth, key: string) =>
-  !!auth && (auth.role === "admin" || (auth.role === "manager" && auth.permissions?.[key] === true));
+// Quem pode o quê está em `permissions.ts`, com testes. Aqui ficam só os guardas, que são a
+// parte HTTP da coisa: traduzir um "não pode" numa resposta 403.
 function requirePermission(auth: Auth, key: string) {
   if (!can(auth, key)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
 }
-/** CRM (contactos e campanhas): como nas políticas RLS, "Utilizadores e Clientes" ou "Marketing". */
 function requireCrm(auth: Auth) {
-  if (!can(auth, "manage_users") && !can(auth, "manage_marketing")) throw new HttpError(403, "Sem permissão para esta operação.");
+  if (!canCrm(auth)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
 }
 
