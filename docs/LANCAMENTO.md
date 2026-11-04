@@ -9,9 +9,9 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Item | Detalhe |
 |------|---------|
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
-| Cloudflare | A passar para `valentinocanguele@gmail.com` (hoje em `canguelev@fata.adventist.org`); projecto Pages `livraria-editora-adventista` |
+| Cloudflare | Conta `valentinocanguele@gmail.com` (`701800d01d428c5141fa1fdb60ee01ae`); projecto Pages `livraria-editora-adventista`, servido em `livraria-editora-adventista-ben.pages.dev` |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
-| Domínio | `livrariaadventista.ao` — **por registar**, o registo `.ao` devolve `NXDOMAIN` (ver secção 7) |
+| Domínio | `livrariaadventista.com` — **no ar** (registado na Hostinger, zona no Cloudflare). O `.ao` continua por registar (ver secção 7) |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
 | Email | Servidor SMTP (Hostinger, Brevo…) ou SendGrid |
 | Google Cloud | ID de cliente OAuth para o login com Google |
@@ -28,8 +28,9 @@ Em **Settings → Secrets and variables → Actions** do repositório:
 | Variável | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave *publishable* (Supabase → API Keys) |
 | Variável | `CLOUDFLARE_PAGES_PROJECT` | `livraria-editora-adventista` |
 | Variável | `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
-| Secret | `CLOUDFLARE_API_TOKEN` | Token com *Cloudflare Pages: Edit* |
-| Secret | `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare |
+| Variável (opcional) | `SITE_URL` | Por omissão `https://livrariaadventista.com` |
+| Secret | `CLOUDFLARE_API_TOKEN` | Token da conta gmail com *Cloudflare Pages: Edit* (um da conta antiga publica no sítio errado) |
+| Secret | `CLOUDFLARE_ACCOUNT_ID` | `701800d01d428c5141fa1fdb60ee01ae` |
 | Secret | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase (Account → Access Tokens) |
 | Secret | `SUPABASE_DB_PASSWORD` | Palavra-passe da base de dados |
 
@@ -114,7 +115,8 @@ Tudo é automático a partir do GitHub:
 Enquanto o Actions não correr, publicar à mão (faz lint, testes e build antes):
 
 ```bash
-CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site
+npx wrangler@4 whoami      # tem de ser a conta valentinocanguele@gmail.com
+npm run deploy:site        # projecto livraria-editora-adventista, em https://livrariaadventista.com
 ```
 
 Para publicar a Edge Function à mão (com um token do Supabase):
@@ -122,6 +124,26 @@ Para publicar a Edge Function à mão (com um token do Supabase):
 ```bash
 npx supabase functions deploy app --project-ref bggqkjjqbjhbjsckzopj --no-verify-jwt
 ```
+
+### Ligar um domínio ao Pages
+
+Foi assim que o `livrariaadventista.com` ficou no ar, e é o mesmo para o `.ao`:
+
+1. **A zona tem de estar na mesma conta Cloudflare que o projecto Pages.** Um CNAME *proxied*
+   para um `.pages.dev` de outra conta é recusado (Error 1014, *CNAME Cross-User Banned*).
+2. **Ligar o domínio ao projecto** pela API — o `wrangler` 4 não tem `pages domain add`:
+
+   ```bash
+   curl -X POST "https://api.cloudflare.com/client/v4/accounts/<conta>/pages/projects/livraria-editora-adventista/domains" \
+     -H "Authorization: Bearer <token>" -H "Content-Type: application/json" --data '{"name":"livrariaadventista.com"}'
+   ```
+
+3. **Criar à mão os registos DNS** — a API do Pages não os cria, e sem eles o domínio fica em
+   `pending` para sempre. Os dois *proxied*: `CNAME @ → livraria-editora-adventista-ben.pages.dev`
+   e `CNAME www → livraria-editora-adventista-ben.pages.dev`. O token OAuth do `wrangler` não
+   escreve DNS: é no painel, ou com um token próprio com *Zone → DNS → Edit*.
+4. **Revalidar** com `PATCH` no mesmo caminho do passo 2 (`.../domains/<domínio>`). Com os
+   registos no sítio, fica `active` em menos de um minuto e o certificado sai sozinho.
 
 ### Domínio `livrariaadventista.ao`
 
@@ -137,14 +159,8 @@ Ordem dos passos:
 2. **Adicionar o domínio como zona no Cloudflare** (Add a site), que devolve dois nameservers.
 3. **Delegar os nameservers** no painel do revendedor. Em alguns é preciso abrir um pedido de
    suporte a indicar os nameservers; a propagação leva até 24 horas.
-4. **Ligar ao Pages**, com a zona já activa no Cloudflare:
-
-   ```bash
-   npx wrangler@4 pages domain add livrariaadventista.ao --project-name=livraria-editora-adventista
-   npx wrangler@4 pages domain add www.livrariaadventista.ao --project-name=livraria-editora-adventista
-   ```
-
-   O certificado HTTPS é emitido pelo Cloudflare automaticamente.
+4. **Ligar ao Pages**, com a zona já activa no Cloudflare, como em *Ligar um domínio ao Pages*
+   acima (para `livrariaadventista.ao` e `www.livrariaadventista.ao`).
 5. **Actualizar o Supabase → Authentication** (Site URL e Redirect URLs) e o
    **Google Cloud OAuth** (origens e URIs de redireccionamento autorizados) para o domínio
    novo. Sem isto o login com Google falha no domínio próprio.

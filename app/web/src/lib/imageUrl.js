@@ -17,12 +17,13 @@ export function extractDriveFileId(url) {
 }
 
 // Endereços onde o próprio site já foi ou vai ser servido: os dois projectos do Cloudflare
-// Pages (e as pré-visualizações por ramo, `<ramo>.livraria-adventista.pages.dev`) e o
-// domínio `.ao`. Uma imagem guardada com um destes endereços é um ficheiro do site, e tem
+// Pages (e as pré-visualizações por ramo, `<ramo>.livraria-adventista.pages.dev`) — o novo
+// serve-se em `livraria-editora-adventista-ben.pages.dev`, com o sufixo que o Cloudflare lhe
+// acrescentou — e os domínios próprios, `livrariaadventista.com` (no ar) e o `.ao`. Uma imagem guardada com um destes endereços é um ficheiro do site, e tem
 // de ficar como caminho relativo: com o endereço completo, a mudança de projecto ou de
 // domínio tornava-a um pedido a outra origem, que o CSP (`img-src 'self'`) bloqueia — e
 // desligar o projecto antigo apagava-a de vez.
-const OWN_SITE_HOST = /^(?:[a-z0-9-]+\.)?livraria-(?:editora-)?adventista\.pages\.dev$|^(?:www\.)?livrariaadventista\.ao$/i;
+const OWN_SITE_HOST = /^(?:[a-z0-9-]+\.)?livraria-(?:editora-)?adventista(?:-ben)?\.pages\.dev$|^(?:www\.)?livrariaadventista\.(?:com|ao)$/i;
 
 /** `https://livraria-adventista.pages.dev/images/x.webp` → `/images/x.webp`; o resto fica igual. */
 export function toSiteRelativeUrl(url) {

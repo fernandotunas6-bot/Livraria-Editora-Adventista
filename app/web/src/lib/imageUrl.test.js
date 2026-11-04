@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { isPersistableImageUrl, normalizeImageUrl, sanitizeImageUrlForSave, toSiteRelativeUrl } from './imageUrl';
 
 describe('toSiteRelativeUrl', () => {
-  it('tira o endereço do próprio site, em qualquer dos projectos e no domínio .ao', () => {
+  it('tira o endereço do próprio site, em qualquer dos projectos e nos domínios próprios', () => {
     expect(toSiteRelativeUrl('https://livraria-adventista.pages.dev/images/site/slide-1.webp')).toBe('/images/site/slide-1.webp');
     expect(toSiteRelativeUrl('https://livraria-editora-adventista.pages.dev/images/a.png?v=2')).toBe('/images/a.png?v=2');
     expect(toSiteRelativeUrl('https://main.livraria-adventista.pages.dev/images/a.png')).toBe('/images/a.png');
     expect(toSiteRelativeUrl('https://www.livrariaadventista.ao/images/a.png')).toBe('/images/a.png');
+    expect(toSiteRelativeUrl('https://livrariaadventista.com/images/a.png')).toBe('/images/a.png');
+    expect(toSiteRelativeUrl('https://www.livrariaadventista.com/images/a.png')).toBe('/images/a.png');
+    expect(toSiteRelativeUrl('https://livraria-editora-adventista-ben.pages.dev/images/a.png')).toBe('/images/a.png');
+    expect(toSiteRelativeUrl('https://main.livraria-editora-adventista-ben.pages.dev/images/a.png')).toBe('/images/a.png');
   });
 
   it('deixa como estão os endereços de outros sites', () => {
@@ -16,6 +20,8 @@ describe('toSiteRelativeUrl', () => {
       // Parecidos, mas não são o site: não podem passar a caminho relativo.
       'https://livraria-adventista.pages.dev.exemplo.invalid/a.png',
       'https://outra-livraria-adventista.pages.dev.invalid/a.png',
+      'https://livrariaadventista.com.exemplo.invalid/a.png',
+      'https://livraria-editora-adventista-bento.pages.dev/a.png',
     ];
     for (const u of fora) expect(toSiteRelativeUrl(u)).toBe(u);
   });

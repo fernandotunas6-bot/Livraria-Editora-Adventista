@@ -5,10 +5,13 @@
 #   npm run deploy:site -- --preview → pré-visualização com o nome do ramo actual
 #
 # Variáveis para escolher o destino:
-#   CLOUDFLARE_PAGES_PROJECT → projecto Pages (por omissão livraria-adventista, o que serve
-#                              produção hoje; o novo é livraria-editora-adventista)
-#   SITE_URL                 → o endereço público (por omissão <projecto>.pages.dev; com domínio
-#                              próprio, ex. https://livrariaadventista.ao). Vai para o canonical,
+#   CLOUDFLARE_PAGES_PROJECT → projecto Pages (por omissão livraria-editora-adventista, na conta
+#                              Cloudflare valentinocanguele@gmail.com — é nela que o wrangler
+#                              tem de estar autenticado: `npx wrangler@4 whoami`)
+#   SITE_URL                 → o endereço público (por omissão https://livrariaadventista.com).
+#                              Não se deriva do nome do projecto: o endereço .pages.dev deste
+#                              é livraria-editora-adventista-ben.pages.dev, com um sufixo que o
+#                              Cloudflare acrescentou por o nome já existir noutra conta. Vai para o canonical,
 #                              as etiquetas de partilha, o sitemap e o robots.txt (ver
 #                              scripts/seo-catalogo.mjs), e é o que a verificação final testa.
 #
@@ -18,9 +21,9 @@
 # VITE_SUPABASE_PUBLISHABLE_KEY.
 set -euo pipefail
 
-PROJECT="${CLOUDFLARE_PAGES_PROJECT:-livraria-adventista}"
+PROJECT="${CLOUDFLARE_PAGES_PROJECT:-livraria-editora-adventista}"
 PROD_BRANCHES="${PROD_BRANCHES:-main claude/youthful-heisenberg-rq5gnw}"
-SITE_URL="${SITE_URL:-https://${PROJECT}.pages.dev}"
+SITE_URL="${SITE_URL:-https://livrariaadventista.com}"
 
 fail() { echo "✘ $*" >&2; exit 1; }
 
