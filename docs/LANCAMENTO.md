@@ -11,7 +11,7 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
 | Cloudflare | Conta `valentinocanguele@gmail.com` (`701800d01d428c5141fa1fdb60ee01ae`); projecto Pages `livraria-editora-adventista`, servido em `livraria-editora-adventista-ben.pages.dev` |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
-| Domínio | `livrariaadventista.com` — **no ar** (registado na Hostinger, zona no Cloudflare). O `.ao` continua por registar (ver secção 7) |
+| Domínio | **`livrariaadventista.ao` — principal** (registado a 2026-11-04; falta ligá-lo no Cloudflare, ver secção 7). `livrariaadventista.com` no ar (Hostinger, zona no Cloudflare), a redireccionar para o `.ao` quando este responder |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
 | Email | Servidor SMTP (Hostinger, Brevo…) ou SendGrid |
 | Google Cloud | ID de cliente OAuth para o login com Google |
@@ -28,7 +28,7 @@ Em **Settings → Secrets and variables → Actions** do repositório:
 | Variável | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave *publishable* (Supabase → API Keys) |
 | Variável | `CLOUDFLARE_PAGES_PROJECT` | `livraria-editora-adventista` |
 | Variável | `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
-| Variável (opcional) | `SITE_URL` | Por omissão `https://livrariaadventista.com` |
+| Variável (opcional) | `SITE_URL` | Por omissão `https://livrariaadventista.ao` |
 | Secret | `CLOUDFLARE_API_TOKEN` | Token da conta gmail com *Cloudflare Pages: Edit* (um da conta antiga publica no sítio errado) |
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | `701800d01d428c5141fa1fdb60ee01ae` |
 | Secret | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase (Account → Access Tokens) |
@@ -116,7 +116,7 @@ Enquanto o Actions não correr, publicar à mão (faz lint, testes e build antes
 
 ```bash
 npx wrangler@4 whoami      # tem de ser a conta valentinocanguele@gmail.com
-npm run deploy:site        # projecto livraria-editora-adventista, em https://livrariaadventista.com
+npm run deploy:site        # projecto livraria-editora-adventista, em https://livrariaadventista.ao
 ```
 
 Para publicar a Edge Function à mão (com um token do Supabase):
@@ -147,25 +147,37 @@ Foi assim que o `livrariaadventista.com` ficou no ar, e é o mesmo para o `.ao`:
 
 ### Domínio `livrariaadventista.ao`
 
-**O Cloudflare não vende domínios `.ao`.** Desde Julho de 2023 o registo é feito só por
-revendedores autorizados do [DNS.ao](https://www.dns.ao) (loja oficial:
-[dominios.ao](https://www.dominios.ao)). É preciso entidade registada em Angola, empresário
-individual, cidadão angolano ou estrangeiro com NIF/representação legal. A activação demora
-24 a 72 horas úteis.
+**Registado** (2026-11-04) e escolhido como domínio principal. O `.com` fica no ar e passa a
+redireccionar para o `.ao`.
 
-Ordem dos passos:
+O Cloudflare não vende domínios `.ao`: o registo é feito por revendedores autorizados do
+[DNS.ao](https://www.dns.ao) (loja oficial: [dominios.ao](https://www.dominios.ao)).
 
-1. **Registar `livrariaadventista.ao`** num revendedor autorizado do DNS.ao.
-2. **Adicionar o domínio como zona no Cloudflare** (Add a site), que devolve dois nameservers.
-3. **Delegar os nameservers** no painel do revendedor. Em alguns é preciso abrir um pedido de
-   suporte a indicar os nameservers; a propagação leva até 24 horas.
-4. **Ligar ao Pages**, com a zona já activa no Cloudflare, como em *Ligar um domínio ao Pages*
-   acima (para `livrariaadventista.ao` e `www.livrariaadventista.ao`).
-5. **Actualizar o Supabase → Authentication** (Site URL e Redirect URLs) e o
-   **Google Cloud OAuth** (origens e URIs de redireccionamento autorizados) para o domínio
-   novo. Sem isto o login com Google falha no domínio próprio.
-6. Só depois de o domínio responder é que se decide desligar o projecto antigo
-   `livraria-adventista`.
+Ordem dos passos (todos na conta Cloudflare do projecto Pages `livraria-editora-adventista`):
+
+1. **Adicionar o domínio como zona** (Add a site → `livrariaadventista.ao`, plano Free). O
+   Cloudflare devolve dois nameservers (`<nome>.ns.cloudflare.com`).
+2. **Delegar os nameservers** no painel do revendedor `.ao`, trocando os que lá estão pelos
+   dois do Cloudflare. Em alguns revendedores é preciso abrir um pedido de suporte. A zona
+   passa a *Active* quando a delegação propagar (minutos a 24 horas).
+3. **Ligar ao Pages**: Workers & Pages → `livraria-editora-adventista` → Custom domains →
+   adicionar `livrariaadventista.ao` e depois `www.livrariaadventista.ao`. Com a zona na mesma
+   conta, o Cloudflare cria os CNAME sozinho; se não criar, ver *Ligar um domínio ao Pages*
+   acima (CNAME *proxied* para `livraria-editora-adventista-ben.pages.dev`).
+4. **`www` → raiz**: Rules → Redirect Rules na zona `.ao`, `www.livrariaadventista.ao/*` →
+   `https://livrariaadventista.ao/${1}`, 301, a manter a query string.
+5. **Supabase → Authentication → URL Configuration**: Site URL `https://livrariaadventista.ao`;
+   nos Redirect URLs juntar `https://livrariaadventista.ao/**` e
+   `https://www.livrariaadventista.ao/**` (manter os do `.com` até ao passo 7).
+6. **Google Cloud → OAuth client**: juntar `https://livrariaadventista.ao` e
+   `https://www.livrariaadventista.ao` às origens JavaScript autorizadas. O URI de
+   redireccionamento (`https://bggqkjjqbjhbjsckzopj.supabase.co/auth/v1/callback`) não muda.
+7. **Só com o `.ao` a responder**: publicar (`npm run deploy:site`, que já usa o `.ao` por
+   omissão e confirma que responde 200) e pôr o `.com` a redireccionar: Redirect Rule na zona
+   `livrariaadventista.com`, `*livrariaadventista.com/*` → `https://livrariaadventista.ao/${2}`,
+   301. Se a variável `SITE_URL` existir no Actions, mudá-la para `https://livrariaadventista.ao`.
+8. **Email**: o domínio não tem MX, SPF nem DMARC. Quando o SMTP for configurado, o remetente
+   deve ser do `.ao` e os registos DNS criados nesta zona.
 
 ---
 

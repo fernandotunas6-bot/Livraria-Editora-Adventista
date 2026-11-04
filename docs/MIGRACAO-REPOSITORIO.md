@@ -178,21 +178,17 @@ Por fazer: **convidar `valentinocanguele@gmail.com` para a organização "Colpot
 
 ### 7. Domínio `livrariaadventista.ao`
 
-**Não está registado.** Verificado a 2026-11-03 perguntando directamente aos servidores
-autoritativos do registo `.ao`, que devolvem `NXDOMAIN`:
+**Registado** (confirmado pelo dono a 2026-11-04; a 2026-11-03 o registo `.ao` ainda
+respondia `NXDOMAIN`). É o **domínio principal** da loja a partir de 2026-11-04: o
+`site_url` das configurações, o `SITE_URL` por omissão do `deploy-site.sh` e do
+`deploy-cloudflare.yml`, e o canonical/sitemap gerados no deploy passam a usá-lo.
+
+Falta o Cloudflare. Os passos estão em [LANCAMENTO.md](LANCAMENTO.md), secção 7, *Domínio
+`livrariaadventista.ao`*. Para confirmar a delegação:
 
 ```bash
-dig +norecurse @a.ns.ao. livrariaadventista.ao NS | grep status:
-# ->>HEADER<<- ... status: NXDOMAIN      → não existe
-# comparar com: dig +norecurse @a.ns.ao. dns.ao NS   → status: NOERROR
+dig +short NS livrariaadventista.ao   # tem de devolver os dois nameservers do Cloudflare
 ```
-
-Isto é mais fiável do que olhar para a ausência de registos NS ou A, que também acontece num
-domínio registado mas ainda sem delegação.
-
-Enquanto devolver `NXDOMAIN` não há nada a fazer no Cloudflare: não se pode adicionar a zona
-nem associar o domínio ao Pages. Os passos do registo, da delegação e do que muda a seguir no
-Supabase Auth e no OAuth da Google estão em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
 
 ## Cópias de trabalho locais
 
