@@ -33,10 +33,11 @@ const CategoryPage = () => {
     isLoading
   } = useProductFilters(category);
 
-  // Debugging: Trace filter flow — removed in production
+  // O endereço traz a categoria como slug ("catalogo-geral"): mostra-se com espaços e
+  // maiúscula inicial. A página vinha do modelo inicial em inglês; ficou em português.
   const categoryName = category
-    ? category.charAt(0).toUpperCase() + category.slice(1)
-    : 'Products';
+    ? decodeURIComponent(category).replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    : 'Livros';
 
   // Apply sorting to filtered products
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -49,7 +50,7 @@ const CategoryPage = () => {
     <>
       <Helmet>
         <title>{pageTitle(categoryName)}</title>
-        <meta name="description" content={`Shop our ${categoryName.toLowerCase()} collection. Premium products for your lifestyle.`} />
+        <meta name="description" content={`Livros de ${categoryName} na Livraria Adventista: preços em kwanzas, entrega em Angola.`} />
       </Helmet>
 
       <Header onCartOpen={() => setIsCartOpen(true)} />
@@ -57,14 +58,14 @@ const CategoryPage = () => {
 
       <PageBannerSlider contentClassName="text-left">
         <nav className="mb-4 flex items-center gap-2 text-sm text-white/75">
-          <Link to="/" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Home</Link>
+          <Link to="/" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Início</Link>
           <ChevronRight className="h-4 w-4" />
-          <Link to="/shop" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Shop</Link>
+          <Link to="/shop" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Loja</Link>
           <ChevronRight className="h-4 w-4" />
           <span className="text-white">{categoryName}</span>
         </nav>
         <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">{categoryName}</h1>
-        <p className="text-base text-white/85 sm:text-lg">Explore our curated {categoryName.toLowerCase()} collection</p>
+        <p className="text-base text-white/85 sm:text-lg">Os livros desta categoria, com filtros e ordenação</p>
       </PageBannerSlider>
 
       <main className="container-custom py-12 min-h-screen">
@@ -90,7 +91,7 @@ const CategoryPage = () => {
                 className="lg:hidden w-full sm:w-auto"
               >
                 <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Filters {filterCount > 0 && `(${filterCount})`}
+                Filtros {filterCount > 0 && `(${filterCount})`}
               </Button>
 
               <div className="flex items-center gap-4 w-full sm:w-auto sm:ml-auto">
@@ -111,12 +112,12 @@ const CategoryPage = () => {
             {!isLoading && sortedProducts.length === 0 ? (
               <div className="space-y-12">
                 <div className="text-center py-16 bg-card border border-border rounded-xl">
-                  <h3 className="text-2xl font-semibold mb-2">No products found</h3>
-                  <p className="text-muted-foreground mb-6">We couldn't find any products matching your filters.</p>
-                  <Button onClick={clearFilters} variant="outline">Clear Filters</Button>
+                  <h3 className="text-2xl font-semibold mb-2">Nenhum livro encontrado</h3>
+                  <p className="text-muted-foreground mb-6">Não há livros com estes filtros.</p>
+                  <Button onClick={clearFilters} variant="outline">Limpar filtros</Button>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-semibold mb-6">No results found. Here are all available products:</h3>
+                  <h3 className="text-2xl font-semibold mb-6">Veja todos os livros disponíveis:</h3>
                   <ProductsList products={allProducts} isLoading={isLoading} />
                 </div>
               </div>
@@ -136,7 +137,7 @@ const CategoryPage = () => {
               className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r border-border p-6 overflow-y-auto shadow-xl"
             >
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-                <h2 className="text-xl font-semibold">Filters</h2>
+                <h2 className="text-xl font-semibold">Filtros</h2>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -155,7 +156,7 @@ const CategoryPage = () => {
               />
               <div className="mt-8 pt-4 border-t border-border">
                 <Button className="w-full btn-primary" onClick={() => setIsMobileFilterOpen(false)}>
-                  Show {sortedProducts.length} Results
+                  Ver {sortedProducts.length} livros
                 </Button>
               </div>
             </motion.div>
@@ -163,7 +164,10 @@ const CategoryPage = () => {
         )}
       </main>
 
-      <Footer />
+      {/* Como na loja: no telemóvel o catálogo segue sem rodapé. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 };
