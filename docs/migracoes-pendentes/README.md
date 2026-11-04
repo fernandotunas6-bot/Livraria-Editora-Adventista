@@ -1,11 +1,29 @@
-# Migrações pendentes (ainda NÃO aplicadas)
+# Migrações pendentes
 
-Estes ficheiros ficam fora de `supabase/migrations` porque ainda não foram aplicados: lá só entram migrações com a versão e o SQL exactos que estão na base de dados.
+Esta pasta guarda SQL que ainda **não** pode ir para `supabase/migrations`: lá só entram
+migrações que se podem aplicar tal como estão (o Actions corre `supabase db push` no merge
+para o `main`, e depois publica a Edge Function).
 
-- ~~`2_painel_vendas_por_loja.sql`~~: aplicada a 2026-11-01 como `20261101205332_painel_vendas_por_loja` (dados de vendas ligados à loja do Huambo, `tlp93hkif52qxmy`).
-- `1_loja_talatona_para_huambo.sql`: **não aplicar como está.** O id `b9b427gh0585i72` é hoje a loja **"Livraria Adventista — Catumbela"** (Benguela), e já existe uma loja do Huambo (`tlp93hkif52qxmy`). Correr este SQL transformaria Catumbela numa segunda loja do Huambo. As lojas actuais são Catumbela (Benguela), Huambo e Lubango (Huíla). Falta o dono confirmar o que quer.
-- ~~`3_utilizadores_rpc.sql`~~: aplicada a 2026-11-01 como `20261101212413_utilizadores_rpc` e testada (cliente bloqueado; gestor gere clientes mas não promove nem suspende admins; admin não se despromove nem se apaga; permissões só com as chaves conhecidas).
-- ~~`4_centro_atendimento_notificacoes.sql`~~: aplicada a 2026-11-03 como `20261103165632_centro_atendimento_notificacoes`. Cria o inbox cliente–equipa, notificações pessoais de encomendas e alertas para a equipa; activa RLS e associa encomendas anteriores a contas pelo email correspondente.
-- ~~`3_indices_chaves_estrangeiras.sql`~~: passou a `supabase/migrations/20261104090000_indices_chaves_estrangeiras.sql` (2026-11-04), para o Actions a aplicar com o `supabase db push` no merge para o `main`. Só acrescenta índices.
-- `4_campos_encomendas.sql` (2026-11-03): preenche nas encomendas antigas o código e o nome do método de pagamento, a morada numa linha e a loja do levantamento, e o trigger `orders_before_update` passa a tirar o local do seguimento do município ou da loja (não de `city`). Recusa também reabrir uma encomenda cancelada: o stock já foi devolvido e não voltava a ser descontado (nenhuma encomenda actual fica bloqueada — verificado a 2026-11-04). Não apaga nada. **Ordem:** publicar o site → esta migração → Edge Function.
-  - **Passo seguinte, ainda sem ficheiro:** apagar as colunas herdadas `payment_method`, `payment_category`, `address` e `city`. Só depois de (1) as três coisas acima estarem publicadas, (2) o site deixar de pedir essas colunas (`ORDER_LIST_FIELDS` no `AdminPage.jsx`) e de as usar como recurso em `orderUtils.js`/`orderFields.ts`, e (3) o trigger deixar de ler `new.city`. Um `select` de uma coluna que já não existe faz o PostgREST recusar o pedido e parte a lista de encomendas do painel.
+Hoje não há nenhuma. O que estava aqui, e para onde foi (2026-11-04):
+
+| Ficheiro | Destino |
+|---|---|
+| `1_loja_talatona_para_huambo.sql` | **Retirado.** O id que alterava é hoje a loja de Catumbela, e a do Huambo já existe (`tlp93hkif52qxmy`): correr o SQL criava uma segunda loja do Huambo. Fica no histórico do git. |
+| `2_capas_das_colecoes.sql` | `supabase/migrations/20261104170500_capas_das_colecoes.sql`, com o domínio novo e só onde a capa ainda é do Unsplash. |
+| `2_painel_vendas_por_loja.sql` | Aplicada a 2026-11-01 (`20261101205332`). |
+| `3_utilizadores_rpc.sql` | Aplicada a 2026-11-01 (`20261101212413`). |
+| `3_indices_chaves_estrangeiras.sql` | `20261104090000`, aplicada. |
+| `4_centro_atendimento_notificacoes.sql` | Aplicada a 2026-11-03 (`20261103165632`). |
+| `4_campos_encomendas.sql` | `supabase/migrations/20261104170000_campos_encomendas.sql`. O site publicado já tem o código de que depende. |
+
+## Passo seguinte, ainda sem ficheiro: apagar as colunas herdadas das encomendas
+
+`payment_method`, `payment_category`, `address` e `city`. Só depois de:
+
+1. a `20261104170000_campos_encomendas` estar aplicada e a Edge Function publicada;
+2. o site deixar de pedir essas colunas (`ORDER_LIST_FIELDS` no `AdminPage.jsx`) e de as usar
+   como recurso em `orderUtils.js` / `orderFields.ts`;
+3. o trigger `orders_before_update` deixar de ler `new.city`.
+
+Um `select` de uma coluna que já não existe faz o PostgREST recusar o pedido e parte a lista
+de encomendas do painel.

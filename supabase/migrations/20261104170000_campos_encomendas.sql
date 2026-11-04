@@ -1,4 +1,9 @@
--- Campos repetidos das encomendas (2026-11-03). NÃO APLICADA.
+-- Campos repetidos das encomendas (2026-11-03). Promovida de docs/migracoes-pendentes a
+-- 2026-11-04: o site publicado já lê por um só critério (612f83c, 4abbf61 estão no deploy),
+-- e o workflow aplica as migrações antes de publicar a Edge Function — a ordem pedida.
+-- Confirmado antes de promover: a definição de orders_before_update em produção é igual à
+-- abaixo, tirando as duas mudanças pretendidas (local do passo e não reabrir canceladas).
+--
 --
 -- O site e a Edge Function já lêem por um só critério (app/web/src/lib/orderUtils.js e
 -- supabase/functions/app/orderFields.ts), com os campos actuais primeiro e os herdados para

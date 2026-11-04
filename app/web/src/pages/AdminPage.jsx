@@ -26,6 +26,7 @@ import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STAT
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
+import { hasCover, hasDescription } from '@/lib/bookContent';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 
@@ -217,7 +218,8 @@ const AdminPage = () => {
   const filteredBooks = books.filter((b) => {
     if (bookFilter === 'featured' && !b.featured) return false;
     if (bookFilter === 'low_stock' && !(b.stock_alert || b.stock_low)) return false;
-    if (bookFilter === 'no_cover' && (b.cover || b.cover_image)) return false;
+    if (bookFilter === 'no_cover' && hasCover(b)) return false;
+    if (bookFilter === 'no_description' && hasDescription(b)) return false;
     if (bookFilter === 'hidden' && isBookVisible(b)) return false;
     if (bookFilter === 'promo' && !(isSaleActive(b) || isSaleScheduled(b))) return false;
     const q = bookSearch.trim().toLowerCase();
@@ -346,10 +348,12 @@ const AdminPage = () => {
   const pendingRevenue = activeOrders.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
 
   const bookMetrics = [
-    { label: 'Livros no catálogo', value: books.length, icon: PackageSearch },
+    // `filter`: carregar no indicador mostra a lista correspondente (o mesmo critério do filtro).
+    { label: 'Livros no catálogo', value: books.length, icon: PackageSearch, filter: 'all' },
     { label: 'Com stock', value: books.filter((book) => Number(book.stock) > 0).length, icon: ShoppingBag },
-    { label: 'Em destaque', value: books.filter((book) => book.featured).length, icon: Star },
-    { label: 'Sem capa', value: books.filter((book) => !String(book.cover || '').trim()).length, icon: Image },
+    { label: 'Em destaque', value: books.filter((book) => book.featured).length, icon: Star, filter: 'featured' },
+    { label: 'Sem capa', value: books.filter((book) => !hasCover(book)).length, icon: Image, filter: 'no_cover' },
+    { label: 'Sem descrição', value: books.filter((book) => !hasDescription(book)).length, icon: AlertTriangle, filter: 'no_description' },
   ];
 
   const defaultTab = canManageCatalog ? 'books' : canManageOrders ? 'orders' : canManageSettings ? 'settings' : canManageUsers ? 'users' : 'payments';
@@ -543,14 +547,30 @@ const AdminPage = () => {
                       <Plus className="h-4 w-4 mr-2" /> Adicionar
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" aria-label="Estatísticas do catálogo">
-                    {bookMetrics.map(({ label, value, icon: Icon }) => (
-                      <div key={label} className="rounded-xl border bg-card p-4">
-                        <Icon className="h-4 w-4 text-muted-foreground mb-2" aria-hidden="true" />
-                        <p className="text-2xl font-bold">{value}</p>
-                        <p className="text-xs text-muted-foreground">{label}</p>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" aria-label="Estatísticas do catálogo">
+                    {bookMetrics.map(({ label, value, icon: Icon, filter }) => {
+                      const body = (
+                        <>
+                          <Icon className="h-4 w-4 text-muted-foreground mb-2" aria-hidden="true" />
+                          <p className="text-2xl font-bold">{value}</p>
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                        </>
+                      );
+                      if (!filter) return <div key={label} className="rounded-xl border bg-card p-4">{body}</div>;
+                      const active = bookFilter === filter;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setBookFilter(filter)}
+                          aria-pressed={active}
+                          title={`Mostrar: ${label.toLowerCase()}`}
+                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
+                        >
+                          {body}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 mb-4">
                     <div className="relative flex-1">
@@ -569,6 +589,7 @@ const AdminPage = () => {
                         <SelectItem value="featured">Em destaque</SelectItem>
                         <SelectItem value="low_stock">Stock baixo ou esgotado</SelectItem>
                         <SelectItem value="no_cover">Sem capa</SelectItem>
+                        <SelectItem value="no_description">Sem descrição</SelectItem>
                         <SelectItem value="hidden">Ocultos da loja</SelectItem>
                         <SelectItem value="promo">Em promoção</SelectItem>
                       </SelectContent>

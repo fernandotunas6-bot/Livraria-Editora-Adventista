@@ -16,7 +16,7 @@ import { sanitizeImageUrlForSave } from '@/lib/imageUrl';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import { isUploadPending } from '@/lib/mediaUpload';
 import PhoneInput from '@/components/PhoneInput';
-import { formatAngolaPhone } from '@/lib/angolaPhone';
+import { formatAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { clearSecret, loadSecretStatus, secretsForSave, withoutSecrets } from '@/lib/siteSecrets';
 
 /**
@@ -621,6 +621,13 @@ export default function SettingsTab() {
         </TabsContent>
 
         <TabsContent value="contact" className="space-y-4 max-w-xl">
+          {!localDigits(form.contact_phone) && !localDigits(form.whatsapp) && (
+            // Sem número o site esconde o telefone e o botão de WhatsApp do rodapé: melhor do
+            // que mostrar um provisório, mas o cliente fica só com o email.
+            <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              O site não mostra nenhum telefone nem o botão de WhatsApp enquanto estes campos estiverem vazios.
+            </p>
+          )}
           <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} /></div>
           <div className="space-y-2"><Label>Telefone</Label><PhoneInput value={form.contact_phone} onChange={(v) => set('contact_phone', v)} /></div>
           <div className="space-y-2"><Label>Morada</Label><Input value={form.contact_address} onChange={(e) => set('contact_address', e.target.value)} /></div>

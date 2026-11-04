@@ -347,6 +347,7 @@ export default function StoresTab() {
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur">{s.province}</span>
                     {!hasCoords(s) && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">Sem GPS</span>}
+                    {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">Sem telefone</span>}
                   </div>
                   <div className="absolute top-2 right-2 flex gap-1">
                     <Button type="button" size="icon" variant="secondary" className="h-7 w-7" disabled={index <= 0 || busyId === s.id} onClick={() => move(s, -1)} aria-label="Subir">

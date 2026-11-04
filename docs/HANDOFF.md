@@ -230,7 +230,7 @@ fotos genéricas do Unsplash.
 
 ### Por correr (dados, não esquema)
 
-`docs/migracoes-pendentes/2_capas_das_colecoes.sql` troca as capas das quatro colecções —
+`supabase/migrations/20261104170500_capas_das_colecoes.sql` troca as capas das quatro colecções —
 hoje fotos genéricas do Unsplash — por imagens feitas com as capas reais do catálogo,
 escolhidas pelo tema de cada uma. Corre-se no SQL Editor do Supabase (o `db push` é só para
 esquema). Em alternativa, dá-se dois cliques por colecção em Admin → Colecções → Capa →
@@ -330,7 +330,7 @@ Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema d
   emails e o recibo do WhatsApp lêem por `orderPaymentLabel`/`orderPaymentCode`
   (`orderUtils.js`) e `paymentLabel` (`orderFields.ts`); antes, o recibo mostrava o nome e a
   exportação o código. O checkout deixa de gravar `payment_method` e grava sempre um nome.
-  Falta aplicar `docs/migracoes-pendentes/4_campos_encomendas.sql` (preenche as antigas) e,
+  Falta aplicar `supabase/migrations/20261104170000_campos_encomendas.sql` (preenche as antigas) e,
   depois, apagar `payment_method`.
 - **`order_type` é derivado de `sale_channel`** (`whatsapp_order` ⇔ `whatsapp`): dois campos
   para a mesma verdade, que podem divergir.
@@ -343,7 +343,7 @@ Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema d
   `orderPickupStore` e `orderLocality` (e `deliveryAddressLine`/`pickupStoreName` na
   função). O painel mostrava a loja dos levantamentos duas vezes ("Levantamento: X, X"). O
   checkout deixa de gravar `address`; `city` continua, porque o trigger `orders_before_update`
-  o usa como local do seguimento — a migração `4_campos_encomendas.sql` muda isso.
+  o usa como local do seguimento — a migração `20261104170000_campos_encomendas` muda isso.
 
 ## Regras para continuar
 

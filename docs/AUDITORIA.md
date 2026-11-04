@@ -636,11 +636,85 @@ a tabela não tinha sido actualizada.
   - `minimatch` (moderados) vem do ESLint e dos plugins: só na máquina de quem desenvolve,
     nunca no site. O `--force` exige versões maiores dos plugins.
 
-### Continua por fazer (dono ou autorização)
+### Segunda ronda (mesmo dia): resolver o que estava parado
 
-Os pontos 5, 7, 8, 12 e 16, e a lista de 9.4 (email do domínio, `site_settings` com três
-linhas e `site_url` antigo, projecto antigo no `pages.dev`, MFA, DNSSEC, alertas, segredos do
-Actions e o primeiro backup). Nada disto se resolve no código.
+Decisões do dono nesta ronda: tirar os telefones provisórios, tirar o mapa às lojas com
+coordenadas da cidade errada, gerar a frase dos backups, e criar à mão os tokens das contas.
+
+**Dados de produção, em três migrações novas** (testadas de ponta a ponta num Postgres em
+memória com os dados de produção: 25 verificações, incluindo repetir cada uma sem efeito):
+
+- `20261104180000_limpeza_dados_provisorios`:
+  - `site_settings` fica com uma linha só: a `et8zevy21sypp73`, que é a que a função lê e a
+    única configurada. As outras duas eram restos quase vazios. Um índice único impede que
+    volte a haver duas. O painel lê a mesma linha (o cliente de dados ordena por omissão
+    como a função), por isso nunca gravou na linha errada.
+  - `site_url` passa a `https://livrariaadventista.com` (os links dos emails, incluindo o
+    de cancelar a subscrição, iam para o projecto antigo).
+  - Telefones provisórios (`+244 923 000 000/001/002`) saem das configurações e das lojas.
+    O botão de WhatsApp do rodapé usava o geral como recurso: apontava para um número que
+    não existe.
+  - Coordenadas trocadas: "Catumbela" estava em Luanda (−8,91; 13,18) e "Lubango" em
+    Benguela (−12,58; 13,41). Ficam em `NULL` (não `0`, que a localização trataria como um
+    ponto no Golfo da Guiné). O link do mapa passa a procurar pela morada escrita.
+  - "LIvraria Adventista - Huambo" → "Livraria Adventista — Huambo".
+  - Três `unitel_money` iguais e desligados → um, e o código passa a ser único.
+  - Tudo o que muda ou sai fica antes em `private.correcoes_dados`. O fim do ficheiro diz
+    como reverter.
+- `20261104170000_campos_encomendas` (antes em `docs/migracoes-pendentes/`): o site
+  publicado já tem o código de que depende, e a definição do trigger em produção era igual
+  à do ficheiro, tirando as duas mudanças pretendidas.
+- `20261104170500_capas_das_colecoes`: as quatro capas das colecções eram fotos genéricas do
+  Unsplash. Passam às imagens feitas com as capas reais (já publicadas no domínio novo; o
+  SQL antigo apontava para o projecto antigo). Só troca as que ainda são do Unsplash.
+- `1_loja_talatona_para_huambo.sql` retirado: transformaria Catumbela numa segunda loja do
+  Huambo.
+
+**A aplicação directa em produção foi recusada pelas permissões desta sessão.** As três
+entram com o `supabase db push` do workflow no merge para o `main`, que só corre quando
+existir o segredo `SUPABASE_ACCESS_TOKEN`. Também se podem colar no SQL Editor, por ordem
+de versão.
+
+**Painel:**
+- Livros: indicador e filtro "Sem descrição" (100 de 102 livros, confirmado por consulta).
+  "Sem capa" passa a contar da mesma maneira no indicador e no filtro (antes o indicador
+  ignorava `cover_image`). Carregar num indicador abre a lista correspondente.
+  Critério único em `lib/bookContent.js`, com testes.
+- Lojas: etiqueta "Sem telefone" ao lado da "Sem GPS".
+- Configurações → Contacto: aviso quando não há telefone nem WhatsApp.
+
+**GitHub Actions:** criados `BACKUP_PASSPHRASE` (frase de 64 caracteres, cópia em
+`~/Documents/livraria-BACKUP_PASSPHRASE.txt`, só com permissões do dono) e
+`CLOUDFLARE_ACCOUNT_ID`.
+
+**Advisors (2026-11-04, 18h):** as 16 funções `SECURITY DEFINER` que um utilizador com sessão
+pode chamar verificam todas a permissão lá dentro; `book_review_helpfulness` (pública) só
+devolve contagens, e `e2ee_admin_key_packages` só chaves públicas. Os 34 índices "sem uso"
+são os das chaves estrangeiras numa base com poucos dias: ficam.
+
+**Segredos locais:** `api-keys-*.csv` e `client_secret_*.json` na raiz estão no
+`.gitignore` e nunca entraram no histórico. O `firebase-applet-config.json` é a configuração
+web do Firebase, pública por natureza.
+
+**Ficou de fora, de propósito:** trocar o Firebase Auth pelo Google Identity Services
+tiraria os últimos avisos do `npm audit`, mas o código vulnerável não chega ao site, e o
+login Google do separador Workspace não se pode testar sem uma conta e um navegador.
+
+### Continua por fazer (dono)
+
+| O quê | Onde |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens → criar "github-actions-livraria"; `gh secret set SUPABASE_ACCESS_TOKEN --repo fernandotunas6-bot/Livraria-Editora-Adventista` |
+| `CLOUDFLARE_API_TOKEN` | dash.cloudflare.com → My Profile → API Tokens → modelo "Edit Cloudflare Workers", com *Cloudflare Pages: Edit* na conta valentinocanguele@gmail.com; mesmo comando |
+| Frase dos backups | passar `~/Documents/livraria-BACKUP_PASSPHRASE.txt` para um gestor de palavras-passe e apagar o ficheiro |
+| Telefones e WhatsApp verdadeiros | Configurações → Contacto, e Lojas |
+| Coordenadas de Catumbela e Lubango | Lojas → colar o link do Google Maps de cada loja |
+| Descrições, stock real | Livros → filtro "Sem descrição" |
+| SMTP / emails de encomenda | Configurações → Email |
+| Projecto antigo `livraria-adventista.pages.dev` | está noutra conta Cloudflare: redireccionar ou apagar |
+| Email do domínio, DNSSEC, alertas | 9.4, pontos 1, 7 e 8 (o wrangler desta máquina só lê zonas) |
+| MFA nas contas de admin | perfil → Segurança |
+| Palavras-passe vazadas | plano Pro do Supabase |
 
 ## 10. Não verificado nesta auditoria
 
@@ -651,9 +725,9 @@ Actions e o primeiro backup). Nada disto se resolve no código.
 
 ## Próximos passos, por ordem
 
-1. Segredos do Actions em falta (só existe `SUPABASE_DB_PASSWORD`), incluindo `BACKUP_PASSPHRASE`.
-2. `site_settings`: corrigir o `site_url` e apagar as duas linhas a mais (ver 9.4, pontos 2 e 10).
-3. Conteúdo: descrições, capas em branco ou trocadas, stock real, contactos, SMTP.
-4. Decisão do dono sobre `1_loja_talatona_para_huambo.sql` (o id é hoje Catumbela) e publicar
-   `4_campos_encomendas.sql` pela ordem do README de `docs/migracoes-pendentes/`.
-5. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4).
+1. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela acima). A partir daí, um
+   merge para o `main` aplica as três migrações de 9.5 e publica a função e o site.
+2. Telefones, coordenadas das lojas e SMTP (Configurações e Lojas).
+3. Descrições e stock real (Livros → "Sem descrição").
+4. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4).
+5. Projecto antigo no `pages.dev`.
