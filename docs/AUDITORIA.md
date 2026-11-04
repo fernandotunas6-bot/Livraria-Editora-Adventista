@@ -503,6 +503,20 @@ O que mudou a partir daqui (efeito por medir depois de publicar, com a mesma con
 - **`/admin/media-config` só para a equipa.** Era pedido em cada página por qualquer cliente
   com sessão, e sempre recusado.
 
+**Autenticação, revista nesta ronda:** o registo e a recuperação de palavra-passe não revelam
+se uma conta existe (o Supabase devolve o mesmo com e sem conta, e o site mostra "Email
+enviado" nos dois casos); as três entradas de palavra-passe exigem 8 caracteres no site. O
+mínimo do Supabase Auth continua nos 6 por omissão: subir para 8 em Authentication → Policies.
+
+**CSP restrito ao projecto** (`scripts/csp-supabase.mjs`, plugin no `vite.config.js`). O
+`connect-src` e o `media-src` aceitavam `*.supabase.co`, ou seja qualquer projecto Supabase:
+um script injectado podia mandar dados para um projecto do atacante. No build passam a ser a
+origem de `VITE_SUPABASE_URL`; sem a variável o ficheiro fica como estava. Confirmado que
+nenhum conteúdo da base de dados aponta para outro projecto Supabase.
+
+**Respostas da API com dados pessoais** passam a `Cache-Control: no-store` e `nosniff`; as
+públicas mantêm a cache curta.
+
 **Continuidade:** organização no plano **Free**. Não há backups do Supabase nem PITR, e um
 projecto Free pode ser pausado por inactividade. Backup semanal cifrado pelo Actions, com RPO de
 7 dias e RTO de ~1 h, e o restauro descrito em `docs/BACKUPS.md`. O restauro **nunca foi

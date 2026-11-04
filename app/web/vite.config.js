@@ -1,9 +1,11 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { supabaseCspPlugin } from '../../scripts/csp-supabase.mjs';
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  // O CSP do `_headers` passa a aceitar só o projecto Supabase da loja (ver o script).
+  plugins: [react(), supabaseCspPlugin(loadEnv(mode, __dirname, 'VITE_').VITE_SUPABASE_URL)],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -45,4 +47,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

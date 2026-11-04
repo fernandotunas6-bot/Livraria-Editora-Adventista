@@ -59,8 +59,14 @@ type Row = Record<string, any>;
 type Auth = { id: string; email: string; role: string; permissions: Row } | null;
 type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
 
+// Por omissão nada se guarda: estas respostas têm dados pessoais (rastreio, painel, contas)
+// e não levavam Cache-Control nenhum. As rotas iguais para todos usam `publicJson`.
+const PRIVATE_HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json", ...extra } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json", ...PRIVATE_HEADERS, ...extra },
+  });
 
 // Rotas públicas que todas as páginas pedem (definições, lojas, colecções, pagamentos, geo).
 // Cada pedido levava ~1 s (Edge Function + base de dados em Estocolmo) e repetia-se em cada
@@ -72,7 +78,7 @@ const PUBLIC_CACHE = "public, max-age=30, stale-while-revalidate=300";
 const publicJson = (body: unknown) =>
   new Response(JSON.stringify(body), {
     status: 200,
-    headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": PUBLIC_CACHE },
+    headers: { ...CORS, "Content-Type": "application/json", "X-Content-Type-Options": "nosniff", "Cache-Control": PUBLIC_CACHE },
   });
 
 // ---------------------------------------------------------------------------
