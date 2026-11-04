@@ -504,3 +504,16 @@ export function secretsMatch(a: string, b: string): boolean {
   for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
   return diff === 0;
 }
+
+/**
+ * Endereço com forma de email, para as rotas públicas que o guardam (checkout, newsletter,
+ * formulário de contacto). Permissivo de propósito: não tenta validar o RFC inteiro, só trava
+ * o que nunca poderia ser entregue — sem `@`, sem domínio com ponto, com espaços, ou maior do
+ * que os 254 caracteres que o SMTP aceita. Chega já normalizado (minúsculas, sem espaços nas
+ * pontas).
+ */
+const EMAIL_SHAPE = /^[^\s@]{1,64}@[^\s@.]+(\.[^\s@.]+)+$/;
+export function isEmail(email: string): boolean {
+  const value = String(email ?? "");
+  return value.length <= 254 && EMAIL_SHAPE.test(value);
+}

@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 import nodemailer from "npm:nodemailer@6.9.16";
 import {
   brandFromSettings, categoryStates, emailDocument, formatKz, isCategoryEnabled,
-  isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand, type FailureSource,
+  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand, type FailureSource,
 } from "./emails.ts";
 import {
   accessLinkLetter,
@@ -38,21 +38,28 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  // Sem isto o browser esconde-os do site: o Retry-After dos limites e o id do pedido, que
+  // é o que a equipa precisa para encontrar o erro nos registos da função.
+  "Access-Control-Expose-Headers": "Retry-After, X-Request-Id",
 };
 
 class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public headers: Record<string, string> = {}) {
     super(message);
   }
 }
 const bad = (msg: string) => new HttpError(400, msg);
+// Limite de pedidos excedido. Respondia 400, que diz "o pedido está errado" e não "espere":
+// 429 com Retry-After é o que clientes, proxies e o Cloudflare sabem tratar. O site lê só a
+// mensagem, qualquer que seja o estado, por isso nada muda para quem compra.
+const tooMany = (msg: string) => new HttpError(429, msg, { "Retry-After": "60" });
 
 type Row = Record<string, any>;
 type Auth = { id: string; email: string; role: string; permissions: Row } | null;
 type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json", ...extra } });
 
 // Rotas públicas que todas as páginas pedem (definições, lojas, colecções, pagamentos, geo).
 // Cada pedido levava ~1 s (Edge Function + base de dados em Estocolmo) e repetia-se em cada
@@ -237,6 +244,13 @@ async function alreadySent(dedupe: string) {
  */
 type SendOutcome = { ok: boolean; source?: FailureSource; status?: number; detail: string; provider: string };
 
+// Segredos de email: um segredo da Edge Function (`supabase secrets set SMTP_PASSWORD=…`)
+// ganha ao que estiver na tabela. Na tabela, quem tem "Configurações" lê-os pela API em texto
+// simples; como segredo da função, só o servidor os vê. Sem segredo definido, tudo continua a
+// funcionar como antes, com o valor do painel. É o mesmo critério das chaves de IA (/chat).
+const smtpPassword = (settings: Row | null) => Deno.env.get("SMTP_PASSWORD") || settings?.smtp_password || "";
+const sendgridKey = (settings: Row | null) => Deno.env.get("SENDGRID_API_KEY") || settings?.sendgrid_api_key || "";
+
 /** Entrega uma mensagem ao fornecedor. Só envia: não regista nem decide repetições. */
 async function deliverEmail(settings: Row, to: string, subject: string, html: string, text: string, headers: Record<string, string>): Promise<SendOutcome> {
   const siteName = settings.site_name || "Livraria Adventista";
@@ -245,7 +259,7 @@ async function deliverEmail(settings: Row, to: string, subject: string, html: st
   const fromName = settings.smtp_from_name || siteName;
 
   if (provider === "sendgrid") {
-    if (!settings.sendgrid_api_key) {
+    if (!sendgridKey(settings)) {
       return { ok: false, detail: "Chave SendGrid em falta.", provider };
     }
     // A ordem importa: o SendGrid usa a última parte como a preferida, por isso o HTML vem
@@ -257,7 +271,7 @@ async function deliverEmail(settings: Row, to: string, subject: string, html: st
     try {
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
-        headers: { Authorization: `Bearer ${settings.sendgrid_api_key}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${sendgridKey(settings)}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: to }] }],
           from: { email: fromEmail, name: fromName },
@@ -282,7 +296,7 @@ async function deliverEmail(settings: Row, to: string, subject: string, html: st
       host: settings.smtp_host,
       port,
       secure: port === 465,
-      auth: settings.smtp_user ? { user: settings.smtp_user, pass: settings.smtp_password || "" } : undefined,
+      auth: settings.smtp_user ? { user: settings.smtp_user, pass: smtpPassword(settings) } : undefined,
     });
     const info = await transport.sendMail({
       from: { name: fromName, address: fromEmail },
@@ -1061,7 +1075,7 @@ async function findOrderByNumberAndEmail(orderNumber: string, email: string) {
 }
 
 route("POST", "/track", async ({ body, ip }) => {
-  if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
@@ -1117,7 +1131,7 @@ route("GET", "/geo/localities", async ({ url }) => {
 
 route("POST", "/confirm-delivery", async ({ body, ip }) => {
   const confirmRate = Math.max(1, Math.floor(storeRules(await getSettings()).trackRate / 2));
-  if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
   const recipientName = String(body.recipientName || "").trim();
@@ -1255,7 +1269,7 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
 route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const settings = await getSettings();
   const rules = storeRules(settings);
-  if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw bad("Demasiadas tentativas de checkout. Aguarde um minuto.");
+  if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw tooMany("Demasiadas tentativas de checkout. Aguarde um minuto.");
   const items: Row[] = data.items || [];
   if (!items.length) throw bad("Carrinho vazio.");
 
@@ -1275,6 +1289,8 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   if (!name) throw bad("Nome obrigatório.");
   if (!phone) throw bad("Telefone obrigatório.");
   if (!isPickup && !email) throw bad("Email obrigatório para entrega ao domicílio.");
+  // No levantamento o email é opcional, mas se vier tem de servir para enviar o recibo.
+  if (email && !isDeliverableEmail(email)) throw bad("Email inválido.");
   if (!isPickup) {
     if (!data.deliveryProvince) throw bad("Província de entrega obrigatória.");
     if (!data.deliveryMunicipality) throw bad("Município de entrega obrigatório.");
@@ -1390,7 +1406,13 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
       express_cost: Number(settings?.shipping_express_cost) || 0,
     },
   });
-  if (error) throw bad(error.message);
+  // Só as mensagens escritas para o comprador ("Stock insuficiente para: …", "Livro
+  // indisponível") saem como estão: são as do `raise exception` do place_order (P0001).
+  // Outro erro do Postgres diria nomes de colunas e restrições a quem está a comprar.
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    throw error;
+  }
 
   // O email de confirmação (SMTP, 1–3 s quando ligado) e o contacto no CRM (várias consultas)
   // saíam antes da resposta: o cliente esperava por eles para ver a encomenda confirmada.
@@ -1462,7 +1484,7 @@ function buildReceiptText(order: Row, siteName: string, paymentLink = "") {
 }
 
 route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
-  if (!await checkRateLimit("whatsapp_receipt", ip, 10)) throw bad("Demasiados pedidos. Aguarde um minuto.");
+  if (!await checkRateLimit("whatsapp_receipt", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.order_number || "").trim();
   const email = normalizeEmail(body.email || "");
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
@@ -1473,7 +1495,7 @@ route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
   if (!phone) return json({ sent: false, fallback: true, message: "A encomenda não tem telefone — use o link manual." });
   if (reqPhone && reqPhone !== normalizePhone(phone)) throw bad("Telefone não corresponde à encomenda.");
   const settings = await getSettings();
-  if (!await checkRateLimit("whatsapp_receipt_order", order.id, storeRules(settings).receiptPerOrder)) throw bad("O recibo desta encomenda já foi enviado. Aguarde um minuto.");
+  if (!await checkRateLimit("whatsapp_receipt_order", order.id, storeRules(settings).receiptPerOrder)) throw tooMany("O recibo desta encomenda já foi enviado. Aguarde um minuto.");
   const config = await getWhatsAppConfig();
   if (!config) return json({ sent: false, fallback: true, message: "API WhatsApp não configurada — use link manual." });
   const text = buildReceiptText(order, settings?.site_name || "Livraria Adventista", await orderPaymentLink(order));
@@ -1509,7 +1531,7 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
  * num meio de confirmar se um token é de alguém.
  */
 route("POST", "/unsubscribe", async ({ body, ip }) => {
-  if (!await checkRateLimit("unsubscribe", ip, 20)) throw bad("Demasiados pedidos. Aguarde um minuto.");
+  if (!await checkRateLimit("unsubscribe", ip, 20)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const token = String(body.token || "").trim();
   const done = { message: "Deixou de receber campanhas e novidades desta loja." };
   if (!/^[a-f0-9]{64}$/.test(token)) return json(done);
@@ -1566,7 +1588,7 @@ route("POST", "/admin/email/categories", async ({ auth, body }) => {
 route("POST", "/cron/email-queue", async ({ req, body, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
-  if (!await checkRateLimit("cron-queue", ip, 30)) throw bad("Demasiados pedidos.");
+  if (!await checkRateLimit("cron-queue", ip, 30)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
   const limit = Math.min(Math.max(Number(body.limit) || 25, 1), 50);
@@ -1640,7 +1662,7 @@ route("GET", "/admin/email/templates", async ({ auth }) => {
     ready: {
       enabled: !!settings?.order_email_enabled,
       provider: settings?.email_provider || "smtp",
-      configured: settings?.email_provider === "sendgrid" ? !!settings?.sendgrid_api_key : !!settings?.smtp_host,
+      configured: settings?.email_provider === "sendgrid" ? !!sendgridKey(settings) : !!settings?.smtp_host,
       site_url: brand.siteUrl,
       logo: brand.logoUrl,
     },
@@ -1710,7 +1732,7 @@ route("GET", "/push/config", async () => {
 });
 
 route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
-  if (!await checkRateLimit("push-subscribe", ip, 10)) throw bad("Demasiados pedidos. Aguarde um minuto.");
+  if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const endpoint = String(body.endpoint || "").trim();
   if (!/^https:\/\/[^\s]{8,1000}$/.test(endpoint)) throw bad("Endpoint inválido.");
   const keys = body.keys && typeof body.keys === "object"
@@ -1724,12 +1746,14 @@ route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
 });
 
 route("POST", "/contact-message", async ({ body, ip }) => {
-  if (!await checkRateLimit("contact", ip, 8)) throw bad("Demasiados pedidos. Aguarde um minuto.");
-  const name = String(body.name || "").trim();
+  if (!await checkRateLimit("contact", ip, 8)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  // Rota pública que escreve no CRM: tamanhos limitados, como no checkout.
+  const name = String(body.name || "").trim().slice(0, 120);
   const email = normalizeEmail(body.email || "");
-  const message = String(body.message || "").trim();
-  const phone = String(body.phone || "").trim();
+  const message = String(body.message || "").trim().slice(0, 4000);
+  const phone = String(body.phone || "").trim().slice(0, 40);
   if (!name || !email || !message) throw bad("Nome, email e mensagem são obrigatórios.");
+  if (!isDeliverableEmail(email)) throw bad("Email inválido.");
   await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId());
   return json({ message: "Mensagem recebida! Entraremos em contacto em breve." });
 });
@@ -1913,7 +1937,7 @@ route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
 route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
-  if (!await checkRateLimit("cron-campaigns", ip, 30)) throw bad("Demasiados pedidos.");
+  if (!await checkRateLimit("cron-campaigns", ip, 30)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
   const r = await runDueCampaigns(null, true);
@@ -1922,9 +1946,10 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 });
 
 route("POST", "/newsletter", async ({ body, ip }) => {
-  if (!await checkRateLimit("newsletter", ip, 6)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("newsletter", ip, 6)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const email = normalizeEmail(body.email || "");
   if (!email) throw bad("Email obrigatório.");
+  if (!isDeliverableEmail(email)) throw bad("Email inválido.");
   const { data } = await db.from("newsletter").select("id").ilike("email", likeExact(email)).limit(1);
   if (data?.[0]) return json({ message: "Já subscrito." });
   const { error } = await db.from("newsletter").insert({ email });
@@ -2332,7 +2357,7 @@ function faqFallback(message: string, settings: Row | null, books: Row[]) {
 }
 
 route("POST", "/chat", async ({ body, ip }) => {
-  if (!await checkRateLimit("chat", ip, 20)) throw bad("Demasiadas mensagens. Aguarde um minuto.");
+  if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
   const page = String(body.page || "/").slice(0, 120);
   const history = (Array.isArray(body.history) ? body.history : []).slice(-8)
@@ -2384,20 +2409,46 @@ route("POST", "/chat", async ({ body, ip }) => {
 });
 
 // ---------------------------------------------------------------------------
+// Mensagem para quem não é da equipa quando algo falha sem ser um erro previsto.
+const UNEXPECTED_ERROR = "Ocorreu um erro inesperado. Tente novamente dentro de momentos.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  // Id de correlação: vai em todas as respostas e em cada registo de erro, por isso uma
+  // queixa ("deu erro ao pagar", com o id que o browser recebeu) leva à linha certa nos
+  // registos da função. Respeita o que o cliente mande, se tiver a forma de um UUID.
+  const given = req.headers.get("x-request-id") || "";
+  const requestId = /^[0-9a-f-]{36}$/i.test(given) ? given : crypto.randomUUID();
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/functions\/v1/, "").replace(/^\/app/, "").replace(/\/$/, "") || "/";
   const handler = routes[`${req.method} ${path}`];
-  if (!handler) return json({ message: "Rota não encontrada." }, 404);
+  if (!handler) return json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
+  let auth: Auth = null;
   try {
     let body: Row = {};
     if (req.method === "POST") body = await req.json().catch(() => ({}));
+    // O gateway do Supabase reescreve este cabeçalho com o IP real (verificado a 2026-11-04:
+    // um X-Forwarded-For forjado ficou registado em private.rate_limits com o IP de origem),
+    // por isso o primeiro valor é fiável para os limites de pedidos.
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "anon";
-    return await handler({ req, url, body, auth: await getAuth(req), ip });
+    auth = await getAuth(req);
+    const res = await handler({ req, url, body, auth, ip });
+    res.headers.set("X-Request-Id", requestId);
+    return res;
   } catch (err) {
-    if (err instanceof HttpError) return json({ message: err.message, status: err.status }, err.status);
-    console.log(`Erro em ${req.method} ${path}:`, err);
-    return json({ message: (err as { message?: string })?.message || String(err) }, 400);
+    if (err instanceof HttpError) {
+      return json({ message: err.message, status: err.status }, err.status, { ...err.headers, "X-Request-Id": requestId });
+    }
+    console.log(`Erro em ${req.method} ${path} [${requestId}]:`, err);
+    // Um erro não previsto (Postgres, fornecedor de email, um bug) trazia a mensagem interna
+    // para o browser de qualquer visitante, com estado 400 como se a culpa fosse do pedido.
+    // A equipa continua a vê-la no painel, onde ajuda a perceber o que falhou; os outros
+    // recebem uma frase e o id para a equipa procurar nos registos.
+    const detail = (err as { message?: string })?.message || String(err);
+    return json(
+      { message: isStaff(auth) ? detail : UNEXPECTED_ERROR, ref: requestId, status: 500 },
+      500,
+      { "X-Request-Id": requestId },
+    );
   }
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   OPTIONAL_CATEGORIES, SAFE_SYMBOLS, brandFromSettings, categoryStates, emailDocument,
-  formatKz, isCategoryEnabled, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand,
+  formatKz, isCategoryEnabled, isEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand,
 } from "./emails.ts";
 import {
   accessLinkLetter,
@@ -689,5 +689,27 @@ describe("secretsMatch", () => {
   it("aguenta valores que não são texto", () => {
     expect(secretsMatch(null as never, null as never)).toBe(false);
     expect(secretsMatch(undefined as never, token)).toBe(false);
+  });
+});
+
+describe("isEmail", () => {
+  it("aceita os endereços que os clientes usam", () => {
+    for (const ok of [
+      "joao.silva@gmail.com", "maria+livros@outlook.pt", "contacto@livrariaadventista.ao",
+      "a@b.co", "nome_apelido@sub.dominio.co.ao", "x-y@ucan.edu.ao",
+    ]) expect(isEmail(ok), ok).toBe(true);
+  });
+
+  it("recusa o que nunca poderia ser entregue", () => {
+    for (const bad of [
+      "", "joao", "joao@", "@gmail.com", "joao@gmail", "joao@@gmail.com", "joao silva@gmail.com",
+      "joao@gmail.com ", "joao@gmail..com", "joao@.com", "joao@gmail.", `${"a".repeat(65)}@x.ao`,
+      `a@${"b".repeat(250)}.ao`,
+    ]) expect(isEmail(bad), JSON.stringify(bad)).toBe(false);
+  });
+
+  it("não rebenta com valores que não são texto", () => {
+    expect(isEmail(undefined as unknown as string)).toBe(false);
+    expect(isEmail(null as unknown as string)).toBe(false);
   });
 });
