@@ -1218,21 +1218,25 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   if (!body.orderId) throw bad("orderId obrigatório.");
   const { data: order } = await db.from("orders").select("*").eq("id", body.orderId).maybeSingle();
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
-  const timeline = [...(order.delivery_timeline || []), timelineEvent(
-    body.status || "in_transit", body.title || "Actualização de entrega", body.description || "", body.location || "",
-  )];
-  const patch: Row = { delivery_timeline: timeline };
+  const statusChanged = !!body.status && body.status !== order.delivery_status;
+  const patch: Row = {};
   if (body.tracking_number) patch.tracking_number = body.tracking_number;
   if (body.carrier) patch.carrier = body.carrier;
   if (body.estimated_delivery) patch.estimated_delivery = body.estimated_delivery;
-  let { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
-  if (error) throw error;
-  let statusChanged = false;
-  if (body.status && body.status !== order.delivery_status) {
-    ({ data: saved, error } = await db.from("orders").update({ delivery_status: body.status }).eq("id", order.id).select().single());
-    if (error) throw error;
-    statusChanged = true;
+  if (statusChanged) {
+    // O passo novo entra na linha temporal pelo trigger orders_before_update, que o escreve
+    // sempre que o estado da entrega muda. Acrescentá-lo também aqui deixava cada mudança
+    // registada duas vezes no seguimento do cliente.
+    patch.delivery_status = body.status;
+  } else {
+    // Sem mudança de estado: é uma nota de entrega, que só esta rota escreve.
+    patch.delivery_timeline = [...(order.delivery_timeline || []), timelineEvent(
+      body.status || order.delivery_status || "in_transit", body.title || "Actualização de entrega",
+      body.description || "", body.location || "",
+    )];
   }
+  const { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
+  if (error) throw error;
   // O email vai só quando o estado muda de facto: gravar a mesma etapa outra vez no painel
   // não é novidade para o cliente. A falha de envio não desfaz a actualização da encomenda.
   let emailSent = false;

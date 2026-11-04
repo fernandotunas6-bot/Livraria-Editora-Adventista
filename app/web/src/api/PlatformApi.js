@@ -203,6 +203,25 @@ export async function setOrderPaymentStatus(orderId, status) {
   }
 }
 
+/**
+ * Muda o estado da entrega de uma encomenda.
+ *
+ * Pela API, como o pagamento: é lá que o cliente recebe o email "enviada", "saiu para
+ * entrega", "entregue". O painel gravava directamente na tabela, e a rota que envia esses
+ * emails existia mas ninguém a chamava — o cliente nunca era avisado. Sem a rota (função
+ * antiga), grava na tabela e devolve `via: 'fallback'`.
+ */
+export async function setOrderDeliveryStatus(orderId, status) {
+  try {
+    const res = await pb.send('/delivery-event', { method: 'POST', body: { orderId, status } });
+    return { ...res, via: 'api' };
+  } catch (err) {
+    if (!isMissingRoute(err)) throw err;
+    await pb.collection('orders').update(orderId, { delivery_status: status });
+    return { email_sent: false, via: 'fallback' };
+  }
+}
+
 export function getSettingsFileUrl(record, field) {
   if (!record?.[field]) return null;
   return pb.files.getURL(record, record[field]);

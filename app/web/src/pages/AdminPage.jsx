@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { pageTitle } from '@/lib/brand';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
-import { setOrderPaymentStatus } from '@/api/PlatformApi';
+import { setOrderPaymentStatus, setOrderDeliveryStatus } from '@/api/PlatformApi';
 import { EDGE_FUNCTION_DESACTUALIZADA } from '@/lib/apiCompat';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
@@ -246,9 +246,15 @@ const AdminPage = () => {
   };
 
   const handleDeliveryStatus = async (order, deliveryStatus) => {
+    if (order.delivery_status === deliveryStatus) return;
     try {
-      await pb.collection('orders').update(order.id, { delivery_status: deliveryStatus });
-      toast({ title: 'Estado de entrega actualizado' });
+      const res = await setOrderDeliveryStatus(order.id, deliveryStatus);
+      toast({
+        title: 'Estado de entrega actualizado',
+        description: res?.via === 'fallback'
+          ? `Cliente não avisado. ${EDGE_FUNCTION_DESACTUALIZADA}`
+          : res?.email_sent ? 'Cliente avisado por email' : undefined,
+      });
       loadAll();
     } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: err.message });
