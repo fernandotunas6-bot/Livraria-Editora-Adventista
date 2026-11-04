@@ -590,11 +590,22 @@ sessão. A primeira só cria índices com `if not exists`.
 
 Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do Supabase.
 
-### Estado de publicação
+### Estado de publicação (actualizado a 2026-11-04, 13h)
 
-Nada foi publicado nesta passagem: nem o site, nem a Edge Function, nem as migrações. As
-alterações estão no ramo do PR #1; o Actions aplica as migrações e publica no merge para o
-`main`, quando existirem os quatro segredos em falta.
+- **Base de dados:** as migrações até `20261104095000` estão aplicadas em produção (pela outra
+  sessão, com as versões dos ficheiros). Confirmado por consulta: MFA nas três funções de
+  permissão, triggers dos segredos e das conversas, índice de idempotência, índices das
+  chaves estrangeiras, agendadores só com trabalho. **Falta a `20261104120000`** (um índice em
+  `contact_group_members.added_by`): a aplicação foi recusada nesta sessão; entra com o
+  `supabase db push` do Actions, ou à mão no SQL Editor.
+- **Edge Function:** a versão publicada é a final (verificado pelos cabeçalhos `X-Request-Id`,
+  `Cache-Control: no-store` e a cache de `/integrations`).
+- **Site:** publicado em produção a partir de `6361ec1` (`deploy-site.sh`), verificado em
+  `https://livrariaadventista.com`. O CSP já só aceita o projecto Supabase da loja, e a loja
+  carrega os 102 livros e as capas com ele. A barra inferior e a lista contínua estão activas
+  no telemóvel.
+- **Advisors depois do deploy:** nada novo de gravidade; `private.site_secrets` sem políticas é
+  intencional (só a service role lhe chega).
 
 ## 10. Não verificado nesta auditoria
 
