@@ -408,13 +408,26 @@
    Em classe própria e não na sintaxe arbitrária do Tailwind: `calc()` com `env()` e `var()`
    leva vírgulas, e o que saía dali não chegava a gerar regra nenhuma. */
 .float-above-bar {
-  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px));
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px));
 }
 
 /* Para quem está preso ao fundo com `bottom`: afasta-se do indicador de gestos
    em vez de lhe ficar por baixo. */
 .safe-float-bottom {
-  bottom: calc(var(--float-gap, 1.5rem) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--float-gap, 1.5rem) + env(safe-area-inset-bottom, 0px) + var(--barra-navegacao, 0px));
+}
+
+/* Barra de navegação inferior do telemóvel (MobileBottomNav). A variável vale 0 quando a
+   barra não está à vista (desktop, ficha do livro, painel), por isso nada muda fora dela.
+   O corpo ganha espaço no fim, para o último cartão não ficar por baixo da barra, e os
+   avisos sobem acima dela. */
+body {
+  padding-bottom: var(--barra-navegacao-total, 0px);
+}
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-y-position=bottom] {
+    bottom: calc(var(--mobile-offset-bottom, 16px) + var(--barra-navegacao-total, 0px)) !important;
+  }
 }
 
 /* Área de toque de 44px sem mudar o tamanho do que se vê.

@@ -12,6 +12,7 @@ import ShoppingCart from '@/components/ShoppingCart.jsx';
 import HeroSlider from '@/components/HeroSlider.jsx';
 import DestaquesSemana from '@/components/DestaquesSemana.jsx';
 import CatalogShowcase from '@/components/home/CatalogShowcase.jsx';
+import MobileDiscoveryFeed from '@/components/home/MobileDiscoveryFeed.jsx';
 import { pageTitle, BRAND } from '@/lib/brand';
 
 const trustSignals = [
@@ -85,9 +86,14 @@ const HomePage = () => {
             </motion.div>
           </div>
         </section>
+
+        {/* Só no telemóvel: o catálogo continua aqui em vez do rodapé. */}
+        <MobileDiscoveryFeed onCartOpen={() => setIsCartOpen(true)} />
       </main>
 
-      <Footer />
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 };

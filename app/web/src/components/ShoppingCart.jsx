@@ -28,6 +28,7 @@ import PhoneInput from '@/components/PhoneInput';
 import { normalizeAngolaPhone, isValidAngolaPhone } from '@/lib/angolaPhone';
 import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
 import { MOTION } from '@/lib/motion';
+import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 
 const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { toast } = useToast();
@@ -85,6 +86,17 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     relativeName: '',
     relativePhone: '',
   });
+
+  // A barra inferior do telemóvel é global e o carrinho é de cada página: ela pede, e o
+  // carrinho montado abre-se (e diz que respondeu).
+  useEffect(() => {
+    const abrir = (e) => {
+      if (e.detail) e.detail.handled = true;
+      setIsCartOpen(true);
+    };
+    window.addEventListener(OPEN_CART_EVENT, abrir);
+    return () => window.removeEventListener(OPEN_CART_EVENT, abrir);
+  }, [setIsCartOpen]);
 
   // Escape fecha o carrinho. É o que se espera de um painel que tapa a página inteira, e
   // sem isso quem navega pelo teclado só sai dele depois de percorrer tudo o que tem dentro.

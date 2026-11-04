@@ -13,7 +13,7 @@ export function useChatPosition() {
   const fixedStyle = {
     position: 'fixed',
     zIndex: 45,
-    bottom: 'calc(24px + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px))',
+    bottom: 'calc(24px + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px))',
     left: 'calc(24px + env(safe-area-inset-left, 0px))',
   };
 

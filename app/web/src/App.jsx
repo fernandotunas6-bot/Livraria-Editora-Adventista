@@ -10,6 +10,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
+import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -109,6 +110,7 @@ function GlobalWidgets() {
     <Suspense fallback={null}>
       <PwaInstallBanner />
       {showAssistant && <LivrariaAssistant />}
+      <MobileBottomNav />
     </Suspense>
   );
 }

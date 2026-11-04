@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   SlidersHorizontal, X, LayoutGrid, List, Sparkles,
@@ -26,6 +26,10 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { applyShopTheme, shopDefaults } from '@/lib/shopTheme';
 import { getSearchRelevance } from '@/lib/searchUtils';
 import { MOTION } from '@/lib/motion';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useInfiniteList } from '@/hooks/useInfiniteList';
+import { useScrollMemory } from '@/hooks/useScrollMemory';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destaques' },
@@ -133,9 +137,38 @@ const ShopPage = () => {
   const perPage = shop.shop_per_page;
   const pageCount = Math.max(1, Math.ceil(sortedProducts.length / perPage));
   const currentPage = Math.min(page, pageCount);
-  const displayProducts = sortedProducts.slice((currentPage - 1) * perPage, currentPage * perPage);
-  const firstShown = sortedProducts.length === 0 ? 0 : (currentPage - 1) * perPage + 1;
-  const lastShown = Math.min(currentPage * perPage, sortedProducts.length);
+
+  // Telemóvel: a lista cresce sozinha ao deslizar, em lotes do tamanho da página
+  // (useInfiniteList). Desktop: as páginas numeradas de sempre. A chave de reinício são os
+  // filtros escolhidos (o URL) e a ordenação — nunca os dados, para a chegada dos livros não
+  // apagar o lugar reposto ao voltar atrás.
+  const isMobile = useIsMobile();
+  const location = useLocation();
+  const infinite = useInfiniteList({
+    total: sortedProducts.length,
+    batch: perPage,
+    resetKey: `${location.search}|${sortBy}`,
+    enabled: isMobile && !isLoading,
+  });
+  // Ao voltar de um livro: os mesmos cartões, a mesma página e a mesma posição no ecrã.
+  const savedPlace = useScrollMemory({
+    ready: !isLoading && sortedProducts.length > 0,
+    snapshot: { count: infinite.count, page: currentPage },
+  });
+  const { setCount: setInfiniteCount } = infinite;
+  useEffect(() => {
+    if (isLoading || !savedPlace) return;
+    if (savedPlace.count) setInfiniteCount(savedPlace.count);
+    if (savedPlace.page) setPage(savedPlace.page);
+    // Só uma vez, quando os livros chegam.
+  }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const displayProducts = isMobile
+    ? sortedProducts.slice(0, infinite.count)
+    : sortedProducts.slice((currentPage - 1) * perPage, currentPage * perPage);
+  // No telemóvel a lista começa sempre no primeiro e vai crescendo.
+  const firstShown = sortedProducts.length === 0 ? 0 : isMobile ? 1 : (currentPage - 1) * perPage + 1;
+  const lastShown = isMobile ? displayProducts.length : Math.min(currentPage * perPage, sortedProducts.length);
 
   useEffect(() => {
     setPage(1);
@@ -551,7 +584,18 @@ const ShopPage = () => {
                 quando os produtos terminavam de carregar. */}
             {isLoading && <div className="mt-10 h-9" aria-hidden />}
 
-            {pageCount > 1 && !isLoading && (
+            {isMobile && !isLoading && (
+              <CatalogInfiniteTail
+                sentinelRef={infinite.sentinelRef}
+                hasMore={infinite.hasMore}
+                loadMore={infinite.loadMore}
+                shown={displayProducts.length}
+                total={sortedProducts.length}
+                onClearFilters={filterCount > 0 || activeFilters.search ? clearFilters : undefined}
+              />
+            )}
+
+            {!isMobile && pageCount > 1 && !isLoading && (
               <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Páginas do catálogo">
                 <Button
                   variant="outline"
@@ -643,7 +687,11 @@ const ShopPage = () => {
         )}
       </main>
 
-      <Footer />
+      {/* No telemóvel o catálogo segue sem rodapé (a barra inferior e o menu do cabeçalho
+          levam às mesmas páginas); no desktop fica o de sempre. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 };

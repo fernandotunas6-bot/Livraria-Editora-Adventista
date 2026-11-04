@@ -84,6 +84,12 @@ export const SHOWCASE_CATEGORIES = [
   },
 ];
 
+/** Ligação da loja para uma categoria (a mesma regra do mega menu do cabeçalho). */
+export function categoryShopLink(cat) {
+  const filter = CATEGORY_SHOP_FILTERS[cat.id];
+  return filter ? `/shop?${filter}` : `/shop?category=${encodeURIComponent(cat.title)}`;
+}
+
 /** Parâmetros da loja (/shop?...) que mostram cada categoria. */
 export const CATEGORY_SHOP_FILTERS = {
   ellen: 'search=Ellen',
