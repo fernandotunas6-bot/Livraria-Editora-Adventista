@@ -8,7 +8,8 @@
 --     o código e o nome do método de pagamento, a morada de entrega numa linha e a loja do
 --     levantamento. Não apaga nada.
 --  2. O trigger `orders_before_update` passa a tirar o local de cada passo do seguimento do
---     município da entrega ou da loja do levantamento, e já não de `city`.
+--     município da entrega ou da loja do levantamento, e já não de `city`; e recusa reabrir
+--     uma encomenda cancelada (o stock já foi devolvido e não voltava a ser descontado).
 --
 -- Os updates não mudam estado, pagamento nem entrega, por isso o trigger de notificações
 -- (`orders_notify_activity`, só `UPDATE OF status, payment_status, delivery_status`) não
@@ -60,6 +61,13 @@ declare
   it jsonb;
   labels constant jsonb := '{"received":"Encomenda recebida","confirmed":"Encomenda confirmada","preparing":"A preparar envio","shipped":"Enviada","in_transit":"Em trânsito","out_for_delivery":"Saiu para entrega","delivered":"Entregue","cancelled":"Cancelada"}';
 begin
+  -- Uma encomenda cancelada já devolveu o stock (stock_restored). Reabri-la não o voltava a
+  -- descontar e a loja ficava a vender livros que já tinham saído. Notas, tracking e
+  -- pagamento continuam a poder ser actualizados; o estado é que não sai de "cancelada".
+  if old.stock_restored and coalesce(new.status, '') <> 'cancelled' and coalesce(new.delivery_status, '') <> 'cancelled' then
+    raise exception 'Encomenda cancelada: o stock já foi devolvido e não pode ser reaberta.';
+  end if;
+
   if coalesce(new.delivery_status, '') <> '' and new.delivery_status is distinct from old.delivery_status then
     new.delivery_timeline := coalesce(new.delivery_timeline, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
       'status', new.delivery_status,

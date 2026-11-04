@@ -213,6 +213,15 @@ const AdminPage = () => {
   });
 
   const handleOrderStatus = async (order, newStatus) => {
+    // Cancelar devolve o stock à loja (trigger orders_before_update, uma só vez). Reabrir
+    // depois não volta a descontá-lo, e a loja ficava a vender livros que já saíram — por
+    // isso cancelar pede confirmação e uma encomenda cancelada não se reabre daqui.
+    if (order.status === 'cancelled') {
+      toast({ variant: 'destructive', title: 'Encomenda cancelada', description: 'O stock já foi devolvido. Para voltar a vender estes livros a este cliente, registe uma encomenda nova.' });
+      return;
+    }
+    if (newStatus === 'cancelled'
+      && !confirm(`Cancelar a encomenda ${formatOrderNumber(order)}?\n\nO stock dos livros volta à loja e a encomenda não pode ser reaberta.`)) return;
     try {
       // Ao cancelar, o trigger orders_before_update devolve o stock (uma só vez, via stock_restored).
       await pb.collection('orders').update(order.id, { status: newStatus });
@@ -312,7 +321,10 @@ const AdminPage = () => {
   // Pagamentos por P2P/transferência que o cliente diz ter feito e falta confirmar.
   const awaitingPaymentCount = orders.filter((o) => o.payment_status === 'awaiting_confirmation' && o.status !== 'cancelled').length;
   const paymentLabelOf = orderPaymentLabel;
-  const totalRevenue = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
+  // Receita é o que foi pago; o resto das encomendas activas é valor por receber.
+  const activeOrders = orders.filter((o) => o.status !== 'cancelled');
+  const totalRevenue = activeOrders.filter((o) => o.payment_status === 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const pendingRevenue = activeOrders.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
 
   const bookMetrics = [
     { label: 'Livros no catálogo', value: books.length, icon: PackageSearch },
@@ -689,8 +701,11 @@ const AdminPage = () => {
                       <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
                     </div>
                     <div className="bg-card border rounded-xl p-4">
-                      <p className="text-sm text-muted-foreground">Receita Total</p>
+                      <p className="text-sm text-muted-foreground">Receita (pagas)</p>
                       <p className="text-2xl font-bold text-primary">Kz {totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      {pendingRevenue > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">+ Kz {pendingRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                      )}
                     </div>
                   </div>
 
@@ -876,11 +891,14 @@ const AdminPage = () => {
                               <p className="text-xs font-medium text-muted-foreground">Estado da encomenda</p>
                               <div className="flex flex-wrap gap-2">
                                 {Object.keys(ORDER_STATUS).map((status) => (
-                                  <Button key={status} size="sm" variant={o.status === status ? 'default' : 'outline'} className={o.status === status ? 'btn-primary' : ''} onClick={() => handleOrderStatus(o, status)} disabled={o.status === status}>
+                                  <Button key={status} size="sm" variant={o.status === status ? 'default' : 'outline'} className={o.status === status ? 'btn-primary' : ''} onClick={() => handleOrderStatus(o, status)} disabled={o.status === status || o.status === 'cancelled'}>
                                     {getOrderStatusLabel(status)}
                                   </Button>
                                 ))}
                               </div>
+                              {o.status === 'cancelled' && (
+                                <p className="text-xs text-muted-foreground">Cancelada: o stock já voltou à loja, por isso a encomenda não se reabre.</p>
+                              )}
                             </div>
 
                             <div className="space-y-2">
