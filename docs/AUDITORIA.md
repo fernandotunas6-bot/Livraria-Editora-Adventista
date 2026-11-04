@@ -477,9 +477,18 @@ vai no site):
 - As funções sensíveis recusam o anónimo com 401, **mesmo com argumentos válidos**:
   `place_order`, `check_rate_limit`, `users_admin_list`, `admin_users_list`, `claim_email_jobs`,
   `email_queue_scheduler_status`, `e2ee_admin_key_packages`, `current_role_name`.
-- Entre clientes com sessão (cliente A a ler dados do cliente B) **não foi testado**: exigia criar
-  contas em produção. As políticas foram lidas uma a uma (todas por `auth.uid()`), mas falta o
-  teste; `docs/testes/seguranca_wishlists.sql` é o modelo a seguir num projecto de testes.
+- Entre clientes com sessão (cliente A a ler dados do cliente B) **ainda não foi corrido**. O teste
+  está escrito em `docs/testes/isolamento_clientes_e_equipa.sql`, com 21 casos e o resultado
+  esperado de cada um. Cobre encomendas, notificações, atendimento, perfis, configurações e
+  funções do painel, e também as migrações novas (MFA em aal1/aal2, segredos, conversas
+  seguras, chave repetida). Não grava nada: termina num erro que anula a transacção. Corre-se no
+  SQL Editor de um projecto de testes, ou em produção depois de aplicar as migrações.
+
+**Paginação das encomendas no painel: deixada de fora de propósito.** O painel carrega a lista
+inteira (só com as colunas da lista) porque os relatórios de vendas somam todas as encomendas.
+Paginar obrigava a passar esses relatórios para agregações na base de dados, uma mudança grande
+sem ganho com 6 encomendas. Rever quando passar das ~2 000 encomendas ou o separador demorar
+mais de 2 s a abrir.
 
 **Linha de base da API** (`function_edge_logs`, 24 h até 2026-11-04, sem um único 5xx):
 
