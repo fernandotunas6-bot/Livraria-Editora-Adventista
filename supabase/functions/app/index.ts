@@ -24,6 +24,7 @@ import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
+import { createRateLimit } from "./rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -84,42 +85,12 @@ const publicJson = (body: unknown) =>
 // ---------------------------------------------------------------------------
 // Utilitários
 // ---------------------------------------------------------------------------
-// Limite de pedidos partilhado por todas as instâncias (migração `limites_pedidos`).
-// O limite em memória que existia aqui era por isolate: as Edge Functions escalam e
-// reciclam, por isso perdia-se a cada arranque a frio e não travava ninguém.
-const rateLimitStore: Record<string, number[]> = {};
-let sharedRateLimitOff = false;
-
-/** Recuo local, para o caso de a função na base de dados ainda não existir. */
-function checkRateLimitLocal(bucket: string, ip: string, maxPerMinute: number) {
-  const key = `${bucket}:${ip || "anon"}`;
-  const now = Date.now();
-  rateLimitStore[key] = (rateLimitStore[key] || []).filter((t) => now - t < 60000);
-  if (rateLimitStore[key].length >= maxPerMinute) return false;
-  rateLimitStore[key].push(now);
-  return true;
-}
-
-async function checkRateLimit(bucket: string, ip: string, maxPerMinute = 30): Promise<boolean> {
-  if (!sharedRateLimitOff) {
-    const { data, error } = await db.rpc("check_rate_limit", {
-      p_bucket: bucket,
-      p_client: ip || "anon",
-      p_max: maxPerMinute,
-    });
-    if (!error) return data !== false;
-    // Função em falta (migração por aplicar): usa o limite local e não volta a tentar.
-    if (error.code === "PGRST202" || /could not find the function|does not exist/i.test(error.message || "")) {
-      sharedRateLimitOff = true;
-      console.log("check_rate_limit em falta na base de dados; a usar o limite em memória.");
-    } else {
-      // Falha passageira da base de dados não pode derrubar a loja.
-      console.log("check_rate_limit:", error.message);
-      return checkRateLimitLocal(bucket, ip, maxPerMinute);
-    }
-  }
-  return checkRateLimitLocal(bucket, ip, maxPerMinute);
-}
+// O limite de pedidos está em `rateLimit.ts`, com testes. Aqui fica só a ligação à base de
+// dados — o módulo não sabe nada de Supabase, e é isso que o torna testável.
+const checkRateLimit = createRateLimit({
+  rpc: (fn, args) => db.rpc(fn, args),
+  log: (...a) => console.log(...a),
+});
 
 const nowISO = () => new Date().toISOString();
 const fileUrl = (table: string, rec: Row, field: string) =>
