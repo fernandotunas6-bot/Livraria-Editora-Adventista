@@ -66,6 +66,25 @@ async function rows(query) {
   return res.json();
 }
 
+/**
+ * Repete à espera de uma rede que falha por instantes. O `fetch failed` que se vê aqui é
+ * quase sempre isso — um segundo depois já responde —, e sem repetição bastava esse segundo
+ * para o site ir para o ar sem as páginas de partilha.
+ */
+async function insistir(fn, vezes = 3) {
+  let ultimo;
+  for (let i = 1; i <= vezes; i += 1) {
+    try { return await fn(); } catch (err) {
+      ultimo = err;
+      if (i < vezes) {
+        console.warn(`⚠ catálogo inalcançável (${err.message}) — tentativa ${i} de ${vezes}`);
+        await new Promise((r) => setTimeout(r, 1500 * i));
+      }
+    }
+  }
+  throw ultimo;
+}
+
 /** URL absoluto de uma imagem: as do próprio site vêm como caminho (/images/…). */
 const absolute = (url) => (/^https?:\/\//i.test(url || '') ? url : url?.startsWith('/') && !url.startsWith('//') ? `${site}${url}` : '');
 
@@ -73,13 +92,22 @@ let books;
 let collections;
 try {
   if (!api || !key) throw new Error('VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY em falta');
-  [books, collections] = await Promise.all([
+  [books, collections] = await insistir(() => Promise.all([
     rows('stock_books?select=id,title,author,description,cover,cover_image,updated&active=eq.true&order=id'),
     rows('book_collections?select=id,slug,title,description,cover,updated&active=eq.true&order=sort_order'),
-  ]);
+  ]));
 } catch (err) {
-  console.warn(`⚠ sem catálogo (${err.message}): sitemap só com as páginas fixas e sem páginas de partilha`);
-  process.exit(0);
+  // Sem catálogo o site sai sem as páginas de partilha e com o sitemap reduzido às páginas
+  // fixas. Isso é uma regressão a sério — é a página de partilha que o WhatsApp lê —, por
+  // isso falha-se aqui em vez de se publicar um site meio feito: o `deploy-site.sh` e o
+  // workflow param no `|| fail`. Quem quiser mesmo construir sem base de dados pede-o por
+  // escrito, com SEO_SEM_CATALOGO=1, e aí assume o que leva.
+  const degradar = String(env.SEO_SEM_CATALOGO || '') === '1';
+  console[degradar ? 'warn' : 'error'](
+    `${degradar ? '⚠' : '✘'} sem catálogo (${err.message}): sitemap só com as páginas fixas e sem páginas de partilha`
+    + (degradar ? '' : '\n  Para construir mesmo assim, de propósito: SEO_SEM_CATALOGO=1')
+  );
+  process.exit(degradar ? 0 : 1);
 }
 
 const coverOf = (b) => b.cover
@@ -117,8 +145,10 @@ try {
     })]),
   ];
 } catch (err) {
-  console.warn(`⚠ páginas de partilha não geradas (${err.message})`);
-  process.exit(0);
+  // Aqui já não é a rede: é o próprio desenho das páginas a rebentar. Publicar sem elas, e
+  // em silêncio, é como o defeito passa despercebido até alguém partilhar um livro.
+  console.error(`✘ páginas de partilha não geradas (${err.message})`);
+  process.exit(1);
 }
 for (const [name, html] of pages) write(name, html);
 console.log(`→ sitemap e partilha: ${bookList.length} livros e ${collectionList.length} colecções`);
