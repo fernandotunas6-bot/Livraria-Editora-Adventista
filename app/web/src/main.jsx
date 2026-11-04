@@ -1,3 +1,5 @@
+// Primeiro de tudo: o www e o endereço do Pages vão para o domínio principal (lib/canonicalHost.js).
+import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App';
@@ -9,6 +11,8 @@ import { initFeatureFlags } from '@/lib/featureFlags';
 // os efeitos ligados antes de os perderem.
 initFeatureFlags();
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-	<App />
-);
+if (!REDIRECTING_TO_CANONICAL) {
+	ReactDOM.createRoot(document.getElementById('root')).render(
+		<App />
+	);
+}

@@ -65,6 +65,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Pedidos para fora do site (tipos de letra da Google, Cloudflare Insights, imagens externas):
+  // o browser trata deles sozinho. Refeitos aqui com fetch(), passavam a obedecer ao
+  // `connect-src` do CSP, que não inclui esses domínios: eram recusados e, a partir da segunda
+  // página, as fontes Inter e Fraunces falhavam e o site caía para as do sistema (auditoria,
+  // 9.6). A excepção são as imagens públicas do Storage do Supabase — as capas —, que o
+  // connect-src autoriza e que vale a pena guardar para a visita seguinte.
+  const isStorageImage = url.pathname.includes('/storage/v1/object/public/');
+  if (url.origin !== self.location.origin && !isStorageImage) return;
+
   // 1. Imagens (do site, do Supabase Storage ou externas): cache primeiro, actualizada em segundo plano.
   const isImage = event.request.destination === 'image' ||
                   /\.(png|jpg|jpeg|gif|webp|svg|ico)$/i.test(url.pathname) ||
@@ -79,7 +88,7 @@ self.addEventListener('fetch', (event) => {
               cache.put(event.request, networkResponse.clone());
             }
             return networkResponse;
-          }).catch(() => cachedResponse);
+          }).catch(() => cachedResponse || Response.error());
 
           // Return cached image immediately, or fallback to fetching
           return cachedResponse || fetchPromise;
@@ -139,7 +148,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch(() => cached || Response.error());
       return cached || fetched;
     })
   );

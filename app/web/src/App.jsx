@@ -1,6 +1,6 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider } from '@/hooks/useTheme';
-import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CartProvider } from '@/hooks/useCart';
 import { AuthProvider } from '@/hooks/useAuth';
 import { SiteSettingsProvider } from '@/hooks/useSiteSettings';
@@ -11,6 +11,8 @@ import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
+import { toast } from 'sonner';
+import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -102,6 +104,26 @@ function RouteErrorBoundary({ children }) {
   return <RouteErrorBoundaryView key={location.key}>{children}</RouteErrorBoundaryView>;
 }
 
+/**
+ * Um link de email expirado ou uma entrada com a Google falhada voltam ao site com o erro no
+ * endereço (ver lib/authRedirectError.js). Mostra-se a razão em português e tira-se o erro do
+ * endereço, para não voltar a aparecer ao recarregar. O /reset-password mostra-a na própria
+ * página.
+ */
+function AuthRedirectNotice() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!AUTH_REDIRECT_ERROR) return undefined;
+    const { pathname } = window.location;
+    navigate(withoutAuthError(window.location.href), { replace: true });
+    if (pathname === '/reset-password') return undefined;
+    // Depois de o <Toaster> estar montado (vem a seguir na árvore).
+    const t = setTimeout(() => toast.error(AUTH_REDIRECT_ERROR.message, { duration: 10000 }), 300);
+    return () => clearTimeout(t);
+  }, [navigate]);
+  return null;
+}
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const showAssistant = pathname !== '/login';
@@ -125,6 +147,7 @@ function App() {
     <CartProvider>
       <Router>
         <ScrollToTop />
+        <AuthRedirectNotice />
         <RouteErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>

@@ -22,3 +22,6 @@ app/pocketbase/
 # Pacote original do painel de vendas (o código vive em app/web/src/painel-vendas/)
 /painel-vendas-huambo/
 /painel-vendas-huambo.zip
+
+# Cópias da configuração do Auth antes de cada alteração (scripts/configurar-auth.sh)
+supabase/auth/.antes-*.json

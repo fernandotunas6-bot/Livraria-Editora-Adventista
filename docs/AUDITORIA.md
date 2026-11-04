@@ -716,18 +716,81 @@ login Google do separador Workspace não se pode testar sem uma conta e um naveg
 | MFA nas contas de admin | perfil → Segurança |
 | Palavras-passe vazadas | plano Pro do Supabase |
 
+## 9.6 Login, links e navegador real (2026-11-04, noite)
+
+Pedido: verificar o login com a Google, os links e o resto, num navegador a sério. Feito com
+o Chrome desta máquina (puppeteer-core no scratchpad): 13 páginas, em computador e telemóvel,
+com a consola, os pedidos falhados e a consola do próprio service worker.
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| 22 | **Todos os links de autenticação levavam ao site antigo.** O `site_url` do Supabase Auth era `https://livraria-adventista.pages.dev/` e a lista de destinos autorizados só tinha o `localhost` e endereços do Lovable. O Supabase ignora um destino que não conhece e manda para o `site_url`: o regresso do login com a Google, a confirmação de conta e a recuperação de palavra-passe, pedidos em `livrariaadventista.com`, acabavam todos no projecto antigo. Provado com `/auth/v1/verify` e um token inválido (o Supabase redirecciona o erro para o destino que aceita): os três endereços da loja → `livraria-adventista.pages.dev`. | Crítica | ⏳ script pronto (a alteração foi recusada nesta sessão) |
+| 23 | **As fontes deixavam de carregar a partir da segunda página.** O service worker refazia com `fetch()` os pedidos a outros domínios; dentro dele vale o `connect-src` do CSP, que não inclui `fonts.gstatic.com`, `static.cloudflareinsights.com` nem `images.unsplash.com`. A consola do SW: *"Refused to connect because it violates the document's Content Security Policy"*. Inter e Fraunces ficavam `error` e o site caía para as fontes do sistema, para quem voltasse. | Alta | ✅ (no próximo deploy) |
+| 24 | Link de email expirado ou entrada com a Google cancelada: o Supabase volta com `#error=…&error_code=otp_expired` e o site não dizia nada (o `/login` mostrava o formulário; o `/reset-password` só "Link inválido."). | Média | ✅ (no próximo deploy) |
+| 25 | `www.livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev` serviam a loja inteira: sessão, carrinho e favoritos à parte por domínio (o canonical estava certo, o SEO não sofria). | Média | ✅ (no próximo deploy) |
+| 26 | Emails do Auth (confirmar conta, nova palavra-passe, convite…) em inglês. | Média | ⏳ no mesmo script do 22 |
+| 27 | **Sem SMTP no Supabase Auth**: o serviço por omissão só entrega a membros da equipa do projecto, e no máximo 2 por hora. Um cliente que se registe com email não recebe a confirmação e não consegue entrar. Hoje há só 3 contas (a equipa), por isso ainda ninguém foi afectado. | Alta | ⏳ dono (Supabase → Authentication → SMTP) |
+
+### Verificado sem problemas
+
+- **Google:** o pedido chega a `accounts.google.com` com o `redirect_uri` do projecto
+  (`…supabase.co/auth/v1/callback`) e a Google mostra o ecrã de entrada, sem
+  `redirect_uri_mismatch`. O botão "Continuar com Google" aparece no `/login` (computador e
+  telemóvel) e leva lá. Âmbito pedido: só `email profile`.
+- Um destino estranho (`https://evil.example.com`) é recusado pelo Supabase.
+- Os 114 endereços do sitemap respondem 200. Os 53 links internos das páginas apontam todos
+  para rotas que existem. `http://` → `https://` com 301.
+- A Edge Function monta os links de convite e recuperação com o mesmo critério (lista do Auth).
+
+### Corrigido no código
+
+- `public/sw.js`: não toca em pedidos a outros domínios, excepto as imagens públicas do
+  Storage do Supabase (as capas, que o CSP autoriza). Um pedido que falha sem cópia em cache
+  devolve `Response.error()` em vez de `undefined` (era o *"Failed to convert value to
+  'Response'"*). Testado com um controlo: com o SW antigo, num servidor local com os
+  cabeçalhos do `_headers`, as 7 variantes de fonte falham na segunda página; com o novo,
+  carregam as 7. Teste novo: `lib/serviceWorker.test.js` (os dois casos externos falham com o
+  SW antigo).
+- `lib/authRedirectError.js` + `AuthRedirectNotice` no `App.jsx`: lê o erro, mostra-o em
+  português (link expirado, entrada cancelada, conta suspensa…) e tira-o do endereço. O
+  `/reset-password` diz a razão na página. Verificado no Chrome.
+- `lib/canonicalHost.js`, o primeiro módulo a correr: o `www` e o `pages.dev` de produção vão
+  para `https://livrariaadventista.com`, com caminho, pesquisa e `#` (onde a Google devolve a
+  sessão). As pré-visualizações e o `localhost` ficam como estão. Confirmado no bundle que
+  corre antes de o cliente Supabase ler o endereço.
+
+### Para aplicar (dono)
+
+```sh
+bash scripts/configurar-auth.sh --verificar   # mostra o que muda e testa os destinos; não mexe
+bash scripts/configurar-auth.sh               # guarda os valores actuais, pede confirmação, aplica e testa
+```
+
+Muda só o `site_url`, a lista de destinos (a loja, o `www`, o `pages.dev` e as
+pré-visualizações, e o `localhost:3000`; saem os endereços do Lovable) e seis emails, que passam
+para português (`supabase/auth/`). Para reverter: `--repor supabase/auth/.antes-<data>.json`.
+Pelo painel é o mesmo: Authentication → URL Configuration, e → Email Templates.
+
+Depois, o SMTP do Auth (achado 27): Authentication → SMTP Settings, com o mesmo fornecedor que
+for usado em Configurações → Email. Até lá, a alternativa é desligar a confirmação de email
+(Authentication → Providers → Email), aceitando contas com emails que ninguém confirmou.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.
-- **Erros na consola do navegador:** o Chrome sem interface não terminou nesta máquina.
+- ~~Erros na consola do navegador~~: verificado em 9.6 (Chrome com puppeteer-core).
 - **Ecrãs com sessão de equipa:** não há conta de teste disponível.
 - **Avisos de segurança e desempenho do Supabase (advisors):** precisam de um token com acesso à base de dados.
 
 ## Próximos passos, por ordem
 
-1. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela acima). A partir daí, um
-   merge para o `main` aplica as três migrações de 9.5 e publica a função e o site.
-2. Telefones, coordenadas das lojas e SMTP (Configurações e Lojas).
-3. Descrições e stock real (Livros → "Sem descrição").
-4. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4).
-5. Projecto antigo no `pages.dev`.
+1. `bash scripts/configurar-auth.sh` (achado 22): sem isto, o login com a Google e todos os
+   links de email levam ao site antigo.
+2. SMTP do Supabase Auth (achado 27), senão os clientes não conseguem confirmar a conta.
+3. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela de 9.5). A partir daí, um
+   merge para o `main` aplica as três migrações de 9.5 e publica a função e o site (com as
+   correcções de 9.6).
+4. Telefones, coordenadas das lojas, descrições e stock real.
+5. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
