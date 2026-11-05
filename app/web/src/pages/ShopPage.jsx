@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   SlidersHorizontal, X, LayoutGrid, List, Sparkles,
-  Layers, Star, ChevronRight, ChevronLeft, TrendingUp,
+  ChevronRight, ChevronLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -17,9 +17,7 @@ import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import ShopHeroBackground from '@/components/ShopHeroBackground';
-import CategoryBookMarquee, { CategoryBookMarqueeSkeleton } from '@/components/home/CategoryBookMarquee';
 import QuickViewModal from '@/components/QuickViewModal';
-import ProductCard from '@/components/ProductCard';
 import { getProduct } from '@/api/EcommerceApi';
 import { pageTitle } from '@/lib/brand';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -30,7 +28,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useInfiniteList } from '@/hooks/useInfiniteList';
 import { readPlace, useScrollMemory } from '@/hooks/useScrollMemory';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
-import { PRODUCT_GRID_CLASS, SHOP_DENSITY_OPTIONS, shopDensityClass } from '@/lib/productGrid';
+import { shopDensityClass } from '@/lib/productGrid';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destaques' },
@@ -72,9 +70,6 @@ const ShopPage = () => {
     ...settings,
     shop_per_page: Number(settings.shop_per_page) || shopDefaults.shop_per_page,
     shop_grid_columns: Number(settings.shop_grid_columns) || shopDefaults.shop_grid_columns,
-    shop_show_featured: settings.shop_show_featured !== false,
-    shop_show_collections: settings.shop_show_collections !== false,
-    shop_show_low_stock: settings.shop_show_low_stock !== false,
   };
 
   // Ao voltar de um livro, a ordenação, a vista e a densidade voltam como estavam (não vivem
@@ -84,9 +79,15 @@ const ShopPage = () => {
   const navType = useNavigationType();
   const [initialPlace] = useState(() => (navType === 'POP' ? readPlace(`${location.pathname}${location.search}`) : null));
 
-  const [sortBy, setSortBy] = useState(initialPlace?.sortBy || shop.shop_default_sort || 'featured');
+  // `?sort=` no endereço (ex.: "Ver todos" das Novidades na página inicial) escolhe a ordem.
+  const [urlSort] = useState(() => {
+    const v = new URLSearchParams(location.search).get('sort');
+    return SORT_OPTIONS.some((o) => o.value === v) ? v : null;
+  });
+  const [sortBy, setSortBy] = useState(initialPlace?.sortBy || urlSort || shop.shop_default_sort || 'featured');
   const [viewMode, setViewMode] = useState(initialPlace?.viewMode === 'list' ? 'list' : 'grid');
-  const [gridCols, setGridCols] = useState(Number(initialPlace?.gridCols) || shop.shop_grid_columns || 4);
+  // Densidade da grelha no desktop largo: a das Configurações da loja.
+  const gridCols = shop.shop_grid_columns || 4;
   const [quickView, setQuickView] = useState(null);
   const [modalProduct, setModalProduct] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -107,9 +108,9 @@ const ShopPage = () => {
   useEffect(() => {
     // A ordem reposta ao voltar atrás ganha sempre à de omissão das configurações, mesmo
     // que estas cheguem depois do primeiro desenho.
-    if (initialPlace?.sortBy) return;
+    if (initialPlace?.sortBy || urlSort) return;
     setSortBy(shop.shop_default_sort || 'featured');
-  }, [shop.shop_default_sort, initialPlace?.sortBy]);
+  }, [shop.shop_default_sort, initialPlace?.sortBy, urlSort]);
 
   useEffect(() => {
     if (!quickView) {
@@ -136,7 +137,6 @@ const ShopPage = () => {
     clearFilters,
     filterCount,
     catalogStats,
-    hasActiveBrowsing,
     isLoading,
   } = useProductFilters();
 
@@ -163,7 +163,7 @@ const ShopPage = () => {
   // Ao voltar de um livro: os mesmos cartões, a mesma página e a mesma posição no ecrã.
   const savedPlace = useScrollMemory({
     ready: !isLoading && sortedProducts.length > 0,
-    snapshot: { count: infinite.count, page: currentPage, sortBy, viewMode, gridCols },
+    snapshot: { count: infinite.count, page: currentPage, sortBy, viewMode },
   });
   const { setCount: setInfiniteCount } = infinite;
   useEffect(() => {
@@ -191,15 +191,7 @@ const ShopPage = () => {
     gridTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const featuredProducts = useMemo(
-    () => allProducts.filter((p) => p.featured).slice(0, 8),
-    [allProducts]
-  );
 
-  const lowStockProducts = useMemo(
-    () => allProducts.filter((p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) <= 5).slice(0, 6),
-    [allProducts]
-  );
 
   // Estável entre renders: uma função criada no JSX muda de identidade a cada render e
   // anula o `memo` dos cartões, que é o que evita refazer os 24 sempre que o painel de
@@ -209,10 +201,6 @@ const ShopPage = () => {
   // Densidade no desktop largo (ver lib/productGrid.js): a grelha é a mesma do resto do site.
   const gridClass = shopDensityClass(gridCols);
 
-  const inStockProducts = useMemo(
-    () => allProducts.filter((p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0),
-    [allProducts]
-  );
 
   const heroTitle = shop.shop_hero_title || shopDefaults.shop_hero_title;
   const heroSubtitle = shop.shop_hero_subtitle || shop.tagline || shopDefaults.shop_hero_subtitle;
@@ -261,29 +249,6 @@ const ShopPage = () => {
           </motion.div>
       </ShopHeroBackground>
 
-      {/* Faixa infinita — livros disponíveis */}
-      {isLoading && !hasActiveBrowsing && (
-        <div className="border-b border-border bg-muted/10">
-          <CategoryBookMarqueeSkeleton
-            title="Disponíveis para Encomenda"
-            description="Deslize sem fim · Toque para pausar"
-          />
-        </div>
-      )}
-      {!hasActiveBrowsing && inStockProducts.length > 0 && (
-        <div className="border-b border-border bg-muted/10">
-          <CategoryBookMarquee
-            title="Disponíveis para Encomenda"
-            description="Deslize sem fim"
-            products={inStockProducts}
-            direction="ltr"
-            viewMode="marquee"
-            onBookSelect={setQuickView}
-            categoryFilter="inStockOnly=true"
-          />
-        </div>
-      )}
-
       <QuickViewModal
         product={modalProduct}
         loading={modalLoading}
@@ -291,63 +256,6 @@ const ShopPage = () => {
         onClose={() => setQuickView(null)}
         onCartOpen={handleCartOpen}
       />
-
-      {/* Destaques — só sem filtros activos */}
-      {!hasActiveBrowsing && shop.shop_show_featured && featuredProducts.length > 0 && (
-        <section className="border-b border-border bg-gradient-to-b from-amber-50/50 to-background dark:from-amber-950/10">
-          <div className="container-custom py-10">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Star className="h-5 w-5 text-amber-500" /> Em Destaque
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">Seleccionados pela equipa editorial</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => updateFilter('featuredOnly', true)}>
-                Ver todos <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-            <div className={PRODUCT_GRID_CLASS}>
-              {featuredProducts.map((product, i) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onCartOpen={handleCartOpen}
-                  onQuickView={setQuickView}
-                  index={i}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Coleções */}
-      {!hasActiveBrowsing && shop.shop_show_collections && bookCollections.length > 0 && (
-        <section className="border-b border-border">
-          <div className="container-custom py-8">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
-              <Layers className="h-5 w-5 text-[var(--brand-primary)]" /> Explorar por Coleção
-            </h2>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-              {bookCollections.map((col) => {
-                const count = allProducts.filter((p) => p.collection_id === col.id).length;
-                return (
-                  <button
-                    key={col.id}
-                    type="button"
-                    onClick={() => updateFilter('collection', col.id)}
-                    className="shrink-0 flex flex-col items-start p-4 rounded-xl border border-border bg-card hover:border-[var(--brand-primary)] hover:shadow-md transition-all min-w-[160px] text-left"
-                  >
-                    <span className="font-semibold text-sm line-clamp-2">{col.title}</span>
-                    <span className="text-xs text-muted-foreground mt-1">{count} livro{count !== 1 ? 's' : ''}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Géneros rápidos */}
       {isLoading && !availableFilters.genres?.length && (
@@ -393,38 +301,6 @@ const ShopPage = () => {
       )}
 
       <main className="container-custom py-10 min-h-screen">
-        {/* Caminho com os filtros activos. Sem filtros repetia o "Início › Loja" do topo da
-            página, por isso só aparece quando acrescenta alguma coisa. */}
-        {(activeFilters.categories?.length > 0 || activeFilters.collection || activeFilters.search) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground mb-6 bg-card border border-border/80 px-4 py-3 rounded-xl shadow-xs shrink-0" id="shop-breadcrumbs">
-          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors font-medium">Início</Link>
-          <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-          <Link to="/shop" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors font-medium" onClick={clearFilters}>Loja</Link>
-          {activeFilters.categories?.length > 0 && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-              <span className="text-foreground font-semibold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-[11px] uppercase tracking-wide">
-                {activeFilters.categories.join(', ')}
-              </span>
-            </>
-          )}
-          {activeFilters.collection && bookCollections.find(c => c.id === activeFilters.collection) && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-              <span className="text-foreground font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full text-[11px] uppercase tracking-wide">
-                Coleção: {bookCollections.find(c => c.id === activeFilters.collection).title}
-              </span>
-            </>
-          )}
-          {activeFilters.search && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-              <span className="text-foreground font-semibold italic">Busca: "{activeFilters.search}"</span>
-            </>
-          )}
-        </div>
-        )}
-
         <AdvancedSearchPanel
           className="mb-6"
           activeFilters={activeFilters}
@@ -470,31 +346,13 @@ const ShopPage = () => {
                   </TooltipTrigger>
                   <TooltipContent side="top">Filtrar catálogo</TooltipContent>
                 </Tooltip>
-                <div className="text-sm text-muted-foreground">
-                  A mostrar <strong className="text-foreground">{firstShown}–{lastShown}</strong>
-                  {` de ${sortedProducts.length}`}
-                  {' '}· catálogo com <strong className="text-foreground">{catalogStats.total}</strong> livros
-                </div>
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  <strong className="text-foreground">{sortedProducts.length}</strong>
+                  {sortedProducts.length === 1 ? ' livro' : ' livros'}
+                  {sortedProducts.length > displayProducts.length && ` · a mostrar ${firstShown}–${lastShown}`}
+                </p>
               </div>
               <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
-                {/* Só onde a escolha muda alguma coisa: a densidade aplica-se a partir de 1280 px. */}
-                {viewMode === 'grid' && (
-                  <div className="hidden xl:flex border rounded-lg overflow-hidden">
-                    {SHOP_DENSITY_OPTIONS.map(({ value, columns }) => (
-                      <Button
-                        key={value}
-                        variant={gridCols === value ? 'secondary' : 'ghost'}
-                        size="icon"
-                        className="h-11 w-11 sm:h-9 sm:w-9 rounded-none"
-                        onClick={() => setGridCols(value)}
-                        title={`${columns} colunas`}
-                        aria-pressed={gridCols === value}
-                      >
-                        <span className="text-[10px] font-bold">{columns}</span>
-                      </Button>
-                    ))}
-                  </div>
-                )}
                 <div className="flex border rounded-lg overflow-hidden">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -534,28 +392,6 @@ const ShopPage = () => {
                   </span>
                 ))}
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7">Limpar tudo</Button>
-              </div>
-            )}
-
-            {/* Últimas unidades */}
-            {!hasActiveBrowsing && shop.shop_show_low_stock && lowStockProducts.length > 0 && (
-              <div className="mb-8 p-4 rounded-2xl border border-amber-200/60 bg-amber-50/50 dark:bg-amber-950/20">
-                <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-200 mb-3">
-                  <TrendingUp className="h-4 w-4" /> Últimas unidades — não perca
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                  {lowStockProducts.map((product) => (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => setQuickView(product)}
-                      className="text-center group"
-                    >
-                      <img src={product.image} alt="" className="w-full aspect-[3/4] object-cover rounded-lg border group-hover:shadow-md transition-shadow" />
-                      <p className="text-xs font-medium mt-1 line-clamp-2">{product.title}</p>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
