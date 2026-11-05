@@ -4,7 +4,10 @@
 --    painel lê a mesma pela ordem por omissão do cliente de dados: as outras duas eram
 --    restos quase vazios. Ficam só em cópia; um índice impede que voltem a aparecer.
 -- 2. site_url ainda era o projecto antigo (https://livraria-adventista.pages.dev): os links
---    dos emails, incluindo o de cancelar a subscrição, iam para lá.
+--    dos emails, incluindo o de cancelar a subscrição, iam para lá. A 2026-11-05 estava em
+--    https://livrariaadventista.ao, que ainda não resolve (o registo .ao devolve NXDOMAIN):
+--    os mesmos links davam numa página que não abre. Os dois passam ao domínio principal,
+--    o mesmo do canonicalHost.js. Quando o .ao estiver no ar, muda-se no painel.
 -- 3. Telefones provisórios (+244 923 000 000/001/002) no site e nas lojas: saem. O site já
 --    esconde o telefone e o botão de WhatsApp quando estão vazios.
 -- 4. Coordenadas trocadas: "Catumbela" apontava para Luanda e "Lubango" para Benguela.
@@ -45,12 +48,12 @@ insert into private.correcoes_dados (migracao, tabela, accao, linha)
 select '20261104180000', 'site_settings', 'alterada',
        jsonb_build_object('id', id, 'site_url', site_url, 'contact_phone', contact_phone, 'whatsapp', whatsapp)
 from public.site_settings
-where site_url = 'https://livraria-adventista.pages.dev'
+where site_url in ('https://livraria-adventista.pages.dev', 'https://livrariaadventista.ao')
    or regexp_replace(coalesce(contact_phone, ''), '\D', '', 'g') in ('244923000000', '244923000001', '244923000002')
    or regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g') in ('244923000000', '244923000001', '244923000002');
 
 update public.site_settings
-set site_url = case when site_url = 'https://livraria-adventista.pages.dev'
+set site_url = case when site_url in ('https://livraria-adventista.pages.dev', 'https://livrariaadventista.ao')
                     then 'https://livrariaadventista.com' else site_url end,
     contact_phone = case when regexp_replace(coalesce(contact_phone, ''), '\D', '', 'g')
                               in ('244923000000', '244923000001', '244923000002')
@@ -58,7 +61,7 @@ set site_url = case when site_url = 'https://livraria-adventista.pages.dev'
     whatsapp = case when regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g')
                          in ('244923000000', '244923000001', '244923000002')
                     then '' else whatsapp end
-where site_url = 'https://livraria-adventista.pages.dev'
+where site_url in ('https://livraria-adventista.pages.dev', 'https://livrariaadventista.ao')
    or regexp_replace(coalesce(contact_phone, ''), '\D', '', 'g') in ('244923000000', '244923000001', '244923000002')
    or regexp_replace(coalesce(whatsapp, ''), '\D', '', 'g') in ('244923000000', '244923000001', '244923000002');
 
