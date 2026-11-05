@@ -11,7 +11,7 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
 | Cloudflare | Conta com Pages; o projecto é criado pelo primeiro deploy |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
-| Domínio | Ex.: `livrariaadventista.ao`, apontado para o Cloudflare Pages |
+| Domínio | `livrariaadventista.ao` (principal) e `livrariaadventista.com`, ambos no Cloudflare Pages — ver secção 8.1 |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
 | Email | Servidor SMTP (Hostinger, Brevo…) ou SendGrid |
 | Google Cloud | ID de cliente OAuth para o login com Google |
@@ -133,6 +133,27 @@ npx supabase functions deploy app --project-ref bggqkjjqbjhbjsckzopj --no-verify
 | Rastreio | `/track` com o número da encomenda |
 
 ---
+
+## 8.1 Domínio `livrariaadventista.ao`
+
+Estado em 2026-11-05:
+
+| Peça | Estado |
+|------|--------|
+| Zona Cloudflare `livrariaadventista.ao` | Criada, **pendente** (`unresolvable`): o registo .ao ainda não conhece o domínio |
+| DNS na zona | `CNAME @` e `CNAME www` → `livraria-editora-adventista-ben.pages.dev`, com proxy |
+| Projecto Pages `livraria-editora-adventista` | `livrariaadventista.ao` e `www.livrariaadventista.ao` adicionados (ficam a validar até a zona activar) |
+| `livrariaadventista.com` | Activo, a servir o mesmo projecto Pages |
+| Site no código | `canonical`, `og:*`, `robots.txt` e `sitemap.xml` já apontam para `https://livrariaadventista.ao` |
+
+Falta, por esta ordem:
+
+1. **No registador .ao (DNS.AO / revendedor):** confirmar que o registo do domínio está concluído e pôr os nameservers `cody.ns.cloudflare.com` e `hadlee.ns.cloudflare.com`. Hoje o `.ao` responde NXDOMAIN para `livrariaadventista.ao`.
+2. **Cloudflare:** a zona passa a *Active* sozinha (ou carregar em "Check nameservers"); os dois domínios no Pages passam a *Active* com certificado.
+3. **Supabase → Authentication → URL Configuration:** Site URL = `https://livrariaadventista.ao`; Redirect URLs = `https://livrariaadventista.ao/**`, `https://www.livrariaadventista.ao/**` (manter o `.com` e o `pages.dev` enquanto forem usados).
+4. **Google Cloud:** acrescentar `https://livrariaadventista.ao` às origens JavaScript autorizadas do cliente OAuth e às restrições da chave Firebase; no Firebase Auth, acrescentar o domínio em *Authorized domains*.
+5. **Redireccionar** `www.livrariaadventista.ao` e `livrariaadventista.com` (+ `www`) para `https://livrariaadventista.ao` com uma *Redirect Rule* (301) em cada zona. Só depois do passo 2, senão o `.com` deixa de abrir a loja.
+6. Email: se o endereço `contacto@livrariaadventista.ao` for usado, criar os registos MX/SPF/DKIM do fornecedor de email na zona.
 
 ## 9. Segurança antes do go-live
 
