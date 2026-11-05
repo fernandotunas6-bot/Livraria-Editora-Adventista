@@ -236,6 +236,12 @@ const LoginPage = () => {
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
                   {mode === 'login' ? 'Entrar' : 'Criar Conta'}
                 </Button>
+                {mode === 'signup' && (
+                  <p className="text-[11px] text-center text-muted-foreground">
+                    Ao criar conta, aceita os <Link to="/termos" className="underline hover:text-primary">Termos e Condições</Link> e
+                    a <Link to="/privacidade" className="underline hover:text-primary">Política de Privacidade</Link>.
+                  </p>
+                )}
               </form>
 
               <p className="text-center text-sm text-muted-foreground mt-6">

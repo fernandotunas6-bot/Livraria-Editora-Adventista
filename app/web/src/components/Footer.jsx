@@ -183,19 +183,12 @@ const Footer = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-4"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-7 px-2.5 items-center justify-center rounded-full text-[10px] font-bold bg-[#0ea5c9]/20 text-[#22d3ee] border border-[#0ea5c9]/30">
-                        <Sparkles className="h-3 w-3 mr-1" /> OFERTA
-                      </span>
-                      <span className="text-xs text-[#22d3ee] font-medium">-10% no 1º livro</span>
-                    </div>
-
                     <div>
                       <h4 className="text-lg font-extrabold text-background flex items-center gap-2">
-                        Newsletter Premium
+                        <Sparkles className="h-4 w-4 text-[#22d3ee]" aria-hidden="true" /> Novidades da livraria
                       </h4>
                       <p className="text-xs text-background/70 mt-1">
-                        Junte-se à nossa lista exclusiva para receber lançamentos, devocionais semanais e ofertas especiais.
+                        Receba no email os lançamentos, as campanhas e as promoções da loja.
                       </p>
                     </div>
 
@@ -222,7 +215,8 @@ const Footer = () => {
                     </form>
 
                     <p className="text-[10px] text-background/40 text-center">
-                      🔒 Respeitamos a sua privacidade. Cancele com um clique.
+                      Só lhe escrevemos com novidades da loja e pode cancelar com um clique em cada email.{' '}
+                      <Link to="/privacidade" className="underline hover:text-[#22d3ee]">Privacidade</Link>
                     </p>
                   </motion.div>
                 ) : (
@@ -238,7 +232,7 @@ const Footer = () => {
                     <div>
                       <h4 className="text-lg font-bold text-background">Inscrição Confirmada!</h4>
                       <p className="text-xs text-background/70 mt-2 leading-relaxed">
-                        Seja bem-vindo(a) à nossa comunidade. Enviámos um cupão de **10% de desconto** para a sua caixa de entrada.
+                        A partir de agora recebe no seu email as novidades e as promoções da loja.
                       </p>
                     </div>
                     <Button 
@@ -396,8 +390,14 @@ const Footer = () => {
           </div>
         )}
 
-        <div className="border-t border-background/20 pt-8 text-center">
+        <div className="border-t border-background/20 pt-8 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <p className="text-sm text-background/50">{copyright}</p>
+          <nav aria-label="Informação legal" className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-background/60">
+            <Link to="/termos" className="py-1 hover:text-[#22d3ee]">Termos e condições</Link>
+            <Link to="/privacidade" className="py-1 hover:text-[#22d3ee]">Privacidade e cookies</Link>
+            <Link to="/shipping-returns" className="py-1 hover:text-[#22d3ee]">Envios e devoluções</Link>
+            <Link to="/faq" className="py-1 hover:text-[#22d3ee]">Ajuda</Link>
+          </nav>
         </div>
       </div>
     </footer>

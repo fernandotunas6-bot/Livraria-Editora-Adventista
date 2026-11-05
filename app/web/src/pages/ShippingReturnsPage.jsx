@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { Truck, Package, RotateCcw, MapPin, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Truck, Package, RotateCcw, MapPin, Zap, Wallet } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
@@ -127,6 +128,20 @@ const ShippingReturnsPage = () => {
                 </p>
               </div>
             </Seccao>
+
+            <Seccao icone={Wallet} titulo="Reembolsos" atraso={0.2}>
+              <ul className="space-y-2 text-muted-foreground list-disc list-inside">
+                <li>Devolvemos o valor pelo mesmo meio de pagamento; nos pagamentos em numerário, por transferência.</li>
+                <li>Recebe um email quando o reembolso for feito. Conforme o banco, pode levar alguns dias a aparecer.</li>
+                <li>Se uma encomenda for cancelada por nós (por exemplo, por falta de stock), o reembolso é total, portes incluídos.</li>
+              </ul>
+            </Seccao>
+
+            <p className="text-sm text-muted-foreground text-center">
+              Estas condições fazem parte dos <Link to="/termos" className="underline hover:text-primary">Termos e Condições</Link>.
+              Dúvidas? Veja as <Link to="/faq" className="underline hover:text-primary">Perguntas Frequentes</Link> ou{' '}
+              <Link to="/contact" className="underline hover:text-primary">fale connosco</Link>.
+            </p>
           </div>
         </div>
       </main>

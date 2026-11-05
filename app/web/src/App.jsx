@@ -25,6 +25,8 @@ const StoresPage = lazy(() => import('@/pages/StoresPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
 const ShippingReturnsPage = lazy(() => import('@/pages/ShippingReturnsPage.jsx'));
+const TermsPage = lazy(() => import('@/pages/TermsPage.jsx'));
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage.jsx'));
 const SuccessPage = lazy(() => import('@/pages/SuccessPage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage.jsx'));
@@ -175,6 +177,13 @@ function App() {
               <Route path="/shipping-returns" element={<ShippingReturnsPage />} />
               <Route path="/envios-devolucoes" element={<Navigate to="/shipping-returns" replace />} />
               <Route path="/envios-e-devolucoes" element={<Navigate to="/shipping-returns" replace />} />
+              <Route path="/termos" element={<TermsPage />} />
+              <Route path="/termos-e-condicoes" element={<Navigate to="/termos" replace />} />
+              <Route path="/terms" element={<Navigate to="/termos" replace />} />
+              <Route path="/privacidade" element={<PrivacyPage />} />
+              <Route path="/politica-de-privacidade" element={<Navigate to="/privacidade" replace />} />
+              <Route path="/privacy" element={<Navigate to="/privacidade" replace />} />
+              <Route path="/cookies" element={<Navigate to="/privacidade#cookies" replace />} />
 
               <Route path="/success" element={<SuccessPage />} />
               <Route path="/login" element={<LoginPage />} />

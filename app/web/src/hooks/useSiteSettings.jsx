@@ -54,7 +54,11 @@ export function SiteSettingsProvider({ children }) {
         }
         link.href = favHref;
       }
-      if (data.site_name) document.title = data.site_name;
+      // Só quando a página não definiu o seu (o título de cada página vem do Helmet, com
+      // " — " e o nome da loja). Sem esta condição, as definições que chegassem depois do
+      // Helmet apagavam o título da página aberta — "Perguntas frequentes" passava a
+      // "Livraria Adventista" consoante a ordem em que as respostas chegavam.
+      if (data.site_name && !document.title.includes(' — ')) document.title = data.site_name;
       if (data.pwa_theme_color) {
         let meta = document.querySelector("meta[name='theme-color']");
         if (!meta) {

@@ -827,6 +827,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         <><strong>WhatsApp</strong> — pedido registado e conversa directa com a equipa.</>
                       )}
                     </p>
+                    <p className="text-[11px] text-center text-muted-foreground">
+                      Ao confirmar, aceita os{' '}
+                      <Link to="/termos" onClick={() => setIsCartOpen(false)} className="underline hover:text-primary">Termos e Condições</Link>
+                      {' '}e a{' '}
+                      <Link to="/privacidade" onClick={() => setIsCartOpen(false)} className="underline hover:text-primary">Política de Privacidade</Link>.
+                    </p>
                   </>
                 )}
               </div>
