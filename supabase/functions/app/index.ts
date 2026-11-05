@@ -1367,7 +1367,8 @@ async function notifyOrderStaff(kind: string, title: string, body: string, order
   const { data: staff } = await db.from("profiles").select("id, role, permissions").in("role", ["admin", "manager"]);
   const rows = (staff || [])
     .filter((p: Row) => p.role === "admin" || p.permissions?.manage_orders === true)
-    .map((p: Row) => ({ staff_id: p.id, kind, title: clipText(title, 200), body: clipText(body, 1000), order_id: orderId }));
+    // Limites da tabela: título até 120 caracteres, texto até 500.
+    .map((p: Row) => ({ staff_id: p.id, kind, title: clipText(title, 120), body: clipText(body, 500) || "—", order_id: orderId }));
   if (!rows.length) return 0;
   const { error } = await db.from("staff_notifications").insert(rows);
   if (error) console.log("staff_notifications:", error.message);
