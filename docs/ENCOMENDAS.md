@@ -2,6 +2,8 @@
 
 Estado em 2026-11-05. Complementa [AUTENTICACAO_E_EMAILS.md](AUTENTICACAO_E_EMAILS.md).
 
+**Publicado:** Edge Function `app` com tudo isto (06:31 UTC, a partir do ramo `claude/tender-archimedes-gq0s8m`, que contém o `main`); push ligado (`push_enabled`, chave pública em site_settings, `VAPID_PRIVATE_KEY` nos segredos da função); vigilância verificada em produção (3 alertas → 3 admins avisados). O site com as páginas novas está só em pré-visualização (`claude-tender-archimedes-gq0.livraria-editora-adventista-ben.pages.dev`) até ao merge no `main`.
+
 ## 1. Produtos
 
 O catálogo (`stock_books`) deixou de ser só de livros. Cada produto tem um `product_type`, e o código (`book_code`) é gerado com o prefixo do tipo, com contagem própria (`private.product_code_counters`):
