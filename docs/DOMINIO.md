@@ -35,7 +35,17 @@ O que falta é configuração nos painéis, que o repositório não controla.
 
 Sem isto, os emails de confirmação e de recuperação de palavra-passe e o login com Google voltam para o domínio antigo.
 
-## 5. Google
+## 5. Firebase (só as ferramentas Google Workspace do painel)
+
+O login dos clientes (email e Google) é do Supabase (passo 4). O Firebase, projecto
+`skilful-form-c5jvd`, só abre o pop-up do Google para o Drive, Gmail, Contactos e Calendar no
+painel (`app/web/src/lib/googleAuth.js`), e recusa domínios que não estejam autorizados.
+
+- [ ] https://console.firebase.google.com/project/skilful-form-c5jvd/authentication/settings
+      → **Authorized domains** → **Add domain**: `livrariaadventista.ao` e `www.livrariaadventista.ao`.
+      Manter `livraria-adventista.pages.dev`; retirar o `.com`, se lá estiver.
+
+## 6. Google
 
 - [ ] Google Cloud → Credenciais → ID do cliente OAuth: juntar `https://livrariaadventista.ao` às *Origens JavaScript autorizadas* (o URI de redireccionamento continua o do Supabase).
 - [ ] Search Console: adicionar a propriedade de domínio `livrariaadventista.ao`, enviar `https://livrariaadventista.ao/sitemap.xml`
