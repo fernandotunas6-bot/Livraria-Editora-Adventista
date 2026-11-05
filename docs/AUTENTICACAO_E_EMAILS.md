@@ -389,7 +389,7 @@ A ordem vem de `suggestions.ts` (`rankSuggestions`, com testes):
 
 Nunca sugere o que o cliente já comprou. Prefere livros com capa a sério: `suggestable_books()` devolve o tamanho do ficheiro da capa, e capas com menos de 10 KB (vazias, há dezenas no catálogo) ficam para o fim. Sem `site_url`, sem histórico ou se a leitura falhar, o email sai na mesma, sem o bloco.
 
-**Livros vistos:** `POST /catalog/view` com sessão grava em `book_views` (`record_book_view`, só service role). Sem sessão, o browser guarda os últimos 30 em `localStorage` (`la:livros-vistos`), que só saem para `POST /recommendations`.
+**Livros vistos:** `POST /catalog/view` com sessão grava em `book_views` (`record_book_view`, só service role). Sem sessão, contam os vistos que a loja já guarda no browser (`lib/recentlyViewed`), que só saem para `POST /recommendations`.
 
 **Página `/sugestoes`** (`SuggestionsPage.jsx`, no menu da conta como "Sugestões para si"): "Escolhidos para si", "Vistos recentemente" e "Novidades", a partir de `POST /recommendations`, que devolve ids; a página lê os livros com as regras de visibilidade de sempre.
 

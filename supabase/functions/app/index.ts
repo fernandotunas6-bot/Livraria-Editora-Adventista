@@ -9,6 +9,7 @@ import {
   type Suggestions,
 } from "./emails.ts";
 import { rankSuggestions } from "./suggestions.ts";
+import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
 import {
   accessLinkLetter,
   noticeLetter,
@@ -16,6 +17,7 @@ import {
   orderStatusLetter,
   paymentConfirmedLetter,
   thankYouLetter,
+  dailySummaryLetter,
   testLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
@@ -2305,6 +2307,124 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
   const r = await runDueCampaigns(null, true);
   console.log("Campanhas (cron):", JSON.stringify({ processed: r.processed, skipped: r.skipped }));
   return json(r);
+});
+
+// ---------------------------------------------------------------------------
+// Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
+// ---------------------------------------------------------------------------
+
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
+
+/** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
+async function ordersForWatch() {
+  const since = new Date(Date.now() - 120 * 24 * 3600_000).toISOString();
+  const { data, error } = await db.from("orders").select(WATCH_FIELDS).gte("created", since).order("created", { ascending: false }).limit(2000);
+  if (error) throw error;
+  return (data || []) as Row[];
+}
+
+/**
+ * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa (staff_notifications)
+ * só dos alertas novos ou que passaram a críticos, e fecha os que deixaram de existir.
+ * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
+ */
+async function runOrderWatch(summary = false) {
+  const orders = await ordersForWatch();
+  const alerts = orderAlerts(orders);
+  const now = nowISO();
+  const { data: open } = await db.from("order_alerts").select("order_id, kind, severity").is("resolved_at", null);
+  const known = new Map<string, Row>((open || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
+  let notified = 0;
+  for (const a of alerts) {
+    const key = `${a.order_id}:${a.kind}`;
+    const before = known.get(key);
+    known.delete(key);
+    await db.from("order_alerts").upsert({
+      order_id: a.order_id, kind: a.kind, severity: a.severity, label: a.label, detail: a.detail.slice(0, 500),
+      last_seen_at: now, resolved_at: null, ...(before ? {} : { first_seen_at: now }),
+    }, { onConflict: "order_id,kind" });
+    if (!before || (before.severity !== "critical" && a.severity === "critical")) {
+      notified += await notifyOrderStaff(
+        a.kind === "customer_problem" ? "order_problem" : "order_stuck",
+        `${a.severity === "critical" ? "Crítico: " : ""}${a.label} — ${a.order_number}`,
+        `${a.customer_name || "Cliente"} · há ${a.hours} h neste passo${a.detail ? ` · ${a.detail}` : ""}`,
+        a.order_id,
+      );
+    }
+  }
+  // O que ficou em `known` já não está em alerta: resolvido.
+  for (const a of known.values()) {
+    await db.from("order_alerts").update({ resolved_at: now }).eq("order_id", a.order_id).eq("kind", a.kind).is("resolved_at", null);
+  }
+  let summarySent = 0;
+  if (summary) summarySent = await sendDailySummary(orders, alerts);
+  return { orders: orders.length, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
+}
+
+/** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
+async function sendDailySummary(orders: Row[], alerts: OrderAlert[]) {
+  const settings = await getSettings(true);
+  if (!settings) return 0;
+  const { data: staff } = await db.from("profiles").select("email, name, role, permissions").in("role", ["admin", "manager"]);
+  const recipients = (staff || []).filter((p: Row) => p.email && (p.role === "admin" || p.permissions?.manage_orders === true));
+  const day = new Date().toISOString().slice(0, 10);
+  let sent = 0;
+  for (const p of recipients) {
+    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders), alerts, STAGE_LABELS);
+    const ok = await sendLetter(settings, p.email, letter, { context: "staff_summary", customer_name: p.name || "", dedupe: `summary:${day}:${normalizeEmail(p.email)}` });
+    if (ok) sent++;
+  }
+  return sent;
+}
+
+/** Chamado pelo pg_cron (migração vigilancia_encomendas), com o token da fila. */
+route("POST", "/cron/order-watch", async ({ req, body, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-order-watch", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const r = await runOrderWatch(body?.summary === true);
+  console.log("Vigilância (cron):", JSON.stringify(r));
+  return json(r);
+});
+
+/** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
+route("GET", "/admin/orders/watch", async ({ auth }) => {
+  requirePermission(auth, "manage_orders");
+  const orders = await ordersForWatch();
+  const alerts = orderAlerts(orders);
+  const { data: since } = await db.from("order_alerts").select("order_id, kind, first_seen_at").is("resolved_at", null);
+  const firstSeen = new Map<string, string>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, String(a.first_seen_at)]));
+  return json({
+    summary: watchSummary(orders),
+    stage_labels: STAGE_LABELS,
+    alerts: alerts.map((a) => ({ ...a, first_seen_at: firstSeen.get(`${a.order_id}:${a.kind}`) || null })),
+  });
+});
+
+/** Correr a vigilância já (botão no painel), sem esperar pela hora. Com `summary`, envia o resumo. */
+route("POST", "/admin/orders/watch/run", async ({ auth, body }) => {
+  requirePermission(auth, "manage_orders");
+  return json(await runOrderWatch(body?.summary === true));
+});
+
+/** Marca o problema reportado pelo cliente como resolvido (sai dos alertas). */
+route("POST", "/admin/orders/feedback-resolve", async ({ auth, body }) => {
+  requirePermission(auth, "manage_orders");
+  const id = String(body.order_id || "").trim();
+  const note = clipText(body.note, 500);
+  const { data: order } = await db.from("orders").select("id, customer_feedback, delivery_timeline").eq("id", id).maybeSingle();
+  if (!order?.customer_feedback) throw bad("Esta encomenda não tem resposta do cliente.");
+  const at = nowISO();
+  const { error } = await db.from("orders").update({
+    customer_feedback: { ...order.customer_feedback, resolved_at: at, resolved_by: auth?.email || "", resolution: note },
+    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []),
+      timelineEvent("customer_problem_resolved", "Problema resolvido", note, "")],
+  }).eq("id", id);
+  if (error) throw error;
+  await db.from("order_alerts").update({ resolved_at: at }).eq("order_id", id).eq("kind", "customer_problem").is("resolved_at", null);
+  return json({ ok: true });
 });
 
 route("POST", "/newsletter", async ({ body, ip }) => {

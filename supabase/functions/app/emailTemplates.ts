@@ -345,6 +345,49 @@ export function thankYouLetter(brand: Brand, order: Row): Letter {
   };
 }
 
+/** Resumo diário das encomendas, para a equipa. `alerts` vem de `orderWatch.orderAlerts`. */
+export function dailySummaryLetter(
+  brand: Brand,
+  summary: { stages: Record<string, number>; newToday: number; revenueToday: number; deliveredToday: number; confirmedByCustomer: number },
+  alerts: { order_number: string; customer_name: string; label: string; hours: number; severity: string; detail?: string }[],
+  stageLabels: Record<string, string>,
+): Letter {
+  const today = dateLong(new Date().toISOString());
+  const critical = alerts.filter((a) => a.severity === "critical").length;
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const fmtHours = (h: number) => (h >= 48 ? `${Math.floor(h / 24)} dias` : `${h} h`);
+  return {
+    subject: alerts.length
+      ? `Resumo de ${today}: ${alerts.length} encomenda(s) a precisar de atenção`
+      : `Resumo de ${today}: tudo em dia`,
+    doc: {
+      symbol: alerts.length ? "!" : "✓",
+      tone: critical ? "danger" : alerts.length ? "warning" : "success",
+      title: "Resumo das encomendas",
+      subtitle: today,
+      lead: [
+        `Últimas 24 horas: ${summary.newToday} encomenda(s) nova(s) (${money(summary.revenueToday)}), ${summary.deliveredToday} entregue(s), ${summary.confirmedByCustomer} confirmada(s) pelo cliente.`,
+        alerts.length
+          ? `${alerts.length} encomenda(s) estão paradas tempo demais ou têm um problema do cliente${critical ? ` (${critical} crítica(s))` : ""}.`
+          : "Nenhuma encomenda parada. Bom trabalho!",
+      ],
+      detailsTitle: "Encomendas em curso, por passo",
+      details: Object.entries(stageLabels)
+        .filter(([k]) => k !== "cancelled" && k !== "delivered")
+        .map(([k, label]) => ({ label, value: String(summary.stages[k] || 0) })),
+      stepsTitle: alerts.length ? "A precisar de atenção" : undefined,
+      steps: alerts.slice(0, 15).map((a) => ({
+        label: `${a.severity === "critical" ? "[CRÍTICO] " : ""}${a.order_number} — ${a.label} (${fmtHours(a.hours)})${a.customer_name ? ` · ${a.customer_name}` : ""}${a.detail ? ` · "${a.detail.slice(0, 120)}"` : ""}`,
+        done: false,
+        current: a.severity === "critical",
+      })),
+      cta: site ? { label: "Abrir o acompanhamento", url: `${site}/admin?tab=acompanhamento` } : undefined,
+      notes: alerts.length > 15 ? [`E mais ${alerts.length - 15}. Veja todas no painel.`] : [],
+      reason: "Recebe este resumo porque gere encomendas na loja.",
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // C. Avisos simples e testes
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -42,6 +42,7 @@ const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
+const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -384,6 +385,7 @@ const AdminPage = () => {
     ] },
     { label: 'Vendas', tabs: [
       canManageOrders && { value: 'orders', label: `Encomendas (${orders.length})`, icon: ShoppingBag },
+      canManageOrders && { value: 'acompanhamento', label: 'Acompanhamento', icon: Siren },
       canManagePayments && { value: 'payments', label: 'Pagamentos', icon: CreditCard },
       canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
     ] },
@@ -531,6 +533,13 @@ const AdminPage = () => {
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageOrders && (
+              <TabsContent value="acompanhamento">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <OrderWatchPanel onOpenOrder={(ref) => { setOrderSearch(ref); setActiveTab('orders'); }} />
                 </Suspense>
               </TabsContent>
             )}
@@ -876,6 +885,9 @@ const AdminPage = () => {
                             {o.customer_feedback?.outcome === 'problem' && (
                               <p className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-800">
                                 <strong>Cliente:</strong> {o.customer_feedback.message}
+                                {o.customer_feedback.resolved_at
+                                  ? <span className="ml-2 text-emerald-700">✓ Resolvido{o.customer_feedback.resolution ? `: ${o.customer_feedback.resolution}` : ''}</span>
+                                  : <span className="ml-2 text-red-900">· por resolver (ver Acompanhamento)</span>}
                               </p>
                             )}
                             <p className="text-sm text-muted-foreground mt-1">
