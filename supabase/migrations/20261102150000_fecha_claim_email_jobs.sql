@@ -19,7 +19,8 @@
 -- constar da lista.
 
 revoke execute on function public.claim_email_jobs(integer) from public, anon, authenticated;
-grant execute on function public.claim_email_jobs(integer) to service_role;
+-- O `grant ... to service_role` não foi aplicado com esta versão: está em
+-- `20261102160000_estado_agendador_service_role`.
 revoke execute on function private.run_email_queue() from public, anon, authenticated;
 revoke execute on function private.new_unsubscribe_token() from public, anon, authenticated;
 revoke execute on function private.set_unsubscribe_token() from public, anon, authenticated;
