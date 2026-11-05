@@ -1414,7 +1414,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     customer_name: name,
     phone,
     // `city` continua: o trigger orders_before_update usa-o como local de cada passo do
-    // seguimento, até à migração 20261104170000_campos_encomendas.
+    // seguimento, até à migração 20261105045510_campos_encomendas.
     // `address` deixou de ser gravado: era uma cópia de delivery_address_full (entrega) ou
     // de pickup_store (levantamento).
     city: deliveryCity,

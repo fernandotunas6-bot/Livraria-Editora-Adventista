@@ -2,7 +2,12 @@ import { supabase } from '@/lib/supabaseClient';
 
 const THREAD_FIELDS = 'id, customer_id, order_id, subject, status, assigned_to, customer_last_read_at, staff_last_read_at, last_sender_id, last_message_at, created_at, updated_at';
 const MESSAGE_FIELDS = 'id, thread_id, sender_id, body, created_at';
-const NOTIFICATION_FIELDS = 'id, kind, title, body, href, order_id, thread_id, read_at, created_at';
+// As duas tabelas não têm as mesmas colunas: `href` só existe nas notificações do cliente
+// (o destino da equipa decide-se no SupportCenter). Pedir `href` à staff_notifications dava
+// 400, e como as consultas do atendimento correm juntas, a equipa ficava sem o separador
+// inteiro (auditoria, 9.7). O teste supportApi.fields.test.js compara isto com as migrações.
+export const CUSTOMER_NOTIFICATION_FIELDS = 'id, kind, title, body, href, order_id, thread_id, read_at, created_at';
+export const STAFF_NOTIFICATION_FIELDS = 'id, kind, title, body, order_id, thread_id, read_at, created_at';
 
 function throwOnError(error) {
   if (error) throw new Error(error.message || 'Não foi possível carregar o atendimento.');
@@ -98,7 +103,7 @@ export async function updateSupportThread({ threadId, status, assignedTo }) {
 export async function listCustomerNotifications() {
   const { data, error } = await supabase
     .from('customer_notifications')
-    .select(NOTIFICATION_FIELDS)
+    .select(CUSTOMER_NOTIFICATION_FIELDS)
     .order('created_at', { ascending: false })
     .limit(100);
   throwOnError(error);
@@ -108,7 +113,7 @@ export async function listCustomerNotifications() {
 export async function listStaffNotifications() {
   const { data, error } = await supabase
     .from('staff_notifications')
-    .select(NOTIFICATION_FIELDS)
+    .select(STAFF_NOTIFICATION_FIELDS)
     .order('created_at', { ascending: false })
     .limit(100);
   throwOnError(error);
