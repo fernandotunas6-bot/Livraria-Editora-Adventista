@@ -369,6 +369,32 @@ erro. Se o `pg_cron` ou o `pg_net` não estiverem disponíveis, fica um aviso no
 migrações seguintes continuam. Uma migração que rebenta bloqueia todas as outras, e o preço
 de a fila ficar manual é muito menor do que o de o `db push` parar.
 
+## 7.1. Visual da loja e sugestões de livros
+
+**Moldura** (`emails.ts`): cabeçalho no azul-escuro do site com o logótipo branco, faixa de livros a toda a largura, corpo marfim com títulos em Fraunces e um filete dourado, botão azul-petróleo e rodapé escuro. As regras de compatibilidade de cima mantêm-se (tabelas, CSS em linha, legível sem imagens).
+
+**Faixas de livros** (`doc.banner`): recortes dos banners da galeria da loja, no bucket público `media`, em `email/`: `hero-encomenda.jpg` (encomendas, pagamento, entrega), `hero-conta.jpg` (boas-vindas e conta) e `hero-mensagem.jpg` (campanhas, contactos, teste). O logótipo do cabeçalho é `email/logo-light.png` quando o painel não tem outro. Para trocar as faixas: mudar a lista em `scripts/email/render-heroes.cjs`, correr `node scripts/email/render-heroes.cjs <pasta>` e enviar os JPEG para o mesmo caminho.
+
+**Sugestões de livros** (`doc.suggestions`): quatro livros no fim da mensagem, com capa, autor, preço e link para `/product/:id`, mais "Ver todas as sugestões" para `/sugestoes`. O `sendLetter` acrescenta-as (e a faixa) em `decorateLetter`, conforme o contexto:
+
+| Com sugestões | Sem sugestões |
+|---|---|
+| encomenda, estado da encomenda, pagamento, recibo, boas-vindas, campanhas, contactos, teste | convite e recuperação de palavra-passe (são de segurança) |
+
+A ordem vem de `suggestions.ts` (`rankSuggestions`, com testes):
+
+1. Lista de desejos e livros vistos, ainda não comprados (no máximo metade do bloco).
+2. Livros dos géneros do que comprou, guardou e viu.
+3. Novidades.
+
+Nunca sugere o que o cliente já comprou. Prefere livros com capa a sério: `suggestable_books()` devolve o tamanho do ficheiro da capa, e capas com menos de 10 KB (vazias, há dezenas no catálogo) ficam para o fim. Sem `site_url`, sem histórico ou se a leitura falhar, o email sai na mesma, sem o bloco.
+
+**Livros vistos:** `POST /catalog/view` com sessão grava em `book_views` (`record_book_view`, só service role). Sem sessão, o browser guarda os últimos 30 em `localStorage` (`la:livros-vistos`), que só saem para `POST /recommendations`.
+
+**Página `/sugestoes`** (`SuggestionsPage.jsx`, no menu da conta como "Sugestões para si"): "Escolhidos para si", "Vistos recentemente" e "Novidades", a partir de `POST /recommendations`, que devolve ids; a página lê os livros com as regras de visibilidade de sempre.
+
+Migrações: `20261105052817_livros_vistos`, `20261105053543_livros_para_sugestoes` (aplicadas).
+
 ## 8. Por fazer
 
 - **Verificar o agendador num projecto a sério.** O `pg_cron` e o `pg_net` estão agendados

@@ -5,8 +5,10 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 import nodemailer from "npm:nodemailer@6.9.16";
 import {
   brandFromSettings, categoryStates, emailDocument, formatKz, isCategoryEnabled,
-  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand, type FailureSource,
+  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type BannerKey, type Brand, type FailureSource,
+  type Suggestions,
 } from "./emails.ts";
+import { rankSuggestions } from "./suggestions.ts";
 import {
   accessLinkLetter,
   noticeLetter,
@@ -476,6 +478,88 @@ function emailBrand(settings: Row | null): Brand {
   return brandFromSettings(settings, String(settings?.site_url || Deno.env.get("SITE_URL") || ""));
 }
 
+// ---------------------------------------------------------------------------
+// Sugestões de livros (emails e /sugestoes)
+// ---------------------------------------------------------------------------
+
+/** Livros que se podem sugerir: visíveis e com stock. Cache curta: o catálogo muda pouco. */
+const suggestableBooks = () => cached("suggestable-books", 60_000, async (): Promise<Row[]> => {
+  // `suggestable_books()`: visíveis, com stock e com o tamanho da capa (migração livros_para_sugestoes).
+  const { data, error } = await db.rpc("suggestable_books");
+  if (error) throw error;
+  return (data as Row[]) || [];
+});
+
+/** Compras, lista de desejos e livros vistos de um cliente (por id de conta e/ou email). */
+async function customerHistory(userId: string | null, email: string) {
+  const owned = new Set<string>();
+  const normalized = normalizeEmail(email || "");
+  const [orders, wish, views] = await Promise.all([
+    normalized
+      ? db.from("orders").select("items").ilike("customer_email", likeExact(normalized)).limit(100)
+      : Promise.resolve({ data: [] as Row[] }),
+    userId ? db.from("wishlists").select("book_id").eq("user_id", userId).order("created", { ascending: false }).limit(50) : Promise.resolve({ data: [] as Row[] }),
+    userId ? db.from("book_views").select("book_id").eq("user_id", userId).order("last_viewed", { ascending: false }).limit(30) : Promise.resolve({ data: [] as Row[] }),
+  ]);
+  for (const o of orders.data || []) for (const it of o.items || []) if (it?.book_id) owned.add(String(it.book_id));
+  return {
+    owned: [...owned],
+    wishlist: (wish.data || []).map((r: Row) => String(r.book_id)),
+    viewed: (views.data || []).map((r: Row) => String(r.book_id)),
+  };
+}
+
+/** Bloco "Sugestões para si" de um email. Sem endereço público da loja não há links, e não vai nada. */
+async function emailSuggestions(brand: Brand, email: string): Promise<Suggestions | undefined> {
+  if (!brand.siteUrl) return undefined;
+  try {
+    let userId: string | null = null;
+    if (email) {
+      const { data } = await db.from("profiles").select("id").ilike("email", likeExact(normalizeEmail(email))).limit(1);
+      userId = data?.[0]?.id || null;
+    }
+    const history = email ? await customerHistory(userId, email) : { owned: [], wishlist: [], viewed: [] };
+    const r = rankSuggestions({ books: await suggestableBooks(), ...history, limit: 4 });
+    if (!r.pick.length) return undefined;
+    const site = brand.siteUrl.replace(/\/$/, "");
+    return {
+      title: r.personal ? "Escolhidos para si" : "Novidades na livraria",
+      subtitle: r.personal ? "A partir dos livros que viu, guardou e comprou." : "Os últimos livros a chegar às nossas prateleiras.",
+      books: r.pick.map((b: Row) => ({
+        title: String(b.title || "Livro"),
+        author: String(b.author || ""),
+        price: formatKz(effectivePrice(b)),
+        imageUrl: b.cover || fileUrl("stock_books", b, "cover_image"),
+        url: `${site}/product/${encodeURIComponent(b.id)}?origem=email`,
+      })),
+      moreUrl: `${site}/sugestoes?origem=email`,
+      moreLabel: "Ver todas as sugestões",
+    };
+  } catch (err) {
+    // As sugestões são um extra: uma falha aqui não pode impedir o email de sair.
+    console.log("emailSuggestions:", (err as Error)?.message || err);
+    return undefined;
+  }
+}
+
+/** Faixa de livros conforme o tipo de mensagem. */
+function bannerFor(context: string): BannerKey {
+  if (["order", "order_status", "payment", "receipt"].includes(context)) return "encomenda";
+  if (["account", "welcome"].includes(context)) return "conta";
+  return "mensagem";
+}
+
+/** Contextos com sugestões de livros. As de conta (convite, palavra-passe) vão sem: são de segurança. */
+const SUGGESTION_CONTEXTS = new Set(["order", "order_status", "payment", "receipt", "welcome", "campaign", "contact", "test"]);
+
+/** Acrescenta a faixa e as sugestões a um modelo, antes de o compor. */
+async function decorateLetter(brand: Brand, letter: Letter, context: string, to: string) {
+  letter.doc.banner ||= bannerFor(context);
+  if (!letter.doc.suggestions && SUGGESTION_CONTEXTS.has(context)) {
+    letter.doc.suggestions = await emailSuggestions(brand, to);
+  }
+}
+
 /**
  * Envia um modelo pronto (`emailTemplates.ts`), com HTML e texto simples.
  *
@@ -494,7 +578,9 @@ async function sendLetter(settings: Row | null, to: string, letter: Letter, meta
     });
     return false;
   }
-  const { html, text } = emailDocument(emailBrand(settings), letter.doc);
+  const brand = emailBrand(settings);
+  await decorateLetter(brand, letter, meta.context || "order", to);
+  const { html, text } = emailDocument(brand, letter.doc);
   // `List-Unsubscribe` é o que os clientes de email usam para mostrar o botão próprio de
   // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
   // pedido ao endereço, sem o utilizador ter de confirmar noutra página.
@@ -1756,6 +1842,9 @@ route("GET", "/admin/email/preview", async ({ auth, url }) => {
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
   const letter = template.build(brand);
+  // Na pré-visualização, as sugestões são as de quem não tem histórico: as novidades.
+  const context = template.group === "Conta" ? (key === "welcome" ? "welcome" : "account") : "order";
+  await decorateLetter(brand, letter, context, "");
   const { html, text } = emailDocument(brand, letter.doc);
   return json({ key, label: template.label, subject: letter.subject, html, text });
 });
@@ -2057,14 +2146,36 @@ route("GET", "/catalog/summary", async ({ auth }) => {
   });
 });
 
-route("POST", "/catalog/view", async ({ body, ip }) => {
+route("POST", "/catalog/view", async ({ auth, body, ip }) => {
   if (!await checkRateLimit("catalog-view", ip, 60)) return json({ ok: true });
   const bookId = String(body.book_id || body.id || "").trim();
   if (!bookId) throw bad("book_id obrigatório.");
   const { data, error } = await db.rpc("increment_book_views", { p_id: bookId });
   if (error) throw error;
   if (data == null) throw new HttpError(404, "Livro não encontrado.");
+  // Com sessão, fica no histórico do cliente para as sugestões (/sugestoes e emails).
+  if (auth?.id) {
+    const { error: viewError } = await db.rpc("record_book_view", { p_user: auth.id, p_book: bookId });
+    if (viewError) console.log("record_book_view:", viewError.message);
+  }
   return json({ ok: true, views_count: data });
+});
+
+/**
+ * Sugestões para a página /sugestoes: "para si", vistos recentemente e novidades.
+ *
+ * Com sessão, usa a lista de desejos, os livros vistos e as compras do cliente. Sem sessão,
+ * usa os vistos que o browser guardou (`viewed`), que não saem dali para mais lado nenhum.
+ * Devolve só ids: a página lê os livros com as regras de visibilidade que já usa.
+ */
+route("POST", "/recommendations", async ({ auth, body, ip }) => {
+  if (!await checkRateLimit("recommendations", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const localViewed = Array.isArray(body.viewed) ? body.viewed.map((v: unknown) => String(v).slice(0, 40)).slice(0, 30) : [];
+  const history = auth?.id ? await customerHistory(auth.id, auth.email) : { owned: [], wishlist: [], viewed: [] };
+  const viewed = [...new Set([...history.viewed, ...localViewed])];
+  const r = rankSuggestions({ books: await suggestableBooks(), ...history, viewed, limit: 8 });
+  const ids = (rows: Row[]) => rows.map((b) => String(b.id));
+  return json({ personal: r.personal, for_you: ids(r.forYou), recent: ids(r.recent), newest: ids(r.newest) });
 });
 
 // --- Gestão de utilizadores e clientes (o frontend não tem a service role) ---

@@ -412,9 +412,34 @@ export async function getLowStockBooks() {
   }
 }
 
-/** Conta uma visualização do livro (uma vez por sessão do navegador); falhas são ignoradas. */
+const RECENT_KEY = 'la:livros-vistos';
+const RECENT_MAX = 30;
+
+/** Livros vistos neste browser, do mais recente para o mais antigo (para quem não tem sessão). */
+export function getRecentlyViewedIds() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return Array.isArray(ids) ? ids.filter((v) => typeof v === 'string').slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecentlyViewed(bookId) {
+  try {
+    const ids = [bookId, ...getRecentlyViewedIds().filter((id) => id !== bookId)].slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(ids));
+  } catch { /* sem localStorage: as sugestões ficam só com as novidades */ }
+}
+
+/**
+ * Conta uma visualização do livro (uma vez por sessão do navegador); falhas são ignoradas.
+ * Guarda também o livro nos "vistos recentemente" deste browser e, com sessão, no histórico
+ * da conta, que alimenta as sugestões em /sugestoes e nos emails.
+ */
 export function trackBookView(bookId) {
   if (!bookId) return;
+  rememberRecentlyViewed(bookId);
   const key = `viewed:${bookId}`;
   try {
     if (sessionStorage.getItem(key)) return;
@@ -422,10 +447,48 @@ export function trackBookView(bookId) {
   } catch { /* sem sessionStorage: conta na mesma */ }
   fetch(`${APP_API_URL}/catalog/view`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
+    },
     body: JSON.stringify({ book_id: bookId }),
     keepalive: true,
   }).catch(() => {});
+}
+
+/** Lê livros visíveis pelos ids, pela ordem pedida. */
+async function productsByIds(ids) {
+  const unique = [...new Set(ids)].slice(0, 60);
+  if (!unique.length) return new Map();
+  const [{ data, error }, collectionsMap] = await Promise.all([
+    supabase.from('stock_books').select('*').in('id', unique).eq('active', true),
+    getCollectionsMap(),
+  ]);
+  if (error) throw error;
+  return new Map((data || []).map((b) => [b.id, bookToProduct(b, collectionsMap)]));
+}
+
+/**
+ * Sugestões para a página /sugestoes: "para si", vistos recentemente e novidades.
+ * A ordem vem da Edge Function (desejos, vistos, compras, género); os livros lêem-se aqui.
+ */
+export async function getRecommendations() {
+  const res = await fetch(`${APP_API_URL}/recommendations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
+    },
+    body: JSON.stringify({ viewed: getRecentlyViewedIds() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível carregar as sugestões.');
+  const forYou = data.for_you || [];
+  const recent = data.recent || [];
+  const newest = data.newest || [];
+  const map = await productsByIds([...forYou, ...recent, ...newest]);
+  const pick = (ids) => ids.map((id) => map.get(id)).filter(Boolean);
+  return { personal: !!data.personal, forYou: pick(forYou), recent: pick(recent), newest: pick(newest) };
 }
 
 export async function searchProducts(query, limit = 50) {
