@@ -15,6 +15,7 @@ export const PAYMENT_STATUS = {
   awaiting_confirmation: { label: 'Aguarda confirmação', color: 'bg-orange-500/10 text-orange-700' },
   paid: { label: 'Pago', color: 'bg-green-500/10 text-green-700' },
   failed: { label: 'Falhou', color: 'bg-destructive/10 text-destructive' },
+  refunded: { label: 'Reembolsado', color: 'bg-violet-500/10 text-violet-700' },
 };
 
 export const DELIVERY_STATUS = {

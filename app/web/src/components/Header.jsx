@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import MegaMenu from '@/components/header/MegaMenu';
@@ -39,6 +40,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
   const location = useLocation();
   const { cartItems } = useCart();
   const { user, isAuthed, isAdmin, canAccessAdmin, logout } = useAuth();
+  const { openAuth } = useAuthDialog();
   const { settings } = useSiteSettings();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -189,11 +191,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <UserAvatar user={user} size="sm" className="ring-2 ring-white/40" />
                 </Link>
               ) : (
-                <Link to="/login" aria-label="Entrar ou criar conta">
-                  <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/15">
-                    <User className="h-5 w-5" aria-hidden="true" />
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/15" aria-label="Entrar ou criar conta" onClick={() => openAuth()}>
+                  <User className="h-5 w-5" aria-hidden="true" />
+                </Button>
               )}
             </div>
           </div>
@@ -239,7 +239,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
           <span>
             {settings.header_welcome_guest || 'Envio em todo o país · Crie a sua conta para acompanhar encomendas'}
             {' · '}
-            <Link to="/login" className="underline underline-offset-2 hover:text-white">Crie a sua conta</Link>
+            <button type="button" onClick={() => openAuth({ mode: 'signup' })} className="underline underline-offset-2 hover:text-white">Crie a sua conta</button>
           </span>
         )}
       </div>
@@ -298,11 +298,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
             ) : (
               <>
                 <GuestAuthButton className="hidden sm:flex text-white" />
-                <Link to="/login" className="sm:hidden" aria-label="Entrar na conta">
-                  <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/10">
-                    <User className="h-5 w-5" aria-hidden="true" />
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="icon" className="sm:hidden rounded-full text-white hover:bg-white/10" aria-label="Entrar ou criar conta" onClick={() => openAuth()}>
+                  <User className="h-5 w-5" aria-hidden="true" />
+                </Button>
               </>
             )}
 

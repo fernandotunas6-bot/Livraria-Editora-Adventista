@@ -5,14 +5,32 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 import nodemailer from "npm:nodemailer@6.9.16";
 import {
   brandFromSettings, categoryStates, emailDocument, formatKz, isCategoryEnabled,
-  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand, type FailureSource,
+  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type BannerKey, type Brand, type FailureSource,
+  type Suggestions,
 } from "./emails.ts";
+import { rankSuggestions } from "./suggestions.ts";
+import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
 import {
   accessLinkLetter,
+  accountClosedLetter,
+  accountStatusLetter,
+  applyOverride,
+  cleanOverride,
+  emailChangedLetter,
+  newLoginLetter,
+  overrideFromLetter,
+  passwordChangedLetter,
+  refundLetter,
+  suspiciousActivityLetter,
+  EDITABLE_TEMPLATES,
+  PLACEHOLDERS,
+  type TextOverride,
   noticeLetter,
   orderCreatedLetter,
   orderStatusLetter,
   paymentConfirmedLetter,
+  thankYouLetter,
+  dailySummaryLetter,
   testLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
@@ -20,6 +38,7 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import { describeDevice, deviceKey } from "./devices.ts";
 import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
@@ -471,9 +490,118 @@ async function processEmailQueue(limit = 10) {
   return summary;
 }
 
+/**
+ * Textos em vigor de cada modelo editado no painel (a versão mais alta de cada um).
+ *
+ * Em cache curta, como as definições. Se a tabela ainda não existir (migração por aplicar),
+ * os emails saem com o texto de origem em vez de falharem: um aviso de encomenda não pode
+ * deixar de sair por causa do editor de textos.
+ */
+async function loadTextOverrides(): Promise<Record<string, TextOverride | null>> {
+  const { data, error } = await db.from("email_template_versions")
+    .select("template_key, version, content")
+    .order("version", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.log("email_template_versions:", error.message);
+    return {};
+  }
+  const current: Record<string, TextOverride | null> = {};
+  for (const row of data || []) {
+    if (!(row.template_key in current)) current[row.template_key] = cleanOverride(row.content);
+  }
+  return current;
+}
+async function textOverride(key: string): Promise<TextOverride | null> {
+  const all = await cached("email_text_overrides", SHORT_TTL_MS, loadTextOverrides);
+  return all[key] || null;
+}
+
 /** Identidade visual da loja para os emails, com o endereço público configurado no painel. */
 function emailBrand(settings: Row | null): Brand {
   return brandFromSettings(settings, String(settings?.site_url || Deno.env.get("SITE_URL") || ""));
+}
+
+// ---------------------------------------------------------------------------
+// Sugestões de livros (emails e /sugestoes)
+// ---------------------------------------------------------------------------
+
+/** Livros que se podem sugerir: visíveis e com stock. Cache curta: o catálogo muda pouco. */
+const suggestableBooks = () => cached("suggestable-books", 60_000, async (): Promise<Row[]> => {
+  // `suggestable_books()`: visíveis, com stock e com o tamanho da capa (migração livros_para_sugestoes).
+  const { data, error } = await db.rpc("suggestable_books");
+  if (error) throw error;
+  return (data as Row[]) || [];
+});
+
+/** Compras, lista de desejos e livros vistos de um cliente (por id de conta e/ou email). */
+async function customerHistory(userId: string | null, email: string) {
+  const owned = new Set<string>();
+  const normalized = normalizeEmail(email || "");
+  const [orders, wish, views] = await Promise.all([
+    normalized
+      ? db.from("orders").select("items").ilike("customer_email", likeExact(normalized)).limit(100)
+      : Promise.resolve({ data: [] as Row[] }),
+    userId ? db.from("wishlists").select("book_id").eq("user_id", userId).order("created", { ascending: false }).limit(50) : Promise.resolve({ data: [] as Row[] }),
+    userId ? db.from("book_views").select("book_id").eq("user_id", userId).order("last_viewed", { ascending: false }).limit(30) : Promise.resolve({ data: [] as Row[] }),
+  ]);
+  for (const o of orders.data || []) for (const it of o.items || []) if (it?.book_id) owned.add(String(it.book_id));
+  return {
+    owned: [...owned],
+    wishlist: (wish.data || []).map((r: Row) => String(r.book_id)),
+    viewed: (views.data || []).map((r: Row) => String(r.book_id)),
+  };
+}
+
+/** Bloco "Sugestões para si" de um email. Sem endereço público da loja não há links, e não vai nada. */
+async function emailSuggestions(brand: Brand, email: string): Promise<Suggestions | undefined> {
+  if (!brand.siteUrl) return undefined;
+  try {
+    let userId: string | null = null;
+    if (email) {
+      const { data } = await db.from("profiles").select("id").ilike("email", likeExact(normalizeEmail(email))).limit(1);
+      userId = data?.[0]?.id || null;
+    }
+    const history = email ? await customerHistory(userId, email) : { owned: [], wishlist: [], viewed: [] };
+    const r = rankSuggestions({ books: await suggestableBooks(), ...history, limit: 4 });
+    if (!r.pick.length) return undefined;
+    const site = brand.siteUrl.replace(/\/$/, "");
+    return {
+      title: r.personal ? "Escolhidos para si" : "Novidades na livraria",
+      subtitle: r.personal ? "A partir dos livros que viu, guardou e comprou." : "Os últimos livros a chegar às nossas prateleiras.",
+      books: r.pick.map((b: Row) => ({
+        title: String(b.title || "Livro"),
+        author: String(b.author || ""),
+        price: formatKz(effectivePrice(b)),
+        imageUrl: b.cover || fileUrl("stock_books", b, "cover_image"),
+        url: `${site}/product/${encodeURIComponent(b.id)}?origem=email`,
+      })),
+      moreUrl: `${site}/sugestoes?origem=email`,
+      moreLabel: "Ver todas as sugestões",
+    };
+  } catch (err) {
+    // As sugestões são um extra: uma falha aqui não pode impedir o email de sair.
+    console.log("emailSuggestions:", (err as Error)?.message || err);
+    return undefined;
+  }
+}
+
+/** Faixa de livros conforme o tipo de mensagem. */
+function bannerFor(context: string): BannerKey {
+  if (["order", "order_status", "payment", "receipt", "thanks"].includes(context)) return "encomenda";
+  if (["account", "welcome"].includes(context)) return "conta";
+  return "mensagem";
+}
+
+/** Contextos com sugestões de livros. As de conta (convite, palavra-passe) vão sem: são de segurança. */
+const SUGGESTION_CONTEXTS = new Set(["order", "order_status", "payment", "receipt", "thanks", "welcome", "campaign", "contact", "test"]);
+
+/** Acrescenta a faixa e as sugestões a um modelo, antes de o compor. */
+async function decorateLetter(brand: Brand, letter: Letter, context: string, to: string) {
+  letter.doc.banner ||= bannerFor(context);
+  if (!letter.doc.suggestions && SUGGESTION_CONTEXTS.has(context)) {
+    letter.doc.suggestions = await emailSuggestions(brand, to);
+  }
 }
 
 /**
@@ -494,7 +622,11 @@ async function sendLetter(settings: Row | null, to: string, letter: Letter, meta
     });
     return false;
   }
-  const { html, text } = emailDocument(emailBrand(settings), letter.doc);
+  // Os textos editados no painel entram aqui, no único sítio por onde todos os modelos saem.
+  letter = applyOverride(letter, letter.key ? await textOverride(letter.key) : null);
+  const brand = emailBrand(settings);
+  await decorateLetter(brand, letter, meta.context || "order", to);
+  const { html, text } = emailDocument(brand, letter.doc);
   // `List-Unsubscribe` é o que os clientes de email usam para mostrar o botão próprio de
   // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
   // pedido ao endereço, sem o utilizador ter de confirmar noutra página.
@@ -538,6 +670,7 @@ const PROGRESS_STATUSES = ["confirmed", "preparing", "shipped", "in_transit", "o
 
 async function sendOrderStatusEmail(order: Row, settings: Row | null, status: string, event?: Row) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
+  if (status === "delivered") await scheduleThankYouEmail(order, settings);
   const letter = orderStatusLetter(emailBrand(settings), order, status, event);
   if (!letter) return false;
   return sendLetter(settings, order.customer_email, letter, {
@@ -549,6 +682,57 @@ async function sendOrderStatusEmail(order: Row, settings: Row | null, status: st
     order_number: order.order_number,
     dedupe: `order:status:${order.id}:${status}`,
   });
+}
+
+/** Avisa o cliente de que o valor da encomenda foi devolvido. */
+async function sendRefundEmail(order: Row, settings: Row | null) {
+  if (!settings?.order_email_enabled || !order.customer_email) return false;
+  return sendLetter(settings, order.customer_email, refundLetter(emailBrand(settings), order), {
+    context: "payment",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    dedupe: `order:refund:${order.id}`,
+  });
+}
+
+/** Um dia depois da entrega: a nota de agradecimento, com "Recebi tudo bem / Tenho um problema". */
+const THANK_YOU_DELAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Põe a nota de agradecimento na fila para daqui a um dia. A fila (agendador de 5 em 5 min)
+ * envia-a quando chegar a hora; a chave `order:thanks:<id>` impede que saia duas vezes, mesmo
+ * que a encomenda volte a ser marcada como entregue.
+ */
+async function scheduleThankYouEmail(order: Row, settings: Row) {
+  try {
+    if (!order?.id || !order.customer_email) return false;
+    if (order.customer_confirmed_at) return false;
+    const dedupe = `order:thanks:${order.id}`;
+    if (await alreadySent(dedupe)) return false;
+    const brand = emailBrand(settings);
+    // Vai directo para a fila, sem passar por `sendLetter`: o texto editado no painel entra aqui.
+    const letter = applyOverride(thankYouLetter(brand, order), await textOverride("thank_you"));
+    await decorateLetter(brand, letter, "thanks", order.customer_email);
+    const { html, text } = emailDocument(brand, letter.doc);
+    const { error } = await db.from("email_queue").insert({
+      recipient: order.customer_email,
+      subject: letter.subject,
+      html,
+      text_body: text,
+      context: "thanks",
+      customer_name: order.customer_name || "",
+      order_number: order.order_number || "",
+      dedupe_key: dedupe,
+      attempts: 0,
+      next_attempt_at: new Date(Date.now() + THANK_YOU_DELAY_MS).toISOString(),
+      last_error: "Agendada: agradecimento um dia depois da entrega.",
+    });
+    if (error && error.code !== "23505") console.log("thank-you queue:", error.message);
+    return !error;
+  } catch (err) {
+    console.log("scheduleThankYouEmail:", (err as Error)?.message || err);
+    return false;
+  }
 }
 
 /** Avisa o cliente de que o pagamento ficou confirmado. */
@@ -665,6 +849,100 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
     await sendWhatsAppText(storePhone, storeMsg, config).catch(() => {});
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Cada passo da encomenda, em todos os canais
+// ---------------------------------------------------------------------------
+
+/**
+ * Avisa o cliente de um passo da encomenda: email, WhatsApp (se a API estiver configurada) e
+ * notificação push (se houver chaves VAPID e o cliente tiver subscrito). O aviso na conta do
+ * site é escrito pela base de dados (trigger `orders_notify_activity`).
+ *
+ * `step` é um estado da entrega (`confirmed`, `preparing`, `shipped`, …) ou `paid`. Cada canal
+ * tem a sua chave de idempotência: voltar a gravar o mesmo passo não repete mensagens. Uma
+ * falha num canal não impede os outros nem desfaz a mudança na encomenda.
+ */
+async function notifyOrderStep(order: Row, step: string, event?: Row) {
+  const settings = await getSettings();
+  const result = { email: false, whatsapp: false, push: 0 };
+  try {
+    result.email = step === "paid"
+      ? await sendPaymentConfirmedEmail(order, settings)
+      : await sendOrderStatusEmail(order, settings, step, event);
+  } catch (err) {
+    console.log(`notifyOrderStep email ${step}:`, (err as Error)?.message || err);
+  }
+  const brand = emailBrand(settings);
+  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : orderStatusLetter(brand, order, step, event);
+  if (!letter) return result;
+  const ref = String(order.order_number || order.id || "");
+  const site = brand.siteUrl.replace(/\/$/, "");
+  const title = letter.doc.title;
+  const subtitle = letter.doc.subtitle || "";
+  try {
+    result.whatsapp = await sendOrderStepWhatsApp(order, step, [
+      `*${title}* — ${ref}`, "", subtitle,
+      event?.description ? String(event.description) : "",
+      site ? `\nAcompanhe: ${site}/track` : "",
+      `\n${settings?.site_name || "Livraria Adventista"}`,
+    ].filter(Boolean).join("\n"));
+  } catch (err) {
+    console.log(`notifyOrderStep whatsapp ${step}:`, (err as Error)?.message || err);
+  }
+  try {
+    result.push = await sendOrderPush(order, settings, { title: `${title} — ${ref}`, body: subtitle, url: "/profile?tab=orders" });
+  } catch (err) {
+    console.log(`notifyOrderStep push ${step}:`, (err as Error)?.message || err);
+  }
+  return result;
+}
+
+/** Mensagem de WhatsApp de um passo, uma só vez por encomenda e passo. */
+async function sendOrderStepWhatsApp(order: Row, step: string, text: string) {
+  if (!order?.phone) return false;
+  const config = await getWhatsAppConfig();
+  if (!config) return false;
+  const dedupe = `wa:order:${order.id}:${step}`;
+  if (await alreadySent(dedupe)) return false;
+  const res = await sendWhatsAppText(order.phone, text, config);
+  await logNotification({
+    type: "whatsapp", context: "order_status", recipient: order.phone, customer_name: order.customer_name || "",
+    order_number: order.order_number || "", content: text, provider: "meta", dedupe_key: dedupe,
+    status: res?.ok ? "sent" : "failed", subject: `Passo: ${step}`,
+    detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
+  });
+  return !!res?.ok;
+}
+
+/**
+ * Notificação push para os dispositivos do cliente (subscrições em `push_subscriptions`).
+ * Precisa de `push_enabled`, da chave pública em site_settings e da privada no segredo
+ * `VAPID_PRIVATE_KEY` (ou em private.site_secrets). Subscrições mortas (404/410) são apagadas.
+ */
+async function sendOrderPush(order: Row, settings: Row | null, payload: { title: string; body: string; url: string }) {
+  if (!order?.customer_id || !settings?.push_enabled) return 0;
+  const publicKey = String(settings.vapid_public_key || "");
+  const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || String(settings.vapid_private_key || "");
+  if (!publicKey || !privateKey) return 0;
+  const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", order.customer_id).limit(10);
+  if (!subs?.length) return 0;
+  const webpush = (await import("npm:web-push@3.6.7")).default;
+  const contact = settings.contact_email ? `mailto:${settings.contact_email}` : "mailto:contacto@livrariaadventista.ao";
+  webpush.setVapidDetails(contact, publicKey, privateKey);
+  let sent = 0;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
+      sent++;
+    } catch (err) {
+      const code = (err as Row)?.statusCode;
+      if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", sub.id);
+      else console.log("push:", code, (err as Error)?.message);
+    }
+  }
+  return sent;
 }
 
 function sanitizeIntegrationConfig(code: string, config: Row) {
@@ -1139,6 +1417,65 @@ route("GET", "/geo/localities", async ({ url }) => {
   return publicJson({ localities, count: localities.length });
 });
 
+/** Avisa a equipa que trata de encomendas (admins e gestores com "manage_orders"). */
+async function notifyOrderStaff(kind: string, title: string, body: string, orderId: string | null) {
+  const { data: staff } = await db.from("profiles").select("id, role, permissions").in("role", ["admin", "manager"]);
+  const rows = (staff || [])
+    .filter((p: Row) => p.role === "admin" || p.permissions?.manage_orders === true)
+    // Limites da tabela: título até 120 caracteres, texto até 500.
+    .map((p: Row) => ({ staff_id: p.id, kind, title: clipText(title, 120), body: clipText(body, 500) || "—", order_id: orderId }));
+  if (!rows.length) return 0;
+  const { error } = await db.from("staff_notifications").insert(rows);
+  if (error) console.log("staff_notifications:", error.message);
+  return error ? 0 : rows.length;
+}
+
+/**
+ * Resposta do cliente ao email de agradecimento: "Recebi tudo bem" ou "Tenho um problema".
+ *
+ * Público (o cliente pode não ter conta), mas só com o segredo da encomenda (`receipt_token`),
+ * que só vai no email. Um problema avisa a equipa e fica na linha do tempo da encomenda.
+ * Responder outra vez substitui a resposta anterior (o cliente pode mudar de ideias).
+ */
+route("POST", "/order-feedback", async ({ body, ip }) => {
+  if (!await checkRateLimit("order-feedback", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const id = String(body.order_id || "").trim().slice(0, 40);
+  const token = String(body.token || "").trim();
+  const outcome = body.outcome === "problem" ? "problem" : body.outcome === "ok" ? "ok" : "";
+  const message = clipText(body.message, 1500);
+  if (!id || !/^[0-9a-f-]{36}$/i.test(token) || !outcome) throw bad("Link inválido.");
+  if (outcome === "problem" && message.length < 5) throw bad("Conte-nos o que aconteceu, para podermos ajudar.");
+
+  const { data: order } = await db.from("orders")
+    .select("id, order_number, customer_name, receipt_token, delivery_timeline, delivery_status, status")
+    .eq("id", id).maybeSingle();
+  // Mesmo erro para encomenda inexistente e token errado: não revela que números existem.
+  if (!order || !secretsMatch(String(order.receipt_token || ""), token)) throw bad("Link inválido ou expirado.");
+  if (order.status === "cancelled") throw bad("Esta encomenda foi cancelada.");
+
+  const at = nowISO();
+  const event = outcome === "ok"
+    ? timelineEvent("customer_confirmed", "Cliente confirmou a recepção", "Recebeu tudo bem.", "")
+    : timelineEvent("customer_problem", "Cliente reportou um problema", message, "");
+  const { error } = await db.from("orders").update({
+    customer_confirmed_at: at,
+    customer_feedback: { outcome, message: outcome === "problem" ? message : "", at },
+    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), event],
+  }).eq("id", id);
+  if (error) throw error;
+
+  const ref = order.order_number || order.id;
+  if (outcome === "problem") {
+    await notifyOrderStaff("order_problem", `Problema na encomenda ${ref}`, `${order.customer_name || "O cliente"}: ${message}`, order.id);
+  } else {
+    await notifyOrderStaff("order_confirmed", `Encomenda ${ref} confirmada pelo cliente`, `${order.customer_name || "O cliente"} recebeu tudo bem.`, order.id);
+  }
+  return json({
+    ok: true, outcome, order_number: ref,
+    message: outcome === "ok" ? "Obrigado por confirmar!" : "Recebemos o seu aviso. A equipa vai entrar em contacto.",
+  });
+});
+
 route("POST", "/confirm-delivery", async ({ body, ip }) => {
   const confirmRate = Math.max(1, Math.floor(storeRules(await getSettings()).trackRate / 2));
   if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
@@ -1184,7 +1521,7 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
     // Comprovativo da entrega para o cliente. A chave de idempotência é a mesma que o
     // painel usaria ao marcar "Entregue", por isso a confirmação não gera dois emails.
     try {
-      await sendOrderStatusEmail(final, await getSettings(), "delivered", {
+      await notifyOrderStep(final, "delivered", {
         description: `Recepção confirmada por ${recipientName}.`,
       });
     } catch (err) {
@@ -1212,7 +1549,7 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   const id = String(body.orderId || "").trim();
   const status = String(body.status || "").trim();
   if (!id) throw bad("orderId obrigatório.");
-  if (!["pending", "awaiting_confirmation", "paid", "failed"].includes(status)) {
+  if (!["pending", "awaiting_confirmation", "paid", "failed", "refunded"].includes(status)) {
     throw bad("Estado de pagamento inválido.");
   }
   const { data: order } = await db.from("orders").select("*").eq("id", id).maybeSingle();
@@ -1230,9 +1567,17 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   let emailSent = false;
   if (status === "paid" && order.payment_status !== "paid") {
     try {
-      emailSent = await sendPaymentConfirmedEmail(saved, await getSettings());
+      emailSent = (await notifyOrderStep(saved, "paid")).email;
     } catch (err) {
       console.log("Email de pagamento confirmado:", err);
+    }
+  }
+  // O reembolso é o outro estado que o cliente precisa de saber: é dinheiro a voltar para ele.
+  if (status === "refunded" && order.payment_status !== "refunded") {
+    try {
+      emailSent = await sendRefundEmail(saved, await getSettings());
+    } catch (err) {
+      console.log("Email de reembolso:", err);
     }
   }
   return json({ payment_status: saved.payment_status, email_sent: emailSent });
@@ -1262,6 +1607,8 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
     // sempre que o estado da entrega muda. Acrescentá-lo também aqui deixava cada mudança
     // registada duas vezes no seguimento do cliente.
     patch.delivery_status = body.status;
+    // Cancelar a entrega cancela a encomenda (o trigger devolve o stock uma só vez).
+    if (body.status === "cancelled") patch.status = "cancelled";
   } else {
     // Sem mudança de estado: é uma nota de entrega, que só esta rota escreve.
     patch.delivery_timeline = [...(order.delivery_timeline || []), timelineEvent(
@@ -1276,9 +1623,9 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   let emailSent = false;
   if (statusChanged) {
     try {
-      emailSent = await sendOrderStatusEmail(saved, await getSettings(), body.status, {
+      emailSent = (await notifyOrderStep(saved, body.status, {
         description: body.description || "",
-      });
+      })).email;
     } catch (err) {
       console.log("Email de estado da encomenda:", err);
     }
@@ -1382,7 +1729,13 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const cartItems = items.map((item) => {
     const bookId = parseBookId(item.variant_id || item.book_id || "");
     if (!bookId) throw bad("Item inválido no carrinho.");
-    return { book_id: bookId, quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99) };
+    // "<id>-v2" é a terceira variante (tamanho, edição): o preço e o stock são os dela.
+    const variant = /-v(\d+)$/.exec(String(item.variant_id || ""));
+    return {
+      book_id: bookId,
+      quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99),
+      ...(variant ? { variant: Math.min(Number(variant[1]), 50) } : {}),
+    };
   });
 
   const paymentCode = clip(data.paymentMethodCode || data.paymentMethod || "entrega", 60);
@@ -1725,8 +2078,12 @@ route("GET", "/admin/email/templates", async ({ auth }) => {
   requirePermission(auth, "manage_settings");
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
+  const overrides = await cached("email_text_overrides", SHORT_TTL_MS, loadTextOverrides, true);
   const templates = Object.entries(PREVIEW_TEMPLATES).map(([key, t]) => ({
-    key, label: t.label, group: t.group, subject: t.build(brand).subject,
+    key, label: t.label, group: t.group,
+    subject: applyOverride(t.build(brand), overrides[key]).subject,
+    editable: EDITABLE_TEMPLATES.includes(key),
+    edited: !!overrides[key],
   }));
   return json({
     templates,
@@ -1748,6 +2105,10 @@ route("GET", "/admin/email/templates", async ({ auth }) => {
  * o gestor vê ser o que o cliente recebe. Um exemplo montado no painel seria um segundo sítio
  * a divergir deste com o tempo.
  */
+/** Na pré-visualização, as sugestões são as de quem não tem histórico: as novidades. */
+const previewContext = (key: string, group: string) =>
+  group === "Conta" ? (key === "welcome" ? "welcome" : "account") : "order";
+
 route("GET", "/admin/email/preview", async ({ auth, url }) => {
   requirePermission(auth, "manage_settings");
   const key = String(url.searchParams.get("template") || "");
@@ -1755,9 +2116,100 @@ route("GET", "/admin/email/preview", async ({ auth, url }) => {
   if (!template) throw bad("Modelo desconhecido.");
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
-  const letter = template.build(brand);
+  const letter = applyOverride(template.build(brand), await textOverride(key));
+  await decorateLetter(brand, letter, previewContext(key, template.group), "");
   const { html, text } = emailDocument(brand, letter.doc);
   return json({ key, label: template.label, subject: letter.subject, html, text });
+});
+
+// ---------------------------------------------------------------------------
+// Textos dos modelos: editar, versões e voltar atrás
+// ---------------------------------------------------------------------------
+
+function editableTemplate(key: unknown) {
+  const k = String(key || "");
+  if (!EDITABLE_TEMPLATES.includes(k)) throw bad("Este modelo não tem texto editável.");
+  return { key: k, template: PREVIEW_TEMPLATES[k] };
+}
+
+/**
+ * Um modelo no editor: o texto de origem, o texto em vigor e o histórico de versões.
+ *
+ * O texto de origem vem com os dados de exemplo já preenchidos — é o que mostra ao gestor
+ * onde vão os marcadores. Para começar a editar, o painel usa o texto em vigor.
+ */
+route("GET", "/admin/email/template", async ({ auth, url }) => {
+  requirePermission(auth, "manage_settings");
+  const { key, template } = editableTemplate(url.searchParams.get("key"));
+  const brand = emailBrand(await getSettings(true));
+  const { data, error } = await db.from("email_template_versions")
+    .select("id, version, content, note, created_by_name, created_at")
+    .eq("template_key", key)
+    .order("version", { ascending: false })
+    .limit(50);
+  if (error) throw bad(`O histórico de versões não está disponível: ${error.message}`);
+  const versions: Row[] = (data || []).map((v: Row) => ({ ...v, content: cleanOverride(v.content) }));
+  return json({
+    key,
+    label: template.label,
+    group: template.group,
+    original: overrideFromLetter(template.build(brand)),
+    current: versions[0]?.content || null,
+    current_version: versions[0]?.version || 0,
+    versions,
+    placeholders: PLACEHOLDERS,
+  });
+});
+
+/** Pré-visualiza um texto ainda por gravar, com os mesmos dados de exemplo. */
+route("POST", "/admin/email/template/preview", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key, template } = editableTemplate(body.key);
+  const brand = emailBrand(await getSettings(true));
+  const letter = applyOverride(template.build(brand), cleanOverride(body.content));
+  await decorateLetter(brand, letter, previewContext(key, template.group), "");
+  const { html, text } = emailDocument(brand, letter.doc);
+  return json({ key, label: template.label, subject: letter.subject, html, text });
+});
+
+async function saveTemplateVersion(auth: Auth, key: string, content: TextOverride | null, note: string) {
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth!.id).maybeSingle();
+  const { data, error } = await db.rpc("email_template_save", {
+    p_key: key,
+    p_content: content,
+    p_note: cleanText(note, 200),
+    p_by: auth!.id,
+    p_by_name: cleanText(profile?.name || auth!.email, 120),
+  });
+  if (error) throw bad(`Não foi possível gravar a versão: ${error.message}`);
+  forgetCached("email_text_overrides");
+  return data as Row;
+}
+
+/**
+ * Grava uma versão nova. `content` nulo ou vazio repõe o texto de origem — também como versão
+ * nova, para a reposição ficar no histórico e se poder desfazer.
+ */
+route("POST", "/admin/email/template/save", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key } = editableTemplate(body.key);
+  const content = cleanOverride(body.content);
+  const saved = await saveTemplateVersion(auth, key, content, String(body.note || (content ? "" : "Texto de origem reposto")));
+  return json({ version: saved?.version, message: content ? "Texto gravado." : "Texto de origem reposto." });
+});
+
+/** Volta a uma versão anterior, gravando-a como versão nova. */
+route("POST", "/admin/email/template/restore", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key } = editableTemplate(body.key);
+  const version = Number(body.version);
+  if (!Number.isInteger(version) || version < 1) throw bad("Versão inválida.");
+  const { data: old, error } = await db.from("email_template_versions")
+    .select("version, content").eq("template_key", key).eq("version", version).maybeSingle();
+  if (error) throw bad(error.message);
+  if (!old) throw new HttpError(404, "Versão não encontrada.");
+  const saved = await saveTemplateVersion(auth, key, cleanOverride(old.content), `Reposta a versão ${version}`);
+  return json({ version: saved?.version, message: `Versão ${version} reposta.` });
 });
 
 /**
@@ -2017,6 +2469,124 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
   return json(r);
 });
 
+// ---------------------------------------------------------------------------
+// Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
+// ---------------------------------------------------------------------------
+
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
+
+/** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
+async function ordersForWatch() {
+  const since = new Date(Date.now() - 120 * 24 * 3600_000).toISOString();
+  const { data, error } = await db.from("orders").select(WATCH_FIELDS).gte("created", since).order("created", { ascending: false }).limit(2000);
+  if (error) throw error;
+  return (data || []) as Row[];
+}
+
+/**
+ * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa (staff_notifications)
+ * só dos alertas novos ou que passaram a críticos, e fecha os que deixaram de existir.
+ * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
+ */
+async function runOrderWatch(summary = false) {
+  const orders = await ordersForWatch();
+  const alerts = orderAlerts(orders);
+  const now = nowISO();
+  const { data: open } = await db.from("order_alerts").select("order_id, kind, severity").is("resolved_at", null);
+  const known = new Map<string, Row>((open || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
+  let notified = 0;
+  for (const a of alerts) {
+    const key = `${a.order_id}:${a.kind}`;
+    const before = known.get(key);
+    known.delete(key);
+    await db.from("order_alerts").upsert({
+      order_id: a.order_id, kind: a.kind, severity: a.severity, label: a.label, detail: a.detail.slice(0, 500),
+      last_seen_at: now, resolved_at: null, ...(before ? {} : { first_seen_at: now }),
+    }, { onConflict: "order_id,kind" });
+    if (!before || (before.severity !== "critical" && a.severity === "critical")) {
+      notified += await notifyOrderStaff(
+        a.kind === "customer_problem" ? "order_problem" : "order_stuck",
+        `${a.severity === "critical" ? "Crítico: " : ""}${a.label} — ${a.order_number}`,
+        `${a.customer_name || "Cliente"} · há ${a.hours} h neste passo${a.detail ? ` · ${a.detail}` : ""}`,
+        a.order_id,
+      );
+    }
+  }
+  // O que ficou em `known` já não está em alerta: resolvido.
+  for (const a of known.values()) {
+    await db.from("order_alerts").update({ resolved_at: now }).eq("order_id", a.order_id).eq("kind", a.kind).is("resolved_at", null);
+  }
+  let summarySent = 0;
+  if (summary) summarySent = await sendDailySummary(orders, alerts);
+  return { orders: orders.length, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
+}
+
+/** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
+async function sendDailySummary(orders: Row[], alerts: OrderAlert[]) {
+  const settings = await getSettings(true);
+  if (!settings) return 0;
+  const { data: staff } = await db.from("profiles").select("email, name, role, permissions").in("role", ["admin", "manager"]);
+  const recipients = (staff || []).filter((p: Row) => p.email && (p.role === "admin" || p.permissions?.manage_orders === true));
+  const day = new Date().toISOString().slice(0, 10);
+  let sent = 0;
+  for (const p of recipients) {
+    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders), alerts, STAGE_LABELS);
+    const ok = await sendLetter(settings, p.email, letter, { context: "staff_summary", customer_name: p.name || "", dedupe: `summary:${day}:${normalizeEmail(p.email)}` });
+    if (ok) sent++;
+  }
+  return sent;
+}
+
+/** Chamado pelo pg_cron (migração vigilancia_encomendas), com o token da fila. */
+route("POST", "/cron/order-watch", async ({ req, body, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-order-watch", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const r = await runOrderWatch(body?.summary === true);
+  console.log("Vigilância (cron):", JSON.stringify(r));
+  return json(r);
+});
+
+/** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
+route("GET", "/admin/orders/watch", async ({ auth }) => {
+  requirePermission(auth, "manage_orders");
+  const orders = await ordersForWatch();
+  const alerts = orderAlerts(orders);
+  const { data: since } = await db.from("order_alerts").select("order_id, kind, first_seen_at").is("resolved_at", null);
+  const firstSeen = new Map<string, string>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, String(a.first_seen_at)]));
+  return json({
+    summary: watchSummary(orders),
+    stage_labels: STAGE_LABELS,
+    alerts: alerts.map((a) => ({ ...a, first_seen_at: firstSeen.get(`${a.order_id}:${a.kind}`) || null })),
+  });
+});
+
+/** Correr a vigilância já (botão no painel), sem esperar pela hora. Com `summary`, envia o resumo. */
+route("POST", "/admin/orders/watch/run", async ({ auth, body }) => {
+  requirePermission(auth, "manage_orders");
+  return json(await runOrderWatch(body?.summary === true));
+});
+
+/** Marca o problema reportado pelo cliente como resolvido (sai dos alertas). */
+route("POST", "/admin/orders/feedback-resolve", async ({ auth, body }) => {
+  requirePermission(auth, "manage_orders");
+  const id = String(body.order_id || "").trim();
+  const note = clipText(body.note, 500);
+  const { data: order } = await db.from("orders").select("id, customer_feedback, delivery_timeline").eq("id", id).maybeSingle();
+  if (!order?.customer_feedback) throw bad("Esta encomenda não tem resposta do cliente.");
+  const at = nowISO();
+  const { error } = await db.from("orders").update({
+    customer_feedback: { ...order.customer_feedback, resolved_at: at, resolved_by: auth?.email || "", resolution: note },
+    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []),
+      timelineEvent("customer_problem_resolved", "Problema resolvido", note, "")],
+  }).eq("id", id);
+  if (error) throw error;
+  await db.from("order_alerts").update({ resolved_at: at }).eq("order_id", id).eq("kind", "customer_problem").is("resolved_at", null);
+  return json({ ok: true });
+});
+
 route("POST", "/newsletter", async ({ body, ip }) => {
   if (!await checkRateLimit("newsletter", ip, 6)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const email = normalizeEmail(body.email || "");
@@ -2057,14 +2627,36 @@ route("GET", "/catalog/summary", async ({ auth }) => {
   });
 });
 
-route("POST", "/catalog/view", async ({ body, ip }) => {
+route("POST", "/catalog/view", async ({ auth, body, ip }) => {
   if (!await checkRateLimit("catalog-view", ip, 60)) return json({ ok: true });
   const bookId = String(body.book_id || body.id || "").trim();
   if (!bookId) throw bad("book_id obrigatório.");
   const { data, error } = await db.rpc("increment_book_views", { p_id: bookId });
   if (error) throw error;
   if (data == null) throw new HttpError(404, "Livro não encontrado.");
+  // Com sessão, fica no histórico do cliente para as sugestões (/sugestoes e emails).
+  if (auth?.id) {
+    const { error: viewError } = await db.rpc("record_book_view", { p_user: auth.id, p_book: bookId });
+    if (viewError) console.log("record_book_view:", viewError.message);
+  }
   return json({ ok: true, views_count: data });
+});
+
+/**
+ * Sugestões para a página /sugestoes: "para si", vistos recentemente e novidades.
+ *
+ * Com sessão, usa a lista de desejos, os livros vistos e as compras do cliente. Sem sessão,
+ * usa os vistos que o browser guardou (`viewed`), que não saem dali para mais lado nenhum.
+ * Devolve só ids: a página lê os livros com as regras de visibilidade que já usa.
+ */
+route("POST", "/recommendations", async ({ auth, body, ip }) => {
+  if (!await checkRateLimit("recommendations", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const localViewed = Array.isArray(body.viewed) ? body.viewed.map((v: unknown) => String(v).slice(0, 40)).slice(0, 30) : [];
+  const history = auth?.id ? await customerHistory(auth.id, auth.email) : { owned: [], wishlist: [], viewed: [] };
+  const viewed = [...new Set([...history.viewed, ...localViewed])];
+  const r = rankSuggestions({ books: await suggestableBooks(), ...history, viewed, limit: 8 });
+  const ids = (rows: Row[]) => rows.map((b) => String(b.id));
+  return json({ personal: r.personal, for_you: ids(r.forYou), recent: ids(r.recent), newest: ids(r.newest) });
 });
 
 // --- Gestão de utilizadores e clientes (o frontend não tem a service role) ---
@@ -2161,6 +2753,102 @@ route("POST", "/account/welcome", async ({ auth }) => {
   return json({ email_sent: sent });
 });
 
+/**
+ * Aviso de novo acesso, pedido pelo site sempre que abre uma sessão.
+ *
+ * O Supabase Auth faz a entrada sem passar por aqui, por isso é o site que avisa, como nas
+ * boas-vindas. O que decide se o aparelho é novo é o servidor: o aparelho vem do
+ * `User-Agent` do próprio pedido e o destinatário é o email da sessão — nada do corpo do
+ * pedido escolhe a quem se escreve nem o que se diz.
+ *
+ * A primeira vez que uma conta usa isto só regista o aparelho: quem acabou de criar conta ou
+ * entra pela primeira vez desde que o aviso existe não precisa de saber que entrou.
+ */
+route("POST", "/account/session-notice", async ({ auth, req, ip }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("session-notice", auth.id, 10)) return json({ ok: true, notified: false });
+  const ua = req.headers.get("User-Agent") || "";
+  const key = await deviceKey(auth.id, ua);
+  const description = describeDevice(ua);
+
+  const { data: known, error } = await db.from("account_devices").select("device_key").eq("user_id", auth.id).limit(50);
+  if (error) {
+    // Migração por aplicar: não há onde guardar, e sem histórico não se sabe o que é novo.
+    console.log("account_devices:", error.message);
+    return json({ ok: true, notified: false });
+  }
+  const seen = (known || []).some((d: Row) => d.device_key === key);
+  const { error: upsertError } = await db.from("account_devices").upsert(
+    { user_id: auth.id, device_key: key, description, last_seen: nowISO() },
+    { onConflict: "user_id,device_key" },
+  );
+  if (upsertError) console.log("account_devices:", upsertError.message);
+  if (seen || !known?.length) return json({ ok: true, notified: false });
+
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, newLoginLetter(emailBrand(settings), profile?.name || "", {
+    device: description, when: new Date(), ip: ip && ip !== "unknown" ? ip : "",
+  }), {
+    context: "account",
+    customer_name: profile?.name || "",
+    // Um aviso por aparelho novo, mesmo que o site peça duas vezes.
+    dedupe: `account:new-login:${auth.id}:${key}`,
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/**
+ * Aviso no endereço antigo quando o próprio cliente pede para mudar o email.
+ *
+ * O Supabase guarda o endereço pedido em `new_email` até ser confirmado. O aviso vai para o
+ * endereço da sessão (o antigo) e diz qual é o novo — os dois lidos da conta, não do pedido.
+ */
+route("POST", "/account/email-change-notice", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  const { data } = await db.auth.admin.getUserById(auth.id);
+  const pending = normalizeEmail(String((data?.user as Row | undefined)?.new_email || ""));
+  if (!pending || pending === normalizeEmail(auth.email)) return json({ ok: true, notified: false });
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, emailChangedLetter(emailBrand(settings), profile?.name || "", pending), {
+    context: "account",
+    customer_name: profile?.name || "",
+    dedupe: `account:email-change:${auth.id}:${pending}`,
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/**
+ * Aviso de palavra-passe alterada, pedido pelo site depois de a mudar.
+ *
+ * Vai sempre para o email da sessão. Quem o pedisse sem ter mudado nada só mandaria um aviso
+ * a si próprio, e o limite por conta trava a repetição.
+ */
+route("POST", "/account/password-changed-notice", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("password-changed-notice", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, passwordChangedLetter(emailBrand(settings), profile?.name || ""), {
+    context: "account",
+    customer_name: profile?.name || "",
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/** Envia um aviso de conta sem deixar que uma falha de email desfaça a operação já feita. */
+async function notifyAccount(email: string, name: string, letter: (brand: Brand) => Letter) {
+  if (!email) return false;
+  try {
+    const settings = await getSettings();
+    return await sendLetter(settings, email, letter(emailBrand(settings)), { context: "account", customer_name: name });
+  } catch (err) {
+    console.log("Aviso de conta:", err);
+    return false;
+  }
+}
+
 route("GET", "/admin/users", async ({ auth, url }) => {
   requirePermission(auth, "manage_users");
   const perPage = Math.min(Math.max(Number(url.searchParams.get("per_page")) || 25, 1), 100);
@@ -2255,6 +2943,8 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
         throw bad(error.message);
       }
       patch.email = email;
+      // Para o endereço antigo: se a mudança não foi pedida pelo cliente, é por lá que ele sabe.
+      await notifyAccount(target.email, target.name, (b) => emailChangedLetter(b, target.name, email, true));
     }
   }
 
@@ -2275,7 +2965,15 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
   }
   const { error } = await db.auth.admin.updateUserById(target.id, { ban_duration: suspend ? SUSPEND_FOR : "none" });
   if (error) throw bad(error.message);
-  return json({ ok: true, suspended: suspend });
+  // A suspensão impede novas entradas; as sessões abertas terminam aqui, em vez de ficarem a
+  // funcionar até o token expirar.
+  if (suspend) {
+    // A suspensão já impede renovar a sessão; isto só a fecha mais cedo. Uma falha aqui
+    // (migração por aplicar) não pode fazer parecer que a suspensão falhou.
+    await endSessions(target.id).catch((err) => console.log("Terminar sessões:", err?.message || err));
+  }
+  const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountStatusLetter(b, target.name, suspend));
+  return json({ ok: true, suspended: suspend, email_sent: emailSent });
 });
 
 route("POST", "/admin/users/access-link", async ({ auth, body }) => {
@@ -2303,7 +3001,36 @@ route("POST", "/admin/users/delete", async ({ auth, body }) => {
   // As encomendas ficam (estão ligadas ao email, não à conta).
   const { error } = await db.auth.admin.deleteUser(target.id);
   if (error) throw bad(error.message);
-  return json({ ok: true });
+  // Depois de apagada, e não antes: um aviso de encerramento de uma conta que afinal ficou
+  // seria pior do que nenhum. O email e o nome já tinham sido lidos em `loadTarget`.
+  const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountClosedLetter(b, target.name));
+  return json({ ok: true, email_sent: emailSent });
+});
+
+/** Termina as sessões de uma conta em todos os aparelhos. Devolve quantas havia. */
+async function endSessions(userId: string) {
+  const { data, error } = await db.rpc("admin_end_user_sessions", { p_user: userId });
+  if (error) throw bad(`Não foi possível terminar as sessões: ${error.message}`);
+  return Number(data) || 0;
+}
+
+/**
+ * Terminar a sessão de um utilizador em todos os aparelhos, a partir do painel.
+ *
+ * Com `suspicious: true`, o cliente recebe o aviso de actividade suspeita, que diz porque
+ * teve de voltar a entrar. Sem isso, termina em silêncio — para quando é o próprio cliente
+ * a pedir por telefone, por exemplo, depois de perder o telemóvel.
+ */
+route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
+  const target = await loadTarget(auth, body.id);
+  assertCanManage(auth, target);
+  const ended = await endSessions(target.id);
+  let emailSent = false;
+  if (body.suspicious === true) {
+    const detail = cleanText(body.detail, 500);
+    emailSent = await notifyAccount(target.email, target.name, (b) => suspiciousActivityLetter(b, target.name, detail));
+  }
+  return json({ ok: true, ended, email_sent: emailSent });
 });
 
 // --- Assistente (antes: chat.pb.js) ---

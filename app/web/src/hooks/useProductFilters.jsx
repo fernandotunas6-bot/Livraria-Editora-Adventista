@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories, getBookCollections } from '@/api/EcommerceApi';
 import { BOOK_GENRES } from '@/lib/bookConstants';
+import { PRODUCT_TYPES } from '@/lib/productTypes';
 import { matchesTokenizedSearch, buildProductSearchHaystack } from '@/lib/searchUtils';
 
 export function buildCatalogSearchParams(activeFilters, availableMaxPrice) {
@@ -14,6 +15,7 @@ export function buildCatalogSearchParams(activeFilters, availableMaxPrice) {
   if (activeFilters.isbn) params.set('isbn', activeFilters.isbn);
   if (activeFilters.publisher) params.set('publisher', activeFilters.publisher);
   if (activeFilters.language) params.set('language', activeFilters.language);
+  if (activeFilters.productType) params.set('tipo', activeFilters.productType);
   if (activeFilters.yearFrom) params.set('yearFrom', activeFilters.yearFrom);
   if (activeFilters.yearTo) params.set('yearTo', activeFilters.yearTo);
   if (activeFilters.featuredOnly) params.set('featuredOnly', 'true');
@@ -137,12 +139,14 @@ export function useProductFilters(initialCategory = null) {
       genres,
       languages: Array.from(languages).sort(),
       publishers: Array.from(publishers).sort(),
+      // Tipos de produto presentes, pela ordem de PRODUCT_TYPES. Só livros: o filtro não aparece.
+      productTypes: PRODUCT_TYPES.map((t) => t.value).filter((v) => allProducts.some((p) => (p.product_type || 'livro') === v)),
     };
   }, [allProducts]);
 
   const [activeFilters, setActiveFilters] = useState(() => {
     const initialOptions = {};
-    const knownParams = ['category', 'collection', 'minPrice', 'maxPrice', 'search', 'rating', 'author', 'isbn', 'publisher', 'language', 'yearFrom', 'yearTo', 'featuredOnly', 'inStockOnly'];
+    const knownParams = ['category', 'collection', 'minPrice', 'maxPrice', 'search', 'rating', 'author', 'isbn', 'publisher', 'language', 'yearFrom', 'yearTo', 'featuredOnly', 'inStockOnly', 'tipo'];
 
     for (const [key, value] of searchParams.entries()) {
       if (!knownParams.includes(key)) {
@@ -167,6 +171,7 @@ export function useProductFilters(initialCategory = null) {
       isbn: searchParams.get('isbn') || '',
       publisher: searchParams.get('publisher') || '',
       language: searchParams.get('language') || '',
+      productType: searchParams.get('tipo') || '',
       yearFrom: searchParams.get('yearFrom') || '',
       yearTo: searchParams.get('yearTo') || '',
       featuredOnly: searchParams.get('featuredOnly') === 'true',
@@ -225,6 +230,7 @@ export function useProductFilters(initialCategory = null) {
         if (activeFilters.yearFrom && year < Number(activeFilters.yearFrom)) return false;
         if (activeFilters.yearTo && year > Number(activeFilters.yearTo)) return false;
       }
+      if (activeFilters.productType && (product.product_type || 'livro') !== activeFilters.productType) return false;
       if (activeFilters.featuredOnly && !product.featured) return false;
       if (activeFilters.inStockOnly && !product.purchasable) return false;
 
@@ -266,6 +272,7 @@ export function useProductFilters(initialCategory = null) {
       isbn: '',
       publisher: '',
       language: '',
+      productType: '',
       yearFrom: '',
       yearTo: '',
       featuredOnly: false,
@@ -286,6 +293,7 @@ export function useProductFilters(initialCategory = null) {
     if (activeFilters.isbn) count++;
     if (activeFilters.publisher) count++;
     if (activeFilters.language) count++;
+    if (activeFilters.productType) count++;
     if (activeFilters.yearFrom || activeFilters.yearTo) count++;
     if (activeFilters.featuredOnly) count++;
     if (activeFilters.inStockOnly) count++;

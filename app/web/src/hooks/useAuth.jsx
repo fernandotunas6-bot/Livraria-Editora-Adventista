@@ -4,7 +4,7 @@ import { canAccessAdmin, hasPermission, getUserPermissions } from '@/lib/permiss
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeLoginEmail, parsePbAuthError } from '@/lib/pbAuth';
-import { requestWelcomeEmail, safeInternalPath } from '@/lib/authSession';
+import { requestSessionNotice, requestWelcomeEmail, safeInternalPath } from '@/lib/authSession';
 
 const AuthContext = createContext(null);
 
@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!ready || !user?.id) return;
     requestWelcomeEmail(pb, user.id);
+    requestSessionNotice(pb, user.id);
   }, [ready, user?.id]);
 
   const value = {
@@ -82,6 +83,17 @@ export const AuthProvider = ({ children }) => {
           .catch(() => {});
       }
     },
+    /**
+     * Termina a sessão em todos os aparelhos (`scope: 'global'`): o Supabase invalida todos
+     * os refresh tokens da conta. Os outros aparelhos saem quando o token de acesso que têm
+     * expirar (até uma hora). Este sai já.
+     */
+    logoutEverywhere: async () => {
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) throw new Error(error.message || 'Não foi possível terminar as sessões.');
+      pb.authStore.clear();
+      setUser(null);
+    },
     // Redirecciona para a Google; ao voltar, o Supabase cria a sessão e o perfil.
     // O destino é validado aqui também, e não só em quem chama: é o que acaba em
     // `redirectTo`, e um caminho não verificado levava o utilizador para fora da loja
@@ -108,8 +120,14 @@ export const AuthProvider = ({ children }) => {
       if (name !== undefined) data.name = name;
       if (email !== undefined) data.email = normalizeLoginEmail(email);
       if (phone !== undefined) data.phone = phone;
+      const previousEmail = pb.authStore.record?.email || '';
       const updated = await pb.collection('users').update(id, data);
       setUser(updated);
+      // Mudança de email pedida: o endereço actual recebe o aviso. O servidor lê o endereço
+      // pendente da própria conta, por isso não se manda nada no pedido.
+      if (data.email && data.email !== normalizeLoginEmail(previousEmail)) {
+        pb.send('/account/email-change-notice', { method: 'POST', body: {} }).catch(() => {});
+      }
       return updated;
     },
     updateAvatar: async (file) => {
@@ -134,6 +152,8 @@ export const AuthProvider = ({ children }) => {
         password: newPassword,
         passwordConfirm: newPassword,
       });
+      // O aviso é um extra: a palavra-passe já está mudada, e uma falha aqui não a desfaz.
+      pb.send('/account/password-changed-notice', { method: 'POST', body: {} }).catch(() => {});
     },
     // Encomendas do cliente; as regras (RLS) só devolvem as do email da sessão.
     fetchUserOrders: async (email) => {

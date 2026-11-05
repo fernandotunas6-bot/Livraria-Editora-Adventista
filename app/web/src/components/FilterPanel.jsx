@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Layers, BookOpen, Package } from 'lucide-react';
 import { BOOK_LANGUAGES } from '@/lib/bookConstants';
+import { productType } from '@/lib/productTypes';
 
 const FilterPanel = ({
   availableFilters,
@@ -118,6 +119,25 @@ const FilterPanel = ({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Tipo de produto */}
+      {(availableFilters.productTypes?.length > 1) && (
+        <div>
+          <h3 className="text-sm font-medium mb-3 text-foreground">Tipo de produto</h3>
+          <Select
+            value={activeFilters.productType || '_all'}
+            onValueChange={(v) => updateFilter('productType', v === '_all' ? '' : v)}
+          >
+            <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Todos</SelectItem>
+              {availableFilters.productTypes.map((v) => (
+                <SelectItem key={v} value={v}>{productType(v).plural}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 

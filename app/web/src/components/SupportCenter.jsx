@@ -35,6 +35,9 @@ const NOTIFICATION_KINDS = {
   delivery: 'Entrega',
   support: 'Atendimento',
   new_order: 'Nova encomenda',
+  order_stuck: 'Encomenda parada',
+  order_problem: 'Problema do cliente',
+  order_confirmed: 'Cliente confirmou a recepção',
 };
 
 function formatDate(value) {

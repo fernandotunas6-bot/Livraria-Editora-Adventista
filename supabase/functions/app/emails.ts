@@ -21,12 +21,34 @@
  */
 
 const BRAND_FALLBACK_COLOR = "#0ea5c9";
-const INK = "#1a2733";
-const INK_SOFT = "#5b6b7a";
-const LINE = "#e3e8ed";
-const PAPER = "#ffffff";
-const CANVAS = "#f4f6f8";
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+// Visual da loja: cabeçalho e rodapé no azul-escuro do site, corpo marfim, botões no
+// azul-petróleo dos botões da loja e detalhes dourados.
+const NAVY = "#141e33";
+const NAVY_DEEP = "#0b1426";
+const TEAL = "#0a748f";
+const TEAL_LIGHT = "#5fd0ea";
+const GOLD = "#b8892f";
+const INK = "#1d2a3f";
+const INK_SOFT = "#66707f";
+const ON_NAVY = "#c9d2e4";
+const LINE = "#ebe1c9";
+const PAPER = "#fffdf8";
+const CANVAS = "#f6f1e6";
+const PANEL = "#f8f3e8";
+const FONT = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const SERIF = "Fraunces,Georgia,'Times New Roman',serif";
+
+/** Imagens dos emails, no bucket público `media` (geradas por `scripts/email/render-heroes.cjs`). */
+const EMAIL_ASSETS = "https://bggqkjjqbjhbjsckzopj.supabase.co/storage/v1/object/public/media/email";
+/** Logótipo branco da loja, para o cabeçalho escuro quando o painel não tiver outro. */
+export const DEFAULT_LOGO_LIGHT = `${EMAIL_ASSETS}/logo-light.png`;
+/** Faixas de livros no topo, recortadas dos banners da galeria da loja. */
+export const EMAIL_BANNERS = {
+  encomenda: `${EMAIL_ASSETS}/hero-encomenda.jpg`,
+  conta: `${EMAIL_ASSETS}/hero-conta.jpg`,
+  mensagem: `${EMAIL_ASSETS}/hero-mensagem.jpg`,
+} as const;
+export type BannerKey = keyof typeof EMAIL_BANNERS;
 
 export type Brand = {
   siteName: string;
@@ -63,10 +85,14 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
 };
 
 export type DetailRow = { label: string; value: string };
-export type LineItem = { quantity: number; title: string; amount: string };
+/** `detail`: linha pequena por baixo do nome (variante e código, ex.: "Tamanho M · UNI-004"). */
+export type LineItem = { quantity: number; title: string; amount: string; detail?: string };
 export type TotalRow = { label: string; value: string; strong?: boolean };
 export type Step = { label: string; done: boolean; current?: boolean };
 export type Action = { label: string; url: string };
+/** Um livro sugerido: capa, título, autor, preço e o link para a página dele na loja. */
+export type SuggestedBook = { title: string; author?: string; price?: string; imageUrl?: string; url: string };
+export type Suggestions = { title: string; subtitle?: string; books: SuggestedBook[]; moreUrl?: string; moreLabel?: string };
 
 export type EmailDoc = {
   /** Linha de pré-visualização que o cliente de email mostra a seguir ao assunto. */
@@ -80,6 +106,10 @@ export type EmailDoc = {
   /** Ilustração própria, quando existir. O emblema fica como recuo se não carregar. */
   heroImageUrl?: string;
   heroAlt?: string;
+  /** Faixa de livros a toda a largura, por baixo do cabeçalho. Decorativa: sem ela a mensagem diz o mesmo. */
+  banner?: BannerKey;
+  /** Livros sugeridos (novidades, desejos, vistos), no fim da mensagem. */
+  suggestions?: Suggestions;
   title: string;
   subtitle?: string;
   lead?: string[];
@@ -148,15 +178,25 @@ export function brandFromSettings(settings: Record<string, any> | null, siteUrl 
 // ---------------------------------------------------------------------------
 
 function header(brand: Brand): string {
-  const logo = brand.logoUrl
-    ? `<img src="${esc(brand.logoUrl)}" width="140" alt="${esc(brand.siteName)}" style="display:block;border:0;max-width:140px;height:auto">`
-    : `<span style="font:600 19px/1.3 ${FONT};color:${PAPER}">${esc(brand.siteName)}</span>`;
+  const src = brand.logoUrl || DEFAULT_LOGO_LIGHT;
+  const logo = `<img src="${esc(src)}" width="190" alt="${esc(brand.siteName)}" style="display:block;border:0;width:190px;max-width:190px;height:auto;font:600 17px/1.3 ${FONT};color:#ffffff">`;
   const wrapped = brand.siteUrl ? `<a href="${esc(brand.siteUrl)}" style="text-decoration:none">${logo}</a>` : logo;
-  return `<tr><td style="background:${brand.color};padding:22px 28px" align="left">${wrapped}</td></tr>`;
+  return `<tr><td style="background:${NAVY};padding:22px 28px" align="left">${wrapped}</td></tr>`;
+}
+
+function bannerBlock(doc: EmailDoc): string {
+  if (!doc.banner || !(doc.banner in EMAIL_BANNERS)) return "";
+  // Alt vazio: é decoração, e um leitor de ecrã não precisa de ouvir "livros" antes da mensagem.
+  return `<tr><td style="background:${NAVY_DEEP};line-height:0;font-size:0">
+    <img src="${EMAIL_BANNERS[doc.banner]}" width="600" alt="" style="display:block;border:0;width:100%;max-width:600px;height:auto">
+  </td></tr>
+  <tr><td style="background:${GOLD};height:3px;line-height:3px;font-size:0">&nbsp;</td></tr>`;
 }
 
 function badge(doc: EmailDoc): string {
   if (!doc.symbol && !doc.heroImageUrl) return "";
+  // Com a faixa de livros, o emblema seria um segundo "topo": fica só a ilustração, se houver.
+  if (doc.banner && !doc.heroImageUrl) return "";
   const tone = TONES[doc.tone || "brand"];
   const hero = safeUrl(doc.heroImageUrl);
   if (hero) {
@@ -174,19 +214,20 @@ function badge(doc: EmailDoc): string {
 
 function heading(doc: EmailDoc): string {
   const sub = doc.subtitle
-    ? `<p style="margin:8px 0 0;font:400 15px/1.55 ${FONT};color:${INK_SOFT}">${esc(doc.subtitle)}</p>`
+    ? `<p style="margin:10px 0 0;font:400 15px/1.6 ${FONT};color:${INK_SOFT}">${esc(doc.subtitle)}</p>`
     : "";
-  return `<tr><td align="center" style="padding:20px 28px 0">
-    <h1 style="margin:0;font:600 23px/1.3 ${FONT};color:${INK}">${esc(doc.title)}</h1>${sub}
+  return `<tr><td align="center" style="padding:${doc.banner ? "34px" : "20px"} 32px 0">
+    <h1 style="margin:0;font:600 27px/1.25 ${SERIF};color:${INK}">${esc(doc.title)}</h1>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:14px auto 0"><tr><td width="48" height="2" style="width:48px;height:2px;background:${GOLD};font-size:0;line-height:0">&nbsp;</td></tr></table>${sub}
   </td></tr>`;
 }
 
 function paragraphs(lines: string[] = []): string {
   if (!lines.length) return "";
   const body = lines
-    .map((l) => `<p style="margin:0 0 12px;font:400 15px/1.65 ${FONT};color:${INK}">${esc(l)}</p>`)
+    .map((l) => `<p style="margin:0 0 14px;font:400 15px/1.7 ${FONT};color:${INK}">${esc(l)}</p>`)
     .join("");
-  return `<tr><td style="padding:22px 28px 0">${body}</td></tr>`;
+  return `<tr><td style="padding:24px 32px 0">${body}</td></tr>`;
 }
 
 function detailsBlock(doc: EmailDoc): string {
@@ -203,7 +244,7 @@ function detailsBlock(doc: EmailDoc): string {
     )
     .join("");
   return `<tr><td style="padding:22px 28px 0">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${CANVAS};border:1px solid ${LINE};border-radius:10px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${PANEL};border:1px solid ${LINE};border-radius:14px">
       <tr><td style="padding:16px 18px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${title}${rows}</table>
       </td></tr>
@@ -216,19 +257,20 @@ function itemsBlock(doc: EmailDoc): string {
   const items = (doc.items || [])
     .map(
       (it) => `<tr>
-        <td style="padding:10px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK}" valign="top">${esc(it.quantity)}× ${esc(it.title)}</td>
-        <td style="padding:10px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK};text-align:right;white-space:nowrap" valign="top">${esc(it.amount)}</td>
+        <td style="padding:11px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK}" valign="top"><span style="color:${GOLD};font-weight:600">${esc(it.quantity)}×</span> ${esc(it.title)}${it.detail ? `<br><span style="font:400 12px/1.5 ${FONT};color:${INK_SOFT}">${esc(it.detail)}</span>` : ""}</td>
+        <td style="padding:11px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK};text-align:right;white-space:nowrap" valign="top">${esc(it.amount)}</td>
       </tr>`,
     )
     .join("");
   const totals = (doc.totals || [])
     .map((t) => {
       const weight = t.strong ? "600" : "400";
-      const size = t.strong ? "16px" : "14px";
+      const size = t.strong ? "19px" : "14px";
+      const face = t.strong ? SERIF : FONT;
       const color = t.strong ? INK : INK_SOFT;
       return `<tr>
-        <td style="padding:${t.strong ? "12px" : "6px"} 0 ${t.strong ? "0" : "6px"};font:${weight} ${size}/1.5 ${FONT};color:${color}">${esc(t.label)}</td>
-        <td style="padding:${t.strong ? "12px" : "6px"} 0 ${t.strong ? "0" : "6px"};font:${weight} ${size}/1.5 ${FONT};color:${color};text-align:right;white-space:nowrap">${esc(t.value)}</td>
+        <td style="padding:${t.strong ? "12px" : "6px"} 0 ${t.strong ? "0" : "6px"};font:${weight} ${size}/1.5 ${face};color:${color}">${esc(t.label)}</td>
+        <td style="padding:${t.strong ? "12px" : "6px"} 0 ${t.strong ? "0" : "6px"};font:${weight} ${size}/1.5 ${face};color:${color};text-align:right;white-space:nowrap">${esc(t.value)}</td>
       </tr>`;
     })
     .join("");
@@ -266,14 +308,14 @@ function buttons(brand: Brand, doc: EmailDoc): string {
   if (!primary && !secondary) return "";
   const main = primary
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto"><tr>
-        <td align="center" style="background:${brand.color};border-radius:8px">
-          <a href="${esc(safeUrl(primary.url))}" style="display:inline-block;padding:13px 28px;font:600 15px/1.2 ${FONT};color:${PAPER};text-decoration:none">${esc(primary.label)}</a>
+        <td align="center" style="background:${TEAL};border-radius:999px">
+          <a href="${esc(safeUrl(primary.url))}" style="display:inline-block;padding:15px 34px;font:600 15px/1.2 ${FONT};color:#ffffff;text-decoration:none;border-radius:999px">${esc(primary.label)} &rarr;</a>
         </td>
       </tr></table>`
     : "";
   const alt = secondary
     ? `<p style="margin:${primary ? "14px" : "0"} 0 0;text-align:center">
-        <a href="${esc(safeUrl(secondary.url))}" style="font:500 14px/1.5 ${FONT};color:${brand.color};text-decoration:underline">${esc(secondary.label)}</a>
+        <a href="${esc(safeUrl(secondary.url))}" style="font:500 14px/1.5 ${FONT};color:${TEAL};text-decoration:underline">${esc(secondary.label)}</a>
       </p>`
     : "";
   return `<tr><td align="center" style="padding:26px 28px 0">${main}${alt}</td></tr>`;
@@ -287,27 +329,63 @@ function notesBlock(notes: string[] = []): string {
   return `<tr><td style="padding:22px 28px 0">${body}</td></tr>`;
 }
 
+function suggestionsBlock(doc: EmailDoc): string {
+  const sg = doc.suggestions;
+  const books = (sg?.books || []).filter((b) => safeUrl(b.url)).slice(0, 4);
+  if (!sg || !books.length) return "";
+  const cell = (b: SuggestedBook) => {
+    const url = esc(safeUrl(b.url));
+    const img = safeUrl(b.imageUrl)
+      ? `<a href="${url}" style="text-decoration:none"><img src="${esc(safeUrl(b.imageUrl))}" width="120" alt="${esc(b.title)}" style="display:block;border:0;width:120px;max-width:120px;height:auto;margin:0 auto;border-radius:6px;box-shadow:0 8px 18px rgba(20,30,51,.22)"></a>`
+      : "";
+    return `<td width="50%" valign="top" align="center" style="width:50%;padding:0 8px 22px">
+      ${img}
+      <a href="${url}" style="display:block;margin:12px 0 0;font:600 14px/1.4 ${FONT};color:${INK};text-decoration:none">${esc(b.title)}</a>
+      ${b.author ? `<p style="margin:3px 0 0;font:400 12px/1.5 ${FONT};color:${INK_SOFT}">${esc(b.author)}</p>` : ""}
+      ${b.price ? `<p style="margin:6px 0 0;font:600 13px/1.4 ${FONT};color:${TEAL}">${esc(b.price)}</p>` : ""}
+    </td>`;
+  };
+  const rows: string[] = [];
+  for (let i = 0; i < books.length; i += 2) {
+    rows.push(`<tr>${cell(books[i])}${books[i + 1] ? cell(books[i + 1]) : `<td width="50%" style="width:50%">&nbsp;</td>`}</tr>`);
+  }
+  const more = safeUrl(sg.moreUrl)
+    ? `<p style="margin:0;text-align:center"><a href="${esc(safeUrl(sg.moreUrl))}" style="font:600 14px/1.5 ${FONT};color:${TEAL};text-decoration:none">${esc(sg.moreLabel || "Ver todas as sugestões")} &rarr;</a></p>`
+    : "";
+  return `<tr><td style="padding:34px 24px 0">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${PANEL};border:1px solid ${LINE};border-radius:16px">
+      <tr><td align="center" style="padding:24px 16px 6px">
+        <p style="margin:0;font:600 11px/1.4 ${FONT};color:${GOLD};letter-spacing:.18em;text-transform:uppercase">Livraria Adventista</p>
+        <h2 style="margin:6px 0 0;font:600 21px/1.3 ${SERIF};color:${INK}">${esc(sg.title)}</h2>
+        ${sg.subtitle ? `<p style="margin:6px 0 0;font:400 13px/1.6 ${FONT};color:${INK_SOFT}">${esc(sg.subtitle)}</p>` : ""}
+      </td></tr>
+      <tr><td style="padding:18px 8px 0">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows.join("")}</table>
+      </td></tr>
+      ${more ? `<tr><td style="padding:0 16px 22px">${more}</td></tr>` : ""}
+    </table>
+  </td></tr>`;
+}
+
 function footer(brand: Brand, doc: EmailDoc): string {
   const unsubscribe = safeUrl(doc.unsubscribeUrl);
   const bits: string[] = [];
   if (brand.contactAddress) bits.push(esc(brand.contactAddress));
   if (brand.contactPhone) bits.push(esc(brand.contactPhone));
   if (brand.contactEmail) {
-    bits.push(`<a href="mailto:${esc(brand.contactEmail)}" style="color:${INK_SOFT};text-decoration:underline">${esc(brand.contactEmail)}</a>`);
+    bits.push(`<a href="mailto:${esc(brand.contactEmail)}" style="color:${ON_NAVY};text-decoration:underline">${esc(brand.contactEmail)}</a>`);
   }
   if (brand.siteUrl) {
     const label = brand.siteUrl.replace(/^https:\/\//, "").replace(/\/$/, "");
-    bits.push(`<a href="${esc(brand.siteUrl)}" style="color:${INK_SOFT};text-decoration:underline">${esc(label)}</a>`);
+    bits.push(`<a href="${esc(brand.siteUrl)}" style="color:${TEAL_LIGHT};text-decoration:none">${esc(label)}</a>`);
   }
-  return `<tr><td style="padding:30px 28px 28px">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-      <tr><td style="border-top:1px solid ${LINE};padding-top:18px">
-        <p style="margin:0 0 6px;font:600 13px/1.5 ${FONT};color:${INK}">${esc(brand.siteName)}</p>
-        ${bits.length ? `<p style="margin:0 0 10px;font:400 12px/1.7 ${FONT};color:${INK_SOFT}">${bits.join(" · ")}</p>` : ""}
-        <p style="margin:0;font:400 12px/1.6 ${FONT};color:${INK_SOFT}">${esc(doc.reason)}</p>
-        ${unsubscribe ? `<p style="margin:10px 0 0;font:400 12px/1.6 ${FONT};color:${INK_SOFT}"><a href="${esc(unsubscribe)}" style="color:${INK_SOFT};text-decoration:underline">Deixar de receber estas mensagens</a></p>` : ""}
-      </td></tr>
-    </table>
+  return `<tr><td style="padding:34px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
+  <tr><td align="center" style="background:${NAVY};padding:28px 32px 30px">
+    <p style="margin:0 0 4px;font:600 17px/1.4 ${SERIF};color:#ffffff">${esc(brand.siteName)}</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:10px auto 12px"><tr><td width="40" height="1" style="width:40px;height:1px;background:${GOLD};font-size:0;line-height:0">&nbsp;</td></tr></table>
+    ${bits.length ? `<p style="margin:0 0 12px;font:400 12px/1.8 ${FONT};color:${ON_NAVY}">${bits.join(" · ")}</p>` : ""}
+    <p style="margin:0;font:400 12px/1.6 ${FONT};color:#8d97ab">${esc(doc.reason)}</p>
+    ${unsubscribe ? `<p style="margin:10px 0 0;font:400 12px/1.6 ${FONT};color:#8d97ab"><a href="${esc(unsubscribe)}" style="color:#8d97ab;text-decoration:underline">Deixar de receber estas mensagens</a></p>` : ""}
   </td></tr>`;
 }
 
@@ -332,9 +410,10 @@ export function emailDocument(brand: Brand, doc: EmailDoc): { html: string; text
 <body style="margin:0;padding:0;background:${CANVAS};-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader)}</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${CANVAS}">
-  <tr><td align="center" style="padding:24px 12px">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background:${PAPER};border-radius:12px;overflow:hidden">
+  <tr><td align="center" style="padding:28px 12px 36px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background:${PAPER};border:1px solid ${LINE};border-radius:18px;overflow:hidden;box-shadow:0 24px 48px -24px rgba(20,30,51,.35)">
       ${header(brand)}
+      ${bannerBlock(doc)}
       ${badge(doc)}
       ${heading(doc)}
       ${paragraphs(doc.lead)}
@@ -343,6 +422,7 @@ export function emailDocument(brand: Brand, doc: EmailDoc): { html: string; text
       ${stepsBlock(doc)}
       ${buttons(brand, doc)}
       ${notesBlock(doc.notes)}
+      ${suggestionsBlock(doc)}
       ${footer(brand, doc)}
     </table>
   </td></tr>
@@ -365,7 +445,7 @@ export function emailText(brand: Brand, doc: EmailDoc): string {
     out.push("");
   }
   if (doc.items?.length) {
-    for (const it of doc.items) out.push(`${it.quantity}x ${it.title} — ${it.amount}`);
+    for (const it of doc.items) out.push(`${it.quantity}x ${it.title}${it.detail ? ` (${it.detail})` : ""} — ${it.amount}`);
     out.push("");
   }
   if (doc.totals?.length) {
@@ -382,6 +462,13 @@ export function emailText(brand: Brand, doc: EmailDoc): string {
     out.push(`${doc.secondaryCta.label}: ${safeUrl(doc.secondaryCta.url)}`, "");
   }
   for (const n of doc.notes || []) out.push(n, "");
+  const suggested = (doc.suggestions?.books || []).filter((b) => safeUrl(b.url)).slice(0, 4);
+  if (doc.suggestions && suggested.length) {
+    out.push(doc.suggestions.title.toUpperCase());
+    for (const b of suggested) out.push(`- ${b.title}${b.author ? ` (${b.author})` : ""}${b.price ? ` — ${b.price}` : ""}: ${safeUrl(b.url)}`);
+    if (safeUrl(doc.suggestions.moreUrl)) out.push(`${doc.suggestions.moreLabel || "Ver todas as sugestões"}: ${safeUrl(doc.suggestions.moreUrl)}`);
+    out.push("");
+  }
   out.push("--", brand.siteName);
   const contact = [brand.contactAddress, brand.contactPhone, brand.contactEmail, brand.siteUrl].filter(Boolean);
   if (contact.length) out.push(contact.join(" · "));

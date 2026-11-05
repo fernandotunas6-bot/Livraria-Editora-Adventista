@@ -726,11 +726,11 @@ com a consola, os pedidos falhados e a consola do próprio service worker.
 
 | # | Achado | Gravidade | Estado |
 |---|---|---|---|
-| 22 | **Todos os links de autenticação levavam ao site antigo.** O `site_url` do Supabase Auth era `https://livraria-adventista.pages.dev/` e a lista de destinos autorizados só tinha o `localhost` e endereços do Lovable. O Supabase ignora um destino que não conhece e manda para o `site_url`: o regresso do login com a Google, a confirmação de conta e a recuperação de palavra-passe, pedidos em `livrariaadventista.com`, acabavam todos no projecto antigo. Provado com `/auth/v1/verify` e um token inválido (o Supabase redirecciona o erro para o destino que aceita): os três endereços da loja → `livraria-adventista.pages.dev`. | Crítica | ⏳ script pronto (a alteração foi recusada nesta sessão) |
+| 22 | **Todos os links de autenticação levavam ao site antigo.** O `site_url` do Supabase Auth era `https://livraria-adventista.pages.dev/` e a lista de destinos autorizados só tinha o `localhost` e endereços do Lovable. O Supabase ignora um destino que não conhece e manda para o `site_url`: o regresso do login com a Google, a confirmação de conta e a recuperação de palavra-passe, pedidos em `livrariaadventista.com`, acabavam todos no projecto antigo. Provado com `/auth/v1/verify` e um token inválido (o Supabase redirecciona o erro para o destino que aceita): os três endereços da loja → `livraria-adventista.pages.dev`. | Crítica | ✅ 2026-11-05: `site_url` e destinos aplicados; os 5 testes do script passam |
 | 23 | **As fontes deixavam de carregar a partir da segunda página.** O service worker refazia com `fetch()` os pedidos a outros domínios; dentro dele vale o `connect-src` do CSP, que não inclui `fonts.gstatic.com`, `static.cloudflareinsights.com` nem `images.unsplash.com`. A consola do SW: *"Refused to connect because it violates the document's Content Security Policy"*. Inter e Fraunces ficavam `error` e o site caía para as fontes do sistema, para quem voltasse. | Alta | ✅ (no próximo deploy) |
 | 24 | Link de email expirado ou entrada com a Google cancelada: o Supabase volta com `#error=…&error_code=otp_expired` e o site não dizia nada (o `/login` mostrava o formulário; o `/reset-password` só "Link inválido."). | Média | ✅ (no próximo deploy) |
 | 25 | `www.livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev` serviam a loja inteira: sessão, carrinho e favoritos à parte por domínio (o canonical estava certo, o SEO não sofria). | Média | ✅ (no próximo deploy) |
-| 26 | Emails do Auth (confirmar conta, nova palavra-passe, convite…) em inglês. | Média | ⏳ no mesmo script do 22 |
+| 26 | Emails do Auth (confirmar conta, nova palavra-passe, convite…) em inglês. O Supabase só deixa mudar os modelos com SMTP próprio ou plano pago (HTTP 400 *"Email template modification is not available for free tier projects using the default email provider"*). | Média | ⏳ depois do SMTP (achado 27): o script envia-os sozinho quando houver |
 | 27 | **Sem SMTP no Supabase Auth**: o serviço por omissão só entrega a membros da equipa do projecto, e no máximo 2 por hora. Um cliente que se registe com email não recebe a confirmação e não consegue entrar. Hoje há só 3 contas (a equipa), por isso ainda ninguém foi afectado. | Alta | ⏳ dono (Supabase → Authentication → SMTP) |
 
 ### Verificado sem problemas
@@ -787,9 +787,9 @@ O Storage teve 3 175 pedidos de capas, nenhum 4xx.
 
 | # | Achado | Gravidade | Estado |
 |---|---|---|---|
-| 28 | **Login com a Google partido no Supabase.** Duas pessoas tentaram entrar (2026-11-04, 12:03 e 17:44) e o regresso falhou com `oauth2: "invalid_client" "The provided client secret is invalid."`. O ID do cliente está certo; a chave guardada no Supabase não. A chave do JSON descarregado da Google Cloud (na raiz, fora do git) foi confirmada na própria Google: um código falso dá `invalid_grant`, ou seja, a chave é aceite. | Crítica | ⏳ `bash scripts/configurar-auth.sh --google client_secret_….json` |
+| 28 | **Login com a Google partido no Supabase.** Duas pessoas tentaram entrar (2026-11-04, 12:03 e 17:44) e o regresso falhou com `oauth2: "invalid_client" "The provided client secret is invalid."`. O ID do cliente está certo; a chave guardada no Supabase não. A chave do JSON descarregado da Google Cloud (na raiz, fora do git) foi confirmada na própria Google: um código falso dá `invalid_grant`, ou seja, a chave é aceite. | Crítica | ✅ 2026-11-05: o teste das 05:06 dá `invalid_grant` (chave aceite) |
 | 29 | **Separador Atendimento da equipa inteiro em erro.** O painel pedia `href` a `staff_notifications`, que não tem essa coluna (400 nos registos, 10:49). As três consultas do atendimento correm num `Promise.all`, por isso a equipa não via nem as notificações nem as conversas. | Alta | ✅ (no próximo deploy) |
-| 30 | **Ligação do painel ao Google Workspace recusada no domínio novo.** O Firebase (projecto `skilful-form-c5jvd`) só tem autorizados o projecto antigo e endereços do AI Studio. Provado no Chrome com o SDK do Firebase: em `livrariaadventista.com` dá `auth/unauthorized-domain`. O painel mostrava a mensagem crua em inglês. | Alta | ⏳ dono (Firebase → Authentication → Settings → Authorized domains: `livrariaadventista.com`); a mensagem passa a dizê-lo ✅ |
+| 30 | **Ligação do painel ao Google Workspace recusada no domínio novo.** O Firebase (projecto `skilful-form-c5jvd`) só tem autorizados o projecto antigo e endereços do AI Studio. Provado no Chrome com o SDK do Firebase: em `livrariaadventista.com` dá `auth/unauthorized-domain`. O painel mostrava a mensagem crua em inglês. | Alta | ✅ domínio autorizado (2026-11-05) |
 
 ### Corrigido no código
 
@@ -812,14 +812,15 @@ O Storage teve 3 175 pedidos de capas, nenhum 4xx.
 
 ## Próximos passos, por ordem
 
-1. `bash scripts/configurar-auth.sh --google client_secret_….json` (achado 28) e depois
-   `bash scripts/configurar-auth.sh` (achado 22): sem os dois, o login com a Google não
-   funciona e os links de email levam ao site antigo.
-2. Firebase → Authorized domains: `livrariaadventista.com` (achado 30), para a ligação do painel
-   ao Gmail, Drive e Calendário.
-3. SMTP do Supabase Auth (achado 27), senão os clientes não conseguem confirmar a conta.
-4. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela de 9.5). A partir daí, um
-   merge para o `main` aplica as três migrações de 9.5 e publica a função e o site (com as
-   correcções de 9.6).
-5. Telefones, coordenadas das lojas, descrições e stock real.
-6. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
+Estado a 2026-11-05, 06h: login com a Google a funcionar, links de autenticação no domínio
+novo, Firebase autorizado, as três migrações aplicadas, PR #1 integrado no `main`.
+
+1. **Tokens do Actions com o formato errado.** Os deploys do merge falharam:
+   `SUPABASE_ACCESS_TOKEN` → *"Invalid access token format. Must be like `sbp_…`"* (foi colada
+   outra chave, não um token pessoal); `CLOUDFLARE_API_TOKEN` → *"Authentication failed
+   (status: 400) [code: 9106]"*. Até serem corrigidos, a Edge Function do `main` (`d1c9c89`) não
+   está publicada.
+2. SMTP do Supabase Auth (achado 27). Depois, `bash scripts/configurar-auth.sh` põe os emails em
+   português (achado 26).
+3. Telefones, coordenadas das lojas, descrições e stock real.
+4. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.

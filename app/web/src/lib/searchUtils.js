@@ -1,3 +1,4 @@
+import { looksLikeProductCode, normalizeProductCode, productTypeLabel } from '@/lib/productTypes';
 /**
  * Texto comparável: sem maiúsculas e sem acentos.
  *
@@ -57,6 +58,8 @@ export function matchesTokenizedSearch(haystack, query) {
 export function buildProductSearchHaystack(product) {
   return [
     product.title,
+    product.book_code ? product.book_code.replace('-', '') : '',
+    productTypeLabel(product.product_type),
     product.subtitle,
     product.description,
     product.book_code,
@@ -88,6 +91,10 @@ const SEARCH_FIELDS = [
 export function getSearchRelevance(product, query) {
   const normalizedQuery = normalizeForSearch(query);
   if (!normalizedQuery) return 0;
+  // Um código de produto ("liv-63", "UNI004") encontra exactamente esse produto, à frente de tudo.
+  if (looksLikeProductCode(query) && product.book_code) {
+    return normalizeProductCode(query) === normalizeProductCode(product.book_code) ? 1000 : 0;
+  }
   const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
   const fields = SEARCH_FIELDS.map(({ get, weight }) => ({
     text: normalizeForSearch(get(product) || ''),

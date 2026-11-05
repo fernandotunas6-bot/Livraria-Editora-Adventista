@@ -15,6 +15,7 @@ export const BOOK_GENRES = [
 export const BOOK_LANGUAGES = ['Português', 'Inglês', 'Francês', 'Espanhol'];
 
 export const emptyBookForm = {
+  product_type: 'livro',
   title: '',
   author: '',
   genre: 'Catálogo Geral',
@@ -51,6 +52,7 @@ export const emptyBookForm = {
 export function bookToForm(record) {
   const cover = record.cover || (record.cover_image ? pb.files.getURL(record, record.cover_image) : '');
   return {
+    product_type: record.product_type || 'livro',
     title: record.title || '',
     author: record.author || '',
     genre: record.genre || 'Catálogo Geral',

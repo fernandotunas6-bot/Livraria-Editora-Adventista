@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield,
+  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,9 +14,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import UserAvatar from '@/components/UserAvatar';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
-import { currentPathWithQuery } from '@/lib/authSession';
 
 export function UserMenu({ compact = false, className }) {
   const { user, isAdmin, canAccessAdmin, logout } = useAuth();
@@ -82,6 +82,11 @@ export function UserMenu({ compact = false, className }) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link to="/sugestoes" className="cursor-pointer">
+            <Sparkles className="mr-2" /> Sugestões para si
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link to="/profile" state={{ tab: 'settings' }} className="cursor-pointer">
             <Settings className="mr-2" /> Definições
           </Link>
@@ -108,9 +113,8 @@ export function UserMenu({ compact = false, className }) {
 }
 
 export function GuestAuthButton({ className, fullWidth = false }) {
-  const navigate = useNavigate();
-  // Quem entra pelo cabeçalho volta à página onde estava, em vez de cair sempre no perfil.
-  const returnTo = currentPathWithQuery(useLocation());
+  // Num modal, sem sair da página: quem entra pelo cabeçalho fica onde estava.
+  const { openAuth } = useAuthDialog();
 
   return (
     <div className={cn('flex items-center gap-2', fullWidth && 'flex-col w-full', className)}>
@@ -118,7 +122,7 @@ export function GuestAuthButton({ className, fullWidth = false }) {
         variant="outline"
         size="sm"
         className={cn('rounded-full bg-transparent border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/10', fullWidth && 'w-full')}
-        onClick={() => navigate('/login', { state: { from: returnTo } })}
+        onClick={() => openAuth({ mode: 'login' })}
       >
         <User className="h-4 w-4 mr-2" />
         Entrar
@@ -126,9 +130,9 @@ export function GuestAuthButton({ className, fullWidth = false }) {
       <Button
         size="sm"
         className={cn('btn-primary rounded-full hidden sm:inline-flex', fullWidth && 'w-full sm:flex')}
-        onClick={() => navigate('/login', { state: { from: returnTo } })}
+        onClick={() => openAuth({ mode: 'signup' })}
       >
-        Criar Conta
+        Criar conta
       </Button>
     </div>
   );

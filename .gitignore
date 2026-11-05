@@ -25,3 +25,6 @@ app/pocketbase/
 
 # Cópias da configuração do Auth antes de cada alteração (scripts/configurar-auth.sh)
 supabase/auth/.antes-*.json
+
+# CLI do Supabase
+supabase/.temp/
