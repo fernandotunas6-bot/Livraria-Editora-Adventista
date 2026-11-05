@@ -882,21 +882,6 @@ export default function SettingsTab() {
               </Select>
             </div>
           </div>
-          <div className="space-y-3 p-4 rounded-xl border">
-            <p className="text-sm font-medium">Secções visíveis na loja</p>
-            <div className="flex items-center gap-3">
-              <Switch checked={form.shop_show_featured} onCheckedChange={(v) => set('shop_show_featured', v)} />
-              <Label>Destaques no topo</Label>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch checked={form.shop_show_collections} onCheckedChange={(v) => set('shop_show_collections', v)} />
-              <Label>Explorar por coleção</Label>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch checked={form.shop_show_low_stock} onCheckedChange={(v) => set('shop_show_low_stock', v)} />
-              <Label>Últimas unidades</Label>
-            </div>
-          </div>
           <div className="rounded-xl border p-4 text-sm" style={{ background: `linear-gradient(135deg, ${form.pwa_theme_color || '#0c4a6e'}, ${form.primary_color || '#0ea5c9'})` }}>
             <p className="text-white/80 text-xs mb-1">Pré-visualização do hero</p>
             <p className="text-white font-bold text-lg">{form.shop_hero_title || 'Todos os Livros'}</p>

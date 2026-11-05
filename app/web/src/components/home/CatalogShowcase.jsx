@@ -1,22 +1,47 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { BookOpen, LayoutGrid, GalleryHorizontal, Loader2, ArrowRight, Package } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { getProducts, getProduct } from '@/api/EcommerceApi';
-import CategoryBookMarquee from '@/components/home/CategoryBookMarquee';
+import ProductRail from '@/components/home/ProductRail';
 import QuickViewModal from '@/components/QuickViewModal';
 import { Button } from '@/components/ui/button';
-import { buildShowcaseCategories, CATEGORY_SHOP_FILTERS } from '@/lib/catalogCategories';
+import { buildShowcaseCategories, categoryShopLink } from '@/lib/catalogCategories';
 
+/**
+ * Faixas que não entram na página inicial: os destaques já têm a secção própria logo acima
+ * (DestaquesSemana), "Disponíveis agora" repete os outros livros todos, e "Catálogo Geral" é
+ * uma etiqueta interna, não um tema que o leitor procure.
+ */
+const HIDDEN_ON_HOME = new Set(['destaques', 'stock', 'catalogo']);
+
+/** Esqueleto com a mesma forma das filas, para a página não saltar quando os livros chegam. */
+function RailSkeleton() {
+  return (
+    <div className="container-custom py-7 md:py-9" aria-hidden="true">
+      <div className="mb-4 h-7 w-48 rounded bg-muted" />
+      <div className="flex gap-3 overflow-hidden sm:gap-4">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="w-[calc((100%-0.75rem)/2)] shrink-0 sm:w-[calc((100%-2rem)/3)] md:w-[calc((100%-3rem)/4)] lg:w-[calc((100%-4rem)/5)] xl:w-[calc((100%-5rem)/6)]">
+            <div className="aspect-[2/3] rounded-xl bg-muted" />
+            <div className="mt-2 h-4 w-4/5 rounded bg-muted" />
+            <div className="mt-1.5 h-4 w-1/2 rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Montra da página inicial: primeiro as novidades, depois uma prateleira por tema, cada uma
+ * com "Ver todos" para a loja já filtrada. A navegação por tema no topo leva a cada uma.
+ */
 export default function CatalogShowcase({ onCartOpen }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [modalProduct, setModalProduct] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('marquee');
-  const [activeCat, setActiveCat] = useState(null);
-  const navRef = useRef(null);
 
   useEffect(() => {
     getProducts({})
@@ -39,146 +64,79 @@ export default function CatalogShowcase({ onCartOpen }) {
       .finally(() => setModalLoading(false));
   }, [selected]);
 
-  const categories = useMemo(() => buildShowcaseCategories(products), [products]);
-
-  const inStockCount = useMemo(
-    () => products.filter((p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0).length,
-    [products],
-  );
-
-  const scrollToCategory = (catId) => {
-    setActiveCat(catId);
-    const el = document.getElementById(`cat-${catId}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const rails = useMemo(() => {
+    if (!products.length) return [];
+    const disponivel = (p) => (p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0 ? 1 : 0);
+    // Em cada prateleira, os que se podem comprar já vêm primeiro.
+    const porDisponibilidade = (list) => [...list].sort((a, b) => disponivel(b) - disponivel(a));
+    const novidades = [...products].sort((a, b) => (b.order || 0) - (a.order || 0));
+    return [
+      {
+        id: 'novidades',
+        title: 'Novidades',
+        description: 'Os títulos mais recentes da livraria',
+        books: porDisponibilidade(novidades.slice(0, 12)),
+        shopLink: '/shop?sort=newest',
+      },
+      ...buildShowcaseCategories(products)
+        .filter((cat) => !HIDDEN_ON_HOME.has(cat.id))
+        .map((cat) => ({ ...cat, books: porDisponibilidade(cat.books), shopLink: categoryShopLink(cat) })),
+    ];
+  }, [products]);
 
   if (loading) {
     return (
-      <section className="section-spacing bg-background">
-        <div className="container-custom flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">A carregar catálogo completo…</p>
-        </div>
+      <section className="bg-background py-4" aria-busy="true" aria-label="A carregar catálogo">
+        <RailSkeleton />
+        <RailSkeleton />
       </section>
     );
   }
 
-  if (!categories.length) return null;
+  if (!rails.length) return null;
 
   return (
     <>
-      <section className="section-spacing bg-gradient-to-b from-background via-muted/10 to-background">
+      <section className="bg-background pt-6 md:pt-10">
         <div className="container-custom">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-6"
-          >
-            <div className="text-center lg:text-left">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#0ea5c9]/10 text-[#0c4a6e] mb-3">
-                <BookOpen className="h-3.5 w-3.5" />
-                Catálogo estratégico
-              </span>
-              <h2 className="text-3xl md:text-5xl font-bold mb-2">Explore por Tema</h2>
-              <p className="text-muted-foreground text-base md:text-lg max-w-2xl">
-                {categories.length} categorias · {products.length} livros no catálogo
-              </p>
-              <div className="flex flex-wrap justify-center lg:justify-start gap-2 mt-4">
-                <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                  <Package className="h-3.5 w-3.5" /> {inStockCount} disponíveis
-                </span>
-                <span className="text-xs px-3 py-1.5 rounded-full bg-muted border text-muted-foreground">
-                  Faixas infinitas · direções alternadas
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-              <div className="flex border rounded-xl overflow-hidden bg-card shadow-sm">
-                <Button
-                  type="button"
-                  variant={viewMode === 'marquee' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-none h-9 gap-1.5 px-3"
-                  onClick={() => setViewMode('marquee')}
-                >
-                  <GalleryHorizontal className="h-4 w-4" />
-                  Faixas
-                </Button>
-                <Button
-                  type="button"
-                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="rounded-none h-9 gap-1.5 px-3"
-                  onClick={() => setViewMode('grid')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Grade
-                </Button>
-              </div>
-              <Link to="/shop">
-                <Button className="btn-primary h-9 gap-1.5">
-                  Loja completa <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-
-          {/* Navegação rápida por categoria */}
-          <div
-            ref={navRef}
-            className="sticky top-[var(--header-offset,64px)] z-20 -mx-4 px-4 py-2 mb-4 bg-background/85 backdrop-blur-md border-y border-border/50"
-          >
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => scrollToCategory(cat.id)}
-                  className={`shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap ${
-                    activeCat === cat.id
-                      ? 'text-white shadow-sm'
-                      : 'bg-card hover:bg-muted text-foreground'
-                  }`}
-                  style={activeCat === cat.id ? { background: cat.accent, borderColor: cat.accent } : { borderColor: `${cat.accent}44` }}
-                >
-                  {cat.title}
-                  <span className="ml-1 opacity-70">({cat.books.length})</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Explore por tema</h2>
+          <nav aria-label="Temas" className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {rails.map((rail) => (
+              <a
+                key={rail.id}
+                href={`#cat-${rail.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById(`cat-${rail.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="shrink-0 whitespace-nowrap rounded-full border border-border bg-card px-3.5 py-2 text-sm transition-colors hover:border-primary hover:text-primary"
+              >
+                {rail.title}
+              </a>
+            ))}
+          </nav>
         </div>
 
-        <div className="divide-y divide-border/40">
-          {categories.map((cat, index) => (
-            <CategoryBookMarquee
-              key={cat.id}
-              id={cat.id}
-              title={cat.title}
-              description={cat.description}
-              accent={cat.accent}
-              products={cat.books}
-              direction={index % 2 === 0 ? 'ltr' : 'rtl'}
-              viewMode={viewMode}
-              autoScroll={false}
-              onBookSelect={setSelected}
+        <div className="divide-y divide-border/50">
+          {rails.map((rail) => (
+            <ProductRail
+              key={rail.id}
+              id={rail.id}
+              title={rail.title}
+              description={rail.description}
+              accent={rail.accent}
+              products={rail.books}
+              shopLink={rail.shopLink}
               onCartOpen={onCartOpen}
-              categoryFilter={CATEGORY_SHOP_FILTERS[cat.id]}
+              onQuickView={setSelected}
             />
           ))}
         </div>
 
-        <div className="container-custom text-center pt-10 pb-4">
-          <p className="text-muted-foreground text-sm mb-4">
-            Não encontrou o que procura? Explore o catálogo completo com filtros avançados.
-          </p>
-          <Link to="/shop">
-            <Button size="lg" variant="outline" className="border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10">
-              Abrir loja completa <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
+        <div className="container-custom pb-10 pt-4 text-center">
+          <Button asChild size="lg" variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
+            <Link to="/shop">Ver o catálogo completo <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
         </div>
       </section>
 

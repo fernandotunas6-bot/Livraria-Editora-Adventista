@@ -293,15 +293,8 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             {discount > 0 && inStock && (
               <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white shadow-sm tabular-nums">−{discount}%</span>
             )}
-            {isLowStock && (
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm"
-                title={qty > 0 ? `Últimas ${qty} unidades` : 'Poucas unidades'}
-              >
-                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="sr-only">{qty > 0 ? `Últimas ${qty} unidades` : 'Poucas unidades'}</span>
-              </span>
-            )}
+            {/* Com stock baixo, a etiqueta do admin (muitas vezes "Últimas unidades") repetia o
+                "Restam N" por baixo do preço. */}
             {product.ribbon_text && inStock && !isLowStock && !discount
               && product.ribbon_text.trim().toLowerCase() !== 'destaque' && (
               <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
@@ -351,24 +344,22 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           </button>
         </div>
 
+        {/* Ordem de qualquer livraria online: título, autor, preço, disponibilidade. Cada
+            linha tem altura reservada (título em duas, autor numa, disponibilidade numa), para
+            que os preços e os botões fiquem alinhados em toda a fila, com ou sem subtítulo.
+            O código interno (LIV-…) fica na página do livro e na pesquisa. */}
         <Link to={`/product/${product.id}`} onClick={handleQuickView} className="flex flex-1 flex-col px-2.5 pt-2 sm:px-3 sm:pt-2.5">
-          {product.book_code && <code className="mb-0.5 font-mono text-[10px] text-brand-ink/80">{product.book_code}</code>}
-          <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground transition-colors [font-family:inherit] group-hover:text-primary sm:text-sm">
+          <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground transition-colors [font-family:inherit] group-hover:text-primary sm:text-sm">
             {product.title}
           </h3>
-          {product.subtitle && (
-            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-xs">{product.subtitle}</p>
-          )}
-          {product.type?.value && (
-            <p className="mt-0.5 hidden line-clamp-1 text-[11px] text-muted-foreground/80 sm:block">{product.type.value}</p>
-          )}
+          <p className="mt-0.5 line-clamp-1 min-h-[1.4em] text-[11px] text-muted-foreground sm:text-xs">{product.subtitle || '\u00a0'}</p>
           <div className="mt-auto flex flex-wrap items-baseline gap-x-1.5 pt-1.5">
             <span className="text-[15px] font-bold text-brand-ink tabular-nums sm:text-base">{price}</span>
             {originalPrice && <span className="text-[11px] text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
           </div>
-          {inStock && isLowStock && qty > 0 && (
-            <span className="text-[11px] font-medium text-orange-700 dark:text-orange-400">Restam {qty}</span>
-          )}
+          <p className={`text-[11px] font-medium ${!inStock ? 'text-muted-foreground' : isLowStock ? 'text-orange-700 dark:text-orange-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            {!inStock ? 'Esgotado' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
+          </p>
         </Link>
 
         <div className="px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3">
