@@ -47,8 +47,8 @@ painel (`app/web/src/lib/googleAuth.js`), e recusa domínios que não estejam au
 
 ## 6. Google
 
-- [ ] Google Cloud → Credenciais → ID do cliente OAuth: juntar `https://livrariaadventista.ao` às *Origens JavaScript autorizadas* (o URI de redireccionamento continua o do Supabase).
-- [ ] Search Console: adicionar a propriedade de domínio `livrariaadventista.ao`, enviar `https://livrariaadventista.ao/sitemap.xml`
+- [x] Google Cloud → Credenciais → ID do cliente OAuth: juntar `https://livrariaadventista.ao` às *Origens JavaScript autorizadas* (o URI de redireccionamento continua o do Supabase).
+- [x] Search Console: adicionar a propriedade de domínio `livrariaadventista.ao`, enviar `https://livrariaadventista.ao/sitemap.xml`
       e usar *Alteração de endereço* na propriedade do `.com`.
 
 ## Verificação
