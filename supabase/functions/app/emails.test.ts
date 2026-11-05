@@ -483,7 +483,7 @@ describe("PREVIEW_TEMPLATES", () => {
 
   it("não leva dados de clientes reais nos exemplos", () => {
     for (const key of chaves) {
-      const { html } = emailDocument(brand, PREVIEW_TEMPLATES[key].build(brand));
+      const { html } = emailDocument(brand, PREVIEW_TEMPLATES[key].build(brand).doc);
       // Os endereços de exemplo são todos `exemplo.ao`: um domínio a sério aqui seria um
       // email de teste a sair para alguém.
       const emails = html.match(/[\w.+-]+@[\w.-]+\.\w+/g) || [];
