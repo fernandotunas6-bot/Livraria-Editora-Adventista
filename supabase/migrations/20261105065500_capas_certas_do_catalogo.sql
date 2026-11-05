@@ -18,10 +18,10 @@
 --
 -- Guarda antes o valor antigo em private.correcoes_dados. Pode correr-se mais de uma vez: só toca
 -- nos livros que ainda não estão como deve ser. Reverter: repor `cover`, `cover_image` e `title`
--- a partir de private.correcoes_dados where migracao = '20261105055728'.
+-- a partir de private.correcoes_dados where migracao = '20261105065500'.
 
 insert into private.correcoes_dados (migracao, tabela, accao, linha)
-select '20261105055728', 'stock_books', 'alterada',
+select '20261105065500', 'stock_books', 'alterada',
        jsonb_build_object('id', id, 'book_code', book_code, 'title', title, 'cover', cover, 'cover_image', cover_image)
 from public.stock_books
 where book_code in (
@@ -72,3 +72,30 @@ update public.stock_books
 update public.stock_books
    set title = 'Mil Cairão ao Teu Lado'
  where book_code = 'LIV-059' and title = 'Nem Cairão ao Teu Lado';
+
+-- As sugestões medem a capa pelo ficheiro no Storage (`cover_image`). Com `cover_image` vazio,
+-- `cover_bytes` vinha 0 para todos os livros e a Edge Function tratava-os a todos como "sem capa".
+-- Sem ficheiro no Storage, `cover_bytes` passa a null: "sem informação", que conta como capa boa.
+create or replace function public.suggestable_books()
+returns table (
+  id text, title text, author text, genre text, price double precision, sale_price double precision,
+  sale_starts_at timestamptz, sale_ends_at timestamptz, cover text, cover_image text,
+  featured boolean, created timestamptz, stock double precision, cover_bytes integer
+)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select b.id, b.title, b.author, b.genre, b.price, b.sale_price, b.sale_starts_at, b.sale_ends_at,
+         b.cover, b.cover_image, b.featured, b.created, b.stock,
+         case when coalesce(b.cover_image, '') = '' then null
+              else coalesce((o.metadata->>'size')::integer, 0) end as cover_bytes
+  from public.stock_books b
+  left join storage.objects o
+    on o.bucket_id = 'media' and o.name = 'stock_books/' || b.id || '/' || b.cover_image
+  where b.active and b.stock > 0;
+$$;
+
+revoke all on function public.suggestable_books() from public, anon, authenticated;
+grant execute on function public.suggestable_books() to service_role;
