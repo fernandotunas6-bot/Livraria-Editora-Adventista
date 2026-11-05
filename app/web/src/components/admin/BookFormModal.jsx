@@ -25,7 +25,7 @@ const PLACEHOLDER_COVER = '/images/site/capa-por-definir.webp';
 // Código por atribuir: a base de dados gera o seguinte da numeração ao gravar (ex.: LIV-101).
 const AUTO_CODE = '(automático)';
 
-export default function BookFormModal({ open, onClose, onSave, editing, template, saving }) {
+export default function BookFormModal({ open, onClose, onSave, editing, template, saving, initialType = 'livro' }) {
   const [form, setForm] = useState(emptyBookForm);
   const [copied, setCopied] = useState(false);
   const [collections, setCollections] = useState([]);
@@ -40,9 +40,13 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
       // Duplicar: copia tudo menos os códigos únicos; o ID e as métricas são novos.
       // Código vazio: a base de dados gera o seguinte da numeração (ex.: LIV-101).
       else if (template) setForm({ ...bookToForm(template), title: `${template.title} (cópia)`, book_code: '', sku: '' });
-      else setForm({ ...emptyBookForm, book_code: '' });
+      else {
+        // Novo produto do tipo escolhido em "Adicionar": a categoria começa no nome do tipo.
+        const t = productType(initialType);
+        setForm({ ...emptyBookForm, book_code: '', product_type: t.value, genre: t.isBook ? emptyBookForm.genre : t.plural, publisher: t.isBook ? emptyBookForm.publisher : '' });
+      }
     }
-  }, [open, editing, template]);
+  }, [open, editing, template, initialType]);
 
   if (!open) return null;
 
@@ -107,7 +111,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{editing ? 'Editar Livro' : template ? 'Duplicar Livro' : 'Adicionar Livro Premium'}</h2>
+              <h2 className="text-xl font-bold">{editing ? `Editar ${type.label.toLowerCase()}` : template ? `Duplicar ${type.label.toLowerCase()}` : `Adicionar ${type.label.toLowerCase()}`}</h2>
               <p className="text-sm text-muted-foreground">Catálogo profissional com ID e código único</p>
             </div>
           </div>
@@ -128,8 +132,8 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                   />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="font-bold text-lg line-clamp-2">{form.title || 'Título do livro'}</h3>
-                  <p className="text-sm text-muted-foreground">{form.author || 'Autor'}</p>
+                  <h3 className="font-bold text-lg line-clamp-2">{form.title || (isBook ? 'Título do livro' : 'Nome do produto')}</h3>
+                  <p className="text-sm text-muted-foreground">{isBook ? (form.author || 'Autor') : type.label}</p>
                   {form.price && (
                     Number(form.sale_price) > 0 && Number(form.sale_price) < Number(form.price) ? (
                       <p className="font-bold text-xl">

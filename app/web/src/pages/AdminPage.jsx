@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { looksLikeProductCode, normalizeProductCode, orderItemTitle, productTypeLabel } from '@/lib/productTypes';
+import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle } from 'lucide-react';
@@ -78,6 +78,9 @@ const AdminPage = () => {
   const [bookSearch, setBookSearch] = useState('');
   const [selectedBookIds, setSelectedBookIds] = useState([]);
   const [bookFilter, setBookFilter] = useState('all');
+  // Tipo de produto no catálogo ('all' ou um valor de PRODUCT_TYPES) e o tipo de um produto novo.
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [newProductType, setNewProductType] = useState('livro');
 
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderSearch, setOrderSearch] = useState('');
@@ -218,6 +221,7 @@ const AdminPage = () => {
   };
 
   const filteredBooks = books.filter((b) => {
+    if (typeFilter !== 'all' && (b.product_type || 'livro') !== typeFilter) return false;
     if (bookFilter === 'featured' && !b.featured) return false;
     if (bookFilter === 'low_stock' && !(b.stock_alert || b.stock_low)) return false;
     if (bookFilter === 'no_cover' && hasCover(b)) return false;
@@ -360,7 +364,7 @@ const AdminPage = () => {
 
   const bookMetrics = [
     // `filter`: carregar no indicador mostra a lista correspondente (o mesmo critério do filtro).
-    { label: 'Livros no catálogo', value: books.length, icon: PackageSearch, filter: 'all' },
+    { label: 'Produtos no catálogo', value: books.length, icon: PackageSearch, filter: 'all' },
     { label: 'Com stock', value: books.filter((book) => Number(book.stock) > 0).length, icon: ShoppingBag },
     { label: 'Em destaque', value: books.filter((book) => book.featured).length, icon: Star, filter: 'featured' },
     { label: 'Sem capa', value: books.filter((book) => !hasCover(book)).length, icon: Image, filter: 'no_cover' },
@@ -372,7 +376,7 @@ const AdminPage = () => {
   // Separadores agrupados por área; o separador activo fica no URL (/admin?tab=orders) para os atalhos do cabeçalho.
   const tabGroups = [
     { label: 'Catálogo', tabs: [
-      canManageCatalog && { value: 'books', label: `Livros (${books.length})`, icon: PackageSearch },
+      canManageCatalog && { value: 'books', label: `Produtos (${books.length})`, icon: PackageSearch },
       canManageCatalog && { value: 'collections', label: 'Coleções', icon: Layers },
       canManageCatalog && { value: 'slides', label: `Slider (${slides.length})`, icon: Image },
     ] },
@@ -552,11 +556,41 @@ const AdminPage = () => {
                   <div className="flex justify-between mb-6">
                     <div>
                       <h2 className="text-2xl font-bold">Catálogo</h2>
-                      <p className="text-sm text-muted-foreground mt-1">Resumo e gestão das capas dos livros.</p>
+                      <p className="text-sm text-muted-foreground mt-1">Livros, Bíblias, revistas, uniformes, t-shirts e materiais: tudo gerido aqui.</p>
                     </div>
-                    <Button className="btn-primary" onClick={() => { setEditingBook(null); setDuplicatingBook(null); setShowBookForm(true); }} disabled={!canManageCatalog}>
-                      <Plus className="h-4 w-4 mr-2" /> Adicionar
-                    </Button>
+                    <Select
+                      value=""
+                      onValueChange={(v) => { setNewProductType(v); setEditingBook(null); setDuplicatingBook(null); setShowBookForm(true); }}
+                      disabled={!canManageCatalog}
+                    >
+                      <SelectTrigger className="w-auto gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-0" aria-label="Adicionar produto">
+                        <Plus className="h-4 w-4" /><span>Adicionar</span>
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        {PRODUCT_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label} <span className="text-muted-foreground font-mono text-xs">{t.prefix}-</span></SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* Tipos de produto: separadores com contagem; os tipos sem produtos ficam de fora. */}
+                  <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filtrar por tipo de produto">
+                    {[{ value: 'all', plural: 'Todos', prefix: '' }, ...PRODUCT_TYPES].map((t) => {
+                      const count = t.value === 'all' ? books.length : books.filter((b) => (b.product_type || 'livro') === t.value).length;
+                      if (t.value !== 'all' && count === 0) return null;
+                      const active = typeFilter === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setTypeFilter(t.value)}
+                          aria-pressed={active}
+                          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'bg-card hover:border-primary/60'}`}
+                        >
+                          {t.plural} <span className={active ? 'opacity-80' : 'text-muted-foreground'}>({count})</span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" aria-label="Estatísticas do catálogo">
                     {bookMetrics.map(({ label, value, icon: Icon, filter }) => {
@@ -589,14 +623,14 @@ const AdminPage = () => {
                       <Input
                         value={bookSearch}
                         onChange={(e) => setBookSearch(e.target.value)}
-                        placeholder="Pesquisar por título, autor, código, SKU ou ISBN..."
+                        placeholder="Pesquisar por nome, autor, código (ex.: UNI-004), SKU ou ISBN..."
                         className="pl-9"
                       />
                     </div>
                     <Select value={bookFilter} onValueChange={setBookFilter}>
                       <SelectTrigger className="sm:w-56"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos os livros</SelectItem>
+                        <SelectItem value="all">Todos os produtos</SelectItem>
                         <SelectItem value="featured">Em destaque</SelectItem>
                         <SelectItem value="low_stock">Stock baixo ou esgotado</SelectItem>
                         <SelectItem value="no_cover">Sem capa</SelectItem>
@@ -617,16 +651,16 @@ const AdminPage = () => {
                         <tr>
                           <th className="pl-4 w-8">
                             <Checkbox
-                              aria-label="Seleccionar todos os livros visíveis na lista"
+                              aria-label="Seleccionar todos os produtos visíveis na lista"
                               checked={filteredBooks.length > 0 && filteredBooks.every((b) => selectedBookIds.includes(b.id))}
                               onCheckedChange={(v) => setSelectedBookIds(v ? filteredBooks.map((b) => b.id) : [])}
                             />
                           </th>
                           <th className="p-4 w-14" />
                           <th className="p-4">Código</th>
-                          <th className="p-4">Título</th>
-                          <th className="p-4 hidden lg:table-cell">Autor</th>
-                          <th className="p-4 hidden md:table-cell">Género</th>
+                          <th className="p-4">Nome</th>
+                          <th className="p-4 hidden lg:table-cell">Autor / Marca</th>
+                          <th className="p-4 hidden md:table-cell">Categoria</th>
                           <th className="p-4">Preço</th>
                           <th className="p-4">Stock</th>
                           <th className="p-4 hidden sm:table-cell">Destaque</th>
@@ -638,14 +672,14 @@ const AdminPage = () => {
                           <tr>
                             <td colSpan={10} className="p-12 text-center text-muted-foreground">
                               <PackageSearch className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                              <p className="font-medium">Nenhum livro no catálogo</p>
-                              <p className="text-sm mt-1">Clique em Adicionar para publicar o primeiro livro.</p>
+                              <p className="font-medium">Nenhum produto no catálogo</p>
+                              <p className="text-sm mt-1">Clique em Adicionar e escolha o tipo de produto.</p>
                             </td>
                           </tr>
                         )}
                         {books.length > 0 && filteredBooks.length === 0 && (
                           <tr>
-                            <td colSpan={10} className="p-10 text-center text-muted-foreground">Nenhum livro corresponde à pesquisa.</td>
+                            <td colSpan={10} className="p-10 text-center text-muted-foreground">Nenhum produto corresponde à pesquisa.</td>
                           </tr>
                         )}
                         {filteredBooks.map((b) => (
@@ -674,6 +708,14 @@ const AdminPage = () => {
                             </td>
                             <td className="p-4 font-medium max-w-[180px]">
                               <span className="block truncate">{b.title}</span>
+                              {(b.product_type || 'livro') !== 'livro' && (
+                                <span className="inline-block mt-0.5 mr-1 text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">{productTypeLabel(b.product_type)}</span>
+                              )}
+                              {Array.isArray(b.versions) && b.versions.length > 0 && (
+                                <span className="inline-block mt-0.5 mr-1 text-[10px] text-muted-foreground" title={b.versions.map((v) => `${v.label || '?'}: ${v.stock ?? '—'}`).join(' · ')}>
+                                  {b.versions.length} {productType(b.product_type).sized ? 'tamanhos' : 'variantes'}
+                                </span>
+                              )}
                               {!isBookVisible(b) && <span className="inline-block mt-0.5 text-[10px] font-semibold uppercase bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-1.5 py-0.5 rounded">Oculto</span>}
                             </td>
                             <td className="p-4 text-muted-foreground hidden lg:table-cell">{b.author}</td>
@@ -1011,6 +1053,7 @@ const AdminPage = () => {
           onSave={handleSaveBook}
           editing={editingBook}
           template={duplicatingBook}
+          initialType={newProductType}
           saving={saving}
         />
 

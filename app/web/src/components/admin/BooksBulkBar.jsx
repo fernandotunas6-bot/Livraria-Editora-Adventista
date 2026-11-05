@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, Eye, EyeOff, Star, StarOff, Percent, BadgeX, Download, X } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Star, StarOff, Percent, BadgeX, Download, X, Shapes } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { effectivePrice, fromLocalInput, isBookVisible } from '@/lib/pricing';
 import { csvSafeText } from '@/lib/orderExport';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PRODUCT_TYPES, productTypeLabel } from '@/lib/productTypes';
 
 /** Actualiza vários livros, 8 de cada vez; devolve quantos falharam. */
 async function updateMany(books, patchFor) {
@@ -25,7 +27,7 @@ async function updateMany(books, patchFor) {
 
 function exportCsv(books) {
   const cols = [
-    ['book_code', 'Código'], ['title', 'Título'], ['author', 'Autor'], ['genre', 'Género'], ['isbn', 'ISBN'],
+    ['book_code', 'Código'], ['tipo', 'Tipo'], ['title', 'Nome'], ['author', 'Autor'], ['genre', 'Género'], ['isbn', 'ISBN'],
     ['price', 'Preço (Kz)'], ['effective', 'Preço em vigor (Kz)'], ['stock', 'Stock'], ['sales_count', 'Vendidos'],
     ['visivel', 'Visível'], ['featured', 'Destaque'],
   ];
@@ -40,6 +42,7 @@ function exportCsv(books) {
       ...b,
       price: num(b.price),
       effective: num(effectivePrice(b)),
+      tipo: productTypeLabel(b.product_type),
       visivel: isBookVisible(b) ? 'Sim' : 'Não',
       featured: b.featured ? 'Sim' : 'Não',
     };
@@ -49,7 +52,7 @@ function exportCsv(books) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `livros-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `produtos-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -61,6 +64,7 @@ export default function BooksBulkBar({ selected, onClear, onDone }) {
   const [promoOpen, setPromoOpen] = useState(false);
   const [percent, setPercent] = useState('10');
   const [endsAt, setEndsAt] = useState('');
+  const [newType, setNewType] = useState('');
 
   if (!selected.length) return null;
 
@@ -69,8 +73,8 @@ export default function BooksBulkBar({ selected, onClear, onDone }) {
     try {
       const failed = await updateMany(selected, patchFor);
       toast(failed
-        ? { variant: 'destructive', title: `${label}: ${selected.length - failed} de ${selected.length}`, description: `${failed} livro(s) não foram alterados.` }
-        : { title: label, description: `${selected.length} livro(s) actualizados.` });
+        ? { variant: 'destructive', title: `${label}: ${selected.length - failed} de ${selected.length}`, description: `${failed} produto(s) não foram alterados.` }
+        : { title: label, description: `${selected.length} produto(s) actualizados.` });
       onDone();
     } finally {
       setBusy(false);
@@ -118,6 +122,18 @@ export default function BooksBulkBar({ selected, onClear, onDone }) {
       <Button size="sm" variant="outline" disabled={busy} onClick={() => run('Promoção removida', () => ({ sale_price: null, sale_starts_at: null, sale_ends_at: null }))}>
         <BadgeX className="h-4 w-4 mr-1" />Tirar promoção
       </Button>
+      <Select
+        value={newType}
+        onValueChange={(v) => { setNewType(''); run(`Tipo mudado para ${productTypeLabel(v)}`, () => ({ product_type: v })); }}
+        disabled={busy}
+      >
+        <SelectTrigger className="h-8 w-auto gap-1 text-xs" aria-label="Mudar o tipo dos produtos seleccionados">
+          <Shapes className="h-3.5 w-3.5" /><SelectValue placeholder="Mudar tipo" />
+        </SelectTrigger>
+        <SelectContent>
+          {PRODUCT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
       <Button size="sm" variant="outline" disabled={busy} onClick={() => exportCsv(selected)}>
         <Download className="h-4 w-4 mr-1" />Exportar
       </Button>
