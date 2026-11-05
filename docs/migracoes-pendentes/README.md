@@ -4,7 +4,7 @@ Esta pasta guarda SQL que ainda **não** pode ir para `supabase/migrations`: lá
 migrações que se podem aplicar tal como estão (o Actions corre `supabase db push` no merge
 para o `main`, e depois publica a Edge Function).
 
-Hoje não há nenhuma. O que estava aqui, e para onde foi (2026-11-04):
+Hoje não há nenhuma. O que estava aqui, e para onde foi (2026-11-04 e 2026-11-05):
 
 | Ficheiro | Destino |
 |---|---|
@@ -14,6 +14,7 @@ Hoje não há nenhuma. O que estava aqui, e para onde foi (2026-11-04):
 | `3_utilizadores_rpc.sql` | Aplicada a 2026-11-01 (`20261101212413`). |
 | `3_indices_chaves_estrangeiras.sql` | `20261104090000`, aplicada. |
 | `4_centro_atendimento_notificacoes.sql` | Aplicada a 2026-11-03 (`20261103165632`). |
+| `descricoes_dos_livros.sql` | `supabase/migrations/…_descricoes_dos_livros.sql`, depois de aprovadas na página de revisão (2026-11-05). |
 | `4_campos_encomendas.sql` | `supabase/migrations/20261105045510_campos_encomendas.sql`. O site publicado já tem o código de que depende. |
 
 ## Passo seguinte, ainda sem ficheiro: apagar as colunas herdadas das encomendas
