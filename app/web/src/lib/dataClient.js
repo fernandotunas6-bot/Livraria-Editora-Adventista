@@ -333,7 +333,10 @@ const authStore = {
   },
   clear() {
     setAuth('', null);
-    supabase.auth.signOut().catch(() => {});
+    // Só este navegador. Sem argumento, o supabase-js usa `scope: 'global'` e cada "Terminar
+    // sessão" desligava também o telemóvel e os outros computadores da pessoa. Terminar em
+    // todo o lado passou a ser um botão próprio (`signOutEverywhere`, em Segurança).
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
   },
   /** `true` quando o arranque já determinou se existe sessão (com ou sem utilizador). */
   get isReady() { return authGate.ready; },

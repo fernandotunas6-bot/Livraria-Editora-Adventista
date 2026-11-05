@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createReadyGate, currentPathWithQuery, safeInternalPath, sessionDecision } from '@/lib/authSession';
+import { createReadyGate, currentPathWithQuery, notifyPasswordChanged, safeInternalPath, sessionDecision, signOutEverywhere } from '@/lib/authSession';
 
 describe('createReadyGate', () => {
   const noTimer = () => {};
@@ -131,5 +131,32 @@ describe('sessionDecision', () => {
     expect(sessionDecision({ ready: true, isAuthed: true, allowed: true })).toBe('allow');
     // Sem `allowed`, a página só exige sessão (é o caso de `/profile`).
     expect(sessionDecision({ ready: true, isAuthed: true })).toBe('allow');
+  });
+});
+
+describe('notifyPasswordChanged', () => {
+  it('pede o aviso à rota certa e diz se o email saiu', async () => {
+    const send = vi.fn().mockResolvedValue({ email_sent: true });
+    expect(await notifyPasswordChanged({ send })).toBe(true);
+    expect(send).toHaveBeenCalledWith('/account/password-changed', { method: 'POST', body: {} });
+  });
+
+  it('uma falha do pedido não rebenta a mudança da palavra-passe', async () => {
+    const send = vi.fn().mockRejectedValue(new Error('rede'));
+    expect(await notifyPasswordChanged({ send })).toBe(false);
+    expect(await notifyPasswordChanged(null)).toBe(false);
+  });
+});
+
+describe('signOutEverywhere', () => {
+  it('revoga as sessões de todos os dispositivos', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    await signOutEverywhere({ auth: { signOut } });
+    expect(signOut).toHaveBeenCalledWith({ scope: 'global' });
+  });
+
+  it('se a revogação falhar, falha também — não finge que terminou', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: { message: 'Failed to fetch' } });
+    await expect(signOutEverywhere({ auth: { signOut } })).rejects.toThrow(/outras sessões/);
   });
 });

@@ -93,6 +93,7 @@ describe('rotas da Edge Function', () => {
     // Explícitas para o teste falhar com um nome, e não só com uma lista vazia que mudou.
     for (const route of [
       '/account/welcome',
+      '/account/password-changed',
       '/admin/orders/payment-status',
       '/admin/email/templates',
       '/admin/email/preview',

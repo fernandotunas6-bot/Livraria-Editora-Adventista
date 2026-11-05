@@ -87,8 +87,25 @@ export async function updateUser(id, data) {
   );
 }
 
+/**
+ * Edge Function primeiro, porque é ela que avisa o cliente por email; a função da base de dados
+ * fica para quando a Edge Function publicada ainda não tiver a rota. As duas aplicam as mesmas
+ * regras (permissões, a própria conta, o último administrador). Pelo caminho da base de dados
+ * não sai aviso, e a resposta di-lo (`email_notified: false`).
+ */
+async function edgeOr(path, body, fn, args) {
+  try {
+    return await call('POST', path, { body });
+  } catch (err) {
+    if (err.message !== EDGE_OUTDATED) throw err;
+  }
+  const { error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(error.message || 'Operação falhou.');
+  return { ok: true, email_notified: false };
+}
+
 export const setUserSuspended = (id, suspended) =>
-  rpcOr('users_admin_set_suspended', { p_id: id, p_suspended: suspended }, () => call('POST', '/admin/users/status', { body: { id, suspended } }));
+  edgeOr('/admin/users/status', { id, suspended }, 'users_admin_set_suspended', { p_id: id, p_suspended: suspended });
 
 /**
  * Link para definir a palavra-passe. Pela Edge Function (devolve o link para partilhar);
@@ -106,4 +123,15 @@ export async function sendAccessLink(id, email) {
 }
 
 export const deleteUser = (id) =>
-  rpcOr('users_admin_delete', { p_id: id }, () => call('POST', '/admin/users/delete', { body: { id } }));
+  edgeOr('/admin/users/delete', { id }, 'users_admin_delete', { p_id: id });
+
+/**
+ * Frase para o gestor saber se o cliente foi avisado. `undefined` quando a acção não leva
+ * aviso (por exemplo, reactivar uma conta que já estava activa).
+ */
+export function notifiedDescription(result) {
+  if (!result || result.email_notified === undefined || result.changed === false) return undefined;
+  return result.email_notified
+    ? 'O cliente foi avisado por email.'
+    : 'O cliente não foi avisado por email. Veja em Integrações → Registo de envios se o email da loja está configurado.';
+}

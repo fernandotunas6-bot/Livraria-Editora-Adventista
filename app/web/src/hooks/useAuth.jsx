@@ -4,7 +4,7 @@ import { canAccessAdmin, hasPermission, getUserPermissions } from '@/lib/permiss
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeLoginEmail, parsePbAuthError } from '@/lib/pbAuth';
-import { requestWelcomeEmail, safeInternalPath } from '@/lib/authSession';
+import { notifyPasswordChanged, requestWelcomeEmail, safeInternalPath, signOutEverywhere } from '@/lib/authSession';
 
 const AuthContext = createContext(null);
 
@@ -33,6 +33,22 @@ export const AuthProvider = ({ children }) => {
     if (!ready || !user?.id) return;
     requestWelcomeEmail(pb, user.id);
   }, [ready, user?.id]);
+
+  // Termina a sessão neste navegador (a revogação nos outros dispositivos é à parte).
+  const endLocalSession = async () => {
+    pb.authStore.clear();
+    setUser(null);
+    // Termina também a ligação ao Google Workspace, se existir. O Firebase só serve as
+    // ferramentas Workspace do painel: é carregado aqui, e não no arranque da loja, para
+    // não pôr 154 KB gzip no caminho crítico de quem só vem comprar um livro.
+    const tinhaGoogle = !!sessionStorage.getItem('google_access_token');
+    sessionStorage.removeItem('google_access_token');
+    if (tinhaGoogle) {
+      await import('@/lib/firebaseClient')
+        .then((m) => m.logoutFirebase())
+        .catch(() => {});
+    }
+  };
 
   const value = {
     user,
@@ -69,18 +85,13 @@ export const AuthProvider = ({ children }) => {
       }
     },
     logout: async () => {
-      pb.authStore.clear();
-      setUser(null);
-      // Termina também a ligação ao Google Workspace, se existir. O Firebase só serve as
-      // ferramentas Workspace do painel: é carregado aqui, e não no arranque da loja, para
-      // não pôr 154 KB gzip no caminho crítico de quem só vem comprar um livro.
-      const tinhaGoogle = !!sessionStorage.getItem('google_access_token');
-      sessionStorage.removeItem('google_access_token');
-      if (tinhaGoogle) {
-        await import('@/lib/firebaseClient')
-          .then((m) => m.logoutFirebase())
-          .catch(() => {});
-      }
+      await endLocalSession();
+    },
+    // Revoga as sessões de todos os dispositivos e só depois termina a deste. Se a revogação
+    // falhar, lança e a sessão local fica: o utilizador vê o erro e pode tentar de novo.
+    logoutEverywhere: async () => {
+      await signOutEverywhere(supabase);
+      await endLocalSession();
     },
     // Redirecciona para a Google; ao voltar, o Supabase cria a sessão e o perfil.
     // O destino é validado aqui também, e não só em quem chama: é o que acaba em
@@ -99,8 +110,10 @@ export const AuthProvider = ({ children }) => {
         normalizeLoginEmail(email),
         `${window.location.origin}/reset-password`,
       ),
-    confirmPasswordReset: (token, password) =>
-      pb.collection('users').confirmPasswordReset(token, password, password),
+    confirmPasswordReset: async (token, password) => {
+      await pb.collection('users').confirmPasswordReset(token, password, password);
+      notifyPasswordChanged(pb);
+    },
     updateProfile: async ({ name, email, phone }) => {
       const id = pb.authStore.record?.id;
       if (!id) throw new Error('Não autenticado');
@@ -134,6 +147,8 @@ export const AuthProvider = ({ children }) => {
         password: newPassword,
         passwordConfirm: newPassword,
       });
+      // O aviso ao email da conta é um extra: não se espera por ele nem se deixa falhar.
+      notifyPasswordChanged(pb);
     },
     // Encomendas do cliente; as regras (RLS) só devolvem as do email da sessão.
     fetchUserOrders: async (email) => {

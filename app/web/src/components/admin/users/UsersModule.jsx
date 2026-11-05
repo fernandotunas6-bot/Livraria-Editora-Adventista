@@ -18,7 +18,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser } from '@/lib/usersApi';
+import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, notifiedDescription } from '@/lib/usersApi';
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
@@ -164,7 +164,7 @@ export default function UsersModule() {
     setBusyId(u.id || u.email);
     try {
       const result = await fn();
-      if (successTitle) toast({ title: successTitle });
+      if (successTitle) toast({ title: successTitle, description: notifiedDescription(result) });
       await load();
       return result;
     } catch (err) {
@@ -226,7 +226,7 @@ export default function UsersModule() {
       toast({ title: 'Conta criada' });
       if (result?.link) setAccessInfo({ name: meta.name, email: meta.email, phone: meta.phone, link: result.link, emailSent: result.emailSent });
     } else {
-      toast({ title: 'Alterações guardadas' });
+      toast({ title: 'Alterações guardadas', description: notifiedDescription(result) });
       setDetail(null);
     }
   };

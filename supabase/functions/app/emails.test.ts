@@ -5,6 +5,10 @@ import {
 } from "./emails.ts";
 import {
   accessLinkLetter,
+  accountClosedLetter,
+  accountStatusLetter,
+  emailChangedLetter,
+  maskEmail,
   noticeLetter,
   orderCreatedLetter,
   orderStatusLetter,
@@ -740,5 +744,69 @@ describe("agradecimento e linhas com variante", () => {
     const { html, text } = emailDocument(brandSite, orderCreatedLetter(brandSite, order).doc);
     expect(html).toContain("M · Azul · UNI-004");
     expect(text).toContain("1x Uniforme — camisa (M · Azul · UNI-004)");
+  });
+});
+
+describe("avisos de conta", () => {
+  const render = (l: { doc: Parameters<typeof emailDocument>[1] }) => emailDocument(brand, l.doc);
+
+  it("maskEmail mostra o domínio e esconde o resto do endereço", () => {
+    expect(maskEmail("maria.nova@exemplo.ao")).toBe("ma•••@exemplo.ao");
+    expect(maskEmail("a@x.ao")).toBe("a•••@x.ao");
+    expect(maskEmail("sem-arroba")).toBe("");
+    expect(maskEmail("")).toBe("");
+  });
+
+  it("o aviso ao endereço antigo não entrega o endereço novo inteiro", () => {
+    const l = emailChangedLetter(brand, "Maria Fernandes", "maria.nova@exemplo.ao", "old");
+    const { html, text } = render(l);
+    expect(l.subject).toMatch(/alterado/);
+    expect(text).toContain("ma•••@exemplo.ao");
+    expect(html).not.toContain("maria.nova@exemplo.ao");
+    expect(text).not.toContain("maria.nova@exemplo.ao");
+    expect(text).toMatch(/não pediu/);
+  });
+
+  it("o aviso ao endereço novo confirma-o e aponta para definir a palavra-passe", () => {
+    const l = emailChangedLetter(brand, "Maria Fernandes", "maria.nova@exemplo.ao", "new");
+    const { text } = render(l);
+    expect(text).toContain("maria.nova@exemplo.ao");
+    expect(l.doc.cta?.url).toBe("https://loja.exemplo.ao/forgot-password");
+  });
+
+  it("suspensão e reactivação dizem coisas diferentes", () => {
+    const off = accountStatusLetter(brand, "Maria", true);
+    const on = accountStatusLetter(brand, "Maria", false);
+    expect(off.subject).toMatch(/suspensa/);
+    expect(off.doc.tone).toBe("danger");
+    expect(off.doc.cta).toBeUndefined();
+    expect(on.subject).toMatch(/reactivada/);
+    expect(on.doc.cta?.url).toBe("https://loja.exemplo.ao/login");
+  });
+
+  it("o encerramento diz que as encomendas não se perdem", () => {
+    const { text } = render(accountClosedLetter(brand, "Maria"));
+    expect(text).toMatch(/encomendas já feitas continuam/);
+  });
+
+  it("nenhum aviso de conta leva palavra-passe nem link de entrada directa", () => {
+    const letters = [
+      emailChangedLetter(brand, "M", "n@x.ao", "old"),
+      emailChangedLetter(brand, "M", "n@x.ao", "new"),
+      accountStatusLetter(brand, "M", true),
+      accountStatusLetter(brand, "M", false),
+      accountClosedLetter(brand, "M"),
+    ];
+    for (const l of letters) {
+      const { html } = render(l);
+      expect(html).not.toMatch(/token=|access_token|type=recovery/);
+      expect(SAFE_SYMBOLS).toContain(l.doc.symbol);
+    }
+  });
+
+  it("sem endereço da loja não há botões partidos", () => {
+    const semSite = brandFromSettings(SETTINGS, "");
+    expect(emailChangedLetter(semSite, "M", "n@x.ao", "new").doc.cta).toBeUndefined();
+    expect(accountStatusLetter(semSite, "M", false).doc.cta).toBeUndefined();
   });
 });

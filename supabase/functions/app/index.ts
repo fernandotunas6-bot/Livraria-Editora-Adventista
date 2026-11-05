@@ -12,6 +12,9 @@ import { rankSuggestions } from "./suggestions.ts";
 import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
 import {
   accessLinkLetter,
+  accountClosedLetter,
+  accountStatusLetter,
+  emailChangedLetter,
   noticeLetter,
   orderCreatedLetter,
   orderStatusLetter,
@@ -19,6 +22,7 @@ import {
   thankYouLetter,
   dailySummaryLetter,
   testLetter,
+  passwordChangedLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
   unsubscribeUrlFor,
@@ -2580,6 +2584,50 @@ async function sendAccessLink(email: string, name: string, kind: "invite" | "res
  * conta) garante que só sai um email, por mais vezes que o pedido se repita. Vai sempre para
  * o email da sessão, nunca para um endereço vindo no corpo do pedido.
  */
+/**
+ * Envia um aviso de conta sem deixar que uma falha do envio desfaça a acção que o originou.
+ *
+ * A suspensão, a mudança de email e o encerramento já aconteceram quando isto corre: o email
+ * é a notícia, não a acção. Devolve se saiu, para o painel dizer ao gestor se o cliente soube.
+ */
+async function notifyAccount(to: string, letter: Letter, name: string, dedupe = "") {
+  if (!to) return false;
+  try {
+    const settings = await getSettings();
+    return await sendLetter(settings, to, letter, { context: "account", customer_name: name, ...(dedupe ? { dedupe } : {}) });
+  } catch (err) {
+    console.log("notifyAccount:", (err as Error)?.message || err);
+    return false;
+  }
+}
+
+/**
+ * Aviso de palavra-passe alterada, pedido pelo próprio cliente depois de a mudar.
+ *
+ * A mudança é feita no browser, directamente no Supabase Auth, e não passa por aqui. Para o
+ * pedido não servir para mandar emails a quem se quiser: vai sempre para o email da sessão,
+ * só se a conta foi alterada há menos de 15 minutos, e a chave de idempotência leva o
+ * `updated_at` — repetir o pedido sem nova mudança não repete a mensagem.
+ */
+const PASSWORD_NOTICE_WINDOW_MS = 15 * 60 * 1000;
+
+route("POST", "/account/password-changed", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  const { data } = await db.auth.admin.getUserById(auth.id);
+  const updatedAt = data?.user?.updated_at || "";
+  const age = Date.now() - Date.parse(updatedAt);
+  if (!updatedAt || !(age >= 0 && age <= PASSWORD_NOTICE_WINDOW_MS)) return json({ email_sent: false, reason: "sem_alteracao_recente" });
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const settings = await getSettings();
+  const sent = await notifyAccount(
+    auth.email,
+    passwordChangedLetter(emailBrand(settings), profile?.name || ""),
+    profile?.name || "",
+    `account:password:${auth.id}:${updatedAt}`,
+  );
+  return json({ email_sent: sent });
+});
+
 route("POST", "/account/welcome", async ({ auth }) => {
   if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
   const settings = await getSettings();
@@ -2694,7 +2742,20 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
     const { error } = await db.from("profiles").update(patch).eq("id", target.id);
     if (error) throw bad(error.message);
   }
-  return json({ ok: true });
+
+  // Avisa os dois endereços. O antigo é o que importa para a segurança: se a mudança não foi
+  // pedida pelo dono, é por ali que ele fica a saber.
+  let emailNotified: boolean | undefined;
+  if (patch.email && target.email) {
+    const brand = emailBrand(await getSettings());
+    const name = String(patch.name ?? target.name ?? "");
+    const [toOld, toNew] = await Promise.all([
+      notifyAccount(target.email, emailChangedLetter(brand, name, String(patch.email), "old"), name),
+      notifyAccount(String(patch.email), emailChangedLetter(brand, name, String(patch.email), "new"), name),
+    ]);
+    emailNotified = toOld && toNew;
+  }
+  return json({ ok: true, ...(emailNotified === undefined ? {} : { email_notified: emailNotified }) });
 });
 
 route("POST", "/admin/users/status", async ({ auth, body }) => {
@@ -2705,9 +2766,20 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
   if (suspend && target.role === "admin" && await activeAdminCount(target.id) === 0) {
     throw bad("Tem de existir pelo menos um administrador activo.");
   }
+  // Estado antes da mudança: só se avisa o cliente quando muda de facto. Gravar "activa" numa
+  // conta que já estava activa não é notícia.
+  const { data: before } = await db.auth.admin.getUserById(target.id);
+  // `banned_until` vem na resposta do Auth mas não está no tipo `User` do supabase-js 2.49.
+  const bannedUntil = Date.parse(String((before?.user as { banned_until?: string } | undefined)?.banned_until || ""));
+  const wasSuspended = Number.isFinite(bannedUntil) && bannedUntil > Date.now();
   const { error } = await db.auth.admin.updateUserById(target.id, { ban_duration: suspend ? SUSPEND_FOR : "none" });
   if (error) throw bad(error.message);
-  return json({ ok: true, suspended: suspend });
+  let notified = false;
+  if (wasSuspended !== suspend) {
+    const brand = emailBrand(await getSettings());
+    notified = await notifyAccount(target.email, accountStatusLetter(brand, target.name || "", suspend), target.name || "");
+  }
+  return json({ ok: true, suspended: suspend, changed: wasSuspended !== suspend, email_notified: notified });
 });
 
 route("POST", "/admin/users/access-link", async ({ auth, body }) => {
@@ -2735,7 +2807,11 @@ route("POST", "/admin/users/delete", async ({ auth, body }) => {
   // As encomendas ficam (estão ligadas ao email, não à conta).
   const { error } = await db.auth.admin.deleteUser(target.id);
   if (error) throw bad(error.message);
-  return json({ ok: true });
+  // Depois de apagar, e não antes: um aviso de "conta encerrada" para uma conta que afinal
+  // não se conseguiu apagar seria falso.
+  const brand = emailBrand(await getSettings());
+  const notified = await notifyAccount(target.email, accountClosedLetter(brand, target.name || ""), target.name || "");
+  return json({ ok: true, email_notified: notified });
 });
 
 // --- Assistente (antes: chat.pb.js) ---

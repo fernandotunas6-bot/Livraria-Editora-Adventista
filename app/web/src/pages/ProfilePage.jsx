@@ -26,6 +26,7 @@ import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, getPayment
 import { displayAngolaPhone, formatAngolaPhone } from '@/lib/angolaPhone';
 import PhoneInput from '@/components/PhoneInput';
 import MfaSettings from '@/components/MfaSettings';
+import SignOutEverywhere from '@/components/SignOutEverywhere';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
 import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -503,6 +504,7 @@ const ProfilePage = () => {
                   </form>
                 </div>
                 <MfaSettings isStaff={canAccessAdmin} />
+                <SignOutEverywhere />
               </TabsContent>
 
               <TabsContent value="wishlist">

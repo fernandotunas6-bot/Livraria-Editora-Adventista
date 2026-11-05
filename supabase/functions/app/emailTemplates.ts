@@ -170,6 +170,112 @@ export function passwordChangedLetter(brand: Brand, name: string): Letter {
   };
 }
 
+/**
+ * Mostra o endereço só em parte (`ma•••@exemplo.ao`).
+ *
+ * O aviso de mudança vai para o endereço antigo, que pode já não ser do dono da conta: dizer o
+ * domínio chega para o dono reconhecer a mudança, sem entregar o endereço novo inteiro a
+ * quem ficou com a caixa antiga.
+ */
+export function maskEmail(email: string): string {
+  const [user, domain] = String(email || "").split("@");
+  if (!user || !domain) return "";
+  return `${user.slice(0, Math.min(2, Math.max(1, user.length - 1)))}•••@${domain}`;
+}
+
+/**
+ * O email da conta mudou. Sai duas vezes: para o endereço antigo (`side: "old"`), que é o que
+ * pode avisar o dono de uma mudança que ele não fez, e para o novo, que confirma onde passam
+ * a chegar as mensagens.
+ */
+export function emailChangedLetter(brand: Brand, name: string, newEmail: string, side: "old" | "new"): Letter {
+  const hello = `Olá${firstName(name) ? `, ${firstName(name)}` : ""}.`;
+  const recover = brand.siteUrl ? `${brand.siteUrl.replace(/\/$/, "")}/forgot-password` : "";
+  if (side === "old") {
+    return {
+      subject: "O email da sua conta foi alterado",
+      doc: {
+        symbol: "!",
+        tone: "warning",
+        title: "Email da conta alterado",
+        subtitle: `As mensagens passam a ir para ${maskEmail(newEmail)}.`,
+        lead: [
+          `${hello} O endereço de email da sua conta foi mudado pela equipa da loja.`,
+          "Este endereço deixa de servir para entrar na conta. Se não pediu esta mudança, responda a esta mensagem ou contacte-nos de imediato.",
+        ],
+        reason: "Recebeu esta mensagem porque este era o email da sua conta até agora.",
+      },
+    };
+  }
+  return {
+    subject: "Este é agora o email da sua conta",
+    doc: {
+      symbol: "✉",
+      tone: "brand",
+      title: "Novo email confirmado",
+      subtitle: "É com este endereço que passa a entrar na loja.",
+      lead: [
+        `${hello} O email da sua conta passou a ser ${newEmail}.`,
+        "A palavra-passe não mudou. Se não a sabe, use o botão para escolher uma nova.",
+      ],
+      cta: recover ? { label: "Definir palavra-passe", url: recover } : undefined,
+      reason: REASON_ACCOUNT,
+    },
+  };
+}
+
+/** Conta suspensa ou reactivada pela equipa. */
+export function accountStatusLetter(brand: Brand, name: string, suspended: boolean): Letter {
+  const hello = `Olá${firstName(name) ? `, ${firstName(name)}` : ""}.`;
+  if (suspended) {
+    return {
+      subject: "A sua conta foi suspensa",
+      doc: {
+        symbol: "■",
+        tone: "danger",
+        title: "Conta suspensa",
+        subtitle: "Enquanto estiver suspensa, não é possível entrar.",
+        lead: [
+          `${hello} A sua conta na ${brand.siteName} foi suspensa pela equipa da loja.`,
+          "As suas encomendas não se perdem e continuam a seguir. Para saber o motivo ou pedir a reactivação, contacte-nos.",
+        ],
+        reason: "Recebeu esta mensagem porque o estado da sua conta mudou.",
+      },
+    };
+  }
+  return {
+    subject: "A sua conta foi reactivada",
+    doc: {
+      symbol: "✓",
+      tone: "success",
+      title: "Conta reactivada",
+      subtitle: "Já pode voltar a entrar.",
+      lead: [`${hello} A sua conta na ${brand.siteName} está activa outra vez.`],
+      cta: brand.siteUrl ? { label: "Entrar na loja", url: `${brand.siteUrl.replace(/\/$/, "")}/login` } : undefined,
+      reason: "Recebeu esta mensagem porque o estado da sua conta mudou.",
+    },
+  };
+}
+
+/** Conta apagada. As encomendas ficam, ligadas ao email: dizê-lo evita o susto de as julgar perdidas. */
+export function accountClosedLetter(brand: Brand, name: string): Letter {
+  return {
+    subject: "A sua conta foi encerrada",
+    doc: {
+      symbol: "●",
+      tone: "neutral",
+      title: "Conta encerrada",
+      subtitle: "Os dados da conta foram apagados.",
+      lead: [
+        `Olá${firstName(name) ? `, ${firstName(name)}` : ""}. A sua conta na ${brand.siteName} foi encerrada.`,
+        "As encomendas já feitas continuam registadas e pode acompanhá-las com o número da encomenda e este email.",
+        "Se não pediu o encerramento, contacte-nos.",
+      ],
+      reason: "Recebeu esta mensagem porque este era o email da conta encerrada.",
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // B. Encomendas
 // ---------------------------------------------------------------------------
@@ -480,6 +586,11 @@ export const PREVIEW_TEMPLATES: Record<string, { label: string; group: string; b
   invite: { label: "Conta criada (convite)", group: "Conta", build: (b) => accessLinkLetter(b, "Maria Fernandes", "invite", "https://exemplo.ao/reset-password?token=exemplo") },
   reset: { label: "Recuperar palavra-passe", group: "Conta", build: (b) => accessLinkLetter(b, "Maria Fernandes", "reset", "https://exemplo.ao/reset-password?token=exemplo") },
   password_changed: { label: "Palavra-passe alterada", group: "Conta", build: (b) => passwordChangedLetter(b, "Maria Fernandes") },
+  email_changed_old: { label: "Email alterado (endereço antigo)", group: "Conta", build: (b) => emailChangedLetter(b, "Maria Fernandes", "maria.nova@exemplo.ao", "old") },
+  email_changed_new: { label: "Email alterado (endereço novo)", group: "Conta", build: (b) => emailChangedLetter(b, "Maria Fernandes", "maria.nova@exemplo.ao", "new") },
+  account_suspended: { label: "Conta suspensa", group: "Conta", build: (b) => accountStatusLetter(b, "Maria Fernandes", true) },
+  account_reactivated: { label: "Conta reactivada", group: "Conta", build: (b) => accountStatusLetter(b, "Maria Fernandes", false) },
+  account_closed: { label: "Conta encerrada", group: "Conta", build: (b) => accountClosedLetter(b, "Maria Fernandes") },
 
   order_unpaid: { label: "Encomenda por pagar", group: "Encomenda", build: (b) => orderCreatedLetter(b, { ...sampleOrder(), payment_status: "pending" }, "https://exemplo.ao/pagar") },
   order_paid: { label: "Encomenda confirmada", group: "Encomenda", build: (b) => orderCreatedLetter(b, sampleOrder()) },

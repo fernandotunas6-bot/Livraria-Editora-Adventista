@@ -146,6 +146,10 @@ total de uma compra não pode mudar de formato com a máquina que gerou a mensag
 |--------|---------------|
 | Boas-vindas | `POST /account/welcome`, pedido pelo cliente no primeiro acesso |
 | Conta criada (convite) · Recuperar palavra-passe | `sendAccessLink()`, pelo painel de utilizadores |
+| Palavra-passe alterada | `POST /account/password-changed`, pedido pelo cliente depois de a mudar (só se a conta mudou há menos de 15 min; chave com o `updated_at`) |
+| Email alterado — ao endereço antigo (mostra o novo só em parte) e ao novo | `POST /admin/users/update` com `email` |
+| Conta suspensa · Conta reactivada | `POST /admin/users/status`, só quando o estado muda de facto |
+| Conta encerrada | `POST /admin/users/delete`, depois de apagar (nunca antes: o aviso seria falso se o apagar falhasse) |
 | Encomenda recebida / confirmada | `POST /checkout` |
 | Pagamento confirmado | `POST /admin/orders/payment-status` |
 | A preparar · Expedida · Em trânsito · Saiu para entrega · Entregue · Cancelada | `POST /delivery-event` |
@@ -176,6 +180,30 @@ Nada disto envia nada enquanto, em **Configurações**:
    definir a variável de ambiente `SITE_URL` na Edge Function).
 
 Falta ainda, do lado do domínio, **SPF, DKIM e DMARC**: sem eles as mensagens vão para o lixo.
+
+### Avisos de conta: a acção vem primeiro
+
+`notifyAccount()` envia sem deixar que uma falha do email desfaça a suspensão, a mudança ou o
+encerramento, que já aconteceram. As rotas devolvem `email_notified`, e o painel de
+utilizadores di-lo ao gestor ("O cliente foi avisado por email" ou não).
+
+Suspender e apagar iam pela base de dados (`users_admin_set_suspended`,
+`users_admin_delete`) e por isso **nunca avisavam ninguém**. Passaram a ir primeiro pela Edge
+Function, que aplica as mesmas regras; a função da base de dados fica só para uma Edge
+Function publicada sem a rota, e aí a resposta diz `email_notified: false`.
+
+**Fica por fazer:** reembolsos (não há estado de reembolso nas encomendas), aviso de novo
+acesso e actividade suspeita (o login vai directo ao Supabase Auth, sem passar pela nossa API:
+precisa de um registo de dispositivos conhecidos, com migração).
+
+### Sessões
+
+"Terminar sessão" termina **só neste navegador** (`signOut({ scope: 'local' })`). Antes, sem
+argumento, o supabase-js usava `scope: 'global'` e cada saída desligava também os outros
+dispositivos da pessoa. Terminar em todo o lado é um botão próprio em Perfil → Segurança
+(`SignOutEverywhere.jsx` → `signOutEverywhere()`), que só limpa a sessão local depois de o
+Auth aceitar a revogação. Os outros dispositivos ficam sem sessão quando o token de acesso
+expirar (`jwt_exp` = 3600 s neste projecto) e a renovação for recusada.
 
 ## 3. O que não existe neste sistema
 

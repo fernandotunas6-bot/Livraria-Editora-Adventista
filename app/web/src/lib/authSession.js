@@ -146,3 +146,37 @@ export async function requestWelcomeEmail(pb, userId) {
   }
   return true;
 }
+
+/**
+ * Pede ao servidor o aviso de "palavra-passe alterada", depois de a mudança ter corrido bem.
+ *
+ * A palavra-passe muda no browser, directamente no Supabase Auth, sem passar pela nossa API.
+ * O servidor confirma que a conta foi alterada há pouco antes de enviar, e o email vai sempre
+ * para o endereço da sessão. Uma falha aqui nunca desfaz a mudança: devolve `false` e segue.
+ */
+export async function notifyPasswordChanged(pb) {
+  if (!pb) return false;
+  try {
+    const res = await pb.send('/account/password-changed', { method: 'POST', body: {} });
+    return res?.email_sent === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Termina a sessão em todos os dispositivos.
+ *
+ * `scope: 'global'` revoga todas as renovações da conta no Supabase Auth. Os outros
+ * dispositivos ficam sem sessão quando o acesso que têm expirar (no máximo, a duração do token
+ * de acesso) e não o conseguem renovar. Só depois de o servidor aceitar é que se limpa a sessão
+ * local: se a revogação falhar (sem rede), dizer "terminada em todo o lado" seria mentir, e
+ * quem pediu isto quase sempre suspeita de um acesso alheio.
+ */
+export async function signOutEverywhere(supabase) {
+  const { error } = await supabase.auth.signOut({ scope: 'global' });
+  if (error) {
+    throw new Error('Não foi possível terminar as outras sessões. Verifique a ligação e tente de novo.');
+  }
+  return true;
+}

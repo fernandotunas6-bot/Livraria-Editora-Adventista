@@ -73,8 +73,9 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
           if (form.role !== user.role) patch.role = form.role;
           if (form.role === 'manager') patch.permissions = form.permissions;
         }
-        if (Object.keys(patch).length) await updateUser(user.id, patch);
-        result = { id: user.id };
+        const saved = Object.keys(patch).length ? await updateUser(user.id, patch) : null;
+        // Ao mudar o email, a resposta diz se os dois endereços foram avisados.
+        result = { id: user.id, email_notified: saved?.email_notified };
       } else {
         result = await createUser({
           name: form.name,
