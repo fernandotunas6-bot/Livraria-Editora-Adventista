@@ -1,13 +1,20 @@
 /**
- * Layout dos emails da loja: azul-noite, dourado e marfim, com a cena 3D no topo.
+ * Layout dos emails da loja: cabeçalho escuro com o logótipo, imagem de livros da galeria,
+ * corpo marfim, botão azul-petróleo e detalhes dourados.
  *
- * Feito para clientes de email: tabelas, estilos inline, largura de 600px, sem CSS 3D
- * (a profundidade vem da imagem renderizada em `scripts/email/hero.html`). Sem dependências
+ * Feito para clientes de email: tabelas, estilos inline, largura de 600px. Sem dependências
  * do Deno, para o `scripts/email/auth-templates.ts` gerar com ele os templates do Supabase Auth.
+ * As imagens do topo são recortes dos banners da galeria (`scripts/email/render-heroes.cjs`).
  */
 
 const EMAIL_ASSETS = "https://bggqkjjqbjhbjsckzopj.supabase.co/storage/v1/object/public/media/email";
-export const EMAIL_HERO_URL = `${EMAIL_ASSETS}/hero-luz.png`;
+/** Imagens do topo (1200×520, mostradas a 600px), recortadas dos banners da loja. */
+export const EMAIL_HEROES = {
+  encomenda: `${EMAIL_ASSETS}/hero-encomenda.jpg`,
+  conta: `${EMAIL_ASSETS}/hero-conta.jpg`,
+  mensagem: `${EMAIL_ASSETS}/hero-mensagem.jpg`,
+};
+export type EmailHero = keyof typeof EMAIL_HEROES;
 /** Logótipo branco da loja (logo-compact-light.svg em PNG, 402×88; mostrado a 201×44). */
 export const EMAIL_LOGO_URL = `${EMAIL_ASSETS}/logo-light.png`;
 
@@ -35,6 +42,8 @@ export const esc = (v: unknown) =>
 export type EmailButton = { label: string; url: string };
 
 export type EmailOptions = {
+  /** Imagem do topo: encomendas, conta (registo, palavra-passe) ou mensagens/campanhas. */
+  hero?: EmailHero;
   /** Texto curto que aparece na lista da caixa de entrada, a seguir ao assunto. */
   preheader?: string;
   /** Linha pequena em dourado por cima do título. */
@@ -115,7 +124,7 @@ export function renderEmail(o: EmailOptions) {
           <img src="${EMAIL_LOGO_URL}" width="201" height="44" alt="${esc(site)}" style="display:block;width:201px;height:44px;border:0;color:#ffffff;font-family:${SANS};font-size:16px;font-weight:600">
         </td></tr>
         <tr><td style="background:${C.navyDeep};line-height:0;font-size:0">
-          <img src="${EMAIL_HERO_URL}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0">
+          <img src="${EMAIL_HEROES[o.hero || "mensagem"]}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0">
         </td></tr>
         <tr><td style="height:3px;background:linear-gradient(90deg,${C.navy},${C.gold},${C.goldLight},${C.gold},${C.navy});font-size:0;line-height:0">&nbsp;</td></tr>
         <tr><td class="px" style="padding:40px 48px 12px">

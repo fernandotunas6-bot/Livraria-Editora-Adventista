@@ -247,6 +247,7 @@ function buildOrderEmailHtml(order: Row, settings: Row | null, paymentLink = "")
   const chrome = emailChrome(settings);
   return renderEmail({
     ...chrome,
+    hero: "encomenda",
     preheader: `Encomenda ${order.order_number || ""} confirmada — total ${fmtMoneyKz(order.total)}.`,
     eyebrow: `Encomenda ${ref}`,
     title: "Obrigado pela sua encomenda",
@@ -1400,6 +1401,7 @@ async function sendAccessLink(email: string, name: string, kind: "invite" | "res
     : `Recebemos um pedido para definir uma nova palavra-passe na <strong>${escapeHtml(site)}</strong>.`;
   const html = renderEmail({
     ...emailChrome(settings),
+    hero: "conta",
     preheader: kind === "invite" ? "Defina a sua palavra-passe para entrar." : "Link para definir uma nova palavra-passe.",
     eyebrow: kind === "invite" ? "Bem-vindo" : "Conta",
     title: kind === "invite" ? "A sua conta está pronta" : "Nova palavra-passe",

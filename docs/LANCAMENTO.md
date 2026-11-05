@@ -158,8 +158,8 @@ Falta, por esta ordem:
 
 ## 8.2 Emails com o layout da loja
 
-- **Layout:** `supabase/functions/app/emailLayout.ts` (cabeçalho escuro com o logótipo branco, cena 3D, corpo marfim, botão azul-petróleo, detalhes dourados). Usado pela confirmação de encomenda, pelo email de teste, pelos convites e recuperação de palavra-passe do painel, e pelas mensagens a contactos e campanhas.
-- **Imagens:** no bucket público `media`, em `email/hero-luz.png` e `email/logo-light.png`. A cena 3D é `scripts/email/hero.html`; para a mudar, editar, correr `node scripts/email/render-hero.cjs hero-luz.png` e voltar a enviar o PNG para o mesmo caminho.
+- **Layout:** `supabase/functions/app/emailLayout.ts` (cabeçalho escuro com o logótipo branco, imagem de livros da galeria, corpo marfim, botão azul-petróleo, detalhes dourados). Usado pela confirmação de encomenda, pelo email de teste, pelos convites e recuperação de palavra-passe do painel, e pelas mensagens a contactos e campanhas.
+- **Imagens do topo:** recortes dos banners da galeria (`images/site/opcoes/loja-*.webp`): `hero-encomenda.jpg` (leque), `hero-conta.jpg` (Ellen G. White) e `hero-mensagem.jpg` (doutrina), mais `logo-light.png`, no bucket público `media`, em `email/`. Para trocar: mudar a lista em `scripts/email/render-heroes.cjs`, correr `node scripts/email/render-heroes.cjs <pasta>` e enviar os JPEG para o mesmo caminho.
 - **Supabase Auth** (confirmação de conta, recuperação, convite, link de entrada, troca de email, código): `node --experimental-strip-types scripts/email/auth-templates.ts > auth-templates.json` e `PATCH /v1/projects/<ref>/config/auth` com esse JSON (comando no topo do script). **O Supabase só aceita templates próprios depois de configurar um SMTP próprio** (Authentication → Emails → SMTP).
 - **Falta:** não há SMTP configurado (nem na loja, em Admin → Sistema → Integrações, nem no Supabase Auth), por isso nenhum email sai ainda; e a Edge Function `app` tem de ser publicada para usar o layout novo.
 
