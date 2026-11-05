@@ -11,7 +11,7 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
 | Cloudflare | Conta com Pages; o projecto é criado pelo primeiro deploy |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
-| Domínio | Ex.: `livrariaadventista.ao`, apontado para o Cloudflare Pages |
+| Domínio | `livrariaadventista.ao` (oficial), apontado para o Cloudflare Pages — ver [DOMINIO.md](DOMINIO.md) |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
 | Email | Servidor SMTP (Hostinger, Brevo…) ou SendGrid |
 | Google Cloud | ID de cliente OAuth para o login com Google |

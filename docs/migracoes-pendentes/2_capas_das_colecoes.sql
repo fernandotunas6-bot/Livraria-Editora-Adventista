@@ -14,13 +14,13 @@
 update public.book_collections set
   cover = case id
     -- Essenciais da Fé → Fé e doutrina
-    when '5958xsw75k3929q' then 'https://livraria-adventista.pages.dev/images/site/opcoes/slide-doutrina-leque.webp'
+    when '5958xsw75k3929q' then 'https://livrariaadventista.ao/images/site/opcoes/slide-doutrina-leque.webp'
     -- Obras de Ellen G. White → Ellen G. White
-    when '311xv9lv292i7d1' then 'https://livraria-adventista.pages.dev/images/site/opcoes/slide-ellen-white-prateleira.webp'
+    when '311xv9lv292i7d1' then 'https://livrariaadventista.ao/images/site/opcoes/slide-ellen-white-prateleira.webp'
     -- Família e Educação → Família e relacionamentos
-    when '3i9kf14o7kbo7bi' then 'https://livraria-adventista.pages.dev/images/site/opcoes/slide-familia-leque.webp'
+    when '3i9kf14o7kbo7bi' then 'https://livrariaadventista.ao/images/site/opcoes/slide-familia-leque.webp'
     -- Devocionais Diários → Destaques
-    when 'u30yl9sx68nx1zt' then 'https://livraria-adventista.pages.dev/images/site/opcoes/slide-destaques-duas-filas.webp'
+    when 'u30yl9sx68nx1zt' then 'https://livrariaadventista.ao/images/site/opcoes/slide-destaques-duas-filas.webp'
     else cover
   end,
   updated = now()

@@ -12,7 +12,7 @@ import { uploadPublicImage } from '@/lib/mediaUpload';
 // Galeria de imagens do site (feitas com as capas reais do catálogo), em public/images/site/opcoes.
 const GALLERY_URL = '/images/site/opcoes/galeria.json';
 // O admin só grava URLs https:// (sanitizeImageUrlForSave); em desenvolvimento aponta para o site publicado.
-const SITE_URL = /^(localhost|127\.)/.test(window.location.hostname) ? 'https://livraria-adventista.pages.dev' : window.location.origin;
+const SITE_URL = /^(localhost|127\.)/.test(window.location.hostname) ? 'https://livrariaadventista.ao' : window.location.origin;
 const TAB_COLS = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
 
 /**
