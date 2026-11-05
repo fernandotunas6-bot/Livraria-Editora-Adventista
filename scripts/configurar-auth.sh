@@ -3,6 +3,8 @@
 #
 #   bash scripts/configurar-auth.sh --verificar   → só lê e testa; não muda nada
 #   bash scripts/configurar-auth.sh               → mostra a diferença, pede confirmação e aplica
+#   bash scripts/configurar-auth.sh --google client_secret_….json
+#                                                 → põe no Supabase a chave do cliente Google
 #
 # Porque existe (auditoria, 9.6): o `site_url` era o projecto antigo e o domínio novo não estava
 # na lista de endereços autorizados. O Supabase ignora um destino que não conhece e manda para o
@@ -12,6 +14,13 @@
 # Muda só: site_url, uri_allow_list, e o assunto e o texto de seis emails. Nada de SMTP, Google,
 # MFA nem limites. Guarda antes os valores actuais em supabase/auth/.antes-<data>.json (fora do
 # git) para reverter com:  bash scripts/configurar-auth.sh --repor supabase/auth/.antes-<data>.json
+#
+# --google (auditoria, 9.7): a chave secreta do cliente Google guardada no Supabase está errada —
+# o regresso do login falha com `invalid_client: The provided client secret is invalid` (visto
+# nos registos do Auth a 2026-11-04, 12:03 e 17:44). Lê a chave do JSON que a Google Cloud
+# Console descarrega, confirma-a primeiro na própria Google (um código falso tem de dar
+# `invalid_grant`; `invalid_client` quer dizer chave errada) e só então a envia. A chave nunca
+# aparece no ecrã nem nos argumentos dos comandos.
 #
 # Token: SUPABASE_ACCESS_TOKEN, ou o do Supabase CLI (~/.supabase/access-token).
 set -euo pipefail
@@ -88,7 +97,43 @@ verificar() {
   return $falhas
 }
 
+# Corpo do formulário do teste da Google, a partir do JSON (vai pela entrada padrão do curl).
+google_form() {
+  python3 -c '
+import json, sys, urllib.parse
+c = json.load(open(sys.argv[1]))["web"]
+sys.stdout.write(urllib.parse.urlencode({"code": "4/codigo-falso", "client_id": c["client_id"],
+  "client_secret": c["client_secret"], "grant_type": "authorization_code",
+  "redirect_uri": sys.argv[2] + "/callback"}))' "$1" "$AUTH"
+}
+
+google_body() {
+  python3 -c '
+import json, sys
+c = json.load(open(sys.argv[1]))["web"]
+uris = c.get("redirect_uris") or []
+if sys.argv[2] + "/callback" not in uris:
+    sys.exit("✘ O cliente Google não tem " + sys.argv[2] + "/callback nos URIs de redireccionamento.")
+sys.stdout.write(json.dumps({"external_google_enabled": True, "external_google_client_id": c["client_id"],
+  "external_google_secret": c["client_secret"]}))' "$1" "$AUTH"
+}
+
 case "${1:-}" in
+  --google)
+    f="${2:-}"; [ -f "$f" ] || { echo "✘ Indique o JSON do cliente Google (client_secret_….json)." >&2; exit 1; }
+    resposta=$(google_form "$f" | curl -s --data @- https://oauth2.googleapis.com/token \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("error",""))')
+    case "$resposta" in
+      invalid_grant) echo "✓ A Google aceita esta chave." ;;
+      invalid_client) echo "✘ A Google recusa esta chave (invalid_client): descarregue o JSON de novo." >&2; exit 1 ;;
+      *) echo "✘ Resposta inesperada da Google: $resposta" >&2; exit 1 ;;
+    esac
+    body=$(google_body "$f")
+    read -r -p "Pôr esta chave no Supabase (Authentication → Providers → Google)? [s/N] " r
+    [ "$r" = "s" ] || { echo "Nada mudado."; exit 0; }
+    printf '%s' "$body" | curl -sf -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @- "$API" >/dev/null
+    echo "Feito. Teste: entrar com a Google em https://livrariaadventista.com/login."
+    ;;
   --verificar)
     echo "Configuração actual vs repositório:"; actual | diferenca "$(desejado)"
     echo "Destinos dos links:"; verificar && echo "Tudo certo." || { echo "Há destinos errados."; exit 1; }
@@ -108,5 +153,5 @@ case "${1:-}" in
     echo "Aplicado. A verificar (o Auth pode levar alguns segundos a recarregar)…"; sleep 8
     verificar && echo "Tudo certo." || { echo "Há destinos errados: ver acima."; exit 1; }
     ;;
-  *) echo "Uso: $0 [--verificar | --repor <ficheiro>]" >&2; exit 2 ;;
+  *) echo "Uso: $0 [--verificar | --repor <ficheiro> | --google <client_secret.json>]" >&2; exit 2 ;;
 esac

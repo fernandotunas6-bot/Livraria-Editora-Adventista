@@ -13,6 +13,7 @@ import {
   sendGmailMessage,
   listGoogleContacts,
 } from '@/lib/googleAuth';
+import { googleWorkspaceErrorMessage } from '@/lib/googleWorkspaceErrors';
 import {
   FolderOpen, Calendar, Mail, Users, File, Trash2, Plus, LogOut,
   Send, User, Clock, Search, ArrowRight, UploadCloud, Loader2, CheckCircle2
@@ -109,7 +110,7 @@ const GoogleWorkspaceHub = () => {
       toast({
         variant: 'destructive',
         title: 'Falha na Ligação',
-        description: err.message || 'Erro ao conectar à conta Google.'
+        description: googleWorkspaceErrorMessage(err),
       });
     } finally {
       setActionLoading(false);

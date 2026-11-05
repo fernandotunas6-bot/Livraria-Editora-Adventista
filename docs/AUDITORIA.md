@@ -777,6 +777,32 @@ Depois, o SMTP do Auth (achado 27): Authentication → SMTP Settings, com o mesm
 for usado em Configurações → Email. Até lá, a alternativa é desligar a confirmação de email
 (Authentication → Providers → Email), aceitando contas com emails que ninguém confirmou.
 
+## 9.7 Erros reais dos registos (2026-11-05)
+
+Leitura dos registos das últimas 24 horas do Supabase (API, base de dados, Auth, Edge Function e
+Storage), agrupados por erro. Os 401 e 404 das 08:35 de 2026-11-04 são o teste de isolamento da
+auditoria (pedidos anónimos que têm de ser recusados). Os `/track` 404/400 são encomendas que
+não existem, e o 400 de `/auth/v1/token` é uma palavra-passe errada: tudo comportamento certo.
+O Storage teve 3 175 pedidos de capas, nenhum 4xx.
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| 28 | **Login com a Google partido no Supabase.** Duas pessoas tentaram entrar (2026-11-04, 12:03 e 17:44) e o regresso falhou com `oauth2: "invalid_client" "The provided client secret is invalid."`. O ID do cliente está certo; a chave guardada no Supabase não. A chave do JSON descarregado da Google Cloud (na raiz, fora do git) foi confirmada na própria Google: um código falso dá `invalid_grant`, ou seja, a chave é aceite. | Crítica | ⏳ `bash scripts/configurar-auth.sh --google client_secret_….json` |
+| 29 | **Separador Atendimento da equipa inteiro em erro.** O painel pedia `href` a `staff_notifications`, que não tem essa coluna (400 nos registos, 10:49). As três consultas do atendimento correm num `Promise.all`, por isso a equipa não via nem as notificações nem as conversas. | Alta | ✅ (no próximo deploy) |
+| 30 | **Ligação do painel ao Google Workspace recusada no domínio novo.** O Firebase (projecto `skilful-form-c5jvd`) só tem autorizados o projecto antigo e endereços do AI Studio. Provado no Chrome com o SDK do Firebase: em `livrariaadventista.com` dá `auth/unauthorized-domain`. O painel mostrava a mensagem crua em inglês. | Alta | ⏳ dono (Firebase → Authentication → Settings → Authorized domains: `livrariaadventista.com`); a mensagem passa a dizê-lo ✅ |
+
+### Corrigido no código
+
+- `supportApi.js`: campos próprios para as notificações do cliente e da equipa.
+- `lib/queryFields.test.js`, teste novo: encontra no código todas as consultas
+  `.from('tabela').select('campos')` com campos escritos à mão (24) e confirma, pelas
+  migrações, que cada coluna existe. Com o `supportApi.js` antigo falha e aponta
+  `staff_notifications.href`.
+- `lib/googleWorkspaceErrors.js`: mensagens em português para as falhas da ligação ao Google
+  Workspace; no domínio não autorizado, diz qual e onde se autoriza.
+- `scripts/configurar-auth.sh --google <json>`: confirma a chave na Google, pede confirmação e
+  põe-na no Supabase. A chave nunca aparece no ecrã nem nos argumentos.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.
@@ -786,11 +812,14 @@ for usado em Configurações → Email. Até lá, a alternativa é desligar a co
 
 ## Próximos passos, por ordem
 
-1. `bash scripts/configurar-auth.sh` (achado 22): sem isto, o login com a Google e todos os
-   links de email levam ao site antigo.
-2. SMTP do Supabase Auth (achado 27), senão os clientes não conseguem confirmar a conta.
-3. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela de 9.5). A partir daí, um
+1. `bash scripts/configurar-auth.sh --google client_secret_….json` (achado 28) e depois
+   `bash scripts/configurar-auth.sh` (achado 22): sem os dois, o login com a Google não
+   funciona e os links de email levam ao site antigo.
+2. Firebase → Authorized domains: `livrariaadventista.com` (achado 30), para a ligação do painel
+   ao Gmail, Drive e Calendário.
+3. SMTP do Supabase Auth (achado 27), senão os clientes não conseguem confirmar a conta.
+4. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela de 9.5). A partir daí, um
    merge para o `main` aplica as três migrações de 9.5 e publica a função e o site (com as
    correcções de 9.6).
-4. Telefones, coordenadas das lojas, descrições e stock real.
-5. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
+5. Telefones, coordenadas das lojas, descrições e stock real.
+6. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
