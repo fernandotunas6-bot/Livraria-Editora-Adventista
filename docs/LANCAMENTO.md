@@ -136,7 +136,7 @@ npx supabase functions deploy app --project-ref bggqkjjqbjhbjsckzopj --no-verify
 
 ## 8.1 Domínio `livrariaadventista.ao`
 
-Estado em 2026-11-05:
+Estado em 2026-11-05 (nameservers trocados no registador; o `.ao` ainda responde NXDOMAIN — a zona `.ao` foi publicada pela última vez às 01:00 UTC):
 
 | Peça | Estado |
 |------|--------|
@@ -144,13 +144,14 @@ Estado em 2026-11-05:
 | DNS na zona | `CNAME @` e `CNAME www` → `livraria-editora-adventista-ben.pages.dev`, com proxy |
 | Projecto Pages `livraria-editora-adventista` | `livrariaadventista.ao` e `www.livrariaadventista.ao` adicionados (ficam a validar até a zona activar) |
 | `livrariaadventista.com` | Activo, a servir o mesmo projecto Pages |
+| Supabase Auth | Redirect URLs já incluem `.ao`, `.com` (com e sem `www`) e os dois `pages.dev`; o Site URL continua `https://livraria-adventista.pages.dev/` até o `.ao` abrir |
 | Site no código | `canonical`, `og:*`, `robots.txt` e `sitemap.xml` já apontam para `https://livrariaadventista.ao` |
 
 Falta, por esta ordem:
 
 1. **No registador .ao (DNS.AO / revendedor):** confirmar que o registo do domínio está concluído e pôr os nameservers `cody.ns.cloudflare.com` e `hadlee.ns.cloudflare.com`. Hoje o `.ao` responde NXDOMAIN para `livrariaadventista.ao`.
 2. **Cloudflare:** a zona passa a *Active* sozinha (ou carregar em "Check nameservers"); os dois domínios no Pages passam a *Active* com certificado.
-3. **Supabase → Authentication → URL Configuration:** Site URL = `https://livrariaadventista.ao`; Redirect URLs = `https://livrariaadventista.ao/**`, `https://www.livrariaadventista.ao/**` (manter o `.com` e o `pages.dev` enquanto forem usados).
+3. **Supabase → Authentication → URL Configuration:** os Redirect URLs já estão feitos; falta trocar o Site URL para `https://livrariaadventista.ao` quando o domínio abrir.
 4. **Google Cloud:** acrescentar `https://livrariaadventista.ao` às origens JavaScript autorizadas do cliente OAuth e às restrições da chave Firebase; no Firebase Auth, acrescentar o domínio em *Authorized domains*.
 5. **Redireccionar** `www.livrariaadventista.ao` e `livrariaadventista.com` (+ `www`) para `https://livrariaadventista.ao` com uma *Redirect Rule* (301) em cada zona. Só depois do passo 2, senão o `.com` deixa de abrir a loja.
 6. Email: se o endereço `contacto@livrariaadventista.ao` for usado, criar os registos MX/SPF/DKIM do fornecedor de email na zona.
