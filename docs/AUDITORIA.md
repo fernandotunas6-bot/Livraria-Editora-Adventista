@@ -644,7 +644,7 @@ coordenadas da cidade errada, gerar a frase dos backups, e criar à mão os toke
 **Dados de produção, em três migrações novas** (testadas de ponta a ponta num Postgres em
 memória com os dados de produção: 25 verificações, incluindo repetir cada uma sem efeito):
 
-- `20261104180000_limpeza_dados_provisorios`:
+- `20261105045627_limpeza_dados_provisorios`:
   - `site_settings` fica com uma linha só: a `et8zevy21sypp73`, que é a que a função lê e a
     única configurada. As outras duas eram restos quase vazios. Um índice único impede que
     volte a haver duas. O painel lê a mesma linha (o cliente de dados ordena por omissão
@@ -661,10 +661,10 @@ memória com os dados de produção: 25 verificações, incluindo repetir cada u
   - Três `unitel_money` iguais e desligados → um, e o código passa a ser único.
   - Tudo o que muda ou sai fica antes em `private.correcoes_dados`. O fim do ficheiro diz
     como reverter.
-- `20261104170000_campos_encomendas` (antes em `docs/migracoes-pendentes/`): o site
+- `20261105045510_campos_encomendas` (antes em `docs/migracoes-pendentes/`): o site
   publicado já tem o código de que depende, e a definição do trigger em produção era igual
   à do ficheiro, tirando as duas mudanças pretendidas.
-- `20261104170500_capas_das_colecoes`: as quatro capas das colecções eram fotos genéricas do
+- `20261105045517_capas_das_colecoes`: as quatro capas das colecções eram fotos genéricas do
   Unsplash. Passam às imagens feitas com as capas reais (já publicadas no domínio novo; o
   SQL antigo apontava para o projecto antigo). Só troca as que ainda são do Unsplash.
 - `1_loja_talatona_para_huambo.sql` retirado: transformaria Catumbela numa segunda loja do

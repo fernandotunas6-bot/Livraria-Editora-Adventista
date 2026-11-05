@@ -35,6 +35,32 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
    - Pôr o domínio do site no Site URL e nos Redirect URLs.
    - A protecção contra palavras-passe vazadas exige o plano Pro; ignorar.
 
+## Backend — revisão e migrações aplicadas (2026-11-05)
+
+- **Aplicadas na base de dados pelo MCP**, com os ficheiros renomeados para as versões
+  atribuídas e o SQL igual ao byte (md5 verificado): `20261105045510_campos_encomendas`,
+  `20261105045517_capas_das_colecoes` e `20261105045627_limpeza_dados_provisorios`. Antes eram
+  `20261104170000`, `20261104170500` e `20261104180000`, ainda por aplicar; ensaiadas primeiro
+  num bloco anulado. O `db push` do merge já não as volta a correr.
+- **`site_url`** estava em `https://livrariaadventista.ao` (alterado nas 3 linhas a
+  2026-11-05 02:09), que ainda não resolve: os links dos emails davam numa página que não
+  abre. Corrigido à mão para `https://livrariaadventista.com` antes da limpeza; a limpeza
+  passou a tratar também o `.ao`.
+- **Três encomendas de teste apagadas** (importadas do PocketBase: `ENC-D9IBRY`,
+  `ENC-D8BM5D` e uma sem número, todas `test@test.com`/`t@t.com`). As linhas inteiras estão
+  em `private.correcoes_dados` (`migracao = 'manual-2026-11-05-encomendas-teste'`). O stock
+  não foi mexido.
+- **Migrações conferidas com `schema_migrations`:** todas iguais tirando comentários e
+  espaços, excepto a `20261102150000`, que tinha um `grant` nunca aplicado com ela (está na
+  `20261102160000`). O ficheiro passou a ser igual ao aplicado.
+- **Edge Function:** `/delivery-event` só aceita os 8 estados de entrega e corta os textos;
+  `/confirm-delivery` corta nome e documento; `successUrl` do checkout fica só com o caminho;
+  o resumo das campanhas usa o `site_url` em vez de `livrariaadventista.ao` fixo. **Ainda não
+  publicada** — vai no deploy do merge (não há CLI do Supabase nesta máquina, e a função é
+  grande demais para a colar à mão).
+- **Avisos do Supabase:** as 16 funções `SECURITY DEFINER` chamáveis com sessão verificam a
+  permissão por dentro (falsos positivos); a protecção de palavras-passe vazadas exige o Pro.
+
 ## O que já está feito
 
 - **Campanhas de contactos agendadas a sério** (2026-11-03): `pg_cron` de 15 em 15 minutos a
@@ -228,13 +254,11 @@ fotos genéricas do Unsplash.
 - **O perfil aceita o separador no URL** (`/profile?tab=wishlist`), como o painel já fazia.
   É o que permite aos atalhos do rodapé abrirem já na secção certa.
 
-### Por correr (dados, não esquema)
+### Capas das colecções — aplicado (2026-11-05)
 
-`supabase/migrations/20261104170500_capas_das_colecoes.sql` troca as capas das quatro colecções —
-hoje fotos genéricas do Unsplash — por imagens feitas com as capas reais do catálogo,
-escolhidas pelo tema de cada uma. Corre-se no SQL Editor do Supabase (o `db push` é só para
-esquema). Em alternativa, dá-se dois cliques por colecção em Admin → Colecções → Capa →
-aba Galeria.
+`supabase/migrations/20261105045517_capas_das_colecoes.sql` trocou as capas das quatro
+colecções (fotos genéricas do Unsplash) pelas imagens feitas com as capas reais do catálogo.
+Continuam a poder ser mudadas em Admin → Colecções → Capa → aba Galeria.
 
 ## Checkout no telemóvel (2026-11-02)
 
@@ -330,8 +354,8 @@ Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema d
   emails e o recibo do WhatsApp lêem por `orderPaymentLabel`/`orderPaymentCode`
   (`orderUtils.js`) e `paymentLabel` (`orderFields.ts`); antes, o recibo mostrava o nome e a
   exportação o código. O checkout deixa de gravar `payment_method` e grava sempre um nome.
-  Falta aplicar `supabase/migrations/20261104170000_campos_encomendas.sql` (preenche as antigas) e,
-  depois, apagar `payment_method`.
+  `supabase/migrations/20261105045510_campos_encomendas.sql` (preenche as antigas) foi aplicada
+  a 2026-11-05. Falta apagar `payment_method`.
 - **`order_type` é derivado de `sale_channel`** (`whatsapp_order` ⇔ `whatsapp`): dois campos
   para a mesma verdade, que podem divergir.
 - **`payment_category`:** coluna morta (vazia em todas as encomendas). O painel deixou de a
@@ -343,7 +367,8 @@ Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema d
   `orderPickupStore` e `orderLocality` (e `deliveryAddressLine`/`pickupStoreName` na
   função). O painel mostrava a loja dos levantamentos duas vezes ("Levantamento: X, X"). O
   checkout deixa de gravar `address`; `city` continua, porque o trigger `orders_before_update`
-  o usa como local do seguimento — a migração `20261104170000_campos_encomendas` muda isso.
+  o usava como local do seguimento — a migração `20261105045510_campos_encomendas` (aplicada a
+  2026-11-05) mudou isso.
 
 ## Regras para continuar
 
