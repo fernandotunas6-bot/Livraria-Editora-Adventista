@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, LayoutGrid, Search, ShoppingCart, User } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { activeTab, bottomNavVisible, requestCartOpen, requestHeaderSearch } from '@/lib/mobileNav';
 import { cn } from '@/lib/utils';
 
@@ -29,19 +30,24 @@ export default function MobileBottomNav() {
   const [sheetUsed, setSheetUsed] = useState(false);
   const visible = isMobile && bottomNavVisible(pathname);
   const tab = activeTab(pathname);
+  // Desce → sai de cena e deixa o ecrã todo para os livros; sobe → volta. Com a folha das
+  // categorias aberta fica sempre.
+  const hidden = useHideOnScroll(visible && !categoriesOpen);
   const cartCount = cartItems.reduce((n, item) => n + (item.quantity || 0), 0);
 
   useEffect(() => {
     const raiz = document.documentElement;
     // --barra-navegacao: a altura que se vê (os flutuantes já somam a área segura à parte).
     // --barra-navegacao-total: com a área segura, para o fim da página e para os avisos.
-    raiz.style.setProperty('--barra-navegacao', visible ? `${ALTURA}px` : '0px');
+    // Escondida, os flutuantes (chat, subir ao topo) descem com ela; o espaço no fim da página
+    // (--barra-navegacao-total) fica, para o conteúdo não saltar.
+    raiz.style.setProperty('--barra-navegacao', visible && !hidden ? `${ALTURA}px` : '0px');
     raiz.style.setProperty('--barra-navegacao-total', visible ? `calc(${ALTURA}px + env(safe-area-inset-bottom, 0px))` : '0px');
     return () => {
       raiz.style.setProperty('--barra-navegacao', '0px');
       raiz.style.setProperty('--barra-navegacao-total', '0px');
     };
-  }, [visible]);
+  }, [visible, hidden]);
 
   useEffect(() => { setCategoriesOpen(false); }, [pathname]);
 
@@ -54,7 +60,10 @@ export default function MobileBottomNav() {
     <>
       <nav
         aria-label="Navegação principal"
-        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm md:hidden"
+        className={cn(
+          'safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden',
+          hidden && 'translate-y-full',
+        )}
       >
         <div className="flex items-stretch" style={{ height: ALTURA }}>
           <Link to="/" className={cn(item, cor(tab === 'inicio'))} aria-current={tab === 'inicio' ? 'page' : undefined}>

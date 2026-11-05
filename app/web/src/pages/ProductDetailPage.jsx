@@ -26,6 +26,7 @@ import BookPreviewModal from '@/components/BookPreviewModal';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import SampleReaderModal from '@/components/SampleReaderModal';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
+import DiscoveryFeed from '@/components/DiscoveryFeed.jsx';
 import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
@@ -832,6 +833,9 @@ function ProductDetailPage() {
       <BookPreviewModal product={product} open={showPreview} onClose={() => setShowPreview(false)} onCartOpen={() => setIsCartOpen(true)} />
 
       <RecentlyViewed currentId={product.id} />
+
+      {/* Como nas grandes lojas: debaixo do livro, o catálogo continua enquanto se desce. */}
+      <DiscoveryFeed excludeId={product.id} onCartOpen={() => setIsCartOpen(true)} title="Também lhe pode interessar" />
 
       <StickyBuyBar
         alvo={botoesCompra}

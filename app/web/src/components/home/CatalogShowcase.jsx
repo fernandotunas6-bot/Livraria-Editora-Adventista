@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
 import { getProducts, getProduct } from '@/api/EcommerceApi';
 import ProductRail from '@/components/home/ProductRail';
 import QuickViewModal from '@/components/QuickViewModal';
-import { Button } from '@/components/ui/button';
 import { buildShowcaseCategories, categoryShopLink } from '@/lib/catalogCategories';
 
 /**
@@ -133,11 +130,6 @@ export default function CatalogShowcase({ onCartOpen }) {
           ))}
         </div>
 
-        <div className="container-custom pb-10 pt-4 text-center">
-          <Button asChild size="lg" variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
-            <Link to="/shop">Ver o catálogo completo <ArrowRight className="ml-2 h-4 w-4" /></Link>
-          </Button>
-        </div>
       </section>
 
       <QuickViewModal

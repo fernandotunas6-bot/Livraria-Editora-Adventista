@@ -1,42 +1,23 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { motion } from 'framer-motion';
-import { Truck, Package, RotateCcw, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { subscribeNewsletter } from '@/api/EcommerceApi';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import HeroSlider from '@/components/HeroSlider.jsx';
 import DestaquesSemana from '@/components/DestaquesSemana.jsx';
 import CatalogShowcase from '@/components/home/CatalogShowcase.jsx';
-import MobileDiscoveryFeed from '@/components/home/MobileDiscoveryFeed.jsx';
+import DiscoveryFeed from '@/components/DiscoveryFeed.jsx';
 import { pageTitle, BRAND } from '@/lib/brand';
 
-const trustSignals = [
-  { icon: Truck, title: 'Envio Grátis acima de 20.000 Kz', description: 'Para todo o país' },
-  { icon: Package, title: 'Pagamento Flexível', description: 'Na entrega ou transferência' },
-  { icon: RotateCcw, title: 'Devolução em 30 dias', description: 'Sem complicações' },
-];
-
+/**
+ * Página inicial: destaques, prateleiras por tema e, a seguir, "Mais para si", que continua
+ * a mostrar livros enquanto se desce. Depois dos livros vem só o rodapé (no desktop; no
+ * telemóvel a barra inferior faz esse papel). As garantias de envio e a newsletter estão no
+ * rodapé, por isso não se repetem aqui entre os livros.
+ */
 const HomePage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [email, setEmail] = useState('');
-  const { toast } = useToast();
-
-  const handleNewsletterSubmit = async (e) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    try {
-      await subscribeNewsletter(email);
-      toast({ title: 'Subscrição realizada com sucesso!' });
-      setEmail('');
-    } catch {
-      toast({ title: 'Erro', description: 'Não foi possível subscrever.', variant: 'destructive' });
-    }
-  };
+  const openCart = useCallback(() => setIsCartOpen(true), []);
 
   return (
     <>
@@ -45,50 +26,14 @@ const HomePage = () => {
         <meta name="description" content={`${BRAND.name} — literatura cristã adventista, educação e inspiração.`} />
       </Helmet>
 
-      <Header onCartOpen={() => setIsCartOpen(true)} />
+      <Header onCartOpen={openCart} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main>
         <HeroSlider />
-        <DestaquesSemana onCartOpen={() => setIsCartOpen(true)} />
-        <CatalogShowcase onCartOpen={() => setIsCartOpen(true)} />
-
-        <section className="section-spacing bg-background">
-          <div className="container-custom">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {trustSignals.map((signal, index) => (
-                <motion.div key={index} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} className="text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#0ea5c9]/10 mb-4">
-                    <signal.icon className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">{signal.title}</h3>
-                  <p className="text-muted-foreground">{signal.description}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section-spacing bg-secondary/20">
-          <div className="container-custom">
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-2xl mx-auto text-center">
-              <h2 className="text-4xl md:text-5xl font-bold mb-4">Junte-se à Nossa Comunidade</h2>
-              <p className="text-muted-foreground text-lg mb-8">
-                Subscreva e receba novidades sobre lançamentos e promoções da {BRAND.name}
-              </p>
-              <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-                <Input type="email" placeholder="O seu email" value={email} onChange={(e) => setEmail(e.target.value)} required className="flex-1" />
-                <Button type="submit" className="btn-primary">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Subscrever
-                </Button>
-              </form>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Só no telemóvel: o catálogo continua aqui em vez do rodapé. */}
-        <MobileDiscoveryFeed onCartOpen={() => setIsCartOpen(true)} />
+        <DestaquesSemana onCartOpen={openCart} />
+        <CatalogShowcase onCartOpen={openCart} />
+        <DiscoveryFeed onCartOpen={openCart} />
       </main>
 
       <div className="hidden md:block">
