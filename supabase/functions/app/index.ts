@@ -770,7 +770,10 @@ function effectivePrice(b: Row) {
   return sale > 0 && sale < price && started && notEnded ? sale : price;
 }
 
-async function getNewBooksDigest() {
+/** Endereço público da loja: o configurado no painel (`site_url`), senão o domínio principal. */
+const DEFAULT_SITE_URL = "https://livrariaadventista.com";
+
+async function getNewBooksDigest(settings: Row | null) {
   const { data: books } = await db.from("stock_books").select("title, price, sale_price, sale_starts_at, sale_ends_at").eq("active", true).gt("stock", 0)
     .order("created", { ascending: false }).limit(5);
   if (!books?.length) return "";
@@ -779,7 +782,10 @@ async function getNewBooksDigest() {
     const price = b.price ? `${effectivePrice(b).toLocaleString("pt-AO")} Kz` : "";
     lines.push(`• ${b.title || "Livro"}${price ? " — " + price : ""}`);
   }
-  lines.push("", "Visite: https://livrariaadventista.ao/shop");
+  // O `.ao` ainda não resolve: um endereço fixo aqui mandava os clientes para uma página que
+  // não abre. Vem das configurações, como os links dos emails.
+  const site = (emailBrand(settings).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  lines.push("", `Visite: ${site}/shop`);
   return lines.join("\n");
 }
 
@@ -1138,8 +1144,9 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
   if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
-  const recipientName = String(body.recipientName || "").trim();
-  const recipientId = String(body.recipientId || "").trim();
+  // Com limite, como no checkout: são texto livre de quem tem o número e o email.
+  const recipientName = String(body.recipientName || "").trim().slice(0, 120);
+  const recipientId = String(body.recipientId || "").trim().slice(0, 60);
   const signature = String(body.signature || "").trim();
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
   if (!recipientName) throw bad("Nome de quem recebe é obrigatório.");
@@ -1231,16 +1238,25 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   return json({ payment_status: saved.payment_status, email_sent: emailSent });
 });
 
+// Os estados que o seguimento, os emails e o painel (DELIVERY_STATUS em orderUtils.js)
+// conhecem. Um estado fora da lista ficava gravado tal como veio e aparecia ao cliente em
+// bruto no seguimento e no email.
+const DELIVERY_STATUSES = new Set([
+  "received", "confirmed", "preparing", "shipped", "in_transit", "out_for_delivery", "delivered", "cancelled",
+]);
+
 route("POST", "/delivery-event", async ({ auth, body }) => {
   requirePermission(auth, "manage_orders");
   if (!body.orderId) throw bad("orderId obrigatório.");
+  if (body.status && !DELIVERY_STATUSES.has(String(body.status))) throw bad("Estado de entrega inválido.");
   const { data: order } = await db.from("orders").select("*").eq("id", body.orderId).maybeSingle();
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
+  const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
   const statusChanged = !!body.status && body.status !== order.delivery_status;
   const patch: Row = {};
-  if (body.tracking_number) patch.tracking_number = body.tracking_number;
-  if (body.carrier) patch.carrier = body.carrier;
-  if (body.estimated_delivery) patch.estimated_delivery = body.estimated_delivery;
+  if (body.tracking_number) patch.tracking_number = text(body.tracking_number, 120);
+  if (body.carrier) patch.carrier = text(body.carrier, 120);
+  if (body.estimated_delivery) patch.estimated_delivery = text(body.estimated_delivery, 60);
   if (statusChanged) {
     // O passo novo entra na linha temporal pelo trigger orders_before_update, que o escreve
     // sempre que o estado da entrega muda. Acrescentá-lo também aqui deixava cada mudança
@@ -1249,8 +1265,8 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   } else {
     // Sem mudança de estado: é uma nota de entrega, que só esta rota escreve.
     patch.delivery_timeline = [...(order.delivery_timeline || []), timelineEvent(
-      body.status || order.delivery_status || "in_transit", body.title || "Actualização de entrega",
-      body.description || "", body.location || "",
+      body.status || order.delivery_status || "in_transit", text(body.title, 160) || "Actualização de entrega",
+      text(body.description, 1000), text(body.location, 160),
     )];
   }
   const { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
@@ -1287,6 +1303,16 @@ async function orderByIdempotencyKey(key: string): Promise<Row | null> {
   const { data, error } = await db.from("orders").select("*").eq("idempotency_key", key).limit(1);
   if (error) return null;
   return data?.[0] || null;
+}
+
+function successPath(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "/success";
+  try {
+    const u = new URL(value.trim(), "https://loja.invalid");
+    return (u.pathname + u.search).slice(0, 200) || "/success";
+  } catch {
+    return "/success";
+  }
 }
 
 function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: boolean; whatsappSent: boolean; replayed?: boolean }) {
@@ -1437,7 +1463,10 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     });
   }
 
-  const successUrl = data.successUrl || "/success";
+  // Só o caminho, nunca outro domínio: o valor vem do browser e volta no `url` da resposta.
+  // O site manda `${origin}/success`; fica "/success". Outro tipo (número, objecto) partia o
+  // `.includes` mais abaixo com um 500.
+  const successUrl = successPath(data.successUrl);
   const idempotencyKey = IDEMPOTENCY_KEY.test(String(data.idempotencyKey || "")) ? String(data.idempotencyKey) : "";
   const emailQueued = !!(email && settings?.order_email_enabled);
   if (idempotencyKey) {
@@ -1909,8 +1938,8 @@ async function groupMemberIds(groupId: string): Promise<string[]> {
 async function runDueCampaigns(ownerId: string | null, agendado: boolean) {
   const now = nowISO();
   const { data: campaigns } = await db.from("contact_campaigns").select("*").eq("is_active", true).limit(50);
-  const digest = await getNewBooksDigest();
   const settings = await getSettings();
+  const digest = await getNewBooksDigest(settings);
   const entrega = { email: emailEntrega(settings), whatsapp: !!(await getWhatsAppConfig()) };
   let processed = 0;
   const notifications: Row[] = [];

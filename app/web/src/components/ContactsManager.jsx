@@ -39,7 +39,7 @@ const DEFAULT_NOTIFY_BODY = `Olá! 👋
 Temos novidades na Livraria Adventista que podem interessar-lhe.
 
 Visite a nossa loja online para descobrir os livros mais recentes:
-https://livrariaadventista.ao/shop
+https://livrariaadventista.com/shop
 
 Com carinho,
 Equipa Livraria Adventista`;
