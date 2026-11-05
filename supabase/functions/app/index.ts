@@ -794,6 +794,100 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Cada passo da encomenda, em todos os canais
+// ---------------------------------------------------------------------------
+
+/**
+ * Avisa o cliente de um passo da encomenda: email, WhatsApp (se a API estiver configurada) e
+ * notificação push (se houver chaves VAPID e o cliente tiver subscrito). O aviso na conta do
+ * site é escrito pela base de dados (trigger `orders_notify_activity`).
+ *
+ * `step` é um estado da entrega (`confirmed`, `preparing`, `shipped`, …) ou `paid`. Cada canal
+ * tem a sua chave de idempotência: voltar a gravar o mesmo passo não repete mensagens. Uma
+ * falha num canal não impede os outros nem desfaz a mudança na encomenda.
+ */
+async function notifyOrderStep(order: Row, step: string, event?: Row) {
+  const settings = await getSettings();
+  const result = { email: false, whatsapp: false, push: 0 };
+  try {
+    result.email = step === "paid"
+      ? await sendPaymentConfirmedEmail(order, settings)
+      : await sendOrderStatusEmail(order, settings, step, event);
+  } catch (err) {
+    console.log(`notifyOrderStep email ${step}:`, (err as Error)?.message || err);
+  }
+  const brand = emailBrand(settings);
+  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : orderStatusLetter(brand, order, step, event);
+  if (!letter) return result;
+  const ref = String(order.order_number || order.id || "");
+  const site = brand.siteUrl.replace(/\/$/, "");
+  const title = letter.doc.title;
+  const subtitle = letter.doc.subtitle || "";
+  try {
+    result.whatsapp = await sendOrderStepWhatsApp(order, step, [
+      `*${title}* — ${ref}`, "", subtitle,
+      event?.description ? String(event.description) : "",
+      site ? `\nAcompanhe: ${site}/track` : "",
+      `\n${settings?.site_name || "Livraria Adventista"}`,
+    ].filter(Boolean).join("\n"));
+  } catch (err) {
+    console.log(`notifyOrderStep whatsapp ${step}:`, (err as Error)?.message || err);
+  }
+  try {
+    result.push = await sendOrderPush(order, settings, { title: `${title} — ${ref}`, body: subtitle, url: "/profile?tab=orders" });
+  } catch (err) {
+    console.log(`notifyOrderStep push ${step}:`, (err as Error)?.message || err);
+  }
+  return result;
+}
+
+/** Mensagem de WhatsApp de um passo, uma só vez por encomenda e passo. */
+async function sendOrderStepWhatsApp(order: Row, step: string, text: string) {
+  if (!order?.phone) return false;
+  const config = await getWhatsAppConfig();
+  if (!config) return false;
+  const dedupe = `wa:order:${order.id}:${step}`;
+  if (await alreadySent(dedupe)) return false;
+  const res = await sendWhatsAppText(order.phone, text, config);
+  await logNotification({
+    type: "whatsapp", context: "order_status", recipient: order.phone, customer_name: order.customer_name || "",
+    order_number: order.order_number || "", content: text, provider: "meta", dedupe_key: dedupe,
+    status: res?.ok ? "sent" : "failed", subject: `Passo: ${step}`,
+    detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
+  });
+  return !!res?.ok;
+}
+
+/**
+ * Notificação push para os dispositivos do cliente (subscrições em `push_subscriptions`).
+ * Precisa de `push_enabled`, da chave pública em site_settings e da privada no segredo
+ * `VAPID_PRIVATE_KEY` (ou em private.site_secrets). Subscrições mortas (404/410) são apagadas.
+ */
+async function sendOrderPush(order: Row, settings: Row | null, payload: { title: string; body: string; url: string }) {
+  if (!order?.customer_id || !settings?.push_enabled) return 0;
+  const publicKey = String(settings.vapid_public_key || "");
+  const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || String(settings.vapid_private_key || "");
+  if (!publicKey || !privateKey) return 0;
+  const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", order.customer_id).limit(10);
+  if (!subs?.length) return 0;
+  const webpush = (await import("npm:web-push@3.6.7")).default;
+  const contact = settings.contact_email ? `mailto:${settings.contact_email}` : "mailto:contacto@livrariaadventista.ao";
+  webpush.setVapidDetails(contact, publicKey, privateKey);
+  let sent = 0;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
+      sent++;
+    } catch (err) {
+      const code = (err as Row)?.statusCode;
+      if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", sub.id);
+      else console.log("push:", code, (err as Error)?.message);
+    }
+  }
+  return sent;
+}
+
 function sanitizeIntegrationConfig(code: string, config: Row) {
   if (!config || typeof config !== "object") return {};
   if (code === "google_drive") {
@@ -1369,7 +1463,7 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
     // Comprovativo da entrega para o cliente. A chave de idempotência é a mesma que o
     // painel usaria ao marcar "Entregue", por isso a confirmação não gera dois emails.
     try {
-      await sendOrderStatusEmail(final, await getSettings(), "delivered", {
+      await notifyOrderStep(final, "delivered", {
         description: `Recepção confirmada por ${recipientName}.`,
       });
     } catch (err) {
@@ -1415,7 +1509,7 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   let emailSent = false;
   if (status === "paid" && order.payment_status !== "paid") {
     try {
-      emailSent = await sendPaymentConfirmedEmail(saved, await getSettings());
+      emailSent = (await notifyOrderStep(saved, "paid")).email;
     } catch (err) {
       console.log("Email de pagamento confirmado:", err);
     }
@@ -1447,6 +1541,8 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
     // sempre que o estado da entrega muda. Acrescentá-lo também aqui deixava cada mudança
     // registada duas vezes no seguimento do cliente.
     patch.delivery_status = body.status;
+    // Cancelar a entrega cancela a encomenda (o trigger devolve o stock uma só vez).
+    if (body.status === "cancelled") patch.status = "cancelled";
   } else {
     // Sem mudança de estado: é uma nota de entrega, que só esta rota escreve.
     patch.delivery_timeline = [...(order.delivery_timeline || []), timelineEvent(
@@ -1461,9 +1557,9 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   let emailSent = false;
   if (statusChanged) {
     try {
-      emailSent = await sendOrderStatusEmail(saved, await getSettings(), body.status, {
+      emailSent = (await notifyOrderStep(saved, body.status, {
         description: body.description || "",
-      });
+      })).email;
     } catch (err) {
       console.log("Email de estado da encomenda:", err);
     }

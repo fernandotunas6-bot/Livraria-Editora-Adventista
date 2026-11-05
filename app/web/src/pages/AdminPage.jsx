@@ -247,7 +247,9 @@ const AdminPage = () => {
       && !confirm(`Cancelar a encomenda ${formatOrderNumber(order)}?\n\nO stock dos livros volta à loja e a encomenda não pode ser reaberta.`)) return;
     try {
       // Ao cancelar, o trigger orders_before_update devolve o stock (uma só vez, via stock_restored).
-      await pb.collection('orders').update(order.id, { status: newStatus });
+      // O cancelamento vai pela API, que também avisa o cliente (email, WhatsApp, push).
+      if (newStatus === 'cancelled') await setOrderDeliveryStatus(order.id, 'cancelled');
+      else await pb.collection('orders').update(order.id, { status: newStatus });
       toast({ title: 'Estado atualizado', description: getOrderStatusLabel(newStatus) });
       loadAll();
     } catch (err) {
