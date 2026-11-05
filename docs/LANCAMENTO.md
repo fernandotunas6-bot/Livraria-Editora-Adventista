@@ -90,6 +90,21 @@ O token fica no servidor: só administradores o vêem, e a loja nunca o envia pa
 
 Este email é o da loja (confirmações, recibos, links de acesso criados no painel). O email de registo e de recuperação de palavra-passe é o do Supabase Auth (ponto 3).
 
+### DNS do email (`contacto@livrariaadventista.ao`, Google Workspace)
+
+Zona `livrariaadventista.ao` no Cloudflare:
+
+| Tipo | Nome | Valor | Estado |
+|---|---|---|---|
+| MX | `@` | `smtp.google.com` (prioridade 1) | ✅ criado |
+| TXT (SPF) | `@` | `v=spf1 include:_spf.google.com ~all` | ✅ criado |
+| TXT (DKIM) | `google._domainkey` | `v=DKIM1; k=rsa; p=…` gerado na consola Google | ⏳ falta a chave |
+| TXT | `@` | `google-site-verification=…` da consola Google | ⏳ se a Google pedir |
+
+- **DKIM:** Admin da Google → Apps → Google Workspace → Gmail → Autenticar email → domínio `livrariaadventista.ao` → Gerar novo registo (2048 bits, prefixo `google`). Criar o TXT no Cloudflare e depois carregar em **Iniciar autenticação**.
+- **SMTP da loja:** `smtp.gmail.com`, porta 465, utilizador `contacto@livrariaadventista.ao` e uma palavra-passe de aplicação (exige verificação em dois passos na conta).
+- A zona ainda está *pending*: o domínio `.ao` só resolve quando o registo do domínio apontar para `cody.ns.cloudflare.com` e `hadlee.ns.cloudflare.com`.
+
 ---
 
 ## 6. Push PWA
