@@ -11,7 +11,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Calendar, Sparkles, Trash2 
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +24,10 @@ import ShoppingCart from '@/components/ShoppingCart.jsx';
 import BookPreviewModal from '@/components/BookPreviewModal';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import SampleReaderModal from '@/components/SampleReaderModal';
+import RecentlyViewed from '@/components/RecentlyViewed.jsx';
+import StickyBuyBar from '@/components/StickyBuyBar.jsx';
+import { addRecentlyViewed } from '@/lib/recentlyViewed';
+import { MOTION } from '@/lib/motion';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -38,7 +42,7 @@ const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
           <Star
             key={star}
             size={size}
-            className={`transition-colors duration-150 ${
+            className={`transition-colors duration-fast ${
               isFilled ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/30'
             } ${interactive ? 'cursor-pointer hover:scale-110' : ''}`}
             onClick={() => interactive && onChange && onChange(star)}
@@ -59,6 +63,10 @@ function ProductDetailPage() {
   const [sampleReaderOpen, setSampleReaderOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [product, setProduct] = useState(null);
+  // A barra de compra do fundo observa estes botões: só aparece quando eles saem do ecrã.
+  // Em estado, e não num `ref`: o observador precisa de saber quando o elemento aparece, e
+  // um `ref` não avisa ninguém de que foi preenchido.
+  const [botoesCompra, setBotoesCompra] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -71,88 +79,12 @@ function ProductDetailPage() {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const isWish = product ? isInWishlist(product.id) : false;
 
-  // Reviews and Google Calendar Events hooks and state
+  // Avaliações
   const { isAuthed, user } = useAuth();
-  const { reviews, loading: loadingReviews, stats, hasPurchased, submitReview, deleteReview, userReview, submitting } = useReviews(product?.id);
+  const { reviews, loading: loadingReviews, stats, hasPurchased, submitReview, deleteReview, userReview, submitting, helpfulVotesEnabled, votingReviewId, toggleHelpfulVote } = useReviews(product?.id);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [editingReview, setEditingReview] = useState(false);
-  const [addingCalendarEvent, setAddingCalendarEvent] = useState(false);
-
-  const handleAddLaunchToCalendar = async () => {
-    try {
-      setAddingCalendarEvent(true);
-      // O Google Workspace traz o SDK do Firebase (154 KB gzip). A página do livro é das
-      // mais visitadas da loja: só carrega isto quem clica em juntar ao calendário.
-      const { signInWithGoogleWorkspace, getCachedGoogleToken, createCalendarEvent } =
-        await import('@/lib/googleAuth');
-      let token = getCachedGoogleToken();
-      if (!token) {
-        toast({
-          title: 'Google OAuth',
-          description: 'A ligar à sua conta Google Workspace...',
-        });
-        const res = await signInWithGoogleWorkspace();
-        token = res.token;
-      }
-
-      const upcomingDate = new Date();
-      upcomingDate.setDate(upcomingDate.getDate() + 7); // Exactly 1 week from now
-      upcomingDate.setHours(18, 0, 0, 0);
-
-      const endDate = new Date(upcomingDate);
-      endDate.setHours(20, 0, 0, 0);
-
-      const eventDetails = {
-        summary: `Lançamento: ${product.title}`,
-        location: 'Livraria Aurora, Luanda, Angola',
-        description: `Sessão de lançamento oficial e autógrafos do livro "${product.title}" (${product.subtitle || 'Aurora'}). Junte-se a nós para este grande evento literário!`,
-        start: {
-          dateTime: upcomingDate.toISOString(),
-          timeZone: 'Africa/Luanda',
-        },
-        end: {
-          dateTime: endDate.toISOString(),
-          timeZone: 'Africa/Luanda',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 30 },
-          ],
-        },
-      };
-
-      await createCalendarEvent(token, eventDetails);
-      toast({
-        title: 'Sucesso',
-        description: 'Evento de lançamento adicionado ao seu Google Calendar com sucesso!',
-      });
-    } catch (err) {
-      console.error(err);
-      toast({
-        variant: 'destructive',
-        title: 'Erro de Calendário',
-        description: 'Não foi possível adicionar o evento ao seu calendário. Verifique a sua ligação Google.',
-      });
-    } finally {
-      setAddingCalendarEvent(false);
-    }
-  };
-
-  const handleWhatsAppLaunchReminder = () => {
-    const phoneNumber = '923000000'; // Brand's official contact number
-    const launchText = `Olá! Quero agendar lembretes para o lançamento do livro "${product.title}" no dia 16 de Julho às 18:00 (Hora de Luanda). Por favor, registem o meu número de WhatsApp! Nome: ${user?.name || 'Cliente'}`;
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    const num = cleanPhone.startsWith('244') ? cleanPhone : `244${cleanPhone}`;
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(launchText)}`, '_blank', 'noopener,noreferrer');
-    
-    toast({
-      title: 'Pedido Enviado',
-      description: 'Mensagem de agendamento gerada! Envie-a no WhatsApp para confirmar o seu registo de lembrete.',
-    });
-  };
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
@@ -247,6 +179,9 @@ function ProductDetailPage() {
           };
 
           setProduct(productWithQuantities);
+          // Fica no navegador de quem visita, para poder voltar a este livro depois de ver
+          // outros. Nada vai para o servidor: é um atalho, não um registo de hábitos.
+          addRecentlyViewed(productWithQuantities);
 
           if (productWithQuantities.variants && productWithQuantities.variants.length > 0) {
             setSelectedVariant(productWithQuantities.variants[0]);
@@ -272,7 +207,7 @@ function ProductDetailPage() {
   if (loading) {
     return (
       <>
-        <Header onCartOpen={() => setIsCartOpen(true)} />
+        <Header pinned onCartOpen={() => setIsCartOpen(true)} />
         <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
         <div className="flex justify-center items-center h-[60vh]">
           <Loader2 className="h-16 w-16 text-primary animate-spin" />
@@ -285,7 +220,7 @@ function ProductDetailPage() {
   if (error || !product) {
     return (
       <>
-        <Header onCartOpen={() => setIsCartOpen(true)} />
+        <Header pinned onCartOpen={() => setIsCartOpen(true)} />
         <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
         <div className="container-custom py-12">
           <div className="text-center text-destructive p-8 bg-card border border-border rounded-xl">
@@ -317,29 +252,34 @@ function ProductDetailPage() {
         <meta name="description" content={(product.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 160) || product.title} />
       </Helmet>
 
-      <Header onCartOpen={() => setIsCartOpen(true)} />
+      <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main className="container-custom py-12">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-          <Link to="/" className="hover:text-primary transition-colors">Início</Link>
+          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Início</Link>
           <span>/</span>
-          <Link to="/shop" className="hover:text-primary transition-colors">Loja</Link>
+          <Link to="/shop" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Loja</Link>
           <span>/</span>
           <span className="text-foreground">{product.title}</span>
         </nav>
 
+        {/* `min-w-0` nas duas colunas: um item de grid tem `min-width: auto` por omissão e
+            recusa-se a encolher abaixo do conteúdo. Era o que empurrava a coluna para 399px
+            dentro de um contentor de 343 e dava 40px de deslocamento horizontal no
+            telemóvel — a página inteira arrastava-se para o lado. */}
         <div className="grid lg:grid-cols-2 gap-12">
           <motion.div
+            className="min-w-0"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-square mb-4">
+            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] sm:aspect-square mb-4">
               <img
                 src={!currentImage?.url ? placeholderImage : currentImage.url}
                 alt={product.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain p-3 sm:object-cover sm:p-0"
               />
 
               {hasMultipleImages && (
@@ -362,7 +302,7 @@ function ProductDetailPage() {
               )}
 
               {product.ribbon_text && (
-                <div className="absolute top-4 left-4 bg-primary text-primary-foreground text-sm font-bold px-4 py-2 rounded-full">
+                <div className="absolute top-4 left-4 bg-brand-solid text-sm font-bold px-4 py-2 rounded-full">
                   {product.ribbon_text}
                 </div>
               )}
@@ -374,7 +314,7 @@ function ProductDetailPage() {
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                    className={`flex-shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
                       index === currentImageIndex ? 'border-primary' : 'border-border hover:border-primary/50'
                     }`}
                   >
@@ -392,12 +332,12 @@ function ProductDetailPage() {
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-col"
+            transition={{ duration: MOTION.base, delay: 0.2 }}
+            className="flex flex-col min-w-0"
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">{product.title}</h1>
             {product.marketing_hook && (
-              <p className="text-lg text-[#0ea5c9] font-medium mb-2">{product.marketing_hook}</p>
+              <p className="text-lg text-primary font-medium mb-2">{product.marketing_hook}</p>
             )}
             {product.subtitle && (
               <p className="text-xl text-muted-foreground mb-4">{product.subtitle}</p>
@@ -411,7 +351,7 @@ function ProductDetailPage() {
             {(product.book_code || product.sku || product.isbn) && (
               <div className="flex flex-wrap gap-3 mb-6 text-sm">
                 {product.book_code && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-[#0ea5c9]">
+                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-primary">
                     Código: {product.book_code}
                   </span>
                 )}
@@ -438,7 +378,7 @@ function ProductDetailPage() {
             )}
 
             <div className="flex items-baseline gap-3 mb-8">
-              <span className="text-4xl font-bold text-primary">{price}</span>
+              <span className="text-4xl font-bold text-brand-ink">{price}</span>
               {selectedVariant?.sale_price_in_cents && (
                 <span className="text-2xl text-muted-foreground line-through">{originalPrice}</span>
               )}
@@ -454,7 +394,7 @@ function ProductDetailPage() {
                 <ul className="space-y-2">
                   {product.benefit_bullets.map((b, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle className="h-4 w-4 text-[#0ea5c9] shrink-0 mt-0.5" />
+                      <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                       {b}
                     </li>
                   ))}
@@ -498,7 +438,7 @@ function ProductDetailPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div ref={setBotoesCompra} className="flex flex-col sm:flex-row gap-3 mb-4">
               <Button
                 onClick={handleBuyNow}
                 size="lg"
@@ -512,7 +452,7 @@ function ProductDetailPage() {
                 onClick={() => handleAddToCart(true)}
                 size="lg"
                 variant="outline"
-                className="flex-1 text-lg py-6 border-[#0ea5c9] text-[#0ea5c9] hover:bg-[#0ea5c9]/10"
+                className="flex-1 text-lg py-6 border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10"
                 disabled={!canAddToCart || !product.purchasable}
               >
                 Adicionar ao Carrinho
@@ -521,7 +461,7 @@ function ProductDetailPage() {
                 onClick={() => toggleWishlist(product)}
                 size="lg"
                 variant="outline"
-                className={`px-4 py-6 border-2 transition-all duration-300 ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
+                className={`px-4 py-6 border-2 transition-all duration-base ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
                 title={isWish ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
               >
                 <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
@@ -530,7 +470,7 @@ function ProductDetailPage() {
             <Button
               onClick={() => setShowPreview(true)}
               variant="outline"
-              className="w-full mb-3 border-[#0ea5c9]/40 text-[#0ea5c9] hover:bg-[#0ea5c9]/5 py-6 text-lg rounded-xl"
+              className="w-full mb-3 border-[#0ea5c9]/40 text-primary hover:bg-[#0ea5c9]/5 py-6 text-lg rounded-xl"
             >
               <BookOpen className="mr-2 h-5 w-5" />
               Ler Amostra Grátis (Primeiras Páginas)
@@ -546,51 +486,9 @@ function ProductDetailPage() {
               </Button>
             )}
 
-            {/* Google Calendar Book Launch Event Integration */}
-            {product && (
-              <div className="mt-6 border border-primary/20 rounded-xl p-5 bg-primary/5 flex flex-col gap-3">
-                <div className="flex gap-2 items-center text-[#0ea5c9]">
-                  <Calendar className="h-5 w-5" />
-                  <h4 className="font-bold text-sm">Evento de Lançamento Virtual</h4>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Junte-se a nós para a apresentação exclusiva e sessão de leitura de <strong>"{product.title}"</strong> com o autor, no dia <strong>16 de Julho às 18:00 (Hora de Luanda)</strong>.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddLaunchToCalendar}
-                  disabled={addingCalendarEvent}
-                  className="w-full text-xs h-9 bg-background border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/10 hover:text-[#0ea5c9] hover:border-[#0ea5c9]"
-                >
-                  {addingCalendarEvent ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#0ea5c9]" />
-                      A adicionar ao calendário...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4 text-[#0ea5c9]" />
-                      Adicionar ao Google Calendar
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleWhatsAppLaunchReminder}
-                  className="w-full text-xs h-9 bg-background border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500"
-                >
-                  <svg className="mr-2 h-4 w-4 fill-current text-emerald-500" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.717-1.458L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.859-4.42 9.863-9.864.002-2.634-1.02-5.11-2.881-6.973C16.69 1.904 14.212.861 11.58.861 6.143.861 1.72 5.281 1.716 10.72c-.001 1.67.438 3.3 1.27 4.733l-.988 3.61 3.702-.97.647.386zM17.16 14.93c-.29-.145-1.716-.847-1.982-.944-.265-.097-.459-.145-.652.145-.193.29-.747.944-.915 1.137-.168.193-.336.218-.626.073-1.638-.818-2.735-1.424-3.82-3.284-.287-.492.287-.457.822-1.52.09-.18.045-.337-.023-.482-.068-.145-.652-1.572-.893-2.152-.234-.564-.472-.488-.652-.497-.169-.008-.362-.01-.555-.01s-.506.072-.77.362c-.265.29-1.012.99-1.012 2.415 0 1.424 1.036 2.801 1.18 2.995.145.193 2.038 3.112 4.937 4.364 2.188.944 3.1 1.054 4.225.888.755-.112 2.327-.95 2.658-1.87.33-.92.33-1.71.233-1.87-.097-.16-.36-.255-.65-.4z" />
-                  </svg>
-                  Lembrar-me por WhatsApp
-                </Button>
-              </div>
-            )}
 
             {isStockManaged && canAddToCart && product.purchasable && (
-              <p className="text-sm text-primary flex items-center justify-center gap-2 mb-4">
+              <p className="text-sm text-brand-ink flex items-center justify-center gap-2 mb-4">
                 <CheckCircle size={16} /> {availableStock} em stock
               </p>
             )}
@@ -650,7 +548,7 @@ function ProductDetailPage() {
               <TabsContent value="preview">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <p className="text-sm text-muted-foreground">Explore as primeiras páginas antes de comprar.</p>
-                  <Button size="sm" className="bg-[#0ea5c9] hover:bg-[#0ea5c9]/90 text-white" onClick={() => setSampleReaderOpen(true)}>
+                  <Button size="sm" className="bg-primary hover:bg-[#0ea5c9]/90 text-white" onClick={() => setSampleReaderOpen(true)}>
                     <BookOpen className="h-4 w-4 mr-1.5" /> Modo Leitura
                   </Button>
                 </div>
@@ -701,7 +599,7 @@ function ProductDetailPage() {
                       <p className="font-semibold">{v.title}</p>
                       {v.format && <p className="text-sm text-muted-foreground">{v.format}</p>}
                       {v.isbn && <p className="text-xs font-mono text-muted-foreground mt-1">ISBN: {v.isbn}</p>}
-                      <p className="text-[#0ea5c9] font-bold mt-2">{v.sale_price_formatted || v.price_formatted}</p>
+                      <p className="text-primary font-bold mt-2">{v.sale_price_formatted || v.price_formatted}</p>
                       <p className="text-xs text-muted-foreground mt-1">{v.inventory_quantity} em stock</p>
                     </div>
                   ))}
@@ -817,7 +715,7 @@ function ProductDetailPage() {
                           />
                         </div>
 
-                        <Button type="submit" disabled={submitting} className="w-full btn-primary h-11 bg-[#0ea5c9] text-white hover:bg-[#0ea5c9]/90">
+                        <Button type="submit" disabled={submitting} className="w-full btn-primary h-11 bg-primary text-white hover:bg-[#0ea5c9]/90">
                           {submitting ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -836,7 +734,7 @@ function ProductDetailPage() {
                     ) : (
                       <div className="text-center py-6">
                         <p className="text-sm text-muted-foreground mb-4">Inicie sessão para deixar uma avaliação e partilhar a sua experiência.</p>
-                        <Button asChild variant="outline" className="w-full border-[#0ea5c9] text-[#0ea5c9] hover:bg-[#0ea5c9]/10">
+                        <Button asChild variant="outline" className="w-full border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10">
                           <Link to="/login" state={{ from: `/product/${product?.id}` }}>Entrar na Conta</Link>
                         </Button>
                       </div>
@@ -850,7 +748,7 @@ function ProductDetailPage() {
                   
                   {loadingReviews ? (
                     <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-[#0ea5c9]" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                   ) : reviews.length === 0 ? (
                     <div className="text-center py-12 border border-dashed rounded-2xl bg-muted/5">
@@ -864,7 +762,7 @@ function ProductDetailPage() {
                         <div key={r.id} className="p-4 border rounded-xl bg-card hover:shadow-sm transition-all">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-[#0ea5c9]/10 text-[#0ea5c9] font-bold flex items-center justify-center text-sm shrink-0 border border-[#0ea5c9]/25">
+                              <div className="h-9 w-9 rounded-full bg-[#0ea5c9]/10 text-primary font-bold flex items-center justify-center text-sm shrink-0 border border-[#0ea5c9]/25">
                                 {r.userAvatar ? (
                                   <img src={r.userAvatar} alt={r.userName} className="h-full w-full rounded-full object-cover" />
                                 ) : (
@@ -883,6 +781,25 @@ function ProductDetailPage() {
                           </div>
                           
                           <p className="text-sm text-muted-foreground leading-relaxed pl-1 whitespace-pre-wrap">{r.comment}</p>
+
+                          {helpfulVotesEnabled && (
+                            <div className="mt-3 flex justify-end">
+                              <Button
+                                type="button"
+                                variant={r.hasHelpfulVote ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="h-8 gap-1.5 px-2"
+                                aria-label={`Marcar comentário como útil, ${r.helpfulCount} votos`}
+                                aria-pressed={r.hasHelpfulVote}
+                                disabled={Boolean(votingReviewId) || r.userId === user?.id}
+                                onClick={() => toggleHelpfulVote(r)}
+                              >
+                                <ThumbsUp className="h-4 w-4" />
+                                <span>Útil</span>
+                                <span>{r.helpfulCount}</span>
+                              </Button>
+                            </div>
+                          )}
                           
                           {r.isVerified && (
                             <div className="mt-3">
@@ -911,6 +828,17 @@ function ProductDetailPage() {
         title={product.title}
       />
       <BookPreviewModal product={product} open={showPreview} onClose={() => setShowPreview(false)} onCartOpen={() => setIsCartOpen(true)} />
+
+      <RecentlyViewed currentId={product.id} />
+
+      <StickyBuyBar
+        alvo={botoesCompra}
+        price={price}
+        originalPrice={originalPrice}
+        onBuy={handleBuyNow}
+        disabled={!canAddToCart || !product.purchasable}
+        label={product.purchasable ? 'Comprar' : 'Esgotado'}
+      />
 
       <Footer />
     </>

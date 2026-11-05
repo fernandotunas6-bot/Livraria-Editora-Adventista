@@ -1,178 +1,133 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { Truck, Package, RotateCcw, Clock } from 'lucide-react';
+import { Truck, Package, RotateCcw, MapPin, Zap } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { pageTitle } from '@/lib/brand';
+import PageBannerSlider from '@/components/PageBannerSlider';
+import { MOTION } from '@/lib/motion';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { calcShippingCents } from '@/lib/shipping';
+import { formatCurrency } from '@/api/EcommerceApi';
 
 const ShippingReturnsPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { settings } = useSiteSettings();
+
+  // Os custos vêm do mesmo cálculo que o checkout usa, e não de texto escrito à mão: uma
+  // página de condições que discorda do que o cliente paga na caixa é pior do que não
+  // existir. O subtotal zero serve para ler a tabela — abaixo do mínimo para o envio grátis.
+  const custoNormal = calcShippingCents('delivery', 0, settings);
+  const custoExpresso = calcShippingCents('express', 0, settings);
+  const envioGratisAcimaDe = (Number(settings.shipping_free_threshold) || 20000) * 100;
+
+  const Seccao = ({ icone: Icone, titulo, atraso, children }) => (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: MOTION.base, delay: atraso }}
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <Icone className="h-6 w-6 text-primary" />
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">{titulo}</h2>
+      </div>
+      <div className="space-y-6 bg-card border border-border rounded-xl p-6">{children}</div>
+    </motion.section>
+  );
 
   return (
     <>
       <Helmet>
         <title>{pageTitle('Envios e Devoluções')}</title>
-        <meta name="description" content="Informações sobre envios, prazos de entrega e política de devoluções." />
+        <meta name="description" content="Prazos de entrega, custos de envio em Angola e como devolver um livro." />
       </Helmet>
 
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
+      <PageBannerSlider>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Envios e Devoluções</h1>
+        <p className="text-base text-white/85 sm:text-lg">Tudo o que precisa saber sobre entregas e devoluções</p>
+      </PageBannerSlider>
+
       <main className="section-spacing bg-background">
         <div className="container-custom max-w-4xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Envios e Devoluções</h1>
-            <p className="text-muted-foreground text-lg">Tudo o que precisa saber sobre entregas e devoluções</p>
-          </motion.div>
-
           <div className="space-y-12">
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Truck className="h-6 w-6 text-primary" />
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground">Shipping Options</h2>
-              </div>
-
-              <div className="space-y-6 bg-card border border-border rounded-xl p-6">
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-foreground">Standard Shipping</h3>
-                  <p className="text-muted-foreground mb-2">Free on orders over $100 (5-7 business days)</p>
-                  <p className="text-muted-foreground">$15 flat rate for orders under $100</p>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-foreground">Express Shipping</h3>
-                  <p className="text-muted-foreground mb-2">2-3 business days</p>
-                  <p className="text-muted-foreground">$35 flat rate</p>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-foreground">White Glove Delivery</h3>
-                  <p className="text-muted-foreground mb-2">Professional delivery, assembly, and setup (2-3 weeks)</p>
-                  <p className="text-muted-foreground">Starting at $149 (varies by item and location)</p>
-                </div>
-              </div>
-            </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Package className="h-6 w-6 text-primary" />
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground">Order Processing</h2>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+            <Seccao icone={Truck} titulo="Formas de entrega" atraso={0.05}>
+              <div className="border-b border-border pb-5">
+                <h3 className="text-lg font-semibold mb-1 text-foreground flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-primary" /> Entrega ao domicílio
+                </h3>
                 <p className="text-muted-foreground">
-                  Orders are processed within 1-2 business days. You'll receive a confirmation email once your order ships with tracking information.
+                  {formatCurrency(custoNormal)} por encomenda, em todo o território nacional.
                 </p>
                 <p className="text-muted-foreground">
-                  Please note that processing times may be longer during peak seasons or for custom orders.
+                  <strong className="text-foreground">Grátis</strong> acima de {formatCurrency(envioGratisAcimaDe)}.
                 </p>
               </div>
-            </motion.section>
 
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <RotateCcw className="h-6 w-6 text-primary" />
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground">Returns Policy</h2>
+              <div className="border-b border-border pb-5">
+                <h3 className="text-lg font-semibold mb-1 text-foreground flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" /> Entrega expressa
+                </h3>
+                <p className="text-muted-foreground">{formatCurrency(custoExpresso)} — prioridade, 24 a 48 horas em Luanda.</p>
               </div>
 
-              <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-                <div>
-                  <h3 className="text-xl font-semibold mb-3 text-foreground">30-Day Return Window</h3>
-                  <p className="text-muted-foreground">
-                    We want you to love your purchase. If you're not completely satisfied, you can return most items within 30 days of delivery for a full refund.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold mb-3 text-foreground">Return Requirements</h3>
-                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li>Items must be in original condition with all packaging</li>
-                    <li>Products must be unused and unassembled (if applicable)</li>
-                    <li>Include all accessories, manuals, and documentation</li>
-                    <li>Custom or personalized items are final sale</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold mb-3 text-foreground">How to Return</h3>
-                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>Contact our customer service team at support@haven.com</li>
-                    <li>Receive your return authorization and prepaid shipping label</li>
-                    <li>Pack the item securely in its original packaging</li>
-                    <li>Drop off at any authorized shipping location</li>
-                    <li>Receive your refund within 5-7 business days after we receive the item</li>
-                  </ol>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold mb-3 text-foreground">Return Shipping</h3>
-                  <p className="text-muted-foreground">
-                    Return shipping is free for defective or damaged items. For standard returns, a $25 return shipping fee will be deducted from your refund.
-                  </p>
-                </div>
-              </div>
-            </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-primary" />
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground">Exchanges</h2>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-1 text-foreground flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" /> Levantamento na loja
+                </h3>
                 <p className="text-muted-foreground">
-                  Need a different size or color? We're happy to help with exchanges. Contact our customer service team, and we'll arrange an exchange at no additional cost.
-                </p>
-                <p className="text-muted-foreground">
-                  Exchanges are subject to product availability. If your preferred item is out of stock, we'll process a full refund.
+                  <strong className="text-foreground">Grátis.</strong> Escolha a loja no checkout e levante quando lhe der jeito.
                 </p>
               </div>
-            </motion.section>
+            </Seccao>
+
+            <Seccao icone={Package} titulo="Prazos" atraso={0.1}>
+              <ul className="space-y-2 text-muted-foreground list-disc list-inside">
+                <li><strong className="text-foreground">Luanda:</strong> 5 a 7 dias úteis.</li>
+                <li><strong className="text-foreground">Outras províncias:</strong> 7 a 14 dias úteis.</li>
+                <li><strong className="text-foreground">Expressa:</strong> 24 a 48 horas em Luanda.</li>
+              </ul>
+              <p className="text-muted-foreground">
+                A contagem começa depois de a encomenda ser confirmada. Pode acompanhá-la a qualquer momento na
+                página <strong className="text-foreground">Rastrear Encomenda</strong>, com o número da compra e o
+                email que usou.
+              </p>
+            </Seccao>
+
+            <Seccao icone={RotateCcw} titulo="Devoluções" atraso={0.15}>
+              <div className="border-b border-border pb-5">
+                <h3 className="text-lg font-semibold mb-2 text-foreground">30 dias para devolver</h3>
+                <p className="text-muted-foreground">
+                  Aceitamos devoluções em até 30 dias a contar da entrega, desde que o livro esteja em bom estado e
+                  na embalagem original.
+                </p>
+              </div>
+
+              <div className="border-b border-border pb-5">
+                <h3 className="text-lg font-semibold mb-2 text-foreground">Como devolver</h3>
+                <ol className="space-y-2 text-muted-foreground list-decimal list-inside">
+                  <li>Escreva-nos pelo formulário da página de Contacto, com o número da encomenda.</li>
+                  <li>Combinamos consigo a recolha ou a entrega numa das lojas físicas.</li>
+                  <li>O reembolso é feito depois de recebermos e conferirmos o livro.</li>
+                </ol>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">Quem paga o reenvio</h3>
+                <p className="text-muted-foreground">
+                  Se o livro chegou danificado, incompleto ou não corresponde ao que encomendou, o reenvio é por
+                  nossa conta. Nas restantes devoluções, combinamos consigo no momento do pedido.
+                </p>
+              </div>
+            </Seccao>
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-            className="mt-12 text-center bg-muted/30 rounded-xl p-8"
-          >
-            <h3 className="text-xl font-semibold mb-3 text-foreground">Questions about shipping or returns?</h3>
-            <p className="text-muted-foreground mb-4">Our customer support team is here to help</p>
-            <a href="/contact" className="text-primary hover:underline font-medium">
-              Contact Us
-            </a>
-          </motion.div>
         </div>
       </main>
 

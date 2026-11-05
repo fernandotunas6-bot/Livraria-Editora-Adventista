@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, SlidersHorizontal, X, BookOpen, Hash, Sparkles, Filter, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { BOOK_GENRES, BOOK_LANGUAGES } from '@/lib/bookConstants';
+import { buildSearchSuggestions } from '@/lib/searchUtils';
 
 export default function AdvancedSearchPanel({
   activeFilters,
   updateFilter,
+  onClear,
   onSearch,
   className,
   variant = 'default',
@@ -18,8 +20,13 @@ export default function AdvancedSearchPanel({
   resultCount,
   filterCount = 0,
   quickGenres = [],
+  catalog = [],
+  showQuickGenres = true,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
+  const [sugestaoActiva, setSugestaoActiva] = useState(-1);
+  const campoRef = useRef(null);
   const [local, setLocal] = useState({
     search: activeFilters.search || '',
     author: activeFilters.author || '',
@@ -48,6 +55,23 @@ export default function AdvancedSearchPanel({
     });
   }, [activeFilters]);
 
+  // Do catálogo que já está carregado: nada é pedido ao servidor enquanto se escreve.
+  const sugestoes = useMemo(
+    () => buildSearchSuggestions(catalog, local.search),
+    [catalog, local.search],
+  );
+
+  useEffect(() => setSugestaoActiva(-1), [local.search]);
+
+  // Fechar ao tocar fora. Num telemóvel a lista tapa metade do ecrã, e ficar presa ali até
+  // alguém escolher alguma coisa seria uma armadilha.
+  useEffect(() => {
+    if (!sugestoesAbertas) return undefined;
+    const fora = (e) => { if (campoRef.current && !campoRef.current.contains(e.target)) setSugestoesAbertas(false); };
+    document.addEventListener('pointerdown', fora);
+    return () => document.removeEventListener('pointerdown', fora);
+  }, [sugestoesAbertas]);
+
   // Real-time debounce for the search filter
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -64,11 +88,20 @@ export default function AdvancedSearchPanel({
     if (variant !== 'hero') setExpanded(false);
   };
 
+  const selectSuggestion = (suggestion) => {
+    setLocal((s) => ({ ...s, search: suggestion.texto }));
+    setSugestoesAbertas(false);
+    setSugestaoActiva(-1);
+    updateFilter('search', suggestion.texto);
+    onSearch?.();
+  };
+
   const clear = () => {
     const empty = {
       search: '', author: '', isbn: '', publisher: '', language: '', collection: '',
       yearFrom: '', yearTo: '', featuredOnly: false, inStockOnly: false,
     };
+    onClear?.();
     setLocal(empty);
     Object.entries(empty).forEach(([k, v]) => updateFilter(k, v));
   };
@@ -89,15 +122,75 @@ export default function AdvancedSearchPanel({
   return (
     <div className={className}>
       <div className="flex gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1" ref={campoRef}>
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isHero ? 'text-white/70' : 'text-muted-foreground'}`} />
           <Input
             value={local.search}
-            onChange={(e) => setLocal((s) => ({ ...s, search: e.target.value }))}
-            onKeyDown={(e) => e.key === 'Enter' && apply()}
+            onChange={(e) => { setLocal((s) => ({ ...s, search: e.target.value })); setSugestoesAbertas(true); }}
+            onFocus={() => setSugestoesAbertas(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && sugestoes.length > 0) {
+                e.preventDefault();
+                setSugestoesAbertas(true);
+                setSugestaoActiva((current) => (current + 1) % sugestoes.length);
+              }
+              if (e.key === 'ArrowUp' && sugestoes.length > 0) {
+                e.preventDefault();
+                setSugestoesAbertas(true);
+                setSugestaoActiva((current) => (current <= 0 ? sugestoes.length - 1 : current - 1));
+              }
+              if (e.key === 'Enter') {
+                if (sugestoesAbertas && sugestaoActiva >= 0 && sugestoes[sugestaoActiva]) {
+                  e.preventDefault();
+                  selectSuggestion(sugestoes[sugestaoActiva]);
+                } else {
+                  setSugestoesAbertas(false);
+                  apply();
+                }
+              }
+              if (e.key === 'Escape') {
+                setSugestoesAbertas(false);
+                setSugestaoActiva(-1);
+              }
+            }}
             placeholder="Título, autor, ISBN, código..."
             className={inputClass}
+            role="combobox"
+            aria-expanded={sugestoesAbertas && sugestoes.length > 0}
+            aria-controls="sugestoes-pesquisa"
+            aria-activedescendant={sugestaoActiva >= 0 ? `sugestao-pesquisa-${sugestaoActiva}` : undefined}
+            aria-autocomplete="list"
           />
+
+          {sugestoesAbertas && sugestoes.length > 0 && (
+            <ul
+              id="sugestoes-pesquisa"
+              role="listbox"
+              aria-label="Sugestões de pesquisa"
+              className="elev-overlay absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-popover py-1 text-left"
+            >
+              {sugestoes.map((sug, index) => (
+                <li
+                  key={`${sug.tipo}-${sug.id || sug.texto}`}
+                  id={`sugestao-pesquisa-${index}`}
+                  role="option"
+                  aria-selected={index === sugestaoActiva}
+                >
+                  <button
+                    type="button"
+                    className={`control-press flex w-full items-baseline gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted ${index === sugestaoActiva ? 'bg-muted' : ''}`}
+                    onMouseEnter={() => setSugestaoActiva(index)}
+                    onClick={() => selectSuggestion(sug)}
+                  >
+                    <span className="min-w-0 flex-1 truncate text-foreground">{sug.texto}</span>
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {sug.tipo === 'livro' ? 'livro' : sug.tipo === 'autor' ? 'autor' : 'editora'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <Button onClick={apply} className={`rounded-full px-5 shrink-0 ${isHero ? 'bg-white text-[var(--brand-dark)] hover:bg-white/90' : 'btn-primary'}`}>
           Pesquisar
@@ -126,18 +219,21 @@ export default function AdvancedSearchPanel({
         </p>
       )}
 
-      {isHero && !expanded && (quickGenres.length > 0 || BOOK_GENRES.length > 0) && (
-        <div className="flex flex-wrap gap-2 mt-3">
+      {!expanded && showQuickGenres && (quickGenres.length > 0 || BOOK_GENRES.length > 0) && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Categorias rápidas</p>
+          <div className="flex flex-wrap gap-2">
           {(quickGenres.length > 0 ? quickGenres : BOOK_GENRES).slice(0, 8).map((g) => (
             <button
               key={g}
               type="button"
               onClick={() => { updateFilter('categories', [g]); updateFilter('search', ''); }}
-              className="text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/90 border border-white/15 transition-colors"
+              className={`text-xs px-3 py-1 rounded-full border transition-colors ${isHero ? 'bg-white/10 hover:bg-white/20 text-white/90 border-white/15' : 'bg-muted hover:bg-muted/70 text-foreground border-border'}`}
             >
               {g}
             </button>
           ))}
+          </div>
         </div>
       )}
 

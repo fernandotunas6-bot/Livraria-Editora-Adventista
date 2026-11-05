@@ -1,0 +1,90 @@
+name: Backup — base de dados (semanal, cifrado)
+
+# O projecto está no plano Free do Supabase: sem backups descarregáveis e sem recuperação
+# pontual (PITR). Este workflow é o backup: todos os domingos, um dump completo (papéis,
+# esquema e dados), comprimido, com SHA-256, e cifrado com AES-256 antes de sair do runner.
+# Fica como artefacto do repositório (privado) durante 90 dias.
+#
+# O dump tem dados pessoais (encomendas, moradas, telefones): nunca é guardado sem cifra.
+# Restaurar e testar o restauro: docs/BACKUPS.md. Sempre num projecto à parte, nunca no de
+# produção.
+
+on:
+  schedule:
+    - cron: '30 3 * * 0'   # domingo, 03:30 UTC (04:30 em Angola)
+  workflow_dispatch:
+
+concurrency:
+  group: backup-base-dados
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      # Falta de segredos fica a vermelho de propósito: uma semana sem backup tem de se ver.
+      - name: Confirmar segredos e variáveis
+        run: |
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD BACKUP_PASSPHRASE PROJECT_REF; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Sem backup esta semana. Faltam em Settings → Secrets and variables → Actions:${missing/PROJECT_REF/SUPABASE_PROJECT_REF}"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Ligar ao projecto
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Dump (papéis, esquema e dados)
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%MZ)"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          mkdir -p "backup-$stamp"
+          supabase db dump --linked -f "backup-$stamp/roles.sql" --role-only
+          supabase db dump --linked -f "backup-$stamp/schema.sql"
+          supabase db dump --linked -f "backup-$stamp/data.sql" --use-copy --data-only
+          # Um dump vazio ou quase vazio é falha, não backup.
+          for f in roles schema data; do
+            size=$(stat -c %s "backup-$stamp/$f.sql")
+            echo "$f.sql: $size bytes"
+            [ "$size" -gt 100 ] || { echo "::error::$f.sql veio vazio"; exit 1; }
+          done
+          ( cd "backup-$stamp" && sha256sum *.sql > SHA256SUMS )
+
+      - name: Comprimir e cifrar
+        run: |
+          set -euo pipefail
+          tar -czf "backup-$STAMP.tar.gz" "backup-$STAMP"
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase-fd 0 -o "backup-$STAMP.tar.gz.gpg" "backup-$STAMP.tar.gz" <<< "$BACKUP_PASSPHRASE"
+          sha256sum "backup-$STAMP.tar.gz.gpg" > "backup-$STAMP.tar.gz.gpg.sha256"
+          # Nada em claro fica para o passo de envio.
+          rm -rf "backup-$STAMP" "backup-$STAMP.tar.gz"
+          ls -la backup-*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ env.STAMP }}
+          path: |
+            backup-*.tar.gz.gpg
+            backup-*.tar.gz.gpg.sha256
+          retention-days: 90
+          if-no-files-found: error

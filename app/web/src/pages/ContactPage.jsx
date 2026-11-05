@@ -10,10 +10,20 @@ import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
+import PageBannerSlider from '@/components/PageBannerSlider';
 import { pageTitle, BRAND } from '@/lib/brand';
 import { APP_API_URL } from '@/lib/supabaseClient';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { displayAngolaPhone } from '@/lib/angolaPhone';
+import { MOTION } from '@/lib/motion';
 
 const ContactPage = () => {
+  // Os contactos vêm de Configurações, como no rodapé. A página mostrava os valores fixos do
+  // código — incluindo o telefone provisório — mesmo depois de o painel ter os verdadeiros.
+  const { settings } = useSiteSettings();
+  const contactEmail = settings.contact_email || '';
+  const contactPhone = settings.contact_phone || '';
+  const contactAddress = settings.contact_address || BRAND.address;
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -68,23 +78,18 @@ const ContactPage = () => {
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <main className="section-spacing bg-background">
-        <div className="container-custom">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Contacte-nos</h1>
-            <p className="text-muted-foreground text-lg">Teremos todo o gosto em ouvir de si</p>
-          </motion.div>
+      <PageBannerSlider>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Contacte-nos</h1>
+        <p className="text-base text-white/85 sm:text-lg">Teremos todo o gosto em ouvir de si</p>
+      </PageBannerSlider>
 
+      <main className="section-spacing bg-background overflow-x-clip">
+        <div className="container-custom">
           <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: MOTION.base, delay: 0.2 }}
             >
               <h2 className="text-2xl font-semibold mb-6 text-foreground">Envie-nos uma mensagem</h2>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -148,31 +153,35 @@ const ContactPage = () => {
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              transition={{ duration: MOTION.base, delay: 0.4 }}
               className="space-y-8"
             >
               <div>
                 <h2 className="text-2xl font-semibold mb-6 text-foreground">Informações de Contacto</h2>
                 <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Mail className="h-5 w-5 text-primary" />
+                  {contactEmail && (
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mail className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 text-foreground">Email</h3>
+                        <p className="text-muted-foreground">{contactEmail}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium mb-1 text-foreground">Email</h3>
-                      <p className="text-muted-foreground">{BRAND.email}</p>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Phone className="h-5 w-5 text-primary" />
+                  {contactPhone && (
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Phone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 text-foreground">Telefone</h3>
+                        <p className="text-muted-foreground">{displayAngolaPhone(contactPhone)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium mb-1 text-foreground">Telefone</h3>
-                      <p className="text-muted-foreground">{BRAND.phone}</p>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -180,7 +189,7 @@ const ContactPage = () => {
                     </div>
                     <div>
                       <h3 className="font-medium mb-1 text-foreground">Morada</h3>
-                      <p className="text-muted-foreground">{BRAND.address}</p>
+                      <p className="text-muted-foreground">{contactAddress}</p>
                     </div>
                   </div>
                 </div>

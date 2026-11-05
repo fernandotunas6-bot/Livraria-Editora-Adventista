@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -12,12 +12,13 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import { pageTitle } from '@/lib/brand';
 import { withCacheBust } from '@/lib/imageUrl';
+import { safeInternalPath } from '@/lib/authSession';
 
 const LoginPage = () => {
   const location = useLocation();
   // ?redirect= só aceita caminhos internos (evita redireccionar para outros sites).
   const redirectParam = new URLSearchParams(location.search).get('redirect');
-  const redirectTo = location.state?.from || (redirectParam?.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : null);
+  const redirectTo = safeInternalPath(location.state?.from || redirectParam, '');
 
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState(() => sessionStorage.getItem('livraria_login_email') || '');
@@ -26,7 +27,7 @@ const LoginPage = () => {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState('');
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, ready, isAuthed, user } = useAuth();
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
 
@@ -37,15 +38,15 @@ const LoginPage = () => {
 
   const afterAuthNavigate = (authRecord) => {
     if (redirectTo) {
-      navigate(redirectTo);
+      navigate(redirectTo, { replace: true });
       return;
     }
     const role = authRecord?.role;
     if (role === 'admin' || role === 'manager') {
-      navigate('/admin');
+      navigate('/admin', { replace: true });
       return;
     }
-    navigate('/profile');
+    navigate('/profile', { replace: true });
   };
 
   const handleSubmit = async (e) => {
@@ -82,6 +83,15 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
+
+  // Quem já tem sessão não volta a ver o formulário: segue para onde ia (ou para a sua área).
+  // Antes disto, abrir `/login` com sessão válida — ou voltar da Google para cá — mostrava o
+  // ecrã de entrada a quem já estava autenticado.
+  useEffect(() => {
+    if (!ready || !isAuthed) return;
+    afterAuthNavigate(user);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, isAuthed]);
 
   const handleGoogle = async () => {
     setLoading(true);
@@ -194,7 +204,7 @@ const LoginPage = () => {
                   <div className="flex justify-between items-center">
                     <Label htmlFor="password">Palavra-passe</Label>
                     {mode === 'login' && (
-                      <Link to="/forgot-password" className="text-xs text-[#0ea5c9] hover:underline">Esqueceu?</Link>
+                      <Link to="/forgot-password" className="-my-2 block py-2 text-xs text-primary hover:underline">Esqueceu?</Link>
                     )}
                   </div>
                   <div className="relative">
@@ -211,7 +221,7 @@ const LoginPage = () => {
                     />
                     <button
                       type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={() => setShowPass((v) => !v)}
                       tabIndex={-1}
                     >
@@ -230,15 +240,15 @@ const LoginPage = () => {
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 {mode === 'login' ? 'Não tem conta?' : 'Já tem conta?'}{' '}
-                <button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setPendingConfirmation(''); }} className="text-[#0ea5c9] font-medium hover:underline">
+                <button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setPendingConfirmation(''); }} className="text-primary font-medium hover:underline">
                   {mode === 'login' ? 'Registe-se' : 'Entrar'}
                 </button>
               </p>
             </div>
 
             <div className="flex flex-wrap justify-center gap-4 mt-6 text-xs text-muted-foreground">
-              <Link to="/track" className="hover:text-[#0ea5c9]">Rastrear encomenda</Link>
-              <Link to="/shop" className="hover:text-[#0ea5c9]">Ir à loja</Link>
+              <Link to="/track" className="block py-2 hover:text-primary">Rastrear encomenda</Link>
+              <Link to="/shop" className="block py-2 hover:text-primary">Ir à loja</Link>
             </div>
           </motion.div>
         </div>

@@ -49,13 +49,13 @@ const DEFAULT_FOOTER_COLUMNS = [
 function FooterLink({ link }) {
   if (link.internal) {
     return (
-      <Link to={link.url} className="text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
+      <Link to={link.url} className="block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
         {link.label}
       </Link>
     );
   }
   return (
-    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
+    <a href={link.url} target="_blank" rel="noopener noreferrer" className="block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
       {link.label}
     </a>
   );
@@ -162,7 +162,7 @@ const Footer = () => {
           {columns.map((col) => (
             <div key={col.title} className="lg:col-span-2">
               <h4 className="font-semibold mb-4 text-background">{col.title}</h4>
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {(col.links || []).map((link) => (
                   <li key={link.label}><FooterLink link={link} /></li>
                 ))}
@@ -213,7 +213,7 @@ const Footer = () => {
                       </div>
                       <Button 
                         type="submit" 
-                        className="w-full bg-[#0ea5c9] hover:bg-[#0891b2] text-white font-bold h-11 rounded-xl shadow-[0_4px_14px_rgba(14,165,201,0.3)] hover:shadow-[0_6px_20px_rgba(14,165,201,0.4)] transition-all flex items-center justify-center cursor-pointer" 
+                        className="w-full bg-primary hover:bg-[#0891b2] text-white font-bold h-11 rounded-xl shadow-[0_4px_14px_rgba(14,165,201,0.3)] hover:shadow-[0_6px_20px_rgba(14,165,201,0.4)] transition-all flex items-center justify-center cursor-pointer" 
                         disabled={submitting}
                       >
                         <Mail className="h-4 w-4 mr-2" />
@@ -315,7 +315,7 @@ const Footer = () => {
                     href={`https://wa.me/${whatsappDigits}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-[#22d3ee] transition-colors"
+                    className="-my-1.5 inline-block py-1.5 hover:text-[#22d3ee] transition-colors"
                   >
                     Falar por WhatsApp
                   </a>
@@ -349,7 +349,7 @@ const Footer = () => {
             <h4 className="font-semibold text-lg mb-6 text-background flex items-center gap-2">
               <MapPin className="h-5 w-5 text-[#22d3ee]" />
               As Nossas Lojas
-              <Link to="/lojas" className="ml-auto text-xs font-normal text-[#22d3ee] hover:underline">Ver todas com mapa</Link>
+              <Link to="/lojas" className="-my-1.5 ml-auto inline-block py-1.5 text-xs font-normal text-[#22d3ee] hover:underline">Ver todas com mapa</Link>
             </h4>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.entries(storesByProvince).map(([province, list]) => (
@@ -370,7 +370,7 @@ const Footer = () => {
                               href={store.maps_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-[#22d3ee] hover:underline mt-2"
+                              className="-mb-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-[#22d3ee] hover:underline mt-0.5"
                             >
                               <ExternalLink className="h-3 w-3" /> Ver no mapa
                             </a>

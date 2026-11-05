@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
 import QuickViewModal from '@/components/QuickViewModal';
+import { MOTION } from '@/lib/motion';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -134,7 +135,7 @@ export default function DestaquesSemana({ onCartOpen }) {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -30 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              transition={{ duration: MOTION.slow, ease: MOTION.ease }}
               className="grid md:grid-cols-12 gap-8 md:gap-12 items-center w-full"
             >
               {/* Product Cover image */}
@@ -147,10 +148,10 @@ export default function DestaquesSemana({ onCartOpen }) {
                   <img
                     src={currentBook.image || PLACEHOLDER}
                     alt={currentBook.title}
-                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-slow"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 justify-center">
-                    <span className="text-sm font-semibold bg-[#0ea5c9] text-white px-4 py-2 rounded-full">Ver detalhes</span>
+                    <span className="text-sm font-semibold bg-primary text-white px-4 py-2 rounded-full">Ver detalhes</span>
                   </div>
                 </button>
               </div>
@@ -189,7 +190,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                       <BookOpen className="h-4 w-4 mr-2" /> Detalhes
                     </Button>
                     {currentBook.purchasable ? (
-                      <Button onClick={handleAddToCart} className="flex-1 sm:flex-initial bg-[#0ea5c9] hover:bg-[#0c90b0] text-white">
+                      <Button onClick={handleAddToCart} className="flex-1 sm:flex-initial bg-primary hover:bg-[#0c90b0] text-white">
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Comprar Agora
                       </Button>
@@ -206,16 +207,23 @@ export default function DestaquesSemana({ onCartOpen }) {
         </div>
 
         {/* Slide indicators */}
-        <div className="flex justify-center gap-2 mt-12">
+        {/* O ponto mede 8px: em vez de o engordar, o botão à volta dele passa a medir 24,
+            o mínimo que a WCAG 2.5.8 pede em AA. O intervalo sai do contentor porque o
+            preenchimento de cada botão já afasta os pontos — somados, davam alvos
+            encostados a nada e uma fila larga de mais. */}
+        <div className="flex justify-center mt-12">
           {books.map((_, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => setCurrentIndex(i)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                i === currentIndex ? 'w-8 bg-[#0ea5c9]' : 'w-2 bg-slate-700 hover:bg-slate-600'
-              }`}
+              className="group grid h-6 place-items-center px-2"
               aria-label={`Ir para destaque ${i + 1}`}
-            />
+            >
+              <span className={`block h-2 rounded-full transition-all duration-base ${
+                i === currentIndex ? 'w-8 bg-primary' : 'w-2 bg-slate-700 group-hover:bg-slate-600'
+              }`} />
+            </button>
           ))}
         </div>
       </div>

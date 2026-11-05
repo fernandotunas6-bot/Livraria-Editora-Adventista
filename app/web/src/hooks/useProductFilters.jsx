@@ -4,6 +4,54 @@ import { getProducts, getCategories, getBookCollections } from '@/api/EcommerceA
 import { BOOK_GENRES } from '@/lib/bookConstants';
 import { matchesTokenizedSearch, buildProductSearchHaystack } from '@/lib/searchUtils';
 
+export function buildCatalogSearchParams(activeFilters, availableMaxPrice) {
+  const params = new URLSearchParams();
+
+  if (activeFilters.categories.length > 0) params.set('category', activeFilters.categories.join(','));
+  if (activeFilters.collection) params.set('collection', activeFilters.collection);
+  if (activeFilters.search) params.set('search', activeFilters.search);
+  if (activeFilters.author) params.set('author', activeFilters.author);
+  if (activeFilters.isbn) params.set('isbn', activeFilters.isbn);
+  if (activeFilters.publisher) params.set('publisher', activeFilters.publisher);
+  if (activeFilters.language) params.set('language', activeFilters.language);
+  if (activeFilters.yearFrom) params.set('yearFrom', activeFilters.yearFrom);
+  if (activeFilters.yearTo) params.set('yearTo', activeFilters.yearTo);
+  if (activeFilters.featuredOnly) params.set('featuredOnly', 'true');
+  if (activeFilters.inStockOnly) params.set('inStockOnly', 'true');
+  if (activeFilters.minPrice > 0) params.set('minPrice', activeFilters.minPrice);
+  if (activeFilters.maxPrice !== Infinity && activeFilters.maxPrice < availableMaxPrice) {
+    params.set('maxPrice', activeFilters.maxPrice);
+  }
+
+  Object.entries(activeFilters.options || {}).forEach(([key, values]) => {
+    values.forEach((val) => params.append(key, val));
+  });
+
+  return params;
+}
+
+/**
+ * Das opções que vieram no endereço, as que são mesmo atributos do catálogo.
+ *
+ * O `useProductFilters` trata qualquer parâmetro desconhecido como filtro por atributo do
+ * livro — é o que permite `?acabamento=capa-dura` sem ter de o declarar. Mas isso apanhava
+ * também os parâmetros de rastreio que as campanhas, o Facebook e o WhatsApp acrescentam
+ * sozinhos aos links (`utm_source`, `fbclid`, `gclid`): nenhum livro tem esse atributo, por
+ * isso o filtro excluía o catálogo inteiro e a loja aparecia vazia a quem viesse por aí.
+ *
+ * A regra é a correspondência com o que o catálogo tem, e não uma lista de nomes a ignorar:
+ * amanhã aparece outro parâmetro de rastreio qualquer e esta função não precisa de mudar.
+ */
+export function usableOptionFilters(activeOptions, availableOptions) {
+  const usable = {};
+  for (const [name, values] of Object.entries(activeOptions || {})) {
+    if (!Array.isArray(values) || values.length === 0) continue;
+    if (!availableOptions || !(name in availableOptions)) continue;
+    usable[name] = values;
+  }
+  return usable;
+}
+
 export function useProductFilters(initialCategory = null) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [allProducts, setAllProducts] = useState([]);
@@ -133,40 +181,26 @@ export function useProductFilters(initialCategory = null) {
   }, [urlSearch]);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (activeFilters.categories.length > 0) params.set('category', activeFilters.categories.join(','));
-    if (activeFilters.collection) params.set('collection', activeFilters.collection);
-    if (activeFilters.search) params.set('search', activeFilters.search);
-    if (activeFilters.author) params.set('author', activeFilters.author);
-    if (activeFilters.isbn) params.set('isbn', activeFilters.isbn);
-    if (activeFilters.publisher) params.set('publisher', activeFilters.publisher);
-    if (activeFilters.language) params.set('language', activeFilters.language);
-    if (activeFilters.yearFrom) params.set('yearFrom', activeFilters.yearFrom);
-    if (activeFilters.yearTo) params.set('yearTo', activeFilters.yearTo);
-    if (activeFilters.featuredOnly) params.set('featuredOnly', 'true');
-    if (activeFilters.inStockOnly) params.set('inStockOnly', 'true');
-    if (activeFilters.minPrice > 0) params.set('minPrice', activeFilters.minPrice);
-    if (activeFilters.maxPrice !== Infinity && activeFilters.maxPrice < availableFilters.maxPrice) {
-      params.set('maxPrice', activeFilters.maxPrice);
+    const nextParams = buildCatalogSearchParams(activeFilters, availableFilters.maxPrice);
+    const nextQuery = nextParams.toString();
+
+    if (searchParams.toString() !== nextQuery) {
+      setSearchParams(nextParams, { replace: true });
     }
-    Object.entries(activeFilters.options).forEach(([key, values]) => {
-      values.forEach((val) => params.append(key, val));
-    });
-    setSearchParams(params, { replace: true });
-  }, [activeFilters, availableFilters.maxPrice, setSearchParams]);
+  }, [activeFilters, availableFilters.maxPrice, searchParams, setSearchParams]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((product) => {
       if (activeFilters.collection && product.collection_id !== activeFilters.collection) return false;
 
       if (activeFilters.categories.length > 0) {
-        const productType = (product.type?.value || '').toLowerCase();
+        const productType = product.type?.value || '';
         const productCategoryNames = (product.collections || []).map((c) =>
-          (categoriesMap[c.collection_id] || c.title || '').toLowerCase()
+          categoriesMap[c.collection_id] || c.title || ''
         );
         const matchesCategory = activeFilters.categories.some((cat) => {
-          const searchCat = cat.toLowerCase();
-          return productType.includes(searchCat) || productCategoryNames.some((name) => name.includes(searchCat));
+          return matchesTokenizedSearch(productType, cat)
+            || productCategoryNames.some((name) => matchesTokenizedSearch(name, cat));
         });
         if (!matchesCategory) return false;
       }
@@ -180,22 +214,26 @@ export function useProductFilters(initialCategory = null) {
         if (!matchesTokenizedSearch(authorHay, activeFilters.author)) return false;
       }
       if (activeFilters.isbn) {
-        const q = activeFilters.isbn.toLowerCase();
-        const codes = [product.isbn, product.book_code, product.sku].filter(Boolean).join(' ').toLowerCase();
-        if (!codes.includes(q)) return false;
+        const codes = [product.isbn, product.book_code, product.sku].filter(Boolean).join(' ');
+        if (!matchesTokenizedSearch(codes, activeFilters.isbn)) return false;
       }
-      if (activeFilters.publisher && !(product.publisher || '').toLowerCase().includes(activeFilters.publisher.toLowerCase())) return false;
+      if (activeFilters.publisher && !matchesTokenizedSearch(product.publisher, activeFilters.publisher)) return false;
       if (activeFilters.language && (product.language || '') !== activeFilters.language) return false;
-      if (activeFilters.yearFrom && Number(product.year) < Number(activeFilters.yearFrom)) return false;
-      if (activeFilters.yearTo && Number(product.year) > Number(activeFilters.yearTo)) return false;
+      if (activeFilters.yearFrom || activeFilters.yearTo) {
+        const year = Number(product.year);
+        if (!Number.isFinite(year)) return false;
+        if (activeFilters.yearFrom && year < Number(activeFilters.yearFrom)) return false;
+        if (activeFilters.yearTo && year > Number(activeFilters.yearTo)) return false;
+      }
       if (activeFilters.featuredOnly && !product.featured) return false;
       if (activeFilters.inStockOnly && !product.purchasable) return false;
 
       const price = product.price_in_cents / 100;
       if (price < activeFilters.minPrice || price > activeFilters.maxPrice) return false;
 
-      for (const [optionName, selectedValues] of Object.entries(activeFilters.options)) {
-        if (selectedValues.length === 0) continue;
+      // `usableOptionFilters` descarta o que veio no endereço mas não é atributo do
+      // catálogo — os parâmetros de rastreio, por exemplo.
+      for (const [optionName, selectedValues] of Object.entries(usableOptionFilters(activeFilters.options, availableFilters.options))) {
         const productOption = product.options?.find((o) => o.title === optionName);
         if (!productOption) return false;
         const productOptionValues = productOption.values.map((v) => v.value);
@@ -204,7 +242,7 @@ export function useProductFilters(initialCategory = null) {
 
       return true;
     });
-  }, [allProducts, activeFilters, categoriesMap]);
+  }, [allProducts, activeFilters, categoriesMap, availableFilters.options]);
 
   const updateFilter = useCallback((key, value) => {
     setActiveFilters((prev) => ({ ...prev, [key]: value }));
@@ -255,9 +293,12 @@ export function useProductFilters(initialCategory = null) {
         (activeFilters.maxPrice !== Infinity && activeFilters.maxPrice < (availableFilters.maxPrice || 5000))) {
       count++;
     }
-    Object.values(activeFilters.options).forEach((values) => { count += values.length; });
+    // Pela mesma razão: um parâmetro de rastreio no endereço não é um filtro que o
+    // utilizador tenha escolhido, e não deve aparecer como "Filtros (1)".
+    Object.values(usableOptionFilters(activeFilters.options, availableFilters.options))
+      .forEach((values) => { count += values.length; });
     return count;
-  }, [activeFilters, initialCategory, availableFilters.minPrice, availableFilters.maxPrice]);
+  }, [activeFilters, initialCategory, availableFilters.minPrice, availableFilters.maxPrice, availableFilters.options]);
 
   const catalogStats = useMemo(() => ({
     total: allProducts.length,

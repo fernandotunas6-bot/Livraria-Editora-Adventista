@@ -3,7 +3,28 @@
 // Deploy com verify_jwt=false: a autenticação é feita aqui (token do Supabase Auth, quando existe).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.49.4";
 import nodemailer from "npm:nodemailer@6.9.16";
-import { C as EC, p as ep, panel as epanel, renderEmail } from "./emailLayout.ts";
+import {
+  brandFromSettings, categoryStates, emailDocument, formatKz, isCategoryEnabled,
+  isEmail as isDeliverableEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand, type FailureSource,
+} from "./emails.ts";
+import {
+  accessLinkLetter,
+  noticeLetter,
+  orderCreatedLetter,
+  orderStatusLetter,
+  paymentConfirmedLetter,
+  testLetter,
+  welcomeLetter,
+  PREVIEW_TEMPLATES,
+  unsubscribeUrlFor,
+  type Letter,
+} from "./emailTemplates.ts";
+import { createMemo, runAfterResponse } from "./runtime.ts";
+import { mfaPending } from "./mfa.ts";
+import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
+import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
+import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
+import { createRateLimit } from "./rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -20,61 +41,62 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  // Sem isto o browser esconde-os do site: o Retry-After dos limites e o id do pedido, que
+  // é o que a equipa precisa para encontrar o erro nos registos da função.
+  "Access-Control-Expose-Headers": "Retry-After, X-Request-Id",
 };
 
 class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public headers: Record<string, string> = {}) {
     super(message);
   }
 }
 const bad = (msg: string) => new HttpError(400, msg);
+// Limite de pedidos excedido. Respondia 400, que diz "o pedido está errado" e não "espere":
+// 429 com Retry-After é o que clientes, proxies e o Cloudflare sabem tratar. O site lê só a
+// mensagem, qualquer que seja o estado, por isso nada muda para quem compra.
+const tooMany = (msg: string) => new HttpError(429, msg, { "Retry-After": "60" });
 
 type Row = Record<string, any>;
-type Auth = { id: string; email: string; role: string; permissions: Row } | null;
 type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+// Por omissão nada se guarda: estas respostas têm dados pessoais (rastreio, painel, contas)
+// e não levavam Cache-Control nenhum. As rotas iguais para todos usam `publicJson`.
+const PRIVATE_HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
+const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json", ...PRIVATE_HEADERS, ...extra },
+  });
+
+// Rotas públicas que todas as páginas pedem (definições, lojas, colecções, pagamentos, geo).
+// Cada pedido levava ~1 s (Edge Function + base de dados em Estocolmo) e repetia-se em cada
+// página aberta. O browser guarda a resposta 30 s e, depois disso, ainda a usa até 5 min
+// enquanto pede a nova em segundo plano — a página não espera. Uma alteração no painel
+// chega aos visitantes no máximo uns minutos depois; o próprio painel pede com `no-cache`.
+// Só para respostas iguais para toda a gente: nunca usar em rotas com sessão.
+const PUBLIC_CACHE = "public, max-age=30, stale-while-revalidate=300";
+const publicJson = (body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...CORS, "Content-Type": "application/json", "X-Content-Type-Options": "nosniff", "Cache-Control": PUBLIC_CACHE },
+  });
 
 // ---------------------------------------------------------------------------
 // Utilitários
 // ---------------------------------------------------------------------------
-// Limite de pedidos partilhado por todas as instâncias (migração `limites_pedidos`).
-// O limite em memória que existia aqui era por isolate: as Edge Functions escalam e
-// reciclam, por isso perdia-se a cada arranque a frio e não travava ninguém.
-const rateLimitStore: Record<string, number[]> = {};
-let sharedRateLimitOff = false;
-
-/** Recuo local, para o caso de a função na base de dados ainda não existir. */
-function checkRateLimitLocal(bucket: string, ip: string, maxPerMinute: number) {
-  const key = `${bucket}:${ip || "anon"}`;
-  const now = Date.now();
-  rateLimitStore[key] = (rateLimitStore[key] || []).filter((t) => now - t < 60000);
-  if (rateLimitStore[key].length >= maxPerMinute) return false;
-  rateLimitStore[key].push(now);
-  return true;
-}
-
-async function checkRateLimit(bucket: string, ip: string, maxPerMinute = 30): Promise<boolean> {
-  if (!sharedRateLimitOff) {
-    const { data, error } = await db.rpc("check_rate_limit", {
-      p_bucket: bucket,
-      p_client: ip || "anon",
-      p_max: maxPerMinute,
-    });
-    if (!error) return data !== false;
-    // Função em falta (migração por aplicar): usa o limite local e não volta a tentar.
-    if (error.code === "PGRST202" || /could not find the function|does not exist/i.test(error.message || "")) {
-      sharedRateLimitOff = true;
-      console.log("check_rate_limit em falta na base de dados; a usar o limite em memória.");
-    } else {
-      // Falha passageira da base de dados não pode derrubar a loja.
-      console.log("check_rate_limit:", error.message);
-      return checkRateLimitLocal(bucket, ip, maxPerMinute);
-    }
-  }
-  return checkRateLimitLocal(bucket, ip, maxPerMinute);
-}
+// O limite de pedidos está em `rateLimit.ts`, com testes. Aqui fica só a ligação à base de
+// dados — o módulo não sabe nada de Supabase, e é isso que o torna testável.
+const checkRateLimit = createRateLimit({
+  // `db.rpc()` devolve um construtor de consulta, não o resultado: só depois de esperado é
+  // que dá `{ data, error }`. Espera-se aqui e devolve-se a forma exacta que o módulo
+  // declara — em vez de lhe passar um objecto com mais coisas lá dentro.
+  rpc: async (fn, args) => {
+    const { data, error } = await db.rpc(fn, args);
+    return { data, error };
+  },
+  log: (...a) => console.log(...a),
+});
 
 const nowISO = () => new Date().toISOString();
 const fileUrl = (table: string, rec: Row, field: string) =>
@@ -83,11 +105,12 @@ const normalizeEmail = (email: string) => (email || "").trim().toLowerCase();
 // Igualdade sem distinguir maiúsculas (ilike sem curingas).
 const likeExact = (value: string) => value.replace(/[\\%_]/g, (c) => "\\" + c);
 const normalizePhone = (phone: string) => (phone || "").replace(/\D/g, "");
-const fmtMoneyKz = (amount: unknown) =>
-  Number(amount || 0).toLocaleString("pt-AO", { minimumFractionDigits: 2 }) + " Kz";
-const escapeHtml = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+// Formatação determinista (ver `formatKz`): o `toLocaleString("pt-AO")` devolvia o
+// separador de milhares que o ICU daquele runtime tivesse, e os valores dos recibos e das
+// mensagens de WhatsApp mudavam de formato com a máquina.
+const fmtMoneyKz = formatKz;
 
-type NotifyMeta = { context?: string; customer_name?: string; order_number?: string };
+type NotifyMeta = { context?: string; customer_name?: string; order_number?: string; dedupe?: string; category?: string };
 
 /** Regista o resultado real de cada envio em notification_logs (visível no admin → Integrações). */
 async function logNotification(entry: Row) {
@@ -111,30 +134,67 @@ async function getAuth(req: Request): Promise<Auth> {
   const { data, error } = await db.auth.getUser(token);
   if (error || !data?.user) return null;
   const { data: profile } = await db.from("profiles").select("role, permissions").eq("id", data.user.id).maybeSingle();
+  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1): vale como
+  // cliente até introduzir o código. É a mesma regra das funções de permissão na base de
+  // dados; ver mfa.ts. Contas sem factor verificado não são afectadas.
+  if (mfaPending(data.user.factors, token)) {
+    return { id: data.user.id, email: data.user.email || "", role: "member", permissions: {} };
+  }
   return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
 }
 
-const isStaff = (auth: Auth) => !!auth && (auth.role === "admin" || auth.role === "manager");
-
-// Igual a private.has_permission() na base de dados: admin pode tudo; gestor só o que tiver activo.
-const PERMISSION_KEYS = ["manage_catalog", "manage_orders", "manage_settings", "manage_users", "manage_payments", "manage_marketing"];
-const can = (auth: Auth, key: string) =>
-  !!auth && (auth.role === "admin" || (auth.role === "manager" && auth.permissions?.[key] === true));
+// Quem pode o quê está em `permissions.ts`, com testes. Aqui ficam só os guardas, que são a
+// parte HTTP da coisa: traduzir um "não pode" numa resposta 403.
 function requirePermission(auth: Auth, key: string) {
   if (!can(auth, key)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
 }
-/** CRM (contactos e campanhas): como nas políticas RLS, "Utilizadores e Clientes" ou "Marketing". */
 function requireCrm(auth: Auth) {
-  if (!can(auth, "manage_users") && !can(auth, "manage_marketing")) throw new HttpError(403, "Sem permissão para esta operação.");
+  if (!canCrm(auth)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
 }
 
 // O registo de configuração activo é o mais antigo (o mesmo que o PocketBase usava).
-async function getSettings(): Promise<Row | null> {
-  const { data } = await db.from("site_settings").select("*")
-    .order("created", { ascending: true }).order("id", { ascending: false }).limit(1);
-  return data?.[0] || null;
+// ---------------------------------------------------------------------------
+// Cache curta por instância
+// ---------------------------------------------------------------------------
+// As definições do site, as integrações e o dono por omissão do CRM são lidos em quase
+// todos os pedidos e mudam raramente. Cada leitura era uma ida à base de dados, que está em
+// Estocolmo enquanto a função corre perto de quem pede (medido a partir de Angola: a
+// função em Paris, 0,1–0,2 s por consulta). Uma instância quente guarda-os uns segundos, e
+// pedidos simultâneos partilham a mesma leitura. Falhas e resultados vazios não ficam
+// guardados: o pedido seguinte volta a tentar.
+// As rotas do painel que dependem do que acabou de ser gravado (testar o SMTP ou o WhatsApp,
+// pré-visualizar um email) pedem `fresh`; quem grava pela função chama `forgetCached`.
+const SHORT_TTL_MS = 15_000;
+const { cached, forget: forgetCached } = createMemo();
+
+/**
+ * Segredos das configurações (palavra-passe SMTP, chaves SendGrid e de IA) guardados fora da
+ * API, em private.site_secrets (migração `segredos_fora_da_api`). Sem a migração a função não
+ * existe e fica-se com o que estiver nas colunas de site_settings, como antes.
+ */
+async function loadSecrets(): Promise<Row> {
+  const { data, error } = await db.rpc("site_secret_values");
+  if (error || !data || typeof data !== "object") return {};
+  return Object.fromEntries(Object.entries(data as Row).filter(([, v]) => typeof v === "string" && v));
+}
+
+async function loadSettings(): Promise<Row | null> {
+  const [{ data }, secrets] = await Promise.all([
+    db.from("site_settings").select("*")
+      .order("created", { ascending: true }).order("id", { ascending: false }).limit(1),
+    loadSecrets(),
+  ]);
+  const row = data?.[0] || null;
+  // Os segredos entram no mesmo objecto, por isso o resto da função não muda. Nenhuma rota
+  // devolve este objecto inteiro: /settings escolhe campo a campo o que é público.
+  return row ? { ...row, ...secrets } : null;
+}
+/** Definições do site (em cache curta). Cópia rasa: alterar o objecto não mexe na cache. */
+async function getSettings(fresh = false): Promise<Row | null> {
+  const rec = await cached("settings", SHORT_TTL_MS, loadSettings, fresh);
+  return rec ? { ...rec } : null;
 }
 
 // Regras da loja configuráveis pelo admin (Configurações → Regras da loja), sempre dentro de limites seguros.
@@ -153,64 +213,296 @@ function storeRules(settings: Row | null) {
   };
 }
 
-async function getIntegration(code: string): Promise<Row | null> {
-  const { data } = await db.from("app_integrations").select("*").eq("code", code).limit(1);
-  return data?.[0] || null;
+async function getIntegration(code: string, fresh = false): Promise<Row | null> {
+  const rec = await cached(`integration:${code}`, SHORT_TTL_MS, async () => {
+    const { data } = await db.from("app_integrations").select("*").eq("code", code).limit(1);
+    return (data?.[0] || null) as Row | null;
+  }, fresh);
+  return rec ? { ...rec } : null;
 }
 
 // ---------------------------------------------------------------------------
 // Email
 // ---------------------------------------------------------------------------
-async function sendTransactionalEmail(settings: Row | null, to: string, subject: string, html: string, meta: NotifyMeta = {}) {
-  if (!to) return false;
-  const base = { type: "email", context: meta.context || "order", recipient: to, customer_name: meta.customer_name || "", order_number: meta.order_number || "", subject, content: html };
-  if (!settings) {
-    await logNotification({ ...base, status: "skipped", detail: "Configurações do site em falta." });
+/** Já saiu um email para este acontecimento? Impede duplicados em repetições e reinícios. */
+async function alreadySent(dedupe: string) {
+  if (!dedupe) return false;
+  const { data, error } = await db.from("notification_logs")
+    .select("id").eq("dedupe_key", dedupe).eq("status", "sent").limit(1);
+  // Numa falha de leitura segue-se o envio: perder uma confirmação é pior do que repetir uma.
+  if (error) {
+    console.log("alreadySent:", error.message);
     return false;
   }
+  return !!data?.length;
+}
+
+/**
+ * Envia uma mensagem transaccional e registo do resultado real em `notification_logs`.
+ *
+ * Leva sempre as duas versões, HTML e texto simples: clientes que não mostram HTML, e os
+ * filtros de correio, contam com a segunda, e um email só com HTML tem mais probabilidade de
+ * acabar no lixo.
+ */
+type SendOutcome = { ok: boolean; source?: FailureSource; status?: number; detail: string; provider: string };
+
+// Segredos de email: um segredo da Edge Function (`supabase secrets set SMTP_PASSWORD=…`)
+// ganha ao que estiver na tabela. Na tabela, quem tem "Configurações" lê-os pela API em texto
+// simples; como segredo da função, só o servidor os vê. Sem segredo definido, tudo continua a
+// funcionar como antes, com o valor do painel. É o mesmo critério das chaves de IA (/chat).
+const smtpPassword = (settings: Row | null) => Deno.env.get("SMTP_PASSWORD") || settings?.smtp_password || "";
+const sendgridKey = (settings: Row | null) => Deno.env.get("SENDGRID_API_KEY") || settings?.sendgrid_api_key || "";
+
+/** Entrega uma mensagem ao fornecedor. Só envia: não regista nem decide repetições. */
+async function deliverEmail(settings: Row, to: string, subject: string, html: string, text: string, headers: Record<string, string>): Promise<SendOutcome> {
   const siteName = settings.site_name || "Livraria Adventista";
   const provider = settings.email_provider || "smtp";
   const fromEmail = settings.smtp_from_email || settings.contact_email || "noreply@livraria.ao";
   const fromName = settings.smtp_from_name || siteName;
-  try {
-    if (provider === "sendgrid") {
-      if (!settings.sendgrid_api_key) {
-        await logNotification({ ...base, status: "skipped", provider, detail: "Chave SendGrid em falta." });
-        return false;
-      }
+
+  if (provider === "sendgrid") {
+    if (!sendgridKey(settings)) {
+      return { ok: false, detail: "Chave SendGrid em falta.", provider };
+    }
+    // A ordem importa: o SendGrid usa a última parte como a preferida, por isso o HTML vem
+    // depois do texto simples.
+    const content = [
+      ...(text ? [{ type: "text/plain", value: text }] : []),
+      { type: "text/html", value: html },
+    ];
+    try {
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
-        headers: { Authorization: `Bearer ${settings.sendgrid_api_key}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${sendgridKey(settings)}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: to }] }],
           from: { email: fromEmail, name: fromName },
           subject,
-          content: [{ type: "text/html", value: html }],
+          content,
+          ...(Object.keys(headers).length ? { headers } : {}),
         }),
       });
-      const detail = res.ok ? `SendGrid ${res.status}` : `SendGrid ${res.status}: ${await res.text()}`;
-      await logNotification({ ...base, status: res.ok ? "sent" : "failed", provider, detail });
-      return res.ok;
+      if (res.ok) return { ok: true, detail: `SendGrid ${res.status}`, provider };
+      return { ok: false, source: "http", status: res.status, detail: `SendGrid ${res.status}: ${await res.text()}`, provider };
+    } catch (err) {
+      return { ok: false, source: "network", detail: (err as Error)?.message || String(err), provider };
     }
-    if (!settings.smtp_host) {
-      await logNotification({ ...base, status: "skipped", provider: "smtp", detail: "Servidor SMTP não configurado." });
-      return false;
-    }
-    const port = Number(settings.smtp_port) || 465;
+  }
+
+  if (!settings.smtp_host) {
+    return { ok: false, detail: "Servidor SMTP não configurado.", provider: "smtp" };
+  }
+  const port = Number(settings.smtp_port) || 465;
+  try {
     const transport = nodemailer.createTransport({
       host: settings.smtp_host,
       port,
       secure: port === 465,
-      auth: settings.smtp_user ? { user: settings.smtp_user, pass: settings.smtp_password || "" } : undefined,
+      auth: settings.smtp_user ? { user: settings.smtp_user, pass: smtpPassword(settings) } : undefined,
     });
-    const info = await transport.sendMail({ from: { name: fromName, address: fromEmail }, to, subject, html });
-    await logNotification({ ...base, status: "sent", provider: "smtp", detail: `${settings.smtp_host}:${port} · ${info?.response || "aceite"}` });
-    return true;
+    const info = await transport.sendMail({
+      from: { name: fromName, address: fromEmail },
+      to, subject, html, ...(text ? { text } : {}),
+      ...(Object.keys(headers).length ? { headers } : {}),
+    });
+    return { ok: true, detail: `${settings.smtp_host}:${port} · ${info?.response || "aceite"}`, provider: "smtp" };
   } catch (err) {
-    console.log("Transactional email error:", err);
-    await logNotification({ ...base, status: "failed", provider, detail: (err as Error)?.message || String(err) });
+    const e = err as { responseCode?: number; message?: string; code?: string };
+    // Sem resposta do servidor é falha de ligação; com código SMTP, é o servidor a recusar.
+    const source: FailureSource = e?.responseCode ? "smtp" : "network";
+    return { ok: false, source, status: e?.responseCode, detail: e?.message || String(err), provider: "smtp" };
+  }
+}
+
+/**
+ * Envia uma mensagem transaccional, regista o resultado e guarda para repetir o que falhou
+ * por motivo passageiro.
+ *
+ * Leva sempre as duas versões, HTML e texto simples: clientes que não mostram HTML, e os
+ * filtros de correio, contam com a segunda, e um email só com HTML tem mais probabilidade de
+ * acabar no lixo.
+ */
+async function sendTransactionalEmail(
+  settings: Row | null,
+  to: string,
+  subject: string,
+  html: string,
+  meta: NotifyMeta = {},
+  text = "",
+  headers: Record<string, string> = {},
+) {
+  if (!to) return false;
+  const dedupe = meta.dedupe || "";
+  if (dedupe && await alreadySent(dedupe)) {
+    console.log("Email repetido ignorado:", dedupe);
+    return true;
+  }
+  const base = {
+    type: "email", context: meta.context || "order", recipient: to,
+    customer_name: meta.customer_name || "", order_number: meta.order_number || "",
+    subject, content: html, ...(dedupe ? { dedupe_key: dedupe } : {}),
+  };
+  if (!settings) {
+    await logNotification({ ...base, status: "skipped", detail: "Configurações do site em falta." });
     return false;
   }
+
+  const outcome = await deliverEmail(settings, to, subject, html, text, headers);
+  if (outcome.ok) {
+    await logNotification({ ...base, status: "sent", provider: outcome.provider, detail: outcome.detail });
+    return true;
+  }
+
+  // Configuração em falta não é falha de envio: não há nada para repetir até alguém a tratar.
+  if (!outcome.source) {
+    await logNotification({ ...base, status: "skipped", provider: outcome.provider, detail: outcome.detail });
+    return false;
+  }
+
+  console.log("Transactional email error:", outcome.detail);
+  const retriable = isRetriableFailure(outcome.source, outcome.status, outcome.detail);
+  if (retriable) {
+    const queued = await enqueueEmail({ to, subject, html, text, headers, meta, lastError: outcome.detail });
+    await logNotification({
+      ...base, status: "failed", provider: outcome.provider,
+      detail: queued ? `${outcome.detail} · na fila para repetir` : outcome.detail,
+    });
+  } else {
+    await logNotification({ ...base, status: "failed", provider: outcome.provider, detail: outcome.detail });
+  }
+  return false;
+}
+
+/** Guarda uma mensagem para repetir mais tarde. */
+async function enqueueEmail(job: {
+  to: string; subject: string; html: string; text: string;
+  headers: Record<string, string>; meta: NotifyMeta; lastError: string;
+}) {
+  const { error } = await db.from("email_queue").insert({
+    recipient: job.to,
+    subject: job.subject,
+    html: job.html,
+    text_body: job.text,
+    headers: Object.keys(job.headers).length ? job.headers : null,
+    context: job.meta.context || "order",
+    customer_name: job.meta.customer_name || "",
+    order_number: job.meta.order_number || "",
+    dedupe_key: job.meta.dedupe || null,
+    attempts: 1,
+    next_attempt_at: new Date(Date.now() + retryDelaySeconds(1) * 1000).toISOString(),
+    last_error: job.lastError.slice(0, 2000),
+  });
+  // 23505: já lá está uma igual à espera. Repetir o pedido não põe duas na fila.
+  if (error && error.code !== "23505") {
+    console.log("email_queue insert:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Processa um lote da fila: tenta entregar, e decide o que fazer com o que falhar.
+ *
+ * As mensagens são reclamadas por `claim_email_jobs`, que usa `for update skip locked`:
+ * duas instâncias da Edge Function a correr ao mesmo tempo levam lotes diferentes, em vez de
+ * enviarem a mesma mensagem duas vezes ao mesmo cliente.
+ */
+async function processEmailQueue(limit = 10) {
+  const settings = await getSettings(true);
+  const summary = { claimed: 0, sent: 0, retrying: 0, failed: 0 };
+  if (!settings) return summary;
+
+  const { data: jobs, error } = await db.rpc("claim_email_jobs", { p_limit: limit });
+  if (error) {
+    console.log("claim_email_jobs:", error.message);
+    return summary;
+  }
+  summary.claimed = jobs?.length || 0;
+
+  for (const job of jobs || []) {
+    // Já saiu entretanto por outro caminho (um reenvio à mão, por exemplo).
+    if (job.dedupe_key && await alreadySent(job.dedupe_key)) {
+      await db.from("email_queue").update({ status: "sent", last_error: "Já tinha sido enviada." }).eq("id", job.id);
+      summary.sent++;
+      continue;
+    }
+
+    const headers = (job.headers && typeof job.headers === "object") ? job.headers as Record<string, string> : {};
+    const outcome = await deliverEmail(settings, job.recipient, job.subject, job.html, job.text_body || "", headers);
+    const attempts = (Number(job.attempts) || 0) + 1;
+    const base = {
+      type: "email", context: job.context || "order", recipient: job.recipient,
+      customer_name: job.customer_name || "", order_number: job.order_number || "",
+      subject: job.subject, content: job.html,
+      ...(job.dedupe_key ? { dedupe_key: job.dedupe_key } : {}),
+    };
+
+    if (outcome.ok) {
+      await db.from("email_queue").update({ status: "sent", attempts, last_error: "" }).eq("id", job.id);
+      await logNotification({ ...base, status: "sent", provider: outcome.provider, detail: `${outcome.detail} · tentativa ${attempts}` });
+      summary.sent++;
+      continue;
+    }
+
+    const maxAttempts = Number(job.max_attempts) || 5;
+    const retriable = !!outcome.source && isRetriableFailure(outcome.source, outcome.status, outcome.detail);
+    // Desistir quando a causa não melhora com o tempo, ou quando as tentativas acabaram:
+    // insistir num endereço que não existe prejudica a reputação do domínio.
+    if (!retriable || attempts >= maxAttempts) {
+      await db.from("email_queue").update({
+        status: "failed", attempts, last_error: outcome.detail.slice(0, 2000),
+      }).eq("id", job.id);
+      await logNotification({
+        ...base, status: "failed", provider: outcome.provider,
+        detail: `${outcome.detail} · ${retriable ? `desistiu ao fim de ${attempts} tentativas` : "falha definitiva"}`,
+      });
+      summary.failed++;
+      continue;
+    }
+
+    await db.from("email_queue").update({
+      status: "pending", attempts,
+      next_attempt_at: new Date(Date.now() + retryDelaySeconds(attempts) * 1000).toISOString(),
+      last_error: outcome.detail.slice(0, 2000),
+      locked_at: null,
+    }).eq("id", job.id);
+    summary.retrying++;
+  }
+  return summary;
+}
+
+/** Identidade visual da loja para os emails, com o endereço público configurado no painel. */
+function emailBrand(settings: Row | null): Brand {
+  return brandFromSettings(settings, String(settings?.site_url || Deno.env.get("SITE_URL") || ""));
+}
+
+/**
+ * Envia um modelo pronto (`emailTemplates.ts`), com HTML e texto simples.
+ *
+ * Verifica aqui a categoria, e não em cada sítio que chama: uma categoria esquecida num dos
+ * pontos de envio seria uma mensagem a sair depois de a loja a ter desligado. As
+ * transaccionais não são desligáveis, e `isCategoryEnabled` trata disso.
+ */
+async function sendLetter(settings: Row | null, to: string, letter: Letter, meta: NotifyMeta = {}) {
+  const category = meta.category || "";
+  if (category && !isCategoryEnabled(settings, category)) {
+    await logNotification({
+      type: "email", context: meta.context || "order", recipient: to,
+      customer_name: meta.customer_name || "", order_number: meta.order_number || "",
+      subject: letter.subject, content: "", status: "skipped",
+      detail: `Categoria "${category}" desligada em Configurações.`,
+    });
+    return false;
+  }
+  const { html, text } = emailDocument(emailBrand(settings), letter.doc);
+  // `List-Unsubscribe` é o que os clientes de email usam para mostrar o botão próprio de
+  // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
+  // pedido ao endereço, sem o utilizador ter de confirmar noutra página.
+  const unsubscribe = letter.doc.unsubscribeUrl || "";
+  const headers: Record<string, string> = unsubscribe
+    ? { "List-Unsubscribe": `<${unsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
+    : {};
+  return sendTransactionalEmail(settings, to, letter.subject, html, meta, text, headers);
 }
 
 /** Link de pagamento do método da encomenda (ex.: Multicaixa Express), se o pagamento ainda não estiver confirmado. */
@@ -221,77 +513,61 @@ async function orderPaymentLink(order: Row) {
   return /^https:\/\//.test(link) ? link : "";
 }
 
-/** Endereço público da loja, usado nos links dos emails. */
-const PUBLIC_SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://livrariaadventista.ao").replace(/\/$/, "");
-
-/** Opções comuns do layout de email, a partir das configurações da loja. */
-const emailChrome = (settings: Row | null) => ({
-  siteName: settings?.site_name || "Livraria Adventista",
-  contactEmail: settings?.contact_email || "",
-  contactPhone: settings?.contact_phone || "",
-  siteUrl: PUBLIC_SITE_URL,
-});
-
-function buildOrderEmailHtml(order: Row, settings: Row | null, paymentLink = "") {
-  const td = `font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;color:${EC.text};padding:12px 0;border-bottom:1px solid ${EC.line}`;
-  const rows = (order.items || []).map((it: Row) => {
-    const line = (Number(it.quantity) || 1) * (Number(it.price) || 0);
-    return `<tr><td style="${td}"><span style="color:${EC.gold};font-weight:600">${escapeHtml(it.quantity || 1)}&times;</span>&nbsp; ${escapeHtml(it.title || "Livro")}</td><td align="right" style="${td};white-space:nowrap">${fmtMoneyKz(line)}</td></tr>`;
-  }).join("");
-  const small = `font-family:'Inter',Helvetica,Arial,sans-serif;font-size:14px;color:${EC.muted};padding:4px 0`;
-  const totals = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="${small}">Envio</td><td align="right" style="${small}">${fmtMoneyKz(order.shipping_cost)}</td></tr>
-    <tr><td style="font-family:Georgia,serif;font-size:20px;color:${EC.navy};padding:8px 0 0">Total</td><td align="right" style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:${EC.navy};padding:8px 0 0;white-space:nowrap">${fmtMoneyKz(order.total)}</td></tr>
-  </table>`;
-  const ref = escapeHtml(order.order_number || order.id);
-  const chrome = emailChrome(settings);
-  return renderEmail({
-    ...chrome,
-    hero: "encomenda",
-    preheader: `Encomenda ${order.order_number || ""} confirmada — total ${fmtMoneyKz(order.total)}.`,
-    eyebrow: `Encomenda ${ref}`,
-    title: "Obrigado pela sua encomenda",
-    body: [
-      ep(`Olá <strong style="color:${EC.navy}">${escapeHtml(order.customer_name)}</strong>,`),
-      ep(`Recebemos a sua encomenda na ${escapeHtml(chrome.siteName)}. Aqui está o resumo.`),
-      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 8px">${rows}</table>`,
-      epanel(totals),
-      paymentLink ? ep(`Para concluir, pague com ${escapeHtml(order.payment_method_name || "o método escolhido")} no botão abaixo.`) : "",
-    ].join(""),
-    button: paymentLink
-      ? { label: `Pagar com ${order.payment_method_name || "o método escolhido"}`, url: escapeHtml(paymentLink) }
-      : { label: "Acompanhar encomenda", url: escapeHtml(`${PUBLIC_SITE_URL}/track`) },
-    note: paymentLink
-      ? "Se já pagou, ignore o botão: confirmamos o pagamento com a referência indicada."
-      : "Use o número da encomenda e o email desta compra para a acompanhar.",
-  });
-}
-
 async function sendOrderConfirmationEmail(order: Row, settings: Row | null) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
   const paymentLink = await orderPaymentLink(order);
-  return sendTransactionalEmail(settings, order.customer_email, `Confirmação de encomenda ${order.order_number || ""}`, buildOrderEmailHtml(order, settings, paymentLink), {
-    context: "order", customer_name: order.customer_name, order_number: order.order_number,
+  const letter = orderCreatedLetter(emailBrand(settings), order, paymentLink);
+  return sendLetter(settings, order.customer_email, letter, {
+    context: "order",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    // Uma só confirmação por encomenda, mesmo que o checkout seja repetido.
+    dedupe: `order:created:${order.id}`,
   });
 }
 
-/** Mensagem de texto (contactos, campanhas) no layout da loja. A 1.ª linha não vazia serve de título se não houver assunto. */
-const plainHtml = (body: string, settings: Row | null = null, subject = "") => {
-  const paras = String(body || "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
-  const title = subject || paras.shift() || "Livraria Adventista";
-  return renderEmail({
-    ...emailChrome(settings),
-    preheader: (paras[0] || "").slice(0, 120),
-    title,
-    body: paras.map((t) => ep(escapeHtml(t).replace(/\n/g, "<br>"))).join(""),
+/**
+ * Avisa o cliente de uma mudança de estado da encomenda.
+ *
+ * Só envia quando o estado muda de facto e quando há texto para esse estado: um email por
+ * cada gravação no painel, ou por um estado que nada diz ao cliente, seria ruído. A chave de
+ * idempotência é a encomenda mais o estado, por isso voltar a pôr a encomenda no mesmo
+ * estado não repete a mensagem.
+ */
+const PROGRESS_STATUSES = ["confirmed", "preparing", "shipped", "in_transit", "out_for_delivery"];
+
+async function sendOrderStatusEmail(order: Row, settings: Row | null, status: string, event?: Row) {
+  if (!settings?.order_email_enabled || !order.customer_email) return false;
+  const letter = orderStatusLetter(emailBrand(settings), order, status, event);
+  if (!letter) return false;
+  return sendLetter(settings, order.customer_email, letter, {
+    context: "order_status",
+    // "Entregue" e "Cancelada" não entram na categoria opcional: são o fecho da compra e
+    // saem mesmo com o acompanhamento desligado.
+    category: PROGRESS_STATUSES.includes(status) ? "order_progress" : "",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    dedupe: `order:status:${order.id}:${status}`,
   });
-};
+}
+
+/** Avisa o cliente de que o pagamento ficou confirmado. */
+async function sendPaymentConfirmedEmail(order: Row, settings: Row | null) {
+  if (!settings?.order_email_enabled || !order.customer_email) return false;
+  const letter = paymentConfirmedLetter(emailBrand(settings), order);
+  return sendLetter(settings, order.customer_email, letter, {
+    context: "payment",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    dedupe: `order:paid:${order.id}`,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // WhatsApp Business (Meta Cloud API)
 // ---------------------------------------------------------------------------
-async function getWhatsAppConfig(): Promise<Row | null> {
-  const rec = await getIntegration("whatsapp_business");
+async function getWhatsAppConfig(fresh = false): Promise<Row | null> {
+  const rec = await getIntegration("whatsapp_business", fresh);
   if (!rec?.enabled) return null;
   const cfg = rec.config || {};
   if (!cfg.access_token || !cfg.phone_number_id) return null;
@@ -470,8 +746,11 @@ async function upsertContact(item: Row, ownerId: string | null) {
 }
 
 async function getDefaultOwnerId() {
-  const { data } = await db.from("profiles").select("id").eq("role", "admin").order("created").limit(1);
-  return data?.[0]?.id || null;
+  // O primeiro administrador quase nunca muda; cinco minutos chegam.
+  return await cached("default-owner", 5 * 60_000, async () => {
+    const { data } = await db.from("profiles").select("id").eq("role", "admin").order("created").limit(1);
+    return (data?.[0]?.id || null) as string | null;
+  });
 }
 
 async function countRows(table: string, filter?: (q: any) => any) {
@@ -491,7 +770,10 @@ function effectivePrice(b: Row) {
   return sale > 0 && sale < price && started && notEnded ? sale : price;
 }
 
-async function getNewBooksDigest() {
+/** Endereço público da loja: o configurado no painel (`site_url`), senão o domínio principal. */
+const DEFAULT_SITE_URL = "https://livrariaadventista.com";
+
+async function getNewBooksDigest(settings: Row | null) {
   const { data: books } = await db.from("stock_books").select("title, price, sale_price, sale_starts_at, sale_ends_at").eq("active", true).gt("stock", 0)
     .order("created", { ascending: false }).limit(5);
   if (!books?.length) return "";
@@ -500,7 +782,10 @@ async function getNewBooksDigest() {
     const price = b.price ? `${effectivePrice(b).toLocaleString("pt-AO")} Kz` : "";
     lines.push(`• ${b.title || "Livro"}${price ? " — " + price : ""}`);
   }
-  lines.push("", "Visite: https://livrariaadventista.ao/shop");
+  // O `.ao` ainda não resolve: um endereço fixo aqui mandava os clientes para uma página que
+  // não abre. Vem das configurações, como os links dos emails.
+  const site = (emailBrand(settings).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  lines.push("", `Visite: ${site}/shop`);
   return lines.join("\n");
 }
 
@@ -515,7 +800,17 @@ function calcNextSendAt(frequency: string) {
 
 // Contactos com esta etiqueta não recebem envios manuais nem campanhas.
 const OPT_OUT_TAG = "nao-contactar";
-const isOptedOut = (contact: Row) => Array.isArray(contact.tags) && contact.tags.includes(OPT_OUT_TAG);
+/**
+ * Não contactar este contacto?
+ *
+ * Duas origens para a mesma decisão: a etiqueta, que a equipa põe no painel, e a data, que
+ * fica quando o próprio cliente usa o link de cancelamento no rodapé de uma campanha. A
+ * etiqueta é o que o painel mostra e o que já era verificado; a data diz quando foi e que
+ * partiu do cliente. Qualquer uma delas basta — uma gravação que falhe a meio não pode
+ * resultar em mensagens a continuar a sair.
+ */
+const isOptedOut = (contact: Row) =>
+  (Array.isArray(contact.tags) && contact.tags.includes(OPT_OUT_TAG)) || !!contact.marketing_opt_out_at;
 const MAX_NOTIFY_CONTACTS = 300;
 const clipText = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
 
@@ -545,7 +840,27 @@ async function notifyContact(contact: Row, opts: Row) {
   }
   if (channel === "email" || channel === "both") {
     if (hasEmail && settings) {
-      emailSent = await sendTransactionalEmail(settings, contact.email, subject, plainHtml(body, settings, subject), { context: opts.campaignId ? "campaign" : "contact", customer_name: contact.name });
+      // Campanhas e avisos levam a mesma moldura das restantes mensagens, e no rodapé a
+      // razão certa: as de marketing dizem como deixar de as receber.
+      const isCampaign = !!opts.campaignId;
+      const brand = emailBrand(settings);
+      // Quem pediu para não ser contactado não recebe campanhas. A verificação é aqui, no
+      // envio, e não só em quem escolhe os destinatários: uma lista montada antes do
+      // cancelamento voltaria a apanhá-lo.
+      if (isCampaign && isOptedOut(contact)) {
+        await logNotification({
+          type: "email", context: "campaign", recipient: contact.email,
+          customer_name: contact.name || "", subject, content: "", status: "skipped",
+          detail: "O contacto pediu para não ser contactado.",
+        });
+        emailSent = false;
+      } else {
+        emailSent = await sendLetter(
+          settings, contact.email,
+          noticeLetter(brand, subject, body, isCampaign, isCampaign ? unsubscribeUrlFor(brand, contact.unsubscribe_token || "") : ""),
+          { context: isCampaign ? "campaign" : "contact", category: isCampaign ? "campaign" : "", customer_name: contact.name },
+        );
+      }
       if (channel === "email") status = emailSent ? "sent" : "failed";
       else if (emailSent) status = "sent";
     } else if (channel === "email") {
@@ -572,7 +887,7 @@ route("GET", "/settings", async () => {
   if (!rec) {
     return json({
       site_name: "Livraria Adventista", tagline: "Literatura que edifica e transforma", primary_color: "#0ea5c9",
-      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "+244 923 000 000",
+      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "",
       contact_address: "Luanda, Angola", pwa_enabled: true, pwa_theme_color: "#0c4a6e", shipping_free_threshold: 20000,
       shipping_cost: 1500, maintenance_mode: false, google_oauth_enabled: false,
       header_welcome_logged: "Bem-vindo de volta, {nome}",
@@ -599,7 +914,7 @@ route("GET", "/settings", async () => {
   if (bgMode === "video" && !rec.shop_bg_video_url) bgMode = "gradient";
   if (!["gradient", "image", "video", "slides"].includes(bgMode)) bgMode = "gradient";
   const orTrue = (v: unknown) => (v == null ? true : !!v);
-  return json({
+  return publicJson({
     site_name: rec.site_name || "Livraria Adventista",
     tagline: rec.tagline || "",
     primary_color: rec.primary_color || "#0ea5c9",
@@ -682,12 +997,14 @@ route("GET", "/integrations", async () => {
     if (!out.google_oauth) out.google_oauth = { enabled: false, config: {} };
     out.google_oauth.enabled = !!settings.google_oauth_enabled;
   }
-  return json({ integrations: out });
+  // Igual para todos os visitantes (configuração já filtrada por sanitizeIntegrationConfig) e
+  // pedida em cada página: ~0,7 s de mediana sem cache. O painel pede com `no-cache`.
+  return publicJson({ integrations: out });
 });
 
 route("GET", "/admin/media-config", async ({ auth }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
-  const drive = await getIntegration("google_drive");
+  const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ google_drive: { enabled: false, config: {} } });
   const config = drive.config || {};
   return json({
@@ -705,7 +1022,7 @@ route("GET", "/admin/media-config", async ({ auth }) => {
 
 route("GET", "/admin/drive-images", async ({ auth, url }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
-  const drive = await getIntegration("google_drive");
+  const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ files: [] });
   const config = drive.config || {};
   const apiKey = config.api_key || "";
@@ -727,7 +1044,7 @@ route("GET", "/admin/drive-images", async ({ auth, url }) => {
 
 route("GET", "/stores", async () => {
   const { data } = await db.from("physical_stores").select("*").eq("active", true).order("sort_order").order("name");
-  return json({
+  return publicJson({
     stores: (data || []).map((r) => ({
       id: r.id, name: r.name, province: r.province, address: r.address, phone: r.phone || "",
       hours: r.hours || "", image_url: r.image_url || fileUrl("physical_stores", r, "image"),
@@ -739,7 +1056,7 @@ route("GET", "/stores", async () => {
 
 route("GET", "/book-collections", async () => {
   const { data } = await db.from("book_collections").select("*").eq("active", true).order("sort_order").order("created");
-  return json({
+  return publicJson({
     collections: (data || []).map((r) => ({
       id: r.id, title: r.title, slug: r.slug || "", description: r.description || "",
       cover: r.cover || fileUrl("book_collections", r, "cover_image"), featured: !!r.featured,
@@ -750,7 +1067,7 @@ route("GET", "/book-collections", async () => {
 
 route("GET", "/payment-methods", async () => {
   const { data } = await db.from("payment_methods").select("*").eq("enabled", true).order("sort_order").limit(50);
-  return json({
+  return publicJson({
     methods: (data || []).map((r) => ({
       id: r.id, name: r.name, code: r.code, type: r.type || "offline", instructions: r.instructions || "",
       account_info: r.account_info || "", qr_url: r.qr_url || fileUrl("payment_methods", r, "qr_code"), icon: r.icon || "",
@@ -768,7 +1085,7 @@ async function findOrderByNumberAndEmail(orderNumber: string, email: string) {
 }
 
 route("POST", "/track", async ({ body, ip }) => {
-  if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
@@ -778,10 +1095,11 @@ route("POST", "/track", async ({ body, ip }) => {
     order_number: order.order_number, status: order.status, delivery_status: order.delivery_status || "received",
     total: order.total, customer_name: order.customer_name, phone: order.phone || "",
     delivery_relative_name: order.delivery_relative_name || "", delivery_relative_phone: order.delivery_relative_phone || "",
-    address: order.address, city: order.city, delivery_province: order.delivery_province || "",
+    delivery_province: order.delivery_province || "",
     delivery_municipality: order.delivery_municipality || "", delivery_locality: order.delivery_locality || "",
     delivery_street: order.delivery_street || "", delivery_reference: order.delivery_reference || "",
-    delivery_address_full: order.delivery_address_full || order.address || "",
+    // A morada numa linha, também nas encomendas antigas (que só tinham address/city).
+    delivery_address_full: deliveryAddressLine(order),
     delivery_confirmed_at: order.delivery_confirmed_at || "", delivery_confirmed_by: order.delivery_confirmed_by || "",
     delivery_recipient_name: order.delivery_recipient_name || "",
     // A imagem da assinatura não sai daqui: basta o número da encomenda e o email para
@@ -798,7 +1116,7 @@ route("POST", "/track", async ({ body, ip }) => {
 route("GET", "/geo/provinces", async () => {
   const { data } = await db.from("angola_provinces").select("id, name, slug, capital, sort_order").order("sort_order").limit(500);
   const provinces = data || [];
-  return json({ provinces, version: "RGPH-2024", count: provinces.length });
+  return publicJson({ provinces, version: "RGPH-2024", count: provinces.length });
 });
 
 route("GET", "/geo/municipalities", async ({ url }) => {
@@ -809,7 +1127,7 @@ route("GET", "/geo/municipalities", async ({ url }) => {
   const { data } = await db.from("angola_municipalities").select("id, name, slug, sort_order, province")
     .eq("province", provinceId).order("sort_order").limit(500);
   const municipalities = data || [];
-  return json({ municipalities, count: municipalities.length });
+  return publicJson({ municipalities, count: municipalities.length });
 });
 
 route("GET", "/geo/localities", async ({ url }) => {
@@ -818,16 +1136,17 @@ route("GET", "/geo/localities", async ({ url }) => {
   const { data } = await db.from("angola_localities").select("id, name, type, sort_order, municipality")
     .eq("municipality", municipalityId).order("sort_order").limit(500);
   const localities = data || [];
-  return json({ localities, count: localities.length });
+  return publicJson({ localities, count: localities.length });
 });
 
 route("POST", "/confirm-delivery", async ({ body, ip }) => {
   const confirmRate = Math.max(1, Math.floor(storeRules(await getSettings()).trackRate / 2));
-  if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
-  const recipientName = String(body.recipientName || "").trim();
-  const recipientId = String(body.recipientId || "").trim();
+  // Com limite, como no checkout: são texto livre de quem tem o número e o email.
+  const recipientName = String(body.recipientName || "").trim().slice(0, 120);
+  const recipientId = String(body.recipientId || "").trim().slice(0, 60);
   const signature = String(body.signature || "").trim();
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
   if (!recipientName) throw bad("Nome de quem recebe é obrigatório.");
@@ -862,6 +1181,15 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
     const { data, error: e2 } = await db.from("orders").update({ delivery_status: "delivered" }).eq("id", order.id).select().single();
     if (e2) throw e2;
     final = data;
+    // Comprovativo da entrega para o cliente. A chave de idempotência é a mesma que o
+    // painel usaria ao marcar "Entregue", por isso a confirmação não gera dois emails.
+    try {
+      await sendOrderStatusEmail(final, await getSettings(), "delivered", {
+        description: `Recepção confirmada por ${recipientName}.`,
+      });
+    } catch (err) {
+      console.log("Email de entrega confirmada:", err);
+    }
   }
   return json({
     order_number: final.order_number, delivery_status: final.delivery_status,
@@ -871,31 +1199,144 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
   });
 });
 
+/**
+ * Muda o estado do pagamento de uma encomenda e avisa o cliente quando fica pago.
+ *
+ * Esta rota existe porque o painel actualizava `payment_status` directamente na tabela, e
+ * nesse caminho não passa nenhum código que possa enviar um email: o cliente nunca sabia que
+ * o pagamento tinha sido aceite. Aqui a mudança e o aviso ficam no mesmo sítio, do lado do
+ * servidor, que é também quem tem a permissão para decidir.
+ */
+route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
+  requirePermission(auth, "manage_orders");
+  const id = String(body.orderId || "").trim();
+  const status = String(body.status || "").trim();
+  if (!id) throw bad("orderId obrigatório.");
+  if (!["pending", "awaiting_confirmation", "paid", "failed"].includes(status)) {
+    throw bad("Estado de pagamento inválido.");
+  }
+  const { data: order } = await db.from("orders").select("*").eq("id", id).maybeSingle();
+  if (!order) throw new HttpError(404, "Encomenda não encontrada.");
+
+  let saved = order;
+  if (order.payment_status !== status) {
+    const { data, error } = await db.from("orders").update({ payment_status: status }).eq("id", id).select().single();
+    if (error) throw error;
+    saved = data;
+  }
+
+  // Só o pagamento aceite gera mensagem: "pendente" ou "falhou" são estados internos, e o
+  // cliente é avisado disso pelo meio por onde está a pagar, não por um email da loja.
+  let emailSent = false;
+  if (status === "paid" && order.payment_status !== "paid") {
+    try {
+      emailSent = await sendPaymentConfirmedEmail(saved, await getSettings());
+    } catch (err) {
+      console.log("Email de pagamento confirmado:", err);
+    }
+  }
+  return json({ payment_status: saved.payment_status, email_sent: emailSent });
+});
+
+// Os estados que o seguimento, os emails e o painel (DELIVERY_STATUS em orderUtils.js)
+// conhecem. Um estado fora da lista ficava gravado tal como veio e aparecia ao cliente em
+// bruto no seguimento e no email.
+const DELIVERY_STATUSES = new Set([
+  "received", "confirmed", "preparing", "shipped", "in_transit", "out_for_delivery", "delivered", "cancelled",
+]);
+
 route("POST", "/delivery-event", async ({ auth, body }) => {
   requirePermission(auth, "manage_orders");
   if (!body.orderId) throw bad("orderId obrigatório.");
+  if (body.status && !DELIVERY_STATUSES.has(String(body.status))) throw bad("Estado de entrega inválido.");
   const { data: order } = await db.from("orders").select("*").eq("id", body.orderId).maybeSingle();
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
-  const timeline = [...(order.delivery_timeline || []), timelineEvent(
-    body.status || "in_transit", body.title || "Actualização de entrega", body.description || "", body.location || "",
-  )];
-  const patch: Row = { delivery_timeline: timeline };
-  if (body.tracking_number) patch.tracking_number = body.tracking_number;
-  if (body.carrier) patch.carrier = body.carrier;
-  if (body.estimated_delivery) patch.estimated_delivery = body.estimated_delivery;
-  let { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
-  if (error) throw error;
-  if (body.status && body.status !== order.delivery_status) {
-    ({ data: saved, error } = await db.from("orders").update({ delivery_status: body.status }).eq("id", order.id).select().single());
-    if (error) throw error;
+  const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
+  const statusChanged = !!body.status && body.status !== order.delivery_status;
+  const patch: Row = {};
+  if (body.tracking_number) patch.tracking_number = text(body.tracking_number, 120);
+  if (body.carrier) patch.carrier = text(body.carrier, 120);
+  if (body.estimated_delivery) patch.estimated_delivery = text(body.estimated_delivery, 60);
+  if (statusChanged) {
+    // O passo novo entra na linha temporal pelo trigger orders_before_update, que o escreve
+    // sempre que o estado da entrega muda. Acrescentá-lo também aqui deixava cada mudança
+    // registada duas vezes no seguimento do cliente.
+    patch.delivery_status = body.status;
+  } else {
+    // Sem mudança de estado: é uma nota de entrega, que só esta rota escreve.
+    patch.delivery_timeline = [...(order.delivery_timeline || []), timelineEvent(
+      body.status || order.delivery_status || "in_transit", text(body.title, 160) || "Actualização de entrega",
+      text(body.description, 1000), text(body.location, 160),
+    )];
   }
-  return json({ timeline: saved.delivery_timeline });
+  const { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
+  if (error) throw error;
+  // O email vai só quando o estado muda de facto: gravar a mesma etapa outra vez no painel
+  // não é novidade para o cliente. A falha de envio não desfaz a actualização da encomenda.
+  let emailSent = false;
+  if (statusChanged) {
+    try {
+      emailSent = await sendOrderStatusEmail(saved, await getSettings(), body.status, {
+        description: body.description || "",
+      });
+    } catch (err) {
+      console.log("Email de estado da encomenda:", err);
+    }
+  }
+  return json({ timeline: saved.delivery_timeline, email_sent: emailSent });
 });
 
-route("POST", "/checkout", async ({ body: data, ip }) => {
+// ---------------------------------------------------------------------------
+// Idempotência do checkout
+// ---------------------------------------------------------------------------
+// A rede cai muitas vezes entre o servidor gravar a encomenda e a resposta chegar ao
+// telemóvel. O cliente vê um erro, o carrinho continua cheio, carrega outra vez — e ficavam
+// duas encomendas, com o stock descontado duas vezes. O site manda agora uma chave por
+// tentativa (a mesma enquanto o conteúdo não mudar), e uma chave já usada devolve a
+// encomenda que ela criou, sem descontar stock nem enviar avisos outra vez.
+// Sem a migração `idempotencia_checkout` a coluna não existe: a leitura falha e é ignorada,
+// e o `place_order` deixa cair a chave (só grava as colunas que existem). Nada parte.
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9-]{16,64}$/;
+
+async function orderByIdempotencyKey(key: string): Promise<Row | null> {
+  if (!key) return null;
+  const { data, error } = await db.from("orders").select("*").eq("idempotency_key", key).limit(1);
+  if (error) return null;
+  return data?.[0] || null;
+}
+
+function successPath(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "/success";
+  try {
+    const u = new URL(value.trim(), "https://loja.invalid");
+    return (u.pathname + u.search).slice(0, 200) || "/success";
+  } catch {
+    return "/success";
+  }
+}
+
+function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: boolean; whatsappSent: boolean; replayed?: boolean }) {
+  const isWhatsApp = saved.order_type === "whatsapp_order";
+  const sep = successUrl.includes("?") ? "&" : "?";
+  return json({
+    url: `${successUrl}${sep}orderId=${saved.id}&orderNumber=${saved.order_number}&total=${saved.total}&type=${isWhatsApp ? "whatsapp" : "purchase"}`,
+    orderId: saved.id,
+    orderNumber: saved.order_number,
+    total: saved.total,
+    payment_status: saved.payment_status,
+    order_type: saved.order_type,
+    sale_channel: saved.sale_channel,
+    // O email segue depois da resposta: aqui só se sabe se foi pedido.
+    email_queued: extra.emailQueued,
+    whatsapp_sent: extra.whatsappSent,
+    ...(extra.replayed ? { replayed: true } : {}),
+  });
+}
+
+route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const settings = await getSettings();
   const rules = storeRules(settings);
-  if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw bad("Demasiadas tentativas de checkout. Aguarde um minuto.");
+  if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw tooMany("Demasiadas tentativas de checkout. Aguarde um minuto.");
   const items: Row[] = data.items || [];
   if (!items.length) throw bad("Carrinho vazio.");
 
@@ -915,6 +1356,8 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
   if (!name) throw bad("Nome obrigatório.");
   if (!phone) throw bad("Telefone obrigatório.");
   if (!isPickup && !email) throw bad("Email obrigatório para entrega ao domicílio.");
+  // No levantamento o email é opcional, mas se vier tem de servir para enviar o recibo.
+  if (email && !isDeliverableEmail(email)) throw bad("Email inválido.");
   if (!isPickup) {
     if (!data.deliveryProvince) throw bad("Província de entrega obrigatória.");
     if (!data.deliveryMunicipality) throw bad("Município de entrega obrigatório.");
@@ -956,7 +1399,8 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
   const isP2P = paidUpfront;
   const saleChannel = clip(data.saleChannel || data.orderType || "web_purchase", 40);
   const isWhatsApp = saleChannel === "whatsapp";
-  const deliveryAddress = shippingMethod === "pickup" ? `Levantamento: ${pickupStore || "Loja física"}` : (clip(data.deliveryAddressFull, 600) || address);
+  // Morada de entrega numa linha (o levantamento não tem morada: tem a loja, em pickup_store).
+  const deliveryAddress = clip(data.deliveryAddressFull, 600) || address;
   const deliveryCity = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.city, 120) || "Luanda");
   const timelineLocation = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.deliveryProvince, 120) || "Angola");
   // Hora + 3 caracteres aleatórios: evita números repetidos em compras simultâneas e números fáceis de adivinhar.
@@ -964,18 +1408,22 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
   const orderNum = rules.orderPrefix + Date.now().toString(36).toUpperCase().slice(-6) + randomPart;
 
   const order: Row = {
+    customer_id: auth?.id || null,
     order_number: orderNum,
     customer_email: email,
     customer_name: name,
     phone,
-    address: deliveryAddress,
+    // `city` continua: o trigger orders_before_update usa-o como local de cada passo do
+    // seguimento, até à migração 20261105045510_campos_encomendas.
+    // `address` deixou de ser gravado: era uma cópia de delivery_address_full (entrega) ou
+    // de pickup_store (levantamento).
     city: deliveryCity,
     checkout_signature_data: signatureOk ? signature : "",
     checkout_signature_at: signatureOk ? nowISO() : null,
     shipping_method: shippingMethod,
     pickup_store: pickupStore,
     payment_method_code: paymentCode,
-    payment_method_name: paymentMethodRow?.name || "",
+    payment_method_name: paymentMethodRow?.name || LEGACY_PAYMENT_LABELS[paymentCode] || paymentCode,
     payment_reference: clip(data.paymentReference, 120),
     payment_status: isP2P ? "awaiting_confirmation" : "pending",
     delivery_status: "received",
@@ -998,7 +1446,6 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
     order.delivery_gps_lat = gpsLat;
     order.delivery_gps_lng = gpsLng;
   }
-  if (paymentCode === "entrega" || paymentCode === "transferencia") order.payment_method = paymentCode;
   if (data.notes && rules.notesMax > 0) order.notes = clip(data.notes, rules.notesMax);
   if (shippingMethod !== "pickup") {
     Object.assign(order, {
@@ -1010,10 +1457,22 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
       delivery_locality: clip(data.deliveryLocality, 120),
       delivery_street: clip(data.deliveryStreet, 300),
       delivery_reference: clip(data.deliveryReference, 300),
-      delivery_address_full: clip(data.deliveryAddressFull, 600) || deliveryAddress,
+      delivery_address_full: deliveryAddress,
       delivery_relative_name: clip(data.deliveryRelativeName, 120),
       delivery_relative_phone: clip(data.deliveryRelativePhone, 40),
     });
+  }
+
+  // Só o caminho, nunca outro domínio: o valor vem do browser e volta no `url` da resposta.
+  // O site manda `${origin}/success`; fica "/success". Outro tipo (número, objecto) partia o
+  // `.includes` mais abaixo com um 500.
+  const successUrl = successPath(data.successUrl);
+  const idempotencyKey = IDEMPOTENCY_KEY.test(String(data.idempotencyKey || "")) ? String(data.idempotencyKey) : "";
+  const emailQueued = !!(email && settings?.order_email_enabled);
+  if (idempotencyKey) {
+    const previous = await orderByIdempotencyKey(idempotencyKey);
+    if (previous) return checkoutResponse(previous, successUrl, { emailQueued, whatsappSent: false, replayed: true });
+    order.idempotency_key = idempotencyKey;
   }
 
   const { data: saved, error } = await db.rpc("place_order", {
@@ -1026,46 +1485,47 @@ route("POST", "/checkout", async ({ body: data, ip }) => {
       express_cost: Number(settings?.shipping_express_cost) || 0,
     },
   });
-  if (error) throw bad(error.message);
-
-  let emailSent = false;
-  let whatsappSent = false;
-  try {
-    emailSent = await sendOrderConfirmationEmail(saved, settings);
-    whatsappSent = await sendOrderWhatsAppConfirmation(saved, settings);
-  } catch (err) {
-    console.log("Post-checkout messaging:", err);
+  // Só as mensagens escritas para o comprador ("Stock insuficiente para: …", "Livro
+  // indisponível") saem como estão: são as do `raise exception` do place_order (P0001).
+  // Outro erro do Postgres diria nomes de colunas e restrições a quem está a comprar.
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    // Dois pedidos com a mesma chave ao mesmo tempo: o índice único deixa passar um só, e o
+    // outro devolve a encomenda que esse criou (o stock do segundo é reposto pelo rollback).
+    if (error.code === "23505" && idempotencyKey) {
+      const previous = await orderByIdempotencyKey(idempotencyKey);
+      if (previous) return checkoutResponse(previous, successUrl, { emailQueued, whatsappSent: false, replayed: true });
+    }
+    throw error;
   }
-  try {
+
+  // O email de confirmação (SMTP, 1–3 s quando ligado) e o contacto no CRM (várias consultas)
+  // saíam antes da resposta: o cliente esperava por eles para ver a encomenda confirmada.
+  // Vão depois da resposta. O WhatsApp fica antes, porque o carrinho usa `whatsapp_sent`
+  // para decidir se ainda abre o WhatsApp à mão.
+  if (email) runAfterResponse("Post-checkout email", () => sendOrderConfirmationEmail(saved, settings));
+  runAfterResponse("Post-checkout CRM", async () => {
     await upsertContact({
       name, email, phone, source: "checkout", is_buyer: true,
       tags: ["comprador", saleChannel || "web_purchase"],
       notes: `Encomenda ${orderNum} · ${fmtMoneyKz(saved.total)}`,
       metadata: { last_order_id: saved.id, last_order_number: orderNum },
     }, await getDefaultOwnerId());
+  });
+  let whatsappSent = false;
+  try {
+    whatsappSent = await sendOrderWhatsAppConfirmation(saved, settings);
   } catch (err) {
-    console.log("Post-checkout CRM:", err);
+    console.log("Post-checkout WhatsApp:", err);
   }
 
-  const successUrl = data.successUrl || "/success";
-  const sep = successUrl.includes("?") ? "&" : "?";
-  return json({
-    url: `${successUrl}${sep}orderId=${saved.id}&orderNumber=${orderNum}&total=${saved.total}&type=${isWhatsApp ? "whatsapp" : "purchase"}`,
-    orderId: saved.id,
-    orderNumber: orderNum,
-    total: saved.total,
-    payment_status: saved.payment_status,
-    order_type: saved.order_type,
-    sale_channel: saleChannel,
-    email_sent: emailSent,
-    whatsapp_sent: whatsappSent,
-  });
+  return checkoutResponse(saved, successUrl, { emailQueued, whatsappSent });
 });
 
 route("GET", "/messaging/status", async () => {
-  const settings = await getSettings();
-  const waRec = await getIntegration("whatsapp_business");
-  const waCfg = await getWhatsAppConfig();
+  const [settings, waRec, waCfg] = await Promise.all([
+    getSettings(), getIntegration("whatsapp_business"), getWhatsAppConfig(),
+  ]);
   return json({
     whatsapp: {
       enabled: !!waRec?.enabled,
@@ -1089,14 +1549,14 @@ function buildReceiptText(order: Row, siteName: string, paymentLink = "") {
   ];
   if (Number(order.shipping_cost)) lines.push(`Portes: ${fmtMoneyKz(order.shipping_cost)}`);
   lines.push("", `*Total: ${fmtMoneyKz(order.total)}*`);
-  if (order.payment_method_name || order.payment_method) lines.push(`Pagamento: ${order.payment_method_name || order.payment_method}`);
+  if (paymentLabel(order)) lines.push(`Pagamento: ${paymentLabel(order)}`);
   if (paymentLink) lines.push(`Link de pagamento: ${paymentLink}`);
   lines.push("", "Obrigado pela sua compra! 📚");
   return lines.join("\n");
 }
 
 route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
-  if (!await checkRateLimit("whatsapp_receipt", ip, 10)) throw bad("Demasiados pedidos. Aguarde um minuto.");
+  if (!await checkRateLimit("whatsapp_receipt", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.order_number || "").trim();
   const email = normalizeEmail(body.email || "");
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
@@ -1107,7 +1567,7 @@ route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
   if (!phone) return json({ sent: false, fallback: true, message: "A encomenda não tem telefone — use o link manual." });
   if (reqPhone && reqPhone !== normalizePhone(phone)) throw bad("Telefone não corresponde à encomenda.");
   const settings = await getSettings();
-  if (!await checkRateLimit("whatsapp_receipt_order", order.id, storeRules(settings).receiptPerOrder)) throw bad("O recibo desta encomenda já foi enviado. Aguarde um minuto.");
+  if (!await checkRateLimit("whatsapp_receipt_order", order.id, storeRules(settings).receiptPerOrder)) throw tooMany("O recibo desta encomenda já foi enviado. Aguarde um minuto.");
   const config = await getWhatsAppConfig();
   if (!config) return json({ sent: false, fallback: true, message: "API WhatsApp não configurada — use link manual." });
   const text = buildReceiptText(order, settings?.site_name || "Livraria Adventista", await orderPaymentLink(order));
@@ -1123,7 +1583,7 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
   requirePermission(auth, "manage_settings");
   const phone = String(body.phone || "").trim();
   if (!phone) throw bad("Indique um número de teste.");
-  const config = await getWhatsAppConfig();
+  const config = await getWhatsAppConfig(true);
   if (!config) throw bad("WhatsApp Business API não está activa ou configurada.");
   const text = "✅ Teste — Livraria Adventista\n\nA integração WhatsApp Business API está funcional. Mensagens automáticas activas.";
   const result = await sendWhatsAppMessage(phone, text, config, { bodyParams: ["Teste", "OK", "0 Kz"] }, { context: "test" });
@@ -1131,19 +1591,208 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
   return json({ message: `Mensagem de teste enviada para ${phone}.` });
 });
 
+/** Lista dos modelos que o painel pode pré-visualizar. */
+/**
+ * Cancelar a subscrição de campanhas, pelo token que vai no rodapé das mensagens.
+ *
+ * Pública e sem sessão: quem quer sair de uma lista não deve ter de criar conta nem entrar.
+ * O token é opaco, de 64 caracteres, por contacto e revogável — é por isso que não vai aqui
+ * o email, que ficaria exposto nos registos do servidor e no histórico do navegador.
+ *
+ * Responde sempre o mesmo com um token inválido: dizer "não existe" transformaria esta rota
+ * num meio de confirmar se um token é de alguém.
+ */
+route("POST", "/unsubscribe", async ({ body, ip }) => {
+  if (!await checkRateLimit("unsubscribe", ip, 20)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const token = String(body.token || "").trim();
+  const done = { message: "Deixou de receber campanhas e novidades desta loja." };
+  if (!/^[a-f0-9]{64}$/.test(token)) return json(done);
+  const { data: contact } = await db.from("contacts")
+    .select("id, tags, marketing_opt_out_at").eq("unsubscribe_token", token).maybeSingle();
+  if (!contact) return json(done);
+  // Grava a data e acrescenta a etiqueta que o painel já usava: a equipa vê o contacto como
+  // "não contactar" na lista, sem ter de aprender um segundo sítio onde olhar, e a decisão
+  // vale para todos os canais e não só para o email.
+  if (!isOptedOut(contact)) {
+    const tags = Array.isArray(contact.tags) ? contact.tags.map(String) : [];
+    await db.from("contacts").update({
+      marketing_opt_out_at: nowISO(),
+      tags: tags.includes(OPT_OUT_TAG) ? tags : [...tags, OPT_OUT_TAG],
+    }).eq("id", contact.id);
+  }
+  return json(done);
+});
+
+/** Categorias opcionais de email, para o painel ligar e desligar. */
+route("GET", "/admin/email/categories", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  return json({ categories: categoryStates(await getSettings(true)) });
+});
+
+route("POST", "/admin/email/categories", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const settings = await getSettings(true);
+  if (!settings) throw bad("Configurações do site em falta.");
+  // Só as chaves conhecidas entram: um valor qualquer vindo do pedido não pode ficar
+  // guardado a fingir-se de categoria.
+  const incoming = body.categories && typeof body.categories === "object" ? body.categories : {};
+  const next: Row = {};
+  for (const { key } of categoryStates(settings)) {
+    next[key] = incoming[key] !== false;
+  }
+  const { error } = await db.from("site_settings").update({ email_categories: next }).eq("id", settings.id);
+  if (error) throw error;
+  forgetCached("settings");
+  return json({ categories: categoryStates({ ...settings, email_categories: next }) });
+});
+
+/**
+ * Faz correr a fila a partir de um agendador, sem sessão de utilizador.
+ *
+ * O `pg_cron` não tem sessão nem token do Supabase Auth, por isso esta rota autentica-se com
+ * um segredo partilhado em `EMAIL_QUEUE_TOKEN` (definido nos segredos da Edge Function, não
+ * no repositório). É propositadamente uma rota separada da do painel: esta não dá acesso a
+ * mais nada, e o segredo que a abre não serve para o resto da API.
+ *
+ * Sem o segredo definido, responde 404 como qualquer caminho desconhecido — uma rota que
+ * respondesse "falta configurar" anunciava a quem passasse que existe aqui algo por fechar.
+ */
+route("POST", "/cron/email-queue", async ({ req, body, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-queue", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const limit = Math.min(Math.max(Number(body.limit) || 25, 1), 50);
+  const summary = await processEmailQueue(limit);
+  console.log("Fila de emails (cron):", JSON.stringify(summary));
+  return json(summary);
+});
+
+/** Estado da fila de recuperação, para o painel. */
+route("GET", "/admin/email/queue", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  const { data } = await db.from("email_queue")
+    .select("id, recipient, subject, context, status, attempts, max_attempts, next_attempt_at, last_error, created")
+    .order("created", { ascending: false })
+    .limit(50);
+  const rows = data || [];
+  // Se o agendador está mesmo a correr, ou se a fila só anda com o botão. Sem isto, o painel
+  // mostrava a fila a encher sem dizer porquê.
+  const { data: scheduler } = await db.rpc("email_queue_scheduler_status");
+  return json({
+    jobs: rows,
+    scheduler: scheduler || { available: false, reason: "Função de diagnóstico ainda não publicada." },
+    summary: {
+      pending: rows.filter((r: Row) => r.status === "pending").length,
+      sending: rows.filter((r: Row) => r.status === "sending").length,
+      failed: rows.filter((r: Row) => r.status === "failed").length,
+    },
+  });
+});
+
+/**
+ * Corre um lote da fila.
+ *
+ * Existe como rota porque esta Edge Function não tem processo a correr entre pedidos: alguém
+ * tem de a chamar. Serve o botão do painel e também um agendador externo (pg_cron com
+ * pg_net, ou uma tarefa agendada) quando houver um.
+ */
+route("POST", "/admin/email/queue/run", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 50);
+  return json(await processEmailQueue(limit));
+});
+
+/** Devolve uma mensagem desistida à fila, para nova tentativa à mão. */
+route("POST", "/admin/email/queue/retry", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const id = String(body.id || "").trim();
+  if (!id) throw bad("id obrigatório.");
+  const { data: job } = await db.from("email_queue").select("id, status").eq("id", id).maybeSingle();
+  if (!job) throw new HttpError(404, "Mensagem não encontrada na fila.");
+  if (job.status === "sent") throw bad("Esta mensagem já foi enviada.");
+  // As tentativas voltam a zero: é uma decisão nova de uma pessoa, e não a continuação da
+  // série que já tinha desistido.
+  const { error } = await db.from("email_queue").update({
+    status: "pending", attempts: 0, next_attempt_at: nowISO(), locked_at: null,
+  }).eq("id", id);
+  if (error) throw error;
+  return json({ message: "Mensagem devolvida à fila." });
+});
+
+route("GET", "/admin/email/templates", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  const settings = await getSettings(true);
+  const brand = emailBrand(settings);
+  const templates = Object.entries(PREVIEW_TEMPLATES).map(([key, t]) => ({
+    key, label: t.label, group: t.group, subject: t.build(brand).subject,
+  }));
+  return json({
+    templates,
+    // O painel avisa quando falta algo para as mensagens saírem de facto.
+    ready: {
+      enabled: !!settings?.order_email_enabled,
+      provider: settings?.email_provider || "smtp",
+      configured: settings?.email_provider === "sendgrid" ? !!sendgridKey(settings) : !!settings?.smtp_host,
+      site_url: brand.siteUrl,
+      logo: brand.logoUrl,
+    },
+  });
+});
+
+/**
+ * Pré-visualização de um modelo, com dados de exemplo.
+ *
+ * Passa pelas mesmas funções que enviam de verdade e devolve o HTML tal como sai, para o que
+ * o gestor vê ser o que o cliente recebe. Um exemplo montado no painel seria um segundo sítio
+ * a divergir deste com o tempo.
+ */
+route("GET", "/admin/email/preview", async ({ auth, url }) => {
+  requirePermission(auth, "manage_settings");
+  const key = String(url.searchParams.get("template") || "");
+  const template = PREVIEW_TEMPLATES[key];
+  if (!template) throw bad("Modelo desconhecido.");
+  const settings = await getSettings(true);
+  const brand = emailBrand(settings);
+  const letter = template.build(brand);
+  const { html, text } = emailDocument(brand, letter.doc);
+  return json({ key, label: template.label, subject: letter.subject, html, text });
+});
+
+/**
+ * Reenvia uma mensagem que já foi composta, a partir do registo de envios.
+ *
+ * Reenvia o conteúdo guardado e não o volta a compor: a encomenda pode ter mudado entretanto,
+ * e o que se quer aqui é repetir a mensagem que falhou, não enviar outra diferente. Sem chave
+ * de idempotência, porque um reenvio é precisamente um envio a mais, pedido à mão.
+ */
+route("POST", "/admin/email/resend", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const id = String(body.logId || "").trim();
+  if (!id) throw bad("logId obrigatório.");
+  const { data: log } = await db.from("notification_logs").select("*").eq("id", id).maybeSingle();
+  if (!log) throw new HttpError(404, "Registo não encontrado.");
+  if (log.type !== "email") throw bad("Só é possível reenviar mensagens de email.");
+  if (!log.recipient) throw bad("Este registo não tem destinatário.");
+  // As de marketing ficam de fora: repetir uma campanha à mão é um envio em massa sem o
+  // consentimento ter sido verificado outra vez.
+  if (log.context === "campaign") throw bad("As campanhas não se reenviam a partir do registo.");
+  if (!log.content) throw bad("Este registo não guardou o conteúdo da mensagem.");
+  const settings = await getSettings(true);
+  const ok = await sendTransactionalEmail(settings, log.recipient, log.subject || "", log.content, {
+    context: log.context, customer_name: log.customer_name, order_number: log.order_number,
+  });
+  if (!ok) throw bad("O reenvio falhou. Veja o motivo no registo de comunicações.");
+  return json({ message: `Mensagem reenviada para ${log.recipient}.` });
+});
+
 route("POST", "/admin/email/test", async ({ auth, body }) => {
   requirePermission(auth, "manage_settings");
   const to = normalizeEmail(body.to || auth?.email || "");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw bad("Indique um email de teste válido.");
-  const settings = await getSettings();
-  const html = renderEmail({
-    ...emailChrome(settings),
-    preheader: "O envio automático de emails está a funcionar.",
-    eyebrow: "Teste de envio",
-    title: "Tudo pronto para enviar",
-    body: ep("Se recebeu este email, o envio automático de confirmações de encomenda está a funcionar."),
-  });
-  const ok = await sendTransactionalEmail(settings, to, "Teste de email — Livraria Adventista", html, { context: "test" });
+  const settings = await getSettings(true);
+  const ok = await sendLetter(settings, to, testLetter(emailBrand(settings)), { context: "test" });
   if (!ok) throw bad("O email não foi enviado. Veja o motivo no registo de comunicações.");
   return json({ message: `Email de teste enviado para ${to}.` });
 });
@@ -1155,7 +1804,7 @@ route("GET", "/push/config", async () => {
 });
 
 route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
-  if (!await checkRateLimit("push-subscribe", ip, 10)) throw bad("Demasiados pedidos. Aguarde um minuto.");
+  if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const endpoint = String(body.endpoint || "").trim();
   if (!/^https:\/\/[^\s]{8,1000}$/.test(endpoint)) throw bad("Endpoint inválido.");
   const keys = body.keys && typeof body.keys === "object"
@@ -1169,12 +1818,14 @@ route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
 });
 
 route("POST", "/contact-message", async ({ body, ip }) => {
-  if (!await checkRateLimit("contact", ip, 8)) throw bad("Demasiados pedidos. Aguarde um minuto.");
-  const name = String(body.name || "").trim();
+  if (!await checkRateLimit("contact", ip, 8)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  // Rota pública que escreve no CRM: tamanhos limitados, como no checkout.
+  const name = String(body.name || "").trim().slice(0, 120);
   const email = normalizeEmail(body.email || "");
-  const message = String(body.message || "").trim();
-  const phone = String(body.phone || "").trim();
+  const message = String(body.message || "").trim().slice(0, 4000);
+  const phone = String(body.phone || "").trim().slice(0, 40);
   if (!name || !email || !message) throw bad("Nome, email e mensagem são obrigatórios.");
+  if (!isDeliverableEmail(email)) throw bad("Email inválido.");
   await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId());
   return json({ message: "Mensagem recebida! Entraremos em contacto em breve." });
 });
@@ -1215,12 +1866,20 @@ route("POST", "/contacts/import-sources", async ({ auth }) => {
 
 route("GET", "/contacts/stats", async ({ auth }) => {
   requireCrm(auth);
+  const settings = await getSettings();
+  // O painel precisa de três coisas que não se vêem nas tabelas: se o agendador está mesmo a
+  // correr, o que cada canal consegue entregar, e quantos membros de grupos ficaram órfãos.
+  // Sem a primeira, o separador mostra campanhas pendentes sem dizer que ninguém as vai
+  // disparar. Sem a segunda, mostra-as pendentes sem dizer que o canal não entrega.
+  const { data: scheduler } = await db.rpc("contact_campaigns_scheduler_status");
   return json({
     total: await countRows("contacts"),
     google: await countRows("contacts", (q) => q.eq("source", "google")),
     buyers: await countRows("contacts", (q) => q.eq("is_buyer", true)),
     groups: await countRows("contact_groups"),
     active_campaigns: await countRows("contact_campaigns", (q) => q.eq("is_active", true)),
+    delivery: { email: emailEntrega(settings), whatsapp: !!(await getWhatsAppConfig()) },
+    scheduler: scheduler || null,
   });
 });
 
@@ -1248,29 +1907,75 @@ route("POST", "/contacts/notify", async ({ auth, body }) => {
   return json({ message: "Notificações processadas.", results, skipped_opt_out: skipped, whatsapp_api: !!(await getWhatsAppConfig()) });
 });
 
-route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
-  const staff = requireCrm(auth);
+/**
+ * Os ids dos membros de um grupo.
+ *
+ * Lê de `contact_group_members`, que é a fonte da verdade desde a migração
+ * `20261103230000`. Recua para o `member_ids` quando a tabela ainda não existe: a Edge
+ * Function é publicada à parte das migrações, por isso há sempre uma janela em que a versão
+ * nova da função corre contra a base de dados antiga.
+ */
+async function groupMemberIds(groupId: string): Promise<string[]> {
+  const { data, error } = await db
+    .from("contact_group_members").select("contact_id").eq("group_id", groupId);
+  if (!error) return (data || []).map((r: Row) => r.contact_id).filter(Boolean);
+  const { data: g } = await db
+    .from("contact_groups").select("member_ids").eq("id", groupId).maybeSingle();
+  return Array.isArray(g?.member_ids) ? g!.member_ids : [];
+}
+
+/**
+ * Corre as campanhas activas cuja data já chegou.
+ *
+ * `agendado` distingue os dois chamadores, e a diferença não é cosmética:
+ *
+ * - **Painel** (`agendado: false`): há uma pessoa à frente do ecrã. Um canal sem entrega
+ *   continua a produzir links `wa.me` para ela clicar, que é o processo de sempre.
+ * - **`pg_cron`** (`agendado: true`): não há ninguém. Uma campanha cujo canal não entrega é
+ *   **saltada sem avançar o `next_send_at`**, para voltar a ser tentada quando o canal ficar
+ *   configurado. Avançar a data marcá-la-ia como enviada sem ninguém ter recebido nada.
+ */
+async function runDueCampaigns(ownerId: string | null, agendado: boolean) {
   const now = nowISO();
   const { data: campaigns } = await db.from("contact_campaigns").select("*").eq("is_active", true).limit(50);
-  const digest = await getNewBooksDigest();
   const settings = await getSettings();
+  const digest = await getNewBooksDigest(settings);
+  const entrega = { email: emailEntrega(settings), whatsapp: !!(await getWhatsAppConfig()) };
   let processed = 0;
-  const notifications = [];
+  const notifications: Row[] = [];
+  const saltadas: Row[] = [];
+
   for (const camp of campaigns || []) {
     if (camp.next_send_at && camp.next_send_at > now) continue;
-    if (!camp.group) continue;
-    const { data: group } = await db.from("contact_groups").select("*").eq("id", camp.group).maybeSingle();
-    const memberIds: string[] = group?.member_ids || [];
-    if (!memberIds.length) continue;
+    if (!camp.group) {
+      saltadas.push({ campaign: camp.name, reason: "campanha sem grupo associado" });
+      continue;
+    }
+    const memberIds = await groupMemberIds(camp.group);
+    if (!memberIds.length) {
+      saltadas.push({ campaign: camp.name, reason: "o grupo não tem membros" });
+      continue;
+    }
+
+    const plano = planearCanais(camp.channel, entrega);
+    const canal = canalDeEnvio(plano);
+    if (agendado && !canal) {
+      saltadas.push({ campaign: camp.name, reason: plano.motivo, blocked: plano.bloqueados });
+      continue;
+    }
+    // No painel, um canal sem entrega continua a valer: o link manual é para alguém clicar.
+    const canalFinal = canal || camp.channel || "whatsapp";
+
     let text = camp.message_template || "";
     if (camp.include_new_books && digest) text = text ? `${text}\n\n${digest}` : digest;
-    const channel = camp.channel || "whatsapp";
     const subject = camp.subject || "Novidades — Livraria Adventista";
+
     const { data: contacts } = await db.from("contacts").select("*").in("id", memberIds);
     for (const contact of contacts || []) {
       if (isOptedOut(contact)) continue;
       const r = await notifyContact(contact, {
-        channel, subject, body: text, settings, owner: staff.id, groupId: camp.group, campaignId: camp.id,
+        channel: canalFinal, subject, body: text, settings,
+        owner: ownerId, groupId: camp.group, campaignId: camp.id,
       });
       notifications.push({ campaign: camp.name, contact: contact.name, whatsapp_url: r.waUrl, status: r.status });
     }
@@ -1278,14 +1983,45 @@ route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
       last_sent_at: now, next_send_at: calcNextSendAt(camp.frequency || "weekly"),
     }).eq("id", camp.id);
     processed++;
+    // Um canal parcialmente bloqueado (um `both` com só o email configurado) sai pelo que
+    // entrega, mas o painel tem de o saber: a campanha consta como enviada e metade dos
+    // destinatários não foi contactada por esse meio.
+    if (plano.bloqueados.length && canal) {
+      saltadas.push({ campaign: camp.name, reason: plano.motivo, blocked: plano.bloqueados, partial: true });
+    }
   }
-  return json({ message: "Campanhas processadas.", processed, notifications });
+  return { processed, notifications, skipped: saltadas, delivery: entrega };
+}
+
+route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
+  const staff = requireCrm(auth);
+  const r = await runDueCampaigns(staff.id, false);
+  return json({ message: "Campanhas processadas.", ...r });
+});
+
+/**
+ * O mesmo, chamado pelo `pg_cron` (migração `20261103231000`), sem sessão.
+ *
+ * Autenticado pelo mesmo token da fila de emails: é a mesma fronteira de confiança, quem pode
+ * disparar o agendador. Sem o token configurado responde **404** e não "falta configurar" —
+ * uma rota que se anuncia diz a quem passa que há aqui algo por fechar.
+ */
+route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-campaigns", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const r = await runDueCampaigns(null, true);
+  console.log("Campanhas (cron):", JSON.stringify({ processed: r.processed, skipped: r.skipped }));
+  return json(r);
 });
 
 route("POST", "/newsletter", async ({ body, ip }) => {
-  if (!await checkRateLimit("newsletter", ip, 6)) throw bad("Demasiadas tentativas. Aguarde um minuto.");
+  if (!await checkRateLimit("newsletter", ip, 6)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const email = normalizeEmail(body.email || "");
   if (!email) throw bad("Email obrigatório.");
+  if (!isDeliverableEmail(email)) throw bad("Email inválido.");
   const { data } = await db.from("newsletter").select("id").ilike("email", likeExact(email)).limit(1);
   if (data?.[0]) return json({ message: "Já subscrito." });
   const { error } = await db.from("newsletter").insert({ email });
@@ -1293,7 +2029,10 @@ route("POST", "/newsletter", async ({ body, ip }) => {
   return json({ message: "Subscrição realizada!" });
 });
 
-route("GET", "/catalog/summary", async () => {
+// Resumo do catálogo para a equipa. Era público e dizia a qualquer pessoa o stock e as vendas
+// de cada livro; nada no site o usa sem sessão.
+route("GET", "/catalog/summary", async ({ auth }) => {
+  requirePermission(auth, "manage_catalog");
   const { data: books } = await db.from("stock_books")
     .select("id, title, book_code, stock, stock_low, genre, featured, cover, cover_image, sales_count").eq("active", true).order("title").limit(500);
   const genres: Record<string, Row> = {};
@@ -1394,24 +2133,33 @@ async function sendAccessLink(email: string, name: string, kind: "invite" | "res
   if (error) throw bad(error.message);
   const link = data?.properties?.action_link || "";
   const settings = await getSettings();
-  const site = settings?.site_name || "Livraria Adventista";
-  const subject = kind === "invite" ? `A sua conta na ${site}` : `Definir nova palavra-passe — ${site}`;
-  const intro = kind === "invite"
-    ? `Foi criada uma conta para si na <strong>${escapeHtml(site)}</strong>. Defina a sua palavra-passe para entrar.`
-    : `Recebemos um pedido para definir uma nova palavra-passe na <strong>${escapeHtml(site)}</strong>.`;
-  const html = renderEmail({
-    ...emailChrome(settings),
-    hero: "conta",
-    preheader: kind === "invite" ? "Defina a sua palavra-passe para entrar." : "Link para definir uma nova palavra-passe.",
-    eyebrow: kind === "invite" ? "Bem-vindo" : "Conta",
-    title: kind === "invite" ? "A sua conta está pronta" : "Nova palavra-passe",
-    body: ep(`Olá ${escapeHtml(name || "")},`) + ep(intro),
-    button: { label: "Definir palavra-passe", url: escapeHtml(link) },
-    note: "O link é pessoal e expira. Se não pediu isto, ignore este email.",
-  });
-  const emailSent = await sendTransactionalEmail(settings, email, subject, html, { context: "account", customer_name: name });
+  const letter = accessLinkLetter(emailBrand(settings), name, kind, link);
+  // Sem `dedupe`: um pedido novo de recuperação tem de gerar um email novo, porque o link
+  // anterior deixa de servir.
+  const emailSent = await sendLetter(settings, email, letter, { context: "account", customer_name: name });
   return { link, emailSent };
 }
+
+/**
+ * Email de boas-vindas, pedido pela própria conta no primeiro acesso.
+ *
+ * O Supabase Auth cria a conta sem passar por aqui, por isso não há gancho no servidor para
+ * o registo. A alternativa é esta: o cliente pede uma vez, e a chave de idempotência (a
+ * conta) garante que só sai um email, por mais vezes que o pedido se repita. Vai sempre para
+ * o email da sessão, nunca para um endereço vindo no corpo do pedido.
+ */
+route("POST", "/account/welcome", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, welcomeLetter(emailBrand(settings), profile?.name || ""), {
+    context: "welcome",
+    category: "welcome",
+    customer_name: profile?.name || "",
+    dedupe: `account:welcome:${auth.id}`,
+  });
+  return json({ email_sent: sent });
+});
 
 route("GET", "/admin/users", async ({ auth, url }) => {
   requirePermission(auth, "manage_users");
@@ -1535,7 +2283,14 @@ route("POST", "/admin/users/access-link", async ({ auth, body }) => {
   assertCanManage(auth, target);
   if (!target.email) throw bad("Esta conta não tem email.");
   const access = await sendAccessLink(target.email, target.name, "reset", body.origin);
-  return json(access);
+  // O link dá entrada directa na conta de outra pessoa, com o histórico de encomendas, as
+  // moradas e os dados dela. Devolvê-lo a quem pede deixava qualquer gestor com
+  // `manage_users` entrar como um cliente — mesmo quando o email já tinha seguido para o
+  // próprio cliente. Só volta quando o email NÃO saiu (por exemplo, SMTP desligado: alguém
+  // tem de o mandar por WhatsApp) e só a um administrador. O gestor fica a saber se o email
+  // seguiu; se não seguiu, pede a um administrador.
+  const canSeeLink = !access.emailSent && auth!.role === "admin";
+  return json({ emailSent: access.emailSent, link: canSeeLink ? access.link : "", link_withheld: !access.emailSent && !canSeeLink });
 });
 
 route("POST", "/admin/users/delete", async ({ auth, body }) => {
@@ -1566,7 +2321,8 @@ route("GET", "/chat/config", async () => {
   if (provider === "gemini" && keys.gemini) { ai = true; active = "gemini"; }
   else if (provider === "deepseek" && keys.deepseek) { ai = true; active = "deepseek"; }
   else if (keys.gemini) { ai = true; active = "gemini"; }
-  return json({ enabled: settings ? settings.chat_enabled !== false : true, ai, provider: active, welcome: settings?.chat_welcome || "" });
+  // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
+  return publicJson({ enabled: settings ? settings.chat_enabled !== false : true, ai, provider: active, welcome: settings?.chat_welcome || "" });
 });
 
 function bookToChatItem(b: Row) {
@@ -1674,7 +2430,7 @@ function faqFallback(message: string, settings: Row | null, books: Row[]) {
 }
 
 route("POST", "/chat", async ({ body, ip }) => {
-  if (!await checkRateLimit("chat", ip, 20)) throw bad("Demasiadas mensagens. Aguarde um minuto.");
+  if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
   const page = String(body.page || "/").slice(0, 120);
   const history = (Array.isArray(body.history) ? body.history : []).slice(-8)
@@ -1682,10 +2438,9 @@ route("POST", "/chat", async ({ body, ip }) => {
   if (!message) throw bad("Mensagem vazia.");
   if (message.length > 800) throw bad("Mensagem demasiado longa.");
 
-  const settings = await getSettings();
+  const [settings, books] = await Promise.all([getSettings(), searchBooks(message, 8)]);
   if (settings && settings.chat_enabled === false) throw bad("Assistente temporariamente indisponível.");
 
-  const books = await searchBooks(message, 8);
   const keys = chatKeys(settings);
   const pref = settings ? (settings.chat_provider || "gemini") : "faq";
   const model = settings?.chat_model || "";
@@ -1727,20 +2482,64 @@ route("POST", "/chat", async ({ body, ip }) => {
 });
 
 // ---------------------------------------------------------------------------
+// Mensagem para quem não é da equipa quando algo falha sem ser um erro previsto.
+const UNEXPECTED_ERROR = "Ocorreu um erro inesperado. Tente novamente dentro de momentos.";
+// 1 MB: folga sobre a assinatura da confirmação de entrega (600 KB) e o checkout (200 KB).
+const MAX_BODY_BYTES = 1_000_000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  // Id de correlação: vai em todas as respostas e em cada registo de erro, por isso uma
+  // queixa ("deu erro ao pagar", com o id que o browser recebeu) leva à linha certa nos
+  // registos da função. Respeita o que o cliente mande, se tiver a forma de um UUID.
+  const given = req.headers.get("x-request-id") || "";
+  const requestId = /^[0-9a-f-]{36}$/i.test(given) ? given : crypto.randomUUID();
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/functions\/v1/, "").replace(/^\/app/, "").replace(/\/$/, "") || "/";
   const handler = routes[`${req.method} ${path}`];
-  if (!handler) return json({ message: "Rota não encontrada." }, 404);
+  if (!handler) return json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
+  let auth: Auth = null;
   try {
     let body: Row = {};
-    if (req.method === "POST") body = await req.json().catch(() => ({}));
+    if (req.method === "POST") {
+      // O maior pedido legítimo é a confirmação de entrega (assinatura até 600 KB). Sem tecto,
+      // um corpo de dezenas de MB era lido e analisado inteiro antes de qualquer validação.
+      const declared = Number(req.headers.get("content-length") || 0);
+      if (declared > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      const raw = await req.text();
+      if (raw.length > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      try {
+        const parsed = raw ? JSON.parse(raw) : {};
+        body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        body = {};
+      }
+    }
+    // O gateway do Supabase reescreve este cabeçalho com o IP real (verificado a 2026-11-04:
+    // um X-Forwarded-For forjado ficou registado em private.rate_limits com o IP de origem),
+    // por isso o primeiro valor é fiável para os limites de pedidos.
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "anon";
-    return await handler({ req, url, body, auth: await getAuth(req), ip });
+    auth = await getAuth(req);
+    const res = await handler({ req, url, body, auth, ip });
+    res.headers.set("X-Request-Id", requestId);
+    return res;
   } catch (err) {
-    if (err instanceof HttpError) return json({ message: err.message, status: err.status }, err.status);
-    console.log(`Erro em ${req.method} ${path}:`, err);
-    return json({ message: (err as { message?: string })?.message || String(err) }, 400);
+    if (err instanceof HttpError) {
+      return json({ message: err.message, status: err.status }, err.status, { ...err.headers, "X-Request-Id": requestId });
+    }
+    console.log(`Erro em ${req.method} ${path} [${requestId}]:`, err);
+    // Um erro não previsto (Postgres, fornecedor de email, um bug) trazia a mensagem interna
+    // para o browser de qualquer visitante, com estado 400 como se a culpa fosse do pedido.
+    // A equipa continua a vê-la no painel, onde ajuda a perceber o que falhou; os outros
+    // recebem uma frase e o id para a equipa procurar nos registos.
+    const detail = (err as { message?: string })?.message || String(err);
+    // A referência curta vai na própria frase: é o que o cliente copia para o WhatsApp da
+    // loja, e os primeiros 8 caracteres chegam para encontrar o pedido nos registos.
+    const publicMessage = `${UNEXPECTED_ERROR} (ref. ${requestId.slice(0, 8)})`;
+    return json(
+      { message: isStaff(auth) ? detail : publicMessage, ref: requestId, status: 500 },
+      500,
+      { "X-Request-Id": requestId },
+    );
   }
 });

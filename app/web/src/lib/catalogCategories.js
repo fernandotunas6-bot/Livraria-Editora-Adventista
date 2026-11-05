@@ -84,6 +84,12 @@ export const SHOWCASE_CATEGORIES = [
   },
 ];
 
+/** Ligação da loja para uma categoria (a mesma regra do mega menu do cabeçalho). */
+export function categoryShopLink(cat) {
+  const filter = CATEGORY_SHOP_FILTERS[cat.id];
+  return filter ? `/shop?${filter}` : `/shop?category=${encodeURIComponent(cat.title)}`;
+}
+
 /** Parâmetros da loja (/shop?...) que mostram cada categoria. */
 export const CATEGORY_SHOP_FILTERS = {
   ellen: 'search=Ellen',
@@ -110,11 +116,25 @@ export function buildShowcaseCategories(products) {
 /** Cópias do track para loop infinito sem salto visível */
 export const MARQUEE_LOOP_COPIES = 4;
 
-export function buildMarqueeTrack(products, copies = MARQUEE_LOOP_COPIES) {
+/**
+ * Títulos distintos que entram na faixa.
+ *
+ * A faixa anda devagar e volta ao início ao fim de uma cópia: ninguém chega a ver mais do
+ * que uma dúzia de livros diferentes. Dar-lhe a lista toda era construir 360 cartões (90
+ * títulos × 4 cópias), com 2520 elementos e 360 imagens — 63% do DOM da página, a competir
+ * pela rede no arranque e a custar centenas de milissegundos a desmontar quando alguém
+ * aplica um filtro.
+ *
+ * Os restantes títulos não se perdem: a grelha do mesmo componente mostra-os em "Ver mais".
+ */
+export const MARQUEE_MAX_ITEMS = 16;
+
+export function buildMarqueeTrack(products, copies = MARQUEE_LOOP_COPIES, maxItems = MARQUEE_MAX_ITEMS) {
   if (!products.length) return [];
+  const visiveis = maxItems > 0 ? products.slice(0, maxItems) : products;
   const track = [];
   for (let c = 0; c < copies; c++) {
-    for (const product of products) {
+    for (const product of visiveis) {
       track.push({ product, copy: c });
     }
   }

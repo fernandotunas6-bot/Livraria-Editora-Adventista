@@ -15,13 +15,17 @@ export function IntegrationsProvider({ children }) {
   const [driveImageConfig, setDriveImageConfig] = useState({ enabled: false });
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
+  // `fresh`: o painel, depois de gravar uma integração, pede sem a cache do browser (a
+  // resposta pública fica 30 s em cache, como a de /settings).
+  const refresh = useCallback(async ({ fresh = false } = {}) => {
     try {
-      const res = await fetch(`${APP_API_URL}/integrations`);
+      const res = await fetch(`${APP_API_URL}/integrations`, fresh ? { cache: 'no-cache' } : undefined);
       const data = res.ok ? await res.json() : {};
       setIntegrations(data.integrations || {});
 
-      if (pb.authStore.isValid) {
+      // Só a equipa usa a configuração do Drive (e só a ela a rota responde): um cliente com
+      // sessão fazia um pedido a mais em cada página, sempre recusado.
+      if (pb.authStore.isValid && ['admin', 'manager'].includes(pb.authStore.record?.role)) {
         try {
           const adminRes = await pb.send('/api/app/admin/media-config', { method: 'GET' });
           const drive = adminRes?.google_drive;

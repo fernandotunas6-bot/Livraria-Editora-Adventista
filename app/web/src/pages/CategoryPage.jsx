@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
+import { useCatalogWindow } from '@/hooks/useCatalogWindow';
 import FilterPanel from '@/components/FilterPanel.jsx';
 import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
+import PageBannerSlider from '@/components/PageBannerSlider';
 
 const CategoryPage = () => {
   const { category } = useParams();
@@ -32,10 +35,11 @@ const CategoryPage = () => {
     isLoading
   } = useProductFilters(category);
 
-  // Debugging: Trace filter flow — removed in production
+  // O endereço traz a categoria como slug ("catalogo-geral"): mostra-se com espaços e
+  // maiúscula inicial. A página vinha do modelo inicial em inglês; ficou em português.
   const categoryName = category
-    ? category.charAt(0).toUpperCase() + category.slice(1)
-    : 'Products';
+    ? decodeURIComponent(category).replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    : 'Livros';
 
   // Apply sorting to filtered products
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -44,35 +48,37 @@ const CategoryPage = () => {
     return (a.order || 0) - (b.order || 0);
   });
 
+  // Telemóvel: lista contínua, como a loja. Desktop: a lista inteira, como sempre.
+  const location = useLocation();
+  const catalog = useCatalogWindow({
+    items: sortedProducts,
+    ready: !isLoading,
+    resetKey: `${category}|${location.search}|${sortBy}`,
+  });
+
   return (
     <>
       <Helmet>
         <title>{pageTitle(categoryName)}</title>
-        <meta name="description" content={`Shop our ${categoryName.toLowerCase()} collection. Premium products for your lifestyle.`} />
+        <meta name="description" content={`Livros de ${categoryName} na Livraria Adventista: preços em kwanzas, entrega em Angola.`} />
       </Helmet>
 
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
+      <PageBannerSlider contentClassName="text-left">
+        <nav className="mb-4 flex items-center gap-2 text-sm text-white/75">
+          <Link to="/" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Início</Link>
+          <ChevronRight className="h-4 w-4" />
+          <Link to="/shop" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Loja</Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-white">{categoryName}</span>
+        </nav>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">{categoryName}</h1>
+        <p className="text-base text-white/85 sm:text-lg">Os livros desta categoria, com filtros e ordenação</p>
+      </PageBannerSlider>
+
       <main className="container-custom py-12 min-h-screen">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-8"
-        >
-          <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <ChevronRight className="h-4 w-4" />
-            <Link to="/shop" className="hover:text-primary transition-colors">Shop</Link>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground">{categoryName}</span>
-          </nav>
-
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">{categoryName}</h1>
-          <p className="text-muted-foreground text-lg">Explore our curated {categoryName.toLowerCase()} collection</p>
-        </motion.div>
-
         <div className="flex flex-col lg:flex-row gap-8">
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24 bg-card border border-border rounded-xl p-6">
@@ -88,20 +94,20 @@ const CategoryPage = () => {
           </aside>
 
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-6 gap-4 bg-card border border-border p-4 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3 sm:gap-4 bg-card border border-border p-4 rounded-xl">
               <Button
                 variant="outline"
                 onClick={() => setIsMobileFilterOpen(true)}
-                className="lg:hidden"
+                className="lg:hidden w-full sm:w-auto"
               >
                 <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Filters {filterCount > 0 && `(${filterCount})`}
+                Filtros {filterCount > 0 && `(${filterCount})`}
               </Button>
 
-              <div className="flex items-center gap-4 ml-auto">
+              <div className="flex items-center gap-4 w-full sm:w-auto sm:ml-auto">
                 <span className="text-sm text-muted-foreground hidden sm:inline">Ordenar por:</span>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[180px] bg-background">
+                  <SelectTrigger className="w-full sm:w-[180px] bg-background">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -116,17 +122,33 @@ const CategoryPage = () => {
             {!isLoading && sortedProducts.length === 0 ? (
               <div className="space-y-12">
                 <div className="text-center py-16 bg-card border border-border rounded-xl">
-                  <h3 className="text-2xl font-semibold mb-2">No products found</h3>
-                  <p className="text-muted-foreground mb-6">We couldn't find any products matching your filters.</p>
-                  <Button onClick={clearFilters} variant="outline">Clear Filters</Button>
+                  <h3 className="text-2xl font-semibold mb-2">Nenhum livro encontrado</h3>
+                  <p className="text-muted-foreground mb-6">Não há livros com estes filtros.</p>
+                  <Button onClick={clearFilters} variant="outline">Limpar filtros</Button>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-semibold mb-6">No results found. Here are all available products:</h3>
+                  <h3 className="text-2xl font-semibold mb-6">Veja todos os livros disponíveis:</h3>
                   <ProductsList products={allProducts} isLoading={isLoading} />
                 </div>
               </div>
             ) : (
-              <ProductsList products={sortedProducts} isLoading={isLoading} />
+              catalog.isMobile ? (
+                <>
+                  <ProductsList embedded products={catalog.visible} isLoading={isLoading} />
+                  {!isLoading && (
+                    <CatalogInfiniteTail
+                      sentinelRef={catalog.infinite.sentinelRef}
+                      hasMore={catalog.infinite.hasMore}
+                      loadMore={catalog.infinite.loadMore}
+                      shown={catalog.visible.length}
+                      total={sortedProducts.length}
+                      onClearFilters={filterCount > 0 ? clearFilters : undefined}
+                    />
+                  )}
+                </>
+              ) : (
+                <ProductsList products={sortedProducts} isLoading={isLoading} />
+              )
             )}
           </div>
         </div>
@@ -141,7 +163,7 @@ const CategoryPage = () => {
               className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r border-border p-6 overflow-y-auto shadow-xl"
             >
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-                <h2 className="text-xl font-semibold">Filters</h2>
+                <h2 className="text-xl font-semibold">Filtros</h2>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -160,7 +182,7 @@ const CategoryPage = () => {
               />
               <div className="mt-8 pt-4 border-t border-border">
                 <Button className="w-full btn-primary" onClick={() => setIsMobileFilterOpen(false)}>
-                  Show {sortedProducts.length} Results
+                  Ver {sortedProducts.length} livros
                 </Button>
               </div>
             </motion.div>
@@ -168,7 +190,10 @@ const CategoryPage = () => {
         )}
       </main>
 
-      <Footer />
+      {/* Como na loja: no telemóvel o catálogo segue sem rodapé. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 };

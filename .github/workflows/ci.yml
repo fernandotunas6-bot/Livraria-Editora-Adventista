@@ -26,14 +26,28 @@ jobs:
 
       - run: npm ci
 
+      # Antes de tudo: uma credencial no PR tem de ser revogada, e quanto mais cedo melhor.
+      - name: Segredos nos ficheiros versionados
+        run: node scripts/verificar-segredos.mjs
+
       - name: Lint
         run: npm run lint
 
+      # Sem variáveis de ambiente de propósito: os valores do Supabase para os testes estão
+      # fixos no `test.env` do app/web/vitest.config.js. Os testes são unitários e não tocam a
+      # rede, por isso não dependem de segredos nem do app/web/.env, que é gitignored e não
+      # existe num checkout.
       - name: Testes
         run: npm test
 
       - name: Build
         run: npm run build
+
+      # Dependências do site com vulnerabilidade crítica conhecida param o PR. Só "critical":
+      # as 4 "high" de hoje são do gRPC, que o Firebase usa no servidor e não entra no bundle
+      # (ver docs/AUDITORIA.md), e um gate que fica sempre vermelho deixa de ser lido.
+      - name: Auditoria de dependências
+        run: npm audit --omit=dev --audit-level=critical
 
   edge-function:
     name: Verificar Edge Function "app"

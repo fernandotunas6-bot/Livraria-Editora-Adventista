@@ -36,6 +36,49 @@ export function getPaymentStatusColor(status) {
   return PAYMENT_STATUS[status]?.color || 'bg-muted text-muted-foreground';
 }
 
+// --- Campos repetidos das encomendas ----------------------------------------------------
+// Por razões históricas, as encomendas guardam o mesmo facto em mais do que uma coluna:
+//  - método de pagamento: `payment_method_code` + `payment_method_name` (os actuais) e
+//    `payment_method` (herdado: nas encomendas antigas é o código, nas novas fica vazio);
+//  - morada: `delivery_address_full` e os `delivery_*` (entrega), `pickup_store`
+//    (levantamento), e `address`/`city` (herdados, cópias destes).
+// Cada ecrã lia-os por uma ordem diferente — o recibo mostrava o nome do método e a
+// exportação o código; o painel repetia a loja dos levantamentos. Ler só por estas funções,
+// que dão os campos actuais primeiro e os herdados às encomendas antigas.
+// A Edge Function segue a mesma regra (supabase/functions/app/orderFields.ts), e o
+// orderFields.test.js confirma que as duas dizem o mesmo.
+
+/** Código do método de pagamento ('entrega', 'transferencia', 'balcao'…). */
+export function orderPaymentCode(order) {
+  return String(order?.payment_method_code || order?.payment_method || '');
+}
+
+/** Nome do método de pagamento, como o cliente o viu no checkout. */
+export function orderPaymentLabel(order) {
+  const code = orderPaymentCode(order);
+  return String(order?.payment_method_name || PAYMENT_METHODS[code] || code);
+}
+
+export const isPickupOrder = (order) => String(order?.shipping_method || '') === 'pickup';
+
+/** Loja do levantamento. As encomendas antigas só a tinham em `address` ("Levantamento: …"). */
+export function orderPickupStore(order) {
+  if (!isPickupOrder(order)) return '';
+  return String(order?.pickup_store || String(order?.address || '').replace(/^Levantamento:\s*/i, '') || '');
+}
+
+/** Morada de entrega numa linha; vazia nos levantamentos. */
+export function orderDeliveryAddress(order) {
+  if (!order || isPickupOrder(order)) return '';
+  if (order.delivery_address_full) return String(order.delivery_address_full);
+  return [order.address, order.city].filter(Boolean).join(', ');
+}
+
+/** Bairro, município e província escolhidos no checkout. */
+export function orderLocality(order, separator = ' · ') {
+  return [order?.delivery_locality, order?.delivery_municipality, order?.delivery_province].filter(Boolean).join(separator);
+}
+
 export function getPaymentMethodLabel(code, methodsMap = PAYMENT_METHODS) {
   return methodsMap[code] || code || '—';
 }

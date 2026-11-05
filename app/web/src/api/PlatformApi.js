@@ -1,4 +1,5 @@
 import pb from '@/lib/dataClient';
+import { isMissingRoute } from '@/lib/apiCompat';
 import { resolveShopBgMode } from '@/lib/shopTheme';
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
 
@@ -8,8 +9,8 @@ const DEFAULT_SETTINGS = {
   primary_color: '#0ea5c9',
   logo_url: '',
   favicon_url: '',
-  contact_email: 'contacto@livrariaadventista.ao',
-  contact_phone: '+244 923 000 000',
+  contact_email: '',
+  contact_phone: '',
   contact_address: 'Luanda, Angola',
   pwa_enabled: true,
   pwa_theme_color: '#0c4a6e',
@@ -45,9 +46,10 @@ const DEFAULT_SETTINGS = {
   assets_version: '',
 };
 
-export async function getSiteSettings() {
+export async function getSiteSettings({ fresh = false } = {}) {
   try {
-    const res = await fetch(`${APP_API_URL}/settings`);
+    // `no-cache` revalida no servidor e actualiza a cópia do browser; ver PUBLIC_CACHE na Edge Function.
+    const res = await fetch(`${APP_API_URL}/settings`, fresh ? { cache: 'no-cache' } : undefined);
     if (!res.ok) return DEFAULT_SETTINGS;
     const merged = { ...DEFAULT_SETTINGS, ...await res.json() };
     merged.shop_bg_mode = resolveShopBgMode(merged);
@@ -174,6 +176,50 @@ export async function addDeliveryEvent(orderId, event, token) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Erro');
   return data;
+}
+
+/**
+ * Muda o estado do pagamento de uma encomenda.
+ *
+ * Passa pela API e não pela tabela porque é aí que o aviso ao cliente é enviado: a gravação
+ * directa em `orders` mudava o estado sem que ninguém soubesse que o pagamento foi aceite.
+ *
+ * Enquanto a Edge Function publicada não tiver esta rota, grava na tabela como antes e
+ * devolve `via: 'fallback'`, para o painel poder dizer que o estado mudou mas o cliente não
+ * foi avisado. Sem isto, o site novo com a função antiga deixava de conseguir sequer
+ * confirmar um pagamento — uma funcionalidade a menos em vez de um aviso a mais.
+ */
+export async function setOrderPaymentStatus(orderId, status) {
+  try {
+    const res = await pb.send('/admin/orders/payment-status', {
+      method: 'POST',
+      body: { orderId, status },
+    });
+    return { ...res, via: 'api' };
+  } catch (err) {
+    if (!isMissingRoute(err)) throw err;
+    await pb.collection('orders').update(orderId, { payment_status: status });
+    return { payment_status: status, email_sent: false, via: 'fallback' };
+  }
+}
+
+/**
+ * Muda o estado da entrega de uma encomenda.
+ *
+ * Pela API, como o pagamento: é lá que o cliente recebe o email "enviada", "saiu para
+ * entrega", "entregue". O painel gravava directamente na tabela, e a rota que envia esses
+ * emails existia mas ninguém a chamava — o cliente nunca era avisado. Sem a rota (função
+ * antiga), grava na tabela e devolve `via: 'fallback'`.
+ */
+export async function setOrderDeliveryStatus(orderId, status) {
+  try {
+    const res = await pb.send('/delivery-event', { method: 'POST', body: { orderId, status } });
+    return { ...res, via: 'api' };
+  } catch (err) {
+    if (!isMissingRoute(err)) throw err;
+    await pb.collection('orders').update(orderId, { delivery_status: status });
+    return { email_sent: false, via: 'fallback' };
+  }
 }
 
 export function getSettingsFileUrl(record, field) {

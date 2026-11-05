@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { motion } from 'framer-motion';
-import { MapPin, Clock, Phone, Mail, Navigation, MessageCircle, PackageCheck, Store, Search, LocateFixed, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Phone, Mail, Navigation, MessageCircle, PackageCheck, Store, Search, LocateFixed, Loader2, Radio, X, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
@@ -10,17 +9,12 @@ import { Input } from '@/components/ui/input';
 import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pageTitle } from '@/lib/brand';
-import { displayAngolaPhone } from '@/lib/angolaPhone';
-import { hasCoords, mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink } from '@/lib/stores';
-
-// Distância aproximada em km (fórmula de Haversine).
-function distanceKm(a, b) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(h));
-}
+import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
+import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink } from '@/lib/stores';
+import PageBannerSlider from '@/components/PageBannerSlider';
+import StoreThumb from '@/components/StoreThumb';
+import useLocalizacaoAoVivo from '@/hooks/useLocalizacaoAoVivo';
+import { formatarDistancia, ordenarPorDistancia, precisaoLegivel } from '@/lib/localizacao';
 
 export default function StoresPage() {
   const { settings } = useSiteSettings();
@@ -29,8 +23,7 @@ export default function StoresPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState('');
   const [province, setProvince] = useState('');
-  const [position, setPosition] = useState(null);
-  const [locating, setLocating] = useState(false);
+  const { estado: estadoGps, posicao, erro: erroGps, comecar, parar } = useLocalizacaoAoVivo();
 
   useEffect(() => {
     getPhysicalStores().then((list) => {
@@ -46,31 +39,22 @@ export default function StoresPage() {
     const q = query.trim().toLowerCase();
     const list = (stores || []).filter((s) => (!province || s.province === province)
       && (!q || [s.name, s.address, s.province].join(' ').toLowerCase().includes(q)));
-    if (!position) return list;
-    return list
-      .map((s) => ({ ...s, distance: hasCoords(s) ? distanceKm(position, { latitude: Number(s.latitude), longitude: Number(s.longitude) }) : null }))
-      .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
-  }, [stores, query, province, position]);
+    return posicao ? ordenarPorDistancia(list, posicao) : list;
+  }, [stores, query, province, posicao]);
 
   const selected = visible.find((s) => s.id === selectedId) || visible[0] || null;
   const embed = selected ? mapEmbedUrl(selected, settings.google_maps_embed_key) : '';
 
-  const locate = () => {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setPosition({ latitude: coords.latitude, longitude: coords.longitude });
-        setLocating(false);
-      },
-      () => setLocating(false),
-      { timeout: 10000 },
-    );
-  };
-
+  // A primeira leitura escolhe a loja mais perto. As seguintes não voltam a escolher: quem
+  // já abriu outra loja na lista não quer ser arrastado de volta a cada passo que dá.
+  const jaEscolheuPorGps = useRef(false);
   useEffect(() => {
-    if (position && visible[0]) setSelectedId(visible[0].id);
-  }, [position]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!posicao) { jaEscolheuPorGps.current = false; return; }
+    if (jaEscolheuPorGps.current) return;
+    if (visible[0]) { setSelectedId(visible[0].id); jaEscolheuPorGps.current = true; }
+  }, [posicao, visible]);
+
+  const maisPerto = posicao && visible[0]?.distancia != null ? visible[0].id : null;
 
   return (
     <>
@@ -81,22 +65,18 @@ export default function StoresPage() {
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <main className="bg-muted/20 min-h-screen">
-        <section className="bg-gradient-to-br from-[#0c4a6e] to-[#0ea5c9] text-white">
-          <div className="container-custom py-12 md:py-16">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <p className="text-sm font-semibold uppercase tracking-wider text-white/70 mb-2 flex items-center gap-2"><Store className="h-4 w-4" /> Lojas físicas</p>
-              <h1 className="text-3xl md:text-5xl font-bold font-serif mb-3">Visite-nos</h1>
-              <p className="text-white/85 max-w-xl">
-                Encontre a loja mais perto de si, veja o horário e combine o levantamento das suas encomendas.
-              </p>
-            </motion.div>
-          </div>
-        </section>
+      <PageBannerSlider contentClassName="text-left">
+        <p className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/80"><Store className="h-4 w-4" /> Lojas físicas</p>
+        <h1 className="mb-3 font-serif text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Visite-nos</h1>
+        <p className="max-w-xl text-sm text-white/85 sm:text-base">
+          Encontre a loja mais perto de si, veja o horário e combine o levantamento das suas encomendas.
+        </p>
+      </PageBannerSlider>
 
+      <main className="bg-muted/20 min-h-screen">
         <div className="container-custom py-8">
           {stores === null ? (
-            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#0ea5c9]" /></div>
+            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : stores.length === 0 ? (
             <div className="text-center py-20 text-muted-foreground">De momento não há lojas para mostrar.</div>
           ) : (
@@ -109,17 +89,55 @@ export default function StoresPage() {
                 {provinces.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por província">
                     {['', ...provinces].map((p) => (
-                      <Button key={p || 'all'} type="button" size="sm" variant={province === p ? 'default' : 'outline'} onClick={() => setProvince(p)} className={province === p ? 'bg-[#0ea5c9] hover:bg-[#0ea5c9]/90' : ''}>
+                      <Button key={p || 'all'} type="button" size="sm" variant={province === p ? 'default' : 'outline'} onClick={() => setProvince(p)} className={province === p ? 'bg-primary hover:bg-[#0ea5c9]/90' : ''}>
                         {p || 'Todas'}
                       </Button>
                     ))}
                   </div>
                 )}
-                <Button type="button" variant="outline" onClick={locate} disabled={locating}>
-                  {locating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <LocateFixed className="h-4 w-4 mr-2" />}
-                  {position ? 'Ordenado pela distância' : 'Loja mais próxima'}
-                </Button>
+                {estadoGps === 'activo' ? (
+                  <Button type="button" variant="outline" onClick={parar} className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300">
+                    <X className="h-4 w-4 mr-2" /> Parar de me localizar
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={comecar} disabled={estadoGps === 'a-pedir'}>
+                    {estadoGps === 'a-pedir'
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <LocateFixed className="h-4 w-4 mr-2" />}
+                    {estadoGps === 'a-pedir' ? 'À procura do sinal…' : 'Loja mais perto de mim'}
+                  </Button>
+                )}
               </div>
+
+              {/* O que o GPS está a fazer, dito por extenso. Antes, negar a autorização
+                  deixava um botão que aparentemente não respondia. */}
+              {estadoGps === 'activo' && (
+                <div
+                  className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200"
+                  role="status"
+                >
+                  <Radio className="h-4 w-4 shrink-0 animate-pulse" aria-hidden />
+                  <span className="font-medium">Lojas ordenadas da mais perto para a mais longe.</span>
+                  <span className="text-emerald-700/80 dark:text-emerald-300/80">
+                    As distâncias acompanham-no enquanto se desloca
+                    {precisaoLegivel(posicao?.precisao) ? ` · sinal ${precisaoLegivel(posicao.precisao)}` : ''}.
+                  </span>
+                </div>
+              )}
+              {(estadoGps === 'erro' || estadoGps === 'indisponivel') && (
+                <div
+                  className="mb-6 flex flex-wrap items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200"
+                  role="alert"
+                >
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
+                  {/* Em telemóvel o botão passa para a linha de baixo: ao lado do texto,
+                      sobrava-lhe metade da largura e a mensagem saía em sete linhas. */}
+                  <span className="min-w-0 basis-full sm:basis-0 sm:flex-1">{erroGps}</span>
+                  {estadoGps === 'erro' && (
+                    <Button type="button" size="sm" variant="outline" onClick={comecar}>Tentar outra vez</Button>
+                  )}
+                </div>
+              )}
 
               <div className="grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6 items-start">
                 <ul className="space-y-3" aria-label="Lista de lojas">
@@ -132,15 +150,24 @@ export default function StoresPage() {
                           className={`rounded-2xl border bg-background overflow-hidden transition-all ${active ? 'border-[#0ea5c9] shadow-lg ring-2 ring-[#0ea5c9]/15' : 'border-border hover:border-[#0ea5c9]/40'}`}
                         >
                           <button type="button" className="w-full text-left flex gap-4 p-4" onClick={() => setSelectedId(s.id)} aria-pressed={active}>
-                            <div className="h-20 w-24 shrink-0 rounded-xl bg-muted overflow-hidden">
-                              {s.image_url ? (
-                                <img src={s.image_url} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center"><Store className="h-7 w-7 text-[#0ea5c9]/40" /></div>
-                              )}
-                            </div>
+                            <StoreThumb store={s} className="h-20 w-24 shrink-0 rounded-xl" />
                             <div className="min-w-0">
-                              <p className="text-[11px] font-bold uppercase tracking-wider text-[#0ea5c9]">{s.province}{s.distance != null && ` · ${s.distance < 10 ? s.distance.toFixed(1) : Math.round(s.distance)} km`}</p>
+                              {/* A distância ganha lugar próprio em vez de ir pendurada na
+                                  província, onde se lia como parte do nome do sítio. */}
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-primary">{s.province}</p>
+                                {formatarDistancia(s.distancia) && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                    <Navigation className="h-3 w-3" aria-hidden />
+                                    {formatarDistancia(s.distancia)}
+                                  </span>
+                                )}
+                                {maisPerto === s.id && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                    A mais perto de si
+                                  </span>
+                                )}
+                              </div>
                               <h2 className="text-base md:text-lg font-semibold leading-snug">{s.name}</h2>
                               <p className="text-sm text-muted-foreground flex items-start gap-1 mt-1"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{s.address}</p>
                               {s.hours && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Clock className="h-3.5 w-3.5 shrink-0" />{s.hours}</p>}
@@ -149,8 +176,8 @@ export default function StoresPage() {
                           {active && (
                             <div className="px-4 pb-4 space-y-3">
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                                {s.phone && <a href={`tel:${s.phone}`} className="flex items-center gap-1.5 hover:text-[#0ea5c9]"><Phone className="h-4 w-4 text-[#0ea5c9]" />{displayAngolaPhone(s.phone)}</a>}
-                                {s.email && <a href={`mailto:${s.email}`} className="flex items-center gap-1.5 hover:text-[#0ea5c9]"><Mail className="h-4 w-4 text-[#0ea5c9]" />{s.email}</a>}
+                                {s.phone && <a href={`tel:+244${localDigits(s.phone)}`} className="flex items-center gap-1.5 py-1 hover:text-primary"><Phone className="h-4 w-4 text-primary" />{displayAngolaPhone(s.phone)}</a>}
+                                {s.email && <a href={`mailto:${s.email}`} className="flex items-center gap-1.5 py-1 hover:text-primary"><Mail className="h-4 w-4 text-primary" />{s.email}</a>}
                               </div>
                               {s.pickup_enabled && (
                                 <p className="text-xs inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 font-medium">
@@ -191,7 +218,7 @@ export default function StoresPage() {
                     />
                   ) : (
                     <div className="aspect-[4/3] flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
-                      <MapPin className="h-10 w-10 text-[#0ea5c9]/50" />
+                      <MapPin className="h-10 w-10 text-primary/50" />
                       <p className="text-sm max-w-xs">{selected ? 'Esta loja ainda não tem coordenadas GPS. Use «Como chegar» para abrir a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
                     </div>
                   )}

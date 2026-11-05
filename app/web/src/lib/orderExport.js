@@ -1,5 +1,19 @@
-function escapeCsv(val) {
+import { isPickupOrder, orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
+
+/**
+ * Célula de CSV segura para abrir no Excel. Um texto começado por = + - @ (ou tabulação) é
+ * lido como fórmula — e a exportação leva texto escrito pelos clientes (nome, morada,
+ * notas): `=HYPERLINK(…)` numa nota virava um link no computador da equipa. O apóstrofo
+ * à frente fá-lo ficar texto (recomendação da OWASP); os telefones +244… também, que o Excel
+ * tentava calcular.
+ */
+export function csvSafeText(val) {
   const s = String(val ?? '');
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+function escapeCsv(val) {
+  const s = csvSafeText(val);
   if (s.includes(',') || s.includes('"') || s.includes('\n')) {
     return `"${s.replace(/"/g, '""')}"`;
   }
@@ -26,16 +40,17 @@ function orderRow(o) {
     o.customer_name || '',
     o.customer_email || '',
     o.phone || '',
-    o.address || '',
-    o.city || '',
+    orderDeliveryAddress(o),
+    isPickupOrder(o) ? '' : (o.delivery_municipality || o.city || ''),
     o.shipping_method === 'pickup' ? 'Levantamento' : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio',
-    o.pickup_store || '',
+    orderPickupStore(o),
     subtotal.toFixed(2),
     shipping.toFixed(2),
     Number(o.total || 0).toFixed(2),
     o.status || '',
     o.payment_status || '',
-    o.payment_method || o.payment_method_code || '',
+    // O nome, como no recibo (antes saía o código: "entrega", "balcao").
+    orderPaymentLabel(o),
     o.delivery_status || '',
     fmtItems(items),
     o.notes || '',

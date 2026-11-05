@@ -1,7 +1,8 @@
 import pb from '@/lib/dataClient';
-import { APP_API_URL, mediaUrl } from '@/lib/supabaseClient';
+import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { toSiteRelativeUrl } from '@/lib/imageUrl';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -140,7 +141,8 @@ function mapSlideRecord(s) {
     id: s.id,
     title: s.title,
     subtitle: s.subtitle || '',
-    image: s.image,
+    // Os slides já gravados têm o endereço completo do projecto antigo; ver toSiteRelativeUrl.
+    image: toSiteRelativeUrl(s.image),
     cta_text: s.cta_text || 'Explorar',
     cta_link: s.cta_link || '/shop',
     template: s.template || 'classic',
@@ -148,14 +150,14 @@ function mapSlideRecord(s) {
     body_html: s.body_html || '',
     promo_badge: s.promo_badge || '',
     promo_price: s.promo_price ?? null,
-    book_cover: s.book_cover || '',
+    book_cover: toSiteRelativeUrl(s.book_cover || ''),
     book_title: s.book_title || '',
     book_author: s.book_author || '',
     placement: s.placement || 'home',
     is_primary: !!s.is_primary,
     transition: s.transition || 'fade',
     media_type: s.media_type || 'image',
-    video_url: s.video_url || '',
+    video_url: toSiteRelativeUrl(s.video_url || ''),
     duration_ms: s.duration_ms ?? null,
     sort_order: s.sort_order ?? 0,
   };
@@ -293,10 +295,19 @@ export async function initializeCheckout({
   deliveryProvince, deliveryProvinceId, deliveryMunicipality, deliveryMunicipalityId,
   deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
+  deliveryGpsLat, deliveryGpsLng,
+  idempotencyKey,
 }) {
+  // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
+  // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
+  // Sem o cabeçalho, toda a encomenda chegava como anónima, com ou sem sessão iniciada.
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
   const res = await fetch(`${APP_API_URL}/checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({
       items, successUrl, customerEmail, customerName,
       phone, address, city,
@@ -311,12 +322,18 @@ export async function initializeCheckout({
       deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
       deliveryRelativeName, deliveryRelativePhone,
       checkoutSignature,
+      // O carrinho já mandava as coordenadas, mas esta função só reenviava os campos que
+      // nomeia, e estes não estavam na lista: nenhuma encomenda chegou a ter GPS.
+      deliveryGpsLat, deliveryGpsLng,
+      // A mesma em cada repetição da mesma compra: o servidor devolve a encomenda já criada
+      // em vez de fazer outra (ver lib/checkoutIdempotency.js).
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     }),
   });
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error || 'Erro no checkout');
-  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_sent: data.email_sent, whatsapp_sent: data.whatsapp_sent };
+  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
 }
 
 export async function subscribeNewsletter(email) {

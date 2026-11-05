@@ -28,6 +28,7 @@ import {
   SOURCE_LABELS, CHANNEL_LABELS, FREQUENCY_LABELS
 } from '@/api/ContactsApi';
 import { listAllGoogleContacts, sendGmailMessage, getCachedGoogleToken } from '@/lib/googleAuth';
+import { estadoDoAgendador, planearCanais } from '@/lib/campaignChannels';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { fetchMessagingStatus, isWhatsAppApiActive } from '@/lib/messaging';
 import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
@@ -38,7 +39,7 @@ const DEFAULT_NOTIFY_BODY = `Olá! 👋
 Temos novidades na Livraria Adventista que podem interessar-lhe.
 
 Visite a nossa loja online para descobrir os livros mais recentes:
-https://livrariaadventista.ao/shop
+https://livrariaadventista.com/shop
 
 Com carinho,
 Equipa Livraria Adventista`;
@@ -74,6 +75,9 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
   const [campaigns, setCampaigns] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [messagingStatus, setMessagingStatus] = useState(null);
+  // O que o último envio saltou, e porquê. Fica à vista em vez de passar num toast: é a
+  // resposta a "porque é que esta campanha continua pendente?".
+  const [lastRunSkipped, setLastRunSkipped] = useState(null);
   const contactsListRef = useRef(null);
 
   const [search, setSearch] = useState('');
@@ -157,17 +161,34 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
     }
   }, [canUseCrm, loadContacts]);
 
-  // As campanhas só correm quando alguém o pede (antes corriam ao abrir o separador).
   const dueCampaigns = campaigns.filter((c) => c.is_active && c.group && (!c.next_send_at || new Date(c.next_send_at).getTime() <= Date.now()));
+
+  // O que cada canal consegue entregar agora. `null` enquanto as estatísticas não chegam:
+  // sem esta distinção, uma falha a carregar passaria por "nada entrega" e o painel acusava
+  // problemas que não existem.
+  const delivery = stats?.delivery || null;
+  const scheduler = stats?.scheduler || null;
+
+  const schedulerState = estadoDoAgendador(scheduler);
+
+  /** Porque é que o agendador não vai disparar esta campanha, se for o caso. */
+  const campaignBlock = (c) => {
+    if (!delivery) return null;
+    const plano = planearCanais(c.channel, delivery);
+    if (!plano.bloqueados.length) return null;
+    return { ...plano, total: !plano.canais.length };
+  };
   const handleRunDueCampaigns = async () => {
     if (!dueCampaigns.length) return;
     if (!window.confirm(`Enviar agora ${dueCampaigns.length} campanha(s) pendente(s) aos contactos dos respectivos grupos?`)) return;
     setRunningCampaigns(true);
     try {
       const due = await runDueCampaigns();
+      setLastRunSkipped(due?.skipped?.length ? due.skipped : null);
       toast({
         title: 'Campanhas enviadas',
-        description: `${due?.processed || 0} campanha(s) processada(s), ${due?.notifications?.length || 0} mensagem(ns).`,
+        description: `${due?.processed || 0} campanha(s) processada(s), ${due?.notifications?.length || 0} mensagem(ns)`
+          + (due?.skipped?.length ? `, ${due.skipped.length} saltada(s) — ver o motivo abaixo.` : '.'),
       });
       await loadAll();
     } catch (err) {
@@ -555,7 +576,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="h-10 w-10 animate-spin text-[#0ea5c9] mb-4" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground text-sm">A carregar CRM de contactos...</p>
       </div>
     );
@@ -597,7 +618,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
           { label: 'Campanhas', value: stats?.active_campaigns ?? 0, icon: Megaphone },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} className="border rounded-xl p-4 bg-card text-center">
-            <Icon className="h-4 w-4 mx-auto text-[#0ea5c9] mb-1" />
+            <Icon className="h-4 w-4 mx-auto text-primary mb-1" />
             <p className="text-2xl font-bold">{value}</p>
             <p className="text-[11px] text-muted-foreground">{label}</p>
           </div>
@@ -606,7 +627,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
 
       {/* Action bar */}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={handleSyncGoogle} disabled={actionLoading || !token} className="bg-[#0ea5c9] hover:bg-[#0ea5c9]/90 text-white">
+        <Button size="sm" onClick={handleSyncGoogle} disabled={actionLoading || !token} className="bg-primary hover:bg-[#0ea5c9]/90 text-white">
           {actionLoading && syncProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
           Sincronizar Google {syncProgress?.total ? `(${syncProgress.loaded || 0}/${syncProgress.total})` : syncProgress?.loaded ? `(${syncProgress.loaded})` : ''}
         </Button>
@@ -680,7 +701,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                         <img src={c.photo_url} alt="" className="h-9 w-9 rounded-full object-cover border shrink-0" />
                       ) : (
                         <div className="h-9 w-9 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center shrink-0">
-                          <User className="h-4 w-4 text-[#0ea5c9]" />
+                          <User className="h-4 w-4 text-primary" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
@@ -714,7 +735,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                       <img src={selectedContact.photo_url} alt="" className="h-16 w-16 rounded-full mx-auto border object-cover" />
                     ) : (
                       <div className="h-16 w-16 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center mx-auto">
-                        <User className="h-8 w-8 text-[#0ea5c9]" />
+                        <User className="h-8 w-8 text-primary" />
                       </div>
                     )}
                     <h3 className="font-bold mt-2">{selectedContact.name}</h3>
@@ -840,7 +861,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
         {/* CAMPANHAS */}
         <TabsContent value="campaigns" className="mt-4">
           <div className="flex justify-between mb-4">
-            <p className="text-sm text-muted-foreground">Envios periódicos com novidades da loja. Quando chega a data, ficam pendentes até carregar em "Enviar pendentes".</p>
+            <p className="text-sm text-muted-foreground">Envios periódicos com novidades da loja. Quando chega a data, saem pelo agendador; "Enviar pendentes" força o envio agora.</p>
             <div className="flex gap-2 shrink-0">
             <Button size="sm" variant="outline" disabled={!dueCampaigns.length || runningCampaigns} onClick={handleRunDueCampaigns}>
               {runningCampaigns ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1" />}
@@ -851,6 +872,36 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
             </Button>
             </div>
           </div>
+          {schedulerState && (
+            <div className={`mb-4 flex items-start gap-2 rounded-lg border p-3 text-xs ${schedulerState.ok ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+              {schedulerState.ok
+                ? <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                : <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />}
+              <p className="text-muted-foreground">{schedulerState.text}</p>
+            </div>
+          )}
+
+          {lastRunSkipped && (
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs font-medium flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                  {lastRunSkipped.length} campanha(s) não saíram no último envio
+                </p>
+                <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLastRunSkipped(null)}>Fechar</Button>
+              </div>
+              <ul className="space-y-1">
+                {lastRunSkipped.map((s, i) => (
+                  <li key={`${s.campaign}-${i}`} className="text-[11px] text-muted-foreground">
+                    <span className="font-medium text-foreground">{s.campaign}</span>
+                    {s.partial ? ' — enviada, mas por um canal só: ' : ' — '}
+                    {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {campaigns.length === 0 ? (
             <div className="text-center py-16 border rounded-xl bg-muted/10">
               <CalendarClock className="h-10 w-10 mx-auto mb-3 opacity-40" />
@@ -860,6 +911,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
             <div className="space-y-3">
               {campaigns.map((c) => {
                 const group = groups.find((g) => g.id === c.group);
+                const block = campaignBlock(c);
                 return (
                   <div key={c.id} className="border rounded-xl p-4 bg-card flex items-center justify-between gap-4">
                     <div className="min-w-0">
@@ -873,6 +925,17 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                         Grupo: {group?.name || '—'} · {(group?.member_ids || []).length} contactos
                         {c.next_send_at && ` · Próximo: ${new Date(c.next_send_at).toLocaleDateString('pt-AO')}`}
                       </p>
+                      {c.is_active && block && (
+                        <p className="text-xs mt-1.5 flex items-start gap-1.5 text-amber-600 dark:text-amber-500">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-px" aria-hidden="true" />
+                          <span>
+                            {block.total
+                              ? 'O agendador não envia esta campanha: '
+                              : 'Sai só por um dos canais: '}
+                            {block.motivo}
+                          </span>
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleToggleCampaign(c)}>
@@ -967,7 +1030,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowNotifyDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSendNotification} disabled={actionLoading} className="bg-[#0ea5c9] hover:bg-[#0ea5c9]/90 text-white">
+            <Button onClick={handleSendNotification} disabled={actionLoading} className="bg-primary hover:bg-[#0ea5c9]/90 text-white">
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
               Enviar
             </Button>
