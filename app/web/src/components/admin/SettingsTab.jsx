@@ -16,7 +16,43 @@ import { sanitizeImageUrlForSave } from '@/lib/imageUrl';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import { isUploadPending } from '@/lib/mediaUpload';
 import PhoneInput from '@/components/PhoneInput';
-import { formatAngolaPhone } from '@/lib/angolaPhone';
+import { formatAngolaPhone, localDigits } from '@/lib/angolaPhone';
+import { clearSecret, loadSecretStatus, secretsForSave, withoutSecrets } from '@/lib/siteSecrets';
+
+/**
+ * Campo de palavra-passe ou chave. Com a migração `segredos_fora_da_api` o valor guardado
+ * nunca volta ao browser: o campo vem vazio, diz se há valor definido, e gravar vazio mantém-no.
+ */
+export function SecretField({ id, label, value, onChange, status, placeholder, className, onClear }) {
+  const known = status !== null && status !== undefined;
+  const isSet = known && !!status?.set;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={id}>{label}</Label>
+        {known && (
+          <span className={isSet ? 'text-xs font-medium text-emerald-700 dark:text-emerald-400' : 'text-xs text-muted-foreground'}>
+            {isSet ? 'Definida' : 'Não definida'}
+          </span>
+        )}
+      </div>
+      <Input
+        id={id}
+        type="password"
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={isSet ? 'Guardada — escreva só para substituir' : placeholder}
+        className={className}
+      />
+      {isSet && (
+        <button type="button" className="text-xs text-destructive hover:underline" onClick={onClear}>
+          Retirar o valor guardado
+        </button>
+      )}
+    </div>
+  );
+}
 
 const empty = {
   site_name: 'Livraria Adventista',
@@ -140,11 +176,17 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Que segredos estão guardados (sem os valores). `null` = base de dados sem a migração.
+  const [secretStatus, setSecretStatus] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await pb.collection('site_settings').getFullList();
+      const [list, status] = await Promise.all([
+        pb.collection('site_settings').getFullList(),
+        loadSecretStatus().catch(() => null),
+      ]);
+      setSecretStatus(status);
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
@@ -215,7 +257,7 @@ export default function SettingsTab() {
           shop_bg_overlay: r.shop_bg_overlay ?? empty.shop_bg_overlay,
           google_maps_embed_key: r.google_maps_embed_key || '',
           order_email_enabled: !!r.order_email_enabled,
-          email_provider: !r.email_provider || r.email_provider === 'pocketbase' ? 'smtp' : r.email_provider,
+          email_provider: !r.email_provider ? 'smtp' : r.email_provider,
           sendgrid_api_key: r.sendgrid_api_key || '',
           smtp_from_email: r.smtp_from_email || '',
           smtp_from_name: r.smtp_from_name || '',
@@ -244,6 +286,25 @@ export default function SettingsTab() {
   useEffect(() => { load(); }, [load]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const removeSecret = async (key, label) => {
+    try {
+      await clearSecret(key);
+      setSecretStatus(await loadSecretStatus().catch(() => null));
+      set(key, '');
+      toast({ title: `${label} retirada` });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: pbErrorMessage(err) });
+    }
+  };
+  const secretProps = (key, label) => ({
+    id: `secret-${key}`,
+    label,
+    value: form[key],
+    onChange: (v) => set(key, v),
+    status: secretStatus ? secretStatus[key] || { set: false } : null,
+    onClear: () => removeSecret(key, label),
+  });
 
   // Equipa da página Sobre
   const teamSet = (index, key, value) => setForm((f) => {
@@ -336,10 +397,12 @@ export default function SettingsTab() {
         data.favicon_url = '';
       }
 
+      // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
+      const payload = { ...withoutSecrets(data), ...secretsForSave(form, secretStatus) };
       if (id) {
-        await pb.collection('site_settings').update(id, data);
+        await pb.collection('site_settings').update(id, payload);
       } else {
-        const created = await pb.collection('site_settings').create(data);
+        const created = await pb.collection('site_settings').create(payload);
         id = created.id;
         setRecordId(id);
       }
@@ -374,7 +437,7 @@ export default function SettingsTab() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#0ea5c9]" /></div>;
+    return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -389,7 +452,7 @@ export default function SettingsTab() {
                   <TabsTrigger
                     key={value}
                     value={value}
-                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-[#0ea5c9]/10 data-[state=active]:text-[#0ea5c9] data-[state=active]:shadow-none"
+                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-[#0ea5c9]/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                   >
                     <Icon className="h-4 w-4" />{label}
                   </TabsTrigger>
@@ -558,6 +621,13 @@ export default function SettingsTab() {
         </TabsContent>
 
         <TabsContent value="contact" className="space-y-4 max-w-xl">
+          {!localDigits(form.contact_phone) && !localDigits(form.whatsapp) && (
+            // Sem número o site esconde o telefone e o botão de WhatsApp do rodapé: melhor do
+            // que mostrar um provisório, mas o cliente fica só com o email.
+            <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              O site não mostra nenhum telefone nem o botão de WhatsApp enquanto estes campos estiverem vazios.
+            </p>
+          )}
           <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} /></div>
           <div className="space-y-2"><Label>Telefone</Label><PhoneInput value={form.contact_phone} onChange={(v) => set('contact_phone', v)} /></div>
           <div className="space-y-2"><Label>Morada</Label><Input value={form.contact_address} onChange={(e) => set('contact_address', e.target.value)} /></div>
@@ -584,7 +654,7 @@ export default function SettingsTab() {
 
         <TabsContent value="messaging" className="space-y-6 max-w-xl">
           <div>
-            <h3 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-[#0ea5c9]" /> Email de confirmação de encomenda</h3>
+            <h3 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
             <p className="text-xs text-muted-foreground mt-1">Enviado automaticamente após checkout (SendGrid ou SMTP).</p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
@@ -619,18 +689,12 @@ export default function SettingsTab() {
                   <Label>Utilizador SMTP</Label>
                   <Input value={form.smtp_user} onChange={(e) => set('smtp_user', e.target.value)} placeholder="noreply@dominio.ao" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Password SMTP</Label>
-                  <Input type="password" value={form.smtp_password} onChange={(e) => set('smtp_password', e.target.value)} />
-                </div>
+                <SecretField {...secretProps('smtp_password', 'Password SMTP')} />
               </div>
             </div>
           )}
           {form.email_provider === 'sendgrid' && (
-            <div className="space-y-2">
-              <Label>SendGrid API Key</Label>
-              <Input type="password" value={form.sendgrid_api_key} onChange={(e) => set('sendgrid_api_key', e.target.value)} placeholder="SG...." className="font-mono text-sm" />
-            </div>
+            <SecretField {...secretProps('sendgrid_api_key', 'Chave SendGrid')} placeholder="SG...." className="font-mono text-sm" />
           )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -644,8 +708,8 @@ export default function SettingsTab() {
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-[#0ea5c9]" /> Notificações Push (PWA)</h3>
-            <p className="text-xs text-muted-foreground mt-1">Gere chaves VAPID em <a href="https://vapidkeys.com" target="_blank" rel="noreferrer" className="text-[#0ea5c9] underline">vapidkeys.com</a></p>
+            <h3 className="font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>
+            <p className="text-xs text-muted-foreground mt-1">Gere chaves VAPID em <a href="https://vapidkeys.com" target="_blank" rel="noreferrer" className="text-primary underline">vapidkeys.com</a></p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.push_enabled} onCheckedChange={(v) => set('push_enabled', v)} />
@@ -655,13 +719,10 @@ export default function SettingsTab() {
             <Label>Chave pública VAPID</Label>
             <Input value={form.vapid_public_key} onChange={(e) => set('vapid_public_key', e.target.value)} className="font-mono text-xs" />
           </div>
-          <div className="space-y-2">
-            <Label>Chave privada VAPID (servidor)</Label>
-            <Input type="password" value={form.vapid_private_key} onChange={(e) => set('vapid_private_key', e.target.value)} className="font-mono text-xs" />
-          </div>
+          <SecretField {...secretProps('vapid_private_key', 'Chave privada VAPID')} className="font-mono text-xs" />
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#0ea5c9]" /> Assistente IA (chat)</h3>
+            <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Widget de ajuda fixo no site com sugestões, catálogo e links. Recomendado: <strong>Gemini Flash Lite</strong> (mais barato). Fallback automático para FAQ sem chave.
             </p>
@@ -683,14 +744,8 @@ export default function SettingsTab() {
           </div>
           {form.chat_provider !== 'faq' && (
             <>
-              <div className="space-y-2">
-                <Label>Chave API Gemini</Label>
-                <Input type="password" value={form.gemini_api_key} onChange={(e) => set('gemini_api_key', e.target.value)} placeholder="AIza… ou variável GEMINI_API_KEY" className="font-mono text-xs" />
-              </div>
-              <div className="space-y-2">
-                <Label>Chave API DeepSeek (opcional)</Label>
-                <Input type="password" value={form.deepseek_api_key} onChange={(e) => set('deepseek_api_key', e.target.value)} placeholder="sk-… ou variável DEEPSEEK_API_KEY" className="font-mono text-xs" />
-              </div>
+              <SecretField {...secretProps('gemini_api_key', 'Chave Gemini')} placeholder="AIza… ou variável GEMINI_API_KEY" className="font-mono text-xs" />
+              <SecretField {...secretProps('deepseek_api_key', 'Chave DeepSeek')} placeholder="sk-… ou variável DEEPSEEK_API_KEY (opcional)" className="font-mono text-xs" />
               <div className="space-y-2">
                 <Label>Modelo (opcional)</Label>
                 <Input value={form.chat_model} onChange={(e) => set('chat_model', e.target.value)} placeholder="gemini-2.0-flash-lite ou deepseek-chat" className="font-mono text-xs" />
@@ -913,7 +968,7 @@ export default function SettingsTab() {
 
         <TabsContent value="header" className="space-y-4 max-w-xl">
           <p className="text-sm text-muted-foreground">
-            Personalize a barra superior do site. Use <code className="text-[#0ea5c9]">{'{nome}'}</code> para inserir o primeiro nome do utilizador.
+            Personalize a barra superior do site. Use <code className="text-primary">{'{nome}'}</code> para inserir o primeiro nome do utilizador.
           </p>
           <div className="space-y-2">
             <Label>Mensagem (utilizador logado)</Label>

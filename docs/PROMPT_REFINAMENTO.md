@@ -26,15 +26,18 @@ Trabalha de forma autónoma. Só paras para perguntar quando a decisão é do do
   - Edge Function com `requirePermission()`;
   - interface com `app/web/src/lib/permissions.js`.
 - **Papéis:** `admin` pode tudo (é o "super admin"); `manager` tem só as chaves activas em `profiles.permissions`; `customer` não tem nenhuma.
-- **Privacidade:** o repositório é público. Não escrevas nele emails, telefones nem segredos (a lista `private.admin_emails` vive só na base de dados).
+- **Privacidade:** o repositório é privado, mas o histórico do git é permanente. Não escrevas nele emails, telefones nem segredos (a lista `private.admin_emails` vive só na base de dados).
 - **Verificar antes de cada commit:**
   - `npm run lint` em `app/web`;
   - `npm run build` na raiz;
   - `deno check --node-modules-dir=auto index.ts` numa cópia da Edge Function fora do repositório.
 - **Commits** em português e pequenos, um por assunto. Não abras PRs novos.
-- **Deploy do site:**
-  - `npx wrangler@4 pages deploy dist/app/web --project-name=livraria-adventista --branch=main` publica na produção;
-  - `--branch=<ramo>` publica uma pré-visualização.
+- **Deploy do site:** usa `npm run deploy:site` (corre lint, testes e build, e recusa publicar
+  um build que não seja a ponta do ramo remoto). Há dois projectos Pages:
+  `livraria-adventista` serve produção hoje e é o que o script usa por omissão;
+  `livraria-editora-adventista` é o novo, para o domínio `livrariaadventista.ao`, e escolhe-se
+  com `CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista`. Para pré-visualizar,
+  `npm run deploy:site -- --preview`.
 - **Deploy da Edge Function:** `npx supabase functions deploy app --project-ref bggqkjjqbjhbjsckzopj --no-verify-jwt`. Nunca a colar à mão.
 - Texto da interface em português de Angola/Portugal ("guardar", "eliminar", "telemóvel", "activo").
 

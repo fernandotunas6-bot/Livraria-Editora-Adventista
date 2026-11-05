@@ -1,0 +1,18 @@
+{
+  "site_url": "https://livrariaadventista.com",
+  "uri_allow_list": [
+    "https://livrariaadventista.com/**",
+    "https://www.livrariaadventista.com/**",
+    "https://livraria-editora-adventista-ben.pages.dev/**",
+    "https://*.livraria-editora-adventista-ben.pages.dev/**",
+    "http://localhost:3000/**"
+  ],
+  "subjects": {
+    "confirmation": "Confirme o seu email — Livraria Adventista",
+    "recovery": "Definir uma nova palavra-passe — Livraria Adventista",
+    "magic_link": "O seu link de entrada — Livraria Adventista",
+    "invite": "Recebeu um convite para a Livraria Adventista",
+    "email_change": "Confirme o seu novo email — Livraria Adventista",
+    "reauthentication": "{{ .Token }} é o seu código de verificação"
+  }
+}

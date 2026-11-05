@@ -1,8 +1,18 @@
+// Primeiro de tudo: o www e o endereço do Pages vão para o domínio principal (lib/canonicalHost.js).
+import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App';
 import '@/index.css';
+import { initFeatureFlags } from '@/lib/featureFlags';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-	<App />
-);
+// Antes de montar: os interruptores viram atributos no `<html>`, e o CSS já encontra o
+// estado certo na primeira pintura. Feito depois, os elementos apareciam um instante com
+// os efeitos ligados antes de os perderem.
+initFeatureFlags();
+
+if (!REDIRECTING_TO_CANONICAL) {
+	ReactDOM.createRoot(document.getElementById('root')).render(
+		<App />
+	);
+}

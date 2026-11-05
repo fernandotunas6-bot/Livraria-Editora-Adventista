@@ -1,30 +1,83 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-01. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
 ## Onde está o trabalho
 
-- **Ramo:** `claude/youthful-heisenberg-rq5gnw` (parte de `supabase/migracao`, que ainda não está no `main`).
-- **PR aberto:** [ValentinoCanguele/livraria_Cunhinga#3](https://github.com/ValentinoCanguele/livraria_Cunhinga/pull/3) para o `main`. A descrição do PR tem o resumo completo e a lista de verificação antes do merge.
+- **Repositório:** [fernandotunas6-bot/Livraria-Editora-Adventista](https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista) (privado). O projecto foi migrado a 2026-11-03 de `ValentinoCanguele/livraria_Cunhinga`, com todo o histórico e os ramos. Ver [docs/MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md) para o que ficou por configurar do lado do GitHub.
+- **Ramo:** `claude/youthful-heisenberg-rq5gnw`, 47 commits à frente do `origin/main`.
+- **`main`:** a migração do Supabase (o antigo PR #3) está integrada no `main` desde 2026-11-02 (commit `f4d9885`). Atenção: um `main` **local** antigo, da era PocketBase, ainda existe em algumas cópias de trabalho e está 114 commits atrás — usar sempre `origin/main` como referência.
 - **Supabase:** projecto "Livraria Adventista", ref `bggqkjjqbjhbjsckzopj`, organização "Colpotor" (plano grátis), região eu-north-1.
-- **Cloudflare Pages:** projecto `livraria-adventista` (conta canguelev@fata.adventist.org), ramo de produção `main`.
-  - Produção em https://livraria-adventista.pages.dev, com o código do PR #3. Foi publicada à mão com o Wrangler porque o Actions está bloqueado.
+- **Cloudflare Pages** — hoje na conta `canguelev@fata.adventist.org`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `valentinocanguele@gmail.com`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
+  - `livraria-editora-adventista` — **o novo**, criado a 2026-11-03, ramo de produção `main`, ainda **sem nenhum deploy**. É o que vai receber o domínio `livrariaadventista.ao`.
+  - `livraria-adventista` — **o que serve produção hoje**, em https://livraria-adventista.pages.dev, com o código do `main`. Fica como está até o domínio `.ao` estar activo e verificado; só depois se decide desligá-lo.
+  - **O domínio `livrariaadventista.ao` não está registado:** os servidores autoritativos do registo `.ao` devolvem `NXDOMAIN` (verificado a 2026-11-03; `dns.ao` devolve `NOERROR` na mesma consulta). O Cloudflare não vende `.ao` — o registo é só por revendedores autorizados do DNS.ao. Passos em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
+  - Foi publicado à mão com o Wrangler porque o Actions está bloqueado.
   - Cada ramo tem o seu URL de pré-visualização (`<ramo>.livraria-adventista.pages.dev`, ver `wrangler pages deployment list`). O `main` antigo (PocketBase) está em `main-pocketbase`, e esse e os ramos `cursor/*` não têm backend.
-  - Publicar à mão: `npm run deploy:site` (produção) ou `npm run deploy:site -- --preview`. O script recusa publicar se o HEAD não for a ponta do ramo remoto, faz lint e build, publica e confirma que o último deploy de produção é esse commit e que o site responde. Várias sessões publicam no mesmo projecto: nunca publicar um build antigo. As variáveis `VITE_SUPABASE_*` vêm de `app/web/.env`.
+  - Publicar à mão: `npm run deploy:site` (produção) ou `npm run deploy:site -- --preview`. O script recusa publicar se o HEAD não for a ponta do ramo remoto, faz lint, testes e build, publica e confirma que o último deploy de produção é esse commit e que o site responde. Várias sessões publicam no mesmo projecto: nunca publicar um build antigo. As variáveis `VITE_SUPABASE_*` vêm de `app/web/.env`.
+  - Para publicar no projecto novo: `CLOUDFLARE_PAGES_PROJECT=livraria-editora-adventista npm run deploy:site`. Com um domínio próprio, acrescentar `SITE_URL=https://livrariaadventista.ao`: além de a verificação final bater no domínio em vez do `.pages.dev`, o script reescreve no build o `canonical`, as etiquetas `og:`/`twitter:`, o `sitemap.xml` e o `robots.txt`, que têm fixo o endereço do projecto que serviu produção primeiro. Sem isso, o site publicado noutro destino diz aos motores de busca e às partilhas que a página "a sério" é a do endereço antigo.
   - Workers, KV, D1 e R2 continuam por usar.
 
 ## Bloqueios (só o dono da conta resolve)
 
-1. **A conta GitHub está bloqueada por um problema de pagamento.** Nenhum workflow do Actions arranca: a anotação diz "The job was not started because your account is locked due to a billing issue". A conta está no plano Free e não tem subscrições pagas. A causa é um cartão guardado cuja autorização falhou. A solução é remover o cartão em Settings → Faturamento e licenciamento → Informações de pagamento, ou abrir um pedido em support.github.com. As verificações do PR a vermelho são só isto; localmente, lint, build e `deno check` passam.
-2. **Segredos e variáveis do GitHub Actions** (Settings → Secrets and variables → Actions):
-   - Segredos: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`
-   - Variáveis: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `CLOUDFLARE_PAGES_PROJECT`, `SUPABASE_PROJECT_REF` (= `bggqkjjqbjhbjsckzopj`)
+1. ~~GitHub Actions bloqueado por facturação.~~ **Resolvido pela migração** (confirmado a 2026-11-03): na conta `fernandotunas6-bot` os workflows arrancam e correm até ao fim. O bloqueio era da conta `ValentinoCanguele` ("The job was not started because your account is locked due to a billing issue", um cartão guardado cuja autorização falhou). O `scripts/deploy-site.sh` continua a ser um gate válido, mas já não é o único.
+
+   > **Consequência a ter em conta.** Com o Actions a funcionar, cada push para o `main` passa a publicar no Cloudflare Pages, e cada push que toque em `supabase/` passa a correr `supabase db push` e a publicar a Edge Function — **automaticamente**. Durante meses isto nunca aconteceu. Ao integrar o PR #1 há migrações por aplicar, e elas vão ser aplicadas sozinhas. Rever o que está em `supabase/migrations/` antes do merge.
+
+2. **Segredos do GitHub Actions** (Settings → Secrets and variables → Actions). Não migram com o código.
+   - **Variáveis: criadas a 2026-11-03.** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `CLOUDFLARE_PAGES_PROJECT` (= `livraria-editora-adventista`) e `SUPABASE_PROJECT_REF` (= `bggqkjjqbjhbjsckzopj`). A chave *publishable* é pública por desenho (vai no bundle do frontend), por isso é variável e não segredo.
+   - **Segredos: por criar** — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`. Os valores não estão em parte alguma desta máquina. Criam-se sem os expor com
+     `GH_TOKEN="$(gh auth token --user fernandotunas6-bot)" gh secret set <NOME> --repo fernandotunas6-bot/Livraria-Editora-Adventista`, que pede o valor sem o mostrar. É preciso o token do dono: a `ValentinoCanguele` só tem escrita, e segredos exigem admin.
+   - **Os dois do Cloudflare devem esperar pela mudança de conta.** Têm de ser da conta `valentinocanguele@gmail.com`, não da `canguelev@fata.adventist.org` — pôr os da conta antiga faz o deploy publicar no sítio errado.
+   - Estado hoje: o `deploy-cloudflare.yml` falha no primeiro passo ("Confirmar segredos e variáveis") a cada push para o `main`. É ruído esperado até os segredos existirem, não um problema novo.
 3. **Supabase → Authentication:**
    - Activar o fornecedor Google, com o Client ID e o Secret da Google Cloud. O URI de redireccionamento é `https://bggqkjjqbjhbjsckzopj.supabase.co/auth/v1/callback`.
    - Pôr o domínio do site no Site URL e nos Redirect URLs.
    - A protecção contra palavras-passe vazadas exige o plano Pro; ignorar.
 
+## Backend — revisão e migrações aplicadas (2026-11-05)
+
+- **Aplicadas na base de dados pelo MCP**, com os ficheiros renomeados para as versões
+  atribuídas e o SQL igual ao byte (md5 verificado): `20261105045510_campos_encomendas`,
+  `20261105045517_capas_das_colecoes` e `20261105045627_limpeza_dados_provisorios`. Antes eram
+  `20261104170000`, `20261104170500` e `20261104180000`, ainda por aplicar; ensaiadas primeiro
+  num bloco anulado. O `db push` do merge já não as volta a correr.
+- **`site_url`** estava em `https://livrariaadventista.ao` (alterado nas 3 linhas a
+  2026-11-05 02:09), que ainda não resolve: os links dos emails davam numa página que não
+  abre. Corrigido à mão para `https://livrariaadventista.com` antes da limpeza; a limpeza
+  passou a tratar também o `.ao`.
+- **Três encomendas de teste apagadas** (importadas do PocketBase: `ENC-D9IBRY`,
+  `ENC-D8BM5D` e uma sem número, todas `test@test.com`/`t@t.com`). As linhas inteiras estão
+  em `private.correcoes_dados` (`migracao = 'manual-2026-11-05-encomendas-teste'`). O stock
+  não foi mexido.
+- **Migrações conferidas com `schema_migrations`:** todas iguais tirando comentários e
+  espaços, excepto a `20261102150000`, que tinha um `grant` nunca aplicado com ela (está na
+  `20261102160000`). O ficheiro passou a ser igual ao aplicado.
+- **Edge Function:** `/delivery-event` só aceita os 8 estados de entrega e corta os textos;
+  `/confirm-delivery` corta nome e documento; `successUrl` do checkout fica só com o caminho;
+  o resumo das campanhas usa o `site_url` em vez de `livrariaadventista.ao` fixo. **Ainda não
+  publicada** — vai no deploy do merge (não há CLI do Supabase nesta máquina, e a função é
+  grande demais para a colar à mão).
+- **Avisos do Supabase:** as 16 funções `SECURITY DEFINER` chamáveis com sessão verificam a
+  permissão por dentro (falsos positivos); a protecção de palavras-passe vazadas exige o Pro.
+
 ## O que já está feito
+
+- **Campanhas de contactos agendadas a sério** (2026-11-03): `pg_cron` de 15 em 15 minutos a
+  chamar `/cron/contact-campaigns`. Antes o `next_send_at` era calculado e nada o disparava —
+  as campanhas saíam quando alguém carregava num botão. **O agendador não agenda o que não
+  entrega:** sem a API do WhatsApp, "enviar" só produz links manuais, por isso o caminho
+  automático salta esses canais sem avançar a data, em vez de marcar como enviada uma campanha
+  que ninguém recebeu. Falta um segredo no Vault (`contact_campaigns_url`) e falta o painel
+  mostrar o estado — **o painel já mostra**: o estado do agendador numa frase (incluindo o caso
+  traiçoeiro de estar agendado sem segredos, em que corre e não chama nada), o motivo por
+  campanha quando o canal não entrega, e a lista do que foi saltado no último envio. Falta o
+  segredo `contact_campaigns_url` no Vault. Detalhe em
+  [CONTACTOS-E-CAMPANHAS.md](CONTACTOS-E-CAMPANHAS.md).
+- **Membros dos grupos de contactos com integridade referencial** (tabela
+  `contact_group_members`): o `member_ids` jsonb deixava ids órfãos ao apagar um contacto, e o
+  envio ia buscar 40 membros, encontrava 37 e seguia em silêncio. O `member_ids` continua
+  actualizado por trigger para não quebrar os leitores antigos.
 
 - **Migrações alinhadas com a base de dados:**
   - Cada ficheiro em `supabase/migrations/` tem a mesma versão e o mesmo SQL que `supabase_migrations.schema_migrations` no projecto (verificado por md5).
@@ -51,7 +104,7 @@ Estado em 2026-11-01. Ponto de partida para o próximo agente ou pessoa que pegu
   - `valentinocanguele@gmail.com` e `admin@livraria.ao` são admin.
   - A tabela `private.admin_emails` (só na base de dados, fora da API) pré-autoriza emails: o perfil passa a admin quando a conta fica confirmada.
   - Há 1 email na lista, que ainda não tem conta.
-  - **Não pôr emails desta lista no repositório (é público).**
+  - **Não pôr emails desta lista no repositório.** É privado, mas o histórico do git é permanente.
 - **Permissões reais:**
   - `private.has_permission(key)`: admin pode tudo; gestor só as chaves activas em `profiles.permissions`; cliente nenhuma.
   - Encomendas, catálogo, pagamentos e configurações exigem a permissão certa nas políticas RLS.
@@ -60,9 +113,63 @@ Estado em 2026-11-01. Ponto de partida para o próximo agente ou pessoa que pegu
   - Ficheiros: `app/web/src/components/admin/users/`, `app/web/src/lib/usersApi.js`, a função SQL `public.admin_users_list` (só service role) e as rotas `/admin/users` (listar), `/admin/users/orders`, `/create`, `/update`, `/status`, `/access-link` e `/delete`.
   - Regras: gestores com `manage_users` gerem clientes; equipa, papéis e permissões só admin; ninguém se apaga nem se suspende a si próprio; fica sempre pelo menos um administrador activo.
 - **CI:**
-  - `ci.yml` corre lint, build e `deno check` em cada PR.
+  - `ci.yml` corre lint, **testes**, build e `deno check` em cada PR para o `main`.
   - Os deploys confirmam os segredos antes de começar.
   - O deploy do Cloudflare cria o projecto Pages se não existir.
+  - O passo `Testes` esteve quebrado num checkout limpo até 2026-11-03 — ver a secção seguinte.
+
+## O passo `Testes` do `ci.yml` falhava num checkout limpo — corrigido
+
+Encontrado a 2026-11-03 ao verificar a ponta do ramo, e corrigido no mesmo dia.
+
+**O que estava mal.** O passo corria `npm test` sem `VITE_SUPABASE_URL` nem
+`VITE_SUPABASE_PUBLISHABLE_KEY`. O `app/web/.env` é gitignored, logo num checkout do GitHub (ou
+em qualquer worktree novo) não existe. Quatro ficheiros de teste importam módulos que criam o
+cliente Supabase **no momento do import** e falhavam a carregar antes de correr um único teste:
+
+```
+Error: supabaseUrl is required.
+ ❯ src/lib/supabaseClient.js:14:37
+FAIL src/lib/apiCompat.test.js · src/hooks/useReviews.test.js
+     src/hooks/useProductFilters.test.js · src/lib/secureInboxApi.test.js
+```
+
+**Porque passou tanto tempo escondido.** O Actions nunca arrancou — a conta antiga estava
+bloqueada por facturação — e localmente o `.env` existe sempre. E o relatório engana: diz "232
+testes a passar", porque um ficheiro que falha a carregar não conta testes nenhuns. **Olhar para
+a linha `Test Files`, não só para `Tests`.**
+
+**A correcção** está no `test.env` do `app/web/vitest.config.js`, com valores fixos
+(`http://supabase.invalid`). Não no `ci.yml`, e não no `supabaseClient.js`:
+
+- Dar as variáveis ao `ci.yml` resolvia só o CI, e **continuaria quebrado** até alguém criar as
+  *repository variables* no repositório novo — que ainda não existem.
+- No `vitest.config.js` o `npm test` dá o mesmo resultado em qualquer máquina, sem configuração
+  nem segredos, e nenhum teste toca a rede. É código de teste, não de produção.
+
+Nenhum teste dependia dos valores reais (verificado: o `imageUrl.test.js` usa o URL do Supabase
+como texto literal de entrada, e o `imageUrl.js` não lê o ambiente).
+
+**Verificado nos dois ambientes**, no commit da correcção:
+
+| | Ficheiros | Testes |
+|---|---|---|
+| worktree sem `.env` e sem variáveis (a condição do CI) | **17 passam** | **250 passam** |
+| árvore local com `.env` | **17 passam** | **250 passam** |
+
+Antes da correcção, na condição do CI: 4 ficheiros falhavam, 13 passavam, 232 testes.
+
+**E confirmado no Actions a sério**, assim que a conta nova o destrancou. O passo `Testes`
+falhou em cinco execuções seguidas (`b5851fc`, `43b84d0`, `38df5ad`, `4c6548c`, `ae06816`) e o
+primeiro verde é no commit da correcção, `2c9a89d`. O `deno check` da Edge Function também
+passa no Actions — o que nesta máquina não dá para verificar, por falta de Deno.
+
+**Duas sessões corrigiram o mesmo defeito ao mesmo tempo.** Logo depois do `2c9a89d`, outra
+sessão acrescentou um segundo bloco `env` no `vitest.config.js` com o mesmo propósito
+(`6de14ad`, "testes sem .env"), o que quebrou o **lint** e fez o passo `Testes` ser saltado;
+foi removido em `b515730`. A configuração que sobreviveu é a do `2c9a89d`, com um só bloco
+`env`. Antes de corrigir algo que já está documentado como conhecido, vale fazer
+`git fetch && git log origin/<ramo>` — pode já estar feito.
 
 ## Análise crítica e correcções (2026-11-01, segunda passagem)
 
@@ -147,13 +254,11 @@ fotos genéricas do Unsplash.
 - **O perfil aceita o separador no URL** (`/profile?tab=wishlist`), como o painel já fazia.
   É o que permite aos atalhos do rodapé abrirem já na secção certa.
 
-### Por correr (dados, não esquema)
+### Capas das colecções — aplicado (2026-11-05)
 
-`docs/migracoes-pendentes/2_capas_das_colecoes.sql` troca as capas das quatro colecções —
-hoje fotos genéricas do Unsplash — por imagens feitas com as capas reais do catálogo,
-escolhidas pelo tema de cada uma. Corre-se no SQL Editor do Supabase (o `db push` é só para
-esquema). Em alternativa, dá-se dois cliques por colecção em Admin → Colecções → Capa →
-aba Galeria.
+`supabase/migrations/20261105045517_capas_das_colecoes.sql` trocou as capas das quatro
+colecções (fotos genéricas do Unsplash) pelas imagens feitas com as capas reais do catálogo.
+Continuam a poder ser mudadas em Admin → Colecções → Capa → aba Galeria.
 
 ## Checkout no telemóvel (2026-11-02)
 
@@ -180,7 +285,9 @@ O cliente preenchia morada, pagamento e assinatura por uma frincha de 288 px.
   antes do envio"** ou **"paga na entrega"**, pela mesma regra que o servidor usa para
   exigir referência.
 
-### Dado por preencher, visível ao cliente
+### ~~Dado por preencher, visível ao cliente~~ — resolvido a 2026-11-03
+
+O IBAN real (titular Livraria e Editora Adventista) foi gravado em Pagamentos → Transferência Bancária. O texto abaixo fica como histórico.
 
 A "Transferência Bancária" mostra no checkout `IBAN: AO06 0000 0000 0000 0000 0000 0` —
 o valor de exemplo, todo a zeros. Quem escolher transferência vê um IBAN falso. Corrigir em
@@ -243,18 +350,25 @@ sem o ponto exacto.
 Encontradas a confirmar o ponto acima. Não foram mexidas — mexer no esquema das encomendas
 é arriscado e merece uma decisão:
 
-- **Três campos para o método de pagamento:** `payment_method` (herdado, só preenchido para
-  "entrega" e "transferencia"), `payment_method_code` e `payment_method_name`. Quem lê tem
-  de tentar os três em cadeia (ver `receipt.js`). Deviam ser um `code` + o nome resolvido na
-  leitura.
+- ~~**Três campos para o método de pagamento**~~ — **tratado a 2026-11-03.** Todos os ecrãs,
+  emails e o recibo do WhatsApp lêem por `orderPaymentLabel`/`orderPaymentCode`
+  (`orderUtils.js`) e `paymentLabel` (`orderFields.ts`); antes, o recibo mostrava o nome e a
+  exportação o código. O checkout deixa de gravar `payment_method` e grava sempre um nome.
+  `supabase/migrations/20261105045510_campos_encomendas.sql` (preenche as antigas) foi aplicada
+  a 2026-11-05. Falta apagar `payment_method`.
 - **`order_type` é derivado de `sale_channel`** (`whatsapp_order` ⇔ `whatsapp`): dois campos
   para a mesma verdade, que podem divergir.
-- **`payment_category`:** zero utilizações na Edge Function, uma no site. Coluna morta.
+- **`payment_category`:** coluna morta (vazia em todas as encomendas). O painel deixou de a
+  pedir; falta apagá-la (ver o README de `docs/migracoes-pendentes`).
 - **`delivery_recipient_id`:** o `/confirm-delivery` guarda o número do documento de quem
   recebe, e **nada o lê**. É recolher um documento de identificação sem uso — ou passa a
   aparecer no painel, ou deixa de ser pedido.
-- **Morada em dobro:** `address`/`city` convivem com `delivery_address_full`,
-  `delivery_municipality` e companhia.
+- ~~**Morada em dobro**~~ — **tratado a 2026-11-03.** Leitura por `orderDeliveryAddress`,
+  `orderPickupStore` e `orderLocality` (e `deliveryAddressLine`/`pickupStoreName` na
+  função). O painel mostrava a loja dos levantamentos duas vezes ("Levantamento: X, X"). O
+  checkout deixa de gravar `address`; `city` continua, porque o trigger `orders_before_update`
+  o usava como local do seguimento — a migração `20261105045510_campos_encomendas` (aplicada a
+  2026-11-05) mudou isso.
 
 ## Regras para continuar
 

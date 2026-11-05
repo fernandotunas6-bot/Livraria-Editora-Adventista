@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { Bold, Italic, List, ListOrdered, Link2, Heading2, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 const TOOLS = [
   { cmd: 'bold', icon: Bold, label: 'Negrito' },
@@ -16,8 +17,14 @@ export default function RichTextEditor({ value = '', onChange, placeholder, clas
   const ref = useRef(null);
 
   useEffect(() => {
+    // O valor vem da base de dados, e qualquer pessoa com permissão de catálogo pode lá
+    // escrever pela API sem passar por este editor. Posto em `innerHTML` tal como está, um
+    // `<img onerror=…>` corria na sessão de quem abrisse o livro no painel — tipicamente um
+    // admin. O CSP já trava os atributos de evento; isto é a segunda barreira, o mesmo
+    // sanitizador da loja. A comparação continua com o valor cru: enquanto se escreve,
+    // `value` é o próprio `innerHTML`, e o editor não volta a ser reescrito (nem o cursor salta).
     if (ref.current && ref.current.innerHTML !== (value || '')) {
-      ref.current.innerHTML = value || '';
+      ref.current.innerHTML = sanitizeHtml(value || '');
     }
   }, [value]);
 

@@ -8,7 +8,7 @@
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![License](https://img.shields.io/badge/Licença-Privado-0ea5c9?style=for-the-badge)](LICENSE)
+![License](https://img.shields.io/badge/Licença-Privado-0ea5c9?style=for-the-badge)
 
 **Loja online completa** com catálogo, checkout seguro, assinatura digital, entregas em Angola, painel administrativo e rastreio de encomendas em tempo real.
 
@@ -232,7 +232,8 @@ Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 
 O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), implementada sobre o Supabase em `app/web/src/lib/dataClient.js`.
 
-> Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md)  
+> Contactos e campanhas: [docs/CONTACTOS-E-CAMPANHAS.md](docs/CONTACTOS-E-CAMPANHAS.md)  
+> Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · Passagem de trabalho: [docs/HANDOFF.md](docs/HANDOFF.md) · Migração do repositório: [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md)  
 > O login (email e Google) é do Supabase Auth. O Firebase fica só para as ferramentas do Google Workspace no painel.
 
 ---
@@ -255,7 +256,7 @@ Cada push para `main` publica automaticamente:
 - **Frontend** → Cloudflare Pages (`.github/workflows/deploy-cloudflare.yml`)
 - **Migrações e Edge Function** → Supabase (`.github/workflows/deploy-supabase.yml`, só quando `supabase/` muda)
 
-Configuração no GitHub (Settings → Secrets and variables → Actions):
+Configuração no GitHub (Settings → Secrets and variables → Actions). Num repositório novo isto tem de ser criado à mão — ver [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md):
 
 | Tipo | Nome | Valor |
 |------|------|-------|

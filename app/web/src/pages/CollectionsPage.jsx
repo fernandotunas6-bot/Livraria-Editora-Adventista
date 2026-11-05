@@ -7,12 +7,16 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import ProductCard from '@/components/ProductCard';
+import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
+import { useCatalogWindow } from '@/hooks/useCatalogWindow';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import QuickViewModal from '@/components/QuickViewModal';
 import { pageTitle } from '@/lib/brand';
 import { getCollections } from '@/api/PlatformApi';
 import pb from '@/lib/dataClient';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { Button } from '@/components/ui/button';
+import PageBannerSlider from '@/components/PageBannerSlider';
 
 // Normalized helper to avoid accent differences matching (e.g. "Religião" vs "religiao")
 const getNormalizedGenre = (genre) => {
@@ -117,6 +121,13 @@ export default function CollectionsPage() {
     });
   }, [books, selectedCategory]);
 
+  // Telemóvel: a coleção cresce ao deslizar, como a loja; desktop: inteira, como sempre.
+  const catalog = useCatalogWindow({
+    items: filteredBooks,
+    ready: !loading,
+    resetKey: `${slug || ''}|${selectedCategory}`,
+  });
+
   return (
     <>
       <Helmet>
@@ -128,32 +139,30 @@ export default function CollectionsPage() {
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <main className="min-h-screen bg-background">
-        <section className="bg-gradient-to-br from-[#0c4a6e] to-[#0ea5c9] text-white py-14">
-          <div className="container-custom">
-            <div className="flex items-center gap-2 text-sm text-white/70 mb-4">
-              <Link to="/" className="hover:text-white">Início</Link>
+      <PageBannerSlider contentClassName="text-left">
+        <div className="mb-4 flex items-center gap-2 text-sm text-white/75">
+          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-white">Início</Link>
+          <ChevronRight className="h-4 w-4" />
+          <Link to="/colecoes" className="-my-1.5 inline-block py-1.5 hover:text-white">Coleções</Link>
+          {activeCollection && (
+            <>
               <ChevronRight className="h-4 w-4" />
-              <Link to="/colecoes" className="hover:text-white">Coleções</Link>
-              {activeCollection && (
-                <>
-                  <ChevronRight className="h-4 w-4" />
-                  <span>{activeCollection.title}</span>
-                </>
-              )}
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-              <Layers className="h-8 w-8" />
-              {activeCollection ? activeCollection.title : 'Coleções de Livros'}
-            </h1>
-            <p className="mt-3 text-white/80 max-w-2xl">
-              {activeCollection
-                ? (activeCollection.marketing_tagline || activeCollection.description?.replace(/<[^>]+>/g, '').slice(0, 200))
-                : 'Explore catálogos temáticos seleccionados para fortalecer a sua fé e conhecimento.'}
-            </p>
-          </div>
-        </section>
+              <span>{activeCollection.title}</span>
+            </>
+          )}
+        </div>
+        <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight sm:gap-3 sm:text-3xl md:text-4xl">
+          <Layers className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
+          {activeCollection ? activeCollection.title : 'Coleções de Livros'}
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm text-white/85 sm:text-base">
+          {activeCollection
+            ? (activeCollection.marketing_tagline || activeCollection.description?.replace(/<[^>]+>/g, '').slice(0, 200))
+            : 'Explore catálogos temáticos seleccionados para fortalecer a sua fé e conhecimento.'}
+        </p>
+      </PageBannerSlider>
 
+      <main className="min-h-screen bg-background">
         <section className="container-custom py-12">
           {loading ? (
             <p className="text-center text-muted-foreground py-20">A carregar...</p>
@@ -172,7 +181,7 @@ export default function CollectionsPage() {
                       className="group block bg-card border rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
                     >
                       {col.cover ? (
-                        <img src={col.cover} alt={col.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img src={col.cover} alt={col.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-base" />
                       ) : (
                         <div className="w-full h-44 bg-gradient-to-br from-primary/20 to-[#0c4a6e]/20 flex items-center justify-center">
                           <BookOpen className="h-12 w-12 text-primary/50" />
@@ -248,7 +257,7 @@ export default function CollectionsPage() {
                 {/* Mobile Slide-out Drawer */}
                 {mobileFilterOpen && (
                   <div className="fixed inset-0 z-50 bg-black/60 lg:hidden flex justify-end">
-                    <div className="bg-background w-80 h-full p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="bg-background w-80 h-full p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-base">
                       <div className="flex items-center justify-between border-b pb-4 mb-6">
                         <h3 className="text-lg font-bold text-foreground">Filtrar por Categoria</h3>
                         <Button variant="ghost" size="icon" onClick={() => setMobileFilterOpen(false)}>
@@ -289,16 +298,28 @@ export default function CollectionsPage() {
               {/* Books Grid */}
               <div className="flex-1">
                 {filteredBooks.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredBooks.map((book) => (
-                      <ProductCard 
-                        key={book.id} 
-                        product={bookToProduct(book)} 
-                        onQuickView={setQuickView}
-                        onCartOpen={() => setIsCartOpen(true)}
+                  <>
+                    <div className={PRODUCT_GRID_CLASS}>
+                      {catalog.visible.map((book) => (
+                        <ProductCard
+                          key={book.id}
+                          product={bookToProduct(book)}
+                          onQuickView={setQuickView}
+                          onCartOpen={() => setIsCartOpen(true)}
+                        />
+                      ))}
+                    </div>
+                    {catalog.isMobile && (
+                      <CatalogInfiniteTail
+                        sentinelRef={catalog.infinite.sentinelRef}
+                        hasMore={catalog.infinite.hasMore}
+                        loadMore={catalog.infinite.loadMore}
+                        shown={catalog.visible.length}
+                        total={filteredBooks.length}
+                        onClearFilters={selectedCategory !== 'all' ? () => setSelectedCategory('all') : undefined}
                       />
-                    ))}
-                  </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-20 bg-card border rounded-2xl">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/60 mb-3" />
@@ -323,7 +344,10 @@ export default function CollectionsPage() {
         onCartOpen={() => setIsCartOpen(true)} 
       />
 
-      <Footer />
+      {/* Como na loja: no telemóvel a coleção segue sem rodapé. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 }

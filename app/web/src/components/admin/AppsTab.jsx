@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Loader2, Mail, MessageSquare, Terminal, CheckCircle2, XCircle, MinusCircle,
+  Loader2, Mail, MessageSquare, RotateCw, Terminal, CheckCircle2, XCircle, MinusCircle,
   Trash2, RefreshCw, Search, Play, Activity, Smartphone, BookOpen
 } from 'lucide-react';
 import pb from '@/lib/dataClient';
+import EmailTemplatesPanel from '@/components/admin/EmailTemplatesPanel.jsx';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
@@ -25,11 +26,14 @@ const LOG_STATUS = {
 
 const LOG_CONTEXT = {
   order: 'Encomenda',
+  order_status: 'Estado da encomenda',
+  payment: 'Pagamento',
   receipt: 'Recibo',
   test: 'Teste',
   contact: 'Contacto',
   campaign: 'Campanha',
   account: 'Conta',
+  welcome: 'Boas-vindas',
 };
 
 // Integrações com efeito real no site (lidas pela Edge Function ou pelo painel).
@@ -115,7 +119,7 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
   return (
     <div className="space-y-3 p-3 rounded-lg bg-muted/30 border text-sm">
       <p className="text-xs text-muted-foreground">
-        Configure em <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="text-[#0ea5c9] underline">Meta for Developers</a>.
+        Configure em <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="text-primary underline">Meta for Developers</a>.
         Com a API activa, checkout, CRM e recibos enviam mensagens <strong>sem abrir o browser</strong>.
       </p>
       <div className="flex items-center gap-3 p-2 rounded border bg-background">
@@ -211,7 +215,8 @@ export default function AppsTab() {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState('apps'); // 'apps', 'logs'
+  const [activeSubTab, setActiveSubTab] = useState('apps'); // 'apps', 'templates', 'logs'
+  const [resendingId, setResendingId] = useState(null);
   
   // Notification logs state
   const [logs, setLogs] = useState([]);
@@ -247,7 +252,7 @@ export default function AppsTab() {
   useEffect(() => { load(); }, [load]);
 
   // Registo de comunicações (tabela notification_logs no Supabase, escrita pela Edge Function).
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
       const { data, error } = await supabase
@@ -263,19 +268,19 @@ export default function AppsTab() {
     } finally {
       setLoadingLogs(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     if (activeSubTab === 'logs') {
       loadLogs();
     }
-  }, [activeSubTab]);
+  }, [activeSubTab, loadLogs]);
 
   const toggle = async (app, enabled) => {
     try {
       await pb.collection('app_integrations').update(app.id, { enabled });
       setApps((prev) => prev.map((a) => (a.id === app.id ? { ...a, enabled } : a)));
-      await refreshIntegrations();
+      await refreshIntegrations({ fresh: true });
       toast({ title: enabled ? 'Integração activada' : 'Integração desactivada' });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Não foi possível alterar', description: pbErrorMessage(err) });
@@ -287,10 +292,30 @@ export default function AppsTab() {
       const payload = typeof config === 'string' ? JSON.parse(config || '{}') : config;
       await pb.collection('app_integrations').update(app.id, { config: payload });
       setApps((prev) => prev.map((a) => (a.id === app.id ? { ...a, config: payload } : a)));
-      await refreshIntegrations();
+      await refreshIntegrations({ fresh: true });
       toast({ title: 'Configuração guardada com sucesso!' });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Não foi possível guardar', description: pbErrorMessage(err) });
+    }
+  };
+
+  /**
+   * Um registo só se reenvia se guardou o conteúdo e tem destinatário. As campanhas ficam
+   * de fora: repetir um envio em massa à mão passa por cima da verificação do consentimento.
+   */
+  const canResend = (log) =>
+    log.type === 'email' && !!log.recipient && !!log.content && log.context !== 'campaign';
+
+  const resendLog = async (log) => {
+    setResendingId(log.id);
+    try {
+      const res = await pb.send('/admin/email/resend', { method: 'POST', body: { logId: log.id } });
+      toast({ title: 'Mensagem reenviada', description: res.message });
+      loadLogs();
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Não foi reenviada', description: err.message });
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -345,7 +370,7 @@ export default function AppsTab() {
     );
   });
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#0ea5c9]" /></div>;
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -363,6 +388,17 @@ export default function AppsTab() {
           Integrações
         </button>
         <button
+          onClick={() => setActiveSubTab('templates')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            activeSubTab === 'templates'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Mail className="h-4 w-4" />
+          Modelos de email
+        </button>
+        <button
           onClick={() => setActiveSubTab('logs')}
           className={`px-4 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 relative ${
             activeSubTab === 'logs' 
@@ -375,6 +411,8 @@ export default function AppsTab() {
         </button>
       </div>
 
+      {activeSubTab === 'templates' && <EmailTemplatesPanel />}
+
       {activeSubTab === 'apps' ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">Active e configure as integrações externas usadas pelo site.</p>
@@ -386,7 +424,7 @@ export default function AppsTab() {
           )}
           
           {apps.map((app) => (
-            <div key={app.id} className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hover:shadow-md transition-shadow duration-300">
+            <div key={app.id} className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hover:shadow-md transition-shadow duration-base">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl p-2 bg-muted rounded-xl">{app.icon || '⚙️'}</span>
@@ -436,7 +474,7 @@ export default function AppsTab() {
             </ul>
           </div>
         </div>
-      ) : (
+      ) : activeSubTab === 'logs' ? (
         /* Logs tab */
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-muted/20 p-4 rounded-xl border border-border">
@@ -532,7 +570,7 @@ export default function AppsTab() {
                           <p className="text-[10px] text-muted-foreground">
                             {new Date(log.created).toLocaleDateString('pt-AO')} às {new Date(log.created).toLocaleTimeString('pt-AO')}
                           </p>
-                          <p className="text-[9px] text-[#0ea5c9] font-mono font-bold uppercase tracking-wider">
+                          <p className="text-[9px] text-primary font-mono font-bold uppercase tracking-wider">
                             {LOG_CONTEXT[log.context] || log.context}{log.provider ? ` · ${log.provider}` : ''}
                           </p>
                         </div>
@@ -578,7 +616,7 @@ export default function AppsTab() {
                         {/* Visual Message Body content */}
                         <div className="space-y-1.5 border rounded-lg p-3.5 bg-background">
                           <p className="text-xs font-bold text-foreground border-b pb-1.5 mb-2 flex items-center gap-1">
-                            <BookOpen className="h-3.5 w-3.5 text-[#0ea5c9]" />
+                            <BookOpen className="h-3.5 w-3.5 text-primary" />
                             Visualização do Conteúdo
                           </p>
                           {isEmail ? (
@@ -592,6 +630,20 @@ export default function AppsTab() {
                             </div>
                           )}
                         </div>
+
+                        {canResend(log) && (
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                            <p className="text-[11px] text-muted-foreground">
+                              Reenvia a mensagem tal como foi composta, para o mesmo destinatário.
+                            </p>
+                            <Button size="sm" variant="outline" disabled={resendingId === log.id} onClick={() => resendLog(log)}>
+                              {resendingId === log.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <RotateCw className="h-3.5 w-3.5" />}
+                              <span className="ml-1.5">Reenviar</span>
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -600,7 +652,7 @@ export default function AppsTab() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

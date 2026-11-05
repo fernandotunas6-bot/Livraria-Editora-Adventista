@@ -9,6 +9,7 @@ import { pageTitle } from '@/lib/brand';
 
 import { FAQ_SECTIONS } from '@/lib/faqData';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import PageBannerSlider from '@/components/PageBannerSlider';
 
 const FAQPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -30,17 +31,17 @@ const FAQPage = () => {
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
+      <PageBannerSlider>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Perguntas Frequentes</h1>
+        <p className="text-base text-white/85 sm:text-lg">Encontre respostas às dúvidas mais comuns</p>
+      </PageBannerSlider>
+
       <main className="section-spacing bg-background">
         <div className="container-custom max-w-4xl">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Perguntas Frequentes</h1>
-            <p className="text-muted-foreground text-lg">Encontre respostas às dúvidas mais comuns</p>
-          </motion.div>
-
           <div className="space-y-8">
             {faqs.map((section, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                <h2 className="text-2xl font-semibold mb-4 text-[#0ea5c9]">{section.category}</h2>
+                <h2 className="text-2xl font-semibold mb-4 text-primary">{section.category}</h2>
                 <Accordion type="single" collapsible className="space-y-2">
                   {section.questions.map((faq, j) => (
                     <AccordionItem key={j} value={`${i}-${j}`} className="bg-card border border-border rounded-xl px-6">

@@ -11,8 +11,6 @@ import { uploadPublicImage } from '@/lib/mediaUpload';
 
 // Galeria de imagens do site (feitas com as capas reais do catálogo), em public/images/site/opcoes.
 const GALLERY_URL = '/images/site/opcoes/galeria.json';
-// O admin só grava URLs https:// (sanitizeImageUrlForSave); em desenvolvimento aponta para o site publicado.
-const SITE_URL = /^(localhost|127\.)/.test(window.location.hostname) ? 'https://livraria-adventista.pages.dev' : window.location.origin;
 const TAB_COLS = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
 
 /**
@@ -175,7 +173,10 @@ export default function ImageField({
   }, [mode, galleryItems, gallery]);
 
   const selectGalleryItem = (item) => {
-    const url = SITE_URL + item.url;
+    // Caminho relativo (`/images/site/…`): a imagem é do próprio site e tem de continuar a
+    // carregar quando o site mudar de projecto ou de domínio. Com `origin + caminho` ficava
+    // presa ao endereço onde foi escolhida.
+    const url = item.url;
     setPreview(url);
     onChange(url);
     onFileChange?.(null);
@@ -300,7 +301,7 @@ export default function ImageField({
                             style={{ aspectRatio: `${item.largura} / ${item.altura}` }}
                           />
                           <span className="block px-1.5 py-1 text-[10px] leading-tight text-muted-foreground truncate">{item.rotulo}</span>
-                          {chosen && <Check className="absolute top-1 right-1 h-4 w-4 rounded-full bg-[#0ea5c9] text-white p-0.5" />}
+                          {chosen && <Check className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary text-white p-0.5" />}
                         </button>
                       );
                     })}
@@ -322,7 +323,7 @@ export default function ImageField({
       </div>
 
       <div className="flex items-start gap-2 p-2.5 rounded-lg bg-[#0ea5c9]/5 border border-[#0ea5c9]/15 text-[11px] text-muted-foreground">
-        <Info className="h-3.5 w-3.5 text-[#0ea5c9] shrink-0 mt-0.5" />
+        <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
         <span>{hint || defaultHint}</span>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

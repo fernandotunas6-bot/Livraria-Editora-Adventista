@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import BrandLogo from '@/components/BrandLogo';
 import { pageTitle } from '@/lib/brand';
 import { IS_PASSWORD_RECOVERY_REDIRECT } from '@/lib/supabaseClient';
+import { AUTH_REDIRECT_ERROR } from '@/lib/authRedirectError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,7 +51,10 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-destructive mb-4">Link inválido.</p>
+          <h1 className="text-xl font-semibold mb-2">Não foi possível abrir o link</h1>
+          <p className="text-destructive mb-4">
+            {AUTH_REDIRECT_ERROR?.message || 'Este link não é válido. Peça um novo para definir a palavra-passe.'}
+          </p>
           <Link to="/forgot-password"><Button variant="outline">Pedir novo link</Button></Link>
         </div>
       </div>

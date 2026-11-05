@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+import { useHeaderReveal } from '@/hooks/useHeaderReveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/hooks/useCart';
@@ -12,6 +14,8 @@ import MegaMenu from '@/components/header/MegaMenu';
 import UserAvatar from '@/components/UserAvatar';
 import { UserMenu, GuestAuthButton } from '@/components/UserMenu';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
+import { getProducts } from '@/api/EcommerceApi';
+import { buildSearchSuggestions } from '@/lib/searchUtils';
 
 // Menu do telemóvel: as mesmas secções do mega menu, em lista.
 const NAV_LINKS = [
@@ -24,16 +28,101 @@ const NAV_LINKS = [
   { to: '/contact', label: 'Contacto' },
 ];
 
-const Header = ({ onCartOpen }) => {
+const OPEN_HEADER_SEARCH_EVENT = 'livraria:open-header-search';
+
+export const openHeaderSearch = () => {
+  window.dispatchEvent(new Event(OPEN_HEADER_SEARCH_EVENT));
+};
+
+const Header = ({ onCartOpen, pinned = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartItems } = useCart();
   const { user, isAuthed, isAdmin, canAccessAdmin, logout } = useAuth();
   const { settings } = useSiteSettings();
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
+  const [searchCatalog, setSearchCatalog] = useState([]);
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const searchInputRef = useRef(null);
+  const headerRef = useRef(null);
+
+  const revealed = useHeaderReveal(pinned || mobileOpen || searchOpen || hasFocus);
+  const searchFormRef = useRef(null);
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const searchSuggestions = useMemo(
+    () => buildSearchSuggestions(searchCatalog, search),
+    [searchCatalog, search],
+  );
+
+  useEffect(() => {
+    setSearch(new URLSearchParams(location.search).get('search') || '');
+  }, [location.search]);
+
+  useEffect(() => {
+    const handleOpenSearch = () => {
+      setSearchOpen(true);
+      setMobileOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener(OPEN_HEADER_SEARCH_EVENT, handleOpenSearch);
+    return () => window.removeEventListener(OPEN_HEADER_SEARCH_EVENT, handleOpenSearch);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  // As barras que colam por baixo (as letras do catálogo, os filtros da loja) precisam de
+  // saber onde o cabeçalho acaba, senão colam ao topo e ficam escondidas por trás dele.
+  // Antes `--header-offset` era lido em dois sítios mas nunca escrito, e cada um ficava
+  // pelo seu palpite — 64px num, 0px no outro. Agora é a medida real, que muda quando a
+  // pesquisa ou o menu abrem.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return undefined;
+    const publish = () => {
+      document.documentElement.style.setProperty('--header-offset', `${Math.round(el.offsetHeight)}px`);
+    };
+    publish();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(publish) : null;
+    observer?.observe(el);
+    window.addEventListener('resize', publish);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', publish);
+      document.documentElement.style.removeProperty('--header-offset');
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen || searchCatalog.length > 0) return undefined;
+    let active = true;
+    getProducts({})
+      .then(({ products }) => { if (active) setSearchCatalog(products || []); })
+      .catch((err) => console.warn('Não foi possível carregar sugestões de pesquisa:', err));
+    return () => { active = false; };
+  }, [searchOpen, searchCatalog.length]);
+
+  useEffect(() => {
+    setActiveSuggestion(-1);
+  }, [search]);
+
+  useEffect(() => {
+    if (!searchSuggestionsOpen) return undefined;
+    const closeOutside = (event) => {
+      if (searchFormRef.current && !searchFormRef.current.contains(event.target)) {
+        setSearchSuggestionsOpen(false);
+        setActiveSuggestion(-1);
+      }
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [searchSuggestionsOpen]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -41,6 +130,21 @@ const Header = ({ onCartOpen }) => {
     if (!query) return;
     navigate(`/shop?search=${encodeURIComponent(query)}`);
     setMobileOpen(false);
+    setSearchOpen(false);
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestion(-1);
+  };
+
+  const chooseSearchSuggestion = (suggestion) => {
+    setSearch(suggestion.texto);
+    setSearchSuggestionsOpen(false);
+    setActiveSuggestion(-1);
+    if (suggestion.tipo === 'livro' && suggestion.id) {
+      navigate(`/product/${suggestion.id}`);
+    } else {
+      navigate(`/shop?search=${encodeURIComponent(suggestion.texto)}`);
+    }
+    setSearchOpen(false);
   };
 
   const closeMobile = () => setMobileOpen(false);
@@ -52,7 +156,71 @@ const Header = ({ onCartOpen }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border shadow-sm glass-topbar text-white">
+    <>
+      {/* Barra fina por cima do herói.
+          O cabeçalho completo sai de cena no topo da página para a imagem de entrada se ver
+          inteira (ver `useHeaderReveal`) — mas isso deixava quem acaba de chegar sem
+          navegação nenhuma: nem logótipo, nem conta, nem carrinho, até rolar duzentos
+          pixels. Esta barra ocupa esse lugar com o mínimo indispensável, sobre um véu que a
+          mantém legível por cima de qualquer imagem, e sai de cena quando o cabeçalho
+          verdadeiro entra. Monta e desmonta em vez de ficar escondida, para não deixar
+          botões invisíveis no caminho de quem navega pelo teclado. */}
+      {!pinned && !revealed && (
+        <div className="safe-top fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base">
+          <div className="container-custom flex h-14 items-center justify-between gap-3">
+            <BrandLogo variant="light" collapseToIcon />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative rounded-full text-white hover:bg-white/15"
+                onClick={onCartOpen}
+                aria-label={`Carrinho com ${cartCount} itens`}
+              >
+                <ShoppingCart className="h-5 w-5" aria-hidden="true" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-[#dc2626] text-white text-[10px] font-bold rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </Button>
+              {isAuthed ? (
+                <Link to="/profile" aria-label="Minha conta">
+                  <UserAvatar user={user} size="sm" className="ring-2 ring-white/40" />
+                </Link>
+              ) : (
+                <Link to="/login" aria-label="Entrar ou criar conta">
+                  <Button variant="ghost" size="icon" className="rounded-full text-white hover:bg-white/15">
+                    <User className="h-5 w-5" aria-hidden="true" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    <header
+      ref={headerRef}
+      onFocusCapture={() => setHasFocus(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
+      }}
+      className={cn(
+        'safe-top top-0 z-40 border-b border-border shadow-sm glass-topbar text-white',
+        // Onde a página abre com imagem de largura inteira, o cabeçalho sai do fluxo para
+        // a poder descobrir: em `sticky` continuava a ocupar lugar, e escondê-lo deixava
+        // uma faixa vazia por cima dela — exactamente o que se queria tirar.
+        //
+        // Onde a página abre com conteúdo normal — ficha de livro, perfil, confirmação de
+        // encomenda — não há imagem para descobrir, e escondê-lo só deixava o texto colado
+        // ao topo, sem navegação. Aí fica `sticky`, no fluxo, como sempre esteve.
+        pinned ? 'sticky' : 'fixed inset-x-0 transition-transform duration-base ease-brand',
+        // Com o menu aberto o cabeçalho pode passar da altura do ecrã; aí desloca-se por
+        // dentro em vez de cortar o fim da lista.
+        mobileOpen && 'max-h-dvh overflow-y-auto',
+        !pinned && (revealed ? 'translate-y-0' : '-translate-y-full')
+      )}
+    >
       {/* Barra superior — mensagem de boas-vindas */}
       <div className="hidden sm:block text-white/90 text-center text-xs py-1.5 px-4 border-b border-white/5 bg-white/5">
         {isAuthed ? (
@@ -78,27 +246,28 @@ const Header = ({ onCartOpen }) => {
 
       <div className="container-custom">
         <div className="flex items-center justify-between h-16 gap-3">
-          <BrandLogo variant="light" />
+          <BrandLogo variant="light" collapseToIcon />
 
           <div className="hidden lg:block">
             <MegaMenu />
           </div>
 
-          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-sm mx-4" role="search" aria-label="Pesquisa rápida">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" aria-hidden="true" />
-              <Input
-                type="search"
-                placeholder="Pesquisar livros, autores..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-white/10 border-white/10 text-white placeholder-white/50 focus-visible:ring-[#22d3ee] rounded-full"
-                aria-label="Pesquisar livros, autores e coleções"
-              />
-            </div>
-          </form>
-
           <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-white/80 hover:text-white hover:bg-white/10"
+              onClick={() => {
+                if (!searchOpen) openHeaderSearch();
+                else setSearchOpen(false);
+              }}
+              aria-expanded={searchOpen}
+              aria-controls="header-search"
+              aria-label={searchOpen ? 'Fechar pesquisa' : 'Abrir pesquisa'}
+            >
+              {searchOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Search className="h-5 w-5" aria-hidden="true" />}
+            </Button>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -140,16 +309,99 @@ const Header = ({ onCartOpen }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden rounded-full text-white hover:bg-white/10 transition-transform duration-200 active:scale-95"
+              className="lg:hidden rounded-full text-white hover:bg-white/10 transition-transform duration-base active:scale-95"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-expanded={mobileOpen}
               aria-controls="mobile-navigation-menu"
               aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
             >
-              {mobileOpen ? <X className="h-5 w-5 animate-in spin-in-90 duration-200" /> : <Menu className="h-5 w-5" />}
+              {mobileOpen ? <X className="h-5 w-5 animate-in spin-in-90 duration-base" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
+
+        <form
+          ref={searchFormRef}
+          id="header-search"
+          onSubmit={handleSearch}
+          role="search"
+          aria-label="Pesquisa de livros"
+          aria-hidden={!searchOpen}
+          className={`relative grid transition-[grid-template-rows,opacity] duration-base ${
+            searchOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="flex gap-2 pb-4">
+              <Input
+                ref={searchInputRef}
+                type="search"
+                placeholder="Pesquisar livros, autores..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setSearchSuggestionsOpen(true); }}
+                onFocus={() => setSearchSuggestionsOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown' && searchSuggestions.length > 0) {
+                    e.preventDefault();
+                    setSearchSuggestionsOpen(true);
+                    setActiveSuggestion((current) => (current + 1) % searchSuggestions.length);
+                  } else if (e.key === 'ArrowUp' && searchSuggestions.length > 0) {
+                    e.preventDefault();
+                    setSearchSuggestionsOpen(true);
+                    setActiveSuggestion((current) => (current <= 0 ? searchSuggestions.length - 1 : current - 1));
+                  } else if (e.key === 'Enter' && searchSuggestionsOpen && activeSuggestion >= 0) {
+                    e.preventDefault();
+                    chooseSearchSuggestion(searchSuggestions[activeSuggestion]);
+                  } else if (e.key === 'Escape') {
+                    setSearchSuggestionsOpen(false);
+                    setActiveSuggestion(-1);
+                  }
+                }}
+                className="min-w-0 flex-1 rounded-full bg-white/10 border-white/10 text-white placeholder-white/50 focus-visible:ring-[#22d3ee]"
+                aria-label="Pesquisar livros, autores e coleções"
+                role="combobox"
+                aria-expanded={searchSuggestionsOpen && searchSuggestions.length > 0}
+                aria-controls="header-search-suggestions"
+                aria-activedescendant={activeSuggestion >= 0 ? `header-search-suggestion-${activeSuggestion}` : undefined}
+                aria-autocomplete="list"
+                tabIndex={searchOpen ? 0 : -1}
+              />
+              <Button type="submit" className="rounded-full bg-[#22d3ee] text-neutral-950 hover:bg-[#22d3ee]/90">
+                Pesquisar
+              </Button>
+            </div>
+          </div>
+          {searchOpen && searchSuggestionsOpen && searchSuggestions.length > 0 && (
+            <ul
+              id="header-search-suggestions"
+              role="listbox"
+              aria-label="Sugestões de pesquisa"
+              className="elev-overlay absolute left-0 right-0 top-full z-50 max-h-72 overflow-y-auto rounded-xl border border-border bg-popover py-1 text-left text-foreground shadow-xl"
+            >
+              {searchSuggestions.map((suggestion, index) => (
+                <li
+                  key={`${suggestion.tipo}-${suggestion.id || suggestion.texto}`}
+                  id={`header-search-suggestion-${index}`}
+                  role="option"
+                  aria-selected={index === activeSuggestion}
+                >
+                  <button
+                    type="button"
+                    tabIndex={searchOpen ? 0 : -1}
+                    onMouseEnter={() => setActiveSuggestion(index)}
+                    onClick={() => chooseSearchSuggestion(suggestion)}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted ${index === activeSuggestion ? 'bg-muted' : ''}`}
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">{suggestion.texto}</span>
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {suggestion.tipo === 'livro' ? 'livro' : suggestion.tipo === 'autor' ? 'autor' : 'editora'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </form>
 
         <div
           id="mobile-navigation-menu"
@@ -174,21 +426,6 @@ const Header = ({ onCartOpen }) => {
               <GuestAuthButton fullWidth />
             </div>
           )}
-
-          <form onSubmit={handleSearch} role="search" aria-label="Pesquisa móvel">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" aria-hidden="true" />
-              <Input
-                type="search"
-                placeholder="Pesquisar livros..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 rounded-full bg-white/10 border-white/10 text-white placeholder-white/40 focus-visible:ring-[#22d3ee]"
-                aria-label="Pesquisar livros no menu móvel"
-                tabIndex={mobileOpen ? 0 : -1}
-              />
-            </div>
-          </form>
 
           <nav className="flex flex-col gap-1" aria-label="Navegação Móvel">
             {NAV_LINKS.map(({ to, label }) => (
@@ -269,6 +506,7 @@ const Header = ({ onCartOpen }) => {
         </div>
       </div>
     </header>
+    </>
   );
 };
 

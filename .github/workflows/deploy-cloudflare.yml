@@ -48,6 +48,18 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
+      # Pós-build de SEO e partilha — o mesmo passo do scripts/deploy-site.sh: endereços
+      # públicos do destino, livros e colecções no sitemap, e uma página de partilha por livro
+      # (capa e título no WhatsApp). Sem ele, uma publicação pelo Actions saía com o endereço
+      # do projecto antigo no canonical e sem as páginas dos livros.
+      - name: SEO e partilha do catálogo
+        run: node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL"
+        env:
+          # Não se deriva do nome do projecto: o endereço .pages.dev deste tem o sufixo -ben.
+          SITE_URL: ${{ vars.SITE_URL || 'https://livrariaadventista.com' }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
       # Cria o projecto no Cloudflare Pages na primeira vez; se já existir, não faz nada.
       - name: Garantir que o projecto Pages existe
         env:

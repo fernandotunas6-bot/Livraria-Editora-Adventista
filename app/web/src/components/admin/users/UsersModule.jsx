@@ -203,8 +203,18 @@ export default function UsersModule() {
     const res = await run(u, () => sendAccessLink(u.id, u.email));
     if (!res) return;
     if (!res.link) {
-      // Sem link para partilhar: o Supabase Auth enviou o email de recuperação.
-      toast({ title: 'Email enviado', description: `${u.email} recebe um email para definir a palavra-passe.` });
+      // O servidor só devolve o link a um administrador, e só quando o email não saiu.
+      if (res.emailSent) {
+        toast({ title: 'Email enviado', description: `${u.email} recebe um email para definir a palavra-passe.` });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'O email não foi enviado',
+          description: res.link_withheld
+            ? 'O envio de emails não está a funcionar. Só um administrador pode obter o link para o enviar por outra via.'
+            : 'Não foi possível enviar o email. Verifique o envio de emails em Configurações.',
+        });
+      }
       return;
     }
     setAccessInfo({ name: u.name, email: u.email, phone: u.phone, link: res.link, emailSent: res.emailSent });

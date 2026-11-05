@@ -1,5 +1,3 @@
-import { BRAND } from '@/lib/brand';
-
 export const FAQ_SECTIONS = [
   {
     category: 'Encomendas e Envios',
@@ -13,7 +11,7 @@ export const FAQ_SECTIONS = [
     category: 'Devoluções',
     questions: [
       { question: 'Qual é a política de devolução?', answer: 'Aceitamos devoluções em até 30 dias, desde que o livro esteja em bom estado e na embalagem original.' },
-      { question: 'Como inicio uma devolução?', answer: `Contacte-nos em ${BRAND.email} ou pelo formulário de contacto.` },
+      { question: 'Como inicio uma devolução?', answer: 'Use o formulário da página de Contacto e indique o número da encomenda.' },
     ],
   },
   {

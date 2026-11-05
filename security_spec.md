@@ -1,99 +1,86 @@
-# Security Specification for Livraria Aurora (Wishlist)
+# Especificação de segurança — Livraria Adventista
 
-This document outlines the security architecture, data invariants, and threat-modeling payloads ("Dirty Dozen") designed to harden our Firestore rules.
+Estado em 2026-11-03. Substitui a versão anterior deste ficheiro, que descrevia regras do
+**Firestore** para a lista de desejos: o Firestore foi desligado (`firestore.rules` fecha
+tudo) e a lista de desejos vive hoje na tabela `public.wishlists` do Supabase. O detalhe de
+cada achado está em [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
-## 1. Data Invariants
+## 1. Onde está cada garantia
 
-For the `wishlists` collection, the following data invariants must be mathematically guaranteed by our Firestore security rules:
+| Camada | O que garante | Onde |
+|---|---|---|
+| RLS do Postgres | Quem lê e escreve cada linha. Activo em todas as tabelas de `public`. | `supabase/migrations/*` |
+| Funções `SECURITY DEFINER` | Verificam a permissão logo no início (`has_permission`, `assert_can_manage_user`, `is_admin`, `auth.uid()`); as sensíveis (`place_order`, `admin_users_list`) só correm com a service role. | idem |
+| Edge Function `app` | Rotas de equipa com `requirePermission`; rotas públicas com limite de pedidos partilhado (`check_rate_limit`); textos com tamanho máximo. | `supabase/functions/app/index.ts` |
+| Checkout | Preço, stock, portes e total calculados na base de dados (`place_order`), com o livro bloqueado (`for update`); livros ocultos recusados. O browser só diz *que* livros e quantos. | `place_order` |
+| Site | HTML das descrições e slides passa pelo DOMPurify com lista branca; CSP sem `unsafe-inline` em scripts; `frame-ancestors 'self'`. | `lib/sanitizeHtml.js`, `public/_headers` |
 
-1. **Identity Binding**: A wishlist document's `userId` field must strictly match the authenticated user's ID (`request.auth.uid`). No user can create, update, or read another user's wishlist.
-2. **Document ID Format**: The document ID must be structured as `${userId}_${bookId}` to prevent ID spoofing and ensure uniqueness.
-3. **Type Integrity & Boundaries**:
-   - `userId`: string, non-empty, matching auth.uid.
-   - `bookId`: string, matches PocketBase ID format (`^[a-zA-Z0-9_\\-]+$`), maximum size of 128 characters.
-   - `bookTitle`: string, non-empty, maximum size of 200 characters.
-   - `bookCover`: string, maximum size of 1024 characters.
-   - `bookPrice`: number, greater than or equal to 0.
-   - `addedAt`: Timestamp, must equal the server timestamp (`request.time`).
-4. **Immutability**: Once a wishlist item is created, all fields except maybe basic visual updates (none in our case, as they are static) are immutable.
-5. **No Blanket Reads**: Standard blanket queries that retrieve all wishlist items across all users must be blocked. Listing is only allowed if filtered by the authenticated user's `userId`.
+## 2. Lista de desejos (`public.wishlists`)
 
----
+Uma linha é só `(user_id, book_id, created)`: o título, a capa e o preço são lidos do livro na
+hora, não copiados. Isto elimina à partida a maior parte dos ataques de "dados envenenados"
+que o desenho do Firestore tinha de travar campo a campo.
 
-## 2. The "Dirty Dozen" Threat Payloads
+Regras (lidas de `pg_policies` e `pg_constraint` a 2026-11-03):
 
-These 12 payloads represent malicious attempts to bypass identity, integrity, and state constraints. Firestore rules must systematically deny all of these.
+- `INSERT`, `SELECT` e `DELETE` só para `authenticated` e só com `user_id = auth.uid()`;
+- **não há política de `UPDATE`**: nenhuma linha pode ser alterada, só apagada e criada de novo;
+- nenhuma política para `anon`: um visitante sem sessão não lê nem escreve (a lista dele fica
+  no browser e passa para a conta ao iniciar sessão);
+- chave primária `(user_id, book_id)`; `book_id` é chave estrangeira para `stock_books` e
+  `user_id` para `auth.users`, ambas com `on delete cascade`.
 
-### Group A: Identity Spoofing & Access Bypass
-1. **Payload 01: Unauthorized Creation (Other User's Wishlist)**
-   - **Intent**: Create a wishlist item for user B while logged in as user A.
-   - **Payload**: `{ "userId": "user_B", "bookId": "book_1", "bookTitle": "O Alquimista", "bookCover": "http://...", "bookPrice": 4500, "addedAt": "request.time" }`
-   - **Expected**: `PERMISSION_DENIED`
+| # | Tentativa | Resultado esperado | Porquê |
+|---|---|---|---|
+| 01 | Cliente A guarda um livro na sua lista | permitido | política de `INSERT` |
+| 02 | A escreve na lista de B (`user_id` = B) | recusado (`42501`) | `with check (user_id = auth.uid())` |
+| 03 | A lê a lista de B | 0 linhas | `using (user_id = auth.uid())` |
+| 04 | A lê a tabela toda, sem filtro | só as suas | idem |
+| 05 | `book_id` inexistente ou com `../` | recusado (`23503`) | chave estrangeira |
+| 06 | `book_id` com 1 MB | recusado | não existe livro com esse id (chave estrangeira); um valor deste tamanho nem cabe no índice da chave primária |
+| 07 | Linha sem livro | recusado (`23502`) | `not null` |
+| 08 | A altera uma linha sua | 0 linhas | sem política de `UPDATE` |
+| 09 | A passa para si as linhas de B | 0 linhas | idem |
+| 10 | A apaga a lista de B | 0 linhas | `using (user_id = auth.uid())` |
+| 11 | Visitante anónimo escreve | recusado (`42501`) | sem política para `anon` |
+| 12 | Visitante anónimo lê | 0 linhas | idem |
+| 13 | Campo extra no pedido (`is_admin: true`) | recusado pelo PostgREST | coluna inexistente |
 
-2. **Payload 02: Unauthorized Read (Other User's Wishlist Item)**
-   - **Intent**: Fetch a specific wishlist item document belonging to user B while logged in as user A.
-   - **Path**: `/wishlists/user_B_book_1`
-   - **Expected**: `PERMISSION_DENIED`
+Estado da verificação: o `HANDOFF.md` regista estas regras como testadas a 2026-11-01 ("cada
+cliente só vê e altera os seus desejos e avaliações; os visitantes lêem avaliações mas não
+escrevem"). O bloco [docs/testes/seguranca_wishlists.sql](docs/testes/seguranca_wishlists.sql)
+repete os casos 01–12 contra a base de dados real e anula tudo no fim (termina com
+`raise exception 'RESULTADO …'`); corre-se no SQL Editor.
 
-3. **Payload 03: Blanket Query / Unfiltered Collection Read**
-   - **Intent**: Query `/wishlists` without checking `userId == auth.uid`.
-   - **Query**: `getDocs(collection(db, "wishlists"))`
-   - **Expected**: `PERMISSION_DENIED`
+Riscos aceites:
 
-4. **Payload 04: Anonymous User Creation**
-   - **Intent**: Create a wishlist item without being signed in.
-   - **Expected**: `PERMISSION_DENIED`
+- O cliente pode escolher o `created` das suas próprias linhas. Só muda a ordem da sua lista.
+- `anon` e `authenticated` têm `TRUNCATE` na tabela (concessão por omissão do Supabase). O
+  `TRUNCATE` não respeita a RLS, mas não é alcançável pela API: o PostgREST não o expõe e
+  nenhuma função o executa.
 
-### Group B: Data Poisoning & Value Injection
-5. **Payload 05: Resource Exhaustion (1MB Title String)**
-   - **Intent**: Inject a massive string to consume storage quota.
-   - **Payload**: `{ "userId": "user_A", "bookId": "book_1", "bookTitle": "MassiveString1MB...", "bookCover": "http://...", "bookPrice": 4500, "addedAt": "request.time" }`
-   - **Expected**: `PERMISSION_DENIED`
+## 3. Outras garantias verificadas a 2026-11-03
 
-6. **Payload 06: Invalid ID Pattern**
-   - **Intent**: Inject malicious characters in `bookId`.
-   - **Payload**: `{ "userId": "user_A", "bookId": "../malicious/path", "bookTitle": "Book Title", "bookCover": "http://...", "bookPrice": 4500, "addedAt": "request.time" }`
-   - **Expected**: `PERMISSION_DENIED`
+- **Encomendas:** o `/track` devolve só o necessário para seguir a encomenda (sem a imagem
+  da assinatura); o checkout liga a encomenda à conta pela sessão (`customer_id`), validada
+  no servidor — um token inválido conta como anónimo, nunca como outra pessoa.
+- **`/catalog/summary`** passou a exigir `manage_catalog`: era público e mostrava o stock e
+  as vendas de cada livro.
+- **Funções `SECURITY DEFINER` chamáveis com sessão** (13, apontadas pelo advisor do
+  Supabase): todas verificam a permissão no início; `book_review_helpfulness` é pública de
+  propósito (contagem de votos).
+- **Imagens:** o CSP aceita `img-src https:` (o painel permite colar links de CDN). Uma
+  imagem não executa código; os scripts continuam limitados à própria origem e ao Google.
 
-7. **Payload 07: Negative Price Injection**
-   - **Intent**: Inject a negative book price.
-   - **Payload**: `{ "userId": "user_A", "bookId": "book_1", "bookTitle": "Book Title", "bookCover": "http://...", "bookPrice": -99.99, "addedAt": "request.time" }`
-   - **Expected**: `PERMISSION_DENIED`
+- **Link de acesso** (`/admin/users/access-link`): deixou de ser devolvido a quem o pede. Só
+  volta quando o email não saiu e quem pede é administrador; um gestor com `manage_users` já
+  não consegue entrar na conta de um cliente. Na criação de contas o link continua a voltar
+  (conta nova, sem histórico).
+- **Google Workspace da equipa**: permissões à medida do que o painel faz — `gmail.readonly`
+  + `gmail.send` em vez de `mail.google.com` (que permitia apagar mensagens),
+  `calendar.events` e `contacts.readonly`. Se o ecrã de consentimento da Google Cloud
+  listar as permissões antigas, acrescentar estas.
 
-8. **Payload 08: Missing Required Field (`bookId`)**
-   - **Intent**: Create a document lacking crucial relationship keys.
-   - **Payload**: `{ "userId": "user_A", "bookTitle": "Book Title", "bookCover": "http://...", "bookPrice": 4500, "addedAt": "request.time" }`
-   - **Expected**: `PERMISSION_DENIED`
+## 4. Por resolver
 
-### Group C: Temporal & Integrity Exploits
-9. **Payload 09: Client-Side Timestamp Spoofing**
-   - **Intent**: Provide a client-defined historical/future timestamp.
-   - **Payload**: `{ "userId": "user_A", "bookId": "book_1", "bookTitle": "Book Title", "bookCover": "http://...", "bookPrice": 4500, "addedAt": "2020-01-01T00:00:00Z" }`
-   - **Expected**: `PERMISSION_DENIED`
-
-10. **Payload 10: Unauthorized Document ID Mismatch**
-    - **Intent**: Attempt to create a document with ID `user_A_book_2` but specifying `bookId: "book_9"` in the payload body.
-    - **Path/Payload**: Path `/wishlists/user_A_book_2` with `{ "userId": "user_A", "bookId": "book_9", ... }`
-    - **Expected**: `PERMISSION_DENIED`
-
-11. **Payload 11: Shadow Field Injection**
-    - **Intent**: Add an unrequested admin field or flag to bypass roles.
-    - **Payload**: `{ "userId": "user_A", "bookId": "book_1", "bookTitle": "Title", "bookCover": "", "bookPrice": 0, "addedAt": "request.time", "isAdminPrivileged": true }`
-    - **Expected**: `PERMISSION_DENIED`
-
-12. **Payload 12: Immutable Update Attempt**
-    - **Intent**: Attempt to modify a wishlist item (should be immutable or only deletable).
-    - **Operation**: Update any field on a wishlist item.
-    - **Expected**: `PERMISSION_DENIED`
-
----
-
-## 3. Test Verification Suite (Mocks)
-
-The following TypeScript code describes the automated test suite simulating these attacks.
-
-```typescript
-import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-
-// Verification implementation mapping directly to the Firestore rules
-```
+- Protecção contra palavras-passe vazadas (HaveIBeenPwned): exige o plano Pro do Supabase.

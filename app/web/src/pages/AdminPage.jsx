@@ -1,40 +1,45 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy } from 'lucide-react';
-import CollectionsTab from '@/components/admin/CollectionsTab';
-import SlidesTab from '@/components/admin/SlidesTab';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
 import BookFormModal from '@/components/admin/BookFormModal';
 import BooksBulkBar from '@/components/admin/BooksBulkBar';
 import { Checkbox } from '@/components/ui/checkbox';
-import SettingsTab from '@/components/admin/SettingsTab';
-import UsersTab from '@/components/admin/UsersTab';
-import PaymentsTab from '@/components/admin/PaymentsTab';
-import AppsTab from '@/components/admin/AppsTab';
-import StoresTab from '@/components/admin/StoresTab';
-import ContactsManager from '@/components/ContactsManager';
 import { pageTitle } from '@/lib/brand';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
+import { setOrderPaymentStatus, setOrderDeliveryStatus } from '@/api/PlatformApi';
+import { EDGE_FUNCTION_DESACTUALIZADA } from '@/lib/apiCompat';
 import { useAuth } from '@/hooks/useAuth';
+import SessionGate from '@/components/SessionGate.jsx';
+import { sessionDecision } from '@/lib/authSession';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import SalesReportsPanel from '@/components/admin/SalesReportsPanel';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, PAYMENT_METHODS, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
+import { hasCover, hasDescription } from '@/lib/bookContent';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 
-// O painel de vendas traz o d3; só é carregado quando se abre o separador.
+const CollectionsTab = lazy(() => import('@/components/admin/CollectionsTab'));
+const SlidesTab = lazy(() => import('@/components/admin/SlidesTab'));
+const SettingsTab = lazy(() => import('@/components/admin/SettingsTab'));
+const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
+const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
+const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
+const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
+const ContactsManager = lazy(() => import('@/components/ContactsManager'));
+const SupportCenter = lazy(() => import('@/components/SupportCenter'));
+const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
@@ -44,7 +49,7 @@ const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'))
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
   'items', 'total', 'shipping_cost', 'status', 'payment_status', 'payment_method',
-  'payment_method_code', 'payment_method_name', 'payment_reference', 'payment_category',
+  'payment_method_code', 'payment_method_name', 'payment_reference',
   'delivery_status', 'tracking_number', 'carrier', 'estimated_delivery',
   'address', 'city', 'notes', 'order_type', 'sale_channel', 'shipping_method', 'pickup_store',
   'delivery_province', 'delivery_municipality', 'delivery_locality', 'delivery_street',
@@ -53,7 +58,7 @@ const ORDER_LIST_FIELDS = [
 ];
 
 const AdminPage = () => {
-  const { user, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
+  const { user, ready, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -78,10 +83,14 @@ const AdminPage = () => {
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [lowStockBooks, setLowStockBooks] = useState([]);
 
+  // `sessionDecision` garante a ordem: nada é decidido antes de se saber se há sessão.
+  // Decidir antes disso expulsava para `/login` quem tinha sessão válida mas ainda não lida.
+  const access = sessionDecision({ ready, isAuthed, allowed: canAccessAdmin });
+
   useEffect(() => {
-    if (!isAuthed) navigate('/login', { state: { from: '/admin' } });
-    else if (!canAccessAdmin) navigate('/profile');
-  }, [isAuthed, canAccessAdmin, navigate]);
+    if (access === 'login') navigate('/login', { state: { from: '/admin' } });
+    else if (access === 'forbidden') navigate('/profile');
+  }, [access, navigate]);
 
   const canManageCatalog = isAdmin || hasPermission('manage_catalog');
   const canManageOrders = isAdmin || hasPermission('manage_orders');
@@ -130,6 +139,19 @@ const AdminPage = () => {
         throw new Error('A promoção tem de terminar depois de começar.');
       }
       if (editingBook) {
+        // O formulário leva o stock que leu ao abrir. Uma venda feita entretanto (o checkout
+        // desconta-o na base de dados) era apagada ao gravar outra coisa qualquer, como a
+        // descrição. Stock não mexido não vai no pedido; stock mexido confere primeiro o actual.
+        const openedWith = Number(editingBook.stock) || 0;
+        if (payload.stock === openedWith) {
+          delete payload.stock;
+        } else {
+          const { stock: current } = await pb.collection('stock_books').getOne(editingBook.id, { fields: 'id,stock' });
+          if ((Number(current) || 0) !== openedWith
+            && !confirm(`O stock deste livro mudou desde que abriu o formulário (era ${openedWith}, agora é ${Number(current) || 0} — provavelmente uma venda).\n\nGravar ${payload.stock} na mesma?`)) {
+            return;
+          }
+        }
         await pb.collection('stock_books').update(editingBook.id, payload);
         toast({ title: 'Livro atualizado', description: `Código: ${payload.book_code || editingBook.book_code}` });
       } else {
@@ -196,7 +218,8 @@ const AdminPage = () => {
   const filteredBooks = books.filter((b) => {
     if (bookFilter === 'featured' && !b.featured) return false;
     if (bookFilter === 'low_stock' && !(b.stock_alert || b.stock_low)) return false;
-    if (bookFilter === 'no_cover' && (b.cover || b.cover_image)) return false;
+    if (bookFilter === 'no_cover' && hasCover(b)) return false;
+    if (bookFilter === 'no_description' && hasDescription(b)) return false;
     if (bookFilter === 'hidden' && isBookVisible(b)) return false;
     if (bookFilter === 'promo' && !(isSaleActive(b) || isSaleScheduled(b))) return false;
     const q = bookSearch.trim().toLowerCase();
@@ -205,6 +228,15 @@ const AdminPage = () => {
   });
 
   const handleOrderStatus = async (order, newStatus) => {
+    // Cancelar devolve o stock à loja (trigger orders_before_update, uma só vez). Reabrir
+    // depois não volta a descontá-lo, e a loja ficava a vender livros que já saíram — por
+    // isso cancelar pede confirmação e uma encomenda cancelada não se reabre daqui.
+    if (order.status === 'cancelled') {
+      toast({ variant: 'destructive', title: 'Encomenda cancelada', description: 'O stock já foi devolvido. Para voltar a vender estes livros a este cliente, registe uma encomenda nova.' });
+      return;
+    }
+    if (newStatus === 'cancelled'
+      && !confirm(`Cancelar a encomenda ${formatOrderNumber(order)}?\n\nO stock dos livros volta à loja e a encomenda não pode ser reaberta.`)) return;
     try {
       // Ao cancelar, o trigger orders_before_update devolve o stock (uma só vez, via stock_restored).
       await pb.collection('orders').update(order.id, { status: newStatus });
@@ -216,9 +248,15 @@ const AdminPage = () => {
   };
 
   const handleDeliveryStatus = async (order, deliveryStatus) => {
+    if (order.delivery_status === deliveryStatus) return;
     try {
-      await pb.collection('orders').update(order.id, { delivery_status: deliveryStatus });
-      toast({ title: 'Estado de entrega actualizado' });
+      const res = await setOrderDeliveryStatus(order.id, deliveryStatus);
+      toast({
+        title: 'Estado de entrega actualizado',
+        description: res?.via === 'fallback'
+          ? `Cliente não avisado. ${EDGE_FUNCTION_DESACTUALIZADA}`
+          : res?.email_sent ? 'Cliente avisado por email' : undefined,
+      });
       loadAll();
     } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: err.message });
@@ -268,8 +306,21 @@ const AdminPage = () => {
 
   const handlePaymentStatus = async (order, paymentStatus) => {
     try {
-      await pb.collection('orders').update(order.id, { payment_status: paymentStatus });
-      toast({ title: 'Pagamento actualizado', description: getPaymentStatusLabel(paymentStatus) });
+      // Pela API, e não por `orders.update`: é no servidor que o cliente é avisado de que o
+      // pagamento foi confirmado. A gravação directa mudava o estado em silêncio.
+      const res = await setOrderPaymentStatus(order.id, paymentStatus);
+      const label = getPaymentStatusLabel(paymentStatus);
+      if (res?.via === 'fallback') {
+        toast({
+          title: 'Pagamento actualizado, cliente não avisado',
+          description: `${label}. ${EDGE_FUNCTION_DESACTUALIZADA}`,
+        });
+      } else {
+        toast({
+          title: 'Pagamento actualizado',
+          description: res?.email_sent ? `${label} · cliente avisado por email` : label,
+        });
+      }
       loadAll();
     } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: err.message });
@@ -290,8 +341,20 @@ const AdminPage = () => {
   const pendingCount = orders.filter((o) => o.status === 'pending').length;
   // Pagamentos por P2P/transferência que o cliente diz ter feito e falta confirmar.
   const awaitingPaymentCount = orders.filter((o) => o.payment_status === 'awaiting_confirmation' && o.status !== 'cancelled').length;
-  const paymentLabelOf = (o) => o.payment_method_name || PAYMENT_METHODS[o.payment_method] || o.payment_method_code || o.payment_method || '';
-  const totalRevenue = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
+  const paymentLabelOf = orderPaymentLabel;
+  // Receita é o que foi pago; o resto das encomendas activas é valor por receber.
+  const activeOrders = orders.filter((o) => o.status !== 'cancelled');
+  const totalRevenue = activeOrders.filter((o) => o.payment_status === 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const pendingRevenue = activeOrders.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
+
+  const bookMetrics = [
+    // `filter`: carregar no indicador mostra a lista correspondente (o mesmo critério do filtro).
+    { label: 'Livros no catálogo', value: books.length, icon: PackageSearch, filter: 'all' },
+    { label: 'Com stock', value: books.filter((book) => Number(book.stock) > 0).length, icon: ShoppingBag },
+    { label: 'Em destaque', value: books.filter((book) => book.featured).length, icon: Star, filter: 'featured' },
+    { label: 'Sem capa', value: books.filter((book) => !hasCover(book)).length, icon: Image, filter: 'no_cover' },
+    { label: 'Sem descrição', value: books.filter((book) => !hasDescription(book)).length, icon: AlertTriangle, filter: 'no_description' },
+  ];
 
   const defaultTab = canManageCatalog ? 'books' : canManageOrders ? 'orders' : canManageSettings ? 'settings' : canManageUsers ? 'users' : 'payments';
 
@@ -313,6 +376,7 @@ const AdminPage = () => {
     { label: 'Clientes', tabs: [
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
       canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
+      canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
     ] },
     { label: 'Sistema', tabs: [
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
@@ -328,6 +392,9 @@ const AdminPage = () => {
     return next;
   }, { replace: true });
 
+  if (access === 'wait') return <SessionGate />;
+  if (access !== 'allow') return null;
+
   return (
     <>
       <Helmet><title>{pageTitle('Painel Admin')}</title></Helmet>
@@ -340,7 +407,7 @@ const AdminPage = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground hidden sm:inline">
-                {user?.name || user?.email} {isAdmin && <span className="text-[#0ea5c9] font-medium">· Admin</span>}
+                {user?.name || user?.email} {isAdmin && <span className="text-primary font-medium">· Admin</span>}
               </span>
               <Button variant="outline" size="sm" onClick={() => navigate('/profile')}>Perfil</Button>
               <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/'); }}>
@@ -367,7 +434,7 @@ const AdminPage = () => {
                     {lowStockBooks.slice(0, 5).map((b) => (
                       <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
                         <span>
-                          <code className="text-xs font-mono text-[#0ea5c9]">{b.book_code}</code>
+                          <code className="text-xs font-mono text-primary">{b.book_code}</code>
                           {' '}{b.title} — <strong className={Number(b.stock) <= 0 ? 'text-red-600' : 'text-amber-700'}>{b.stock} un.</strong>
                           {b.stock_alert && <span className="ml-1 text-xs text-red-600">(esgotado)</span>}
                         </span>
@@ -392,7 +459,7 @@ const AdminPage = () => {
                   <p className="px-2 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{group.label}</p>
                   <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
                     {group.tabs.map(({ value, label, icon: Icon }) => (
-                      <TabsTrigger key={value} value={value} className="data-[state=active]:bg-[#0ea5c9] data-[state=active]:text-white">
+                      <TabsTrigger key={value} value={value} className="data-[state=active]:bg-primary data-[state=active]:text-white">
                         <Icon className="h-4 w-4 mr-1.5" />{label}
                       </TabsTrigger>
                     ))}
@@ -401,27 +468,72 @@ const AdminPage = () => {
               ))}
             </div>
 
-            {canManageSettings && <TabsContent value="settings"><SettingsTab /></TabsContent>}
-            {canManageUsers && <TabsContent value="users"><UsersTab /></TabsContent>}
-            {canManagePayments && <TabsContent value="payments"><PaymentsTab /></TabsContent>}
-            {canManageSettings && <TabsContent value="stores"><StoresTab /></TabsContent>}
-            {canManageMarketing && <TabsContent value="contacts"><ContactsManager /></TabsContent>}
-            {isAdmin && <TabsContent value="apps"><AppsTab /></TabsContent>}
+            {canManageSettings && (
+              <TabsContent value="settings">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <SettingsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageUsers && (
+              <TabsContent value="users">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <UsersTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManagePayments && (
+              <TabsContent value="payments">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <PaymentsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageSettings && (
+              <TabsContent value="stores">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <StoresTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageMarketing && (
+              <TabsContent value="contacts">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <ContactsManager />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageOrders && (
+              <TabsContent value="support">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <SupportCenter />
+                </Suspense>
+              </TabsContent>
+            )}
+            {isAdmin && (
+              <TabsContent value="apps">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
             {canAccessAdmin && (
               <TabsContent value="vendas-huambo">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-[#0ea5c9]" /></div>}>
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <VendasHuamboTab />
                 </Suspense>
               </TabsContent>
             )}
             {canManageCatalog && (
               <TabsContent value="collections">
-                <CollectionsTab books={books} onBooksChange={loadAll} />
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <CollectionsTab books={books} onBooksChange={loadAll} />
+                </Suspense>
               </TabsContent>
             )}
 
             {loading ? (
-              <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-[#0ea5c9]" /></div>
+              <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
             ) : (
               <>
                 {canManageCatalog && (
@@ -429,11 +541,36 @@ const AdminPage = () => {
                   <div className="flex justify-between mb-6">
                     <div>
                       <h2 className="text-2xl font-bold">Catálogo</h2>
-                      <p className="text-sm text-muted-foreground mt-1">{books.length} livros · {books.filter((b) => b.featured).length} em destaque</p>
+                      <p className="text-sm text-muted-foreground mt-1">Resumo e gestão das capas dos livros.</p>
                     </div>
                     <Button className="btn-primary" onClick={() => { setEditingBook(null); setDuplicatingBook(null); setShowBookForm(true); }} disabled={!canManageCatalog}>
                       <Plus className="h-4 w-4 mr-2" /> Adicionar
                     </Button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" aria-label="Estatísticas do catálogo">
+                    {bookMetrics.map(({ label, value, icon: Icon, filter }) => {
+                      const body = (
+                        <>
+                          <Icon className="h-4 w-4 text-muted-foreground mb-2" aria-hidden="true" />
+                          <p className="text-2xl font-bold">{value}</p>
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                        </>
+                      );
+                      if (!filter) return <div key={label} className="rounded-xl border bg-card p-4">{body}</div>;
+                      const active = bookFilter === filter;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setBookFilter(filter)}
+                          aria-pressed={active}
+                          title={`Mostrar: ${label.toLowerCase()}`}
+                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
+                        >
+                          {body}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 mb-4">
                     <div className="relative flex-1">
@@ -452,6 +589,7 @@ const AdminPage = () => {
                         <SelectItem value="featured">Em destaque</SelectItem>
                         <SelectItem value="low_stock">Stock baixo ou esgotado</SelectItem>
                         <SelectItem value="no_cover">Sem capa</SelectItem>
+                        <SelectItem value="no_description">Sem descrição</SelectItem>
                         <SelectItem value="hidden">Ocultos da loja</SelectItem>
                         <SelectItem value="promo">Em promoção</SelectItem>
                       </SelectContent>
@@ -518,7 +656,7 @@ const AdminPage = () => {
                               </div>
                             </td>
                             <td className="p-4">
-                              <code className="text-xs font-mono text-[#0ea5c9]">{b.book_code || '—'}</code>
+                              <code className="text-xs font-mono text-primary">{b.book_code || '—'}</code>
                               {b.sku && b.sku !== b.book_code && (
                                 <span className="block text-[10px] text-muted-foreground font-mono">{b.sku}</span>
                               )}
@@ -603,8 +741,11 @@ const AdminPage = () => {
                       <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
                     </div>
                     <div className="bg-card border rounded-xl p-4">
-                      <p className="text-sm text-muted-foreground">Receita Total</p>
-                      <p className="text-2xl font-bold text-[#0ea5c9]">Kz {totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-sm text-muted-foreground">Receita (pagas)</p>
+                      <p className="text-2xl font-bold text-primary">Kz {totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      {pendingRevenue > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">+ Kz {pendingRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                      )}
                     </div>
                   </div>
 
@@ -658,7 +799,7 @@ const AdminPage = () => {
                               <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusColor(o.status)}`}>
                                 {getOrderStatusLabel(o.status)}
                               </span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-[#0ea5c9]/10 text-[#0ea5c9]'}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-[#0ea5c9]/10 text-primary'}`}>
                                 {getOrderChannelLabel(o)}
                               </span>
                               {o.delivery_status && (
@@ -675,7 +816,7 @@ const AdminPage = () => {
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <p className="font-bold text-[#0ea5c9]">Kz {Number(o.total).toFixed(2)}</p>
+                            <p className="font-bold text-primary">Kz {Number(o.total).toFixed(2)}</p>
                             {expandedOrder === o.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </div>
                         </div>
@@ -699,17 +840,17 @@ const AdminPage = () => {
                                   </span>
                                 </p>
                               )}
-                              {(o.delivery_address_full || o.address) && (
+                              {/* Só entregas: o levantamento aparece em "Envio", mais abaixo. Antes, a loja
+                                  dos levantamentos saía aqui duas vezes ("Levantamento: X, X"). */}
+                              {orderDeliveryAddress(o) && (
                                 <p className="flex items-start gap-2 text-muted-foreground">
                                   <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                                   <span>
-                                    {o.delivery_address_full || `${o.address}${o.city ? `, ${o.city}` : ''}`}
-                                    {o.delivery_province && (
-                                      <span className="block text-xs mt-0.5">
-                                        {[o.delivery_locality, o.delivery_municipality, o.delivery_province].filter(Boolean).join(' · ')}
-                                      </span>
+                                    {orderDeliveryAddress(o)}
+                                    {orderLocality(o) && (
+                                      <span className="block text-xs mt-0.5">{orderLocality(o)}</span>
                                     )}
-                                    {o.delivery_reference && <span className="block text-xs text-[#0ea5c9]">Ref: {o.delivery_reference}</span>}
+                                    {o.delivery_reference && <span className="block text-xs text-primary">Ref: {o.delivery_reference}</span>}
                                     {o.delivery_confirmed_at && (
                                       <span className="block text-xs text-green-700 mt-1">
                                         ✓ Confirmado por {o.delivery_confirmed_by || o.delivery_recipient_name} em {new Date(o.delivery_confirmed_at).toLocaleString('pt-AO')}
@@ -728,7 +869,7 @@ const AdminPage = () => {
                                   Referência: <code className="font-mono text-foreground bg-muted px-1.5 py-0.5 rounded">{o.payment_reference}</code>
                                   <button
                                     type="button"
-                                    className="text-xs text-[#0ea5c9] hover:underline"
+                                    className="text-xs text-primary hover:underline"
                                     onClick={() => navigator.clipboard?.writeText(o.payment_reference).then(() => toast({ title: 'Referência copiada' }))}
                                   >
                                     copiar
@@ -742,7 +883,7 @@ const AdminPage = () => {
                               )}
                               {o.shipping_method && (
                                 <p className="text-muted-foreground">
-                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${o.pickup_store || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio'}
+                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${orderPickupStore(o) || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio'}
                                 </p>
                               )}
                             </div>
@@ -790,11 +931,14 @@ const AdminPage = () => {
                               <p className="text-xs font-medium text-muted-foreground">Estado da encomenda</p>
                               <div className="flex flex-wrap gap-2">
                                 {Object.keys(ORDER_STATUS).map((status) => (
-                                  <Button key={status} size="sm" variant={o.status === status ? 'default' : 'outline'} className={o.status === status ? 'btn-primary' : ''} onClick={() => handleOrderStatus(o, status)} disabled={o.status === status}>
+                                  <Button key={status} size="sm" variant={o.status === status ? 'default' : 'outline'} className={o.status === status ? 'btn-primary' : ''} onClick={() => handleOrderStatus(o, status)} disabled={o.status === status || o.status === 'cancelled'}>
                                     {getOrderStatusLabel(status)}
                                   </Button>
                                 ))}
                               </div>
+                              {o.status === 'cancelled' && (
+                                <p className="text-xs text-muted-foreground">Cancelada: o stock já voltou à loja, por isso a encomenda não se reabre.</p>
+                              )}
                             </div>
 
                             <div className="space-y-2">

@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, BookOpen, X } from 'lucide-react';
 import { ProductGrid } from '@/components/ProductCard';
+import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid', onQuickView, embedded = false }) => {
+const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid', onQuickView, embedded = false, skeletonCount = 8 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -59,6 +60,10 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
   const displayList = embedded ? products : filteredList;
 
   if (isLoading) {
+    // O esqueleto usa a classe `product-grid` e as mesmas colunas da grelha real, e tantos
+    // cartões quantos a página vai mostrar. Antes eram 8 fixos, numa grelha com outras
+    // colunas: quando os 24 produtos chegavam, a página crescia de repente e empurrava tudo
+    // o que estava abaixo. Um esqueleto com a forma errada desloca tanto como não ter nenhum.
     return (
       <div className="space-y-6">
         {!embedded && (
@@ -67,10 +72,14 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
             <Skeleton className="h-8 w-full sm:w-80 rounded-full" />
           </div>
         )}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(8)].map((_, i) => (
+        <div
+          className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}
+          aria-busy="true"
+          aria-label="A carregar livros"
+        >
+          {Array.from({ length: skeletonCount }, (_, i) => (
             <div key={i} className="space-y-4">
-              <Skeleton className="aspect-[3/4] w-full rounded-xl" />
+              <Skeleton className="aspect-[2/3] w-full rounded-xl" />
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="h-4 w-1/3" />
             </div>
@@ -115,7 +124,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
                 size="sm"
                 onClick={() => setSelectedCategory(category)}
                 className={`rounded-full shrink-0 text-xs px-4 h-9 ${
-                  isSelected ? 'btn-primary bg-[#0ea5c9] text-white hover:bg-[#0ea5c9]/90' : 'hover:border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/5'
+                  isSelected ? 'btn-primary bg-primary text-white hover:bg-[#0ea5c9]/90' : 'hover:border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/5'
                 }`}
               >
                 {category === 'all' ? 'Todos os Géneros' : category}
@@ -144,7 +153,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
                 setSearchQuery('');
                 setSelectedCategory('all');
               }}
-              className="rounded-xl border-[#0ea5c9] text-[#0ea5c9] hover:bg-[#0ea5c9]/10"
+              className="rounded-xl border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10"
             >
               Limpar Filtros
             </Button>
@@ -155,7 +164,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
           layout
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="transition-all duration-300"
+          className="transition-all duration-base"
         >
           <ProductGrid products={displayList} isLoading={false} onCartOpen={onCartOpen} viewMode={viewMode} onQuickView={onQuickView} />
         </motion.div>

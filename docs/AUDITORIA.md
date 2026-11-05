@@ -10,15 +10,15 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
 |---|---|---|---|
 | 1 | Sanitização de HTML contornável (injecção de código nas descrições e slides) | Crítica | ✅ |
 | 2 | Edge Function publicada desactualizada: módulo de utilizadores partido em produção | Alta | ✅ publicada (2026-11-01 23:21) |
-| 3 | GitHub Actions bloqueado por pagamento (CI e deploys automáticos não correm) | Alta | ⏳ dono da conta |
+| 3 | GitHub Actions bloqueado por pagamento (CI e deploys automáticos não correm) | Alta | ✅ corre na conta nova; faltam segredos (ver 9.5) |
 | 4 | Service worker serve HTML antigo depois de cada deploy (risco de ecrã branco) | Alta | ✅ |
 | 5 | 100 de 102 livros sem descrição; 17 capas em branco; capas trocadas | Alta (negócio) | ⏳ conteúdo |
 | 6 | Carregamento inicial pesado (Firebase e Recharts em todas as páginas) | Média | ✅ 580 → 331 KB |
 | 7 | Contactos provisórios no site (telefone `+244 923 000 000`, WhatsApp vazio) | Média | ⏳ Configurações |
 | 8 | Emails de confirmação de encomenda desligados (sem SMTP) | Média | ⏳ Configurações |
-| 9 | Sem `robots.txt`, `sitemap.xml`, `favicon.ico`, etiquetas `og:` | Média | ✅ (falta só o `favicon.ico`) |
-| 10 | Sem cabeçalhos de segurança (CSP, X-Frame-Options, HSTS) | Média | ✅ excepto CSP |
-| 11 | 11 vulnerabilidades em dependências (10 altas, impacto prático baixo) | Média | ⏳ |
+| 9 | Sem `robots.txt`, `sitemap.xml`, `favicon.ico`, etiquetas `og:` | Média | ✅ |
+| 10 | Sem cabeçalhos de segurança (CSP, X-Frame-Options, HSTS) | Média | ✅ |
+| 11 | 11 vulnerabilidades em dependências (10 altas, impacto prático baixo) | Média | ✅ nada vulnerável no site publicado (ver 9.5) |
 | 12 | Stock: 96 de 102 livros esgotados ou com 1–4 unidades | Média (negócio) | ⏳ conferir |
 | 13 | API lenta (0,85–1,5 s por pedido, Supabase em Estocolmo, sem cache) | Média | ⏳ |
 | 14 | 53 botões só com ícone sem nome acessível | Baixa | ✅ |
@@ -28,7 +28,7 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
 | 18 | Três bugs de runtime que o gate desligado escondia (criar livro no painel rebentava) | Alta | ✅ |
 | 19 | `/track` devolvia a assinatura manuscrita a quem soubesse nº da encomenda + email | Alta | ✅ |
 | 20 | `/admin` descarregava todas as encomendas com `select *`, assinaturas base64 incluídas | Média | ✅ |
-| 21 | Limite de pedidos em memória por isolate: na prática não limitava nada | Alta | ⏳ migração por aplicar |
+| 21 | Limite de pedidos em memória por isolate: na prática não limitava nada | Alta | ✅ migração aplicada |
 
 ## 1. Repositório e deploy
 
@@ -225,20 +225,601 @@ Gravidade: **Crítica · Alta · Média · Baixa**. Estado: ✅ corrigido nesta 
   detecta a falta e recua para o limite local (comportamento anterior, sem regressão).
   Aplicar com `supabase db push` ou pelo painel.
 
+## 9.2 Passagem de produção (2026-11-03)
+
+Feita a partir da ponta `cc57236`, depois da migração para o repositório novo. Gate:
+lint limpo, **250 testes** (eram 244), build e `deno check` da Edge Function.
+
+### Corrigido
+
+- **Capas das colecções em branco.** As quatro capas estão em `images.unsplash.com`, e o
+  `img-src` do CSP só aceitava Supabase e Google: o navegador bloqueava-as. O próprio painel
+  diz para colar "um link directo (CDN, Unsplash)". O `img-src` passou a `https:` — uma
+  imagem não executa código; os scripts continuam fechados.
+- **Slides presos ao projecto antigo.** A galeria do painel gravava
+  `window.location.origin + caminho`, por isso os quatro slides têm
+  `https://livraria-adventista.pages.dev/images/…`. No projecto novo ou no domínio `.ao`
+  isso é outra origem (bloqueada pelo CSP) e desaparece quando o projecto antigo for
+  desligado. Agora a galeria grava o caminho relativo, `normalizeImageUrl` converte
+  endereços do próprio site em caminhos (`toSiteRelativeUrl`), e os slides já gravados são
+  convertidos na leitura — sem mexer nos dados.
+- **`canonical`, `og:`, sitemap e robots com o endereço antigo.** O `deploy-site.sh`
+  reescreve-os no build para o `SITE_URL` de destino; o mesmo commit serve para qualquer
+  projecto ou domínio.
+- **`favicon.ico`** criado (antes devolvia a página HTML).
+- **Edge Function não passava no `deno check`** (`headers` do `List-Unsubscribe` sem tipo).
+  O CI teria ficado vermelho no primeiro PR.
+- **Rotas públicas sem cache.** `/settings`, `/stores`, `/book-collections`,
+  `/payment-methods` e `/geo/*` (≈1 s cada, em todas as páginas) passam a
+  `Cache-Control: public, max-age=30, stale-while-revalidate=300`. O painel, ao gravar,
+  pede com `no-cache`, para ver logo o que gravou. **Só tem efeito depois de publicar a
+  Edge Function.**
+
+### Verificado sem problemas
+
+- As 13 funções `SECURITY DEFINER` que o advisor aponta como chamáveis por utilizadores com
+  sessão verificam todas a permissão no início (`has_permission`, `assert_can_manage_user`,
+  `is_admin`, `auth.uid()`). `book_review_helpfulness` é pública de propósito (contagem de
+  votos). `private.admin_emails` sem políticas é intencional: só o service role lê.
+- Migrações: as 33 do repositório coincidem com as da base de dados.
+- Segredos locais (`api-keys-*.csv`, `client_secret_*.json`, `.env`) estão no `.gitignore`.
+- `npm audit`: as 4 altas são do gRPC, que o Firebase só usa no servidor; não entra no site.
+
+### Segunda leva (2026-11-03, noite)
+
+- **O checkout nunca enviava a sessão.** O `initializeCheckout` fazia o `fetch` sem
+  `Authorization`, por isso o servidor tratava toda a encomenda como anónima: o
+  `customer_id` do `075bfa3` ficava sempre vazio, **mesmo depois de publicar a função**.
+  Agora envia o token quando há sessão (sem sessão segue como antes).
+- **O GPS da entrega nunca chegava.** O carrinho passava `deliveryGpsLat/Lng`, mas a função
+  só reenviava os campos que nomeia. As 6 encomendas na base de dados têm 0/0. Corrigido;
+  4 testes novos (`checkoutRequest.test.js`) falham com o código antigo.
+- **Testes no CI.** Sem o `.env` (que não está no git) quatro ficheiros de teste nem
+  carregavam. O `vitest.config.js` fixa um projecto fictício: 254 testes passam com e sem
+  `.env`.
+- **Sitemap com livros e colecções.** `scripts/seo-catalogo.mjs` (antes `gerar-sitemap.mjs`) corre no deploy e junta
+  as 102 páginas de livro e as 4 de colecção às 8 fixas (lê só o que é público). Se a base
+  de dados não responder, publica com as fixas.
+
+Fica por decidir: o servidor ainda aceita entrega ao domicílio sem conta (a regra só está
+no carrinho). **Só se pode exigir depois de o site novo estar publicado** — antes disso, o
+site antigo não envia a sessão e todas as entregas seriam recusadas.
+
+### Por fazer (precisa de autorização ou do dono)
+
+- **Publicar a Edge Function.** A publicada é de 2026-11-02 13:59 e não tem o
+  `customer_id` no checkout (commit `075bfa3`): as encomendas novas de clientes com sessão
+  ficam sem conta e **não geram as notificações do centro de atendimento**. Leva também a
+  cache e a correcção de tipos acima.
+- **Índices das 11 chaves estrangeiras** sem índice:
+  `docs/migracoes-pendentes/3_indices_chaves_estrangeiras.sql` (só acrescenta índices).
+- **Primeiro deploy no projecto novo** `livraria-editora-adventista` (hoje responde 522).
+- ~~IBAN de exemplo~~: corrigido a 2026-11-03 para o IBAN real da Livraria e Editora Adventista (BAI), confirmado na rota pública `/payment-methods`.
+- Conteúdo: telefone `+244 923 000 000` e das lojas
+  provisórios, emails de encomenda desligados (sem SMTP), 100 de 102 livros sem descrição,
+  12 esgotados, 3 linhas em `site_settings` e 3 `unitel_money` repetidas, e o nome da loja
+  "LIvraria Adventista - Huambo" com gralha e sem telefone.
+- Protecção contra palavras-passe vazadas: exige o plano Pro do Supabase.
+
+## 9.3 Backend mais leve, encomendas e partilha (2026-11-03, noite)
+
+Medido a partir de Angola: a Edge Function corre em Paris (`eu-west-3`) e a base de dados em
+Estocolmo; um pedido sem base de dados leva ~0,36 s (rede) e cada consulta em série
+acrescenta 0,1–0,2 s. Fixar a função na região da base de dados não mudou nada mensurável. A
+alavanca é fazer menos consultas em série:
+
+- **Cache curta por instância** (`runtime.ts`, 11 testes): definições e integrações 15 s,
+  dono do CRM 5 min; pedidos simultâneos partilham a leitura; o painel lê fresco onde testa
+  o que acabou de gravar. `/messaging/status` e `/chat` fazem as leituras em paralelo.
+- **Checkout sem esperar** pelo email (SMTP, 1–3 s quando ligado) nem pelo CRM: vão depois
+  da resposta (`EdgeRuntime.waitUntil`). O WhatsApp fica antes, porque o carrinho usa
+  `whatsapp_sent`.
+- **`/catalog/summary`** passa a exigir `manage_catalog` (mostrava stock e vendas a todos).
+- **Campos repetidos das encomendas**: um só critério de leitura no site (`orderUtils.js`) e
+  na função (`orderFields.ts`), com um teste que confirma que dizem o mesmo. Corrige o
+  painel, que repetia a loja dos levantamentos, e a exportação, que mostrava o código do
+  método em vez do nome. O checkout deixa de gravar `payment_method` e `address`.
+  SQL por aplicar: `docs/migracoes-pendentes/4_campos_encomendas.sql` (testado num bloco
+  anulado).
+- **Partilha dos livros no WhatsApp**: `scripts/seo-catalogo.mjs` gera no deploy uma página
+  estática por livro (`product/<id>.html`) e por colecção, com o título, a capa e a
+  descrição. Escolheu-se ficheiro estático em vez de Pages Function: não custa nada por
+  visita e mantém os cabeçalhos do `_headers` — as respostas de uma Function não os levam
+  (documentação do Cloudflare). O mesmo passo troca os endereços públicos e põe o catálogo
+  no sitemap, e corre agora **também no deploy pelo Actions**, que antes o saltava.
+- **`security_spec.md`** reescrito para o Supabase (era do Firestore), com os casos de ataque
+  à lista de desejos e o teste em `docs/testes/seguranca_wishlists.sql`.
+
+- **Página inicial 309 → 241 KB comprimidos (−22 %)**, e o JavaScript a executar de ~916 para
+  ~695 KB. O `vite.config.js` voltara a ter uma regra geral (`return 'vendor-core'`) que
+  metia na página inicial as dependências do Recharts (`lodash`, `react-smooth`,
+  `decimal.js-light`… ~80 KB): a regra apanhava-as antes de o Rollup as juntar ao bloco dos
+  gráficos. Ficam fixos só os blocos que todas as páginas usam (React com o router, Supabase,
+  animações). Medido pelo source map; confirmado num Chrome sem interface que a página
+  inicial, a loja e a página de partilha de um livro arrancam e mostram o conteúdo.
+
+- **Fontes sem cadeia de pedidos**: o `@import` do Google Fonts estava dentro do CSS, e o
+  browser só o descobria depois de descarregar o CSS da loja (mais dois pedidos em série).
+  Passou para o `<head>` com `preconnect`. Saíram também cinco dependências que nada
+  importava (`@hookform/resolvers`, `date-fns`, `esbuild`, `next-themes`, `zod`).
+- **Por fazer:** versões mais pequenas das imagens do slider para telemóvel (hoje 1920×1080,
+  42–149 KB); esta máquina não tem ferramenta para gravar WebP.
+
+### Ordem de publicação (importa)
+
+1. **Site** (`deploy-site.sh` ou Actions): passa a enviar a sessão e o GPS no checkout e lê
+   as encomendas por um só critério. Funciona com a função antiga e com a nova.
+2. **`4_campos_encomendas.sql`** e **`3_indices_chaves_estrangeiras.sql`**.
+3. **Edge Function**: deixa de gravar `payment_method`/`address`, liga a encomenda à conta, e
+   traz a cache e o checkout sem esperas. Publicada antes do site, o painel antigo deixava de
+   mostrar a morada das encomendas novas.
+4. Depois de confirmado: exigir conta no servidor para entrega ao domicílio, e apagar as
+   colunas herdadas (ver o README de `docs/migracoes-pendentes`).
+
+## 9.4 Segurança, rede e continuidade (2026-11-04)
+
+Feita a partir da ponta `1ea225e` do ramo. Tudo o que está marcado como validado foi visto a
+funcionar (consulta à base de dados de produção só de leitura, pedido HTTP real, ou teste
+automático), e não apenas lido no código.
+
+### Arquitectura encontrada
+
+- **Site**: SPA React/Vite no Cloudflare Pages (`livrariaadventista.com` e `www`, projecto
+  `livraria-editora-adventista` com sufixo `-ben` no `pages.dev`). O projecto antigo
+  `livraria-adventista.pages.dev` **continua no ar com um build antigo**.
+- **API**: uma Edge Function do Supabase (`app`, `verify_jwt = false`, autenticação feita na
+  função) e o PostgREST com RLS. Base de dados Postgres 17 em `eu-north-1`.
+- **Autenticação**: Supabase Auth (email + palavra-passe com confirmação, Google OAuth). A
+  Firebase só serve o login Google Workspace do painel.
+- **Sem servidores próprios**: não há origem a esconder, nem balanceador a configurar. A
+  distribuição e o failover são os do Cloudflare e do Supabase.
+- **Pagamentos**: sem gateway. O cliente indica a referência e a equipa confirma no painel.
+
+### Estado de cada controlo
+
+| Controlo | Estado | Evidência |
+|---|---|---|
+| SQL sem concatenação de valores | Existente e validado | `place_order` monta colunas com `quote_ident` a partir do catálogo e passa os valores em `$1`; filtros PostgREST escapados (`likeExact`, `JSON.stringify` no `.or`) |
+| RLS nas tabelas expostas | Existente e validado | As 33 tabelas de `public` e o `storage.objects` com RLS; `private.rate_limits` sem RLS mas fora da API e sem grants |
+| Funções `SECURITY DEFINER` | Existente e validado | Todas com `search_path = ''`; li as 6 novas do atendimento: verificam `auth.uid()` e a permissão antes de escrever |
+| Privilégios no próprio perfil | Existente e validado | Trigger `protect_profile_privileges` repõe `role`, `permissions` e `email` |
+| Isolamento entre clientes | Existente; refinado | Encomendas, desejos, avaliações e notificações por `auth.uid()`. As conversas seguras deixavam o cliente reabrir e alterar a conversa (corrigido abaixo) |
+| Validação no servidor | Existente; refinado | Checkout com lista explícita de campos, tamanhos e preço calculado na base de dados; faltava validar a forma do email |
+| XSS | Existente; refinado | DOMPurify na loja, CSP sem `unsafe-inline` nos scripts; o editor do painel não sanitizava (corrigido) |
+| Segredos no repositório | Existente e validado | Histórico completo: só a configuração Web da Firebase (pública por desenho). CSV de chaves e `client_secret` locais nunca foram commitados |
+| Segredos na base de dados | Refinado (por publicar) | Estavam em colunas de `site_settings` legíveis por quem tem "Configurações" (hoje vazias). Passam para `private.site_secrets`, fora da API; o painel só vê "definida / não definida" |
+| Palavras-passe | Existente e validado | Só o Supabase Auth (bcrypt); não há hashing próprio |
+| Palavras-passe vazadas (HIBP) | Ausente | Advisor de segurança |
+| MFA | Implementado (por publicar) | TOTP: activação no perfil e código pedido à entrada. Exigido na base de dados e na Edge Function para contas com factor; 3 admins, 0 factores hoje |
+| Confirmação de email | Existente e validado | 0 contas por confirmar com sessão iniciada (a política de encomendas confia no email do JWT) |
+| Limites de pedidos | Existente e validado; refinado | Contador partilhado na base de dados. **IP fiável testado:** um `X-Forwarded-For` forjado ficou registado com o IP real. Respondia 400; passa a 429 com `Retry-After` |
+| Enumeração no `/track` | Existente e validado | O número leva os últimos 6 dígitos base36 do tempo **em milissegundos** (repetem só a cada ~25 dias) mais 3 aleatórios: adivinhar exige o milissegundo da compra |
+| Pagamento marcado só pelo servidor | Existente e validado | Checkout grava sempre `pending`/`awaiting_confirmation`; só `manage_orders` marca `paid` |
+| Idempotência do checkout | Implementado (por publicar) | Botão trancado (`a40fbfc`) e chave por tentativa no servidor, com índice único para pedidos simultâneos |
+| Crons (`/cron/*`) | Existente e validado | Segredo comparado em tempo constante e limite por IP |
+| Fuga de erros internos | Necessitava de refinamento | Erros não previstos (Postgres incluído) iam para o browser com estado 400 (corrigido) |
+| Cabeçalhos HTTP e TLS | Existente e validado | HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` nos dois hostnames; TLS 1.3, TLS 1.1 recusado; certificado até Fev. 2027; HTTP → HTTPS 301 |
+| SPF, DKIM, DMARC, MX | Ausente | `livrariaadventista.com` sem MX, SPF nem DMARC: qualquer pessoa pode enviar email em nome do domínio |
+| DNSSEC | Ausente | `DNSSEC: unsigned` no registo (Hostinger) |
+| WAF e regras do Cloudflare | Não foi possível verificar | O conector do Cloudflare precisa de autorização nesta sessão |
+| API do Supabase fora do WAF | Por desenho | O `*.supabase.co` não passa pelo Cloudflare do domínio; a protecção é o RLS e os limites da função |
+| Backups e PITR | Implementado (falta um segredo) | Plano **Free**: sem backups do Supabase nem PITR. Novo backup semanal cifrado pelo Actions (`docs/BACKUPS.md`); corre quando existir `BACKUP_PASSPHRASE` |
+| Observabilidade | Parcialmente implementado | Web Analytics do Cloudflare e registos do Supabase (latência por rota em `function_edge_logs`, usada abaixo); id de correlação acrescentado; sem alertas |
+| CI | Existente; refinado | Lint, 341 testes, build e `deno check`; acrescentadas a detecção de segredos e a auditoria de dependências críticas |
+| Tamanho dos pedidos | Refinado | O corpo era lido inteiro, sem tecto; passa a 1 MB (413) |
+| Balanceamento de carga | Não aplicável | Pages e Edge Functions são geridos; não há origens próprias |
+
+### Corrigido nesta passagem
+
+- **Erros internos fora do browser** (`index.ts`, despachante). Um erro não previsto devolvia a
+  mensagem interna, com nomes de colunas e restrições, e estado 400. Passa a 500 com uma frase
+  e o id do pedido; a equipa continua a ver o detalhe no painel. No checkout só as mensagens
+  escritas para o comprador (`raise exception`, código P0001, como "Stock insuficiente") saem
+  tal como estão.
+- **Id de correlação**: `X-Request-Id` em todas as respostas e em cada registo de erro, exposto
+  ao browser pelo CORS.
+- **429 com `Retry-After`** nos 12 limites de pedidos. O site lê só a mensagem, qualquer que seja
+  o estado, por isso nada muda para quem compra.
+- **Forma do email** validada no servidor no checkout (quando há email), na newsletter e no
+  formulário de contacto, que também passou a ter tamanhos máximos. Função `isEmail` em
+  `emails.ts`, com testes. As rotas do painel mantêm a validação que já tinham.
+- **Segredos de email fora da tabela**: `SMTP_PASSWORD` e `SENDGRID_API_KEY` como segredos da
+  Edge Function ganham ao valor do painel, como já acontecia com as chaves de IA. Sem segredo
+  definido, tudo funciona como antes.
+- **Editor do painel** (`RichTextEditor.jsx`): o HTML da base de dados ia para `innerHTML` sem
+  sanitizar. Quem tem permissão de catálogo escreve pela API sem passar pelo editor, por isso um
+  `<img onerror>` corria na sessão do admin que abrisse o livro. O CSP já o travava; passa a
+  haver também o sanitizador. 3 testes, dois dos quais falham com o código antigo.
+- **Migração `20261104090000_indices_chaves_estrangeiras`**: o SQL de índices que estava em
+  `docs/migracoes-pendentes/` passou a migração, para o Actions a aplicar no merge.
+- **Migração `20261104091000_conversas_seguras_cliente_so_fecha`**: o cliente só pode fechar a
+  sua conversa segura; já não a reabre nem lhe muda o grupo, o livro ou a avaliação. O site
+  nunca actualiza esta tabela e ela tem 0 linhas.
+
+### Segunda ronda (mesmo dia)
+
+- **Checkout idempotente** (`20261104092000_idempotencia_checkout`, `lib/checkoutIdempotency.js`).
+  Se a rede cai depois de o servidor gravar a encomenda, o cliente vê erro e carrega outra vez:
+  ficavam duas encomendas e o stock descontado duas vezes. O site manda uma chave por tentativa
+  (a mesma enquanto o pedido não mudar; nova se mudar o carrinho, a morada ou o pagamento), e a
+  função devolve a encomenda que a chave já criou, sem stock nem avisos repetidos. Dois pedidos
+  simultâneos: o índice único deixa passar um, e o outro recebe a mesma encomenda. Sem a
+  migração a função ignora a chave.
+- **Verificação em dois passos** (`20261104093000_verificacao_dois_passos_equipa`, `mfa.ts`,
+  `MfaGate`, `MfaSettings`). Activação no perfil → Segurança (QR e chave escrita), código pedido
+  depois de entrar. **A exigência está no servidor:** numa conta com factor verificado,
+  `is_admin`, `is_staff` e `has_permission` (e com elas todas as políticas RLS, o Storage e as
+  funções de utilizadores) e a Edge Function só reconhecem a equipa numa sessão `aal2`. Sem
+  isto a palavra-passe chegava para chamar a API REST e saltar o ecrã. Contas sem factor não
+  mudam. O diálogo vai num bloco à parte: a página inicial passou de 241,9 para 243,0 KB gzip
+  (medido no build; numa primeira versão eram +9,7 KB, por isso foi separado).
+  **Recuperação** se um admin perder o telemóvel: outro admin, ou Supabase → Authentication →
+  Users → remover o factor.
+- **Segredos fora da API** (`20261104094000_segredos_fora_da_api`, `lib/siteSecrets.js`). Ver a
+  tabela acima. Um trigger apanha o valor quando o painel o grava, por isso um painel antigo
+  continua a funcionar; a Edge Function junta-os às definições ao lê-las.
+- **Corpo dos pedidos limitado a 1 MB** e **referência curta** (`ref. 1a2b3c4d`) na mensagem de
+  erro inesperado, para o cliente a passar à loja.
+- **Detecção de segredos** (`scripts/verificar-segredos.mjs`) no CI e no `deploy-site.sh`: chaves
+  com prefixo próprio e JWT `service_role`; a chave Web da Firebase fica de fora (é pública).
+
+### Terceira ronda (mesmo dia): evidências, desempenho e continuidade
+
+**Isolamento, testado em produção como visitante anónimo** (só leituras, com a chave pública que
+vai no site):
+
+- As 24 tabelas privadas devolvem **0 linhas** ou **401**: `orders`, `profiles`, `site_settings`,
+  `app_integrations`, as 4 do CRM, `newsletter`, `notification_logs`, `email_queue`, o painel de
+  vendas, `stock_movements`, `push_subscriptions`, as 6 do atendimento e das conversas,
+  `wishlists`, `book_review_helpful_votes`, `e2ee_device_keys`.
+- As públicas por desenho devolvem o esperado: 102 livros, 4 métodos de pagamento activos, 3
+  lojas, 4 slides, 4 colecções.
+- As funções sensíveis recusam o anónimo com 401, **mesmo com argumentos válidos**:
+  `place_order`, `check_rate_limit`, `users_admin_list`, `admin_users_list`, `claim_email_jobs`,
+  `email_queue_scheduler_status`, `e2ee_admin_key_packages`, `current_role_name`.
+- Entre clientes com sessão (cliente A a ler dados do cliente B) **ainda não foi corrido**. O teste
+  está escrito em `docs/testes/isolamento_clientes_e_equipa.sql`, com 21 casos e o resultado
+  esperado de cada um. Cobre encomendas, notificações, atendimento, perfis, configurações e
+  funções do painel, e também as migrações novas (MFA em aal1/aal2, segredos, conversas
+  seguras, chave repetida). Não grava nada: termina num erro que anula a transacção. Corre-se no
+  SQL Editor de um projecto de testes, ou em produção depois de aplicar as migrações.
+
+**Paginação das encomendas no painel: deixada de fora de propósito.** O painel carrega a lista
+inteira (só com as colunas da lista) porque os relatórios de vendas somam todas as encomendas.
+Paginar obrigava a passar esses relatórios para agregações na base de dados, uma mudança grande
+sem ganho com 6 encomendas. Rever quando passar das ~2 000 encomendas ou o separador demorar
+mais de 2 s a abrir.
+
+**Linha de base da API** (`function_edge_logs`, 24 h até 2026-11-04, sem um único 5xx):
+
+| Rota | Pedidos | p50 | p95 | p99 |
+|---|---|---|---|---|
+| `GET /payment-methods` | 326 | 334 ms | 958 ms | 1 437 ms |
+| `POST /cron/email-queue` | 287 | 1 968 ms | 2 878 ms | 3 514 ms |
+| `GET /integrations` | 237 | 665 ms | 1 398 ms | 2 723 ms |
+| `GET /chat/config` | 230 | 330 ms | 1 105 ms | 2 181 ms |
+| `GET /settings` | 225 | 542 ms | 1 205 ms | 2 376 ms |
+
+O que mudou a partir daqui (efeito por medir depois de publicar, com a mesma consulta):
+
+- **Agendadores só com trabalho** (`20261104095000`, e a migração das campanhas ainda por
+  aplicar). O `/cron/email-queue` arrancava a função 287 vezes por dia, ~2 s cada, com a fila
+  vazia. Agora a base de dados confirma primeiro se há trabalho, com o mesmo critério do
+  `claim_email_jobs`. Esperado: 0 chamadas enquanto não houver emails.
+- **`/integrations` e `/chat/config` com a cache curta** de `/settings` (30 s, e até 5 min em
+  segundo plano). São iguais para todos os visitantes; o painel pede com `no-cache` depois de
+  gravar.
+- **`/admin/media-config` só para a equipa.** Era pedido em cada página por qualquer cliente
+  com sessão, e sempre recusado.
+
+**Autenticação, revista nesta ronda:** o registo e a recuperação de palavra-passe não revelam
+se uma conta existe (o Supabase devolve o mesmo com e sem conta, e o site mostra "Email
+enviado" nos dois casos); as três entradas de palavra-passe exigem 8 caracteres no site. O
+mínimo do Supabase Auth continua nos 6 por omissão: subir para 8 em Authentication → Policies.
+
+**CSP restrito ao projecto** (`scripts/csp-supabase.mjs`, plugin no `vite.config.js`). O
+`connect-src` e o `media-src` aceitavam `*.supabase.co`, ou seja qualquer projecto Supabase:
+um script injectado podia mandar dados para um projecto do atacante. No build passam a ser a
+origem de `VITE_SUPABASE_URL`; sem a variável o ficheiro fica como estava. Confirmado que
+nenhum conteúdo da base de dados aponta para outro projecto Supabase.
+
+**Respostas da API com dados pessoais** passam a `Cache-Control: no-store` e `nosniff`; as
+públicas mantêm a cache curta.
+
+**Continuidade:** organização no plano **Free**. Não há backups do Supabase nem PITR, e um
+projecto Free pode ser pausado por inactividade. Backup semanal cifrado pelo Actions, com RPO de
+7 dias e RTO de ~1 h, e o restauro descrito em `docs/BACKUPS.md`. O restauro **nunca foi
+testado**: precisa do segredo `BACKUP_PASSPHRASE` e de um projecto à parte.
+
+**Ordem de publicação:** as migrações primeiro (seis desta auditoria, mais as duas do CRM) (o Actions fá-lo no merge), depois a Edge
+Function, depois o site. Qualquer outra ordem funciona sem erros — cada parte detecta a falta
+da outra —, mas só com as três a protecção fica completa.
+
+**As migrações não foram corridas contra um Postgres.** Esta máquina não tem Postgres, e
+o teste dentro de uma transacção anulada na base de dados de produção foi recusado nesta
+sessão. A primeira só cria índices com `if not exists`.
+
+### Por fazer (precisa do dono ou de autorização)
+
+1. **Email do domínio** (Cloudflare → DNS). Enquanto o domínio não envia nem recebe email:
+   `MX 0 .`, `TXT "v=spf1 -all"` e `_dmarc TXT "v=DMARC1; p=reject; rua=mailto:<caixa>"`.
+   Quando se ligar o SMTP ou o Email Routing, trocar o SPF pelo do fornecedor **antes** de
+   enviar o primeiro email. Para reverter, basta apagar os registos.
+2. **`site_settings` com três linhas**, todas com `site_url = https://livraria-adventista.pages.dev`.
+   A função lê a mais antiga; os links dos emails (incluindo o de cancelar a subscrição) vão
+   para o projecto antigo. Corrigir o URL em Configurações e apagar as duas linhas a mais
+   depois de confirmar qual é a activa.
+3. **Projecto antigo `livraria-adventista.pages.dev`**: serve um build antigo ligado à mesma
+   base de dados. Redireccionar para o domínio novo ou desligar.
+4. **Activar o MFA nas três contas de admin**, depois de publicado (perfil → Segurança). Antes,
+   confirmar no Supabase → Authentication → Multi-Factor que o TOTP está ligado (é o padrão).
+5. **Protecção de palavras-passe vazadas**: Supabase → Authentication → Policies. Disponível
+   a partir do plano Pro.
+6. **Segredos**: com a migração aplicada, o painel já não os expõe. Mais tarde, apagar as
+   cinco colunas de `site_settings` (ficam sempre vazias): primeiro o painel tem de deixar de
+   as enviar, senão o PostgREST recusa a gravação.
+7. **DNSSEC**: activar no Cloudflare e colar o registo DS no painel da Hostinger. Por esta
+   ordem, nunca ao contrário.
+8. **WAF, regras de rate limiting e alertas do Cloudflare**: verificar com o conector
+   autorizado. Para alertas sem custo: notificação de picos de tráfego e de erros 5xx no
+   Cloudflare, e um alerta no Supabase para falhas da função.
+9. **Backups**: criar o segredo `BACKUP_PASSPHRASE` (comando em `docs/BACKUPS.md`), correr o
+   workflow à mão uma vez e fazer o primeiro teste de restauro num projecto à parte. Quando
+   houver vendas reais, decidir se 7 dias de RPO chegam (backup diário sem custo, ou plano Pro).
+10. **`site_url` nas configurações** — a correcção foi recusada nesta sessão (alteração a dados
+    de produção). Em Configurações → endereço do site, ou no SQL Editor:
+    `update public.site_settings set site_url = 'https://livrariaadventista.com' where site_url = 'https://livraria-adventista.pages.dev';`
+    Para reverter, o mesmo com os endereços trocados.
+
+### Rollback
+
+- Edge Function: voltar a publicar a versão anterior (`git checkout 1ea225e -- supabase/functions/app`
+  e `supabase functions deploy app --no-verify-jwt`). Não há migração de que dependa.
+- Site: o painel do Cloudflare Pages permite promover o deploy anterior.
+- Migrações: `drop index if exists …` para cada um dos 11 índices;
+  `drop trigger secure_support_threads_guard on public.secure_support_threads` e
+  `drop function private.secure_support_threads_guard()`.
+- Idempotência: `drop index orders_idempotency_key_key` e `alter table orders drop column idempotency_key`
+  (a função passa a ignorar a chave sozinha).
+- MFA: recriar `is_admin`, `is_staff` e `has_permission` sem `and private.mfa_satisfied()`
+  (definições em `20261101131748_funcoes_privadas.sql` / `20261101131516_base_perfis.sql`).
+- Segredos: `drop trigger site_settings_capture_secrets on public.site_settings`; os valores
+  ficam em `private.site_secrets` para repor nas colunas.
+
+### Custos
+
+Nenhum serviço novo nem dependência nova. Os pontos 5 e 9 dependem do plano do Supabase.
+
+### Estado de publicação (actualizado a 2026-11-04, 13h)
+
+- **Base de dados:** as migrações até `20261104095000` estão aplicadas em produção (pela outra
+  sessão, com as versões dos ficheiros). Confirmado por consulta: MFA nas três funções de
+  permissão, triggers dos segredos e das conversas, índice de idempotência, índices das
+  chaves estrangeiras, agendadores só com trabalho. A `20261104120000` (índice em
+  `contact_group_members.added_by`) também já está aplicada (confirmado a 2026-11-04, ver 9.5).
+- **Edge Function:** a versão publicada é a final (verificado pelos cabeçalhos `X-Request-Id`,
+  `Cache-Control: no-store` e a cache de `/integrations`).
+- **Site:** publicado em produção a partir de `6361ec1` (`deploy-site.sh`), verificado em
+  `https://livrariaadventista.com`. O CSP já só aceita o projecto Supabase da loja, e a loja
+  carrega os 102 livros e as capas com ele. A barra inferior e a lista contínua estão activas
+  no telemóvel.
+- **Advisors depois do deploy:** nada novo de gravidade; `private.site_secrets` sem políticas é
+  intencional (só a service role lhe chega).
+
+## 9.5 Correcção auditada (2026-11-04, tarde)
+
+Releitura de cada ponto ⏳ contra o estado real, com comandos. Vários estavam já resolvidos e
+a tabela não tinha sido actualizada.
+
+### Verificado
+
+| Ponto | Evidência |
+|---|---|
+| 21 e a `20261104120000` | `list_migrations` no projecto `bggqkjjqbjhbjsckzopj`: as 42 migrações de `supabase/migrations` estão todas aplicadas, de `20261101131516` a `20261104120000`, incluindo `20261102013223_limites_pedidos`. |
+| 3 | `gh run list`: a verificação dos PRs corre (última a 2026-11-04 13:32, com sucesso). Só existe o segredo `SUPABASE_DB_PASSWORD`; os outros quatro continuam por criar. |
+| 9 | `https://livrariaadventista.com/favicon.ico` responde 200 `image/vnd.microsoft.icon`. |
+| 10 | A resposta da página inicial traz `content-security-policy`, `strict-transport-security` e `x-frame-options: SAMEORIGIN`. |
+| Próximo passo 6 | Scope do Gmail: `googleAuth.js` pede só `gmail.readonly` e `gmail.send` (já não `mail.google.com`). `access-link`: o link só volta a um administrador e só quando o email não seguiu. |
+
+### Corrigido
+
+- **Dependências (achado 11).** `npm audit fix` sem `--force`: só subidas dentro das versões
+  pedidas no `package.json` (`vite` 7.3.6 → 7.3.7, `eslint` 9.39.4 → 9.39.5, `browserslist`,
+  `js-yaml`, `brace-expansion`, `baseline-browser-mapping`, entre outras). Antes 16 avisos
+  (8 altos), agora 11 (4 altos). Lint limpo, 48/48 ficheiros e 416/416 testes, build sem erros.
+- **O que fica, e porquê:**
+  - `@grpc/grpc-js` (os 4 altos) chega pelo `firebase` → `@firebase/firestore`. O site não
+    importa o Firestore (só o Auth, em `firebaseClient.js` e `googleAuth.js`), e o gRPC só
+    corre em Node: `grep -i grpc` no `dist/` dá zero ficheiros. A versão mais recente do
+    Firebase (13.2.0) continua presa a `~1.9`, por isso subir não resolve; o `--force`
+    trocaria o Firebase por uma versão maior sem ganho.
+  - `minimatch` (moderados) vem do ESLint e dos plugins: só na máquina de quem desenvolve,
+    nunca no site. O `--force` exige versões maiores dos plugins.
+
+### Segunda ronda (mesmo dia): resolver o que estava parado
+
+Decisões do dono nesta ronda: tirar os telefones provisórios, tirar o mapa às lojas com
+coordenadas da cidade errada, gerar a frase dos backups, e criar à mão os tokens das contas.
+
+**Dados de produção, em três migrações novas** (testadas de ponta a ponta num Postgres em
+memória com os dados de produção: 25 verificações, incluindo repetir cada uma sem efeito):
+
+- `20261105045627_limpeza_dados_provisorios`:
+  - `site_settings` fica com uma linha só: a `et8zevy21sypp73`, que é a que a função lê e a
+    única configurada. As outras duas eram restos quase vazios. Um índice único impede que
+    volte a haver duas. O painel lê a mesma linha (o cliente de dados ordena por omissão
+    como a função), por isso nunca gravou na linha errada.
+  - `site_url` passa a `https://livrariaadventista.com` (os links dos emails, incluindo o
+    de cancelar a subscrição, iam para o projecto antigo).
+  - Telefones provisórios (`+244 923 000 000/001/002`) saem das configurações e das lojas.
+    O botão de WhatsApp do rodapé usava o geral como recurso: apontava para um número que
+    não existe.
+  - Coordenadas trocadas: "Catumbela" estava em Luanda (−8,91; 13,18) e "Lubango" em
+    Benguela (−12,58; 13,41). Ficam em `NULL` (não `0`, que a localização trataria como um
+    ponto no Golfo da Guiné). O link do mapa passa a procurar pela morada escrita.
+  - "LIvraria Adventista - Huambo" → "Livraria Adventista — Huambo".
+  - Três `unitel_money` iguais e desligados → um, e o código passa a ser único.
+  - Tudo o que muda ou sai fica antes em `private.correcoes_dados`. O fim do ficheiro diz
+    como reverter.
+- `20261105045510_campos_encomendas` (antes em `docs/migracoes-pendentes/`): o site
+  publicado já tem o código de que depende, e a definição do trigger em produção era igual
+  à do ficheiro, tirando as duas mudanças pretendidas.
+- `20261105045517_capas_das_colecoes`: as quatro capas das colecções eram fotos genéricas do
+  Unsplash. Passam às imagens feitas com as capas reais (já publicadas no domínio novo; o
+  SQL antigo apontava para o projecto antigo). Só troca as que ainda são do Unsplash.
+- `1_loja_talatona_para_huambo.sql` retirado: transformaria Catumbela numa segunda loja do
+  Huambo.
+
+**A aplicação directa em produção foi recusada pelas permissões desta sessão.** As três
+entram com o `supabase db push` do workflow no merge para o `main`, que só corre quando
+existir o segredo `SUPABASE_ACCESS_TOKEN`. Também se podem colar no SQL Editor, por ordem
+de versão.
+
+**Painel:**
+- Livros: indicador e filtro "Sem descrição" (100 de 102 livros, confirmado por consulta).
+  "Sem capa" passa a contar da mesma maneira no indicador e no filtro (antes o indicador
+  ignorava `cover_image`). Carregar num indicador abre a lista correspondente.
+  Critério único em `lib/bookContent.js`, com testes.
+- Lojas: etiqueta "Sem telefone" ao lado da "Sem GPS".
+- Configurações → Contacto: aviso quando não há telefone nem WhatsApp.
+
+**GitHub Actions:** criados `BACKUP_PASSPHRASE` (frase de 64 caracteres, cópia em
+`~/Documents/livraria-BACKUP_PASSPHRASE.txt`, só com permissões do dono) e
+`CLOUDFLARE_ACCOUNT_ID`.
+
+**Advisors (2026-11-04, 18h):** as 16 funções `SECURITY DEFINER` que um utilizador com sessão
+pode chamar verificam todas a permissão lá dentro; `book_review_helpfulness` (pública) só
+devolve contagens, e `e2ee_admin_key_packages` só chaves públicas. Os 34 índices "sem uso"
+são os das chaves estrangeiras numa base com poucos dias: ficam.
+
+**Segredos locais:** `api-keys-*.csv` e `client_secret_*.json` na raiz estão no
+`.gitignore` e nunca entraram no histórico. O `firebase-applet-config.json` é a configuração
+web do Firebase, pública por natureza.
+
+**Ficou de fora, de propósito:** trocar o Firebase Auth pelo Google Identity Services
+tiraria os últimos avisos do `npm audit`, mas o código vulnerável não chega ao site, e o
+login Google do separador Workspace não se pode testar sem uma conta e um navegador.
+
+### Continua por fazer (dono)
+
+| O quê | Onde |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens → criar "github-actions-livraria"; `gh secret set SUPABASE_ACCESS_TOKEN --repo fernandotunas6-bot/Livraria-Editora-Adventista` |
+| `CLOUDFLARE_API_TOKEN` | dash.cloudflare.com → My Profile → API Tokens → modelo "Edit Cloudflare Workers", com *Cloudflare Pages: Edit* na conta valentinocanguele@gmail.com; mesmo comando |
+| Frase dos backups | passar `~/Documents/livraria-BACKUP_PASSPHRASE.txt` para um gestor de palavras-passe e apagar o ficheiro |
+| Telefones e WhatsApp verdadeiros | Configurações → Contacto, e Lojas |
+| Coordenadas de Catumbela e Lubango | Lojas → colar o link do Google Maps de cada loja |
+| Descrições, stock real | Livros → filtro "Sem descrição" |
+| SMTP / emails de encomenda | Configurações → Email |
+| Projecto antigo `livraria-adventista.pages.dev` | está noutra conta Cloudflare: redireccionar ou apagar |
+| Email do domínio, DNSSEC, alertas | 9.4, pontos 1, 7 e 8 (o wrangler desta máquina só lê zonas) |
+| MFA nas contas de admin | perfil → Segurança |
+| Palavras-passe vazadas | plano Pro do Supabase |
+
+## 9.6 Login, links e navegador real (2026-11-04, noite)
+
+Pedido: verificar o login com a Google, os links e o resto, num navegador a sério. Feito com
+o Chrome desta máquina (puppeteer-core no scratchpad): 13 páginas, em computador e telemóvel,
+com a consola, os pedidos falhados e a consola do próprio service worker.
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| 22 | **Todos os links de autenticação levavam ao site antigo.** O `site_url` do Supabase Auth era `https://livraria-adventista.pages.dev/` e a lista de destinos autorizados só tinha o `localhost` e endereços do Lovable. O Supabase ignora um destino que não conhece e manda para o `site_url`: o regresso do login com a Google, a confirmação de conta e a recuperação de palavra-passe, pedidos em `livrariaadventista.com`, acabavam todos no projecto antigo. Provado com `/auth/v1/verify` e um token inválido (o Supabase redirecciona o erro para o destino que aceita): os três endereços da loja → `livraria-adventista.pages.dev`. | Crítica | ⏳ script pronto (a alteração foi recusada nesta sessão) |
+| 23 | **As fontes deixavam de carregar a partir da segunda página.** O service worker refazia com `fetch()` os pedidos a outros domínios; dentro dele vale o `connect-src` do CSP, que não inclui `fonts.gstatic.com`, `static.cloudflareinsights.com` nem `images.unsplash.com`. A consola do SW: *"Refused to connect because it violates the document's Content Security Policy"*. Inter e Fraunces ficavam `error` e o site caía para as fontes do sistema, para quem voltasse. | Alta | ✅ (no próximo deploy) |
+| 24 | Link de email expirado ou entrada com a Google cancelada: o Supabase volta com `#error=…&error_code=otp_expired` e o site não dizia nada (o `/login` mostrava o formulário; o `/reset-password` só "Link inválido."). | Média | ✅ (no próximo deploy) |
+| 25 | `www.livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev` serviam a loja inteira: sessão, carrinho e favoritos à parte por domínio (o canonical estava certo, o SEO não sofria). | Média | ✅ (no próximo deploy) |
+| 26 | Emails do Auth (confirmar conta, nova palavra-passe, convite…) em inglês. | Média | ⏳ no mesmo script do 22 |
+| 27 | **Sem SMTP no Supabase Auth**: o serviço por omissão só entrega a membros da equipa do projecto, e no máximo 2 por hora. Um cliente que se registe com email não recebe a confirmação e não consegue entrar. Hoje há só 3 contas (a equipa), por isso ainda ninguém foi afectado. | Alta | ⏳ dono (Supabase → Authentication → SMTP) |
+
+### Verificado sem problemas
+
+- **Google:** o pedido chega a `accounts.google.com` com o `redirect_uri` do projecto
+  (`…supabase.co/auth/v1/callback`) e a Google mostra o ecrã de entrada, sem
+  `redirect_uri_mismatch`. O botão "Continuar com Google" aparece no `/login` (computador e
+  telemóvel) e leva lá. Âmbito pedido: só `email profile`.
+- Um destino estranho (`https://evil.example.com`) é recusado pelo Supabase.
+- Os 114 endereços do sitemap respondem 200. Os 53 links internos das páginas apontam todos
+  para rotas que existem. `http://` → `https://` com 301.
+- A Edge Function monta os links de convite e recuperação com o mesmo critério (lista do Auth).
+
+### Corrigido no código
+
+- `public/sw.js`: não toca em pedidos a outros domínios, excepto as imagens públicas do
+  Storage do Supabase (as capas, que o CSP autoriza). Um pedido que falha sem cópia em cache
+  devolve `Response.error()` em vez de `undefined` (era o *"Failed to convert value to
+  'Response'"*). Testado com um controlo: com o SW antigo, num servidor local com os
+  cabeçalhos do `_headers`, as 7 variantes de fonte falham na segunda página; com o novo,
+  carregam as 7. Teste novo: `lib/serviceWorker.test.js` (os dois casos externos falham com o
+  SW antigo).
+- `lib/authRedirectError.js` + `AuthRedirectNotice` no `App.jsx`: lê o erro, mostra-o em
+  português (link expirado, entrada cancelada, conta suspensa…) e tira-o do endereço. O
+  `/reset-password` diz a razão na página. Verificado no Chrome.
+- `lib/canonicalHost.js`, o primeiro módulo a correr: o `www` e o `pages.dev` de produção vão
+  para `https://livrariaadventista.com`, com caminho, pesquisa e `#` (onde a Google devolve a
+  sessão). As pré-visualizações e o `localhost` ficam como estão. Confirmado no bundle que
+  corre antes de o cliente Supabase ler o endereço.
+
+### Para aplicar (dono)
+
+```sh
+bash scripts/configurar-auth.sh --verificar   # mostra o que muda e testa os destinos; não mexe
+bash scripts/configurar-auth.sh               # guarda os valores actuais, pede confirmação, aplica e testa
+```
+
+Muda só o `site_url`, a lista de destinos (a loja, o `www`, o `pages.dev` e as
+pré-visualizações, e o `localhost:3000`; saem os endereços do Lovable) e seis emails, que passam
+para português (`supabase/auth/`). Para reverter: `--repor supabase/auth/.antes-<data>.json`.
+Pelo painel é o mesmo: Authentication → URL Configuration, e → Email Templates.
+
+Depois, o SMTP do Auth (achado 27): Authentication → SMTP Settings, com o mesmo fornecedor que
+for usado em Configurações → Email. Até lá, a alternativa é desligar a confirmação de email
+(Authentication → Providers → Email), aceitando contas com emails que ninguém confirmou.
+
+## 9.7 Erros reais dos registos (2026-11-05)
+
+Leitura dos registos das últimas 24 horas do Supabase (API, base de dados, Auth, Edge Function e
+Storage), agrupados por erro. Os 401 e 404 das 08:35 de 2026-11-04 são o teste de isolamento da
+auditoria (pedidos anónimos que têm de ser recusados). Os `/track` 404/400 são encomendas que
+não existem, e o 400 de `/auth/v1/token` é uma palavra-passe errada: tudo comportamento certo.
+O Storage teve 3 175 pedidos de capas, nenhum 4xx.
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| 28 | **Login com a Google partido no Supabase.** Duas pessoas tentaram entrar (2026-11-04, 12:03 e 17:44) e o regresso falhou com `oauth2: "invalid_client" "The provided client secret is invalid."`. O ID do cliente está certo; a chave guardada no Supabase não. A chave do JSON descarregado da Google Cloud (na raiz, fora do git) foi confirmada na própria Google: um código falso dá `invalid_grant`, ou seja, a chave é aceite. | Crítica | ⏳ `bash scripts/configurar-auth.sh --google client_secret_….json` |
+| 29 | **Separador Atendimento da equipa inteiro em erro.** O painel pedia `href` a `staff_notifications`, que não tem essa coluna (400 nos registos, 10:49). As três consultas do atendimento correm num `Promise.all`, por isso a equipa não via nem as notificações nem as conversas. | Alta | ✅ (no próximo deploy) |
+| 30 | **Ligação do painel ao Google Workspace recusada no domínio novo.** O Firebase (projecto `skilful-form-c5jvd`) só tem autorizados o projecto antigo e endereços do AI Studio. Provado no Chrome com o SDK do Firebase: em `livrariaadventista.com` dá `auth/unauthorized-domain`. O painel mostrava a mensagem crua em inglês. | Alta | ⏳ dono (Firebase → Authentication → Settings → Authorized domains: `livrariaadventista.com`); a mensagem passa a dizê-lo ✅ |
+
+### Corrigido no código
+
+- `supportApi.js`: campos próprios para as notificações do cliente e da equipa.
+- `lib/queryFields.test.js`, teste novo: encontra no código todas as consultas
+  `.from('tabela').select('campos')` com campos escritos à mão (24) e confirma, pelas
+  migrações, que cada coluna existe. Com o `supportApi.js` antigo falha e aponta
+  `staff_notifications.href`.
+- `lib/googleWorkspaceErrors.js`: mensagens em português para as falhas da ligação ao Google
+  Workspace; no domínio não autorizado, diz qual e onde se autoriza.
+- `scripts/configurar-auth.sh --google <json>`: confirma a chave na Google, pede confirmação e
+  põe-na no Supabase. A chave nunca aparece no ecrã nem nos argumentos.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.
-- **Erros na consola do navegador:** o Chrome sem interface não terminou nesta máquina.
+- ~~Erros na consola do navegador~~: verificado em 9.6 (Chrome com puppeteer-core).
 - **Ecrãs com sessão de equipa:** não há conta de teste disponível.
 - **Avisos de segurança e desempenho do Supabase (advisors):** precisam de um token com acesso à base de dados.
 
 ## Próximos passos, por ordem
 
-1. Aplicar a migração `limites_pedidos` e o SQL de `docs/migracoes-pendentes/`. (A Edge Function já está publicada e os advisors já correram: ver 9.1.)
-2. Desbloquear o GitHub (pagamento) → CI e deploys automáticos.
-3. Conteúdo: descrições, capas em branco ou trocadas, stock real, contactos, SMTP.
-4. Content-Security-Policy, com o browser aberto para confirmar cada fluxo (ver 9.1).
-5. `npm audit fix` e remover as dependências sem uso.
-6. Decisões do dono: o scope `https://mail.google.com/` (acesso total ao Gmail) pedido no
-   login Google, e o link de recuperação devolvido na resposta de `/admin/users/access-link`
-   (quem tem `manage_users` pode ler o link de qualquer cliente).
+1. `bash scripts/configurar-auth.sh --google client_secret_….json` (achado 28) e depois
+   `bash scripts/configurar-auth.sh` (achado 22): sem os dois, o login com a Google não
+   funciona e os links de email levam ao site antigo.
+2. Firebase → Authorized domains: `livrariaadventista.com` (achado 30), para a ligação do painel
+   ao Gmail, Drive e Calendário.
+3. SMTP do Supabase Auth (achado 27), senão os clientes não conseguem confirmar a conta.
+4. Criar `SUPABASE_ACCESS_TOKEN` e `CLOUDFLARE_API_TOKEN` (tabela de 9.5). A partir daí, um
+   merge para o `main` aplica as três migrações de 9.5 e publica a função e o site (com as
+   correcções de 9.6).
+5. Telefones, coordenadas das lojas, descrições e stock real.
+6. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.

@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  SlidersHorizontal, X, LayoutGrid, List, BookOpen, Sparkles,
-  Layers, Star, Package, ChevronRight, ChevronLeft, TrendingUp,
+  SlidersHorizontal, X, LayoutGrid, List, Sparkles,
+  Layers, Star, ChevronRight, ChevronLeft, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -12,18 +12,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
 import FilterPanel from '@/components/FilterPanel.jsx';
+import AdvancedSearchPanel from '@/components/AdvancedSearchPanel.jsx';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
-import AdvancedSearchPanel from '@/components/AdvancedSearchPanel';
 import ShopHeroBackground from '@/components/ShopHeroBackground';
-import CategoryBookMarquee from '@/components/home/CategoryBookMarquee';
+import CategoryBookMarquee, { CategoryBookMarqueeSkeleton } from '@/components/home/CategoryBookMarquee';
 import QuickViewModal from '@/components/QuickViewModal';
 import ProductCard from '@/components/ProductCard';
 import { getProduct } from '@/api/EcommerceApi';
 import { pageTitle } from '@/lib/brand';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { applyShopTheme, shopDefaults } from '@/lib/shopTheme';
+import { getSearchRelevance } from '@/lib/searchUtils';
+import { MOTION } from '@/lib/motion';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useInfiniteList } from '@/hooks/useInfiniteList';
+import { readPlace, useScrollMemory } from '@/hooks/useScrollMemory';
+import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
+import { PRODUCT_GRID_CLASS, SHOP_DENSITY_OPTIONS, shopDensityClass } from '@/lib/productGrid';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destaques' },
@@ -33,13 +40,20 @@ const SORT_OPTIONS = [
   { value: 'newest', label: 'Novidades' },
 ];
 
-function sortProducts(products, sortBy) {
+function sortProducts(products, sortBy, search = '') {
   return [...products].sort((a, b) => {
     if (sortBy === 'price-low') return a.price_in_cents - b.price_in_cents;
     if (sortBy === 'price-high') return b.price_in_cents - a.price_in_cents;
     if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
     if (sortBy === 'newest') return (b.order || 0) - (a.order || 0);
-    if (sortBy === 'featured') return (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || (b.order || 0) - (a.order || 0);
+    if (sortBy === 'featured') {
+      const relevance = search
+        ? getSearchRelevance(b, search) - getSearchRelevance(a, search)
+        : 0;
+      return relevance
+        || (b.featured ? 1 : 0) - (a.featured ? 1 : 0)
+        || (b.order || 0) - (a.order || 0);
+    }
     return (b.order || 0) - (a.order || 0);
   });
 }
@@ -63,9 +77,16 @@ const ShopPage = () => {
     shop_show_low_stock: settings.shop_show_low_stock !== false,
   };
 
-  const [sortBy, setSortBy] = useState(shop.shop_default_sort || 'featured');
-  const [viewMode, setViewMode] = useState('grid');
-  const [gridCols, setGridCols] = useState(shop.shop_grid_columns || 4);
+  // Ao voltar de um livro, a ordenação, a vista e a densidade voltam como estavam (não vivem
+  // no URL). Lidas antes de criar o estado, para a lista começar já na ordem certa: mudar a
+  // ordem depois reiniciava a lista e a posição reposta apontava para outros livros.
+  const location = useLocation();
+  const navType = useNavigationType();
+  const [initialPlace] = useState(() => (navType === 'POP' ? readPlace(`${location.pathname}${location.search}`) : null));
+
+  const [sortBy, setSortBy] = useState(initialPlace?.sortBy || shop.shop_default_sort || 'featured');
+  const [viewMode, setViewMode] = useState(initialPlace?.viewMode === 'list' ? 'list' : 'grid');
+  const [gridCols, setGridCols] = useState(Number(initialPlace?.gridCols) || shop.shop_grid_columns || 4);
   const [quickView, setQuickView] = useState(null);
   const [modalProduct, setModalProduct] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -74,9 +95,21 @@ const ShopPage = () => {
     applyShopTheme(settings);
   }, [settings]);
 
+  // Escape fecha o painel de filtros, como fecha o carrinho. Sem isto, quem navega pelo
+  // teclado só saía dele depois de percorrer todos os filtros lá dentro.
   useEffect(() => {
+    if (!isMobileFilterOpen) return undefined;
+    const aoTeclar = (e) => { if (e.key === 'Escape') setIsMobileFilterOpen(false); };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [isMobileFilterOpen]);
+
+  useEffect(() => {
+    // A ordem reposta ao voltar atrás ganha sempre à de omissão das configurações, mesmo
+    // que estas cheguem depois do primeiro desenho.
+    if (initialPlace?.sortBy) return;
     setSortBy(shop.shop_default_sort || 'featured');
-  }, [shop.shop_default_sort]);
+  }, [shop.shop_default_sort, initialPlace?.sortBy]);
 
   useEffect(() => {
     if (!quickView) {
@@ -108,16 +141,44 @@ const ShopPage = () => {
   } = useProductFilters();
 
   const sortedProducts = useMemo(
-    () => sortProducts(filteredProducts, sortBy),
-    [filteredProducts, sortBy]
+    () => sortProducts(filteredProducts, sortBy, activeFilters.search),
+    [filteredProducts, sortBy, activeFilters.search]
   );
 
   const perPage = shop.shop_per_page;
   const pageCount = Math.max(1, Math.ceil(sortedProducts.length / perPage));
   const currentPage = Math.min(page, pageCount);
-  const displayProducts = sortedProducts.slice((currentPage - 1) * perPage, currentPage * perPage);
-  const firstShown = sortedProducts.length === 0 ? 0 : (currentPage - 1) * perPage + 1;
-  const lastShown = Math.min(currentPage * perPage, sortedProducts.length);
+
+  // Telemóvel: a lista cresce sozinha ao deslizar, em lotes do tamanho da página
+  // (useInfiniteList). Desktop: as páginas numeradas de sempre. A chave de reinício são os
+  // filtros escolhidos (o URL) e a ordenação — nunca os dados, para a chegada dos livros não
+  // apagar o lugar reposto ao voltar atrás.
+  const isMobile = useIsMobile();
+  const infinite = useInfiniteList({
+    total: sortedProducts.length,
+    batch: perPage,
+    resetKey: `${location.search}|${sortBy}`,
+    enabled: isMobile && !isLoading,
+  });
+  // Ao voltar de um livro: os mesmos cartões, a mesma página e a mesma posição no ecrã.
+  const savedPlace = useScrollMemory({
+    ready: !isLoading && sortedProducts.length > 0,
+    snapshot: { count: infinite.count, page: currentPage, sortBy, viewMode, gridCols },
+  });
+  const { setCount: setInfiniteCount } = infinite;
+  useEffect(() => {
+    if (isLoading || !savedPlace) return;
+    if (savedPlace.count) setInfiniteCount(savedPlace.count);
+    if (savedPlace.page) setPage(savedPlace.page);
+    // Só uma vez, quando os livros chegam.
+  }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const displayProducts = isMobile
+    ? sortedProducts.slice(0, infinite.count)
+    : sortedProducts.slice((currentPage - 1) * perPage, currentPage * perPage);
+  // No telemóvel a lista começa sempre no primeiro e vai crescendo.
+  const firstShown = sortedProducts.length === 0 ? 0 : isMobile ? 1 : (currentPage - 1) * perPage + 1;
+  const lastShown = isMobile ? displayProducts.length : Math.min(currentPage * perPage, sortedProducts.length);
 
   useEffect(() => {
     setPage(1);
@@ -140,11 +201,13 @@ const ShopPage = () => {
     [allProducts]
   );
 
-  const gridClass = {
-    2: 'xl:grid-cols-2',
-    3: 'xl:grid-cols-3',
-    4: 'xl:grid-cols-4',
-  }[gridCols] || 'xl:grid-cols-4';
+  // Estável entre renders: uma função criada no JSX muda de identidade a cada render e
+  // anula o `memo` dos cartões, que é o que evita refazer os 24 sempre que o painel de
+  // filtros abre ou a página muda.
+  const handleCartOpen = useCallback(() => setIsCartOpen(true), []);
+
+  // Densidade no desktop largo (ver lib/productGrid.js): a grelha é a mesma do resto do site.
+  const gridClass = shopDensityClass(gridCols);
 
   const inStockProducts = useMemo(
     () => allProducts.filter((p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0),
@@ -179,7 +242,7 @@ const ShopPage = () => {
         <meta name="description" content={heroSubtitle} />
       </Helmet>
 
-      <Header onCartOpen={() => setIsCartOpen(true)} />
+      <Header onCartOpen={handleCartOpen} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       {/* Hero personalizável com fundo configurável */}
@@ -189,51 +252,29 @@ const ShopPage = () => {
               <Sparkles className="h-4 w-4" />
               <span>{heroBadge}</span>
               <span className="text-white/40">·</span>
-              <Link to="/" className="hover:text-white transition-colors">Início</Link>
+              <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-white transition-colors">Início</Link>
               <ChevronRight className="h-3 w-3" />
               <span className="text-white">Loja</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">{heroTitle}</h1>
             <p className="text-white/85 max-w-2xl text-lg mb-8">{heroSubtitle}</p>
-
-            {/* Estatísticas do catálogo */}
-            {!isLoading && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-2xl">
-                {[
-                  { icon: BookOpen, label: 'Livros', value: catalogStats.total },
-                  { icon: Package, label: 'Disponíveis', value: catalogStats.inStock },
-                  { icon: Star, label: 'Destaques', value: catalogStats.featured },
-                  { icon: Layers, label: 'Coleções', value: catalogStats.collections },
-                ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/10">
-                    <Icon className="h-4 w-4 text-white/70 mb-1" />
-                    <p className="text-2xl font-bold">{value}</p>
-                    <p className="text-xs text-white/70">{label}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <AdvancedSearchPanel
-              activeFilters={activeFilters}
-              updateFilter={updateFilter}
-              className="max-w-2xl"
-              variant="hero"
-              bookCollections={bookCollections}
-              publishers={availableFilters.publishers}
-              quickGenres={availableFilters.genres}
-              resultCount={hasActiveBrowsing ? filteredProducts.length : undefined}
-              filterCount={filterCount}
-            />
           </motion.div>
       </ShopHeroBackground>
 
       {/* Faixa infinita — livros disponíveis */}
+      {isLoading && !hasActiveBrowsing && (
+        <div className="border-b border-border bg-muted/10">
+          <CategoryBookMarqueeSkeleton
+            title="Disponíveis para Encomenda"
+            description="Deslize sem fim · Toque para pausar"
+          />
+        </div>
+      )}
       {!hasActiveBrowsing && inStockProducts.length > 0 && (
         <div className="border-b border-border bg-muted/10">
           <CategoryBookMarquee
             title="Disponíveis para Encomenda"
-            description="Deslize sem fim — toque para pausar"
+            description="Deslize sem fim"
             products={inStockProducts}
             direction="ltr"
             viewMode="marquee"
@@ -248,7 +289,7 @@ const ShopPage = () => {
         loading={modalLoading}
         open={!!quickView}
         onClose={() => setQuickView(null)}
-        onCartOpen={() => setIsCartOpen(true)}
+        onCartOpen={handleCartOpen}
       />
 
       {/* Destaques — só sem filtros activos */}
@@ -266,12 +307,12 @@ const ShopPage = () => {
                 Ver todos <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className={PRODUCT_GRID_CLASS}>
               {featuredProducts.map((product, i) => (
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onCartOpen={() => setIsCartOpen(true)}
+                  onCartOpen={handleCartOpen}
                   onQuickView={setQuickView}
                   index={i}
                 />
@@ -309,6 +350,17 @@ const ShopPage = () => {
       )}
 
       {/* Géneros rápidos */}
+      {isLoading && !availableFilters.genres?.length && (
+        <div className="border-b border-border bg-muted/20" aria-hidden="true">
+          {/* A mesma caixa da fila a sério: `py-3` à volta de um botão de 40px. */}
+          <div className="container-custom py-3 flex gap-2 items-center overflow-hidden">
+            <span className="h-4 w-14 shrink-0 rounded bg-muted" />
+            {[91, 138, 125, 177].map((largura) => (
+              <span key={largura} className="h-10 sm:h-8 shrink-0 rounded-full bg-muted" style={{ width: largura }} />
+            ))}
+          </div>
+        </div>
+      )}
       {availableFilters.genres?.length > 0 && (
         <div className="border-b border-border bg-muted/20 sticky top-[var(--header-offset,0px)] z-20 backdrop-blur-md bg-background/80">
           <div className="container-custom py-3 flex gap-2 overflow-x-auto scrollbar-hide items-center">
@@ -316,7 +368,7 @@ const ShopPage = () => {
             <Button
               size="sm"
               variant={activeFilters.categories.length === 0 && !activeFilters.collection ? 'default' : 'outline'}
-              className={`rounded-full shrink-0 h-8 ${activeFilters.categories.length === 0 && !activeFilters.collection ? 'btn-primary' : ''}`}
+              className={`rounded-full shrink-0 h-10 sm:h-8 ${activeFilters.categories.length === 0 && !activeFilters.collection ? 'btn-primary' : ''}`}
               onClick={() => { updateFilter('categories', []); updateFilter('collection', ''); }}
             >
               Todos ({catalogStats.total})
@@ -329,7 +381,7 @@ const ShopPage = () => {
                   key={g}
                   size="sm"
                   variant={active ? 'default' : 'outline'}
-                  className={`rounded-full shrink-0 h-8 ${active ? 'btn-primary' : ''}`}
+                  className={`rounded-full shrink-0 h-10 sm:h-8 ${active ? 'btn-primary' : ''}`}
                   onClick={() => updateFilter('categories', active ? [] : [g])}
                 >
                   {g} ({count})
@@ -341,11 +393,13 @@ const ShopPage = () => {
       )}
 
       <main className="container-custom py-10 min-h-screen">
-        {/* Dynamic Breadcrumbs */}
+        {/* Caminho com os filtros activos. Sem filtros repetia o "Início › Loja" do topo da
+            página, por isso só aparece quando acrescenta alguma coisa. */}
+        {(activeFilters.categories?.length > 0 || activeFilters.collection || activeFilters.search) && (
         <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground mb-6 bg-card border border-border/80 px-4 py-3 rounded-xl shadow-xs shrink-0" id="shop-breadcrumbs">
-          <Link to="/" className="hover:text-primary transition-colors font-medium">Início</Link>
+          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors font-medium">Início</Link>
           <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-          <Link to="/shop" className="hover:text-primary transition-colors font-medium" onClick={clearFilters}>Loja</Link>
+          <Link to="/shop" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors font-medium" onClick={clearFilters}>Loja</Link>
           {activeFilters.categories?.length > 0 && (
             <>
               <ChevronRight className="h-3.5 w-3.5 opacity-60" />
@@ -369,6 +423,22 @@ const ShopPage = () => {
             </>
           )}
         </div>
+        )}
+
+        <AdvancedSearchPanel
+          className="mb-6"
+          activeFilters={activeFilters}
+          updateFilter={updateFilter}
+          onClear={clearFilters}
+          onSearch={() => gridTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          bookCollections={bookCollections}
+          publishers={availableFilters.publishers}
+          resultCount={filteredProducts.length}
+          filterCount={filterCount}
+          quickGenres={availableFilters.genres}
+          catalog={allProducts}
+          showQuickGenres={false}
+        />
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar filtros */}
@@ -390,6 +460,7 @@ const ShopPage = () => {
             {/* Barra de ferramentas */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-card border border-border p-4 rounded-2xl shadow-sm">
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Sem botão "Pesquisar" aqui: o campo de pesquisa completo está logo acima. */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setIsMobileFilterOpen(true)}>
@@ -406,22 +477,20 @@ const ShopPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                {/* Só onde a escolha muda alguma coisa: a densidade aplica-se a partir de 1280 px. */}
                 {viewMode === 'grid' && (
-                  <div className="flex border rounded-lg overflow-hidden">
-                    {[
-                      { cols: 2, label: '2 colunas' },
-                      { cols: 3, label: '3 colunas' },
-                      { cols: 4, label: '4 colunas' },
-                    ].map(({ cols, label }) => (
+                  <div className="hidden xl:flex border rounded-lg overflow-hidden">
+                    {SHOP_DENSITY_OPTIONS.map(({ value, columns }) => (
                       <Button
-                        key={cols}
-                        variant={gridCols === cols ? 'secondary' : 'ghost'}
+                        key={value}
+                        variant={gridCols === value ? 'secondary' : 'ghost'}
                         size="icon"
-                        className="h-9 w-9 rounded-none"
-                        onClick={() => setGridCols(cols)}
-                        title={label}
+                        className="h-11 w-11 sm:h-9 sm:w-9 rounded-none"
+                        onClick={() => setGridCols(value)}
+                        title={`${columns} colunas`}
+                        aria-pressed={gridCols === value}
                       >
-                        <span className="text-[10px] font-bold">{cols}</span>
+                        <span className="text-[10px] font-bold">{columns}</span>
                       </Button>
                     ))}
                   </div>
@@ -429,7 +498,7 @@ const ShopPage = () => {
                 <div className="flex border rounded-lg overflow-hidden">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9 rounded-none" onClick={() => setViewMode('grid')}>
+                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')}>
                         <LayoutGrid className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -437,7 +506,7 @@ const ShopPage = () => {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-9 w-9 rounded-none" onClick={() => setViewMode('list')}>
+                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')}>
                         <List className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -445,7 +514,7 @@ const ShopPage = () => {
                   </Tooltip>
                 </div>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11 sm:h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SORT_OPTIONS.map((o) => (
                       <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -491,24 +560,47 @@ const ShopPage = () => {
             )}
 
             <div ref={gridTopRef} aria-hidden="true" className="scroll-mt-24" />
+            {/* Sem `key` derivada dos filtros. Tinha-a para reanimar a entrada sempre que a
+                selecção mudava, mas mudar a `key` faz o React desmontar e montar de novo os
+                24 cartões — o caminho mais caro possível para uma acção que o utilizador
+                espera ver responder de imediato. A animação de entrada mantém-se na primeira
+                montagem; a seguir, o React reconcilia pelos `key={product.id}` de cada
+                cartão e reaproveita os que não mudaram. Quem muda um filtro já tem a
+                contagem de resultados a dizer-lhe que mudou. */}
             <motion.div
-              key={`${activeFilters.categories.join(',')}-${sortBy}-${viewMode}-${filterCount}-p${currentPage}`}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className={viewMode === 'grid' ? `[&_.product-grid]:grid-cols-2 md:[&_.product-grid]:grid-cols-3 ${gridClass}` : ''}
+              transition={{ duration: MOTION.base, ease: MOTION.ease }}
+              className={viewMode === 'grid' ? gridClass : ''}
             >
               <ProductsList
                 embedded
                 products={displayProducts}
                 isLoading={isLoading}
-                onCartOpen={() => setIsCartOpen(true)}
+                skeletonCount={perPage}
+                onCartOpen={handleCartOpen}
                 viewMode={viewMode}
                 onQuickView={setQuickView}
               />
             </motion.div>
 
-            {pageCount > 1 && !isLoading && (
+            {/* Enquanto carrega, fica aqui um espaço com a altura da navegação de páginas.
+                Sem ele, a navegação aparecia de repente no fim da lista e empurrava o rodapé
+                quando os produtos terminavam de carregar. */}
+            {isLoading && <div className="mt-10 h-9" aria-hidden />}
+
+            {isMobile && !isLoading && (
+              <CatalogInfiniteTail
+                sentinelRef={infinite.sentinelRef}
+                hasMore={infinite.hasMore}
+                loadMore={infinite.loadMore}
+                shown={displayProducts.length}
+                total={sortedProducts.length}
+                onClearFilters={filterCount > 0 || activeFilters.search ? clearFilters : undefined}
+              />
+            )}
+
+            {!isMobile && pageCount > 1 && !isLoading && (
               <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Páginas do catálogo">
                 <Button
                   variant="outline"
@@ -516,6 +608,7 @@ const ShopPage = () => {
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                   aria-label="Página anterior"
+                  className="min-w-11 h-11 sm:min-w-0 sm:h-8"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span className="hidden sm:inline ml-1">Anterior</span>
@@ -552,6 +645,7 @@ const ShopPage = () => {
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === pageCount}
                   aria-label="Página seguinte"
+                  className="min-w-11 h-11 sm:min-w-0 sm:h-8"
                 >
                   <span className="hidden sm:inline mr-1">Seguinte</span>
                   <ChevronRight className="h-4 w-4" />
@@ -562,10 +656,23 @@ const ShopPage = () => {
         </div>
 
         {isMobileFilterOpen && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm lg:hidden">
-            <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r p-6 overflow-y-auto shadow-xl">
+          <div
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm lg:hidden"
+            onClick={() => setIsMobileFilterOpen(false)}
+          >
+            {/* Tocar na zona escurecida fecha — num telemóvel é o gesto que se tenta primeiro,
+                e aqui não fazia nada: só o X no canto fechava o painel. */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r p-6 overflow-y-auto shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="titulo-filtros"
+            >
               <div className="flex justify-between mb-6 pb-4 border-b">
-                <h2 className="text-xl font-semibold">Filtros</h2>
+                <h2 id="titulo-filtros" className="text-xl font-semibold">Filtros</h2>
                 <Button variant="ghost" size="icon" onClick={() => setIsMobileFilterOpen(false)}><X /></Button>
               </div>
               <FilterPanel
@@ -585,7 +692,11 @@ const ShopPage = () => {
         )}
       </main>
 
-      <Footer />
+      {/* No telemóvel o catálogo segue sem rodapé (a barra inferior e o menu do cabeçalho
+          levam às mesmas páginas); no desktop fica o de sempre. */}
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </>
   );
 };
