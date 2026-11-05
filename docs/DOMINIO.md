@@ -41,7 +41,7 @@ O login dos clientes (email e Google) é do Supabase (passo 4). O Firebase, proj
 `skilful-form-c5jvd`, só abre o pop-up do Google para o Drive, Gmail, Contactos e Calendar no
 painel (`app/web/src/lib/googleAuth.js`), e recusa domínios que não estejam autorizados.
 
-- [ ] https://console.firebase.google.com/project/skilful-form-c5jvd/authentication/settings
+- [x] https://console.firebase.google.com/project/skilful-form-c5jvd/authentication/settings
       → **Authorized domains** → **Add domain**: `livrariaadventista.ao` e `www.livrariaadventista.ao`.
       Manter `livraria-adventista.pages.dev`; retirar o `.com`, se lá estiver.
 
