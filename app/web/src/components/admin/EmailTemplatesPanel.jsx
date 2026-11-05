@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { EDGE_FUNCTION_DESACTUALIZADA, isMissingRoute } from '@/lib/apiCompat';
+import EmailTextEditor from './EmailTextEditor';
 
 /**
  * Modelos de email: lista, pré-visualização e envio de teste.
@@ -29,6 +30,10 @@ export default function EmailTemplatesPanel() {
   const [savingCategory, setSavingCategory] = useState('');
   const [queue, setQueue] = useState(null);
   const [runningQueue, setRunningQueue] = useState(false);
+  // Muda depois de gravar um texto, para a pré-visualização e a lista se actualizarem.
+  const [revision, setRevision] = useState(0);
+  // A pré-visualização mostra um rascunho por gravar até se mudar de modelo ou gravar.
+  const [isDraft, setIsDraft] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +65,7 @@ export default function EmailTemplatesPanel() {
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
+    setIsDraft(false);
     setPreviewLoading(true);
     pb.send(`/admin/email/preview?template=${encodeURIComponent(selected)}`)
       .then((res) => { if (!cancelled) setPreview(res); })
@@ -68,7 +74,19 @@ export default function EmailTemplatesPanel() {
       })
       .finally(() => { if (!cancelled) setPreviewLoading(false); });
     return () => { cancelled = true; };
-  }, [selected, toast]);
+  }, [selected, toast, revision]);
+
+  const afterSave = useCallback(async () => {
+    setRevision((r) => r + 1);
+    try {
+      const res = await pb.send('/admin/email/templates');
+      setTemplates(res.templates || []);
+    } catch {
+      // a lista fica como estava; a pré-visualização já se actualiza
+    }
+  }, []);
+
+  const selectedTemplate = templates.find((t) => t.key === selected);
 
   const groups = useMemo(() => {
     const byGroup = new Map();
@@ -154,7 +172,8 @@ export default function EmailTemplatesPanel() {
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
         Os modelos enviados aos clientes, tal como chegam. Cada um é composto pelo mesmo código
-        que faz os envios reais.
+        que faz os envios reais. O texto de cada modelo pode ser alterado por baixo da
+        pré-visualização, com histórico de versões.
       </p>
 
       {blockers.length > 0 ? (
@@ -270,6 +289,7 @@ export default function EmailTemplatesPanel() {
                       }`}
                     >
                       {t.label}
+                      {t.edited && <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">· editado</span>}
                     </button>
                   </li>
                 ))}
@@ -281,7 +301,9 @@ export default function EmailTemplatesPanel() {
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Assunto</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Assunto{isDraft && <span className="ml-2 normal-case tracking-normal text-amber-600">rascunho por gravar</span>}
+              </p>
               <p className="truncate text-sm font-medium">{preview?.subject || '—'}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -337,6 +359,16 @@ export default function EmailTemplatesPanel() {
               />
             )}
           </div>
+          {selectedTemplate?.editable && (
+            <div className="border-t">
+              <EmailTextEditor
+                key={selected}
+                templateKey={selected}
+                onDraftPreview={(res) => { setPreview(res); setIsDraft(true); }}
+                onSaved={afterSave}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

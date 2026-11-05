@@ -9,6 +9,19 @@ import {
 } from "./emails.ts";
 import {
   accessLinkLetter,
+  accountClosedLetter,
+  accountStatusLetter,
+  applyOverride,
+  cleanOverride,
+  emailChangedLetter,
+  newLoginLetter,
+  overrideFromLetter,
+  passwordChangedLetter,
+  refundLetter,
+  suspiciousActivityLetter,
+  EDITABLE_TEMPLATES,
+  PLACEHOLDERS,
+  type TextOverride,
   noticeLetter,
   orderCreatedLetter,
   orderStatusLetter,
@@ -20,6 +33,7 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import { describeDevice, deviceKey } from "./devices.ts";
 import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
@@ -471,6 +485,33 @@ async function processEmailQueue(limit = 10) {
   return summary;
 }
 
+/**
+ * Textos em vigor de cada modelo editado no painel (a versão mais alta de cada um).
+ *
+ * Em cache curta, como as definições. Se a tabela ainda não existir (migração por aplicar),
+ * os emails saem com o texto de origem em vez de falharem: um aviso de encomenda não pode
+ * deixar de sair por causa do editor de textos.
+ */
+async function loadTextOverrides(): Promise<Record<string, TextOverride | null>> {
+  const { data, error } = await db.from("email_template_versions")
+    .select("template_key, version, content")
+    .order("version", { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.log("email_template_versions:", error.message);
+    return {};
+  }
+  const current: Record<string, TextOverride | null> = {};
+  for (const row of data || []) {
+    if (!(row.template_key in current)) current[row.template_key] = cleanOverride(row.content);
+  }
+  return current;
+}
+async function textOverride(key: string): Promise<TextOverride | null> {
+  const all = await cached("email_text_overrides", SHORT_TTL_MS, loadTextOverrides);
+  return all[key] || null;
+}
+
 /** Identidade visual da loja para os emails, com o endereço público configurado no painel. */
 function emailBrand(settings: Row | null): Brand {
   return brandFromSettings(settings, String(settings?.site_url || Deno.env.get("SITE_URL") || ""));
@@ -494,6 +535,8 @@ async function sendLetter(settings: Row | null, to: string, letter: Letter, meta
     });
     return false;
   }
+  // Os textos editados no painel entram aqui, no único sítio por onde todos os modelos saem.
+  letter = applyOverride(letter, letter.key ? await textOverride(letter.key) : null);
   const { html, text } = emailDocument(emailBrand(settings), letter.doc);
   // `List-Unsubscribe` é o que os clientes de email usam para mostrar o botão próprio de
   // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
@@ -548,6 +591,17 @@ async function sendOrderStatusEmail(order: Row, settings: Row | null, status: st
     customer_name: order.customer_name,
     order_number: order.order_number,
     dedupe: `order:status:${order.id}:${status}`,
+  });
+}
+
+/** Avisa o cliente de que o valor da encomenda foi devolvido. */
+async function sendRefundEmail(order: Row, settings: Row | null) {
+  if (!settings?.order_email_enabled || !order.customer_email) return false;
+  return sendLetter(settings, order.customer_email, refundLetter(emailBrand(settings), order), {
+    context: "payment",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    dedupe: `order:refund:${order.id}`,
   });
 }
 
@@ -1212,7 +1266,7 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   const id = String(body.orderId || "").trim();
   const status = String(body.status || "").trim();
   if (!id) throw bad("orderId obrigatório.");
-  if (!["pending", "awaiting_confirmation", "paid", "failed"].includes(status)) {
+  if (!["pending", "awaiting_confirmation", "paid", "failed", "refunded"].includes(status)) {
     throw bad("Estado de pagamento inválido.");
   }
   const { data: order } = await db.from("orders").select("*").eq("id", id).maybeSingle();
@@ -1233,6 +1287,14 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
       emailSent = await sendPaymentConfirmedEmail(saved, await getSettings());
     } catch (err) {
       console.log("Email de pagamento confirmado:", err);
+    }
+  }
+  // O reembolso é o outro estado que o cliente precisa de saber: é dinheiro a voltar para ele.
+  if (status === "refunded" && order.payment_status !== "refunded") {
+    try {
+      emailSent = await sendRefundEmail(saved, await getSettings());
+    } catch (err) {
+      console.log("Email de reembolso:", err);
     }
   }
   return json({ payment_status: saved.payment_status, email_sent: emailSent });
@@ -1725,8 +1787,12 @@ route("GET", "/admin/email/templates", async ({ auth }) => {
   requirePermission(auth, "manage_settings");
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
+  const overrides = await cached("email_text_overrides", SHORT_TTL_MS, loadTextOverrides, true);
   const templates = Object.entries(PREVIEW_TEMPLATES).map(([key, t]) => ({
-    key, label: t.label, group: t.group, subject: t.build(brand).subject,
+    key, label: t.label, group: t.group,
+    subject: applyOverride(t.build(brand), overrides[key]).subject,
+    editable: EDITABLE_TEMPLATES.includes(key),
+    edited: !!overrides[key],
   }));
   return json({
     templates,
@@ -1755,9 +1821,98 @@ route("GET", "/admin/email/preview", async ({ auth, url }) => {
   if (!template) throw bad("Modelo desconhecido.");
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
-  const letter = template.build(brand);
+  const letter = applyOverride(template.build(brand), await textOverride(key));
   const { html, text } = emailDocument(brand, letter.doc);
   return json({ key, label: template.label, subject: letter.subject, html, text });
+});
+
+// ---------------------------------------------------------------------------
+// Textos dos modelos: editar, versões e voltar atrás
+// ---------------------------------------------------------------------------
+
+function editableTemplate(key: unknown) {
+  const k = String(key || "");
+  if (!EDITABLE_TEMPLATES.includes(k)) throw bad("Este modelo não tem texto editável.");
+  return { key: k, template: PREVIEW_TEMPLATES[k] };
+}
+
+/**
+ * Um modelo no editor: o texto de origem, o texto em vigor e o histórico de versões.
+ *
+ * O texto de origem vem com os dados de exemplo já preenchidos — é o que mostra ao gestor
+ * onde vão os marcadores. Para começar a editar, o painel usa o texto em vigor.
+ */
+route("GET", "/admin/email/template", async ({ auth, url }) => {
+  requirePermission(auth, "manage_settings");
+  const { key, template } = editableTemplate(url.searchParams.get("key"));
+  const brand = emailBrand(await getSettings(true));
+  const { data, error } = await db.from("email_template_versions")
+    .select("id, version, content, note, created_by_name, created_at")
+    .eq("template_key", key)
+    .order("version", { ascending: false })
+    .limit(50);
+  if (error) throw bad(`O histórico de versões não está disponível: ${error.message}`);
+  const versions = (data || []).map((v: Row) => ({ ...v, content: cleanOverride(v.content) }));
+  return json({
+    key,
+    label: template.label,
+    group: template.group,
+    original: overrideFromLetter(template.build(brand)),
+    current: versions[0]?.content || null,
+    current_version: versions[0]?.version || 0,
+    versions,
+    placeholders: PLACEHOLDERS,
+  });
+});
+
+/** Pré-visualiza um texto ainda por gravar, com os mesmos dados de exemplo. */
+route("POST", "/admin/email/template/preview", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key, template } = editableTemplate(body.key);
+  const brand = emailBrand(await getSettings(true));
+  const letter = applyOverride(template.build(brand), cleanOverride(body.content));
+  const { html, text } = emailDocument(brand, letter.doc);
+  return json({ key, label: template.label, subject: letter.subject, html, text });
+});
+
+async function saveTemplateVersion(auth: Auth, key: string, content: TextOverride | null, note: string) {
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth!.id).maybeSingle();
+  const { data, error } = await db.rpc("email_template_save", {
+    p_key: key,
+    p_content: content,
+    p_note: cleanText(note, 200),
+    p_by: auth!.id,
+    p_by_name: cleanText(profile?.name || auth!.email, 120),
+  });
+  if (error) throw bad(`Não foi possível gravar a versão: ${error.message}`);
+  forgetCached("email_text_overrides");
+  return data as Row;
+}
+
+/**
+ * Grava uma versão nova. `content` nulo ou vazio repõe o texto de origem — também como versão
+ * nova, para a reposição ficar no histórico e se poder desfazer.
+ */
+route("POST", "/admin/email/template/save", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key } = editableTemplate(body.key);
+  const content = cleanOverride(body.content);
+  const saved = await saveTemplateVersion(auth, key, content, String(body.note || (content ? "" : "Texto de origem reposto")));
+  return json({ version: saved?.version, message: content ? "Texto gravado." : "Texto de origem reposto." });
+});
+
+/** Volta a uma versão anterior, gravando-a como versão nova. */
+route("POST", "/admin/email/template/restore", async ({ auth, body }) => {
+  requirePermission(auth, "manage_settings");
+  const { key } = editableTemplate(body.key);
+  const version = Number(body.version);
+  if (!Number.isInteger(version) || version < 1) throw bad("Versão inválida.");
+  const { data: old, error } = await db.from("email_template_versions")
+    .select("version, content").eq("template_key", key).eq("version", version).maybeSingle();
+  if (error) throw bad(error.message);
+  if (!old) throw new HttpError(404, "Versão não encontrada.");
+  const saved = await saveTemplateVersion(auth, key, cleanOverride(old.content), `Reposta a versão ${version}`);
+  return json({ version: saved?.version, message: `Versão ${version} reposta.` });
 });
 
 /**
@@ -2161,6 +2316,102 @@ route("POST", "/account/welcome", async ({ auth }) => {
   return json({ email_sent: sent });
 });
 
+/**
+ * Aviso de novo acesso, pedido pelo site sempre que abre uma sessão.
+ *
+ * O Supabase Auth faz a entrada sem passar por aqui, por isso é o site que avisa, como nas
+ * boas-vindas. O que decide se o aparelho é novo é o servidor: o aparelho vem do
+ * `User-Agent` do próprio pedido e o destinatário é o email da sessão — nada do corpo do
+ * pedido escolhe a quem se escreve nem o que se diz.
+ *
+ * A primeira vez que uma conta usa isto só regista o aparelho: quem acabou de criar conta ou
+ * entra pela primeira vez desde que o aviso existe não precisa de saber que entrou.
+ */
+route("POST", "/account/session-notice", async ({ auth, req, ip }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("session-notice", auth.id, 10)) return json({ ok: true, notified: false });
+  const ua = req.headers.get("User-Agent") || "";
+  const key = await deviceKey(auth.id, ua);
+  const description = describeDevice(ua);
+
+  const { data: known, error } = await db.from("account_devices").select("device_key").eq("user_id", auth.id).limit(50);
+  if (error) {
+    // Migração por aplicar: não há onde guardar, e sem histórico não se sabe o que é novo.
+    console.log("account_devices:", error.message);
+    return json({ ok: true, notified: false });
+  }
+  const seen = (known || []).some((d: Row) => d.device_key === key);
+  const { error: upsertError } = await db.from("account_devices").upsert(
+    { user_id: auth.id, device_key: key, description, last_seen: nowISO() },
+    { onConflict: "user_id,device_key" },
+  );
+  if (upsertError) console.log("account_devices:", upsertError.message);
+  if (seen || !known?.length) return json({ ok: true, notified: false });
+
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, newLoginLetter(emailBrand(settings), profile?.name || "", {
+    device: description, when: new Date(), ip: ip && ip !== "unknown" ? ip : "",
+  }), {
+    context: "account",
+    customer_name: profile?.name || "",
+    // Um aviso por aparelho novo, mesmo que o site peça duas vezes.
+    dedupe: `account:new-login:${auth.id}:${key}`,
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/**
+ * Aviso no endereço antigo quando o próprio cliente pede para mudar o email.
+ *
+ * O Supabase guarda o endereço pedido em `new_email` até ser confirmado. O aviso vai para o
+ * endereço da sessão (o antigo) e diz qual é o novo — os dois lidos da conta, não do pedido.
+ */
+route("POST", "/account/email-change-notice", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  const { data } = await db.auth.admin.getUserById(auth.id);
+  const pending = normalizeEmail(String((data?.user as Row | undefined)?.new_email || ""));
+  if (!pending || pending === normalizeEmail(auth.email)) return json({ ok: true, notified: false });
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, emailChangedLetter(emailBrand(settings), profile?.name || "", pending), {
+    context: "account",
+    customer_name: profile?.name || "",
+    dedupe: `account:email-change:${auth.id}:${pending}`,
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/**
+ * Aviso de palavra-passe alterada, pedido pelo site depois de a mudar.
+ *
+ * Vai sempre para o email da sessão. Quem o pedisse sem ter mudado nada só mandaria um aviso
+ * a si próprio, e o limite por conta trava a repetição.
+ */
+route("POST", "/account/password-changed-notice", async ({ auth }) => {
+  if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("password-changed-notice", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const settings = await getSettings();
+  const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
+  const sent = await sendLetter(settings, auth.email, passwordChangedLetter(emailBrand(settings), profile?.name || ""), {
+    context: "account",
+    customer_name: profile?.name || "",
+  });
+  return json({ ok: true, notified: sent });
+});
+
+/** Envia um aviso de conta sem deixar que uma falha de email desfaça a operação já feita. */
+async function notifyAccount(email: string, name: string, letter: (brand: Brand) => Letter) {
+  if (!email) return false;
+  try {
+    const settings = await getSettings();
+    return await sendLetter(settings, email, letter(emailBrand(settings)), { context: "account", customer_name: name });
+  } catch (err) {
+    console.log("Aviso de conta:", err);
+    return false;
+  }
+}
+
 route("GET", "/admin/users", async ({ auth, url }) => {
   requirePermission(auth, "manage_users");
   const perPage = Math.min(Math.max(Number(url.searchParams.get("per_page")) || 25, 1), 100);
@@ -2255,6 +2506,8 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
         throw bad(error.message);
       }
       patch.email = email;
+      // Para o endereço antigo: se a mudança não foi pedida pelo cliente, é por lá que ele sabe.
+      await notifyAccount(target.email, target.name, (b) => emailChangedLetter(b, target.name, email, true));
     }
   }
 
@@ -2275,7 +2528,15 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
   }
   const { error } = await db.auth.admin.updateUserById(target.id, { ban_duration: suspend ? SUSPEND_FOR : "none" });
   if (error) throw bad(error.message);
-  return json({ ok: true, suspended: suspend });
+  // A suspensão impede novas entradas; as sessões abertas terminam aqui, em vez de ficarem a
+  // funcionar até o token expirar.
+  if (suspend) {
+    // A suspensão já impede renovar a sessão; isto só a fecha mais cedo. Uma falha aqui
+    // (migração por aplicar) não pode fazer parecer que a suspensão falhou.
+    await endSessions(target.id).catch((err) => console.log("Terminar sessões:", err?.message || err));
+  }
+  const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountStatusLetter(b, target.name, suspend));
+  return json({ ok: true, suspended: suspend, email_sent: emailSent });
 });
 
 route("POST", "/admin/users/access-link", async ({ auth, body }) => {
@@ -2303,7 +2564,36 @@ route("POST", "/admin/users/delete", async ({ auth, body }) => {
   // As encomendas ficam (estão ligadas ao email, não à conta).
   const { error } = await db.auth.admin.deleteUser(target.id);
   if (error) throw bad(error.message);
-  return json({ ok: true });
+  // Depois de apagada, e não antes: um aviso de encerramento de uma conta que afinal ficou
+  // seria pior do que nenhum. O email e o nome já tinham sido lidos em `loadTarget`.
+  const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountClosedLetter(b, target.name));
+  return json({ ok: true, email_sent: emailSent });
+});
+
+/** Termina as sessões de uma conta em todos os aparelhos. Devolve quantas havia. */
+async function endSessions(userId: string) {
+  const { data, error } = await db.rpc("admin_end_user_sessions", { p_user: userId });
+  if (error) throw bad(`Não foi possível terminar as sessões: ${error.message}`);
+  return Number(data) || 0;
+}
+
+/**
+ * Terminar a sessão de um utilizador em todos os aparelhos, a partir do painel.
+ *
+ * Com `suspicious: true`, o cliente recebe o aviso de actividade suspeita, que diz porque
+ * teve de voltar a entrar. Sem isso, termina em silêncio — para quando é o próprio cliente
+ * a pedir por telefone, por exemplo, depois de perder o telemóvel.
+ */
+route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
+  const target = await loadTarget(auth, body.id);
+  assertCanManage(auth, target);
+  const ended = await endSessions(target.id);
+  let emailSent = false;
+  if (body.suspicious === true) {
+    const detail = cleanText(body.detail, 500);
+    emailSent = await notifyAccount(target.email, target.name, (b) => suspiciousActivityLetter(b, target.name, detail));
+  }
+  return json({ ok: true, ended, email_sent: emailSent });
 });
 
 // --- Assistente (antes: chat.pb.js) ---

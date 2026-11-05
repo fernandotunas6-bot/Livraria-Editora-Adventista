@@ -118,7 +118,7 @@ export function buildReceiptHtml(order, brand = {}) {
     return `<tr><td>${qty}× ${e(item.title)}${code}</td><td class="num">${old}${fmtMoney(price * qty)}</td></tr>`;
   }).join('');
   const paymentStatus = {
-    paid: 'Pago', awaiting_confirmation: 'A aguardar confirmação', pending: 'Pendente', failed: 'Falhou',
+    paid: 'Pago', awaiting_confirmation: 'A aguardar confirmação', pending: 'Pendente', failed: 'Falhou', refunded: 'Reembolsado',
   }[order.paymentStatus] || '';
   const contact = [brand.phone, brand.email, brand.address].filter(Boolean).map(e).join(' · ');
   const logo = /^(https:\/\/|data:image\/)/.test(brand.logo || '') ? `<img src="${e(brand.logo)}" alt="" class="logo"/>` : '';

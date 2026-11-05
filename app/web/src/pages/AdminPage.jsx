@@ -305,6 +305,10 @@ const AdminPage = () => {
   };
 
   const handlePaymentStatus = async (order, paymentStatus) => {
+    if (paymentStatus === order.payment_status) return;
+    // O reembolso avisa o cliente de que o dinheiro foi devolvido: só depois de o ter sido.
+    if (paymentStatus === 'refunded'
+      && !confirm(`Marcar a encomenda ${formatOrderNumber(order)} como reembolsada?\n\nO cliente recebe um email a dizer que o valor foi devolvido.`)) return;
     try {
       // Pela API, e não por `orders.update`: é no servidor que o cliente é avisado de que o
       // pagamento foi confirmado. A gravação directa mudava o estado em silêncio.
@@ -762,7 +766,7 @@ const AdminPage = () => {
                       <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os pagamentos</SelectItem>
-                        {['awaiting_confirmation', 'pending', 'paid', 'failed'].map((ps) => (
+                        {['awaiting_confirmation', 'pending', 'paid', 'failed', 'refunded'].map((ps) => (
                           <SelectItem key={ps} value={ps}>{getPaymentStatusLabel(ps)}</SelectItem>
                         ))}
                       </SelectContent>
@@ -919,7 +923,7 @@ const AdminPage = () => {
                             <div className="space-y-2">
                               <p className="text-xs font-medium text-muted-foreground">Confirmar pagamento</p>
                               <div className="flex flex-wrap gap-1">
-                                {['pending', 'awaiting_confirmation', 'paid', 'failed'].map((ps) => (
+                                {['pending', 'awaiting_confirmation', 'paid', 'failed', 'refunded'].map((ps) => (
                                   <Button key={ps} size="sm" variant={o.payment_status === ps ? 'default' : 'outline'} className={`text-xs h-7 ${o.payment_status === ps ? 'btn-primary' : ''}`} onClick={() => handlePaymentStatus(o, ps)}>
                                     {getPaymentStatusLabel(ps)}
                                   </Button>

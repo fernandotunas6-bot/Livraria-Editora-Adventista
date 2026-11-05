@@ -1,7 +1,8 @@
 /**
  * Gestão de utilizadores e clientes pelo painel.
- * - Listar, ver encomendas, editar, suspender e apagar: funções da base de dados (RPC users_admin_*),
- *   que verificam as permissões lá dentro. Funcionam mesmo com uma Edge Function antiga.
+ * - Listar, ver encomendas e editar: funções da base de dados (RPC users_admin_*), que
+ *   verificam as permissões lá dentro. Funcionam mesmo com uma Edge Function antiga.
+ * - Suspender e apagar: Edge Function, que avisa a pessoa por email; a RPC fica de recurso.
  * - Criar contas e gerar links de acesso: Edge Function "app" (precisam da API de administração do Auth).
  * Enquanto a migração das RPC não estiver aplicada, as chamadas caem para a Edge Function.
  */
@@ -87,8 +88,30 @@ export async function updateUser(id, data) {
   );
 }
 
-export const setUserSuspended = (id, suspended) =>
-  rpcOr('users_admin_set_suspended', { p_id: id, p_suspended: suspended }, () => call('POST', '/admin/users/status', { body: { id, suspended } }));
+/**
+ * Primeiro a Edge Function, porque é ela que avisa a pessoa por email; a RPC fica para quando
+ * a função publicada ainda não tem a rota. As duas fazem as mesmas verificações.
+ */
+async function edgeOr(path, body, rpc, rpcArgs) {
+  try {
+    return await call('POST', path, { body });
+  } catch (err) {
+    if (err.message !== EDGE_OUTDATED) throw err;
+    await rpcOr(rpc, rpcArgs, () => { throw err; });
+    return { ok: true, email_sent: false, via: 'fallback' };
+  }
+}
+
+/** Suspende ou reactiva. `notify: false` não envia o email de aviso. */
+export const setUserSuspended = (id, suspended, { notify = true } = {}) =>
+  edgeOr('/admin/users/status', { id, suspended, notify }, 'users_admin_set_suspended', { p_id: id, p_suspended: suspended });
+
+/**
+ * Termina a sessão da conta em todos os aparelhos. Com `suspicious`, a pessoa recebe o aviso
+ * de actividade suspeita (com `detail`, se for dado); sem isso, termina sem email.
+ */
+export const endUserSessions = (id, { suspicious = false, detail = '' } = {}) =>
+  call('POST', '/admin/users/end-sessions', { body: { id, suspicious, detail } });
 
 /**
  * Link para definir a palavra-passe. Pela Edge Function (devolve o link para partilhar);
@@ -105,5 +128,5 @@ export async function sendAccessLink(id, email) {
   }
 }
 
-export const deleteUser = (id) =>
-  rpcOr('users_admin_delete', { p_id: id }, () => call('POST', '/admin/users/delete', { body: { id } }));
+export const deleteUser = (id, { notify = true } = {}) =>
+  edgeOr('/admin/users/delete', { id, notify }, 'users_admin_delete', { p_id: id });

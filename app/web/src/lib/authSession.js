@@ -146,3 +146,33 @@ export async function requestWelcomeEmail(pb, userId) {
   }
   return true;
 }
+
+/** Contas para as quais este separador já pediu o aviso de novo acesso. */
+const SESSION_NOTICE_KEY = 'livraria_session_notice';
+
+/**
+ * Pede ao servidor o aviso de novo acesso, uma vez por conta e por sessão do navegador.
+ *
+ * Quem decide se o aparelho é novo é o servidor (pelo `User-Agent` do pedido e pelos
+ * aparelhos que a conta já usou). Aqui só se evita repetir o pedido a cada página aberta.
+ * Uma falha não estraga nada: o aviso é um extra, e o pedido repete-se na próxima sessão.
+ */
+export async function requestSessionNotice(pb, userId) {
+  if (!pb || !userId) return false;
+  try {
+    if (sessionStorage.getItem(SESSION_NOTICE_KEY) === userId) return false;
+  } catch {
+    // armazenamento indisponível: pede na mesma, o servidor não repete o aviso
+  }
+  try {
+    await pb.send('/account/session-notice', { method: 'POST', body: {} });
+  } catch {
+    return false;
+  }
+  try {
+    sessionStorage.setItem(SESSION_NOTICE_KEY, userId);
+  } catch {
+    // armazenamento indisponível
+  }
+  return true;
+}

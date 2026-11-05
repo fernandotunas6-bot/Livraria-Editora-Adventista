@@ -34,7 +34,7 @@ import { isPushSupported, subscribeToPush, requestPushPermission } from '@/lib/p
 
 
 const ProfilePage = () => {
-  const { user, ready, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout, updateProfile, changePassword, fetchUserOrders, updateAvatar } = useAuth();
+  const { user, ready, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout, logoutEverywhere, updateProfile, changePassword, fetchUserOrders, updateAvatar } = useAuth();
   // As mesmas permissões que o servidor exige em /contacts/*.
   const canManageContacts = isAdmin || hasPermission('manage_marketing') || hasPermission('manage_users');
   const { wishlist, loading: loadingWishlist, removeFromWishlist } = useWishlist();
@@ -190,6 +190,20 @@ const ProfilePage = () => {
       toast({ variant: 'destructive', title: 'Erro', description: err.message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [endingSessions, setEndingSessions] = useState(false);
+  const handleLogoutEverywhere = async () => {
+    if (!confirm('Terminar a sessão em todos os aparelhos, incluindo este?\n\nVai ter de voltar a entrar com a palavra-passe em cada um.')) return;
+    setEndingSessions(true);
+    try {
+      await logoutEverywhere();
+      toast({ title: 'Sessões terminadas', description: 'Saiu da conta em todos os aparelhos.' });
+      navigate('/login');
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: err.message });
+      setEndingSessions(false);
     }
   };
 
@@ -501,6 +515,17 @@ const ProfilePage = () => {
                   </form>
                 </div>
                 <MfaSettings isStaff={canAccessAdmin} />
+                <div className="bg-card border rounded-xl p-6 max-w-lg mt-6">
+                  <h3 className="font-bold text-lg mb-1">Sessões abertas</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Perdeu um telemóvel ou entrou num computador que não é seu? Termine a sessão em todos os aparelhos.
+                    Nos outros, a sessão fecha no máximo dentro de uma hora.
+                  </p>
+                  <Button type="button" variant="outline" onClick={handleLogoutEverywhere} disabled={endingSessions}>
+                    {endingSessions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                    Terminar sessão em todos os aparelhos
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="wishlist">
