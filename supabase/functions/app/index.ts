@@ -3,6 +3,7 @@
 // Deploy com verify_jwt=false: a autenticação é feita aqui (token do Supabase Auth, quando existe).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.49.4";
 import nodemailer from "npm:nodemailer@6.9.16";
+import { C as EC, p as ep, panel as epanel, renderEmail } from "./emailLayout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -220,41 +221,70 @@ async function orderPaymentLink(order: Row) {
   return /^https:\/\//.test(link) ? link : "";
 }
 
-function buildOrderEmailHtml(order: Row, siteName: string, paymentLink = "") {
+/** Endereço público da loja, usado nos links dos emails. */
+const PUBLIC_SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://livrariaadventista.ao").replace(/\/$/, "");
+
+/** Opções comuns do layout de email, a partir das configurações da loja. */
+const emailChrome = (settings: Row | null) => ({
+  siteName: settings?.site_name || "Livraria Adventista",
+  contactEmail: settings?.contact_email || "",
+  contactPhone: settings?.contact_phone || "",
+  siteUrl: PUBLIC_SITE_URL,
+});
+
+function buildOrderEmailHtml(order: Row, settings: Row | null, paymentLink = "") {
+  const td = `font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;color:${EC.text};padding:12px 0;border-bottom:1px solid ${EC.line}`;
   const rows = (order.items || []).map((it: Row) => {
     const line = (Number(it.quantity) || 1) * (Number(it.price) || 0);
-    return `<tr><td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(it.quantity || 1)}× ${escapeHtml(it.title || "Livro")}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${fmtMoneyKz(line)}</td></tr>`;
+    return `<tr><td style="${td}"><span style="color:${EC.gold};font-weight:600">${escapeHtml(it.quantity || 1)}&times;</span>&nbsp; ${escapeHtml(it.title || "Livro")}</td><td align="right" style="${td};white-space:nowrap">${fmtMoneyKz(line)}</td></tr>`;
   }).join("");
-  return [
-    '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">',
-    '<h2 style="color:#0ea5c9">Encomenda Confirmada</h2>',
-    `<p>Olá <strong>${escapeHtml(order.customer_name)}</strong>,</p>`,
-    `<p>Obrigado pela sua compra na <strong>${escapeHtml(siteName || "Livraria Adventista")}</strong>.</p>`,
-    `<p><strong>Nº:</strong> ${escapeHtml(order.order_number || order.id)}</p>`,
-    '<table style="width:100%;border-collapse:collapse;margin:16px 0">',
-    '<thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #0ea5c9">Livro</th><th style="text-align:right;padding:8px;border-bottom:2px solid #0ea5c9">Total</th></tr></thead>',
-    "<tbody>", rows, "</tbody>",
-    "</table>",
-    `<p>Envio: ${fmtMoneyKz(order.shipping_cost)}</p>`,
-    `<p style="font-size:18px"><strong>Total: ${fmtMoneyKz(order.total)}</strong></p>`,
-    paymentLink
-      ? `<p><a href="${escapeHtml(paymentLink)}" style="display:inline-block;padding:10px 18px;background:#0ea5c9;color:#fff;border-radius:8px;text-decoration:none">Pagar com ${escapeHtml(order.payment_method_name || "o método escolhido")}</a></p><p style="color:#666;font-size:13px">Se já pagou, ignore este botão: confirmamos o pagamento com a referência indicada.</p>`
-      : "",
-    '<p style="color:#666;font-size:13px">Acompanhe em /track com o número e email utilizados na compra.</p>',
-  ].join("");
+  const small = `font-family:'Inter',Helvetica,Arial,sans-serif;font-size:14px;color:${EC.muted};padding:4px 0`;
+  const totals = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="${small}">Envio</td><td align="right" style="${small}">${fmtMoneyKz(order.shipping_cost)}</td></tr>
+    <tr><td style="font-family:Georgia,serif;font-size:20px;color:${EC.navy};padding:8px 0 0">Total</td><td align="right" style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:${EC.navy};padding:8px 0 0;white-space:nowrap">${fmtMoneyKz(order.total)}</td></tr>
+  </table>`;
+  const ref = escapeHtml(order.order_number || order.id);
+  const chrome = emailChrome(settings);
+  return renderEmail({
+    ...chrome,
+    preheader: `Encomenda ${order.order_number || ""} confirmada — total ${fmtMoneyKz(order.total)}.`,
+    eyebrow: `Encomenda ${ref}`,
+    title: "Obrigado pela sua encomenda",
+    body: [
+      ep(`Olá <strong style="color:${EC.navy}">${escapeHtml(order.customer_name)}</strong>,`),
+      ep(`Recebemos a sua encomenda na ${escapeHtml(chrome.siteName)}. Aqui está o resumo.`),
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 8px">${rows}</table>`,
+      epanel(totals),
+      paymentLink ? ep(`Para concluir, pague com ${escapeHtml(order.payment_method_name || "o método escolhido")} no botão abaixo.`) : "",
+    ].join(""),
+    button: paymentLink
+      ? { label: `Pagar com ${order.payment_method_name || "o método escolhido"}`, url: escapeHtml(paymentLink) }
+      : { label: "Acompanhar encomenda", url: escapeHtml(`${PUBLIC_SITE_URL}/track`) },
+    note: paymentLink
+      ? "Se já pagou, ignore o botão: confirmamos o pagamento com a referência indicada."
+      : "Use o número da encomenda e o email desta compra para a acompanhar.",
+  });
 }
 
 async function sendOrderConfirmationEmail(order: Row, settings: Row | null) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
-  const siteName = settings.site_name || "Livraria Adventista";
   const paymentLink = await orderPaymentLink(order);
-  return sendTransactionalEmail(settings, order.customer_email, `Confirmação de encomenda ${order.order_number || ""}`, buildOrderEmailHtml(order, siteName, paymentLink), {
+  return sendTransactionalEmail(settings, order.customer_email, `Confirmação de encomenda ${order.order_number || ""}`, buildOrderEmailHtml(order, settings, paymentLink), {
     context: "order", customer_name: order.customer_name, order_number: order.order_number,
   });
 }
 
-const plainHtml = (body: string) =>
-  `<div style="font-family:sans-serif;line-height:1.6">${escapeHtml(body).replace(/\n/g, "<br>")}</div>`;
+/** Mensagem de texto (contactos, campanhas) no layout da loja. A 1.ª linha não vazia serve de título se não houver assunto. */
+const plainHtml = (body: string, settings: Row | null = null, subject = "") => {
+  const paras = String(body || "").split(/\n{2,}/).map((t) => t.trim()).filter(Boolean);
+  const title = subject || paras.shift() || "Livraria Adventista";
+  return renderEmail({
+    ...emailChrome(settings),
+    preheader: (paras[0] || "").slice(0, 120),
+    title,
+    body: paras.map((t) => ep(escapeHtml(t).replace(/\n/g, "<br>"))).join(""),
+  });
+};
 
 // ---------------------------------------------------------------------------
 // WhatsApp Business (Meta Cloud API)
@@ -514,7 +544,7 @@ async function notifyContact(contact: Row, opts: Row) {
   }
   if (channel === "email" || channel === "both") {
     if (hasEmail && settings) {
-      emailSent = await sendTransactionalEmail(settings, contact.email, subject, plainHtml(body), { context: opts.campaignId ? "campaign" : "contact", customer_name: contact.name });
+      emailSent = await sendTransactionalEmail(settings, contact.email, subject, plainHtml(body, settings, subject), { context: opts.campaignId ? "campaign" : "contact", customer_name: contact.name });
       if (channel === "email") status = emailSent ? "sent" : "failed";
       else if (emailSent) status = "sent";
     } else if (channel === "email") {
@@ -1105,7 +1135,13 @@ route("POST", "/admin/email/test", async ({ auth, body }) => {
   const to = normalizeEmail(body.to || auth?.email || "");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw bad("Indique um email de teste válido.");
   const settings = await getSettings();
-  const html = plainHtml("✅ Teste — Livraria Adventista\n\nSe recebeu este email, o envio automático de confirmações de encomenda está a funcionar.");
+  const html = renderEmail({
+    ...emailChrome(settings),
+    preheader: "O envio automático de emails está a funcionar.",
+    eyebrow: "Teste de envio",
+    title: "Tudo pronto para enviar",
+    body: ep("Se recebeu este email, o envio automático de confirmações de encomenda está a funcionar."),
+  });
   const ok = await sendTransactionalEmail(settings, to, "Teste de email — Livraria Adventista", html, { context: "test" });
   if (!ok) throw bad("O email não foi enviado. Veja o motivo no registo de comunicações.");
   return json({ message: `Email de teste enviado para ${to}.` });
@@ -1362,14 +1398,15 @@ async function sendAccessLink(email: string, name: string, kind: "invite" | "res
   const intro = kind === "invite"
     ? `Foi criada uma conta para si na <strong>${escapeHtml(site)}</strong>. Defina a sua palavra-passe para entrar.`
     : `Recebemos um pedido para definir uma nova palavra-passe na <strong>${escapeHtml(site)}</strong>.`;
-  const html = [
-    `<div style="font-family:sans-serif;line-height:1.6;max-width:560px">`,
-    `<p>Olá ${escapeHtml(name || "")},</p>`,
-    `<p>${intro}</p>`,
-    `<p><a href="${escapeHtml(link)}" style="display:inline-block;padding:10px 18px;background:#0ea5c9;color:#fff;border-radius:8px;text-decoration:none">Definir palavra-passe</a></p>`,
-    `<p style="color:#64748b;font-size:13px">O link é pessoal e expira. Se não pediu isto, ignore este email.</p>`,
-    `</div>`,
-  ].join("");
+  const html = renderEmail({
+    ...emailChrome(settings),
+    preheader: kind === "invite" ? "Defina a sua palavra-passe para entrar." : "Link para definir uma nova palavra-passe.",
+    eyebrow: kind === "invite" ? "Bem-vindo" : "Conta",
+    title: kind === "invite" ? "A sua conta está pronta" : "Nova palavra-passe",
+    body: ep(`Olá ${escapeHtml(name || "")},`) + ep(intro),
+    button: { label: "Definir palavra-passe", url: escapeHtml(link) },
+    note: "O link é pessoal e expira. Se não pediu isto, ignore este email.",
+  });
   const emailSent = await sendTransactionalEmail(settings, email, subject, html, { context: "account", customer_name: name });
   return { link, emailSent };
 }

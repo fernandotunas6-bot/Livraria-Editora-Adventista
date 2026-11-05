@@ -156,6 +156,13 @@ Falta, por esta ordem:
 5. **Redireccionar** `www.livrariaadventista.ao` e `livrariaadventista.com` (+ `www`) para `https://livrariaadventista.ao` com uma *Redirect Rule* (301) em cada zona. Só depois do passo 2, senão o `.com` deixa de abrir a loja.
 6. Email: se o endereço `contacto@livrariaadventista.ao` for usado, criar os registos MX/SPF/DKIM do fornecedor de email na zona.
 
+## 8.2 Emails com o layout da loja
+
+- **Layout:** `supabase/functions/app/emailLayout.ts` (cabeçalho escuro com o logótipo branco, cena 3D, corpo marfim, botão azul-petróleo, detalhes dourados). Usado pela confirmação de encomenda, pelo email de teste, pelos convites e recuperação de palavra-passe do painel, e pelas mensagens a contactos e campanhas.
+- **Imagens:** no bucket público `media`, em `email/hero-luz.png` e `email/logo-light.png`. A cena 3D é `scripts/email/hero.html`; para a mudar, editar, correr `node scripts/email/render-hero.cjs hero-luz.png` e voltar a enviar o PNG para o mesmo caminho.
+- **Supabase Auth** (confirmação de conta, recuperação, convite, link de entrada, troca de email, código): `node --experimental-strip-types scripts/email/auth-templates.ts > auth-templates.json` e `PATCH /v1/projects/<ref>/config/auth` com esse JSON (comando no topo do script). **O Supabase só aceita templates próprios depois de configurar um SMTP próprio** (Authentication → Emails → SMTP).
+- **Falta:** não há SMTP configurado (nem na loja, em Admin → Sistema → Integrações, nem no Supabase Auth), por isso nenhum email sai ainda; e a Edge Function `app` tem de ser publicada para usar o layout novo.
+
 ## 9. Segurança antes do go-live
 
 - [ ] Nenhuma credencial real no repositório (é público)
