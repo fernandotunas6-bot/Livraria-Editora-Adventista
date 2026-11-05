@@ -1,17 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getProduct, getProductQuantities, getRelatedProducts, trackBookView } from '@/api/EcommerceApi';
+import { getProduct, getProductQuantities, trackBookView, formatCurrency } from '@/api/EcommerceApi';
+import { discountPercent } from '@/lib/productGrid';
+
+/** Caracteres do resumo ao lado do preço; o texto inteiro está em "Detalhes". */
+const SUMMARY_CHARS = 320;
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { shareBookOnWhatsApp } from '@/lib/whatsapp';
-import RelatedProducts from '@/components/RelatedProducts';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp,
+  Truck, Wallet, Store,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,8 +77,14 @@ function ProductDetailPage() {
   const [error, setError] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  // Separadores controlados: o resumo e as estrelas do topo abrem "Detalhes" e "Avaliações".
+  const [tab, setTab] = useState('details');
+  const tabsRef = useRef(null);
+  const openTab = (value) => {
+    setTab(value);
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [relatedProducts, setRelatedProducts] = useState([]);
   const { addToCart } = useCart();
   const { toast } = useToast();
   const { settings } = useSiteSettings();
@@ -190,10 +200,6 @@ function ProductDetailPage() {
             setSelectedVariant(productWithQuantities.variants[0]);
           }
 
-          const bookGenre = productWithQuantities.type?.value || productWithQuantities.category || '';
-          getRelatedProducts(productWithQuantities.subtitle, productWithQuantities.id, 4, bookGenre)
-            .then((res) => setRelatedProducts(res.products || []))
-            .catch(() => {});
         } catch (quantityError) {
           throw quantityError;
         }
@@ -246,6 +252,32 @@ function ProductDetailPage() {
   const canAddToCart = !isStockManaged || quantity <= availableStock;
 
   const currentImage = product.images[currentImageIndex];
+
+  const genre = product.type?.value || product.category || '';
+  const discount = discountPercent(selectedVariant);
+  const availability = !product.purchasable
+    ? { ok: false, label: 'Esgotado de momento', tone: 'text-destructive' }
+    : isStockManaged && !canAddToCart
+      ? { ok: false, label: `Só ${availableStock} disponíve${availableStock === 1 ? 'l' : 'is'}`, tone: 'text-destructive' }
+      : isStockManaged && availableStock > 0 && product.stock_low
+        ? { ok: true, label: `Restam ${availableStock} — pode esgotar em breve`, tone: 'text-orange-700 dark:text-orange-400' }
+        : { ok: true, label: 'Em stock, pronto a enviar', tone: 'text-emerald-700 dark:text-emerald-400' };
+  const freeShippingLabel = formatCurrency((Number(settings.shipping_free_threshold) || 20000) * 100);
+  const plainDescription = (product.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const summaryIsShort = plainDescription.length > SUMMARY_CHARS;
+  const summary = summaryIsShort
+    ? `${plainDescription.slice(0, plainDescription.lastIndexOf(' ', SUMMARY_CHARS))}…`
+    : plainDescription;
+  const specs = [
+    ['Autor', product.subtitle],
+    ['Editora', product.publisher],
+    ['Idioma', product.language],
+    ['Páginas', product.pages > 0 ? product.pages : null],
+    ['Ano', product.year > 0 ? product.year : null],
+    ['ISBN', product.isbn],
+    ['Género', genre],
+    ['Código', product.book_code],
+  ].filter(([, v]) => v);
   const hasMultipleImages = product.images.length > 1;
 
   return (
@@ -258,74 +290,80 @@ function ProductDetailPage() {
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <main className="container-custom py-12">
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Início</Link>
-          <span>/</span>
-          <Link to="/shop" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Loja</Link>
-          <span>/</span>
-          <span className="text-foreground">{product.title}</span>
+      <main className="container-custom pb-12 pt-6 md:pt-8">
+        {/* Caminho: no telemóvel só até ao género, o título já está logo abaixo em grande. */}
+        <nav aria-label="Caminho" className="mb-5 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground md:mb-8">
+          <Link to="/" className="-my-1.5 shrink-0 py-1.5 hover:text-primary">Início</Link>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
+          <Link to="/shop" className="-my-1.5 shrink-0 py-1.5 hover:text-primary">Loja</Link>
+          {genre && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
+              <Link to={`/shop?category=${encodeURIComponent(genre)}`} className="-my-1.5 truncate py-1.5 hover:text-primary">{genre}</Link>
+            </>
+          )}
+          <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 opacity-60 md:block" aria-hidden="true" />
+          <span className="hidden truncate text-foreground md:block" aria-current="page">{product.title}</span>
         </nav>
 
         {/* `min-w-0` nas duas colunas: um item de grid tem `min-width: auto` por omissão e
-            recusa-se a encolher abaixo do conteúdo. Era o que empurrava a coluna para 399px
-            dentro de um contentor de 343 e dava 40px de deslocamento horizontal no
-            telemóvel — a página inteira arrastava-se para o lado. */}
-        <div className="grid lg:grid-cols-2 gap-12">
+            recusa-se a encolher abaixo do conteúdo (dava deslocamento horizontal no telemóvel). */}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
           <motion.div
-            className="min-w-0"
+            className="min-w-0 lg:sticky lg:top-24 lg:self-start"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] sm:aspect-square mb-4">
+            {/* A capa inteira, na proporção dos livros (2:3): sem cortes nem moldura vazia. */}
+            <div className="relative mx-auto mb-4 aspect-[2/3] w-full max-w-[15rem] overflow-hidden rounded-xl bg-muted shadow-lg sm:max-w-xs lg:max-w-sm">
               <img
                 src={!currentImage?.url ? placeholderImage : currentImage.url}
-                alt={product.title}
-                className="w-full h-full object-contain p-3 sm:object-cover sm:p-0"
+                alt={`Capa de ${product.title}`}
+                className="h-full w-full object-cover"
               />
 
               {hasMultipleImages && (
                 <>
                   <button
                     onClick={handlePrevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground p-2 rounded-full transition-colors"
-                    aria-label="Previous image"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground transition-colors hover:bg-background"
+                    aria-label="Imagem anterior"
                   >
-                    <ChevronLeft size={24} />
+                    <ChevronLeft size={22} />
                   </button>
                   <button
                     onClick={handleNextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground p-2 rounded-full transition-colors"
-                    aria-label="Next image"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground transition-colors hover:bg-background"
+                    aria-label="Imagem seguinte"
                   >
-                    <ChevronRight size={24} />
+                    <ChevronRight size={22} />
                   </button>
                 </>
               )}
 
-              {product.ribbon_text && (
-                <div className="absolute top-4 left-4 bg-brand-solid text-sm font-bold px-4 py-2 rounded-full">
+              {discount > 0 && product.purchasable && (
+                <span className="absolute left-3 top-3 rounded-full bg-rose-600 px-2.5 py-1 text-sm font-bold text-white shadow tabular-nums">−{discount}%</span>
+              )}
+              {!discount && product.ribbon_text && (
+                <span className="absolute left-3 top-3 rounded-full bg-brand-solid px-3 py-1 text-xs font-bold shadow">
                   {product.ribbon_text}
-                </div>
+                </span>
               )}
             </div>
 
             {hasMultipleImages && (
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="mx-auto flex max-w-sm gap-2 overflow-x-auto">
                 {product.images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                    aria-label={`Ver imagem ${index + 1}`}
+                    className={`h-20 w-14 flex-shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
                       index === currentImageIndex ? 'border-primary' : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <img
-                      src={!image.url ? placeholderImage : image.url}
-                      alt={`${product.title} ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={!image.url ? placeholderImage : image.url} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -335,196 +373,166 @@ function ProductDetailPage() {
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: MOTION.base, delay: 0.2 }}
-            className="flex flex-col min-w-0"
+            transition={{ duration: MOTION.base, delay: 0.1 }}
+            className="flex min-w-0 flex-col"
           >
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">{product.title}</h1>
-            {product.marketing_hook && (
-              <p className="text-lg text-primary font-medium mb-2">{product.marketing_hook}</p>
-            )}
+            {/* 1. O quê e de quem */}
+            <h1 className="text-3xl font-bold leading-tight text-foreground md:text-4xl">{product.title}</h1>
             {product.subtitle && (
-              <p className="text-xl text-muted-foreground mb-4">{product.subtitle}</p>
+              <p className="mt-2 text-base text-muted-foreground md:text-lg">
+                de{' '}
+                <Link to={`/shop?author=${encodeURIComponent(product.subtitle)}`} className="font-medium text-primary hover:underline">
+                  {product.subtitle}
+                </Link>
+              </p>
             )}
+            {product.marketing_hook && (
+              <p className="mt-2 font-medium text-primary">{product.marketing_hook}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => openTab('reviews')}
+              className="mt-3 flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <StarRating rating={Math.round(stats.average)} size={16} />
+              {stats.total > 0
+                ? <span>{stats.average} · {stats.total} {stats.total === 1 ? 'avaliação' : 'avaliações'}</span>
+                : <span>Seja o primeiro a avaliar</span>}
+            </button>
             {product.social_proof && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 inline-block">
+              <p className="mt-3 inline-block w-fit rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700">
                 ✓ {product.social_proof}
               </p>
             )}
 
-            {(product.book_code || product.sku || product.isbn) && (
-              <div className="flex flex-wrap gap-3 mb-6 text-sm">
-                {product.book_code && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-primary">
-                    Código: {product.book_code}
-                  </span>
+            {/* 2. Preço e disponibilidade, juntos */}
+            <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-3xl font-bold text-brand-ink tabular-nums md:text-4xl">{price}</span>
+                {selectedVariant?.sale_price_in_cents && (
+                  <span className="text-lg text-muted-foreground line-through tabular-nums">{originalPrice}</span>
                 )}
-                {product.sku && product.sku !== product.book_code && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-muted-foreground">
-                    SKU: {product.sku}
-                  </span>
-                )}
-                {product.isbn && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-muted-foreground">
-                    ISBN: {product.isbn}
-                  </span>
+                {discount > 0 && (
+                  <span className="rounded-full bg-rose-600/10 px-2 py-0.5 text-sm font-semibold text-rose-700">Poupa {discount}%</span>
                 )}
               </div>
-            )}
-
-            {(product.publisher || product.language || product.pages || product.year) && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 text-sm">
-                {product.publisher && <div><span className="text-muted-foreground">Editora</span><p className="font-medium">{product.publisher}</p></div>}
-                {product.language && <div><span className="text-muted-foreground">Idioma</span><p className="font-medium">{product.language}</p></div>}
-                {product.pages > 0 && <div><span className="text-muted-foreground">Páginas</span><p className="font-medium">{product.pages}</p></div>}
-                {product.year > 0 && <div><span className="text-muted-foreground">Ano</span><p className="font-medium">{product.year}</p></div>}
-              </div>
-            )}
-
-            <div className="flex items-baseline gap-3 mb-8">
-              <span className="text-4xl font-bold text-brand-ink">{price}</span>
-              {selectedVariant?.sale_price_in_cents && (
-                <span className="text-2xl text-muted-foreground line-through">{originalPrice}</span>
-              )}
-            </div>
-
-            {product.description && (
-              <div className="prose prose-sm max-w-none text-muted-foreground mb-8" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
-            )}
-
-            {Array.isArray(product.benefit_bullets) && product.benefit_bullets.length > 0 && (
-              <div className="mb-8 p-4 rounded-xl bg-[#0ea5c9]/5 border border-[#0ea5c9]/15">
-                <p className="font-semibold mb-3 text-foreground">Porquê este livro?</p>
-                <ul className="space-y-2">
-                  {product.benefit_bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {product.target_audience && (
-              <p className="text-sm text-muted-foreground mb-8">
-                <span className="font-medium text-foreground">Ideal para:</span> {product.target_audience}
+              <p className={`mt-2 flex items-center gap-1.5 text-sm font-medium ${availability.tone}`}>
+                {availability.ok ? <CheckCircle size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />}
+                {availability.label}
               </p>
-            )}
 
-            {product.variants.length > 1 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3 text-foreground">Edição</h3>
-                <div className="flex flex-wrap gap-2">
-                  {product.variants.map(variant => (
-                    <Button
-                      key={variant.id}
-                      variant={selectedVariant?.id === variant.id ? 'default' : 'outline'}
-                      onClick={() => handleVariantSelect(variant)}
-                      className={`transition-all ${selectedVariant?.id === variant.id ? 'btn-primary' : 'border-border hover:border-primary'}`}
-                    >
-                      {variant.title}
-                    </Button>
-                  ))}
+              {product.variants.length > 1 && (
+                <div className="mt-5">
+                  <h2 className="mb-2 text-sm font-semibold text-foreground">Edição</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {product.variants.map(variant => (
+                      <Button
+                        key={variant.id}
+                        variant={selectedVariant?.id === variant.id ? 'default' : 'outline'}
+                        onClick={() => handleVariantSelect(variant)}
+                        className={`transition-all ${selectedVariant?.id === variant.id ? 'btn-primary' : 'border-border hover:border-primary'}`}
+                      >
+                        {variant.title}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex items-center gap-4 mb-8">
-              <div className="flex items-center border border-border rounded-lg">
-                <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted">
-                  <Minus size={18} />
-                </Button>
-                <span className="w-12 text-center font-semibold text-foreground">{quantity}</span>
-                <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="rounded-r-lg hover:bg-muted">
-                  <Plus size={18} />
+              {/* 3. Comprar */}
+              <div ref={setBotoesCompra} className="mt-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center rounded-lg border border-border">
+                    <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="h-11 w-11 rounded-l-lg hover:bg-muted" aria-label="Menos um">
+                      <Minus size={18} />
+                    </Button>
+                    <span className="w-10 text-center font-semibold text-foreground tabular-nums" aria-live="polite">{quantity}</span>
+                    <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="h-11 w-11 rounded-r-lg hover:bg-muted" aria-label="Mais um">
+                      <Plus size={18} />
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={() => handleAddToCart(true)}
+                    variant="outline"
+                    className="h-11 min-w-0 flex-1 border-primary/50 px-3 text-primary hover:bg-primary/10"
+                    disabled={!canAddToCart || !product.purchasable}
+                  >
+                    <ShoppingCartIcon className="mr-2 h-4 w-4 shrink-0" />
+                    {/* Num ecrã de 375 px o texto inteiro empurrava o coração para fora. */}
+                    <span className="truncate sm:hidden">Carrinho</span>
+                    <span className="hidden truncate sm:inline">Adicionar ao carrinho</span>
+                  </Button>
+                  <Button
+                    onClick={() => toggleWishlist(product)}
+                    variant="outline"
+                    size="icon"
+                    className={`h-11 w-11 shrink-0 ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
+                    aria-label={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                    title={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                  >
+                    <Heart className={`h-5 w-5 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                  </Button>
+                </div>
+                <Button
+                  onClick={handleBuyNow}
+                  size="lg"
+                  className="btn-primary h-12 w-full text-base"
+                  disabled={!canAddToCart || !product.purchasable}
+                >
+                  Comprar agora
                 </Button>
               </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button onClick={() => setShowPreview(true)} variant="ghost" size="sm" className="h-10 text-primary hover:bg-primary/10">
+                  <BookOpen className="mr-1.5 h-4 w-4" /> Ler amostra grátis
+                </Button>
+                {(settings.whatsapp || settings.contact_phone) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 text-green-700 hover:bg-green-50"
+                    onClick={() => shareBookOnWhatsApp(product, settings.whatsapp || settings.contact_phone)}
+                  >
+                    <MessageCircle className="mr-1.5 h-4 w-4" /> Pedir ou partilhar no WhatsApp
+                  </Button>
+                )}
+              </div>
+
+              {/* 4. O que acontece depois de comprar */}
+              <ul className="mt-4 space-y-2.5 border-t border-border pt-4 text-sm">
+                <li className="flex items-start gap-2.5">
+                  <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span><strong className="font-medium text-foreground">Entrega em todo o país.</strong> <span className="text-muted-foreground">Grátis a partir de {freeShippingLabel}.</span></span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span><strong className="font-medium text-foreground">Pagamento na entrega</strong> <span className="text-muted-foreground">ou por transferência.</span></span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <Store className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary hover:underline">ver moradas</Link>.</span>
+                </li>
+              </ul>
             </div>
 
-            <div ref={setBotoesCompra} className="flex flex-col sm:flex-row gap-3 mb-4">
-              <Button
-                onClick={handleBuyNow}
-                size="lg"
-                className="flex-1 btn-primary text-lg py-6"
-                disabled={!canAddToCart || !product.purchasable}
-              >
-                <ShoppingCartIcon className="mr-2 h-5 w-5" />
-                Comprar Agora
-              </Button>
-              <Button
-                onClick={() => handleAddToCart(true)}
-                size="lg"
-                variant="outline"
-                className="flex-1 text-lg py-6 border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10"
-                disabled={!canAddToCart || !product.purchasable}
-              >
-                Adicionar ao Carrinho
-              </Button>
-              <Button
-                onClick={() => toggleWishlist(product)}
-                size="lg"
-                variant="outline"
-                className={`px-4 py-6 border-2 transition-all duration-base ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
-                title={isWish ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
-              >
-                <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
-              </Button>
-            </div>
-            <Button
-              onClick={() => setShowPreview(true)}
-              variant="outline"
-              className="w-full mb-3 border-[#0ea5c9]/40 text-primary hover:bg-[#0ea5c9]/5 py-6 text-lg rounded-xl"
-            >
-              <BookOpen className="mr-2 h-5 w-5" />
-              Ler Amostra Grátis (Primeiras Páginas)
-            </Button>
-            {(settings.whatsapp || settings.contact_phone) && (
-              <Button
-                variant="outline"
-                className="w-full mb-4 border-green-500/40 text-green-700 hover:bg-green-50"
-                onClick={() => shareBookOnWhatsApp(product, settings.whatsapp || settings.contact_phone)}
-              >
-                <MessageCircle className="mr-2 h-5 w-5" />
-                Partilhar / Pedir via WhatsApp
-              </Button>
-            )}
-
-
-            {isStockManaged && canAddToCart && product.purchasable && (
-              <p className="text-sm text-brand-ink flex items-center justify-center gap-2 mb-4">
-                <CheckCircle size={16} /> {availableStock} em stock
-              </p>
-            )}
-
-            {isStockManaged && !canAddToCart && product.purchasable && (
-              <p className="text-sm text-destructive flex items-center justify-center gap-2 mb-4">
-                <XCircle size={16} /> Stock insuficiente. Apenas {availableStock} disponível{availableStock !== 1 ? 'eis' : ''}.
-              </p>
-            )}
-
-            {!product.purchasable && (
-              <p className="text-sm text-destructive flex items-center justify-center gap-2 mb-4">
-                <XCircle size={16} /> Indisponível no momento
-              </p>
-            )}
-
-            {product.additional_info?.length > 0 && (
-              <div className="mt-8 space-y-6">
-                {product.additional_info
-                  .sort((a, b) => a.order - b.order)
-                  .map((info) => (
-                    <div key={info.id} className="border-l-2 border-primary/30 pl-4">
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">{info.title}</h3>
-                      <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(info.description) }} />
-                    </div>
-                  ))}
+            {/* 5. Resumo: o texto completo fica em "Detalhes", sem se repetir aqui. */}
+            {summary && (
+              <div className="mt-6">
+                <h2 className="mb-2 text-base font-semibold text-foreground">Sobre o livro</h2>
+                <p className="leading-relaxed text-muted-foreground">{summary}</p>
+                {summaryIsShort && (
+                  <button type="button" onClick={() => openTab('details')} className="mt-2 text-sm font-medium text-primary hover:underline">
+                    Ler a descrição completa
+                  </button>
+                )}
               </div>
             )}
           </motion.div>
         </div>
 
-        <div className="mt-16 border-t border-border pt-10">
-          <Tabs defaultValue="details">
+        <div ref={tabsRef} className="mt-14 scroll-mt-24 border-t border-border pt-10">
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="mb-8 flex-wrap h-auto gap-1">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
               {product.preview_enabled && product.sample_pages?.length > 0 && (
@@ -539,12 +547,61 @@ function ProductDetailPage() {
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="max-w-3xl">
-              {product.description ? (
-                <div className="prose max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
-              ) : (
-                <p className="text-muted-foreground">Sem descrição disponível.</p>
-              )}
+            <TabsContent value="details">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+                <div className="min-w-0 space-y-8">
+                  {product.description ? (
+                    <div className="prose max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
+                  ) : (
+                    <p className="text-muted-foreground">Sem descrição disponível.</p>
+                  )}
+
+                  {Array.isArray(product.benefit_bullets) && product.benefit_bullets.length > 0 && (
+                    <div className="rounded-xl border border-primary/15 bg-primary/5 p-4">
+                      <p className="mb-3 font-semibold text-foreground">Porquê este livro?</p>
+                      <ul className="space-y-2">
+                        {product.benefit_bullets.map((b, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {product.additional_info?.length > 0 && (
+                    <div className="space-y-6">
+                      {[...product.additional_info]
+                        .sort((a, b) => a.order - b.order)
+                        .map((info) => (
+                          <div key={info.id} className="border-l-2 border-primary/30 pl-4">
+                            <h3 className="mb-2 text-lg font-semibold text-foreground">{info.title}</h3>
+                            <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(info.description) }} />
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Ficha técnica: o que se compara entre edições e se pede ao telefone. */}
+                <aside className="min-w-0">
+                  <h3 className="mb-3 text-base font-semibold text-foreground">Características</h3>
+                  <dl className="divide-y divide-border rounded-xl border border-border bg-card text-sm">
+                    {specs.map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="text-right font-medium text-foreground">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {product.target_audience && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">Ideal para:</span> {product.target_audience}
+                    </p>
+                  )}
+                </aside>
+              </div>
             </TabsContent>
 
             {product.preview_enabled && product.sample_pages?.length > 0 && (
@@ -821,7 +878,6 @@ function ProductDetailPage() {
           </Tabs>
         </div>
 
-        <RelatedProducts products={relatedProducts} author={product.subtitle} onCartOpen={() => setIsCartOpen(true)} />
       </main>
 
       <SampleReaderModal
