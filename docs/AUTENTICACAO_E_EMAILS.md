@@ -111,6 +111,36 @@ Quem entra a partir do carrinho, do menu ou de uma ficha de livro volta à pági
 sobrevive à ida à Google e de volta. Quem abre `/login` já com sessão é encaminhado em vez de
 ver o formulário outra vez.
 
+### Entrar e criar conta num modal
+
+`AuthDialogProvider` (`hooks/useAuthDialog.jsx`) abre o modal em qualquer página com
+`openAuth({ mode, reason, defaultEmail, defaultName })`. O formulário é o mesmo da página
+`/login` (`components/auth/AuthForm.jsx`). No fim, a pessoa fica onde estava, com o carrinho e o
+que já tinha escrito.
+
+| Onde | Motivo (`reason`) |
+|---|---|
+| Cabeçalho, menu, ícone no telemóvel, página de sugestões | — |
+| Carrinho, entrega ao domicílio sem conta | `delivery`: abre por cima do carrinho; o Esc fecha só o modal |
+| Avaliar um livro | `review` |
+| Página de sucesso, compra feita sem conta | `order`, com o nome e o email da compra preenchidos |
+| Convite automático | `nudge` |
+
+**Convite automático** (regras em `lib/authPrompt.js`, com testes): só a quem não tem sessão,
+na terceira ficha de livro vista nesta sessão, quatro segundos depois de a abrir e nunca por
+cima de outro painel. Abre uma vez por sessão. Depois de fechado, volta passados 7 dias; depois
+de fechado 3 vezes, passados 60. Não abre nas páginas de entrada, recuperação, painel, perfil,
+rastreio, sucesso, confirmação da encomenda nem cancelamento de subscrição. Quem já entrou
+neste navegador vê "Bem-vindo de volta" e o email preenchido. Guarda-se só o email, e isso não
+é sessão.
+
+**A confirmação por email não chega aos clientes (verificado a 2026-11-05).** No Auth,
+`mailer_autoconfirm` está `false` e não há SMTP próprio. O correio do Supabase só entrega a
+membros da equipa do projecto, até 2 por hora. Quem se regista por email fica à espera de um
+link que não vem. O modal põe o Google em primeiro lugar e, depois do registo, sugere-o se o
+email não chegar. A correcção é configurar SMTP no Auth ou ligar a confirmação automática:
+decisão do dono, e o modo automático recusa mudar a configuração do Auth.
+
 ## 2. Emails
 
 ### Onde está o quê

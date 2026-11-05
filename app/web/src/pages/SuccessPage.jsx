@@ -9,6 +9,7 @@ import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { pageTitle } from '@/lib/brand';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +20,8 @@ const SuccessPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [receiptChoice, setReceiptChoice] = useState(null);
   const [params] = useSearchParams();
-  const { isAuthed } = useAuth();
+  const { isAuthed, ready } = useAuth();
+  const { openAuth } = useAuthDialog();
   const { settings } = useSiteSettings();
   const { integrations } = useIntegrations();
   const { toast } = useToast();
@@ -202,6 +204,28 @@ const SuccessPage = () => {
                       : '✓ Recibo descarregado'}
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* O melhor momento para sugerir conta: a pessoa acabou de comprar e quer saber da
+                encomenda. As encomendas ficam ligadas ao email, por isso a conta criada com o
+                email da compra mostra-a logo no perfil. */}
+            {ready && !isAuthed && hasOrder && !isWhatsApp && (
+              <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-6 text-left flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                  <h2 className="font-semibold mb-1">Acompanhe esta encomenda na sua conta</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Crie conta com {orderData?.email ? <strong>{orderData.email}</strong> : 'o email da compra'} e veja o estado da entrega
+                    sempre que quiser. Demora segundos.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="btn-primary shrink-0"
+                  onClick={() => openAuth({ reason: 'order', mode: 'signup', defaultEmail: orderData?.email || '', defaultName: orderData?.customerName || '' })}
+                >
+                  <User className="mr-2 h-4 w-4" aria-hidden="true" /> Criar conta
+                </Button>
               </div>
             )}
 

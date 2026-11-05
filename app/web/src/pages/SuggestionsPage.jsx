@@ -11,6 +11,7 @@ import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
 import { pageTitle } from '@/lib/brand';
 import { getRecommendations } from '@/api/EcommerceApi';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 
 /**
  * Sugestões de livros: o que o cliente guardou e viu, livros do mesmo género e as novidades.
@@ -42,6 +43,7 @@ export default function SuggestionsPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [state, setState] = useState({ loading: true, error: '', data: null });
   const { isAuthed, ready } = useAuth();
+  const { openAuth } = useAuthDialog();
 
   useEffect(() => {
     if (ready === false) return undefined;
@@ -108,9 +110,9 @@ export default function SuggestionsPage() {
                   <p className="mb-4 text-muted-foreground">
                     Entre na sua conta para as sugestões contarem também com a lista de desejos e as compras, em qualquer dispositivo.
                   </p>
-                  <Link to="/login" className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:bg-primary/90">
+                  <button type="button" onClick={() => openAuth()} className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:bg-primary/90">
                     Entrar ou criar conta
-                  </Link>
+                  </button>
                 </div>
               )}
             </>
