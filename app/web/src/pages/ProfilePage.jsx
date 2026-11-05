@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { orderItemTitle } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -391,7 +392,8 @@ const ProfilePage = () => {
                               <div className="mt-2 space-y-1">
                                 {(o.items || []).map((item, i) => (
                                   <p key={i} className="text-xs text-muted-foreground">
-                                    {item.quantity}× {item.title}
+                                    {item.quantity}× {orderItemTitle(item)}
+                                    {item.book_code && <span className="ml-1 font-mono text-[10px]">{item.book_code}</span>}
                                   </p>
                                 ))}
                               </div>

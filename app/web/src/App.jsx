@@ -34,6 +34,8 @@ const AdminPage = lazy(() => import('@/pages/AdminPage.jsx'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage.jsx'));
 const CollectionsPage = lazy(() => import('@/pages/CollectionsPage.jsx'));
 const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
+const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
+const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
@@ -179,6 +181,9 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/track" element={<TrackOrderPage />} />
+              <Route path="/sugestoes" element={<SuggestionsPage />} />
+              <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
+              <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />
               <Route path="/cancelar-subscricao" element={<UnsubscribeAliasRedirect />} />
               <Route path="/rastreio" element={<Navigate to="/track" replace />} />

@@ -3,6 +3,8 @@ import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
+import { looksLikeProductCode, normalizeProductCode } from '@/lib/productTypes';
+import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -72,6 +74,7 @@ function bookToProduct(book, collectionsMap = {}) {
     collection_title: collectionsMap[collectionId] || null,
     order: book.year ? Number(book.year) * 1000 : 0,
     featured: !!book.featured,
+    product_type: book.product_type || 'livro',
     book_code: book.book_code || null,
     sku: book.sku || book.book_code || null,
     isbn: book.isbn || null,
@@ -412,7 +415,11 @@ export async function getLowStockBooks() {
   }
 }
 
-/** Conta uma visualização do livro (uma vez por sessão do navegador); falhas são ignoradas. */
+/**
+ * Conta uma visualização do livro (uma vez por sessão do navegador); falhas são ignoradas.
+ * Com sessão, o livro fica também no histórico da conta, que alimenta as sugestões em
+ * /sugestoes e nos emails (sem sessão, contam os vistos de `lib/recentlyViewed`).
+ */
 export function trackBookView(bookId) {
   if (!bookId) return;
   const key = `viewed:${bookId}`;
@@ -422,16 +429,63 @@ export function trackBookView(bookId) {
   } catch { /* sem sessionStorage: conta na mesma */ }
   fetch(`${APP_API_URL}/catalog/view`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
+    },
     body: JSON.stringify({ book_id: bookId }),
     keepalive: true,
   }).catch(() => {});
+}
+
+/** Lê livros visíveis pelos ids, pela ordem pedida. */
+async function productsByIds(ids) {
+  const unique = [...new Set(ids)].slice(0, 60);
+  if (!unique.length) return new Map();
+  const [{ data, error }, collectionsMap] = await Promise.all([
+    supabase.from('stock_books').select('*').in('id', unique).eq('active', true),
+    getCollectionsMap(),
+  ]);
+  if (error) throw error;
+  return new Map((data || []).map((b) => [b.id, bookToProduct(b, collectionsMap)]));
+}
+
+/**
+ * Sugestões para a página /sugestoes: "para si", vistos recentemente e novidades.
+ * A ordem vem da Edge Function (desejos, vistos, compras, género); os livros lêem-se aqui.
+ */
+export async function getRecommendations() {
+  const res = await fetch(`${APP_API_URL}/recommendations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
+    },
+    body: JSON.stringify({ viewed: getRecentlyViewed().map((e) => e.id).filter(Boolean).slice(0, 30) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível carregar as sugestões.');
+  const forYou = data.for_you || [];
+  const recent = data.recent || [];
+  const newest = data.newest || [];
+  const map = await productsByIds([...forYou, ...recent, ...newest]);
+  const pick = (ids) => ids.map((id) => map.get(id)).filter(Boolean);
+  return { personal: !!data.personal, forYou: pick(forYou), recent: pick(recent), newest: pick(newest) };
 }
 
 export async function searchProducts(query, limit = 50) {
   const q = query.trim();
   if (!q) return getProducts({ limit });
 
+  // Código de produto escrito de qualquer forma ("liv63", "uni-4"): procura esse código exacto.
+  if (looksLikeProductCode(q)) {
+    const code = escapeFilterValue(normalizeProductCode(q));
+    const exact = await pb.collection('stock_books').getList(1, 1, { filter: `book_code = "${code}" && ${VISIBLE}` });
+    if (exact.items.length) {
+      const collectionsMap = await getCollectionsMap();
+      return { products: exact.items.map((b) => bookToProduct(b, collectionsMap)) };
+    }
+  }
   const v = escapeFilterValue(q);
   const filter = `(title ~ "${v}" || author ~ "${v}" || genre ~ "${v}" || book_code ~ "${v}" || isbn ~ "${v}") && ${VISIBLE}`;
   const records = await pb.collection('stock_books').getList(1, limit, { filter, sort: BOOK_SORT });

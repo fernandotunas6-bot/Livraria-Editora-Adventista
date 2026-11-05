@@ -12,6 +12,7 @@ import {
   passwordChangedLetter,
   paymentConfirmedLetter,
   testLetter,
+  thankYouLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
   unsubscribeUrlFor,
@@ -711,5 +712,33 @@ describe("isEmail", () => {
   it("não rebenta com valores que não são texto", () => {
     expect(isEmail(undefined as unknown as string)).toBe(false);
     expect(isEmail(null as unknown as string)).toBe(false);
+  });
+});
+
+describe("agradecimento e linhas com variante", () => {
+  const brandSite = brandFromSettings({ site_name: "Livraria Adventista" }, "https://loja.exemplo.ao");
+  const order = {
+    id: "abc123", order_number: "LA-2026-0099", customer_name: "Ana Costa", receipt_token: "11111111-2222-3333-4444-555555555555",
+    shipping_method: "delivery",
+    items: [{ quantity: 1, title: "Uniforme — camisa", variant_label: "M · Azul", book_code: "UNI-004", price: 6000 }],
+  };
+
+  it("leva os links de confirmação com o segredo da encomenda", () => {
+    const { html, text } = emailDocument(brandSite, thankYouLetter(brandSite, order).doc);
+    expect(html).toContain("https://loja.exemplo.ao/confirmar-encomenda?e=abc123&amp;t=11111111-2222-3333-4444-555555555555&amp;r=ok");
+    expect(text).toContain("r=problema");
+    expect(html).toContain("Obrigado, Ana!");
+  });
+
+  it("sem endereço da loja ou sem segredo, não leva botões partidos", () => {
+    const semSite = brandFromSettings({ site_name: "Livraria Adventista" }, "");
+    expect(thankYouLetter(semSite, order).doc.cta).toBeUndefined();
+    expect(thankYouLetter(brandSite, { ...order, receipt_token: "" }).doc.cta).toBeUndefined();
+  });
+
+  it("mostra a variante e o código de cada produto", () => {
+    const { html, text } = emailDocument(brandSite, orderCreatedLetter(brandSite, order).doc);
+    expect(html).toContain("M · Azul · UNI-004");
+    expect(text).toContain("1x Uniforme — camisa (M · Azul · UNI-004)");
   });
 });

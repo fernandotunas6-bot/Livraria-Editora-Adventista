@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield,
+  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -79,6 +79,11 @@ export function UserMenu({ compact = false, className }) {
         <DropdownMenuItem asChild>
           <Link to="/profile" state={{ tab: 'orders' }} className="cursor-pointer">
             <ShoppingBag className="mr-2" /> As Minhas Encomendas
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/sugestoes" className="cursor-pointer">
+            <Sparkles className="mr-2" /> Sugestões para si
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
