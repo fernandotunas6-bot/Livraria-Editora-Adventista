@@ -97,6 +97,14 @@ describe('rotas da Edge Function', () => {
       '/admin/email/templates',
       '/admin/email/preview',
       '/admin/email/resend',
+      '/admin/email/template',
+      '/admin/email/template/preview',
+      '/admin/email/template/save',
+      '/admin/email/template/restore',
+      '/admin/users/end-sessions',
+      '/account/session-notice',
+      '/account/email-change-notice',
+      '/account/password-changed-notice',
     ]) {
       expect(declared.has(route), route).toBe(true);
     }

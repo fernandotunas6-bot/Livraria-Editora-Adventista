@@ -147,7 +147,13 @@ total de uma compra não pode mudar de formato com a máquina que gerou a mensag
 | Boas-vindas | `POST /account/welcome`, pedido pelo cliente no primeiro acesso |
 | Conta criada (convite) · Recuperar palavra-passe | `sendAccessLink()`, pelo painel de utilizadores |
 | Encomenda recebida / confirmada | `POST /checkout` |
-| Pagamento confirmado | `POST /admin/orders/payment-status` |
+| Pagamento confirmado · Reembolso | `POST /admin/orders/payment-status` (`paid` / `refunded`) |
+| Palavra-passe alterada | `POST /account/password-changed-notice`, pedido pelo site depois de a mudar |
+| Email da conta alterado | `POST /account/email-change-notice` (cliente) e `POST /admin/users/update` (equipa); vai para o endereço **antigo** |
+| Novo acesso | `POST /account/session-notice`, pedido pelo site ao abrir sessão (ver abaixo) |
+| Actividade suspeita | `POST /admin/users/end-sessions` com `suspicious: true` |
+| Conta suspensa · Conta reactivada | `POST /admin/users/status` |
+| Conta encerrada | `POST /admin/users/delete`, depois de a conta ser apagada |
 | A preparar · Expedida · Em trânsito · Saiu para entrega · Entregue · Cancelada | `POST /delivery-event` |
 | Entregue (confirmação do comprador) | `POST /confirm-delivery` |
 | Campanhas e avisos | `notifyContact()` |
@@ -155,6 +161,39 @@ total de uma compra não pode mudar de formato com a máquina que gerou a mensag
 
 Nos levantamentos na loja ("expedida" → "Pronta para levantamento") o texto e a linha de
 progresso mudam: falar de trânsito a quem vai ao balcão não diz nada.
+
+### Novo acesso
+
+O aparelho é o navegador e o sistema ("Chrome em Android"), lido do `User-Agent` do pedido,
+guardado em hash em `account_devices`. A versão e o IP ficam de fora: mudam a cada
+actualização e a cada troca de rede, e o aviso passava a sair todas as semanas para o mesmo
+telemóvel. A primeira vez que uma conta usa isto só regista o aparelho, sem email.
+
+A loja **não decide sozinha** o que é actividade suspeita. O aviso sai quando alguém da
+equipa termina as sessões da conta no painel e marca "por actividade suspeita".
+
+### Textos editáveis e versões
+
+No painel dos modelos de email, por baixo da pré-visualização, edita-se o assunto, o título,
+o subtítulo e os parágrafos de cada modelo (menos campanhas e teste). Os detalhes, totais,
+etapas e botões continuam a vir dos dados. Os marcadores são `{nome}`, `{loja}`,
+`{encomenda}`, `{total}`, `{email_novo}` e `{detalhe}`.
+
+Cada gravação é uma linha nova em `email_template_versions`. Está em vigor a de versão mais
+alta. "Voltar a esta" e "Repor texto de origem" gravam também uma versão nova, por isso
+nada se perde e tudo se pode desfazer. `content` nulo quer dizer texto de origem. Os textos
+entram em `sendLetter`, o único sítio por onde todos os modelos saem. Se a tabela não
+existir ainda, os emails saem com o texto de origem.
+
+### Terminar sessão em todos os aparelhos
+
+- **O cliente**, em Perfil → Segurança: `supabase.auth.signOut({ scope: 'global' })`.
+- **A equipa**, no painel de utilizadores: `POST /admin/users/end-sessions`, que chama
+  `admin_end_user_sessions()` (apaga `auth.sessions` e `auth.refresh_tokens` da conta).
+  Suspender uma conta também termina as sessões.
+
+Nos dois casos, os tokens de acesso já emitidos só deixam de servir quando expiram (uma hora,
+por omissão).
 
 ### Idempotência
 
@@ -369,6 +408,32 @@ erro. Se o `pg_cron` ou o `pg_net` não estiverem disponíveis, fica um aviso no
 migrações seguintes continuam. Uma migração que rebenta bloqueia todas as outras, e o preço
 de a fila ficar manual é muito menor do que o de o `db push` parar.
 
+## 7.1. Visual da loja e sugestões de livros
+
+**Moldura** (`emails.ts`): cabeçalho no azul-escuro do site com o logótipo branco, faixa de livros a toda a largura, corpo marfim com títulos em Fraunces e um filete dourado, botão azul-petróleo e rodapé escuro. As regras de compatibilidade de cima mantêm-se (tabelas, CSS em linha, legível sem imagens).
+
+**Faixas de livros** (`doc.banner`): recortes dos banners da galeria da loja, no bucket público `media`, em `email/`: `hero-encomenda.jpg` (encomendas, pagamento, entrega), `hero-conta.jpg` (boas-vindas e conta) e `hero-mensagem.jpg` (campanhas, contactos, teste). O logótipo do cabeçalho é `email/logo-light.png` quando o painel não tem outro. Para trocar as faixas: mudar a lista em `scripts/email/render-heroes.cjs`, correr `node scripts/email/render-heroes.cjs <pasta>` e enviar os JPEG para o mesmo caminho.
+
+**Sugestões de livros** (`doc.suggestions`): quatro livros no fim da mensagem, com capa, autor, preço e link para `/product/:id`, mais "Ver todas as sugestões" para `/sugestoes`. O `sendLetter` acrescenta-as (e a faixa) em `decorateLetter`, conforme o contexto:
+
+| Com sugestões | Sem sugestões |
+|---|---|
+| encomenda, estado da encomenda, pagamento, recibo, boas-vindas, campanhas, contactos, teste | convite e recuperação de palavra-passe (são de segurança) |
+
+A ordem vem de `suggestions.ts` (`rankSuggestions`, com testes):
+
+1. Lista de desejos e livros vistos, ainda não comprados (no máximo metade do bloco).
+2. Livros dos géneros do que comprou, guardou e viu.
+3. Novidades.
+
+Nunca sugere o que o cliente já comprou. Prefere livros com capa a sério: `suggestable_books()` devolve o tamanho do ficheiro da capa, e capas com menos de 10 KB (vazias, há dezenas no catálogo) ficam para o fim. Sem `site_url`, sem histórico ou se a leitura falhar, o email sai na mesma, sem o bloco.
+
+**Livros vistos:** `POST /catalog/view` com sessão grava em `book_views` (`record_book_view`, só service role). Sem sessão, contam os vistos que a loja já guarda no browser (`lib/recentlyViewed`), que só saem para `POST /recommendations`.
+
+**Página `/sugestoes`** (`SuggestionsPage.jsx`, no menu da conta como "Sugestões para si"): "Escolhidos para si", "Vistos recentemente" e "Novidades", a partir de `POST /recommendations`, que devolve ids; a página lê os livros com as regras de visibilidade de sempre.
+
+Migrações: `20261105052817_livros_vistos`, `20261105053543_livros_para_sugestoes` (aplicadas).
+
 ## 8. Por fazer
 
 - **Verificar o agendador num projecto a sério.** O `pg_cron` e o `pg_net` estão agendados
@@ -377,8 +442,9 @@ de a fila ficar manual é muito menor do que o de o `db push` parar.
   este projecto.
 - **Webhooks do fornecedor** (entregue, devolvido, marcado como spam): o estado de entrega
   real não é conhecido.
-- **Painel de comunicações**: falta activar ou desactivar categorias opcionais, editar os
-  textos a partir do painel e guardar versões dos modelos.
+- **Aplicar a migração `20261105064252_textos_emails_aparelhos_sessoes.sql` e publicar a
+  Edge Function.** Sem a migração, os emails saem com o texto de origem, não há aviso de
+  novo acesso e "terminar sessões" pela equipa responde com erro.
 - **O painel novo não foi verificado a funcionar.** Passa lint, build e testes, mas as rotas
   `/admin/email/templates`, `/preview` e `/resend` só respondem depois de a Edge Function ser
   publicada, e esta máquina não tem credenciais do Supabase nem um `app/web/.env`.

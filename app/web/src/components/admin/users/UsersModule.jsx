@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Plus, Search, MoreHorizontal, Eye, Pencil, KeyRound, Ban, CheckCircle2, Trash2, UserPlus,
-  Users, UserCheck, ShoppingBag, ShieldAlert, Copy, MessageCircle, ChevronLeft, ChevronRight, RefreshCw, Download,
+  Users, UserCheck, ShoppingBag, ShieldAlert, Copy, MessageCircle, ChevronLeft, ChevronRight, RefreshCw, Download, LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +18,8 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser } from '@/lib/usersApi';
+import { Checkbox } from '@/components/ui/checkbox';
+import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, endUserSessions } from '@/lib/usersApi';
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
@@ -106,7 +107,10 @@ export default function UsersModule() {
   const [formOpen, setFormOpen] = useState(false);
   const [formUser, setFormUser] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [confirm, setConfirm] = useState(null); // { title, description, actionLabel, destructive, run }
+  // { title, description, actionLabel, destructive, run(checked), option?: { label, checked } }
+  const [confirm, setConfirm] = useState(null);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const ask = (c) => { setConfirmChecked(!!c.option?.checked); setConfirm(c); };
   const [accessInfo, setAccessInfo] = useState(null); // { name, email, phone, link, emailSent }
 
   // Pesquisa com atraso, para não pedir ao servidor a cada tecla.
@@ -157,6 +161,7 @@ export default function UsersModule() {
       accessLink: u.has_account && manageable,
       suspend: u.has_account && manageable && !self,
       remove: u.has_account && manageable && !self,
+      endSessions: u.has_account && manageable && !self && !u.suspended,
     };
   }, [isAdmin, me?.id]);
 
@@ -178,25 +183,48 @@ export default function UsersModule() {
   const openCreate = (prefill = null) => { setFormUser(prefill); setFormOpen(true); };
   const openEdit = (u) => { setFormUser(u); setFormOpen(true); };
 
-  const askSuspend = (u) => setConfirm({
+  /** Título do aviso de sucesso, a dizer se a pessoa foi avisada por email. */
+  const withEmail = (title, notify) => (res) => {
+    if (!notify) return title;
+    return res?.email_sent ? `${title} · avisada por email` : `${title} · o email de aviso não saiu`;
+  };
+
+  const runWithEmail = async (u, fn, title, notify) => {
+    const res = await run(u, fn);
+    if (res) toast({ title: withEmail(title, notify)(res) });
+    return res;
+  };
+
+  const askSuspend = (u) => ask({
     title: u.suspended ? 'Reactivar conta?' : 'Suspender conta?',
     description: u.suspended
       ? `${u.name || u.email} volta a poder entrar na loja.`
-      : `${u.name || u.email} deixa de conseguir entrar até a conta ser reactivada. As encomendas não são afectadas.`,
+      : `${u.name || u.email} deixa de conseguir entrar até a conta ser reactivada, e as sessões abertas terminam. As encomendas não são afectadas.`,
     actionLabel: u.suspended ? 'Reactivar' : 'Suspender',
     destructive: !u.suspended,
-    run: () => run(u, () => setUserSuspended(u.id, !u.suspended), u.suspended ? 'Conta reactivada' : 'Conta suspensa'),
+    option: { label: 'Avisar a pessoa por email', checked: true },
+    run: (notify) => runWithEmail(u, () => setUserSuspended(u.id, !u.suspended, { notify }), u.suspended ? 'Conta reactivada' : 'Conta suspensa', notify),
   });
 
-  const askDelete = (u) => setConfirm({
+  const askDelete = (u) => ask({
     title: 'Apagar conta?',
     description: `A conta de ${u.name || u.email} é apagada de vez. As encomendas ficam guardadas (estão ligadas ao email) e a pessoa pode voltar a registar-se.`,
     actionLabel: 'Apagar',
     destructive: true,
-    run: async () => {
-      const ok = await run(u, () => deleteUser(u.id), 'Conta apagada');
+    option: { label: 'Avisar a pessoa por email de que a conta foi encerrada', checked: true },
+    run: async (notify) => {
+      const ok = await runWithEmail(u, () => deleteUser(u.id, { notify }), 'Conta apagada', notify);
       if (ok) setDetail(null);
     },
+  });
+
+  const askEndSessions = (u) => ask({
+    title: 'Terminar a sessão em todos os aparelhos?',
+    description: `${u.name || u.email} tem de voltar a entrar com a palavra-passe em todos os aparelhos. As sessões já abertas deixam de funcionar no máximo dentro de uma hora.`,
+    actionLabel: 'Terminar sessões',
+    destructive: true,
+    option: { label: 'Por actividade suspeita: enviar o aviso por email', checked: false },
+    run: (suspicious) => runWithEmail(u, () => endUserSessions(u.id, { suspicious }), 'Sessões terminadas', suspicious),
   });
 
   const doAccessLink = async (u) => {
@@ -239,6 +267,7 @@ export default function UsersModule() {
         {can.edit && <DropdownMenuItem onClick={() => openEdit(u)}><Pencil className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>}
         {can.createAccount && <DropdownMenuItem onClick={() => openCreate(u)}><UserPlus className="h-4 w-4 mr-2" />Criar conta</DropdownMenuItem>}
         {can.accessLink && <DropdownMenuItem onClick={() => doAccessLink(u)}><KeyRound className="h-4 w-4 mr-2" />Link para definir palavra-passe</DropdownMenuItem>}
+        {can.endSessions && <DropdownMenuItem onClick={() => askEndSessions(u)}><LogOut className="h-4 w-4 mr-2" />Terminar sessão em todos os aparelhos</DropdownMenuItem>}
         {(can.suspend || can.remove) && <DropdownMenuSeparator />}
         {can.suspend && (
           <DropdownMenuItem onClick={() => askSuspend(u)}>
@@ -263,6 +292,7 @@ export default function UsersModule() {
         {can.edit && <Button size="sm" variant="outline" onClick={() => openEdit(detail)}><Pencil className="h-4 w-4 mr-1" />Editar</Button>}
         {can.createAccount && <Button size="sm" onClick={() => openCreate(detail)}><UserPlus className="h-4 w-4 mr-1" />Criar conta</Button>}
         {can.accessLink && <Button size="sm" variant="outline" onClick={() => doAccessLink(detail)}><KeyRound className="h-4 w-4 mr-1" />Link de acesso</Button>}
+        {can.endSessions && <Button size="sm" variant="outline" onClick={() => askEndSessions(detail)}><LogOut className="h-4 w-4 mr-1" />Terminar sessões</Button>}
         {can.suspend && (
           <Button size="sm" variant="outline" onClick={() => askSuspend(detail)}>
             {detail.suspended ? <CheckCircle2 className="h-4 w-4 mr-1" /> : <Ban className="h-4 w-4 mr-1" />}
@@ -417,11 +447,17 @@ export default function UsersModule() {
             <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
             <AlertDialogDescription>{confirm?.description}</AlertDialogDescription>
           </AlertDialogHeader>
+          {confirm?.option && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={confirmChecked} onCheckedChange={(v) => setConfirmChecked(v === true)} />
+              {confirm.option.label}
+            </label>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className={confirm?.destructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-              onClick={() => { const action = confirm?.run; setConfirm(null); action?.(); }}
+              onClick={() => { const action = confirm?.run; const checked = confirmChecked; setConfirm(null); action?.(checked); }}
             >
               {confirm?.actionLabel}
             </AlertDialogAction>
