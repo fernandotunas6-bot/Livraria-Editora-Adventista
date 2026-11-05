@@ -85,7 +85,8 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
 };
 
 export type DetailRow = { label: string; value: string };
-export type LineItem = { quantity: number; title: string; amount: string };
+/** `detail`: linha pequena por baixo do nome (variante e código, ex.: "Tamanho M · UNI-004"). */
+export type LineItem = { quantity: number; title: string; amount: string; detail?: string };
 export type TotalRow = { label: string; value: string; strong?: boolean };
 export type Step = { label: string; done: boolean; current?: boolean };
 export type Action = { label: string; url: string };
@@ -256,7 +257,7 @@ function itemsBlock(doc: EmailDoc): string {
   const items = (doc.items || [])
     .map(
       (it) => `<tr>
-        <td style="padding:11px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK}" valign="top"><span style="color:${GOLD};font-weight:600">${esc(it.quantity)}×</span> ${esc(it.title)}</td>
+        <td style="padding:11px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK}" valign="top"><span style="color:${GOLD};font-weight:600">${esc(it.quantity)}×</span> ${esc(it.title)}${it.detail ? `<br><span style="font:400 12px/1.5 ${FONT};color:${INK_SOFT}">${esc(it.detail)}</span>` : ""}</td>
         <td style="padding:11px 0;border-bottom:1px solid ${LINE};font:400 14px/1.5 ${FONT};color:${INK};text-align:right;white-space:nowrap" valign="top">${esc(it.amount)}</td>
       </tr>`,
     )
@@ -444,7 +445,7 @@ export function emailText(brand: Brand, doc: EmailDoc): string {
     out.push("");
   }
   if (doc.items?.length) {
-    for (const it of doc.items) out.push(`${it.quantity}x ${it.title} — ${it.amount}`);
+    for (const it of doc.items) out.push(`${it.quantity}x ${it.title}${it.detail ? ` (${it.detail})` : ""} — ${it.amount}`);
     out.push("");
   }
   if (doc.totals?.length) {

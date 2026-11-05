@@ -56,6 +56,7 @@ const ORDER_LIST_FIELDS = [
   'delivery_province', 'delivery_municipality', 'delivery_locality', 'delivery_street',
   'delivery_reference', 'delivery_address_full', 'delivery_relative_name', 'delivery_relative_phone',
   'delivery_recipient_name', 'delivery_confirmed_at', 'delivery_confirmed_by', 'checkout_signature_at',
+  'customer_confirmed_at', 'customer_feedback',
 ];
 
 const AdminPage = () => {
@@ -817,7 +818,22 @@ const AdminPage = () => {
                                   {getDeliveryStatusLabel(o.delivery_status)}
                                 </span>
                               )}
+                              {o.customer_feedback?.outcome === 'ok' && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800" title={`Confirmado em ${new Date(o.customer_confirmed_at).toLocaleString('pt-AO')}`}>
+                                  ✓ Cliente confirmou
+                                </span>
+                              )}
+                              {o.customer_feedback?.outcome === 'problem' && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800" title={o.customer_feedback.message}>
+                                  ! Problema reportado
+                                </span>
+                              )}
                             </div>
+                            {o.customer_feedback?.outcome === 'problem' && (
+                              <p className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-800">
+                                <strong>Cliente:</strong> {o.customer_feedback.message}
+                              </p>
+                            )}
                             <p className="text-sm text-muted-foreground mt-1">
                               {o.customer_name || 'Cliente'} · {o.customer_email}
                             </p>

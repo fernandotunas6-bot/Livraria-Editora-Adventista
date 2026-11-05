@@ -5,7 +5,7 @@
  * `emails.ts`. Separar assim mantém o conteúdo de cada mensagem legível e garante que todas
  * têm o mesmo cabeçalho, o mesmo rodapé e a mesma linha a dizer porque foi enviada.
  *
- * O catálogo segue o que esta loja tem: livros físicos, com entrega ao domicílio ou
+ * O catálogo segue o que esta loja tem: produtos físicos (livros, Bíblias, uniformes, materiais), com entrega ao domicílio ou
  * levantamento na loja. Não há produtos digitais, licenças nem vendedores no esquema da base
  * de dados, por isso não há aqui modelos para isso — seriam ficheiros que nada chamaria.
  */
@@ -39,7 +39,8 @@ const REASON_ACCOUNT = "Recebeu esta mensagem por causa de um pedido feito na su
 function orderItems(order: Row) {
   return (order.items || []).map((it: Row) => ({
     quantity: Number(it.quantity) || 1,
-    title: String(it.title || "Livro"),
+    title: String(it.title || "Produto"),
+    detail: [it.variant_label ? String(it.variant_label) : "", it.book_code ? String(it.book_code) : ""].filter(Boolean).join(" · ") || undefined,
     amount: money((Number(it.quantity) || 1) * (Number(it.price) || 0)),
   }));
 }
@@ -115,7 +116,7 @@ export function welcomeLetter(brand: Brand, name: string): Letter {
       title: `Bem-vindo, ${firstName(name) || "leitor"}!`,
       subtitle: "A sua conta está criada.",
       lead: [
-        "A partir de agora pode acompanhar as suas encomendas, guardar livros na lista de desejos e deixar avaliações.",
+        "A partir de agora pode acompanhar as suas encomendas, guardar produtos na lista de desejos e deixar avaliações.",
       ],
       cta: brand.siteUrl ? { label: "Ver o catálogo", url: `${brand.siteUrl.replace(/\/$/, "")}/shop` } : undefined,
       secondaryCta: ordersUrl(brand.siteUrl) ? { label: "A minha conta", url: ordersUrl(brand.siteUrl) } : undefined,
@@ -187,7 +188,7 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = ""): 
       tone: paid ? "success" : "brand",
       title: paid ? "Encomenda confirmada!" : "Recebemos a sua encomenda",
       subtitle: paid
-        ? "O pagamento está confirmado e vamos preparar os livros."
+        ? "O pagamento está confirmado e vamos preparar a sua encomenda."
         : "Falta só o pagamento para a prepararmos.",
       lead: [
         `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}! Obrigado pela sua compra na ${brand.siteName}.`,
@@ -218,7 +219,7 @@ export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
       tone: "success",
       title: "Pagamento confirmado!",
       subtitle: isPickup(order)
-        ? "Vamos preparar os livros para levantamento."
+        ? "Vamos preparar a sua encomenda para levantamento."
         : "Vamos preparar a sua encomenda para envio.",
       lead: [
         `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}! Recebemos o pagamento da sua encomenda.`,
@@ -239,11 +240,11 @@ export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
 /** Texto de cada mudança de estado da entrega. */
 const STATUS_COPY: Record<string, { title: string; subtitle: string; symbol: SafeSymbol; tone: EmailDoc["tone"] }> = {
   confirmed: { title: "Encomenda confirmada", subtitle: "Está na fila de preparação.", symbol: "✓", tone: "success" },
-  preparing: { title: "A preparar a sua encomenda", subtitle: "Estamos a separar os livros.", symbol: "◷", tone: "brand" },
+  preparing: { title: "A preparar a sua encomenda", subtitle: "Estamos a separar e a embalar os seus produtos.", symbol: "◷", tone: "brand" },
   shipped: { title: "Encomenda expedida", subtitle: "Já saiu da nossa loja.", symbol: "➜", tone: "brand" },
   in_transit: { title: "Encomenda em trânsito", subtitle: "Está a caminho do endereço indicado.", symbol: "➜", tone: "brand" },
   out_for_delivery: { title: "Saiu para entrega", subtitle: "Deve chegar hoje.", symbol: "➜", tone: "warning" },
-  delivered: { title: "Encomenda entregue", subtitle: "Boas leituras!", symbol: "✓", tone: "success" },
+  delivered: { title: "Encomenda entregue", subtitle: "Esperamos que goste de tudo!", symbol: "✓", tone: "success" },
   cancelled: { title: "Encomenda cancelada", subtitle: "A encomenda não vai seguir.", symbol: "✕", tone: "danger" },
 };
 
@@ -273,7 +274,7 @@ export function orderStatusLetter(brand: Brand, order: Row, status: string, even
   const lead = [`Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}!`];
   if (event?.description) lead.push(String(event.description));
   if (status === "delivered") {
-    lead.push("Obrigado pela sua compra. Se quiser, deixe uma avaliação dos livros que recebeu.");
+    lead.push("Obrigado pela sua compra. Amanhã enviamos-lhe uma mensagem para confirmar que correu tudo bem.");
   }
   if (status === "cancelled") {
     lead.push("Se tiver dúvidas sobre o motivo ou sobre a devolução de um valor já pago, responda a esta mensagem.");
@@ -292,6 +293,53 @@ export function orderStatusLetter(brand: Brand, order: Row, status: string, even
       stepsTitle: status === "cancelled" ? undefined : "Estado da encomenda",
       steps: status === "cancelled" ? undefined : orderSteps(order, status),
       cta: trackUrl(brand.siteUrl) ? { label: "Ver a encomenda", url: trackUrl(brand.siteUrl) } : undefined,
+      reason: REASON_ORDER,
+    },
+  };
+}
+
+/** Links da confirmação do cliente: "Recebi tudo bem" e "Tenho um problema". */
+export function receiptLinks(siteUrl: string, order: Row) {
+  const site = String(siteUrl || "").replace(/\/$/, "");
+  if (!site || !order?.id || !order?.receipt_token) return null;
+  const base = `${site}/confirmar-encomenda?e=${encodeURIComponent(order.id)}&t=${encodeURIComponent(order.receipt_token)}`;
+  return { ok: `${base}&r=ok`, problem: `${base}&r=problema` };
+}
+
+/**
+ * A nota de agradecimento, um dia depois da entrega.
+ *
+ * Fecha a compra: agradece, lembra o que foi entregue e pede ao cliente que confirme que
+ * correu tudo bem. Um problema reportado aqui avisa a equipa, em vez de ficar num email
+ * que ninguém lê.
+ */
+export function thankYouLetter(brand: Brand, order: Row): Letter {
+  const name = firstName(order.customer_name);
+  const links = receiptLinks(brand.siteUrl, order);
+  const pickup = isPickup(order);
+  return {
+    subject: `Obrigado pela sua compra${name ? `, ${name}` : ""}!`,
+    doc: {
+      symbol: "★",
+      tone: "success",
+      title: name ? `Obrigado, ${name}!` : "Obrigado pela sua compra!",
+      subtitle: `A encomenda ${orderRef(order)} foi ${pickup ? "levantada" : "entregue"}. Foi uma alegria servi-lo.`,
+      lead: [
+        `Em nome de toda a equipa da ${brand.siteName}, obrigado pela confiança.`,
+        "Cada compra ajuda a levar mais literatura e materiais a famílias, igrejas e escolas.",
+        links ? "Recebeu tudo como esperava? Diga-nos com um clique." : "",
+      ].filter(Boolean),
+      detailsTitle: "O que recebeu",
+      details: [
+        { label: "Encomenda", value: orderRef(order) },
+        ...(order.delivery_confirmed_at ? [{ label: pickup ? "Levantada" : "Entregue", value: dateLong(order.delivery_confirmed_at) }] : []),
+      ],
+      items: orderItems(order),
+      cta: links ? { label: "Recebi tudo bem", url: links.ok } : undefined,
+      secondaryCta: links ? { label: "Tive um problema com a encomenda", url: links.problem } : undefined,
+      notes: [
+        "Se algum produto chegou danificado, em falta ou diferente do que pediu, use o link acima: a equipa recebe o aviso e entra em contacto.",
+      ],
       reason: REASON_ORDER,
     },
   };
@@ -365,10 +413,11 @@ function sampleOrder(pickup = false): Row {
     customer_name: "Maria Fernandes",
     customer_email: "cliente@exemplo.ao",
     items: [
-      { quantity: 2, title: "O Grande Conflito", price: 4500 },
-      { quantity: 1, title: "Caminho a Cristo", price: 2500 },
+      { quantity: 2, title: "O Grande Conflito", price: 4500, book_code: "LIV-012" },
+      { quantity: 1, title: "Caminho a Cristo", price: 2500, book_code: "LIV-034" },
+      { quantity: 1, title: "Uniforme do Colégio Adventista — camisa", variant_label: "10 anos · Azul", price: 6000, book_code: "UNI-004" },
     ],
-    total: 13000,
+    total: 19000,
     shipping_cost: 1500,
     payment_method_name: "Multicaixa Express",
     payment_status: "paid",
@@ -398,6 +447,7 @@ export const PREVIEW_TEMPLATES: Record<string, { label: string; group: string; b
   in_transit: { label: "Em trânsito", group: "Entrega", build: (b) => orderStatusLetter(b, sampleOrder(), "in_transit")! },
   out_for_delivery: { label: "Saiu para entrega", group: "Entrega", build: (b) => orderStatusLetter(b, sampleOrder(), "out_for_delivery")! },
   delivered: { label: "Entregue", group: "Entrega", build: (b) => orderStatusLetter(b, sampleOrder(), "delivered")! },
+  thank_you: { label: "Agradecimento (1 dia depois)", group: "Entrega", build: (b) => thankYouLetter(b, { ...sampleOrder(), receipt_token: "00000000-0000-0000-0000-000000000000" }) },
   cancelled: { label: "Cancelada", group: "Entrega", build: (b) => orderStatusLetter(b, sampleOrder(), "cancelled")! },
   pickup_ready: { label: "Pronta para levantamento", group: "Entrega", build: (b) => orderStatusLetter(b, sampleOrder(true), "shipped")! },
 

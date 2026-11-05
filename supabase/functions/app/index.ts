@@ -15,6 +15,7 @@ import {
   orderCreatedLetter,
   orderStatusLetter,
   paymentConfirmedLetter,
+  thankYouLetter,
   testLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
@@ -544,13 +545,13 @@ async function emailSuggestions(brand: Brand, email: string): Promise<Suggestion
 
 /** Faixa de livros conforme o tipo de mensagem. */
 function bannerFor(context: string): BannerKey {
-  if (["order", "order_status", "payment", "receipt"].includes(context)) return "encomenda";
+  if (["order", "order_status", "payment", "receipt", "thanks"].includes(context)) return "encomenda";
   if (["account", "welcome"].includes(context)) return "conta";
   return "mensagem";
 }
 
 /** Contextos com sugestões de livros. As de conta (convite, palavra-passe) vão sem: são de segurança. */
-const SUGGESTION_CONTEXTS = new Set(["order", "order_status", "payment", "receipt", "welcome", "campaign", "contact", "test"]);
+const SUGGESTION_CONTEXTS = new Set(["order", "order_status", "payment", "receipt", "thanks", "welcome", "campaign", "contact", "test"]);
 
 /** Acrescenta a faixa e as sugestões a um modelo, antes de o compor. */
 async function decorateLetter(brand: Brand, letter: Letter, context: string, to: string) {
@@ -624,6 +625,7 @@ const PROGRESS_STATUSES = ["confirmed", "preparing", "shipped", "in_transit", "o
 
 async function sendOrderStatusEmail(order: Row, settings: Row | null, status: string, event?: Row) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
+  if (status === "delivered") await scheduleThankYouEmail(order, settings);
   const letter = orderStatusLetter(emailBrand(settings), order, status, event);
   if (!letter) return false;
   return sendLetter(settings, order.customer_email, letter, {
@@ -635,6 +637,45 @@ async function sendOrderStatusEmail(order: Row, settings: Row | null, status: st
     order_number: order.order_number,
     dedupe: `order:status:${order.id}:${status}`,
   });
+}
+
+/** Um dia depois da entrega: a nota de agradecimento, com "Recebi tudo bem / Tenho um problema". */
+const THANK_YOU_DELAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Põe a nota de agradecimento na fila para daqui a um dia. A fila (agendador de 5 em 5 min)
+ * envia-a quando chegar a hora; a chave `order:thanks:<id>` impede que saia duas vezes, mesmo
+ * que a encomenda volte a ser marcada como entregue.
+ */
+async function scheduleThankYouEmail(order: Row, settings: Row) {
+  try {
+    if (!order?.id || !order.customer_email) return false;
+    if (order.customer_confirmed_at) return false;
+    const dedupe = `order:thanks:${order.id}`;
+    if (await alreadySent(dedupe)) return false;
+    const brand = emailBrand(settings);
+    const letter = thankYouLetter(brand, order);
+    await decorateLetter(brand, letter, "thanks", order.customer_email);
+    const { html, text } = emailDocument(brand, letter.doc);
+    const { error } = await db.from("email_queue").insert({
+      recipient: order.customer_email,
+      subject: letter.subject,
+      html,
+      text_body: text,
+      context: "thanks",
+      customer_name: order.customer_name || "",
+      order_number: order.order_number || "",
+      dedupe_key: dedupe,
+      attempts: 0,
+      next_attempt_at: new Date(Date.now() + THANK_YOU_DELAY_MS).toISOString(),
+      last_error: "Agendada: agradecimento um dia depois da entrega.",
+    });
+    if (error && error.code !== "23505") console.log("thank-you queue:", error.message);
+    return !error;
+  } catch (err) {
+    console.log("scheduleThankYouEmail:", (err as Error)?.message || err);
+    return false;
+  }
 }
 
 /** Avisa o cliente de que o pagamento ficou confirmado. */
@@ -1223,6 +1264,64 @@ route("GET", "/geo/localities", async ({ url }) => {
     .eq("municipality", municipalityId).order("sort_order").limit(500);
   const localities = data || [];
   return publicJson({ localities, count: localities.length });
+});
+
+/** Avisa a equipa que trata de encomendas (admins e gestores com "manage_orders"). */
+async function notifyOrderStaff(kind: string, title: string, body: string, orderId: string | null) {
+  const { data: staff } = await db.from("profiles").select("id, role, permissions").in("role", ["admin", "manager"]);
+  const rows = (staff || [])
+    .filter((p: Row) => p.role === "admin" || p.permissions?.manage_orders === true)
+    .map((p: Row) => ({ staff_id: p.id, kind, title: clipText(title, 200), body: clipText(body, 1000), order_id: orderId }));
+  if (!rows.length) return 0;
+  const { error } = await db.from("staff_notifications").insert(rows);
+  if (error) console.log("staff_notifications:", error.message);
+  return error ? 0 : rows.length;
+}
+
+/**
+ * Resposta do cliente ao email de agradecimento: "Recebi tudo bem" ou "Tenho um problema".
+ *
+ * Público (o cliente pode não ter conta), mas só com o segredo da encomenda (`receipt_token`),
+ * que só vai no email. Um problema avisa a equipa e fica na linha do tempo da encomenda.
+ * Responder outra vez substitui a resposta anterior (o cliente pode mudar de ideias).
+ */
+route("POST", "/order-feedback", async ({ body, ip }) => {
+  if (!await checkRateLimit("order-feedback", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const id = String(body.order_id || "").trim().slice(0, 40);
+  const token = String(body.token || "").trim();
+  const outcome = body.outcome === "problem" ? "problem" : body.outcome === "ok" ? "ok" : "";
+  const message = clipText(body.message, 1500);
+  if (!id || !/^[0-9a-f-]{36}$/i.test(token) || !outcome) throw bad("Link inválido.");
+  if (outcome === "problem" && message.length < 5) throw bad("Conte-nos o que aconteceu, para podermos ajudar.");
+
+  const { data: order } = await db.from("orders")
+    .select("id, order_number, customer_name, receipt_token, delivery_timeline, delivery_status, status")
+    .eq("id", id).maybeSingle();
+  // Mesmo erro para encomenda inexistente e token errado: não revela que números existem.
+  if (!order || !secretsMatch(String(order.receipt_token || ""), token)) throw bad("Link inválido ou expirado.");
+  if (order.status === "cancelled") throw bad("Esta encomenda foi cancelada.");
+
+  const at = nowISO();
+  const event = outcome === "ok"
+    ? timelineEvent("customer_confirmed", "Cliente confirmou a recepção", "Recebeu tudo bem.", "")
+    : timelineEvent("customer_problem", "Cliente reportou um problema", message, "");
+  const { error } = await db.from("orders").update({
+    customer_confirmed_at: at,
+    customer_feedback: { outcome, message: outcome === "problem" ? message : "", at },
+    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), event],
+  }).eq("id", id);
+  if (error) throw error;
+
+  const ref = order.order_number || order.id;
+  if (outcome === "problem") {
+    await notifyOrderStaff("order_problem", `Problema na encomenda ${ref}`, `${order.customer_name || "O cliente"}: ${message}`, order.id);
+  } else {
+    await notifyOrderStaff("order_confirmed", `Encomenda ${ref} confirmada pelo cliente`, `${order.customer_name || "O cliente"} recebeu tudo bem.`, order.id);
+  }
+  return json({
+    ok: true, outcome, order_number: ref,
+    message: outcome === "ok" ? "Obrigado por confirmar!" : "Recebemos o seu aviso. A equipa vai entrar em contacto.",
+  });
 });
 
 route("POST", "/confirm-delivery", async ({ body, ip }) => {
