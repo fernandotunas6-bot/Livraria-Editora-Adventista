@@ -1,0 +1,238 @@
+import React, { useId, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff, MailCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/useAuth';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { validateAuthForm } from '@/lib/authPrompt';
+
+const GoogleIcon = () => (
+  <svg className="h-5 w-5 mr-2 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+  </svg>
+);
+
+/**
+ * Entrar ou criar conta: o mesmo formulário na página /login e no modal.
+ *
+ * Um só sítio para as regras (validação, Google, confirmação por email), em vez de duas cópias
+ * a divergir. Quem usa decide o que acontece a seguir em `onDone(record)`: a página navega, o
+ * modal fecha e a pessoa fica onde estava.
+ *
+ * @param {object} p
+ * @param {'login'|'signup'} [p.initialMode]
+ * @param {string} [p.defaultEmail]
+ * @param {string} [p.defaultName]
+ * @param {string} p.returnPath  para onde a Google devolve a pessoa
+ * @param {(record: object) => void} p.onDone
+ * @param {(mode: string) => void} [p.onModeChange]
+ * @param {() => void} [p.onNavigateAway]  ao seguir um link (ex.: "Esqueceu?")
+ */
+export default function AuthForm({
+  initialMode = 'login', defaultEmail = '', defaultName = '', returnPath, onDone, onModeChange, onNavigateAway,
+}) {
+  const ids = useId();
+  const [mode, setModeState] = useState(initialMode);
+  const [email, setEmail] = useState(defaultEmail);
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState(defaultName);
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [pendingConfirmation, setPendingConfirmation] = useState('');
+  const { login, signup, loginWithGoogle } = useAuth();
+  const { settings } = useSiteSettings();
+
+  const errors = validateAuthForm({ mode, name, email, password });
+  const show = (field) => (submitted || touched[field]) && errors[field];
+  const touch = (field) => () => setTouched((t) => ({ ...t, [field]: true }));
+
+  const setMode = (next) => {
+    setModeState(next);
+    setPendingConfirmation('');
+    setSubmitted(false);
+    setTouched({});
+    onModeChange?.(next);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitted(true);
+    if (Object.keys(errors).length) return;
+    setLoading(true);
+    setPendingConfirmation('');
+    try {
+      try { sessionStorage.setItem('livraria_login_email', email.trim()); } catch { /* sem armazenamento */ }
+      const authData = mode === 'login' ? await login(email, password) : await signup(email, password, name);
+      if (authData?.needsConfirmation) {
+        setPendingConfirmation(authData.email);
+        setModeState('login');
+        setPassword('');
+        return;
+      }
+      if (mode === 'login') {
+        toast.success('Sessão iniciada', { description: `Bem-vindo de volta, ${authData.record?.name || 'leitor'}!` });
+      } else {
+        toast.success('Conta criada', { description: `Seja bem-vindo, ${name.trim().split(/\s+/)[0]}!` });
+      }
+      onDone?.(authData.record);
+    } catch (err) {
+      toast.error(mode === 'login' ? 'Não foi possível entrar' : 'Não foi possível criar a conta', {
+        description: err.message || 'Verifique o email e a palavra-passe.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    try {
+      // Sai para a Google e volta já com a sessão, à página onde a pessoa estava.
+      await loginWithGoogle(returnPath || '/profile');
+    } catch (err) {
+      toast.error('Google não disponível', {
+        description: err?.message || 'Tente com o email e a palavra-passe.',
+      });
+      setLoading(false);
+    }
+  };
+
+  const field = (key) => `${ids}-${key}`;
+  const errorId = (key) => `${ids}-${key}-erro`;
+
+  return (
+    <div>
+      {pendingConfirmation && (
+        <div className="mb-4 flex gap-2 text-xs text-sky-900 dark:text-sky-200 bg-sky-500/10 border border-sky-500/30 rounded-lg p-3" role="status">
+          <MailCheck className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <p>
+            Enviámos um link de confirmação para <strong>{pendingConfirmation}</strong>. Depois de confirmar, entre com o email e a
+            palavra-passe.{settings.google_oauth_enabled ? ' Se o email não chegar em alguns minutos, use "Continuar com Google".' : ''}
+          </p>
+        </div>
+      )}
+
+      {settings.google_oauth_enabled && (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full py-6 border-2 hover:bg-muted/50"
+            onClick={handleGoogle}
+            disabled={loading}
+          >
+            <GoogleIcon />
+            Continuar com Google
+          </Button>
+          {mode === 'signup' && (
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">O mais rápido: sem palavra-passe nova e sem esperar por email.</p>
+          )}
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">ou com email</span></div>
+          </div>
+        </>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {mode === 'signup' && (
+          <div className="space-y-1.5">
+            <Label htmlFor={field('nome')}>Nome</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Input
+                id={field('nome')}
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={touch('name')}
+                className="pl-9 h-11"
+                maxLength={100}
+                aria-invalid={!!show('name')}
+                aria-describedby={show('name') ? errorId('name') : undefined}
+              />
+            </div>
+            {show('name') && <p id={errorId('name')} className="text-xs text-destructive">{errors.name}</p>}
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label htmlFor={field('email')}>Email</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id={field('email')}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={touch('email')}
+              className="pl-9 h-11"
+              placeholder="o.seu.email@exemplo.com"
+              aria-invalid={!!show('email')}
+              aria-describedby={show('email') ? errorId('email') : undefined}
+            />
+          </div>
+          {show('email') && <p id={errorId('email')} className="text-xs text-destructive">{errors.email}</p>}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center">
+            <Label htmlFor={field('senha')}>Palavra-passe</Label>
+            {mode === 'login' && (
+              <Link to="/forgot-password" onClick={onNavigateAway} className="-my-2 block py-2 text-xs text-primary hover:underline">Esqueceu?</Link>
+            )}
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id={field('senha')}
+              type={showPass ? 'text' : 'password'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onBlur={touch('password')}
+              className="pl-9 pr-11 h-11"
+              aria-invalid={!!show('password')}
+              aria-describedby={show('password') ? errorId('password') : (mode === 'signup' ? `${field('senha')}-dica` : undefined)}
+            />
+            <button
+              type="button"
+              className="tap-target absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPass((v) => !v)}
+              aria-label={showPass ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+              aria-pressed={showPass}
+            >
+              {showPass ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+            </button>
+          </div>
+          {show('password')
+            ? <p id={errorId('password')} className="text-xs text-destructive">{errors.password}</p>
+            : mode === 'signup' && <p id={`${field('senha')}-dica`} className="text-[11px] text-muted-foreground">Mínimo de 8 caracteres.</p>}
+        </div>
+
+        <Button type="submit" className="w-full btn-primary py-6 text-base" disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="mr-2 h-4 w-4" aria-hidden="true" />}
+          {mode === 'login' ? 'Entrar' : 'Criar conta'}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground mt-5">
+        {mode === 'login' ? 'Ainda não tem conta?' : 'Já tem conta?'}{' '}
+        <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-primary font-medium hover:underline">
+          {mode === 'login' ? 'Criar conta' : 'Entrar'}
+        </button>
+      </p>
+    </div>
+  );
+}

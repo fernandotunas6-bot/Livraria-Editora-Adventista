@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useReviews } from '@/hooks/useReviews';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/Header.jsx';
@@ -81,6 +82,7 @@ function ProductDetailPage() {
 
   // Avaliações
   const { isAuthed, user } = useAuth();
+  const { openAuth } = useAuthDialog();
   const { reviews, loading: loadingReviews, stats, hasPurchased, submitReview, deleteReview, userReview, submitting, helpfulVotesEnabled, votingReviewId, toggleHelpfulVote } = useReviews(product?.id);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -734,8 +736,8 @@ function ProductDetailPage() {
                     ) : (
                       <div className="text-center py-6">
                         <p className="text-sm text-muted-foreground mb-4">Inicie sessão para deixar uma avaliação e partilhar a sua experiência.</p>
-                        <Button asChild variant="outline" className="w-full border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10">
-                          <Link to="/login" state={{ from: `/product/${product?.id}` }}>Entrar na Conta</Link>
+                        <Button type="button" variant="outline" className="w-full border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10" onClick={() => openAuth({ reason: 'review', mode: 'login' })}>
+                          Entrar na conta
                         </Button>
                       </div>
                     )}

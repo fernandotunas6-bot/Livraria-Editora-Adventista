@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine,
@@ -14,6 +14,7 @@ import { initializeCheckout } from '@/api/EcommerceApi';
 import { nextCheckoutAttempt } from '@/lib/checkoutIdempotency';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { getPaymentMethods, getPhysicalStores } from '@/api/PlatformApi';
@@ -21,7 +22,6 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
 import { calcShippingCents, SHIPPING_METHODS, getShippingLabel } from '@/lib/shipping';
 import { saveLastOrder } from '@/lib/receipt';
-import { currentPathWithQuery } from '@/lib/authSession';
 import AngolaAddressSelector, { validateAngolaAddress, angolaAddressToPayload } from '@/components/AngolaAddressSelector';
 import SignaturePad from '@/components/SignaturePad';
 import PhoneInput from '@/components/PhoneInput';
@@ -33,9 +33,10 @@ import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { toast } = useToast();
   const { user, updateProfile } = useAuth();
+  // Entrar ou criar conta num modal, por cima do carrinho: a pessoa não perde o passo nem o que escreveu.
+  const { openAuth } = useAuthDialog();
   // O carrinho é um painel sobre a página, não tem endereço próprio: quem sai daqui para
   // entrar volta à página onde estava, com o carrinho intacto (fica no armazenamento local).
-  const loginReturnTo = currentPathWithQuery(useLocation());
   const { settings } = useSiteSettings();
   const { integrations } = useIntegrations();
   const waApiActive = !!(integrations?.whatsapp_business?.enabled && integrations?.whatsapp_business?.config?.configured);
@@ -699,17 +700,17 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   form.shippingMethod === 'pickup' ? (
                     <div className="text-xs p-3 rounded-lg bg-muted/60 border border-border text-muted-foreground">
                       A levantar na loja não precisa de conta: pague e leve o recibo no balcão.{' '}
-                      <Link to="/login" state={{ from: loginReturnTo }} className="text-primary font-medium hover:underline" onClick={() => setIsCartOpen(false)}>
+                      <button type="button" className="text-primary font-medium hover:underline" onClick={() => openAuth({ mode: 'login', defaultEmail: form.email, defaultName: form.name })}>
                         Entrar
-                      </Link>{' '}guarda os seus dados para a próxima.
+                      </button>{' '}guarda os seus dados para a próxima.
                     </div>
                   ) : (
                     <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900">
                       <strong>A entrega ao domicílio precisa de conta</strong>, para poder acompanhar a
                       encomenda e confirmar a recepção.{' '}
-                      <Link to="/login" state={{ from: loginReturnTo }} className="font-semibold underline" onClick={() => setIsCartOpen(false)}>
+                      <button type="button" className="font-semibold underline" onClick={() => openAuth({ reason: 'delivery', mode: 'signup', defaultEmail: form.email, defaultName: form.name })}>
                         Entrar ou criar conta
-                      </Link>
+                      </button>
                       {' '}— ou escolha <strong>Levantamento na loja</strong>, que não pede nada disto.
                     </div>
                   )

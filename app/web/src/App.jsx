@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/hooks/useTheme';
 import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CartProvider } from '@/hooks/useCart';
 import { AuthProvider } from '@/hooks/useAuth';
+import { AuthDialogProvider } from '@/hooks/useAuthDialog';
 import { SiteSettingsProvider } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
@@ -148,6 +149,7 @@ function App() {
     <AuthProvider>
     <CartProvider>
       <Router>
+        <AuthDialogProvider>
         <ScrollToTop />
         <AuthRedirectNotice />
         <RouteErrorBoundary>
@@ -214,6 +216,7 @@ function App() {
         <Toaster />
         <MfaGate />
         <GlobalWidgets />
+        </AuthDialogProvider>
       </Router>
     </CartProvider>
     </AuthProvider>
