@@ -1,6 +1,5 @@
--- Descrições dos livros (2026-11-05). POR REVER: está aqui, e não em supabase/migrations, para
--- não entrar na loja antes de o dono ler a página de revisão. Depois de aprovado, passa para
--- supabase/migrations com uma versão nova (ou cola-se no SQL Editor).
+-- Descrições dos livros (2026-11-05). Aprovadas pelo dono depois da página de revisão.
+-- Versão depois de 20261105065500_capas_certas_do_catalogo (a última por aplicar antes desta).
 --
 -- Origem: a sinopse de cada livro na loja da Casa Publicadora Brasileira (a editora), limpa de
 -- rótulos promocionais ("REFORMULADO"), de publicidade a aplicações e de linhas de ficha técnica.
@@ -10,10 +9,10 @@
 -- COL-001 e COL-002 já tinham descrição; delas sai só a primeira linha, uma nota interna
 -- ("[Colportagem] PC: … Kz · … págs · …") que estava à vista dos clientes.
 -- LIV-057 e LIV-072 ficam sem descrição: a editora já não os tem no catálogo.
--- Guarda o valor antigo em private.correcoes_dados (migracao = 'descricoes_dos_livros').
+-- Guarda o valor antigo em private.correcoes_dados (migracao = '20261105074300').
 
 insert into private.correcoes_dados (migracao, tabela, accao, linha)
-select 'descricoes_dos_livros', 'stock_books', 'alterada', jsonb_build_object('id', id, 'book_code', book_code, 'description', description)
+select '20261105074300', 'stock_books', 'alterada', jsonb_build_object('id', id, 'book_code', book_code, 'description', description)
 from public.stock_books
 where (book_code in ('LIV-001', 'LIV-002', 'LIV-003', 'LIV-004', 'LIV-005', 'LIV-006', 'LIV-007', 'LIV-008', 'LIV-009', 'LIV-010', 'LIV-011', 'LIV-012', 'LIV-013', 'LIV-014', 'LIV-015', 'LIV-016', 'LIV-017', 'LIV-018', 'LIV-019', 'LIV-020', 'LIV-021', 'LIV-022', 'LIV-023', 'LIV-024', 'LIV-025', 'LIV-026', 'LIV-027', 'LIV-028', 'LIV-029', 'LIV-030', 'LIV-031', 'LIV-032', 'LIV-033', 'LIV-034', 'LIV-035', 'LIV-036', 'LIV-037', 'LIV-038', 'LIV-039', 'LIV-040', 'LIV-041', 'LIV-042', 'LIV-043', 'LIV-044', 'LIV-045', 'LIV-046', 'LIV-047', 'LIV-048', 'LIV-049', 'LIV-050', 'LIV-051', 'LIV-052', 'LIV-053', 'LIV-054', 'LIV-055', 'LIV-056', 'LIV-058', 'LIV-059', 'LIV-060', 'LIV-061', 'LIV-062', 'LIV-063', 'LIV-064', 'LIV-065', 'LIV-066', 'LIV-067', 'LIV-068', 'LIV-069', 'LIV-070', 'LIV-071', 'LIV-073', 'LIV-074', 'LIV-075', 'LIV-076', 'LIV-077', 'LIV-078', 'LIV-079', 'LIV-080', 'LIV-081', 'LIV-082', 'LIV-083', 'LIV-084', 'LIV-085', 'LIV-086', 'LIV-087', 'LIV-088', 'LIV-089', 'LIV-090', 'LIV-091', 'LIV-092', 'LIV-093', 'LIV-094', 'LIV-095', 'LIV-096', 'LIV-097', 'LIV-098', 'LIV-099', 'LIV-100')
        and length(trim(regexp_replace(coalesce(description, ''), '<[^>]*>', '', 'g'))) = 0)
