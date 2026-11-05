@@ -38,17 +38,32 @@ TOKEN="${SUPABASE_ACCESS_TOKEN:-$(cat "$HOME/.supabase/access-token" 2>/dev/null
 actual() { curl -sf -H "Authorization: Bearer $TOKEN" "$API"; }
 
 # Corpo do PATCH a partir de supabase/auth/ (ou de um ficheiro guardado, em --repor).
+# Os modelos de email só se podem mudar com SMTP próprio (ou num plano pago): sem ele o
+# Supabase responde 400 "Email template modification is not available for free tier projects
+# using the default email provider". Por isso só seguem quando há SMTP (COM_EMAILS=1 força).
 desejado() {
-  python3 - "$DIR" <<'EOF'
+  python3 - "$DIR" "${COM_EMAILS:-0}" <<'EOF'
 import json, sys, pathlib
 d = pathlib.Path(sys.argv[1])
 c = json.loads((d / "config.json").read_text())
 body = {"site_url": c["site_url"], "uri_allow_list": ",".join(c["uri_allow_list"])}
-for name, subject in c["subjects"].items():
-    body[f"mailer_subjects_{name}"] = subject
-    body[f"mailer_templates_{name}_content"] = (d / "templates" / f"{name}.html").read_text()
+if sys.argv[2] == "1":
+    for name, subject in c["subjects"].items():
+        body[f"mailer_subjects_{name}"] = subject
+        body[f"mailer_templates_{name}_content"] = (d / "templates" / f"{name}.html").read_text()
 print(json.dumps(body, ensure_ascii=False))
 EOF
+}
+
+# Liga os modelos de email se o Auth já tiver SMTP próprio.
+decidir_emails() {
+  [ -n "${COM_EMAILS:-}" ] && return
+  if actual | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("smtp_host") else 1)'; then
+    COM_EMAILS=1
+  else
+    COM_EMAILS=0
+    echo "ℹ Sem SMTP próprio no Auth: os emails ficam como estão (o Supabase só os deixa mudar com SMTP)."
+  fi
 }
 
 diferenca() {  # $1 = corpo desejado; lê a configuração actual do stdin
@@ -135,6 +150,7 @@ case "${1:-}" in
     echo "Feito. Teste: entrar com a Google em https://livrariaadventista.com/login."
     ;;
   --verificar)
+    decidir_emails
     echo "Configuração actual vs repositório:"; actual | diferenca "$(desejado)"
     echo "Destinos dos links:"; verificar && echo "Tudo certo." || { echo "Há destinos errados."; exit 1; }
     ;;
@@ -144,12 +160,15 @@ case "${1:-}" in
     echo "Reposto a partir de $2."
     ;;
   "")
+    decidir_emails
     body="$(desejado)"; cur="$(actual)"
     echo "$cur" | diferenca "$body"
     copia="$DIR/.antes-$(date +%Y%m%d-%H%M%S).json"
     echo "$cur" | guardar "$body" "$copia"; echo "Valores actuais guardados em $copia"
     read -r -p "Aplicar? [s/N] " r; [ "$r" = "s" ] || { echo "Nada mudado."; exit 0; }
-    curl -sf -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data "$body" "$API" >/dev/null
+    resp=$(curl -s -w '\n%{http_code}' -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data "$body" "$API")
+    code="${resp##*$'\n'}"
+    [ "$code" = "200" ] || { echo "✘ O Supabase recusou (HTTP $code): $(printf '%s' "${resp%$'\n'*}" | head -c 300)" >&2; exit 1; }
     echo "Aplicado. A verificar (o Auth pode levar alguns segundos a recarregar)…"; sleep 8
     verificar && echo "Tudo certo." || { echo "Há destinos errados: ver acima."; exit 1; }
     ;;
