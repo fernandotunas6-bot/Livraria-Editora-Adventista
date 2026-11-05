@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BOOK_GENRES, BOOK_LANGUAGES, emptyBookForm, bookToForm } from '@/lib/bookConstants';
+import { PRODUCT_TYPES, isBookType, productType } from '@/lib/productTypes';
 import pb from '@/lib/dataClient';
 import { Megaphone, User, BookMarked, Layers, TrendingUp } from 'lucide-react';
 import RichTextEditor from '@/components/admin/RichTextEditor';
@@ -60,12 +61,16 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
     return { ...f, sample_pages: pages };
   });
   const uploadPending = isUploadPending(form.cover, form.author_photo, samplePages);
+  // Autor, ISBN, páginas, idioma e amostra só fazem sentido em livros, Bíblias e revistas.
+  const isBook = isBookType(form.product_type);
+  const type = productType(form.product_type);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (uploadPending) return;
     onSave({
       ...form,
+      product_type: form.product_type || 'livro',
       price: Number(form.price) || 0,
       stock: Number(form.stock) || 0,
       pages: Number(form.pages) || 0,
@@ -172,47 +177,67 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                   <TabsTrigger value="info" className="flex-1 min-w-[70px]"><BookOpen className="h-4 w-4 mr-1 hidden sm:inline" />Info</TabsTrigger>
                   <TabsTrigger value="codes" className="flex-1 min-w-[70px]"><Hash className="h-4 w-4 mr-1 hidden sm:inline" />Códigos</TabsTrigger>
                   <TabsTrigger value="marketing" className="flex-1 min-w-[70px]"><Megaphone className="h-4 w-4 mr-1 hidden sm:inline" />Marketing</TabsTrigger>
-                  <TabsTrigger value="author" className="flex-1 min-w-[70px]"><User className="h-4 w-4 mr-1 hidden sm:inline" />Autor</TabsTrigger>
+                  {isBook && <TabsTrigger value="author" className="flex-1 min-w-[70px]"><User className="h-4 w-4 mr-1 hidden sm:inline" />Autor</TabsTrigger>}
                   <TabsTrigger value="stats" className="flex-1 min-w-[70px]"><TrendingUp className="h-4 w-4 mr-1 hidden sm:inline" />Métricas</TabsTrigger>
-                  <TabsTrigger value="preview" className="flex-1 min-w-[70px]"><BookMarked className="h-4 w-4 mr-1 hidden sm:inline" />Preview</TabsTrigger>
-                  <TabsTrigger value="versions" className="flex-1 min-w-[70px]"><Layers className="h-4 w-4 mr-1 hidden sm:inline" />Versões</TabsTrigger>
+                  {isBook && <TabsTrigger value="preview" className="flex-1 min-w-[70px]"><BookMarked className="h-4 w-4 mr-1 hidden sm:inline" />Preview</TabsTrigger>}
+                  <TabsTrigger value="versions" className="flex-1 min-w-[70px]"><Layers className="h-4 w-4 mr-1 hidden sm:inline" />{type.sized ? 'Tamanhos' : 'Versões'}</TabsTrigger>
                   <TabsTrigger value="media" className="flex-1 min-w-[70px]"><ImageIcon className="h-4 w-4 mr-1 hidden sm:inline" />Mídia</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="info" className="space-y-4 mt-0">
                   <div className="space-y-2">
-                    <Label>Título *</Label>
-                    <Input value={form.title} onChange={(e) => set('title', e.target.value)} required placeholder="Ex: Caminho a Cristo" />
+                    <Label>Tipo de produto *</Label>
+                    <Select value={form.product_type || 'livro'} onValueChange={(v) => set('product_type', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PRODUCT_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label} ({t.prefix}-…)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!editing?.id && <p className="text-xs text-muted-foreground">O código é gerado com o prefixo do tipo ({type.prefix}-001, {type.prefix}-002…).</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{isBook ? 'Título *' : 'Nome do produto *'}</Label>
+                    <Input value={form.title} onChange={(e) => set('title', e.target.value)} required placeholder={isBook ? 'Ex: Caminho a Cristo' : type.sized ? 'Ex: Uniforme do Colégio Adventista — camisa' : 'Ex: Caderno de lições'} />
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {isBook && (
+                      <div className="space-y-2">
+                        <Label>Autor</Label>
+                        <Input value={form.author} onChange={(e) => set('author', e.target.value)} placeholder="Ex: Ellen G. White" />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label>{isBook ? 'Género' : 'Categoria'}</Label>
+                      {isBook ? (
+                        <Select value={form.genre} onValueChange={(v) => set('genre', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {BOOK_GENRES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={form.genre === 'Catálogo Geral' ? '' : form.genre} onChange={(e) => set('genre', e.target.value)} placeholder={type.plural} />
+                      )}
+                    </div>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Autor</Label>
-                      <Input value={form.author} onChange={(e) => set('author', e.target.value)} placeholder="Ex: Ellen G. White" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Género</Label>
-                      <Select value={form.genre} onValueChange={(v) => set('genre', v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {BOOK_GENRES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Editora</Label>
+                      <Label>{isBook ? 'Editora' : 'Marca / Fornecedor'}</Label>
                       <Input value={form.publisher} onChange={(e) => set('publisher', e.target.value)} />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Idioma</Label>
-                      <Select value={form.language} onValueChange={(v) => set('language', v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {BOOK_LANGUAGES.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {isBook && (
+                      <div className="space-y-2">
+                        <Label>Idioma</Label>
+                        <Select value={form.language} onValueChange={(v) => set('language', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {BOOK_LANGUAGES.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <div className="grid sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
@@ -228,13 +253,15 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                       <Input type="number" value={form.year} onChange={(e) => set('year', e.target.value)} />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Páginas</Label>
-                    <Input type="number" min="0" value={form.pages} onChange={(e) => set('pages', e.target.value)} />
-                  </div>
+                  {isBook && (
+                    <div className="space-y-2">
+                      <Label>Páginas</Label>
+                      <Input type="number" min="0" value={form.pages} onChange={(e) => set('pages', e.target.value)} />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Descrição</Label>
-                    <RichTextEditor value={form.description} onChange={(v) => set('description', v)} placeholder="Sinopse do livro..." />
+                    <RichTextEditor value={form.description} onChange={(v) => set('description', v)} placeholder={isBook ? 'Sinopse do livro...' : 'Descrição, materiais, medidas, cuidados...'} />
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-[#0ea5c9]/5 border border-[#0ea5c9]/20">
                     <Switch checked={form.featured} onCheckedChange={(v) => set('featured', v)} />
@@ -294,10 +321,12 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                     <Label>SKU / Código de Barras</Label>
                     <Input value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="Igual ao código ou ISBN" className="font-mono" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>ISBN</Label>
-                    <Input value={form.isbn} onChange={(e) => set('isbn', e.target.value)} placeholder="978-..." className="font-mono" />
-                  </div>
+                  {isBook && (
+                    <div className="space-y-2">
+                      <Label>ISBN</Label>
+                      <Input value={form.isbn} onChange={(e) => set('isbn', e.target.value)} placeholder="978-..." className="font-mono" />
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="marketing" className="space-y-4 mt-0">
@@ -394,11 +423,15 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                 </TabsContent>
 
                 <TabsContent value="versions" className="space-y-4 mt-0">
-                  <p className="text-sm text-muted-foreground">Defina edições alternativas (capa dura, pocket, ebook, etc.)</p>
+                  <p className="text-sm text-muted-foreground">
+                    {type.sized
+                      ? 'Um tamanho por linha (ex.: S, M, L, XL, ou 6 anos, 8 anos), cada um com o seu stock e, se mudar, o seu preço. Em "Formato" pode pôr a cor.'
+                      : isBook ? 'Defina edições alternativas (capa dura, pocket, ebook, etc.)' : 'Defina variantes (cor, modelo, tamanho), cada uma com o seu stock.'}
+                  </p>
                   {(form.versions || []).map((v, i) => (
                     <div key={i} className="p-3 rounded-xl border space-y-2 bg-muted/20">
                       <div className="grid sm:grid-cols-2 gap-2">
-                        <Input placeholder="Nome da edição" value={v.label || ''} onChange={(e) => {
+                        <Input placeholder={type.sized ? 'Tamanho (ex.: M)' : isBook ? 'Nome da edição' : 'Variante'} value={v.label || ''} onChange={(e) => {
                           const versions = [...(form.versions || [])];
                           versions[i] = { ...versions[i], label: e.target.value };
                           set('versions', versions);

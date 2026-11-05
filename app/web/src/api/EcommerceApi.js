@@ -3,6 +3,8 @@ import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
+import { looksLikeProductCode, normalizeProductCode } from '@/lib/productTypes';
+import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -72,6 +74,7 @@ function bookToProduct(book, collectionsMap = {}) {
     collection_title: collectionsMap[collectionId] || null,
     order: book.year ? Number(book.year) * 1000 : 0,
     featured: !!book.featured,
+    product_type: book.product_type || 'livro',
     book_code: book.book_code || null,
     sku: book.sku || book.book_code || null,
     isbn: book.isbn || null,
@@ -412,34 +415,13 @@ export async function getLowStockBooks() {
   }
 }
 
-const RECENT_KEY = 'la:livros-vistos';
-const RECENT_MAX = 30;
-
-/** Livros vistos neste browser, do mais recente para o mais antigo (para quem não tem sessão). */
-export function getRecentlyViewedIds() {
-  try {
-    const ids = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
-    return Array.isArray(ids) ? ids.filter((v) => typeof v === 'string').slice(0, RECENT_MAX) : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberRecentlyViewed(bookId) {
-  try {
-    const ids = [bookId, ...getRecentlyViewedIds().filter((id) => id !== bookId)].slice(0, RECENT_MAX);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(ids));
-  } catch { /* sem localStorage: as sugestões ficam só com as novidades */ }
-}
-
 /**
  * Conta uma visualização do livro (uma vez por sessão do navegador); falhas são ignoradas.
- * Guarda também o livro nos "vistos recentemente" deste browser e, com sessão, no histórico
- * da conta, que alimenta as sugestões em /sugestoes e nos emails.
+ * Com sessão, o livro fica também no histórico da conta, que alimenta as sugestões em
+ * /sugestoes e nos emails (sem sessão, contam os vistos de `lib/recentlyViewed`).
  */
 export function trackBookView(bookId) {
   if (!bookId) return;
-  rememberRecentlyViewed(bookId);
   const key = `viewed:${bookId}`;
   try {
     if (sessionStorage.getItem(key)) return;
@@ -479,7 +461,7 @@ export async function getRecommendations() {
       'Content-Type': 'application/json',
       ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
     },
-    body: JSON.stringify({ viewed: getRecentlyViewedIds() }),
+    body: JSON.stringify({ viewed: getRecentlyViewed().map((e) => e.id).filter(Boolean).slice(0, 30) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Não foi possível carregar as sugestões.');
@@ -495,6 +477,15 @@ export async function searchProducts(query, limit = 50) {
   const q = query.trim();
   if (!q) return getProducts({ limit });
 
+  // Código de produto escrito de qualquer forma ("liv63", "uni-4"): procura esse código exacto.
+  if (looksLikeProductCode(q)) {
+    const code = escapeFilterValue(normalizeProductCode(q));
+    const exact = await pb.collection('stock_books').getList(1, 1, { filter: `book_code = "${code}" && ${VISIBLE}` });
+    if (exact.items.length) {
+      const collectionsMap = await getCollectionsMap();
+      return { products: exact.items.map((b) => bookToProduct(b, collectionsMap)) };
+    }
+  }
   const v = escapeFilterValue(q);
   const filter = `(title ~ "${v}" || author ~ "${v}" || genre ~ "${v}" || book_code ~ "${v}" || isbn ~ "${v}") && ${VISIBLE}`;
   const records = await pb.collection('stock_books').getList(1, limit, { filter, sort: BOOK_SORT });

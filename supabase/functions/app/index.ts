@@ -1468,7 +1468,13 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const cartItems = items.map((item) => {
     const bookId = parseBookId(item.variant_id || item.book_id || "");
     if (!bookId) throw bad("Item inválido no carrinho.");
-    return { book_id: bookId, quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99) };
+    // "<id>-v2" é a terceira variante (tamanho, edição): o preço e o stock são os dela.
+    const variant = /-v(\d+)$/.exec(String(item.variant_id || ""));
+    return {
+      book_id: bookId,
+      quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99),
+      ...(variant ? { variant: Math.min(Number(variant[1]), 50) } : {}),
+    };
   });
 
   const paymentCode = clip(data.paymentMethodCode || data.paymentMethod || "entrega", 60);

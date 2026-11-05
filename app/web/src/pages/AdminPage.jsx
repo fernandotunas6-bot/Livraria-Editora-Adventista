@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { looksLikeProductCode, normalizeProductCode, orderItemTitle, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle } from 'lucide-react';
@@ -224,7 +225,9 @@ const AdminPage = () => {
     if (bookFilter === 'promo' && !(isSaleActive(b) || isSaleScheduled(b))) return false;
     const q = bookSearch.trim().toLowerCase();
     if (!q) return true;
-    return [b.title, b.author, b.book_code, b.sku, b.isbn, b.genre].filter(Boolean).join(' ').toLowerCase().includes(q);
+    // Código escrito de qualquer forma ("liv63", "UNI-4") encontra o produto exacto.
+    if (looksLikeProductCode(q)) return normalizeProductCode(q) === normalizeProductCode(b.book_code);
+    return [b.title, b.author, b.book_code, b.sku, b.isbn, b.genre, productTypeLabel(b.product_type)].filter(Boolean).join(' ').toLowerCase().includes(q);
   });
 
   const handleOrderStatus = async (order, newStatus) => {
@@ -332,7 +335,14 @@ const AdminPage = () => {
     if (paymentFilter !== 'all' && (o.payment_status || 'pending') !== paymentFilter) return false;
     if (orderSearch.trim()) {
       const q = orderSearch.toLowerCase();
-      const hay = [o.order_number, o.id, o.customer_name, o.customer_email, o.phone, o.payment_reference].filter(Boolean).join(' ').toLowerCase();
+      // Também pelos produtos da encomenda: código ("LIV-063", "liv63") ou nome.
+      const items = Array.isArray(o.items) ? o.items : [];
+      if (looksLikeProductCode(q)) {
+        const code = normalizeProductCode(q);
+        if (!items.some((it) => normalizeProductCode(it.book_code || '') === code)) return false;
+        return true;
+      }
+      const hay = [o.order_number, o.id, o.customer_name, o.customer_email, o.phone, o.payment_reference, ...items.map((it) => `${it.book_code || ''} ${it.title || ''}`)].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -892,7 +902,7 @@ const AdminPage = () => {
                               {(o.items || []).map((item, i) => (
                                 <div key={i} className="flex justify-between gap-3 text-sm">
                                   <span>
-                                    {item.quantity}× {item.title}
+                                    {item.quantity}× {orderItemTitle(item)}
                                     {item.book_code && <code className="ml-1 text-[10px] text-muted-foreground font-mono">{item.book_code}</code>}
                                   </span>
                                   <span className="font-medium text-right whitespace-nowrap">

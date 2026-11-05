@@ -1,4 +1,5 @@
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
+import { orderItemTitle } from '@/lib/productTypes';
 import { fetchMessagingStatus, sendReceiptViaWhatsAppApi, isWhatsAppApiActive } from '@/lib/messaging';
 import { orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
 
@@ -86,7 +87,7 @@ export function buildReceiptText(order) {
   (order.items || []).forEach((item) => {
     const price = Number(item.price) || 0;
     const qty = Number(item.quantity) || 1;
-    lines.push(`• ${qty}× ${item.title} — ${fmtMoney(price * qty)}`);
+    lines.push(`• ${qty}× ${orderItemTitle(item)}${item.book_code ? ` [${item.book_code}]` : ''} — ${fmtMoney(price * qty)}`);
   });
 
   lines.push('');
@@ -115,7 +116,7 @@ export function buildReceiptHtml(order, brand = {}) {
     const list = Number(item.list_price) || 0;
     const old = list > price ? `<span class="old">${fmtMoney(list * qty)}</span>` : '';
     const code = item.book_code ? ` <span class="code">${e(item.book_code)}</span>` : '';
-    return `<tr><td>${qty}× ${e(item.title)}${code}</td><td class="num">${old}${fmtMoney(price * qty)}</td></tr>`;
+    return `<tr><td>${qty}× ${e(orderItemTitle(item))}${code}</td><td class="num">${old}${fmtMoney(price * qty)}</td></tr>`;
   }).join('');
   const paymentStatus = {
     paid: 'Pago', awaiting_confirmation: 'A aguardar confirmação', pending: 'Pendente', failed: 'Falhou',
