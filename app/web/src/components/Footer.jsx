@@ -204,6 +204,8 @@ const Footer = () => {
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-background/40" />
                         <Input
                           type="email"
+                          aria-label="Email para receber novidades"
+                          autoComplete="email"
                           placeholder="Digite o seu melhor email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}

@@ -120,8 +120,12 @@ export default function TrackOrderPage() {
 
             <form onSubmit={handleTrack} className="bg-card border rounded-2xl p-6 mb-8 space-y-4">
               <div className="space-y-2">
-                <Label>Número da Encomenda</Label>
+                <Label htmlFor="rastreio-numero">Número da Encomenda</Label>
                 <Input
+                  id="rastreio-numero"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
                   placeholder={`${settings?.order_number_prefix || 'ENC-'}XXXXXXXXX`}
@@ -130,8 +134,8 @@ export default function TrackOrderPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email usado na compra</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Label htmlFor="rastreio-email">Email usado na compra</Label>
+                <Input id="rastreio-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <Button type="submit" className="w-full btn-primary py-6" disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}

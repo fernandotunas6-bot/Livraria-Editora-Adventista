@@ -356,7 +356,7 @@ const ShopPage = () => {
                 <div className="flex border rounded-lg overflow-hidden">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')}>
+                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')} aria-label="Visualização em grelha" aria-pressed={viewMode === 'grid'}>
                         <LayoutGrid className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -364,7 +364,7 @@ const ShopPage = () => {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')}>
+                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')} aria-label="Visualização em lista" aria-pressed={viewMode === 'list'}>
                         <List className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
