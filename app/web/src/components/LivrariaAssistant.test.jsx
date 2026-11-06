@@ -220,4 +220,18 @@ describe('LivrariaAssistant', () => {
     await openChat();
     expect(support.markThreadNotificationsRead).toHaveBeenCalledWith('t9');
   });
+
+  it('uma falha ao ler a configuração não prende o chat no modo antigo: carrega a conversa guardada', async () => {
+    api.fetchChatConfig.mockResolvedValue({ ...CONFIG, handoff: null });
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't1', status: 'bot', ticket_number: null },
+      messages: [{ id: 1, role: 'user', text: 'Olá de ontem' }],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    await openChat();
+    expect(api.loadChatSession).toHaveBeenCalled();
+    expect(text()).toContain('Olá de ontem');
+  });
 });

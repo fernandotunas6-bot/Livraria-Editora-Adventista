@@ -10,11 +10,13 @@ describe("relatório do atendimento", () => {
       // respondido em 1 h (dentro do prazo de 24 h), resolvido em 10 h (dentro de 72 h), 5 estrelas
       { ticket_number: 1, status: "closed", channel: "assistant", category: "payment", escalated_at: ago(20), first_response_at: ago(19),
         first_response_due_at: ago(-4), closed_at: ago(10), resolution_due_at: ago(-52), csat_score: 5, csat_at: ago(9) },
-      // respondido em 3 h mas o prazo era 1 h (urgente); ainda aberto e com resolução atrasada
-      { ticket_number: 2, status: "pending", channel: "form", category: "order", escalated_at: ago(30), first_response_at: ago(27),
+      // respondido em 3 h mas o prazo era 1 h (urgente); à espera da equipa e com resolução atrasada
+      { ticket_number: 2, status: "open", channel: "form", category: "order", escalated_at: ago(30), first_response_at: ago(27),
         first_response_due_at: ago(29), resolution_due_at: ago(22) },
       // sem resposta, ainda dentro do prazo
       { ticket_number: 3, status: "open", channel: "assistant", category: "payment", escalated_at: ago(2), first_response_due_at: ago(-22), resolution_due_at: ago(-70) },
+      // à espera do cliente com o prazo de resolução passado: não conta como atraso da equipa
+      { ticket_number: 5, status: "pending", channel: "form", category: "order", escalated_at: ago(500), first_response_at: ago(499), resolution_due_at: ago(100) },
       // fora do período
       { ticket_number: 4, status: "closed", escalated_at: ago(400), closed_at: ago(300), csat_score: 1, csat_at: ago(299) },
     ];
@@ -28,7 +30,7 @@ describe("relatório do atendimento", () => {
       now: NOW,
     });
     expect(r.tickets).toMatchObject({
-      opened: 3, closed: 1, open_now: 2, overdue_now: 1,
+      opened: 3, closed: 1, open_now: 3, overdue_now: 1,
       first_response_minutes: 120, resolution_minutes: 600,
       first_response_within_sla: 50, resolution_within_sla: 100,
       csat_responses: 1, csat_average: 5, csat_satisfied: 100, from_assistant: 2,

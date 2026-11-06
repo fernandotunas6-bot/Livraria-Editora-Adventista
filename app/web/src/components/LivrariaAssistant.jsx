@@ -94,7 +94,9 @@ export default function LivrariaAssistant() {
   useEffect(() => {
     fetchChatConfig().then((cfg) => {
       setChatConfig(cfg);
-      if (!cfg.handoff) setLegacy(true);
+      // Só o servidor antigo responde sem `handoff`; numa falha de rede (null) tenta-se a sessão,
+      // e um 404 aí é que decide o modo antigo.
+      if (cfg.handoff === false) setLegacy(true);
     });
   }, []);
 
@@ -125,8 +127,8 @@ export default function LivrariaAssistant() {
   // A conversa carrega na primeira abertura, e outra vez quando a sessão muda (ao entrar, a
   // conversa do browser passa para a conta; ao sair, começa uma nova).
   useEffect(() => {
-    if (open && !session.loaded && !session.loading && chatConfig.handoff) refreshSession();
-  }, [open, session.loaded, session.loading, chatConfig.handoff, refreshSession]);
+    if (open && !session.loaded && !session.loading && chatConfig.handoff !== false && !legacy) refreshSession();
+  }, [open, session.loaded, session.loading, chatConfig.handoff, legacy, refreshSession]);
   const lastUser = useRef(user?.id || '');
   useEffect(() => {
     if (lastUser.current === (user?.id || '')) return;
@@ -280,7 +282,7 @@ export default function LivrariaAssistant() {
   const lastBot = [...messages].reverse().find((m) => m.role === 'bot');
   const lastMessage = messages[messages.length - 1];
   const offerKey = lastBot?.id ?? null;
-  const showHandoff = !legacy && chatConfig.handoff && status === 'bot' && !sending
+  const showHandoff = !legacy && chatConfig.handoff !== false && status === 'bot' && !sending
     && ((lastBot?.offer_handoff && lastMessage === lastBot && handoff.dismissedFor !== offerKey) || handoff.forced);
   const loginHref = `/login?redirect=${encodeURIComponent(`${pathname}?ajuda=1`)}`;
   const welcome = { role: 'bot', text: chatConfig.welcome || DEFAULT_WELCOME, suggestions: STARTERS };

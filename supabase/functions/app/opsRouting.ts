@@ -150,7 +150,9 @@ export function ticketSlaBreach(t: Row, now = Date.now()): 0 | 1 | 2 {
   if (!t?.ticket_number || !["open", "pending"].includes(String(t.status))) return 0;
   const level = Number(t.sla_alert_level) || 0;
   const resolution = time(t.resolution_due_at);
-  if (level < 2 && resolution && now > resolution) return 2;
+  // O relógio da resolução pára enquanto o pedido espera pelo CLIENTE ('pending'), como nos
+  // SLA do Zendesk: um cliente que não responde não é atraso da equipa (e há o fecho automático).
+  if (level < 2 && t.status === "open" && resolution && now > resolution) return 2;
   const first = time(t.first_response_due_at);
   if (level < 1 && !t.first_response_at && first && now > first) return 1;
   return 0;

@@ -2698,7 +2698,9 @@ async function notifyDuty(opts: {
   const { data, error } = await db.rpc("ops_recipients", { p_duty: opts.duty, p_store_id: opts.storeId, p_escalate: !!opts.escalate });
   let ids: string[] = error ? [] : (data || []).map((r: Row) => String(r.profile_id));
   if (error) console.log("ops_recipients:", error.message);
-  if (opts.only) ids = ids.includes(opts.only) ? [opts.only] : [opts.only];
+  // Um responsável atribuído (só pode ser alguém da equipa: support_update_ticket valida) recebe
+  // sozinho, esteja ou não nas equipas da função — como o `p_only` de private.notify_staff.
+  if (opts.only) ids = [opts.only];
   if (!ids.length) return 0;
   const rows = [...new Set(ids)].map((staffId) => ({
     staff_id: staffId, kind: opts.kind, title: clipText(opts.title, 120), body: clipText(opts.body, 500) || "—",
@@ -2857,14 +2859,19 @@ async function dispatchCustomerSupportNotifications(limit = 50) {
   const brand = emailBrand(settings);
   let sent = 0;
   for (const n of pending as Row[]) {
+    const { data: claimed } = await db.from("customer_notifications").update({ dispatched_at: nowISO() })
+      .eq("id", n.id).is("dispatched_at", null).select("id");
+    if (!claimed?.length) continue;
     let ok = false;
     try {
       const [{ data: person }, { data: thread }, { data: lastReply }] = await Promise.all([
         db.from("profiles").select("name, email").eq("id", n.customer_id).maybeSingle(),
         n.thread_id ? db.from("support_threads").select("ticket_number, subject").eq("id", n.thread_id).maybeSingle() : Promise.resolve({ data: null }),
         n.thread_id
+          // A resposta que gerou ESTE aviso (o gatilho escreve os dois na mesma transacção, com o
+          // mesmo instante): com duas respostas seguidas, cada email leva a sua.
           ? db.from("support_messages").select("body, sender_id").eq("thread_id", n.thread_id).eq("author_kind", "staff")
-            .order("id", { ascending: false }).limit(1).maybeSingle()
+            .lte("created_at", n.created_at).order("id", { ascending: false }).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
       const { data: staff } = lastReply?.sender_id
@@ -2889,7 +2896,6 @@ async function dispatchCustomerSupportNotifications(limit = 50) {
     } catch (err) {
       console.log("resposta ao cliente:", (err as Error)?.message || err);
     }
-    await db.from("customer_notifications").update({ dispatched_at: nowISO() }).eq("id", n.id);
     if (ok) sent++;
   }
   return { pending: pending.length, sent };
@@ -2905,17 +2911,22 @@ async function dispatchStaffNotifications(limit = 100) {
   const cutoff = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
   await db.from("staff_notifications").update({ dispatched_at: nowISO(), channels: { skipped: "antigo" } })
     .is("dispatched_at", null).lt("created_at", cutoff);
-  const { data: pending, error } = await db.from("staff_notifications")
+  const [settings, hours, whatsapp] = await Promise.all([getSettings(), opsHours(), getWhatsAppConfig()]);
+  const open = isOpenAt(Date.now(), hours);
+  // Críticos primeiro ('critical' < 'high' < 'normal'); fora de horas só os críticos — os outros
+  // esperam pela abertura e não podem ocupar o lote (100 avisos adiados prendiam uma escalada).
+  let query = db.from("staff_notifications")
     .select("id, staff_id, kind, title, body, order_id, thread_id, severity, created_at")
-    .is("dispatched_at", null).order("created_at", { ascending: true }).limit(limit);
+    .is("dispatched_at", null);
+  if (!open) query = query.eq("severity", "critical");
+  const { data: pending, error } = await query
+    .order("severity", { ascending: true }).order("created_at", { ascending: true }).limit(limit);
   if (error) {
     console.log("dispatchStaffNotifications:", error.message);
     return { pending: 0, sent: 0, deferred: 0 };
   }
   if (!pending?.length) return { pending: 0, sent: 0, deferred: 0 };
 
-  const [settings, hours, whatsapp] = await Promise.all([getSettings(), opsHours(), getWhatsAppConfig()]);
-  const open = isOpenAt(Date.now(), hours);
   const staffIds = [...new Set(pending.map((n: Row) => String(n.staff_id)))];
   const [{ data: people }, { data: memberships }] = await Promise.all([
     db.from("profiles").select("id, name, email, phone, role").in("id", staffIds),
@@ -2942,6 +2953,11 @@ async function dispatchStaffNotifications(limit = 100) {
       deferred++;
       continue;
     }
+    // Reclama o aviso antes de enviar: o agendador, o checkout e a vigilância podem correr isto
+    // ao mesmo tempo, e sem isto o mesmo aviso saía duas vezes (o push não tem outra protecção).
+    const { data: claimed } = await db.from("staff_notifications").update({ dispatched_at: nowISO() })
+      .eq("id", n.id).is("dispatched_at", null).select("id");
+    if (!claimed?.length) continue;
     const path = n.thread_id ? "/admin?tab=support" : n.order_id ? "/admin?tab=acompanhamento" : "/admin";
     const result: Row = {};
     for (const channel of plan.channels) {
@@ -2979,7 +2995,7 @@ async function dispatchStaffNotifications(limit = 100) {
         console.log(`aviso à equipa (${channel}):`, (err as Error)?.message || err);
       }
     }
-    await db.from("staff_notifications").update({ dispatched_at: nowISO(), channels: result }).eq("id", n.id);
+    await db.from("staff_notifications").update({ channels: result }).eq("id", n.id);
     if (Object.values(result).some(Boolean)) sent++;
   }
   return { pending: pending.length, sent, deferred };
@@ -3065,14 +3081,13 @@ route("POST", "/admin/ops/test", async ({ auth, body }) => {
   const { data: members } = await db.from("staff_team_members").select("profile_id").eq("team_id", teamId);
   if (!members?.length) throw bad("Esta equipa ainda não tem membros.");
   const { data: inserted, error } = await db.from("staff_notifications").insert(members.map((m: Row) => ({
-    staff_id: m.profile_id, kind: "ops_test", severity: "high",
+    // Crítico desde o início: o teste sai já, mesmo fora do horário (é para confirmar os canais).
+    staff_id: m.profile_id, kind: "ops_test", severity: "critical",
     title: `Teste de avisos — ${clipText(team.name, 80)}`,
     body: "Se recebeu isto, os avisos da sua equipa estão a funcionar. Não é preciso fazer nada.",
   }))).select("id, staff_id");
   if (error) throw error;
-  // O teste sai já, mesmo fora do horário: é para confirmar os canais.
   const ids = (inserted || []).map((r: Row) => r.id);
-  await db.from("staff_notifications").update({ severity: "critical" }).in("id", ids);
   await dispatchStaffNotifications();
   const { data: done } = await db.from("staff_notifications").select("staff_id, channels").in("id", ids);
   return json({ results: done || [] });
@@ -3945,7 +3960,11 @@ route("POST", "/chat", async ({ body, ip, auth }) => {
   let verifiedOrder: Row | null = null;
   let lookupFailed = false;
   const orderTalk = ORDERISH.includes(quick) || lastIntent === "order_status" || !!extractEmail(message) || extractOrderRefs(message, rules.orderPrefix).length > 0;
-  if (!auth && orderRefs.length && emailGiven && orderTalk) {
+  // Com sessão, uma encomenda que não está entre as recentes da conta (feita com outro email)
+  // só aparece com o número e o email dessa compra, como para um visitante.
+  const knownRefs = new Set(customer.orders.map((o) => orderNumber(o).toUpperCase()));
+  const unknownRef = auth && orderRefs.some((r) => !knownRefs.has(r.toUpperCase()));
+  if ((!auth || unknownRef) && orderRefs.length && emailGiven && orderTalk) {
     if (!await checkRateLimit("track", ip, rules.trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
     for (const ref of orderRefs.slice(0, 2)) {
       verifiedOrder = await findOrderByNumberAndEmail(ref, emailGiven);
@@ -4064,7 +4083,9 @@ route("POST", "/chat/new", async ({ body, ip, auth }) => {
       .eq("id", thread.id).eq("status", "bot");
     return json({ conversation: null, messages: [] });
   }
-  if (thread && thread.status !== "closed") {
+  // Um pedido à equipa (aberto, ou resolvido e ainda à vista) continua na conta: começa-se outra
+  // conversa, que passa a ser a actual. Antes, com um pedido resolvido, o botão não fazia nada.
+  if (thread) {
     const created = await createConversation(id, String(body.page || "/").slice(0, 120));
     return json({ token: created.token, conversation: publicThread(created.thread), messages: [] });
   }
@@ -4177,8 +4198,11 @@ route("POST", "/admin/support/suggest-reply", async ({ auth, body, ip }) => {
     `<conhecimento>\n${knowledgeText(knowledge)}\n</conhecimento>`,
     `<cliente>\n${JSON.stringify({ nome: chatFirstName(customer.name) || undefined, encomendas: customer.orders.map((o) => ({ numero: orderNumber(o), estado: stageText(o) })) })}\n</cliente>`,
     `<pedido>#${thread.ticket_number || "—"} · ${thread.subject} · categoria ${thread.category}</pedido>`,
+    // As chamadas à IA cortam a mensagem aos 2400 caracteres pelo início: a conversa vai aqui,
+    // limitada pelo FIM, para a última pergunta do cliente nunca ficar de fora.
+    `<conversa>\n${transcript.length > 12000 ? `…${transcript.slice(-12000)}` : transcript}\n</conversa>`,
   ].join("\n");
-  const message = `<conversa>\n${transcript}\n</conversa>\nEscreve a próxima resposta da equipa ao cliente.`;
+  const message = "Escreve a próxima resposta da equipa ao cliente, à última mensagem da conversa.";
   let raw: string | null = null;
   try {
     raw = ai.use === "gemini"

@@ -65,7 +65,7 @@ export function buildOpsReport(input: {
   const openNow = input.tickets.filter((x) => x.ticket_number && ["open", "pending"].includes(String(x.status)));
   const overdueNow = openNow.filter((x) =>
     (!x.first_response_at && t(x.first_response_due_at) && t(x.first_response_due_at) < now)
-    || (t(x.resolution_due_at) && t(x.resolution_due_at) < now));
+    || (x.status === "open" && t(x.resolution_due_at) && t(x.resolution_due_at) < now));
 
   const responded = opened.filter((x) => x.first_response_at);
   const firstTimes = responded.map((x) => t(x.first_response_at) - t(x.escalated_at));

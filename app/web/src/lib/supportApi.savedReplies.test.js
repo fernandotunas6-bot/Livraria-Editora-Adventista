@@ -22,5 +22,7 @@ describe('prazos dos pedidos', () => {
     expect(slaState(t, now)).toEqual({ first: 'late', resolution: 'soon' });
     expect(slaState({ ...t, first_response_at: '2026-11-09T10:00:00Z', resolution_due_at: '2026-11-12T12:00:00Z' }, now)).toEqual({ first: '', resolution: 'ok' });
     expect(slaState({ ...t, status: 'closed' }, now)).toEqual({ first: '', resolution: '' });
+    expect(slaState({ ...t, status: 'pending', first_response_at: '2026-11-09T10:00:00Z', resolution_due_at: '2026-11-09T11:00:00Z' }, now))
+      .toEqual({ first: '', resolution: '' });
   });
 });

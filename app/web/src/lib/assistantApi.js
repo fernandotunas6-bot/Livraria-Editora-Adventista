@@ -22,12 +22,16 @@ export function setChatToken(token) {
   }
 }
 
-const DEFAULT_CONFIG = { enabled: true, ai: false, provider: 'faq', handoff: false, whatsapp: '' };
+// `handoff`: true (servidor novo), false (servidor antigo, sem conversas guardadas) ou null (não se
+// sabe: a leitura falhou). Uma falha momentânea da rede não pode pôr o chat no modo antigo.
+const DEFAULT_CONFIG = { enabled: true, ai: false, provider: 'faq', handoff: null, whatsapp: '' };
 
 export async function fetchChatConfig() {
   try {
     const res = await fetch(`${APP_API_URL}/chat/config`);
-    return res.ok ? { ...DEFAULT_CONFIG, ...(await res.json()) } : DEFAULT_CONFIG;
+    if (!res.ok) return DEFAULT_CONFIG;
+    const data = await res.json();
+    return { ...DEFAULT_CONFIG, ...data, handoff: data.handoff === true };
   } catch {
     return DEFAULT_CONFIG;
   }

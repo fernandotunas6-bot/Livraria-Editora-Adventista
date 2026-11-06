@@ -259,4 +259,18 @@ describe("histórico para a IA", async () => {
     expect(ruleReply(ctx("quanto custa a entrega?", { knowledge: k0 })).reply).toContain("A entrega ao domicílio é grátis");
     expect(ruleReply(ctx("Envio grátis?", { knowledge: k0 })).reply).not.toContain("0 Kz");
   });
+
+  it("com sessão, uma encomenda nomeada que não é da conta não é trocada por outra", async () => {
+    const { pickOrder } = await import("./chatEngine.ts");
+    expect(pickOrder([ORDER], ["ENC-ZZZZZZ999"])).toBeNull();
+    expect(pickOrder([ORDER], [])).toBe(ORDER);
+    const pede = ruleReply(ctx("onde está a ENC-ZZZZZZ999?", { loggedIn: true, orders: [ORDER] }));
+    expect(pede.reply).toContain("não está na sua conta");
+    expect(pede.reply).not.toContain("ENC-K3J9XA4F2");
+    const outra = { ...ORDER, id: "o9", order_number: "ENC-ZZZZZZ999", delivery_status: "delivered" };
+    const achada = ruleReply(ctx("ENC-ZZZZZZ999 outro@exemplo.ao", { loggedIn: true, orders: [ORDER], verifiedOrder: outra }));
+    expect(achada.reply).toContain("ENC-ZZZZZZ999");
+    expect(achada.reply).toContain("entregue");
+    expect(ruleReply(ctx("ENC-ZZZZZZ999 outro@exemplo.ao", { loggedIn: true, orders: [ORDER], lookupFailed: true })).reply).toContain("Não encontrei a encomenda");
+  });
 });

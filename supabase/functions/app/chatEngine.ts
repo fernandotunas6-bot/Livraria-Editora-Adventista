@@ -283,11 +283,21 @@ export function describeOrder(o: Row): string {
   return parts.join(" ");
 }
 
-/** A encomenda de que se fala: a que o cliente nomeou, senão a mais recente. */
+/**
+ * A encomenda de que se fala: a que o cliente nomeou; sem número, a mais recente. Com um número
+ * que não é de nenhuma destas encomendas devolve null — descrever outra como se fosse a pedida
+ * seria responder com dados errados.
+ */
 export function pickOrder(orders: Row[], refs: string[]): Row | null {
   if (!orders.length) return null;
+  if (!refs.length) return orders[0];
   const wanted = refs.map((r) => r.toUpperCase());
-  return orders.find((o) => wanted.includes(orderNumber(o).toUpperCase())) || orders[0];
+  return orders.find((o) => wanted.includes(orderNumber(o).toUpperCase())) || null;
+}
+
+/** A encomenda da conversa: da conta (com sessão) ou verificada por número e email. */
+export function conversationOrder(ctx: ChatContext): Row | null {
+  return (ctx.loggedIn ? pickOrder(ctx.orders, ctx.orderRefs) : null) || ctx.verifiedOrder;
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +314,7 @@ export function ruleReply(ctx: ChatContext): EngineReply {
   const primary = resolveIntent(ctx);
   const out: EngineReply = { reply: "", links: [], suggestions: [], product_ids: [], offer_handoff: false, intent: primary, unresolved: false };
   const name = firstName(ctx.customerName);
-  const order = loggedIn ? pickOrder(ctx.orders, ctx.orderRefs) : ctx.verifiedOrder;
+  const order = conversationOrder(ctx);
   if (order && ["order_status", "cancel_change", "return_refund", "payment_problem", "invoice"].includes(primary)) out.order_id = String(order.id);
 
   switch (primary) {
@@ -323,6 +333,13 @@ export function ruleReply(ctx: ChatContext): EngineReply {
           out.reply += ` Tem ${ctx.orders.length} encomendas recentes; diga-me o número se quiser outra.`;
         }
         out.links = loggedIn ? [LINKS.orders, LINKS.track] : [LINKS.track];
+      } else if (loggedIn && ctx.orderRefs.length) {
+        // Nomeou uma encomenda que não está na conta: talvez feita com outro email.
+        out.reply = ctx.lookupFailed
+          ? `Não encontrei a encomenda ${ctx.orderRefs[0]} com esse email. Confirme o número e o email usado na compra.`
+          : `A encomenda ${ctx.orderRefs[0]} não está na sua conta. Se a fez com outro email, escreva também esse email e eu procuro-a.`;
+        out.links = [LINKS.orders, LINKS.track];
+        out.unresolved = ctx.lookupFailed;
       } else if (loggedIn) {
         out.reply = `Não encontrei encomendas na sua conta${ctx.customerEmail ? ` (${ctx.customerEmail})` : ""}. Se comprou com outro email, escreva o número da encomenda e esse email.`;
         out.links = [LINKS.track];
@@ -682,7 +699,7 @@ export function sanitizeAi(parsed: Row | null, ctx: ChatContext): EngineReply | 
     intent: primary,
     unresolved: parsed.unresolved === true,
   };
-  const order = ctx.loggedIn ? pickOrder(ctx.orders, ctx.orderRefs) : ctx.verifiedOrder;
+  const order = conversationOrder(ctx);
   if (order && ["order_status", "cancel_change", "return_refund", "payment_problem", "invoice"].includes(primary)) out.order_id = String(order.id);
   return applySignals(out, ctx);
 }

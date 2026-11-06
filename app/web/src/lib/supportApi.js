@@ -249,7 +249,8 @@ export function slaState(thread, now = Date.now()) {
   };
   return {
     first: state(thread.first_response_due_at, !!thread.first_response_at),
-    resolution: state(thread.resolution_due_at, false),
+    // À espera do cliente ('pending'), o relógio da resolução está parado.
+    resolution: thread.status === 'open' ? state(thread.resolution_due_at, false) : '',
   };
 }
 

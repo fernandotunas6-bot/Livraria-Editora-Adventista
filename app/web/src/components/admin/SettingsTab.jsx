@@ -267,7 +267,9 @@ export default function SettingsTab() {
           shop_bg_overlay: r.shop_bg_overlay ?? empty.shop_bg_overlay,
           google_maps_embed_key: r.google_maps_embed_key || '',
           order_email_enabled: !!r.order_email_enabled,
-          email_provider: !r.email_provider ? 'brevo' : r.email_provider,
+          // Vazio na base de dados = SMTP no servidor (deliverEmail): o painel mostra o mesmo, para
+          // gravar outra definição não trocar o fornecedor em silêncio.
+          email_provider: !r.email_provider ? 'smtp' : r.email_provider,
           sendgrid_api_key: r.sendgrid_api_key || '',
           brevo_api_key: '',
           cloudflare_email_token: '',

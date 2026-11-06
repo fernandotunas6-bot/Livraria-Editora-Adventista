@@ -117,6 +117,8 @@ describe("prazos dos pedidos de ajuda", () => {
     expect(ticketSlaBreach({ ...base, sla_alert_level: 1 }, at("2026-11-09T09:00:00Z"))).toBe(0);
     expect(ticketSlaBreach({ ...base, sla_alert_level: 1 }, at("2026-11-12T09:00:00Z"))).toBe(2);
     expect(ticketSlaBreach({ ...base, status: "closed" }, at("2026-11-12T09:00:00Z"))).toBe(0);
+    // À espera do cliente: o relógio da resolução pára (a equipa já respondeu).
+    expect(ticketSlaBreach({ ...base, status: "pending", first_response_at: "2026-11-09T07:30:00Z", sla_alert_level: 1 }, at("2026-11-12T09:00:00Z"))).toBe(0);
     expect(ticketSlaBreach({ ...base, ticket_number: null }, at("2026-11-12T09:00:00Z"))).toBe(0);
   });
 });
