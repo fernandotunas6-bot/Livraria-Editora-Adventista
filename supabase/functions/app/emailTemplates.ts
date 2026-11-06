@@ -616,6 +616,31 @@ export function dailySummaryLetter(
   };
 }
 
+/**
+ * Aviso a uma pessoa da equipa (encomenda nova, alerta, escalada, pedido de ajuda). Curto: o
+ * que aconteceu e um botão para o sítio do painel onde se trata.
+ */
+export function staffAlertLetter(
+  brand: Brand,
+  alert: { title: string; body: string; severity: "normal" | "high" | "critical"; path: string },
+): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const critical = alert.severity === "critical";
+  return {
+    subject: `${critical ? "[URGENTE] " : ""}${alert.title}`,
+    doc: {
+      preheader: alert.body.slice(0, 120),
+      symbol: critical ? "!" : "●",
+      tone: critical ? "danger" : alert.severity === "high" ? "warning" : "brand",
+      title: alert.title,
+      lead: [alert.body],
+      cta: site ? { label: "Abrir no painel", url: `${site}${alert.path}` } : undefined,
+      notes: critical ? ["Este aviso subiu de nível porque ninguém o assumiu a tempo. Abra o painel e assuma-o."] : [],
+      reason: "Recebe este aviso porque faz parte da equipa da loja e a sua equipa trata deste assunto.",
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // C. Avisos simples e testes
 // ---------------------------------------------------------------------------

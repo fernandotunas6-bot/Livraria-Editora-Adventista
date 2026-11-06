@@ -24,7 +24,12 @@ export const SHIPPING_METHODS = {
 export function calcShippingCents(method, subtotalCents, settings = {}) {
   const freeThreshold = (Number(settings.shipping_free_threshold) || 20000) * 100;
   const standardCost = (Number(settings.shipping_cost) || 1500) * 100;
-  const expressCost = (Number(settings.shipping_express_cost) || standardCost * 2);
+  // O painel guarda kwanzas; aqui tudo é em cêntimos. Sem o ×100, 3000 Kz apareciam no
+  // carrinho como 30 Kz, e o servidor (place_order) cobrava 3000. Sem valor, o dobro da normal,
+  // a mesma regra do place_order.
+  const expressCost = (Number(settings.shipping_express_cost) > 0
+    ? Number(settings.shipping_express_cost) * 100
+    : standardCost * 2);
 
   if (method === 'pickup') return 0;
   if (method === 'express') return expressCost;

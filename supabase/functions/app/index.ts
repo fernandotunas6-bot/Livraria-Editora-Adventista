@@ -9,7 +9,17 @@ import {
   type Suggestions,
 } from "./emails.ts";
 import { rankSuggestions } from "./suggestions.ts";
+import {
+  type ChatContext, type EngineReply, type HandoffReason, type PastMessage, HANDOFF_REASON_LABELS, aiTurns,
+  buildSystemPrompt, categoryOf, classify, escalationSubject, escalationSummary, extractEmail, extractOrderRefs,
+  isSubstantive, normalize, orderNumber, parseAiJson, priorityOf, ruleReply, sanitizeAi, stageText,
+} from "./chatEngine.ts";
+import { buildKnowledge, kz } from "./chatKnowledge.ts";
 import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
+import {
+  DUTY_OF_ALERT, dispatchPlan, hoursFromRow, isOpenAt, openMinutesBetween, staffPrefs, ticketSlaBreach,
+  type Duty, type OpsHours, type Severity,
+} from "./opsRouting.ts";
 import {
   accessLinkLetter,
   accountClosedLetter,
@@ -31,6 +41,7 @@ import {
   paymentConfirmedLetter,
   thankYouLetter,
   dailySummaryLetter,
+  staffAlertLetter,
   testLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
@@ -922,11 +933,17 @@ async function sendOrderStepWhatsApp(order: Row, step: string, text: string) {
  * `VAPID_PRIVATE_KEY` (ou em private.site_secrets). Subscrições mortas (404/410) são apagadas.
  */
 async function sendOrderPush(order: Row, settings: Row | null, payload: { title: string; body: string; url: string }) {
-  if (!order?.customer_id || !settings?.push_enabled) return 0;
+  if (!order?.customer_id) return 0;
+  return await sendUserPush(order.customer_id, settings, payload);
+}
+
+/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
+async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
+  if (!userId || !settings?.push_enabled) return 0;
   const publicKey = String(settings.vapid_public_key || "");
   const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || String(settings.vapid_private_key || "");
   if (!publicKey || !privateKey) return 0;
-  const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", order.customer_id).limit(10);
+  const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", userId).limit(10);
   if (!subs?.length) return 0;
   const webpush = (await import("npm:web-push@3.6.7")).default;
   const contact = settings.contact_email ? `mailto:${settings.contact_email}` : "mailto:contacto@livrariaadventista.ao";
@@ -1466,7 +1483,12 @@ route("POST", "/order-feedback", async ({ body, ip }) => {
 
   const ref = order.order_number || order.id;
   if (outcome === "problem") {
-    await notifyOrderStaff("order_problem", `Problema na encomenda ${ref}`, `${order.customer_name || "O cliente"}: ${message}`, order.id);
+    // Um problema do cliente vai para a equipa de atendimento, com prioridade, e sai já.
+    await notifyDuty({
+      duty: "support", storeId: null, kind: "order_problem", title: `Problema na encomenda ${ref}`,
+      body: `${order.customer_name || "O cliente"}: ${message}`, severity: "high", orderId: order.id,
+    });
+    runAfterResponse("Avisos à equipa (problema do cliente)", () => dispatchStaffNotifications());
   } else {
     await notifyOrderStaff("order_confirmed", `Encomenda ${ref} confirmada pelo cliente`, `${order.customer_name || "O cliente"} recebeu tudo bem.`, order.id);
   }
@@ -1557,7 +1579,13 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
 
   let saved = order;
   if (order.payment_status !== status) {
-    const { data, error } = await db.from("orders").update({ payment_status: status }).eq("id", id).select().single();
+    // O pagamento confirmado fica na linha do tempo: é daí que conta o prazo de entrega
+    // prometido (Envios e Devoluções), que a vigilância usa para alertar atrasos.
+    const timeline = status === "paid" && order.payment_status !== "paid"
+      ? { delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []),
+        timelineEvent("paid", "Pagamento confirmado", "", "")] }
+      : {};
+    const { data, error } = await db.from("orders").update({ payment_status: status, ...timeline }).eq("id", id).select().single();
     if (error) throw error;
     saved = data;
   }
@@ -1857,6 +1885,9 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   // Vão depois da resposta. O WhatsApp fica antes, porque o carrinho usa `whatsapp_sent`
   // para decidir se ainda abre o WhatsApp à mão.
   if (email) runAfterResponse("Post-checkout email", () => sendOrderConfirmationEmail(saved, settings));
+  // A equipa que recebe encomendas (a da loja, nos levantamentos) é avisada já por push,
+  // WhatsApp e email, sem esperar pelo agendador. O aviso no painel foi escrito pela base de dados.
+  runAfterResponse("Post-checkout avisos à equipa", () => dispatchStaffNotifications());
   runAfterResponse("Post-checkout CRM", async () => {
     await upsertContact({
       name, email, phone, source: "checkout", is_buyer: true,
@@ -2473,7 +2504,7 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 // Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
 // ---------------------------------------------------------------------------
 
-const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
 
 /** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
 async function ordersForWatch() {
@@ -2483,42 +2514,248 @@ async function ordersForWatch() {
   return (data || []) as Row[];
 }
 
+// ---------------------------------------------------------------------------
+// Equipas: quem recebe cada aviso (public.ops_recipients) e por que canais
+// ---------------------------------------------------------------------------
+async function opsHours(): Promise<OpsHours> {
+  return await cached("ops:hours", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("staff_ops_settings").select("open_hour, close_hour, open_days").eq("id", 1).maybeSingle();
+    return hoursFromRow(data);
+  });
+}
+
+async function opsTeams(): Promise<Row[]> {
+  return await cached("ops:teams", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("staff_teams").select("id, name, store_id, duties, escalation_minutes, active").eq("active", true);
+    return (data || []) as Row[];
+  }) || [];
+}
+
+/** Loja de uma encomenda (só levantamentos), pelo nome que o checkout guarda — como na base de dados. */
+async function storeIdResolver(): Promise<(o: Row) => string | null> {
+  const stores = await cached("ops:stores", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("physical_stores").select("id, name, active");
+    return (data || []) as Row[];
+  }) || [];
+  const byName = new Map<string, string>();
+  for (const st of [...stores].sort((x, y) => Number(!!x.active) - Number(!!y.active))) byName.set(String(st.name || "").trim().toLowerCase(), st.id);
+  const ids = new Set(stores.map((st) => st.id));
+  return (o: Row) => {
+    if (o?.shipping_method !== "pickup") return null;
+    const key = String(o.pickup_store || "").trim();
+    if (!key) return null;
+    return ids.has(key) ? key : byName.get(key.toLowerCase()) || null;
+  };
+}
+
+/** Minutos que a equipa responsável tem para assumir (o menor das equipas que recebem). */
+function escalationMinutes(teams: Row[], duty: Duty, storeId: string | null): number {
+  const withDuty = teams.filter((t) => Array.isArray(t.duties) && t.duties.includes(duty));
+  const own = storeId ? withDuty.filter((t) => t.store_id === storeId) : [];
+  const chosen = own.length ? own : withDuty.filter((t) => !t.store_id).length ? withDuty.filter((t) => !t.store_id) : withDuty;
+  const values = chosen.map((t) => Number(t.escalation_minutes)).filter((n) => n >= 5);
+  return values.length ? Math.min(...values) : 30;
+}
+
 /**
- * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa (staff_notifications)
- * só dos alertas novos ou que passaram a críticos, e fecha os que deixaram de existir.
+ * Aviso no painel a quem trata de uma função (ou, com `escalate`, aos responsáveis e às
+ * urgências). Os canais externos saem depois, por `dispatchStaffNotifications`.
+ */
+async function notifyDuty(opts: {
+  duty: Duty; storeId: string | null; kind: string; title: string; body: string; severity: Severity;
+  orderId?: string | null; threadId?: string | null; escalate?: boolean; only?: string | null;
+}) {
+  const { data, error } = await db.rpc("ops_recipients", { p_duty: opts.duty, p_store_id: opts.storeId, p_escalate: !!opts.escalate });
+  let ids: string[] = error ? [] : (data || []).map((r: Row) => String(r.profile_id));
+  if (error) console.log("ops_recipients:", error.message);
+  if (opts.only) ids = ids.includes(opts.only) ? [opts.only] : [opts.only];
+  if (!ids.length) return 0;
+  const rows = [...new Set(ids)].map((staffId) => ({
+    staff_id: staffId, kind: opts.kind, title: clipText(opts.title, 120), body: clipText(opts.body, 500) || "—",
+    order_id: opts.orderId ?? null, thread_id: opts.threadId ?? null, severity: opts.severity,
+  }));
+  const { error: insertError } = await db.from("staff_notifications").insert(rows);
+  if (insertError) {
+    console.log("staff_notifications:", insertError.message);
+    return 0;
+  }
+  return rows.length;
+}
+
+/**
+ * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa responsável (por
+ * função e loja) dos alertas novos ou que passaram a críticos, sobe aos responsáveis e às
+ * urgências o que ninguém assumiu a tempo, e verifica os prazos dos pedidos de ajuda.
  * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
  */
 async function runOrderWatch(summary = false) {
-  const orders = await ordersForWatch();
-  const alerts = orderAlerts(orders);
+  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
+  const ackMinutes = (o: Row) => escalationMinutes(teams, "new_order", storeOf(o));
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes, hours });
+  const byId = new Map<string, Row>(orders.map((o) => [String(o.id), o]));
   const now = nowISO();
-  const { data: open } = await db.from("order_alerts").select("order_id, kind, severity").is("resolved_at", null);
+  const { data: open } = await db.from("order_alerts")
+    .select("order_id, kind, severity, first_seen_at, acknowledged_at, escalated_at").is("resolved_at", null);
   const known = new Map<string, Row>((open || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
   let notified = 0;
+  let escalated = 0;
   for (const a of alerts) {
     const key = `${a.order_id}:${a.kind}`;
     const before = known.get(key);
     known.delete(key);
+    const order = byId.get(a.order_id);
+    const storeId = order ? storeOf(order) : null;
+    const duty = DUTY_OF_ALERT[a.kind] || "new_order";
     await db.from("order_alerts").upsert({
       order_id: a.order_id, kind: a.kind, severity: a.severity, label: a.label, detail: a.detail.slice(0, 500),
       last_seen_at: now, resolved_at: null, ...(before ? {} : { first_seen_at: now }),
     }, { onConflict: "order_id,kind" });
+    const title = `${a.severity === "critical" ? "Crítico: " : ""}${a.label} — ${a.order_number}`;
+    const text = `${a.customer_name || "Cliente"} · ${a.detail || `há ${a.hours} h neste passo`}`;
+
     if (!before || (before.severity !== "critical" && a.severity === "critical")) {
-      notified += await notifyOrderStaff(
-        a.kind === "customer_problem" ? "order_problem" : "order_stuck",
-        `${a.severity === "critical" ? "Crítico: " : ""}${a.label} — ${a.order_number}`,
-        `${a.customer_name || "Cliente"} · há ${a.hours} h neste passo${a.detail ? ` · ${a.detail}` : ""}`,
-        a.order_id,
-      );
+      if (a.kind === "new_unacknowledged") {
+        // Ninguém assumiu a encomenda nova a tempo: vai directa aos responsáveis e às urgências.
+        notified += await notifyDuty({ duty, storeId, kind: "order_unacknowledged", title, body: text, severity: "critical", orderId: a.order_id, escalate: true });
+        await db.from("order_alerts").update({ escalated_at: now }).eq("order_id", a.order_id).eq("kind", a.kind);
+        escalated++;
+      } else {
+        notified += await notifyDuty({
+          duty, storeId, title, body: text, orderId: a.order_id,
+          kind: a.kind === "customer_problem" ? "order_problem" : a.kind === "delivery_overdue" ? "order_overdue" : "order_stuck",
+          severity: a.severity === "critical" ? "critical" : "high",
+        });
+      }
+      continue;
+    }
+    // Crítico e ninguém disse "estou a tratar" dentro do tempo da equipa: sobe de nível, uma vez.
+    if (a.severity === "critical" && !before.acknowledged_at && !before.escalated_at) {
+      const waited = openMinutesBetween(Date.parse(String(before.first_seen_at)), Date.now(), hours);
+      if (waited >= escalationMinutes(teams, duty, storeId)) {
+        notified += await notifyDuty({
+          duty, storeId, kind: "escalation", title: `Sem resposta: ${a.label} — ${a.order_number}`,
+          body: `${text} · ninguém assumiu este alerta`, severity: "critical", orderId: a.order_id, escalate: true,
+        });
+        await db.from("order_alerts").update({ escalated_at: now }).eq("order_id", a.order_id).eq("kind", a.kind);
+        escalated++;
+      }
     }
   }
   // O que ficou em `known` já não está em alerta: resolvido.
   for (const a of known.values()) {
     await db.from("order_alerts").update({ resolved_at: now }).eq("order_id", a.order_id).eq("kind", a.kind).is("resolved_at", null);
   }
+
+  // Pedidos de ajuda fora do prazo: primeira resposta → equipa de atendimento (ou o responsável);
+  // resolução → responsáveis e urgências.
+  let slaAlerts = 0;
+  const { data: tickets } = await db.from("support_threads")
+    .select("id, ticket_number, subject, status, priority, assigned_to, order_id, first_response_at, first_response_due_at, resolution_due_at, sla_alert_level")
+    .in("status", ["open", "pending"]).not("ticket_number", "is", null).limit(500);
+  for (const t of tickets || []) {
+    const level = ticketSlaBreach(t);
+    if (!level) continue;
+    const label = `#${t.ticket_number} · ${t.subject}`;
+    slaAlerts += level === 1
+      ? await notifyDuty({ duty: "support", storeId: null, kind: "ticket_sla", title: `Pedido sem resposta no prazo — #${t.ticket_number}`, body: label, severity: "high", orderId: t.order_id, threadId: t.id, only: t.assigned_to })
+      : await notifyDuty({ duty: "support", storeId: null, kind: "ticket_sla", title: `Pedido por resolver fora do prazo — #${t.ticket_number}`, body: label, severity: "critical", orderId: t.order_id, threadId: t.id, escalate: true });
+    await db.from("support_threads").update({ sla_alert_level: level }).eq("id", t.id).lt("sla_alert_level", level);
+  }
+
   let summarySent = 0;
   if (summary) summarySent = await sendDailySummary(orders, alerts);
-  return { orders: orders.length, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
+  const dispatched = await dispatchStaffNotifications();
+  return { orders: orders.length, alerts: alerts.length, notified, escalated, resolved: known.size, sla_alerts: slaAlerts, summary_sent: summarySent, dispatched };
+}
+
+/**
+ * Envia por email, WhatsApp e push os avisos à equipa ainda por enviar (os do painel já lá
+ * estão). Canais por tipo e gravidade (opsRouting.ts) e pelas preferências das equipas de cada
+ * pessoa. Fora do horário só sai o crítico; o resto fica para a abertura. Cada canal tem a sua
+ * chave de idempotência: correr duas vezes não repete mensagens.
+ */
+async function dispatchStaffNotifications(limit = 100) {
+  const cutoff = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
+  await db.from("staff_notifications").update({ dispatched_at: nowISO(), channels: { skipped: "antigo" } })
+    .is("dispatched_at", null).lt("created_at", cutoff);
+  const { data: pending, error } = await db.from("staff_notifications")
+    .select("id, staff_id, kind, title, body, order_id, thread_id, severity, created_at")
+    .is("dispatched_at", null).order("created_at", { ascending: true }).limit(limit);
+  if (error) {
+    console.log("dispatchStaffNotifications:", error.message);
+    return { pending: 0, sent: 0, deferred: 0 };
+  }
+  if (!pending?.length) return { pending: 0, sent: 0, deferred: 0 };
+
+  const [settings, hours, whatsapp] = await Promise.all([getSettings(), opsHours(), getWhatsAppConfig()]);
+  const open = isOpenAt(Date.now(), hours);
+  const staffIds = [...new Set(pending.map((n: Row) => String(n.staff_id)))];
+  const [{ data: people }, { data: memberships }] = await Promise.all([
+    db.from("profiles").select("id, name, email, phone, role").in("id", staffIds),
+    db.from("staff_team_members").select("profile_id, staff_teams(notify_email, notify_whatsapp, notify_push, active)").in("profile_id", staffIds),
+  ]);
+  const person = new Map<string, Row>((people || []).map((p: Row) => [String(p.id), p]));
+  const teamsOf = new Map<string, Row[]>();
+  for (const m of memberships || []) {
+    const list = teamsOf.get(String(m.profile_id)) || [];
+    if (m.staff_teams) list.push(m.staff_teams as Row);
+    teamsOf.set(String(m.profile_id), list);
+  }
+  const brand = emailBrand(settings);
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  let sent = 0;
+  let deferred = 0;
+  for (const n of pending as Row[]) {
+    const p = person.get(String(n.staff_id));
+    const isTeam = p && ["admin", "manager"].includes(String(p.role));
+    const plan = isTeam
+      ? dispatchPlan({ kind: String(n.kind), severity: (n.severity || "normal") as Severity }, staffPrefs(teamsOf.get(String(n.staff_id)) || []), open)
+      : { channels: [], defer: false };
+    if (plan.defer) {
+      deferred++;
+      continue;
+    }
+    const path = n.thread_id ? "/admin?tab=support" : n.order_id ? "/admin?tab=acompanhamento" : "/admin";
+    const result: Row = {};
+    for (const channel of plan.channels) {
+      try {
+        if (channel === "email" && p!.email) {
+          result.email = await sendLetter(settings, p!.email, staffAlertLetter(brand, {
+            title: n.title, body: n.body, severity: (n.severity || "normal") as Severity, path,
+          }), { context: "staff_alert", customer_name: p!.name || "", dedupe: `staff:${n.id}:email` });
+        }
+        if (channel === "whatsapp" && p!.phone && whatsapp) {
+          const dedupe = `staff:${n.id}:wa`;
+          if (!await alreadySent(dedupe)) {
+            const text = `${n.severity === "critical" ? "🚨" : "🔔"} *${n.title}*\n${n.body}${site ? `\n${site}${path}` : ""}`;
+            // Fora da janela de 24 h, a Meta só entrega templates aprovados (Integrações → WhatsApp).
+            const res = whatsapp.staff_template_name
+              ? await metaSend(whatsapp, {
+                messaging_product: "whatsapp", to: waNumber(p!.phone), type: "template",
+                template: {
+                  name: whatsapp.staff_template_name, language: { code: whatsapp.template_language || "pt_PT" },
+                  components: [{ type: "body", parameters: [{ type: "text", text: clipText(n.title, 200) }, { type: "text", text: clipText(n.body, 500) }] }],
+                },
+              })
+              : await sendWhatsAppText(p!.phone, text, whatsapp);
+            await logNotification({
+              type: "whatsapp", context: "staff_alert", recipient: p!.phone, customer_name: p!.name || "",
+              content: text, provider: "meta", dedupe_key: dedupe, status: res?.ok ? "sent" : "failed",
+              subject: n.title, detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
+            });
+            result.whatsapp = !!res?.ok;
+          }
+        }
+        if (channel === "push") result.push = await sendUserPush(String(p!.id), settings, { title: n.title, body: n.body, url: path });
+      } catch (err) {
+        result[channel] = false;
+        console.log(`aviso à equipa (${channel}):`, (err as Error)?.message || err);
+      }
+    }
+    await db.from("staff_notifications").update({ dispatched_at: nowISO(), channels: result }).eq("id", n.id);
+    if (Object.values(result).some(Boolean)) sent++;
+  }
+  return { pending: pending.length, sent, deferred };
 }
 
 /** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
@@ -2549,17 +2786,101 @@ route("POST", "/cron/order-watch", async ({ req, body, ip }) => {
   return json(r);
 });
 
+/** Envio dos avisos à equipa por email/WhatsApp/push (pg_cron de 2 em 2 minutos, só quando há algum). */
+route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
+  const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
+  const given = (req.headers.get("x-queue-token") || "").trim();
+  if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
+  const r = await dispatchStaffNotifications();
+  if (r.pending) console.log("Avisos à equipa (cron):", JSON.stringify(r));
+  return json(r);
+});
+
+const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];
+
+/**
+ * Quem recebe o quê, com a configuração actual das equipas: por função, para as encomendas
+ * sem loja e para cada loja, e a quem sobe uma escalada. É a prova de que ninguém fica de fora.
+ */
+route("GET", "/admin/ops/routing", async ({ auth }) => {
+  if (!can(auth, "manage_users") && !can(auth, "manage_orders")) throw new HttpError(403, "Sem permissão para esta operação.");
+  const { data: stores } = await db.from("physical_stores").select("id, name, active").order("sort_order");
+  const { data: people } = await db.from("profiles").select("id, name, email, phone").in("role", ["admin", "manager"]);
+  const nameOf = new Map<string, Row>((people || []).map((p: Row) => [String(p.id), p]));
+  const places: { store_id: string | null; label: string }[] = [
+    { store_id: null, label: "Entregas e encomendas sem loja" },
+    ...(stores || []).filter((st: Row) => st.active !== false).map((st: Row) => ({ store_id: String(st.id), label: String(st.name) })),
+  ];
+  const describe = async (duty: Duty, storeId: string | null, escalate: boolean) => {
+    const { data } = await db.rpc("ops_recipients", { p_duty: duty, p_store_id: storeId, p_escalate: escalate });
+    return (data || []).map((r: Row) => {
+      const p = nameOf.get(String(r.profile_id)) || {};
+      return { id: r.profile_id, name: p.name || p.email || "—", lead: !!r.is_lead, has_phone: !!String(p.phone || "").trim() };
+    });
+  };
+  const rows = [];
+  for (const place of places) {
+    for (const duty of DUTIES.filter((d) => d !== "urgent")) {
+      rows.push({ ...place, duty, recipients: await describe(duty, place.store_id, false), escalation: await describe(duty, place.store_id, true) });
+    }
+  }
+  return json({ rows, hours: await opsHours(), whatsapp_configured: !!(await getWhatsAppConfig()), push_enabled: !!(await getSettings())?.push_enabled });
+});
+
+/** Aviso de teste a uma equipa: prova que os membros recebem no painel, email, WhatsApp e push. */
+route("POST", "/admin/ops/test", async ({ auth, body }) => {
+  if (!can(auth, "manage_users")) throw new HttpError(403, "Sem permissão para esta operação.");
+  const teamId = String(body.team_id || "").trim();
+  const { data: team } = await db.from("staff_teams").select("id, name").eq("id", teamId).maybeSingle();
+  if (!team) throw new HttpError(404, "Equipa não encontrada.");
+  const { data: members } = await db.from("staff_team_members").select("profile_id").eq("team_id", teamId);
+  if (!members?.length) throw bad("Esta equipa ainda não tem membros.");
+  const { data: inserted, error } = await db.from("staff_notifications").insert(members.map((m: Row) => ({
+    staff_id: m.profile_id, kind: "ops_test", severity: "high",
+    title: `Teste de avisos — ${clipText(team.name, 80)}`,
+    body: "Se recebeu isto, os avisos da sua equipa estão a funcionar. Não é preciso fazer nada.",
+  }))).select("id, staff_id");
+  if (error) throw error;
+  // O teste sai já, mesmo fora do horário: é para confirmar os canais.
+  const ids = (inserted || []).map((r: Row) => r.id);
+  await db.from("staff_notifications").update({ severity: "critical" }).in("id", ids);
+  await dispatchStaffNotifications();
+  const { data: done } = await db.from("staff_notifications").select("staff_id, channels").in("id", ids);
+  return json({ results: done || [] });
+});
+
 /** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
 route("GET", "/admin/orders/watch", async ({ auth }) => {
   requirePermission(auth, "manage_orders");
-  const orders = await ordersForWatch();
-  const alerts = orderAlerts(orders);
-  const { data: since } = await db.from("order_alerts").select("order_id, kind, first_seen_at").is("resolved_at", null);
-  const firstSeen = new Map<string, string>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, String(a.first_seen_at)]));
+  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours });
+  const { data: since } = await db.from("order_alerts")
+    .select("order_id, kind, first_seen_at, acknowledged_at, acknowledged_by, escalated_at").is("resolved_at", null);
+  const state = new Map<string, Row>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
+  const ackIds = [...new Set((since || []).map((a: Row) => a.acknowledged_by).filter(Boolean))];
+  const { data: ackPeople } = ackIds.length ? await db.from("profiles").select("id, name, email").in("id", ackIds) : { data: [] as Row[] };
+  const nameOf = new Map<string, string>((ackPeople || []).map((p: Row) => [String(p.id), String(p.name || p.email || "")]));
+  // Encomendas por assumir (ainda dentro do tempo): a equipa vê-as antes de virarem alerta.
+  const unacknowledged = orders
+    .filter((o) => !o.acknowledged_at && o.status !== "cancelled" && !["preparing", "shipped", "in_transit", "out_for_delivery", "delivered"].includes(String(o.delivery_status || "")))
+    .slice(0, 50)
+    .map((o) => ({ order_id: o.id, order_number: o.order_number || o.id, customer_name: o.customer_name || "", created: o.created, total: o.total, shipping_method: o.shipping_method || "", pickup_store: o.pickup_store || "" }));
   return json({
     summary: watchSummary(orders),
     stage_labels: STAGE_LABELS,
-    alerts: alerts.map((a) => ({ ...a, first_seen_at: firstSeen.get(`${a.order_id}:${a.kind}`) || null })),
+    unacknowledged,
+    alerts: alerts.map((a) => {
+      const st = state.get(`${a.order_id}:${a.kind}`);
+      return {
+        ...a,
+        first_seen_at: st?.first_seen_at || null,
+        acknowledged_at: st?.acknowledged_at || null,
+        acknowledged_by_name: st?.acknowledged_by ? nameOf.get(String(st.acknowledged_by)) || "" : "",
+        escalated_at: st?.escalated_at || null,
+      };
+    }),
   });
 });
 
@@ -3033,85 +3354,103 @@ route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
   return json({ ok: true, ended, email_sent: emailSent });
 });
 
-// --- Assistente (antes: chat.pb.js) ---
+// --- Assistente e atendimento no chat ---
+// A conversa fica guardada (support_threads/support_messages, canal 'assistant'): o cliente
+// retoma-a noutra visita, e a equipa continua a MESMA conversa quando o cliente a pede.
+// O que o assistente sabe e como decide está em chatEngine.ts e chatKnowledge.ts (com testes);
+// aqui fica só o acesso à base de dados e à IA. A migração que suporta isto é
+// 20261106090000_assistente_conversas_e_pedidos.sql.
 const chatKeys = (settings: Row | null) => ({
   gemini: Deno.env.get("GEMINI_API_KEY") || settings?.gemini_api_key || "",
   deepseek: Deno.env.get("DEEPSEEK_API_KEY") || settings?.deepseek_api_key || "",
 });
 
+/** Fornecedor de IA em uso (o escolhido, ou o que tiver chave), ou null para as respostas próprias. */
+function chatProvider(settings: Row | null): { use: "gemini" | "deepseek"; key: string; model: string } | null {
+  if (!settings) return null;
+  const keys = chatKeys(settings);
+  const pref = settings.chat_provider || "gemini";
+  if (pref === "faq") return null;
+  const model = String(settings.chat_model || "");
+  if (pref === "deepseek" && keys.deepseek) return { use: "deepseek", key: keys.deepseek, model: model || "deepseek-chat" };
+  if (keys.gemini) return { use: "gemini", key: keys.gemini, model: (pref === "gemini" && model) || "gemini-2.0-flash-lite" };
+  if (keys.deepseek) return { use: "deepseek", key: keys.deepseek, model: (pref === "deepseek" && model) || "deepseek-chat" };
+  return null;
+}
+
 route("GET", "/chat/config", async () => {
   const settings = await getSettings();
-  const keys = chatKeys(settings);
-  const provider = settings ? (settings.chat_provider || "gemini") : "faq";
-  let ai = false;
-  let active = "faq";
-  if (provider === "gemini" && keys.gemini) { ai = true; active = "gemini"; }
-  else if (provider === "deepseek" && keys.deepseek) { ai = true; active = "deepseek"; }
-  else if (keys.gemini) { ai = true; active = "gemini"; }
+  const ai = chatProvider(settings);
   // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
-  return publicJson({ enabled: settings ? settings.chat_enabled !== false : true, ai, provider: active, welcome: settings?.chat_welcome || "" });
+  return publicJson({
+    enabled: settings ? settings.chat_enabled !== false : true,
+    ai: !!ai, provider: ai?.use || "faq", welcome: settings?.chat_welcome || "",
+    // O cliente sabe, antes de pedir, se a equipa responde por aqui (precisa de conta).
+    handoff: true, whatsapp: settings?.whatsapp || "",
+  });
 });
 
 function bookToChatItem(b: Row) {
   return {
     id: b.id, title: b.title || "", author: b.author || "", book_code: b.book_code || "",
-    price: b.price ? `${effectivePrice(b)} Kz` : "", cover: fileUrl("stock_books", b, "cover_image") || b.cover || "",
+    price: b.price ? kz(effectivePrice(b)) : "", cover: fileUrl("stock_books", b, "cover_image") || b.cover || "",
     genre: b.genre || "", stock: Number(b.stock) || 0,
   };
 }
 
-async function searchBooks(query: string, limit = 8) {
-  const q = (query || "").trim().toLowerCase().replace(/[,()"%]/g, " ").trim();
-  const seen = new Set<string>();
-  const books: Row[] = [];
-  const add = (list: Row[] | null) => {
-    for (const b of list || []) if (!seen.has(b.id)) { seen.add(b.id); books.push(b); }
-  };
-  const base = () => db.from("stock_books").select("*").eq("active", true).gt("stock", 0);
-  if (q.length >= 2) {
-    const like = `%${q}%`;
-    add((await base().or(`title.ilike.${like},author.ilike.${like},genre.ilike.${like},book_code.ilike.${like}`)
-      .order("featured", { ascending: false }).order("created", { ascending: false }).limit(limit)).data);
-    if (books.length < limit) {
-      add((await base().ilike("description", like)
-        .order("featured", { ascending: false }).order("created", { ascending: false }).limit(limit - books.length)).data);
+// Palavras que não dizem nada sobre o livro procurado ("procuro um livro sobre…").
+const CHAT_STOPWORDS = new Set([
+  "procuro", "procurar", "procura", "livro", "livros", "quero", "queria", "gostaria", "comprar", "preciso", "sobre",
+  "para", "pela", "pelo", "como", "qual", "quais", "voces", "vosso", "vossa", "algum", "alguma", "alguns", "algumas",
+  "livraria", "loja", "catalogo", "mostrar", "recomenda", "recomendam", "recomendacao", "sugestao", "sugestoes",
+  "obrigado", "obrigada", "onde", "quanto", "custa", "preco", "precos", "esta", "estao", "isso", "este", "esta",
+  "temos", "tens", "tem", "existe", "existem", "ainda", "favor", "podem", "pode", "poderia", "boas", "tarde", "noite",
+  "esgotado", "esgotada", "stock", "disponivel", "volta", "quando", "autor", "autora", "titulo", "tema", "temas",
+  "destaque", "destaques", "novidades", "ver",
+]);
+
+/** Livros que correspondem ao texto (frase inteira ou palavras com significado) e destaques de recurso. */
+async function searchBooksForChat(text: string, limit = 6): Promise<{ matches: Row[]; featured: Row[] }> {
+  const phrase = String(text || "").toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+  const base = () => db.from("stock_books").select("*").eq("active", true);
+  const found = new Map<string, Row>();
+  if (phrase.length >= 3 && phrase.length <= 80) {
+    const like = `%${phrase}%`;
+    const { data } = await base().or(`title.ilike.${like},author.ilike.${like},book_code.ilike.${like}`)
+      .order("featured", { ascending: false }).limit(limit);
+    for (const b of data || []) found.set(b.id, b);
+  }
+  if (found.size < limit) {
+    const terms = [...new Set((phrase.match(/[\p{L}\p{N}]{4,}/gu) || []).filter((w) => !CHAT_STOPWORDS.has(normalize(w))))].slice(0, 4);
+    if (terms.length) {
+      const filters = terms.flatMap((w) => [`title.ilike.%${w}%`, `author.ilike.%${w}%`, `genre.ilike.%${w}%`]).join(",");
+      const { data } = await base().or(filters).order("featured", { ascending: false }).limit(limit * 3);
+      // Primeiro os que têm mais palavras da pergunta.
+      const score = (b: Row) => terms.filter((w) => normalize(`${b.title} ${b.author} ${b.genre}`).includes(normalize(w))).length;
+      for (const b of (data || []).sort((a, b) => score(b) - score(a))) if (found.size < limit) found.set(b.id, b);
     }
   }
-  if (!books.length) add((await base().eq("featured", true).order("created", { ascending: false }).limit(limit)).data);
-  if (!books.length) add((await base().order("featured", { ascending: false }).order("created", { ascending: false }).limit(limit)).data);
-  return books.slice(0, limit).map(bookToChatItem);
-}
-
-function parseAiJson(raw: string | null) {
-  if (!raw) return null;
-  let text = String(raw).trim();
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) text = fence[1].trim();
-  try {
-    const obj = JSON.parse(text);
-    return {
-      reply: obj.reply || "",
-      suggestions: Array.isArray(obj.suggestions) ? obj.suggestions.slice(0, 4) : [],
-      links: Array.isArray(obj.links) ? obj.links.slice(0, 5) : [],
-      product_ids: Array.isArray(obj.product_ids) ? obj.product_ids.slice(0, 4) : [],
-    };
-  } catch {
-    return { reply: text.slice(0, 2000), suggestions: [], links: [], product_ids: [] };
-  }
+  const matches = [...found.values()].map(bookToChatItem);
+  if (matches.length) return { matches, featured: [] };
+  const { data: feat } = await base().gt("stock", 0).order("featured", { ascending: false })
+    .order("created", { ascending: false }).limit(limit);
+  return { matches: [], featured: (feat || []).map(bookToChatItem) };
 }
 
 async function callGemini(apiKey: string, model: string, system: string, history: Row[], message: string) {
   const contents = history.filter((h) => h.content).map((h) => ({
-    role: h.role === "assistant" ? "model" : "user", parts: [{ text: String(h.content).slice(0, 1200) }],
+    role: h.role === "assistant" ? "model" : "user", parts: [{ text: String(h.content).slice(0, 2400) }],
   }));
-  contents.push({ role: "user", parts: [{ text: message.slice(0, 1200) }] });
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  contents.push({ role: "user", parts: [{ text: message.slice(0, 2400) }] });
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    // Sem resposta em 15 s, o cliente recebe a resposta própria do assistente em vez de esperar.
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { temperature: 0.65, maxOutputTokens: 900, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 900, responseMimeType: "application/json" },
     }),
   });
   if (!res.ok) return null;
@@ -3121,91 +3460,387 @@ async function callGemini(apiKey: string, model: string, system: string, history
 
 async function callDeepseek(apiKey: string, model: string, system: string, history: Row[], message: string) {
   const messages = [{ role: "system", content: system }, ...history.filter((h) => h.content).map((h) => ({
-    role: h.role === "assistant" ? "assistant" : "user", content: String(h.content).slice(0, 1200),
-  })), { role: "user", content: message.slice(0, 1200) }];
+    role: h.role === "assistant" ? "assistant" : "user", content: String(h.content).slice(0, 2400),
+  })), { role: "user", content: message.slice(0, 2400) }];
   const res = await fetch("https://api.deepseek.com/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, temperature: 0.65, max_tokens: 900, response_format: { type: "json_object" } }),
+    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 900, response_format: { type: "json_object" } }),
   });
   if (!res.ok) return null;
   const body = await res.json().catch(() => ({}));
   return body?.choices?.[0]?.message?.content || null;
 }
 
-function faqFallback(message: string, settings: Row | null, books: Row[]) {
-  const q = (message || "").toLowerCase();
-  let reply: string;
-  if (q.includes("envio") || q.includes("entrega")) reply = "A entrega padrão demora 5-7 dias úteis em Luanda e 7-14 noutras províncias.";
-  else if (q.includes("grátis") || q.includes("gratis")) reply = "Envio grátis para encomendas acima do limiar configurado na loja.";
-  else if (q.includes("pagamento") || q.includes("pagar")) reply = "Aceitamos transferência, Multicaixa Express e pagamento na entrega.";
-  else if (q.includes("rastrear") || q.includes("encomenda")) reply = "Rastreie em /track com o número e email da compra.";
-  else if (q.includes("catálogo") || q.includes("catalogo") || q.includes("livro")) {
-    reply = books.length
-      ? `Temos ${books.length} sugestões no catálogo, por exemplo «${books[0].title}». Explore /shop.`
-      : "Explore o catálogo em /shop ou diga-me o tema que procura.";
-  } else {
-    const wa = settings?.whatsapp || settings?.contact_phone || "";
-    reply = `Posso ajudar com envios, pagamentos e catálogo. Visite /contact${wa ? " ou WhatsApp " + wa : ""}.`;
+// O código do visitante: 32 bytes aleatórios em base64url (43 caracteres). Só o hash fica na
+// base de dados, como uma palavra-passe: quem ler a tabela não consegue entrar na conversa.
+const CHAT_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+function newChatToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function sha256Hex(text: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type ChatIdentity = { auth: Auth; tokenHash: string | null };
+async function chatIdentity(auth: Auth, body: Row): Promise<ChatIdentity> {
+  const token = typeof body.token === "string" && CHAT_TOKEN_RE.test(body.token) ? body.token : "";
+  return { auth, tokenHash: token ? await sha256Hex(token) : null };
+}
+
+const CHAT_THREAD_COLS = "id, customer_id, status, channel, ticket_number, subject, category, priority, order_id, csat_score, created_at, closed_at, last_message_at";
+const CHAT_MESSAGE_COLS = "id, author_kind, sender_id, body, meta, feedback, created_at";
+const CHAT_ORDER_COLS = "id, order_number, created, updated, status, payment_status, payment_method_name, delivery_status, shipping_method, pickup_store, tracking_number, carrier, estimated_delivery, total, items, delivery_timeline, customer_id, customer_email";
+// Um pedido resolvido continua à vista uns dias (para o cliente o ler e avaliar); uma conversa
+// só com o assistente, depois de fechada, dá lugar a uma nova.
+const CLOSED_TICKET_VISIBLE_MS = 3 * 24 * 3600_000;
+
+function visibleThread(t: Row | undefined | null): Row | null {
+  if (!t) return null;
+  if (t.status !== "closed") return t;
+  if (!t.ticket_number) return null;
+  const closed = new Date(t.closed_at || t.last_message_at || 0).getTime();
+  return Date.now() - closed < CLOSED_TICKET_VISIBLE_MS ? t : null;
+}
+
+/** A conversa actual: a da conta (passando para ela a que o browser tinha) ou a do browser. */
+async function currentConversation(id: ChatIdentity): Promise<Row | null> {
+  if (id.auth) {
+    if (id.tokenHash) {
+      const { error } = await db.from("support_threads")
+        .update({ customer_id: id.auth.id, guest_token_hash: null, updated_at: nowISO() })
+        .eq("guest_token_hash", id.tokenHash).is("customer_id", null);
+      if (error) console.log("chat claim:", error.message);
+    }
+    const { data } = await db.from("support_threads").select(CHAT_THREAD_COLS)
+      .eq("customer_id", id.auth.id).eq("channel", "assistant")
+      .order("created_at", { ascending: false }).limit(1);
+    return visibleThread(data?.[0]);
   }
+  if (!id.tokenHash) return null;
+  const { data } = await db.from("support_threads").select(CHAT_THREAD_COLS)
+    .eq("guest_token_hash", id.tokenHash).is("customer_id", null)
+    .order("created_at", { ascending: false }).limit(1);
+  return visibleThread(data?.[0]);
+}
+
+async function createConversation(id: ChatIdentity, page: string): Promise<{ thread: Row; token?: string }> {
+  let token: string | undefined;
+  let tokenHash = id.tokenHash;
+  if (!id.auth && !tokenHash) {
+    token = newChatToken();
+    tokenHash = await sha256Hex(token);
+  }
+  const { data, error } = await db.from("support_threads").insert({
+    customer_id: id.auth?.id ?? null,
+    guest_token_hash: id.auth ? null : tokenHash,
+    subject: "Conversa com o assistente",
+    channel: "assistant",
+    status: "bot",
+    page: page.slice(0, 200),
+  }).select(CHAT_THREAD_COLS).single();
+  if (error || !data) throw new Error(`chat: não foi possível criar a conversa (${error?.message})`);
+  return { thread: data, token };
+}
+
+function publicThread(t: Row | null) {
+  if (!t) return null;
   return {
-    reply,
-    suggestions: ["Ver catálogo", "Envio grátis?", "Rastrear encomenda", "Falar com a equipa"],
-    links: [{ label: "Loja", path: "/shop" }, { label: "FAQ", path: "/faq" }, { label: "Contacto", path: "/contact" }],
-    product_ids: books.slice(0, 2).map((b) => b.id),
+    id: t.id,
+    status: t.status,
+    ticket_number: t.ticket_number || null,
+    subject: t.ticket_number ? t.subject : "",
+    category: t.category,
+    created_at: t.created_at,
+    can_rate: t.status === "closed" && !!t.ticket_number && !!t.customer_id && t.csat_score == null,
+    csat_score: t.csat_score ?? null,
   };
 }
 
-route("POST", "/chat", async ({ body, ip }) => {
+const chatFirstName = (name: unknown) => String(name || "").trim().split(/\s+/)[0] || "";
+
+/** Mensagens como o site as mostra: livros com dados actuais e o nome de quem respondeu. */
+async function presentMessages(rows: Row[]) {
+  const productIds = [...new Set(rows.flatMap((r) => (Array.isArray(r.meta?.product_ids) ? r.meta.product_ids : []).map(String)))].slice(0, 60);
+  const staffIds = [...new Set(rows.filter((r) => r.author_kind === "staff" && r.sender_id).map((r) => r.sender_id))];
+  const [books, staff] = await Promise.all([
+    productIds.length ? db.from("stock_books").select("*").in("id", productIds).eq("active", true) : Promise.resolve({ data: [] as Row[] }),
+    staffIds.length ? db.from("profiles").select("id, name").in("id", staffIds) : Promise.resolve({ data: [] as Row[] }),
+  ]);
+  const byBook = new Map((books.data || []).map((b: Row) => [String(b.id), bookToChatItem(b)]));
+  const byStaff = new Map((staff.data || []).map((p: Row) => [p.id, chatFirstName(p.name)]));
+  return rows.map((r) => ({
+    id: r.id,
+    role: r.author_kind === "customer" ? "user" : r.author_kind === "assistant" ? "bot" : r.author_kind,
+    text: r.body,
+    created_at: r.created_at,
+    links: Array.isArray(r.meta?.links) ? r.meta.links : [],
+    suggestions: Array.isArray(r.meta?.suggestions) ? r.meta.suggestions : [],
+    products: (Array.isArray(r.meta?.product_ids) ? r.meta.product_ids : []).map((pid: unknown) => byBook.get(String(pid))).filter(Boolean),
+    offer_handoff: r.meta?.offer_handoff === true,
+    handoff_reason: typeof r.meta?.handoff_reason === "string" ? r.meta.handoff_reason : undefined,
+    feedback: r.feedback ?? null,
+    author: r.author_kind === "staff" ? (byStaff.get(r.sender_id) || "Equipa") : undefined,
+  }));
+}
+
+async function threadMessages(threadId: string, limit = 100): Promise<Row[]> {
+  const { data } = await db.from("support_messages").select(CHAT_MESSAGE_COLS)
+    .eq("thread_id", threadId).neq("author_kind", "note")
+    .order("id", { ascending: false }).limit(limit);
+  return (data || []).reverse();
+}
+
+const asPast = (rows: Row[]): PastMessage[] => rows.map((r) => ({
+  role: r.author_kind === "customer" ? "customer" : r.author_kind,
+  text: String(r.body || ""),
+  meta: r.meta || null,
+  feedback: r.feedback ?? null,
+}));
+
+/** O cliente com sessão: nome e as suas encomendas (pela conta ou pelo email, como no RLS). */
+async function chatCustomer(auth: Auth): Promise<{ name: string; email: string; orders: Row[] }> {
+  if (!auth) return { name: "", email: "", orders: [] };
+  const email = normalizeEmail(auth.email);
+  const [profile, byId, byEmail] = await Promise.all([
+    db.from("profiles").select("name").eq("id", auth.id).maybeSingle(),
+    db.from("orders").select(CHAT_ORDER_COLS).eq("customer_id", auth.id).order("created", { ascending: false }).limit(5),
+    email
+      ? db.from("orders").select(CHAT_ORDER_COLS).ilike("customer_email", likeExact(email)).order("created", { ascending: false }).limit(5)
+      : Promise.resolve({ data: [] as Row[] }),
+  ]);
+  const all = new Map<string, Row>();
+  for (const o of [...(byId.data || []), ...(byEmail.data || [])]) all.set(o.id, o);
+  const orders = [...all.values()].sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()).slice(0, 5);
+  return { name: String(profile.data?.name || ""), email, orders };
+}
+
+async function chatPaymentMethods() {
+  return await cached("chat:payments", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("payment_methods").select("name, instructions, enabled, sort_order").eq("enabled", true).order("sort_order").limit(20);
+    return (data || []) as Row[];
+  }) || [];
+}
+async function chatStores() {
+  return await cached("chat:stores", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("physical_stores").select("name, province, address, phone, hours, active, sort_order").eq("active", true).order("sort_order").limit(20);
+    return (data || []) as Row[];
+  }) || [];
+}
+
+const ORDERISH: string[] = ["order_status", "cancel_change", "return_refund", "payment_problem", "invoice"];
+
+route("POST", "/chat/session", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("chat_session", ip, 120)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const id = await chatIdentity(auth, body);
+  const thread = await currentConversation(id);
+  const rows = thread ? await threadMessages(thread.id) : [];
+  let orders: Row[] = [];
+  let openTickets: Row[] = [];
+  if (auth) {
+    const [customer, tickets] = await Promise.all([
+      chatCustomer(auth),
+      db.from("support_threads").select("id, ticket_number, status, subject")
+        .eq("customer_id", auth.id).in("status", ["open", "pending"]).not("ticket_number", "is", null)
+        .order("last_message_at", { ascending: false }).limit(5),
+    ]);
+    orders = customer.orders.map((o) => ({ id: o.id, order_number: orderNumber(o), state: stageText(o), created: o.created }));
+    openTickets = (tickets.data || []).filter((t: Row) => t.id !== thread?.id);
+  }
+  return json({
+    conversation: publicThread(thread),
+    messages: await presentMessages(rows),
+    orders,
+    open_tickets: openTickets,
+    // Com sessão, a conversa do browser já passou para a conta: o site deixa de guardar o código.
+    token_cleared: !!auth && !!id.tokenHash,
+  });
+});
+
+route("POST", "/chat", async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
   const page = String(body.page || "/").slice(0, 120);
-  const history = (Array.isArray(body.history) ? body.history : []).slice(-8)
-    .filter((h: Row) => h && (h.role === "user" || h.role === "assistant") && h.content);
   if (!message) throw bad("Mensagem vazia.");
   if (message.length > 800) throw bad("Mensagem demasiado longa.");
 
-  const [settings, books] = await Promise.all([getSettings(), searchBooks(message, 8)]);
+  const settings = await getSettings();
   if (settings && settings.chat_enabled === false) throw bad("Assistente temporariamente indisponível.");
 
-  const keys = chatKeys(settings);
-  const pref = settings ? (settings.chat_provider || "gemini") : "faq";
-  const model = settings?.chat_model || "";
-  const site = settings?.site_name || "Livraria Adventista";
-  const shipping = Number(settings?.shipping_free_threshold) || 20000;
-  const catalog = books.map((b) => `- [${b.id}] ${b.title}${b.book_code ? ` (${b.book_code})` : ""} | ${b.author} | ${effectivePrice(b)} | stock:${b.stock}\n`).join("");
-  const system = [
-    `Assistente da ${site}. Responde em português de Portugal.`,
-    "Só recomende livros do catálogo listado. Não invente títulos.",
-    `Página: ${page || "/"}. Serviços: /shop, /track, /contact, /faq.`,
-    `Envio grátis acima de ${Math.round(shipping)} Kz.`,
-    `Catálogo (IDs reais):\n${catalog}`,
-    'JSON: {"reply":"","suggestions":[],"links":[{"label":"","path":""}],"product_ids":[]}',
-  ].join("\n");
+  const id = await chatIdentity(auth, body);
+  let thread = await currentConversation(id);
+  let token: string | undefined;
+  // Depois de resolvida, uma conversa não recebe mais mensagens: começa outra (como no Zendesk).
+  if (!thread || thread.status === "closed") ({ thread, token } = await createConversation(id, page));
 
-  let parsed = null;
-  let usedAi = false;
-  let provider = "faq";
-  if (pref !== "faq") {
-    let use = "";
-    if (pref === "gemini" && keys.gemini) use = "gemini";
-    else if (pref === "deepseek" && keys.deepseek) use = "deepseek";
-    else if (keys.gemini) use = "gemini";
-    else if (keys.deepseek) use = "deepseek";
-    const raw = use === "gemini"
-      ? await callGemini(keys.gemini, model || "gemini-2.0-flash-lite", system, history, message)
-      : use === "deepseek"
-        ? await callDeepseek(keys.deepseek, model || "deepseek-chat", system, history, message)
-        : null;
-    if (raw) { parsed = parseAiJson(raw); usedAi = true; provider = use; }
+  const previousRows = await threadMessages(thread.id, 20);
+  const { data: userRow, error: userError } = await db.from("support_messages").insert({
+    thread_id: thread.id, sender_id: auth?.id ?? null, author_kind: "customer", body: message,
+  }).select(CHAT_MESSAGE_COLS).single();
+  if (userError || !userRow) throw new Error(`chat: mensagem não guardada (${userError?.message})`);
+
+  // Com a equipa: a mensagem fica no pedido (o gatilho avisa quem atende) e o assistente cala-se.
+  if (thread.status !== "bot") {
+    const { data: fresh } = await db.from("support_threads").select(CHAT_THREAD_COLS).eq("id", thread.id).single();
+    return json({ token, conversation: publicThread(fresh || thread), messages: await presentMessages([userRow]) });
   }
-  if (!parsed) parsed = faqFallback(message, settings, books);
 
-  const byId = Object.fromEntries(books.map((b) => [b.id, b]));
-  let products = (parsed.product_ids || []).map((id: string) => byId[id]).filter(Boolean);
-  if (!products.length && books.length) products = [books[0]];
-  const links = parsed.links?.length ? parsed.links : [{ label: "Catálogo", path: "/shop" }];
-  return json({ reply: parsed.reply || "", suggestions: parsed.suggestions || [], links, products: products.slice(0, 4), ai: usedAi, provider });
+  const rules = storeRules(settings);
+  const previous = asPast(previousRows);
+  const customerTexts = [...previous.filter((m) => m.role === "customer").map((m) => m.text), message];
+  const orderRefs = [...new Set(customerTexts.slice().reverse().flatMap((t) => extractOrderRefs(t, rules.orderPrefix)))].slice(0, 3);
+  const emailGiven = customerTexts.slice().reverse().map((t) => extractEmail(t)).find(Boolean) || null;
+  const quick = classify(message, extractOrderRefs(message, rules.orderPrefix).length > 0).primary;
+  const lastIntent = String([...previous].reverse().find((m) => m.role === "assistant")?.meta?.intent || "");
+
+  const [payments, stores, customer] = await Promise.all([chatPaymentMethods(), chatStores(), chatCustomer(auth)]);
+  const knowledge = buildKnowledge(settings, payments, stores);
+
+  // Visitante: uma encomenda só com o número E o email da compra, com o mesmo limite do rastreio.
+  let verifiedOrder: Row | null = null;
+  let lookupFailed = false;
+  const orderTalk = ORDERISH.includes(quick) || lastIntent === "order_status" || !!extractEmail(message) || extractOrderRefs(message, rules.orderPrefix).length > 0;
+  if (!auth && orderRefs.length && emailGiven && orderTalk) {
+    if (!await checkRateLimit("track", ip, rules.trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+    for (const ref of orderRefs.slice(0, 2)) {
+      verifiedOrder = await findOrderByNumberAndEmail(ref, emailGiven);
+      if (verifiedOrder) break;
+    }
+    lookupFailed = !verifiedOrder;
+  }
+
+  const wantsBooks = ["catalog", "stock", "unknown"].includes(quick);
+  const { matches, featured } = wantsBooks ? await searchBooksForChat(message) : { matches: [], featured: [] };
+
+  const ctx: ChatContext = {
+    text: message, previous, knowledge, loggedIn: !!auth,
+    customerName: customer.name, customerEmail: customer.email, orders: customer.orders,
+    verifiedOrder, lookupFailed, orderRefs, emailGiven, orderPrefix: rules.orderPrefix,
+    books: matches.length ? matches : featured, bookMatches: matches,
+  };
+
+  let reply: EngineReply | null = null;
+  let provider = "";
+  const ai = chatProvider(settings);
+  if (ai) {
+    try {
+      const turns = aiTurns(previous, message);
+      const system = buildSystemPrompt(ctx, page);
+      const raw = ai.use === "gemini"
+        ? await callGemini(ai.key, ai.model, system, turns.history, turns.message)
+        : await callDeepseek(ai.key, ai.model, system, turns.history, turns.message);
+      reply = sanitizeAi(parseAiJson(raw), ctx);
+      if (reply) provider = ai.use;
+    } catch (err) {
+      console.log("chat ia:", (err as Error)?.message || err);
+    }
+  }
+  if (!reply) reply = ruleReply(ctx);
+
+  const meta: Row = {
+    links: reply.links, suggestions: reply.suggestions, product_ids: reply.product_ids,
+    offer_handoff: reply.offer_handoff, intent: reply.intent, unresolved: reply.unresolved,
+  };
+  if (reply.handoff_reason) meta.handoff_reason = reply.handoff_reason;
+  if (reply.order_id) meta.order_id = reply.order_id;
+  if (provider) meta.ai = provider;
+  const { data: botRow, error: botError } = await db.from("support_messages").insert({
+    thread_id: thread.id, sender_id: null, author_kind: "assistant", body: reply.reply.slice(0, 4000), meta,
+  }).select(CHAT_MESSAGE_COLS).single();
+  if (botError || !botRow) throw new Error(`chat: resposta não guardada (${botError?.message})`);
+  // A encomenda de que se falou fica na conversa: se o cliente pedir a equipa, ela já a vê.
+  if (reply.order_id && !thread.order_id) {
+    await db.from("support_threads").update({ order_id: reply.order_id }).eq("id", thread.id).is("order_id", null);
+  }
+
+  const shown = await presentMessages([userRow, botRow]);
+  const bot = shown[1];
+  return json({
+    token,
+    conversation: publicThread(thread),
+    messages: shown,
+    // Forma antiga da resposta, para a versão do site que ainda estiver aberta durante a publicação.
+    reply: bot.text, suggestions: bot.suggestions, links: bot.links, products: bot.products, ai: !!provider, provider: provider || "faq",
+  });
+});
+
+route("POST", "/chat/escalate", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("chat_escalate", ip, 5)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  if (!auth) throw new HttpError(401, "Entre na sua conta para a equipa lhe poder responder.");
+  const id = await chatIdentity(auth, body);
+  const thread = await currentConversation(id);
+  if (!thread || thread.status !== "bot") throw bad("Não há nenhuma conversa com o assistente para passar à equipa.");
+
+  const details = String(body.details ?? "").replace(/\r\n/g, "\n").trim().slice(0, 2000);
+  const reason = (Object.keys(HANDOFF_REASON_LABELS) as HandoffReason[]).includes(body.reason) ? body.reason as HandoffReason : "requested";
+  const messages = asPast(await threadMessages(thread.id, 60));
+  if (!messages.some((m) => m.role === "customer" && isSubstantive(m.text)) && !isSubstantive(details)) {
+    throw bad("Descreva em poucas palavras o que precisa, para a equipa o poder ajudar.");
+  }
+
+  const customer = await chatCustomer(auth);
+  const wantedOrder = typeof body.order_id === "string" && body.order_id ? body.order_id : (thread.order_id || "");
+  let order: Row | null = customer.orders.find((o) => o.id === wantedOrder) || null;
+  if (wantedOrder && !order) {
+    const { data } = await db.from("orders").select(CHAT_ORDER_COLS).eq("id", wantedOrder).maybeSingle();
+    const own = data && (data.customer_id === auth.id || normalizeEmail(data.customer_email) === customer.email);
+    if (!own && typeof body.order_id === "string" && body.order_id) throw bad("A encomenda indicada não pertence à sua conta.");
+    order = own ? data : null;
+  }
+
+  const category = categoryOf(messages, details);
+  const priority = priorityOf(messages, details);
+  const { error } = await db.rpc("assistant_escalate", {
+    p_thread_id: thread.id,
+    p_customer_id: auth.id,
+    p_subject: escalationSubject(category, order, messages, details),
+    p_category: category,
+    p_priority: priority,
+    p_summary: escalationSummary({ reason, category, priority, order, messages, details, customerName: customer.name, customerEmail: customer.email }),
+    p_order_id: order?.id ?? null,
+    p_details: details || null,
+  });
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    throw new Error(`assistant_escalate: ${error.message}`);
+  }
+  const fresh = await currentConversation(id);
+  return json({ conversation: publicThread(fresh), messages: await presentMessages(fresh ? await threadMessages(fresh.id) : []) });
+});
+
+route("POST", "/chat/new", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("chat_session", ip, 120)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const id = await chatIdentity(auth, body);
+  const thread = await currentConversation(id);
+  if (thread?.status === "bot") {
+    // Só a conversa com o assistente fecha; um pedido à equipa continua aberto na conta.
+    await db.from("support_threads").update({ status: "closed", closed_at: nowISO(), updated_at: nowISO() })
+      .eq("id", thread.id).eq("status", "bot");
+    return json({ conversation: null, messages: [] });
+  }
+  if (thread && thread.status !== "closed") {
+    const created = await createConversation(id, String(body.page || "/").slice(0, 120));
+    return json({ token: created.token, conversation: publicThread(created.thread), messages: [] });
+  }
+  return json({ conversation: null, messages: [] });
+});
+
+route("POST", "/chat/feedback", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("chat_feedback", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const value = Number(body.value);
+  const messageId = Number(body.message_id);
+  if (value !== 1 && value !== -1) throw bad("Avaliação inválida.");
+  if (!Number.isSafeInteger(messageId) || messageId <= 0) throw bad("Mensagem inválida.");
+  const id = await chatIdentity(auth, body);
+  const thread = await currentConversation(id);
+  if (!thread) throw new HttpError(404, "Conversa não encontrada.");
+  const { data } = await db.from("support_messages").update({ feedback: value })
+    .eq("id", messageId).eq("thread_id", thread.id).eq("author_kind", "assistant").select("id");
+  if (!data?.length) throw new HttpError(404, "Mensagem não encontrada.");
+  return json({ ok: true, offer_handoff: value === -1 && thread.status === "bot" });
 });
 
 // ---------------------------------------------------------------------------

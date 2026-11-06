@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren, UsersRound } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -43,6 +43,8 @@ const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
+const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
+const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -390,6 +392,7 @@ const AdminPage = () => {
     { label: 'Vendas', tabs: [
       canManageOrders && { value: 'orders', label: `Encomendas (${orders.length})`, icon: ShoppingBag },
       canManageOrders && { value: 'acompanhamento', label: 'Acompanhamento', icon: Siren },
+      (canManageUsers || canManageOrders) && { value: 'equipas', label: 'Equipas e alertas', icon: UsersRound },
       canManagePayments && { value: 'payments', label: 'Pagamentos', icon: CreditCard },
       canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
     ] },
@@ -439,6 +442,18 @@ const AdminPage = () => {
             </div>
           </div>
         </header>
+
+        {/* Encomendas novas e alertas urgentes, com som, para quem está na loja com o painel aberto. */}
+        {canManageOrders && (
+          <Suspense fallback={null}>
+            <StaffAlertBar
+              onOpen={(alert) => {
+                if (alert.thread_id) setActiveTab('support');
+                else setActiveTab('acompanhamento');
+              }}
+            />
+          </Suspense>
+        )}
 
         <main className="container-custom py-10">
           {!canAccessAdmin && (
@@ -537,6 +552,13 @@ const AdminPage = () => {
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {(canManageUsers || canManageOrders) && (
+              <TabsContent value="equipas">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <OpsTeamsPanel canEdit={canManageUsers} />
                 </Suspense>
               </TabsContent>
             )}
