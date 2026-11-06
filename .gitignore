@@ -28,3 +28,8 @@ supabase/auth/.antes-*.json
 
 # CLI do Supabase
 supabase/.temp/
+
+# Registo da Igreja: ficheiros de origem com dados pessoais (telefones, avaliações dos pastores).
+# Importam-se pelo painel (Igreja → Registo da Igreja → Importar); não vão para o repositório.
+/churches.json
+/pastores.json

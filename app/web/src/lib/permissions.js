@@ -7,6 +7,8 @@ export const PERMISSIONS = {
   manage_users: { label: 'Utilizadores e Clientes', description: 'Gerir contas de clientes (a equipa é só para administradores)' },
   manage_payments: { label: 'Pagamentos', description: 'Métodos de pagamento' },
   manage_marketing: { label: 'Marketing', description: 'Mensagens, barra superior, SEO' },
+  manage_church_registry: { label: 'Registo da Igreja', description: 'Campos, distritos, igrejas e pastores' },
+  manage_colporteurs: { label: 'Colportagem', description: 'Colportores, relatórios, stock entregue, percentagens e acertos' },
 };
 
 export const ROLES = {
@@ -22,6 +24,8 @@ export const DEFAULT_PERMISSIONS = {
   manage_users: false,
   manage_payments: false,
   manage_marketing: false,
+  manage_church_registry: false,
+  manage_colporteurs: false,
 };
 
 export const MANAGER_PERMISSIONS = {
@@ -31,6 +35,8 @@ export const MANAGER_PERMISSIONS = {
   manage_users: false,
   manage_payments: false,
   manage_marketing: true,
+  manage_church_registry: false,
+  manage_colporteurs: false,
 };
 
 /** Só os gestores usam permissões granulares; clientes não têm nenhuma e administradores têm todas. */

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren, Church } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -43,6 +43,7 @@ const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
+const ChurchRegistryTab = lazy(() => import('@/components/admin/igreja/ChurchRegistryTab'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -104,6 +105,8 @@ const AdminPage = () => {
   const canManageUsers = isAdmin || hasPermission('manage_users');
   const canManagePayments = isAdmin || hasPermission('manage_payments');
   const canManageMarketing = isAdmin || hasPermission('manage_marketing');
+  // Quem gere colportores também precisa de ver as igrejas e os pastores (só leitura).
+  const canSeeChurchRegistry = isAdmin || hasPermission('manage_church_registry') || hasPermission('manage_colporteurs');
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -406,6 +409,9 @@ const AdminPage = () => {
       canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
       canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
     ] },
+    { label: 'Igreja', tabs: [
+      canSeeChurchRegistry && { value: 'igreja', label: 'Registo da Igreja', icon: Church },
+    ] },
     { label: 'Sistema', tabs: [
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
       isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
@@ -545,6 +551,13 @@ const AdminPage = () => {
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canSeeChurchRegistry && (
+              <TabsContent value="igreja">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <ChurchRegistryTab />
                 </Suspense>
               </TabsContent>
             )}
