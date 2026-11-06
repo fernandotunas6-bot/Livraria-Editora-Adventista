@@ -892,6 +892,36 @@ caracteres (o comprimento é largo de propósito, para aceitar os aliases curtos
 
 Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes_e_svg.sql`.
 
+### Publicação e verificação (mesmo dia)
+
+- Integrado no `main` (PR #14, `463f177`). O deploy aplicou as três migrações em produção — o
+  `supabase db push` listou e aplicou `20261106120000`, `20261106121000` e `20261106122000` —,
+  publicou a Edge Function `app` e o site no Cloudflare Pages (que tinha falhado nos dois merges
+  anteriores e desta vez passou).
+- **A primeira versão do `permissoes_e_svg.sql` dava falsos negativos.** Definia a sessão
+  (`request.jwt.claims`) antes das actualizações de preparação, e os dois triggers de `profiles`
+  (`profiles_codigos_pessoa`, `profiles_protect_privileges`) repõem o papel e as permissões quando
+  `auth.uid()` não é nulo e a pessoa da sessão não é admin. Mal o utilizador do teste passava a
+  gestor, as actualizações seguintes eram revertidas em silêncio: com a migração correcta, A2 e A4
+  saíam como falhas. Corrigido — cada caso prepara sem sessão, confirma que a preparação ficou
+  gravada (senão pára com "PREPARAÇÃO FALHOU") e só depois verifica com sessão.
+- Verificado num Postgres 16 local, com as funções e os triggers extraídos tal e qual das
+  migrações: o script antigo contra a base nova dá A2 e A4 falsos; o novo contra a base nova passa
+  em tudo; o novo contra a base antiga apanha os dois bugs (A1 e B); um trigger que reverte o papel
+  faz disparar a guarda. Em todos, perfis e contadores iguais antes e depois.
+- O `place_order` foi verificado no mesmo Postgres, com o texto exacto da migração, contra a versão
+  anterior e contra a nova sem o reinício das variáveis por item. A anterior cobrava 3000 Kz por
+  uma variante de 2500 com `sale_price` 3000 e antecipava a promoção agendada; a nova cobra 2500 nos
+  dois casos; sem o reinício, o 2.º item de um carrinho herdava o `list_price` da variante do 1.º
+  (um desconto falso no recibo — o valor cobrado não mudava). Não há teste deste para correr em
+  produção, de propósito: inserir livros de teste dispara `nextval('private.book_code_seq')`, que o
+  rollback não desfaz, e deixava um buraco permanente nos códigos dos livros.
+- O `permissoes_e_svg.sql` não deixa rasto em produção: os únicos triggers de `profiles` são os dois
+  acima, ambos `before` e só sobre a própria linha, e o contador de códigos é uma tabela (desfeita
+  pelo rollback). O teste escolhe um admin que já tem `staff_code`, para nem lhe tocar.
+- **Por correr em produção:** o `permissoes_e_svg.sql`. O conector do Supabase da sessão estava
+  ligado a outra conta (via os projectos "Sga" e um inactivo, não o `bggqkjjqbjhbjsckzopj`).
+
 ### Observações de desenho (não são falhas, decisão do dono)
 
 - O separador **"Vendas por loja"** é visível a qualquer gestor com uma permissão qualquer
