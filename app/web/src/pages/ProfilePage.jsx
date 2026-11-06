@@ -11,6 +11,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import { pageTitle } from '@/lib/brand';
+import { ALLOWED_IMAGE_ACCEPT, imageFileError } from '@/lib/imageTypes';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
 import { sessionDecision } from '@/lib/authSession';
@@ -212,8 +213,12 @@ const ProfilePage = () => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'Imagem demasiado grande', description: 'Escolha uma foto com até 2 MB.' });
+    // Tipo e tamanho (lib/imageTypes.js). O tipo é verificado aqui porque o `accept` do
+    // input é só uma sugestão da janela de ficheiros: sem isto passava um SVG, que é um
+    // documento capaz de levar `<script>`, para um bucket público.
+    const problem = imageFileError(file, 2);
+    if (problem) {
+      toast({ variant: 'destructive', title: 'Foto não aceite', description: problem });
       return;
     }
     setAvatarUploading(true);
@@ -436,7 +441,7 @@ const ProfilePage = () => {
                           {user?.avatar ? 'Foto do Google ou upload personalizado' : 'Adicione a sua foto (PNG/JPG, máx. 2MB)'}
                         </p>
                         <label className="cursor-pointer">
-                          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
+                          <input type="file" accept={ALLOWED_IMAGE_ACCEPT} className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
                           <Button type="button" variant="outline" size="sm" asChild>
                             <span>{avatarUploading ? 'A carregar...' : 'Alterar foto'}</span>
                           </Button>
