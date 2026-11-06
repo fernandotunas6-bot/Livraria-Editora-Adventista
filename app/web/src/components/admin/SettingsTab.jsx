@@ -511,7 +511,7 @@ export default function SettingsTab() {
             onFileChange={(f) => { setLogoFile(f); if (f) setLogoRemoved(false); }}
             onClear={() => setLogoRemoved(true)}
             aspect="quadrado ou horizontal"
-            hint="Logotipo: PNG/SVG com fundo transparente · 200×200px mínimo · Aparece em todo o site (header, login, admin, rodapé)"
+            hint="Logotipo: PNG ou WebP com fundo transparente · 200×200px mínimo · Aparece em todo o site (header, login, admin, rodapé)"
             previewClassName="h-20 w-40"
             driveConfig={driveImageConfig}
           />
@@ -921,7 +921,7 @@ export default function SettingsTab() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="gradient">Gradiente (cores da marca)</SelectItem>
-                <SelectItem value="image">Imagem (JPG, PNG, SVG)</SelectItem>
+                <SelectItem value="image">Imagem (JPG, PNG, WebP)</SelectItem>
                 <SelectItem value="video">Vídeo (MP4/WebM)</SelectItem>
                 <SelectItem value="slides">Slider da loja (slides com localização «shop»)</SelectItem>
               </SelectContent>
@@ -936,7 +936,7 @@ export default function SettingsTab() {
                   aspect="16:9"
                   previewClassName="h-24 w-40"
                   driveConfig={driveImageConfig}
-                  hint="JPG, PNG, WebP ou SVG · 1920×1080 recomendado"
+                  hint="JPG, PNG ou WebP · 1920×1080 recomendado"
                   uploadFolder="site_settings"
                 />
                 {form.shop_bg_mode === 'video' && (

@@ -935,6 +935,77 @@ Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes
   risco de cobrar a mais (o servidor recalcula no checkout), só de mostrar um preço velho.
 - CORS `*` na Edge Function: aceitável, a autenticação é por token e não por cookie.
 
+## 9.9 Segunda passagem: lógica de funcionamento e pormenores (2026-11-06)
+
+Passagem mais funda nas zonas que a 9.8 viu por cima: links de acesso, rotas públicas que
+devolvem configuração ou enviam mensagens, HTML dos emails, transições de estado das encomendas
+e textos do painel. `npm test` (560), `npm run lint`, `npm run build`, `deno check` e
+`scripts/verificar-segredos.mjs` passam.
+
+### Verificado sem problemas
+
+- **Links de acesso** (`/admin/users/access-link`, `/admin/users/create`): o `origin` vem do
+  corpo do pedido, mas o `redirectTo` fica limitado pela lista do Supabase Auth
+  (`supabase/auth/config.json`), que só tem os domínios da loja, o projecto Pages e o
+  `localhost:3000` — um gestor não consegue desviar um link de recuperação para fora.
+- **Rotas públicas de configuração**: `/integrations` filtra por lista branca
+  (`sanitizeIntegrationConfig`: código desconhecido dá `{}`, e das chaves só diz se existem);
+  `/settings` só expõe a chave pública VAPID; `/messaging/status` e `/chat/config` só booleanos.
+- **`/whatsapp/receipt`**: só para o telefone da própria encomenda, texto montado no servidor,
+  limite por IP e por encomenda.
+- **HTML dos emails**: os modelos produzem dados (`EmailDoc`) e só o `emailDocument()` gera HTML,
+  com `esc()` e `safeUrl()` — seguro por construção, com os testes do `emails.test.ts`.
+- **Push**: só vai para as subscrições do `customer_id` da encomenda; as anónimas nunca recebem.
+- **`/unsubscribe`**, **avisos de conta** (`/account/*`): token de 64 hex com a mesma resposta
+  para válido e inválido; avisos sempre para o email da sessão, com deduplicação e limites.
+- **Destino depois do login**: `safeInternalPath` recusa `//host` e `/\host`, com testes.
+- **Cancelamento automático** (`unpaidOrdersToCancel`): só encomendas pendentes, sem referência,
+  não enviadas e com pagamento antecipado.
+
+### Corrigido
+
+| # | Achado | Gravidade |
+|---|---|---|
+| 33 | Email de **reembolso** a quem nunca pagou | Média (cliente) |
+| 34 | "**Pagamento confirmado — vamos preparar a sua encomenda**" numa encomenda cancelada | Média (cliente) |
+| 35 | Respostas ao email de agradecimento sem tecto por encomenda | Baixa |
+| 36 | `successPath` deixava passar `//host` | Baixa |
+| 37 | Textos do painel a pedir SVG depois de o bucket o recusar (achado 28) | Baixa (equipa) |
+
+**33 — reembolso sem pagamento.** `/admin/orders/payment-status` aceitava qualquer transição, e
+`sendRefundEmail` envia "Devolvemos o valor da sua encomenda", com o total, em qualquer passagem
+para `refunded` — também a partir de `pending` ou `failed`. Passa a recusar o reembolso de uma
+encomenda que não está paga ("se o dinheiro chegou, marque-a primeiro como paga").
+
+**34 — pago numa encomenda cancelada.** O email de pago diz "Vamos preparar a sua encomenda", e
+uma encomenda cancelada não pode ser reaberta (o trigger `orders_before_update` não deixa). O
+caso é real: o cancelamento automático das encomendas por pagar e um pagamento que chega depois.
+O pagamento continua a gravar-se (é preciso para o reembolso), mas sem o email, e o painel
+mostra à equipa "o cliente não foi avisado do pagamento. Falta reembolsá-lo."
+
+As duas regras estão em `checkoutRules.ts` (`paymentStatusChange`), com testes. Desfazer um
+reembolso marcado por engano continua possível: o email e o WhatsApp de pago têm deduplicação.
+
+**35 — respostas ao agradecimento.** Responder outra vez é de propósito (o cliente pode mudar de
+ideias), mas cada resposta avisa cada pessoa da equipa e acrescenta um evento à linha do tempo,
+que o `/track` devolve inteira. O limite era só por IP. Passa a haver um tecto de 5 por
+encomenda e por dia (`check_rate_limit_daily`), verificado depois do token.
+
+**36 — `successPath`.** O `pathname` de `https://x.ao//evil.com` é `//evil.com`, um URL relativo
+ao protocolo. Não era explorável — o carrinho não usa o `url` da resposta e quem o envia é o
+próprio comprador —, mas a função prometia "nunca outro domínio". As barras do início colapsam
+numa só, como no `safeInternalPath`; a função passou para `checkoutRules.ts`, com testes.
+
+**37 — textos do painel.** O logótipo dizia "PNG/SVG com fundo transparente", e o fundo da loja e
+o texto por omissão do `ImageField` também ofereciam SVG — quem seguisse a indicação batia num
+erro de envio. A foto de perfil dizia só PNG/JPG. Os textos usam agora `ALLOWED_IMAGE_LABEL`.
+
+### Por decidir (dono)
+
+- `http://localhost:3000/**` na lista de redirecionamentos do Auth de produção serve o
+  desenvolvimento local. O risco é baixo — um link desviado para lá só chega ao computador da
+  própria vítima —, mas sai se ninguém desenvolver contra a base de produção.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

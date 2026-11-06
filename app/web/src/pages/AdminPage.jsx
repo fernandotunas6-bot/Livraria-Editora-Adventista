@@ -330,6 +330,10 @@ const AdminPage = () => {
           title: 'Pagamento actualizado, cliente não avisado',
           description: `${label}. ${EDGE_FUNCTION_DESACTUALIZADA}`,
         });
+      } else if (res?.notice) {
+        // Gravado, mas falta a equipa fazer alguma coisa — por exemplo, reembolsar uma
+        // encomenda cancelada cujo pagamento chegou depois (o cliente não foi avisado).
+        toast({ title: 'Pagamento actualizado — atenção', description: `${label}. ${res.notice}`, duration: 12000 });
       } else {
         toast({
           title: 'Pagamento actualizado',
