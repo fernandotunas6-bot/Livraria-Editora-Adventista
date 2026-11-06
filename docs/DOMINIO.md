@@ -17,6 +17,32 @@ Objectivo: **https://livrariaadventista.ao** (sem `www`) passa a ser o endereço
 | Firebase, Authorized domains | `.ao` e `www.ao` juntados |
 | Google OAuth e Search Console | Feitos pelo dono |
 
+### Verificação de 2026-11-06
+
+A AngoWeb já não serve o `.ao`, mas os nameservers foram trocados para **`randy` e `riya`**.
+Estes pertencem a uma **segunda zona `livrariaadventista.ao`, criada noutra conta Cloudflare**,
+vazia. A conta do projecto (`Valentinocanguele@gmail.com's Account`, a do Pages e do token)
+continua com a zona `.ao` **pending** em `cody`/`hadlee`, com os registos todos. Não se recriam os
+registos na outra conta: o Pages está nesta conta e um domínio de outra conta não activa nele
+(o apex nem chega a validar). A correcção é pôr `cody`/`hadlee` na AngoWeb e apagar a zona
+duplicada da outra conta.
+
+**Ponto da situação (2026-11-06, 04:52 UTC):**
+
+- AngoWeb: nameservers alterados pelo dono para `cody`/`hadlee` (Meus Domínios → Gerir domínio →
+  Servidores de Nome → personalizados) por volta das 04:37 UTC. Nos `.ao` o painel pode mostrar os
+  campos vazios depois de gravar; se não propagar, abrir ticket. O "Gerir DNS" da AngoWeb é outra
+  coisa (zona antiga deles, sem efeito) e não se mexe.
+- DNS.AO: publica a zona `.ao` de ~5 em 5 h (serial = hora Unix; 23:45 e 04:45 UTC). Às 04:52 o
+  `.ao` ainda delegava em `randy`/`riya` e a zona continuava **pending**.
+- Email: o dono **não usa** email `@livrariaadventista.ao` (nem Google, nem a AngoWeb `ws100`).
+  Decidido: **Cloudflare Email Routing**, `contacto@livrariaadventista.ao` →
+  `valentinocanguele@gmail.com`. Ainda **não ficou activo** nesta zona (regra inexistente; MX e SPF
+  do Google ainda lá). Fazer pelo painel, nesta conta: Email → Email Routing → regra `contacto` →
+  verificar o Gmail → "Adicionar registos e ativar", aceitando apagar o MX/SPF do Google.
+  O token do repositório não tem permissão para os endereços de destino.
+- Falta ainda: remover a zona `.ao` duplicada da outra conta (`randy`/`riya`).
+
 ## 1. Bloqueio: nameservers do `.ao` (só o dono, no painel da AngoWeb)
 
 No painel do registador do `.ao` (AngoWeb), trocar os nameservers do domínio para:
