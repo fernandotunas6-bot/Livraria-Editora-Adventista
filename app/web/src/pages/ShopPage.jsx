@@ -226,7 +226,7 @@ const ShopPage = () => {
   return (
     <>
       <Helmet>
-        <title>{pageTitle(`${heroTitle} — ${settings.site_name || 'Loja'}`)}</title>
+        <title>{pageTitle(heroTitle)}</title>
         <meta name="description" content={heroSubtitle} />
       </Helmet>
 
@@ -372,7 +372,7 @@ const ShopPage = () => {
                   </Tooltip>
                 </div>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[160px] h-11 sm:h-9"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11 sm:h-9" aria-label="Ordenar por"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SORT_OPTIONS.map((o) => (
                       <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>

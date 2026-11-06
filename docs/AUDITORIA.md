@@ -1058,6 +1058,60 @@ riscada e diz "Este tamanho esgotou. Escolha outro.".
 **46–47.** Os destaques seguem os cartões (aviso com "Ver", erro mostrado, preço em vigor).
 `variantNames` dá Tamanho, Edição ou Opção conforme o tipo.
 
+## 9.12 Análise crítica do sistema todo: segurança, lógica, visual e pormenores (2026-11-06)
+
+Passagem sobre o ramo `claude/quirky-hypatia-wnid2g` (com as Fases 1 a 3), feita num **Supabase
+local completo** (`supabase start`: Postgres com as 72 migrações, API, Auth e Storage) e com a
+**Edge Function a correr em Deno** contra ele. Isto permitiu o que as passagens anteriores não
+conseguiam: checkout real, ecrãs da equipa com sessão e os advisors do Supabase. O site de
+produção e a base de produção não foram tocados (a rede da sessão não chega lá).
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 48 | **Comunidade: endereços escritos no texto e na citação viravam links clicáveis sem validação no servidor.** A base só verificava a lista `links`; o site (`linkifySegments`) transforma qualquer `https://…` do texto em link. Uma publicação enviada pela API com o endereço só no texto passava. | Alta | ✅ migração `comunidade_links_seguros` |
+| 49 | **Links maliciosos e pornográficos** (pedido do dono): regras fixas na gravação (IP, porta, `xn--`, domínios de topo de adultos, palavras no nome do site, programas), lista `community_blocked_domains` gerida no painel e reputação pelo filtro de família do Cloudflare (`pg_net` + agendador). | Alta | ✅ (filtro do Cloudflare por confirmar em produção) |
+| 50 | Advisors: 9 regras RLS da comunidade avaliavam `auth.uid()` linha a linha (`auth_rls_initplan`). | Baixa (desempenho) | ✅ |
+| 51 | Advisors: `community_posts_public` e `downloads_public` são vistas `SECURITY DEFINER` (nível ERROR). | — | ⚠️ intencional: é o que deixa os visitantes lerem sem ver `user_id` nem o caminho do PDF; trocar por `security_invoker` obriga a permissões por coluna e funções para o autor, e não fecha falha nenhuma |
+| 52 | "**Tenho um problema**" (resposta ao email de agradecimento) gravava `customer_confirmed_at`, que conta como compra feita (compra verificada, PDFs pagos). | Baixa | ✅ `index.ts` (falta publicar a Edge Function) |
+| 53 | **Página de sucesso:** nos botões do recibo, o ícone e a descrição saíam do botão. O `h-auto` não vencia o `sm:h-9` do tamanho por omissão do `Button`. | Média (visual) | ✅ |
+| 54 | Cerca de 30 títulos `h2/h3/h4` sem tamanho herdavam `text-2xl`–`text-5xl` dos estilos base: no Contacto, "Email/Telefone/Morada" ficavam maiores do que o título da secção; "Acompanhe esta encomenda" ocupava meio ecrã. | Baixa (visual) | ✅ nas páginas de cliente; os do painel ficam |
+| 55 | Título da loja: "Todos os Livros — Livraria Adventista — Livraria Adventista". | Baixa (SEO) | ✅ |
+| 56 | Topo com banner (loja, lojas, contacto, rastreio): no telemóvel o texto ficava por baixo do logótipo da barra fina. | Média (visual) | ✅ |
+| 57 | Acessibilidade (axe-core, WCAG A/AA): pesquisa do cabeçalho fechada mas focável (em todas as páginas); botões −/+ da quantidade sem nome; seletores e preço dos filtros sem rótulo; ordenação sem nome; `aria-label` em `div` sem papel; contraste da nota do rodapé. | Média | ✅ 0 violações nas páginas verificadas |
+| 58 | Carrinho: "2 items" → "2 itens". | Trivial | ✅ |
+| 59 | Painel de filtros montado duas vezes (barra lateral e telemóvel) com os mesmos `id`. | Baixa | ✅ `useId` |
+| 60 | Painel → Comunidade: a lista de sites bloqueados esticava a página ~5000px (textos `sr-only` absolutos fora da lista com scroll). Introduzido e corrigido nesta passagem. | Baixa | ✅ |
+| 61 | `sales_count` e `views_count` de cada produto legíveis por qualquer visitante (vendas por livro). | Baixa (negócio) | ⏳ dono |
+| 62 | As avaliações expõem o `user_id` de quem escreve (a comunidade esconde-o). | Baixa (privacidade) | ⏳ |
+| 63 | `start_download` sem limite: o contador de downloads pode ser inflacionado. | Baixa | ⏳ |
+| 64 | Painel de vendas: a "senha de administrador" é um cadeado de interface (o hash PBKDF2 fica legível a quem tem `manage_orders`); a escrita está protegida pelo RLS (só admin). | Informativo | — |
+| 65 | Textos: "senha" no painel de vendas e "palavra-passe" no resto; "checkout" em mensagens ao cliente. | Trivial | ⏳ |
+
+### Verificado sem problemas
+
+- **RLS:** todas as tabelas de `public` têm RLS; nenhuma regra de escrita aberta (`true`) nem para
+  anónimos. Das funções que um cliente pode chamar pela API, as 24 foram lidas: todas verificam a
+  permissão por dentro (`assert_can_manage_user`, `has_permission`, dono da linha). O `place_order`
+  não está exposto: só a Edge Function o chama.
+- **Storage:** `media` só tem imagens públicas (capas, slides, logótipo, avatares); `downloads` é
+  privado e só passa links temporários a quem `can_download` deixa.
+- **Checkout real**, ponta a ponta no browser (local): visitante sem conta, 2 livros, levantamento
+  e "Pagar no balcão" → encomenda `ENC-…` com total e portes calculados no servidor, stock 40 → 38,
+  código `CLI-` atribuído, página de sucesso com o número.
+- **16 páginas × computador e telemóvel:** 0 erros na consola, 0 pedidos falhados, sem scroll
+  horizontal, um `h1` por página, títulos certos.
+- **14 separadores do painel** abertos com sessão de admin, sem erros.
+- `deno check` da Edge Function, `npm test` (631), lint, build e o scanner de segredos.
+
+### Não verificado
+
+- Produção (site e base): a rede desta sessão não chega a `livrariaadventista.com` nem ao projecto.
+- A resposta real do filtro do Cloudflare (bloqueado na rede da sessão; testado com respostas simuladas).
+- Entrega ao domicílio (as tabelas de províncias e municípios estão vazias na base local),
+  transferência com referência, emails e WhatsApp reais.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

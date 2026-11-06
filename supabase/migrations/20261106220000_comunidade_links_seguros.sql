@@ -508,6 +508,44 @@ create policy "community_blocked_domains: moderação tira" on public.community_
 revoke all on public.community_blocked_domains from anon, authenticated;
 grant select, insert, delete on public.community_blocked_domains to authenticated;
 
+-- ── Regras RLS da comunidade, com auth.uid() avaliado uma vez ──────────────
+-- As da migração `comunidade` chamavam auth.uid() linha a linha (aviso auth_rls_initplan dos
+-- advisors do Supabase). As mesmas regras, com (select auth.uid()).
+
+drop policy if exists "community_posts: autor e equipa lêem" on public.community_posts;
+create policy "community_posts: autor e equipa lêem" on public.community_posts
+  for select to authenticated using (user_id = (select auth.uid()) or (select private.is_staff()));
+drop policy if exists "community_posts: o próprio publica" on public.community_posts;
+create policy "community_posts: o próprio publica" on public.community_posts
+  for insert to authenticated with check (user_id = (select auth.uid()));
+drop policy if exists "community_posts: o próprio ou a equipa edita" on public.community_posts;
+create policy "community_posts: o próprio ou a equipa edita" on public.community_posts
+  for update to authenticated using (user_id = (select auth.uid()) or (select private.is_staff()))
+  with check (user_id = (select auth.uid()) or (select private.is_staff()));
+drop policy if exists "community_posts: o próprio ou a equipa apaga" on public.community_posts;
+create policy "community_posts: o próprio ou a equipa apaga" on public.community_posts
+  for delete to authenticated using (user_id = (select auth.uid()) or (select private.is_staff()));
+
+drop policy if exists "community_likes: os próprios" on public.community_likes;
+create policy "community_likes: os próprios" on public.community_likes
+  for select to authenticated using (user_id = (select auth.uid()));
+drop policy if exists "community_likes: o próprio gosta" on public.community_likes;
+create policy "community_likes: o próprio gosta" on public.community_likes
+  for insert to authenticated with check (user_id = (select auth.uid()));
+drop policy if exists "community_likes: o próprio tira" on public.community_likes;
+create policy "community_likes: o próprio tira" on public.community_likes
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+drop policy if exists "community_reports: o próprio e a equipa lêem" on public.community_reports;
+create policy "community_reports: o próprio e a equipa lêem" on public.community_reports
+  for select to authenticated using (user_id = (select auth.uid()) or (select private.is_staff()));
+drop policy if exists "community_reports: o próprio denuncia" on public.community_reports;
+create policy "community_reports: o próprio denuncia" on public.community_reports
+  for insert to authenticated with check (user_id = (select auth.uid()));
+drop policy if exists "community_reports: a equipa limpa" on public.community_reports;
+create policy "community_reports: a equipa limpa" on public.community_reports
+  for delete to authenticated using ((select private.is_staff()));
+
 -- ── Lista de origem ─────────────────────────────────────────────────────────
 -- Os sites que as palavras da camada 1 não apanham. A equipa junta mais no painel.
 

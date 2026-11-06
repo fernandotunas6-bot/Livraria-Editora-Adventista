@@ -423,11 +423,11 @@ function ProductDetailPage() {
 
             <div className="flex items-center gap-4 mb-8">
               <div className="flex items-center border border-border rounded-lg">
-                <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted">
+                <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted" aria-label="Diminuir quantidade">
                   <Minus size={18} />
                 </Button>
                 <span className="w-12 text-center font-semibold text-foreground">{quantity}</span>
-                <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="rounded-r-lg hover:bg-muted">
+                <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="rounded-r-lg hover:bg-muted" aria-label="Aumentar quantidade">
                   <Plus size={18} />
                 </Button>
               </div>

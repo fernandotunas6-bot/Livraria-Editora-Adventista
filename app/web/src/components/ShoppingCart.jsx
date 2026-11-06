@@ -420,7 +420,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     {step === 'cart' ? 'Carrinho' : 'Finalizar Compra'}
                   </h2>
                   {itemCount > 0 && (
-                    <p className="text-xs text-muted-foreground">{itemCount} item{itemCount !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-muted-foreground">{itemCount} {itemCount === 1 ? 'item' : 'itens'}</p>
                   )}
                 </div>
               </div>

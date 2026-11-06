@@ -161,7 +161,7 @@ const Footer = () => {
 
           {columns.map((col) => (
             <div key={col.title} className="lg:col-span-2">
-              <h4 className="font-semibold mb-4 text-background">{col.title}</h4>
+              <h4 className="text-lg font-semibold mb-4 text-background">{col.title}</h4>
               <ul className="space-y-1">
                 {(col.links || []).map((link) => (
                   <li key={link.label}><FooterLink link={link} /></li>
@@ -223,7 +223,7 @@ const Footer = () => {
                       </Button>
                     </form>
 
-                    <p className="text-[10px] text-background/40 text-center">
+                    <p className="text-[11px] text-background/75 text-center">
                       🔒 Respeitamos a sua privacidade. Cancele com um clique.
                     </p>
                   </motion.div>
@@ -261,7 +261,7 @@ const Footer = () => {
             lojas e dos métodos de pagamento activos. */}
         <div className="grid gap-8 lg:grid-cols-12 mb-12 border-t border-background/20 pt-10">
           <div className="lg:col-span-5">
-            <h4 className="font-semibold mb-2 text-background flex items-center gap-2">
+            <h4 className="text-lg font-semibold mb-2 text-background flex items-center gap-2">
               <PackageSearch className="h-4 w-4 text-[#22d3ee]" aria-hidden="true" />
               Rastrear a sua encomenda
             </h4>
@@ -291,7 +291,7 @@ const Footer = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <h4 className="font-semibold mb-4 text-background">Como compra e recebe</h4>
+            <h4 className="text-lg font-semibold mb-4 text-background">Como compra e recebe</h4>
             <ul className="space-y-3 text-sm text-background/70">
               <li className="flex gap-3">
                 <Truck className="h-4 w-4 mt-0.5 text-[#22d3ee] shrink-0" aria-hidden="true" />
@@ -328,7 +328,7 @@ const Footer = () => {
 
           {payments.length > 0 && (
             <div className="lg:col-span-3">
-              <h4 className="font-semibold mb-4 text-background flex items-center gap-2">
+              <h4 className="text-lg font-semibold mb-4 text-background flex items-center gap-2">
                 <CreditCard className="h-4 w-4 text-[#22d3ee]" aria-hidden="true" />
                 Pagamentos aceites
               </h4>

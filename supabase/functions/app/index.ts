@@ -1575,8 +1575,10 @@ route("POST", "/order-feedback", async ({ body, ip }) => {
   const event = outcome === "ok"
     ? timelineEvent("customer_confirmed", "Cliente confirmou a recepção", "Recebeu tudo bem.", "")
     : timelineEvent("customer_problem", "Cliente reportou um problema", message, "");
+  // Só "Recebi tudo bem" é confirmação: customer_confirmed_at conta como compra feita (compra
+  // verificada, PDFs pagos). "Tenho um problema" (por exemplo, "não recebi") limpa-a.
   const { error } = await db.from("orders").update({
-    customer_confirmed_at: at,
+    customer_confirmed_at: outcome === "ok" ? at : null,
     customer_feedback: { outcome, message: outcome === "problem" ? message : "", at },
     delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), event],
   }).eq("id", id);

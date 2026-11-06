@@ -111,7 +111,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-4 border-b shrink-0">
-              <h3 className="font-bold">Detalhes do Livro</h3>
+              <h3 className="text-lg font-bold">Detalhes do Livro</h3>
               <div className="flex items-center gap-2">
                 {descriptionText && product && (
                   <Button size="sm" variant="outline" onClick={() => setReadingMode(true)} className="hidden sm:flex">

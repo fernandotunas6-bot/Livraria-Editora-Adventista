@@ -212,7 +212,7 @@ const SuccessPage = () => {
                 <div className="grid sm:grid-cols-2 gap-3">
                   <Button
                     variant={receiptChoice === 'whatsapp' ? 'default' : 'outline'}
-                    className={`py-6 h-auto flex-col gap-2 ${receiptChoice === 'whatsapp' ? 'btn-primary' : 'border-green-500/40 text-green-700 hover:bg-green-50'}`}
+                    className={`py-6 h-auto sm:h-auto whitespace-normal flex-col gap-2 ${receiptChoice === 'whatsapp' ? 'btn-primary' : 'border-green-500/40 text-green-700 hover:bg-green-50'}`}
                     onClick={handleReceiptWhatsApp}
                   >
                     <MessageCircle className="h-6 w-6" />
@@ -221,7 +221,7 @@ const SuccessPage = () => {
                   </Button>
                   <Button
                     variant={receiptChoice === 'download' ? 'default' : 'outline'}
-                    className={`py-6 h-auto flex-col gap-2 ${receiptChoice === 'download' ? 'btn-primary' : ''}`}
+                    className={`py-6 h-auto sm:h-auto whitespace-normal flex-col gap-2 ${receiptChoice === 'download' ? 'btn-primary' : ''}`}
                     onClick={handleReceiptDownload}
                   >
                     <Download className="h-6 w-6" />
@@ -245,7 +245,7 @@ const SuccessPage = () => {
             {ready && !isAuthed && hasOrder && !isWhatsApp && (
               <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-6 text-left flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1">
-                  <h2 className="font-semibold mb-1">Acompanhe esta encomenda na sua conta</h2>
+                  <h2 className="text-lg font-semibold mb-1">Acompanhe esta encomenda na sua conta</h2>
                   <p className="text-sm text-muted-foreground">
                     Crie conta com {orderData?.email ? <strong>{orderData.email}</strong> : 'o email da compra'} e veja o estado da entrega
                     sempre que quiser. Demora segundos.

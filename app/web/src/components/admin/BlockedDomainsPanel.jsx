@@ -109,7 +109,9 @@ export default function BlockedDomainsPanel() {
       {loading ? (
         <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
-        <ul className="max-h-72 divide-y overflow-y-auto rounded-lg border">
+        // relative: os textos sr-only (posição absoluta) dos botões ficam dentro da lista com scroll;
+        // sem isto escapavam dela e esticavam a página em milhares de píxeis.
+        <ul className="relative max-h-72 divide-y overflow-y-auto rounded-lg border">
           {shown.slice(0, 200).map((d) => (
             <li key={d.domain} className="flex items-center gap-2 px-3 py-2 text-sm">
               <span className="min-w-0 flex-1 truncate font-mono">{d.domain}</span>

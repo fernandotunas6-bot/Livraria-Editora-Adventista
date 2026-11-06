@@ -342,7 +342,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
           onSubmit={handleSearch}
           role="search"
           aria-label="Pesquisa de livros"
-          aria-hidden={!searchOpen}
+          // Fechada, sai do caminho do teclado e dos leitores de ecrã (antes só aria-hidden,
+          // e o campo continuava a receber o foco sem se ver).
+          {...(searchOpen ? {} : { inert: '' })}
           className={`relative grid transition-[grid-template-rows,opacity] duration-base ${
             searchOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
           }`}

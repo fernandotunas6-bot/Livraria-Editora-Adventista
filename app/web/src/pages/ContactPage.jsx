@@ -165,7 +165,7 @@ const ContactPage = () => {
                         <Mail className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-medium mb-1 text-foreground">Email</h3>
+                        <h3 className="text-base font-semibold mb-1 text-foreground">Email</h3>
                         <p className="text-muted-foreground">{contactEmail}</p>
                       </div>
                     </div>
@@ -177,7 +177,7 @@ const ContactPage = () => {
                         <Phone className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-medium mb-1 text-foreground">Telefone</h3>
+                        <h3 className="text-base font-semibold mb-1 text-foreground">Telefone</h3>
                         <p className="text-muted-foreground">{displayAngolaPhone(contactPhone)}</p>
                       </div>
                     </div>
@@ -188,7 +188,7 @@ const ContactPage = () => {
                       <MapPin className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-medium mb-1 text-foreground">Morada</h3>
+                      <h3 className="text-base font-semibold mb-1 text-foreground">Morada</h3>
                       <p className="text-muted-foreground">{contactAddress}</p>
                     </div>
                   </div>
@@ -196,7 +196,7 @@ const ContactPage = () => {
               </div>
 
               <div className="bg-muted/30 rounded-xl p-6">
-                <h3 className="font-semibold mb-3 text-foreground">Horário de Atendimento</h3>
+                <h3 className="text-lg font-semibold mb-3 text-foreground">Horário de Atendimento</h3>
                 <p className="text-muted-foreground text-sm mb-2">Segunda a Sexta: 8h – 17h</p>
                 <p className="text-muted-foreground text-sm mb-2">Sábado: 8h – 12h</p>
                 <p className="text-muted-foreground text-sm">Domingo: Encerrado</p>
