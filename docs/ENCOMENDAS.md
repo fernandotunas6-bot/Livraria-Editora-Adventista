@@ -28,6 +28,24 @@ A lista existe em dois sítios que têm de andar juntos: `app/web/src/lib/produc
 
 **Painel → Produtos:** separadores por tipo com contagem, "Adicionar" por tipo, etiqueta do tipo e número de tamanhos em cada linha, "Mudar tipo" nas acções em massa. Na loja, filtro "Tipo de produto" (`/shop?tipo=uniforme`).
 
+### 1.1 Códigos de cliente e de funcionário
+
+Três identificadores, todos fixos depois de atribuídos:
+
+| Código | Quem recebe | Onde fica | Formato |
+|---|---|---|---|
+| `LIV-`, `UNI-`, … (produto) | cada produto | `stock_books.book_code` | 3 dígitos, prefixo do tipo |
+| `CLI-` (cliente) | cada conta de cliente; cada pessoa que comprou só com email | `profiles.customer_code`, ou `private.guest_customer_codes` (sem conta) | 6 dígitos, ex.: `CLI-000001` |
+| `FUN-` (funcionário) | cada administrador e gestor | `profiles.staff_code` | 3 dígitos, ex.: `FUN-001` |
+
+- **Mesma pessoa, mesmo código.** Quem comprou sem conta e depois cria conta fica com o `CLI-` que já tinha: o trigger `profiles_codigos_pessoa` vai buscar o código ao mapeamento do email.
+- **Equipa que também compra.** Um administrador com encomendas não tem `CLI-` no perfil; a listagem e as encomendas usam o código do email. Se deixar de ser equipa e passar a cliente, mantém esse código.
+- **Encomendas.** `orders.customer_code` é preenchido pelo trigger `orders_codigo_cliente` a partir do email (na criação e quando o email muda). A encomenda, portanto, fica ligada ao cliente mesmo sem conta.
+- **Contadores.** Partilham `private.product_code_counters` com os de produto (`CLI-`, `FUN-`); a atribuição é `private.codigo_seguinte`.
+- **Pesquisa.** Em `/admin/users` a pesquisa aceita o código em qualquer grafia (`cli1`, `CLI-000001`, ` fun 3 `), via `public.normalize_person_code`. A listagem `admin_users_list` devolve `customer_code` e `staff_code`.
+- **Privacidade.** Os clientes só vêem o próprio perfil (RLS de `profiles`); os códigos de outros clientes não são acessíveis pela API. `private.guest_customer_codes` tem RLS activo e sem políticas: só o service role e as funções da base de dados leem.
+- **Migrações:** `20261106033302_codigos_cliente_funcionario` (esquema, triggers, pesquisa e dados existentes) e `20261106033425_codigo_cliente_tambem_na_equipa` (listagem).
+
 ## 2. Passos e avisos ao cliente
 
 `notifyOrderStep` (Edge Function) é o ponto único para cada passo: pagamento confirmado e cada estado da entrega (confirmada, a preparar, expedida/pronta para levantar, em trânsito, saiu para entrega, entregue, cancelada).

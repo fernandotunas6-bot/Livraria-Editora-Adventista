@@ -2,6 +2,15 @@
 
 Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Códigos de cliente e de funcionário (2026-11-06)
+
+- **Feito e aplicado** no Supabase (`bggqkjjqbjhbjsckzopj`): `20261106033302_codigos_cliente_funcionario` e `20261106033425_codigo_cliente_tambem_na_equipa`, com o mesmo SQL dos ficheiros em `supabase/migrations/`.
+- **Estado dos dados depois da migração:** 3 administradores com `FUN-001`…`FUN-003`; 1 cliente sem conta (`CLI-000001`, com 4 encomendas); todas as encomendas com `customer_code`. Nenhum cliente com conta ainda, por isso o `CLI-` de conta foi testado só em transacção revertida.
+- **Teste de ponta a ponta** (transacção revertida): compra sem conta → `CLI-000002`; ao criar conta, o mesmo código; ao passar a gestor, mantém `CLI-` e recebe `FUN-004`; a pesquisa encontra a conta pelo código.
+- **Produtos:** revistos, sem alterações. Os 9 tipos têm prefixo e contador, e `normalize_product_code` (SQL) e `normalizeProductCode` (JS) usam a mesma expressão.
+- **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
+- **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
+
 ## Onde está o trabalho
 
 - **Repositório:** [fernandotunas6-bot/Livraria-Editora-Adventista](https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista) (privado). O projecto foi migrado a 2026-11-03 de `ValentinoCanguele/livraria_Cunhinga`, com todo o histórico e os ramos. Ver [docs/MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md) para o que ficou por configurar do lado do GitHub.
