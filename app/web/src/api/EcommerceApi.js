@@ -1,6 +1,6 @@
 import pb from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
-import { effectivePrice, isSaleActive } from '@/lib/pricing';
+import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode } from '@/lib/productTypes';
@@ -221,14 +221,18 @@ export async function getProduct(id) {
   const extraVersions = Array.isArray(book.versions) ? book.versions : [];
   if (extraVersions.length > 0) {
     product.variants = extraVersions.map((v, i) => {
-      const priceInCents = Math.round((Number(v.price ?? book.price) || 0) * 100);
+      // O promocional da variante só conta se for menor que o preço dela e dentro da janela
+      // de datas do produto — a mesma regra que o `place_order` cobra (ver lib/pricing.js).
+      const { price, sale } = variantPrices(book, v);
+      const priceInCents = Math.round(price * 100);
+      const saleInCents = sale != null ? Math.round(sale * 100) : null;
       return {
         id: `${book.id}-v${i}`,
         title: v.label || v.title || `Edição ${i + 1}`,
         price_in_cents: priceInCents,
-        sale_price_in_cents: v.sale_price ? Math.round(Number(v.sale_price) * 100) : null,
+        sale_price_in_cents: saleInCents,
         price_formatted: formatCurrency(priceInCents),
-        sale_price_formatted: v.sale_price ? formatCurrency(Math.round(Number(v.sale_price) * 100)) : null,
+        sale_price_formatted: saleInCents != null ? formatCurrency(saleInCents) : null,
         currency_info: CURRENCY,
         inventory_quantity: Number(v.stock ?? book.stock) || 0,
         manage_inventory: true,

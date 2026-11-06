@@ -63,3 +63,57 @@ export function unpaidOrdersToCancel<T extends OrderLike>(orders: T[], upfrontCo
       && Number.isFinite(created) && created < limit;
   });
 }
+
+/**
+ * Caminho para onde o site volta depois do checkout. Só o caminho, nunca outro domínio: o
+ * valor vem do browser e volta no `url` da resposta.
+ *
+ * O `pathname` de um URL pode começar por `//` — `https://x.ao//evil.com` dá `//evil.com` —, e
+ * um caminho assim é um URL relativo ao protocolo, que o browser abre noutro domínio. As barras
+ * do início colapsam numa só, como o `safeInternalPath` faz no site (`lib/authSession.js`).
+ */
+export function successPath(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "/success";
+  try {
+    const u = new URL(value.trim(), "https://loja.invalid");
+    const path = (u.pathname + u.search).replace(/^[/\\]+/, "/");
+    return path.slice(0, 200) || "/success";
+  } catch {
+    return "/success";
+  }
+}
+
+/** Aviso que acompanha uma mudança de estado do pagamento. */
+export type PaymentNotice = "paid" | "refunded" | null;
+
+/**
+ * Decide uma mudança de estado do pagamento feita no painel, e que aviso o cliente recebe.
+ *
+ * - **Reembolso só de uma encomenda paga.** O email de reembolso diz "Devolvemos o valor da
+ *   sua encomenda", com o total: numa encomenda pendente ou falhada dizia a quem nunca pagou que
+ *   lhe tinham devolvido dinheiro. Se o dinheiro chegou, marca-se primeiro como paga.
+ * - **Pago numa encomenda cancelada grava-se, mas sem o "Pagamento confirmado".** Esse email diz
+ *   "Vamos preparar a sua encomenda", e uma encomenda cancelada já não pode ser reaberta (o
+ *   trigger `orders_before_update` não deixa). Acontece de facto: o cancelamento automático das
+ *   encomendas por pagar (`unpaidOrdersToCancel`) e um pagamento que chega depois. O pagamento
+ *   tem de ficar registado, para o reembolso; a equipa recebe a nota de que falta reembolsar.
+ */
+export function paymentStatusChange(
+  order: { payment_status?: string | null; status?: string | null },
+  next: string,
+): { error: string } | { notify: PaymentNotice; note: string } {
+  const before = String(order?.payment_status || "pending");
+  if (next === before) return { notify: null, note: "" };
+  if (next === "refunded" && before !== "paid") {
+    return { error: "Só se reembolsa uma encomenda paga. Se o dinheiro chegou, marque-a primeiro como paga." };
+  }
+  if (next === "paid" && order?.status === "cancelled") {
+    return {
+      notify: null,
+      note: "A encomenda está cancelada: o cliente não foi avisado do pagamento. Falta reembolsá-lo.",
+    };
+  }
+  if (next === "paid") return { notify: "paid", note: "" };
+  if (next === "refunded") return { notify: "refunded", note: "" };
+  return { notify: null, note: "" };
+}

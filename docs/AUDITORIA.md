@@ -803,6 +803,228 @@ O Storage teve 3 175 pedidos de capas, nenhum 4xx.
 - `scripts/configurar-auth.sh --google <json>`: confirma a chave na Google, pede confirmação e
   põe-na no Supabase. A chave nunca aparece no ecrã nem nos argumentos.
 
+## 9.8 Revisão crítica de rotas, segurança e lógica (2026-11-06)
+
+Passagem pedida sobre o sistema todo: encaminhamento, autorização e regras de negócio.
+Cada ponto foi verificado no código, não de memória. `npm test` (551 testes), `npm run lint`,
+`npm run build` e `scripts/verificar-segredos.mjs` passam.
+
+### Verificado sem problemas
+
+- **As 69 rotas da Edge Function têm guarda.** Mapeadas uma a uma: `/admin/*` com
+  `requirePermission` na chave certa, `/contacts/*` com `requireCrm`, `/cron/*` com token em
+  comparação de tempo constante (`secretsMatch`) e 404 quando o token não está configurado.
+  As de gestão de contas passam por `loadTarget` + `assertCanManage`, e o `loadTarget` verifica
+  a permissão **antes** de ir à base (o achado 15 continua fechado).
+- **MFA a valer nos dois lados.** `mfaPending()` na função e `private.mfa_satisfied()` dentro de
+  `is_admin`, `is_staff` **e** `has_permission`. Uma sessão `aal1` de uma conta com factor
+  verificado vale como cliente, pela REST API ou pela função.
+- **Escalada por `profiles` fechada** pelo trigger `profiles_protect_privileges`: quem não é
+  admin não muda `role`, `permissions` nem `email`, e um INSERT nasce sempre `member`.
+- **`place_order` não aceita preços do cliente.** O carrinho envia `book_id`, `quantity` e
+  `variant`; o preço vem de `effective_price`. Usa `for update`, relê o stock em cada iteração
+  (o mesmo livro duas vezes no carrinho não passa) e a idempotência trata o `23505` devolvendo
+  a encomenda original.
+- **As 77 funções `security definer` têm `set search_path = ''`.** Conferidas todas.
+- **Rotas públicas de encomendas** identificam por nº + email/telefone e dão **o mesmo erro**
+  para encomenda inexistente e contacto errado (não dizem que números existem). O
+  `receipt_token` está revogado a `anon, authenticated` ao nível da coluna.
+- **Isolamento por RLS** em encomendas, perfis, listas de desejos, avaliações e inbox seguro.
+- **XSS**: todos os `dangerouslySetInnerHTML` passam pelo `sanitizeHtml` (DOMPurify com lista
+  branca). A excepção, `ui/chart.jsx`, gera CSS a partir de configuração do próprio código.
+- **CSP real e sem `unsafe-inline` em scripts**; `frame-ancestors`, HSTS e `Permissions-Policy`
+  presentes. Firestore fechado a leitura e escrita.
+- **CI** corre em `pull_request` (não `pull_request_target`), com permissões mínimas, scanner de
+  segredos e `npm audit`. O painel de vendas antigo é importado como módulo dentro do separador
+  com guarda, não servido como página.
+- Portes e promoções do produto: `lib/shipping.js` e `lib/pricing.js` espelham as contas do
+  `place_order`.
+
+### Corrigido nesta passagem
+
+| # | Achado | Gravidade | Onde |
+|---|---|---|---|
+| 28 | Bucket público `media` aceitava SVG, e qualquer cliente registado podia enviar | Média | migração `svg_fora_do_bucket_publico`, `lib/imageTypes.js` |
+| 29 | Promoções das variantes sem janela de datas e sem exigir desconto | Baixa/Média | migração `promocoes_das_variantes`, `lib/pricing.js` |
+| 30 | `private.has_permission` aceitava a string `"true"`; `can()` não | Baixa | migração `permissoes_so_booleanos` |
+| 31 | `folder_id` interpolado na consulta ao Google Drive sem validação | Baixa | `index.ts` (`DRIVE_FOLDER_ID`) |
+| 32 | `_headers` dizia "Em falta: Content-Security-Policy" debaixo do CSP já definido | Trivial | `app/web/public/_headers` |
+
+**28 — SVG num bucket público.** O `allowed_mime_types` do `media` incluía `image/svg+xml`, o
+`private.can_write_media` deixa qualquer conta escrever em `users/<o-seu-id>/` (é por onde passa
+a foto de perfil) e o site só validava o **tamanho** da foto — o `accept` de um
+`<input type="file">` é uma sugestão da janela de ficheiros, não um controlo. Um cliente comum
+conseguia pôr um SVG com `<script>` em
+`<projecto>.supabase.co/storage/v1/object/public/media/users/<id>/x.svg`, servido como
+`image/svg+xml`, que o browser executa quando o endereço é aberto directamente (num `<img>` não
+executa). Não alcança a origem da loja, onde vive a sessão, mas é execução de código na origem
+`*.supabase.co` — a mesma de `/auth/v1/*` — e phishing num domínio do próprio projecto, a partir
+de uma conta sem permissões. Era também incoerente com as duas decisões já tomadas sobre SVG: o
+`sanitizeHtml` põe `svg` em `FORBID_TAGS` e as assinaturas só aceitam PNG (`isPngSignature`).
+O bucket passa a recusar SVG (é o controlo que manda) e o site valida o tipo em
+`lib/imageTypes.js`, com testes. Ficheiros já enviados não são tocados: `allowed_mime_types` é
+verificado no envio. Para substituir um logótipo SVG, usar PNG ou WebP.
+
+**29 — promoções das variantes.** `effective_price` exige que o promocional seja menor que o
+preço de tabela **e** que a janela `sale_starts_at`/`sale_ends_at` esteja aberta. O caminho das
+variantes não exigia nenhuma das duas, nos dois lados: uma promoção agendada para a semana
+seguinte já descontava, e um `sale_price` acima do preço da variante era cobrado como se fosse
+desconto (com o preço verdadeiro riscado por baixo). O site e o servidor concordavam entre si,
+por isso não havia diferença entre o preço mostrado e o cobrado — a regra de negócio é que
+estava inconsistente. A regra passou a ser a mesma nos dois (`variantPrices`, com testes).
+Ao escrever a migração apareceu um segundo problema no mesmo bloco: as variáveis do plpgsql
+sobrevivem ao ciclo, e o preço de tabela da variante de um item ia para o `list_price` do item
+seguinte. Passam a ser reiniciadas em cada volta, e o `list_price` é o da variante da linha (é o
+valor que o recibo e o painel riscam).
+
+**30 — `has_permission`.** Estava `permissions ->> chave = 'true'`, e o `->>` devolve o texto
+`'true'` tanto para o booleano `true` como para a string `"true"`: `{"manage_users": "true"}`
+dava a permissão. O `can()` da função sempre foi estrito (`=== true`, com teste), portanto o
+desacordo estava no lado que manda de facto, o RLS, e abria em vez de fechar. Não era
+explorável — só admin e o service role escrevem `permissions`, e `cleanPermissions` força
+booleanos — mas as duas declaram ser cópia fiel uma da outra. Passa a `permissions -> chave =
+'true'::jsonb`.
+
+**31 — `folder_id` do Drive.** O id ia dentro de apóstrofes na consulta (`'<id>' in parents`) e
+vinha da query string. Uma apóstrofe fechava a string e acrescentava condições — com sessão de
+equipa, mas a listar pastas que a chave alcança e que não foram pedidas. Valida-se o conjunto de
+caracteres (o comprimento é largo de propósito, para aceitar os aliases curtos do Drive).
+
+Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes_e_svg.sql`.
+
+### Publicação e verificação (mesmo dia)
+
+- Integrado no `main` (PR #14, `463f177`). O deploy aplicou as três migrações em produção — o
+  `supabase db push` listou e aplicou `20261106120000`, `20261106121000` e `20261106122000` —,
+  publicou a Edge Function `app` e o site no Cloudflare Pages (que tinha falhado nos dois merges
+  anteriores e desta vez passou).
+- **A primeira versão do `permissoes_e_svg.sql` dava falsos negativos.** Definia a sessão
+  (`request.jwt.claims`) antes das actualizações de preparação, e os dois triggers de `profiles`
+  (`profiles_codigos_pessoa`, `profiles_protect_privileges`) repõem o papel e as permissões quando
+  `auth.uid()` não é nulo e a pessoa da sessão não é admin. Mal o utilizador do teste passava a
+  gestor, as actualizações seguintes eram revertidas em silêncio: com a migração correcta, A2 e A4
+  saíam como falhas. Corrigido — cada caso prepara sem sessão, confirma que a preparação ficou
+  gravada (senão pára com "PREPARAÇÃO FALHOU") e só depois verifica com sessão.
+- Verificado num Postgres 16 local, com as funções e os triggers extraídos tal e qual das
+  migrações: o script antigo contra a base nova dá A2 e A4 falsos; o novo contra a base nova passa
+  em tudo; o novo contra a base antiga apanha os dois bugs (A1 e B); um trigger que reverte o papel
+  faz disparar a guarda. Em todos, perfis e contadores iguais antes e depois.
+- O `place_order` foi verificado no mesmo Postgres, com o texto exacto da migração, contra a versão
+  anterior e contra a nova sem o reinício das variáveis por item. A anterior cobrava 3000 Kz por
+  uma variante de 2500 com `sale_price` 3000 e antecipava a promoção agendada; a nova cobra 2500 nos
+  dois casos; sem o reinício, o 2.º item de um carrinho herdava o `list_price` da variante do 1.º
+  (um desconto falso no recibo — o valor cobrado não mudava). Não há teste deste para correr em
+  produção, de propósito: inserir livros de teste dispara `nextval('private.book_code_seq')`, que o
+  rollback não desfaz, e deixava um buraco permanente nos códigos dos livros.
+- O `permissoes_e_svg.sql` não deixa rasto em produção: os únicos triggers de `profiles` são os dois
+  acima, ambos `before` e só sobre a própria linha, e o contador de códigos é uma tabela (desfeita
+  pelo rollback). O teste escolhe um admin que já tem `staff_code`, para nem lhe tocar.
+- **Por correr em produção:** o `permissoes_e_svg.sql`. O conector do Supabase da sessão estava
+  ligado a outra conta (via os projectos "Sga" e um inactivo, não o `bggqkjjqbjhbjsckzopj`).
+
+### Observações de desenho (não são falhas, decisão do dono)
+
+- O separador **"Vendas por loja"** é visível a qualquer gestor com uma permissão qualquer
+  (`canAccessAdmin` na UI, `is_staff()` no RLS — coerentes entre si). Um gestor só com
+  `manage_catalog` vê a facturação.
+- Um gestor com `manage_users` pode mudar o email de um cliente e pedir um link de acesso — na
+  prática, assumir a conta. O código já mitiga (o link só volta a um admin e só quando o email
+  falhou) e é inerente à permissão, mas vale a pena ficar escrito.
+- O carrinho só actualiza o preço das variantes `-default` quando revalida
+  (`useCart.jsx`): uma variante com nome guarda o preço de quando foi posta no carrinho. Não há
+  risco de cobrar a mais (o servidor recalcula no checkout), só de mostrar um preço velho.
+- CORS `*` na Edge Function: aceitável, a autenticação é por token e não por cookie.
+
+## 9.9 Segunda passagem: lógica de funcionamento e pormenores (2026-11-06)
+
+Passagem mais funda nas zonas que a 9.8 viu por cima: links de acesso, rotas públicas que
+devolvem configuração ou enviam mensagens, HTML dos emails, transições de estado das encomendas
+e textos do painel. `npm test` (560), `npm run lint`, `npm run build`, `deno check` e
+`scripts/verificar-segredos.mjs` passam.
+
+### Verificado sem problemas
+
+- **Links de acesso** (`/admin/users/access-link`, `/admin/users/create`): o `origin` vem do
+  corpo do pedido, mas o `redirectTo` fica limitado pela lista do Supabase Auth
+  (`supabase/auth/config.json`), que só tem os domínios da loja, o projecto Pages e o
+  `localhost:3000` — um gestor não consegue desviar um link de recuperação para fora.
+- **Rotas públicas de configuração**: `/integrations` filtra por lista branca
+  (`sanitizeIntegrationConfig`: código desconhecido dá `{}`, e das chaves só diz se existem);
+  `/settings` só expõe a chave pública VAPID; `/messaging/status` e `/chat/config` só booleanos.
+- **`/whatsapp/receipt`**: só para o telefone da própria encomenda, texto montado no servidor,
+  limite por IP e por encomenda.
+- **HTML dos emails**: os modelos produzem dados (`EmailDoc`) e só o `emailDocument()` gera HTML,
+  com `esc()` e `safeUrl()` — seguro por construção, com os testes do `emails.test.ts`.
+- **Push**: só vai para as subscrições do `customer_id` da encomenda; as anónimas nunca recebem.
+- **`/unsubscribe`**, **avisos de conta** (`/account/*`): token de 64 hex com a mesma resposta
+  para válido e inválido; avisos sempre para o email da sessão, com deduplicação e limites.
+- **Destino depois do login**: `safeInternalPath` recusa `//host` e `/\host`, com testes.
+- **Cancelamento automático** (`unpaidOrdersToCancel`): só encomendas pendentes, sem referência,
+  não enviadas e com pagamento antecipado.
+
+### Corrigido
+
+| # | Achado | Gravidade |
+|---|---|---|
+| 33 | Email de **reembolso** a quem nunca pagou | Média (cliente) |
+| 34 | "**Pagamento confirmado — vamos preparar a sua encomenda**" numa encomenda cancelada | Média (cliente) |
+| 35 | Respostas ao email de agradecimento sem tecto por encomenda | Baixa |
+| 36 | `successPath` deixava passar `//host` | Baixa |
+| 37 | Textos do painel a pedir SVG depois de o bucket o recusar (achado 28) | Baixa (equipa) |
+
+**33 — reembolso sem pagamento.** `/admin/orders/payment-status` aceitava qualquer transição, e
+`sendRefundEmail` envia "Devolvemos o valor da sua encomenda", com o total, em qualquer passagem
+para `refunded` — também a partir de `pending` ou `failed`. Passa a recusar o reembolso de uma
+encomenda que não está paga ("se o dinheiro chegou, marque-a primeiro como paga").
+
+**34 — pago numa encomenda cancelada.** O email de pago diz "Vamos preparar a sua encomenda", e
+uma encomenda cancelada não pode ser reaberta (o trigger `orders_before_update` não deixa). O
+caso é real: o cancelamento automático das encomendas por pagar e um pagamento que chega depois.
+O pagamento continua a gravar-se (é preciso para o reembolso), mas sem o email, e o painel
+mostra à equipa "o cliente não foi avisado do pagamento. Falta reembolsá-lo."
+
+As duas regras estão em `checkoutRules.ts` (`paymentStatusChange`), com testes. Desfazer um
+reembolso marcado por engano continua possível: o email e o WhatsApp de pago têm deduplicação.
+
+**35 — respostas ao agradecimento.** Responder outra vez é de propósito (o cliente pode mudar de
+ideias), mas cada resposta avisa cada pessoa da equipa e acrescenta um evento à linha do tempo,
+que o `/track` devolve inteira. O limite era só por IP. Passa a haver um tecto de 5 por
+encomenda e por dia (`check_rate_limit_daily`), verificado depois do token.
+
+**36 — `successPath`.** O `pathname` de `https://x.ao//evil.com` é `//evil.com`, um URL relativo
+ao protocolo. Não era explorável — o carrinho não usa o `url` da resposta e quem o envia é o
+próprio comprador —, mas a função prometia "nunca outro domínio". As barras do início colapsam
+numa só, como no `safeInternalPath`; a função passou para `checkoutRules.ts`, com testes.
+
+**37 — textos do painel.** O logótipo dizia "PNG/SVG com fundo transparente", e o fundo da loja e
+o texto por omissão do `ImageField` também ofereciam SVG — quem seguisse a indicação batia num
+erro de envio. A foto de perfil dizia só PNG/JPG. Os textos usam agora `ALLOWED_IMAGE_LABEL`.
+
+### Por decidir (dono)
+
+- `http://localhost:3000/**` na lista de redirecionamentos do Auth de produção serve o
+  desenvolvimento local. O risco é baixo — um link desviado para lá só chega ao computador da
+  própria vítima —, mas sai se ninguém desenvolver contra a base de produção.
+
+## 9.10 Pendentes fechados (2026-11-06)
+
+O que as secções 9.8 e 9.9 deixaram como observação ou decisão do dono, fechado a pedido.
+
+| # | O quê | Onde |
+|---|---|---|
+| 38 | Um gestor com `manage_users` mudava o email de um cliente e pedia um link de acesso, que ia para o email novo: entrava na conta | `/admin/users/update` recusa a troca de email a quem não é admin; o formulário bloqueia o campo |
+| 39 | "Vendas por loja" (facturação, metas, notas) visível a qualquer gestor com uma permissão qualquer | migração `vendas_so_com_encomendas` (leitura com `manage_orders`) e o separador com `canManageOrders` |
+| 40 | O carrinho só revalidava o preço da edição normal: um tamanho ou edição extra guardava o preço de quando entrou, e o cliente via um preço e pagava outro | `refreshCart` usa `variantPrices` e o stock da edição; uma edição que deixou de existir sai do carrinho |
+| 41 | Um gestor sem nenhuma das quatro permissões principais abria o painel em Pagamentos, mesmo sem acesso | o separador por omissão é o primeiro permitido |
+| 42 | `http://localhost:3000/**` na lista de redirecionamentos do Auth de produção | retirado de `supabase/auth/config.json` |
+
+A migração foi verificada num Postgres local: substitui as duas políticas, e quem só tem
+`manage_catalog` deixa de ler as vendas.
+
+**Para aplicar à mão:** o `supabase/auth/config.json` não vai pelo deploy — aplica-se com
+`bash scripts/configurar-auth.sh` (mostra a diferença e pede confirmação). Para voltar a
+desenvolver contra a base de produção, repor `http://localhost:3000/**` nesse ficheiro.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

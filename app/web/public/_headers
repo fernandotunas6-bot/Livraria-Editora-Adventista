@@ -54,9 +54,3 @@
   Cache-Control: no-cache
 /sw.js
   Cache-Control: no-cache
-
-# Em falta: Content-Security-Policy.
-# Não vai aqui por adivinhação — precisa de uma passagem com o browser aberto, porque tem de
-# cobrir o `<script>` inline do index.html, o Supabase, os pop-ups do Google (Auth, Drive,
-# Calendar, Gmail), os embeds do Google Maps, e `img-src https:` para as capas que o painel
-# aponta para URLs externos. Um CSP errado parte a loja em silêncio.

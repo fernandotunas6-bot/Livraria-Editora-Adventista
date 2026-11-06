@@ -45,8 +45,8 @@ import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orde
 import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
 import { createRateLimit } from "./rateLimit.ts";
 import {
-  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, saleChannelFrom, settingNumber,
-  unpaidOrdersToCancel,
+  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, paymentStatusChange,
+  saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1308,6 +1308,15 @@ route("GET", "/admin/media-config", async ({ auth }) => {
   });
 });
 
+/**
+ * Id de pasta do Google Drive: o que a Google emite, e nada que altere a consulta.
+ *
+ * O que protege é o conjunto de caracteres (sem apóstrofe não há como fechar a string da
+ * consulta), não o comprimento — por isso o limite é largo de propósito, para aceitar tanto
+ * os ids longos como os aliases curtos que o Drive entende (`root`).
+ */
+const DRIVE_FOLDER_ID = /^[A-Za-z0-9_-]{3,200}$/;
+
 route("GET", "/admin/drive-images", async ({ auth, url }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
   const drive = await getIntegration("google_drive", true);
@@ -1316,6 +1325,11 @@ route("GET", "/admin/drive-images", async ({ auth, url }) => {
   const apiKey = config.api_key || "";
   const folderId = url.searchParams.get("folder_id") || config.folder_id || "";
   if (!apiKey || !folderId) throw bad("Configure API key e pasta do Google Drive.");
+  // O id vai dentro de apóstrofes na consulta ao Drive (`'<id>' in parents`), e vem da query
+  // string. Sem validar, uma apóstrofe fechava a string e acrescentava condições à consulta —
+  // com sessão de equipa, mas a listar pastas que a chave alcança e que não foram pedidas.
+  // Um id do Drive é só letras, dígitos, `-` e `_`.
+  if (!DRIVE_FOLDER_ID.test(folderId)) throw bad("Identificador de pasta do Google Drive inválido.");
   const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
   const fields = encodeURIComponent("files(id,name,mimeType,thumbnailLink)");
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&key=${encodeURIComponent(apiKey)}&supportsAllDrives=true&includeItemsFromAllDrives=true`);
@@ -1512,12 +1526,22 @@ async function notifyOrderStaff(kind: string, title: string, body: string, order
   return error ? 0 : rows.length;
 }
 
+/** Respostas ao email de agradecimento por encomenda e por dia. Falha da base: deixa passar. */
+const FEEDBACK_PER_ORDER_PER_DAY = 5;
+async function feedbackAllowedToday(orderId: string) {
+  const { data, error } = await db.rpc("check_rate_limit_daily", {
+    p_bucket: "order-feedback-order", p_client: orderId, p_max: FEEDBACK_PER_ORDER_PER_DAY,
+  });
+  return error ? true : data !== false;
+}
+
 /**
  * Resposta do cliente ao email de agradecimento: "Recebi tudo bem" ou "Tenho um problema".
  *
  * Público (o cliente pode não ter conta), mas só com o segredo da encomenda (`receipt_token`),
  * que só vai no email. Um problema avisa a equipa e fica na linha do tempo da encomenda.
- * Responder outra vez substitui a resposta anterior (o cliente pode mudar de ideias).
+ * Responder outra vez substitui a resposta anterior (o cliente pode mudar de ideias), até
+ * `FEEDBACK_PER_ORDER_PER_DAY` vezes por dia e por encomenda.
  */
 route("POST", "/order-feedback", async ({ body, ip }) => {
   if (!await checkRateLimit("order-feedback", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
@@ -1534,6 +1558,14 @@ route("POST", "/order-feedback", async ({ body, ip }) => {
   // Mesmo erro para encomenda inexistente e token errado: não revela que números existem.
   if (!order || !secretsMatch(String(order.receipt_token || ""), token)) throw bad("Link inválido ou expirado.");
   if (order.status === "cancelled") throw bad("Esta encomenda foi cancelada.");
+  // Mudar de ideias continua a valer, mas com tecto. Cada resposta avisa cada pessoa da equipa e
+  // acrescenta um evento à linha do tempo, que o /track devolve inteira: sem limite por
+  // encomenda, quem tivesse o link enchia o centro de avisos e fazia crescer a encomenda sem fim
+  // (o limite por IP não trava quem muda de IP). O limite é verificado depois do token, para
+  // ninguém gastar o de uma encomenda que não é sua.
+  if (!await feedbackAllowedToday(order.id)) {
+    throw tooMany("Já recebemos várias respostas sobre esta encomenda hoje. Se precisar de ajuda, fale connosco pelo WhatsApp.");
+  }
 
   const at = nowISO();
   const event = outcome === "ok"
@@ -1637,6 +1669,9 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   }
   const { data: order } = await db.from("orders").select("*").eq("id", id).maybeSingle();
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
+  // Que transições valem e que aviso o cliente recebe: checkoutRules.ts, com testes.
+  const change = paymentStatusChange(order, status);
+  if ("error" in change) throw bad(change.error);
 
   let saved = order;
   if (order.payment_status !== status) {
@@ -1648,7 +1683,7 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
   // Só o pagamento aceite gera mensagem: "pendente" ou "falhou" são estados internos, e o
   // cliente é avisado disso pelo meio por onde está a pagar, não por um email da loja.
   let emailSent = false;
-  if (status === "paid" && order.payment_status !== "paid") {
+  if (change.notify === "paid") {
     try {
       emailSent = (await notifyOrderStep(saved, "paid")).email;
     } catch (err) {
@@ -1656,14 +1691,15 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
     }
   }
   // O reembolso é o outro estado que o cliente precisa de saber: é dinheiro a voltar para ele.
-  if (status === "refunded" && order.payment_status !== "refunded") {
+  if (change.notify === "refunded") {
     try {
       emailSent = await sendRefundEmail(saved, await getSettings());
     } catch (err) {
       console.log("Email de reembolso:", err);
     }
   }
-  return json({ payment_status: saved.payment_status, email_sent: emailSent });
+  // `notice`: o que a equipa tem de saber e o cliente não soube (o painel mostra-o no aviso).
+  return json({ payment_status: saved.payment_status, email_sent: emailSent, notice: change.note });
 });
 
 // Os estados que o seguimento, os emails e o painel (DELIVERY_STATUS em orderUtils.js)
@@ -1733,16 +1769,6 @@ async function orderByIdempotencyKey(key: string): Promise<Row | null> {
   const { data, error } = await db.from("orders").select("*").eq("idempotency_key", key).limit(1);
   if (error) return null;
   return data?.[0] || null;
-}
-
-function successPath(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) return "/success";
-  try {
-    const u = new URL(value.trim(), "https://loja.invalid");
-    return (u.pathname + u.search).slice(0, 200) || "/success";
-  } catch {
-    return "/success";
-  }
 }
 
 function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: boolean; whatsappSent: boolean; replayed?: boolean }) {
@@ -3071,6 +3097,11 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
     const email = normalizeEmail(body.email);
     if (!isEmail(email)) throw bad("Indique um email válido.");
     if (email !== normalizeEmail(target.email)) {
+      // Mudar o email e depois pedir um link de acesso (que vai para o email novo) era entrar na
+      // conta do cliente: histórico, moradas, dados. Um gestor com `manage_users` continua a
+      // corrigir nome e telefone e a mandar o link para o email do próprio cliente; trocar o
+      // endereço da conta fica para um administrador.
+      if (auth!.role !== "admin") throw new HttpError(403, "Só administradores podem mudar o email de uma conta.");
       const { error } = await db.auth.admin.updateUserById(target.id, { email, email_confirm: true });
       if (error) {
         if (/already|registered|exists/i.test(error.message)) throw new HttpError(409, "Já existe uma conta com este email.");
