@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -20,7 +21,14 @@ import ImageField from '@/components/admin/ImageField';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { pbErrorMessage, saveRecordWithMedia } from '@/lib/mediaSave';
 
-const empty = { name: '', code: '', type: 'p2p', enabled: true, instructions: '', account_info: '', payment_link: '', qr_url: '', icon: '', sort_order: 0 };
+const empty = { name: '', code: '', type: 'p2p', enabled: true, instructions: '', account_info: '', payment_link: '', qr_url: '', icon: '', sort_order: 0, shipping_methods: [] };
+
+// Envios em que cada método aparece no checkout (payment_methods.shipping_methods). Nenhum marcado = todos.
+const SHIPPING_OPTIONS = [
+  { value: 'delivery', label: 'Entrega ao domicílio' },
+  { value: 'express', label: 'Entrega expressa' },
+  { value: 'pickup', label: 'Levantamento na loja' },
+];
 
 const TYPE_LABELS = {
   p2p: { label: 'P2P (referência/QR)', icon: QrCode },
@@ -97,6 +105,7 @@ export default function PaymentsTab() {
       payment_link: m.payment_link || '',
       qr_url: m.qr_url || (m.qr_code ? pb.files.getURL(m, m.qr_code) : ''),
       icon: m.icon || '', sort_order: m.sort_order ?? 0,
+      shipping_methods: Array.isArray(m.shipping_methods) ? m.shipping_methods : [],
     });
     setShowForm(true);
   };
@@ -139,7 +148,11 @@ export default function PaymentsTab() {
         payment_link: form.payment_link.trim(),
         sort_order: Number(form.sort_order) || 0,
         enabled: !!form.enabled,
+        // Nenhum envio marcado = serve para todos (null na base de dados).
+        shipping_methods: form.shipping_methods?.length ? form.shipping_methods : null,
       };
+      // A coluna só existe depois da migração 20261106050000; antes, enviá-la partia a gravação.
+      if (!methods.some((m) => 'shipping_methods' in m)) delete data.shipping_methods;
       await saveRecordWithMedia({
         collection: 'payment_methods',
         recordId: editing?.id,
@@ -303,6 +316,9 @@ export default function PaymentsTab() {
                 <p className="text-xs text-muted-foreground truncate">
                   {TYPE_LABELS[m.type]?.label || m.type}
                   {m.account_info ? ` · ${m.account_info}` : ''}
+                  {Array.isArray(m.shipping_methods) && m.shipping_methods.length
+                    ? ` · só ${m.shipping_methods.map((v) => SHIPPING_OPTIONS.find((o) => o.value === v)?.label.toLowerCase() || v).join(', ')}`
+                    : ''}
                   {(m.qr_url || m.qr_code) ? ' · com QR' : ''}
                   {m.payment_link ? ' · com link de pagamento' : ''}
                 </p>
@@ -383,14 +399,39 @@ export default function PaymentsTab() {
                   className="font-mono text-xs"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Ex.: link do Multicaixa Express. Aparece como botão "Pagar agora" no checkout, na página de sucesso, no email de confirmação e nos recibos, para qualquer livro. Deixe vazio para retirar.
+                  Ex.: link do Multicaixa Express. Aparece como botão de pagamento na página de sucesso e no rastreio (o cliente paga depois de encomendar), no email de confirmação e nos recibos. Deixe vazio para retirar.
                 </p>
               </div>
               <div className="space-y-2">
                 <Label>Instruções para o cliente</Label>
-                <Textarea rows={3} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} maxLength={1000} placeholder="Envie o comprovativo para…" />
-                <p className="text-[11px] text-muted-foreground">Aparecem no checkout e no recibo.</p>
+                <Textarea rows={3} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} maxLength={1000} placeholder="Ex.: Transfira o total com o número da encomenda no descritivo…" />
+                <p className="text-[11px] text-muted-foreground">Aparecem no checkout, na página de sucesso, no rastreio e no recibo.</p>
               </div>
+              {methods.some((m) => 'shipping_methods' in m) && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">Disponível para</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {SHIPPING_OPTIONS.map((o) => {
+                      const checked = (form.shipping_methods || []).includes(o.value);
+                      return (
+                        <label key={o.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => setForm({
+                              ...form,
+                              shipping_methods: v
+                                ? [...(form.shipping_methods || []), o.value]
+                                : (form.shipping_methods || []).filter((x) => x !== o.value),
+                            })}
+                          />
+                          {o.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Nenhum marcado = aparece em todos. Ex.: "Pagar no Balcão" só no levantamento.</p>
+                </fieldset>
+              )}
               <ImageField
                 label="QR code de pagamento"
                 value={form.qr_url}

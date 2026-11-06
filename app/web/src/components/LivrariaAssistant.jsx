@@ -236,6 +236,7 @@ export default function LivrariaAssistant() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Pergunte sobre livros, envios, pagamentos…"
+                    aria-label="Mensagem para o assistente"
                     className="h-9 text-sm"
                     disabled={loading}
                     maxLength={800}
@@ -245,6 +246,11 @@ export default function LivrariaAssistant() {
                   </Button>
                 </form>
 
+                {/* As mensagens podem ir para um fornecedor de IA fora de Angola (Gemini, DeepSeek):
+                    o visitante tem de o saber antes de escrever. */}
+                <p className="text-[10px] text-center text-muted-foreground px-3 pt-1">
+                  As respostas podem ser geradas por um serviço de IA externo. Não escreva dados pessoais nem de pagamento.
+                </p>
                 <p className="text-[10px] text-center text-muted-foreground pb-2 px-2">
                   <Link to="/faq" className="text-primary hover:underline">FAQ</Link>
                   {' · '}
