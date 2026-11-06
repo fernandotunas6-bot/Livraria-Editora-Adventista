@@ -129,7 +129,7 @@ export default function PaymentsTab() {
       toast({
         variant: 'destructive',
         title: 'Código reservado',
-        description: `O código "${editing.code}" é usado pelo checkout e não pode ser alterado. Desactive o método em vez disso.`,
+        description: `O código "${editing.code}" é usado pela finalização da compra e não pode ser alterado. Desactive o método em vez disso.`,
       });
       return;
     }
@@ -177,7 +177,7 @@ export default function PaymentsTab() {
     if (!enabled && m.enabled && activeCount === 1) {
       toast({
         title: 'Último método activo',
-        description: 'Sem métodos activos, o checkout aceita apenas "Pagamento na entrega".',
+        description: 'Sem métodos activos, a finalização da compra aceita apenas "Pagamento na entrega".',
       });
     }
     setBusyId(m.id);
@@ -276,7 +276,7 @@ export default function PaymentsTab() {
       {!loadError && methods.length > 0 && activeCount === 0 && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>Nenhum método está activo. O checkout aceita apenas "Pagamento na entrega" até activar um método.</span>
+          <span>Nenhum método está activo. A finalização da compra aceita apenas "Pagamento na entrega" até activar um método.</span>
         </div>
       )}
 
@@ -342,7 +342,7 @@ export default function PaymentsTab() {
         {!loadError && methods.length === 0 && (
           <div className="text-center text-muted-foreground py-10 border border-dashed rounded-xl">
             <p>Nenhum método configurado.</p>
-            <p className="text-xs mt-1">Sem métodos, o checkout aceita apenas "Pagamento na entrega".</p>
+            <p className="text-xs mt-1">Sem métodos, a finalização da compra aceita apenas "Pagamento na entrega".</p>
           </div>
         )}
       </div>
@@ -445,7 +445,7 @@ export default function PaymentsTab() {
               />
               <div className="flex items-center gap-3">
                 <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
-                <Label>Activo no checkout</Label>
+                <Label>Activo na finalização da compra</Label>
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowForm(false)} disabled={saving}>Cancelar</Button>
@@ -464,10 +464,10 @@ export default function PaymentsTab() {
             <AlertDialogTitle>Eliminar "{toDelete?.method?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               {toDelete?.usedIn > 0
-                ? `Este método aparece em ${toDelete.usedIn} encomenda(s). Recomendamos desactivá-lo: deixa de aparecer no checkout e o histórico fica intacto.`
+                ? `Este método aparece em ${toDelete.usedIn} encomenda(s). Recomendamos desactivá-lo: deixa de aparecer na finalização da compra e o histórico fica intacto.`
                 : RESERVED_CODES[toDelete?.method?.code]
                   ? 'Este é um método do sistema. Recomendamos desactivá-lo em vez de o eliminar.'
-                  : 'O método deixa de aparecer no checkout. Esta acção não pode ser desfeita.'}
+                  : 'O método deixa de aparecer na finalização da compra. Esta acção não pode ser desfeita.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

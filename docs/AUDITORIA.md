@@ -1073,21 +1073,21 @@ produção e a base de produção não foram tocados (a rede da sessão não che
 | 48 | **Comunidade: endereços escritos no texto e na citação viravam links clicáveis sem validação no servidor.** A base só verificava a lista `links`; o site (`linkifySegments`) transforma qualquer `https://…` do texto em link. Uma publicação enviada pela API com o endereço só no texto passava. | Alta | ✅ migração `comunidade_links_seguros` |
 | 49 | **Links maliciosos e pornográficos** (pedido do dono): regras fixas na gravação (IP, porta, `xn--`, domínios de topo de adultos, palavras no nome do site, programas), lista `community_blocked_domains` gerida no painel e reputação pelo filtro de família do Cloudflare (`pg_net` + agendador). | Alta | ✅ (filtro do Cloudflare por confirmar em produção) |
 | 50 | Advisors: 9 regras RLS da comunidade avaliavam `auth.uid()` linha a linha (`auth_rls_initplan`). | Baixa (desempenho) | ✅ |
-| 51 | Advisors: `community_posts_public` e `downloads_public` são vistas `SECURITY DEFINER` (nível ERROR). | — | ⚠️ intencional: é o que deixa os visitantes lerem sem ver `user_id` nem o caminho do PDF; trocar por `security_invoker` obriga a permissões por coluna e funções para o autor, e não fecha falha nenhuma |
+| 51 | Advisors: `community_posts_public` e `downloads_public` eram vistas `SECURITY DEFINER` (nível ERROR). | Média (advisors) | ✅ migração `leituras_publicas_por_funcoes`: funções `community_feed`, `community_replies`, `community_post` e `downloads_list`, com os filtros como parâmetros; os advisors de segurança ficam sem avisos |
 | 52 | "**Tenho um problema**" (resposta ao email de agradecimento) gravava `customer_confirmed_at`, que conta como compra feita (compra verificada, PDFs pagos). | Baixa | ✅ `index.ts` (falta publicar a Edge Function) |
 | 53 | **Página de sucesso:** nos botões do recibo, o ícone e a descrição saíam do botão. O `h-auto` não vencia o `sm:h-9` do tamanho por omissão do `Button`. | Média (visual) | ✅ |
-| 54 | Cerca de 30 títulos `h2/h3/h4` sem tamanho herdavam `text-2xl`–`text-5xl` dos estilos base: no Contacto, "Email/Telefone/Morada" ficavam maiores do que o título da secção; "Acompanhe esta encomenda" ocupava meio ecrã. | Baixa (visual) | ✅ nas páginas de cliente; os do painel ficam |
+| 54 | Cerca de 30 títulos `h2/h3/h4` sem tamanho herdavam `text-2xl`–`text-5xl` dos estilos base: no Contacto, "Email/Telefone/Morada" ficavam maiores do que o título da secção; "Acompanhe esta encomenda" ocupava meio ecrã. | Baixa (visual) | ✅ nas páginas de cliente e no painel |
 | 55 | Título da loja: "Todos os Livros — Livraria Adventista — Livraria Adventista". | Baixa (SEO) | ✅ |
 | 56 | Topo com banner (loja, lojas, contacto, rastreio): no telemóvel o texto ficava por baixo do logótipo da barra fina. | Média (visual) | ✅ |
 | 57 | Acessibilidade (axe-core, WCAG A/AA): pesquisa do cabeçalho fechada mas focável (em todas as páginas); botões −/+ da quantidade sem nome; seletores e preço dos filtros sem rótulo; ordenação sem nome; `aria-label` em `div` sem papel; contraste da nota do rodapé. | Média | ✅ 0 violações nas páginas verificadas |
 | 58 | Carrinho: "2 items" → "2 itens". | Trivial | ✅ |
 | 59 | Painel de filtros montado duas vezes (barra lateral e telemóvel) com os mesmos `id`. | Baixa | ✅ `useId` |
 | 60 | Painel → Comunidade: a lista de sites bloqueados esticava a página ~5000px (textos `sr-only` absolutos fora da lista com scroll). Introduzido e corrigido nesta passagem. | Baixa | ✅ |
-| 61 | `sales_count` e `views_count` de cada produto legíveis por qualquer visitante (vendas por livro). | Baixa (negócio) | ⏳ dono |
-| 62 | As avaliações expõem o `user_id` de quem escreve (a comunidade esconde-o). | Baixa (privacidade) | ⏳ |
-| 63 | `start_download` sem limite: o contador de downloads pode ser inflacionado. | Baixa | ⏳ |
+| 61 | `sales_count` e `views_count` de cada produto legíveis por qualquer visitante (vendas por livro). | Baixa (negócio) | Aceite: o catálogo é lido com `select *` por visitantes e pela equipa (o mesmo papel `authenticated`), por isso tirar as colunas por permissão parte a loja; mudá-las de tabela obriga a reescrever o `place_order` e a reposição de stock. Fica para quando houver razão de negócio |
+| 62 | As avaliações expõem o `user_id` de quem escreve (a comunidade esconde-o). | Baixa (privacidade) | Aceite: o id está também no endereço da foto (`users/<id>/…`); escondê-lo obriga a tirar as fotos das avaliações ou a mudar onde ficam os avatares. Saber o id não dá acesso a nada (RLS) |
+| 63 | `start_download` sem limite: o contador de downloads podia ser inflacionado. | Baixa | ✅ 30 por hora por conta ou, sem sessão, por IP (`private.request_ip`) |
 | 64 | Painel de vendas: a "senha de administrador" é um cadeado de interface (o hash PBKDF2 fica legível a quem tem `manage_orders`); a escrita está protegida pelo RLS (só admin). | Informativo | — |
-| 65 | Textos: "senha" no painel de vendas e "palavra-passe" no resto; "checkout" em mensagens ao cliente. | Trivial | ⏳ |
+| 65 | Textos: "senha" no painel de vendas e "palavra-passe" no resto; "checkout" em mensagens ao cliente e no painel. | Trivial | ✅ |
 
 ### Verificado sem problemas
 
@@ -1109,8 +1109,13 @@ produção e a base de produção não foram tocados (a rede da sessão não che
 
 - Produção (site e base): a rede desta sessão não chega a `livrariaadventista.com` nem ao projecto.
 - A resposta real do filtro do Cloudflare (bloqueado na rede da sessão; testado com respostas simuladas).
-- Entrega ao domicílio (as tabelas de províncias e municípios estão vazias na base local),
-  transferência com referência, emails e WhatsApp reais.
+- Emails e WhatsApp reais (sem SMTP nem API do WhatsApp na base local).
+
+Verificado depois, na mesma passagem: **entrega ao domicílio** (cliente com conta, edição "Capa
+dura" a 7 500 Kz + 1 500 de portes = 9 000 Kz, município e rua gravados, stock da edição 2 → 1) e
+**transferência com referência** (`/order/payment-reference`: com outro email, a mesma resposta de
+"não encontrada"; com o certo, a encomenda passa a "a aguardar confirmação"). A página de sucesso
+diz "Encomenda Registada! … Falta o pagamento" a quem ainda tem de pagar.
 
 ## 10. Não verificado nesta auditoria
 

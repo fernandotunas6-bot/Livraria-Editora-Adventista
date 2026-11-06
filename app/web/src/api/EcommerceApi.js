@@ -349,7 +349,7 @@ export async function initializeCheckout({
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.error || 'Erro no checkout');
+  if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
   return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
 }
 

@@ -489,7 +489,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
 
                 <TabsContent value="stats" className="space-y-4 mt-0">
                   <div className="rounded-xl bg-gradient-to-r from-marca/10 to-marca/5 border border-marca/20 p-4 text-sm text-foreground">
-                    <h4 className="font-semibold text-primary mb-1">Métricas reais</h4>
+                    <h4 className="text-base font-semibold text-primary mb-1">Métricas reais</h4>
                     <p className="text-muted-foreground">Contadas automaticamente: vendas quando uma encomenda é registada e visualizações quando alguém abre a página do livro.</p>
                   </div>
                   {editing ? (

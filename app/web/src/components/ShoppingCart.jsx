@@ -222,7 +222,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
   const handleCheckout = useCallback(async (viaWhatsApp = false) => {
     if (maintenanceMode) {
-      toast({ variant: 'destructive', title: 'Loja em manutenção', description: 'O checkout está temporariamente indisponível. Tente mais tarde ou contacte-nos.' });
+      toast({ variant: 'destructive', title: 'Loja em manutenção', description: 'As compras estão temporariamente indisponíveis. Tente mais tarde ou contacte-nos.' });
       return;
     }
     const needsAddress = form.shippingMethod !== 'pickup';
@@ -375,7 +375,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       window.location.href = `/success?${params.toString()}`;
     } catch (error) {
       toast({
-        title: viaWhatsApp ? 'Erro no pedido WhatsApp' : 'Erro no checkout',
+        title: viaWhatsApp ? 'Erro no pedido WhatsApp' : 'Não foi possível finalizar a compra',
         description: error.message || 'Não foi possível finalizar.',
         variant: 'destructive',
       });
@@ -794,7 +794,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
                 {step === 'cart' ? (
                   <Button className="w-full btn-primary py-6 text-base" onClick={() => setStep('checkout')} disabled={maintenanceMode}>
-                    {maintenanceMode ? 'Checkout indisponível' : 'Continuar para Checkout'}
+                    {maintenanceMode ? 'Compras indisponíveis' : 'Continuar para finalizar a compra'}
                   </Button>
                 ) : (
                   <>

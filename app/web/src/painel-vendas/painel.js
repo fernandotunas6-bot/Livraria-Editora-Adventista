@@ -593,7 +593,7 @@ export function mountPainel(root, api) {
   $('sel-comp').addEventListener('change', (e) => { S.comp = e.target.value ? Number(e.target.value) : null; clearTimers(); stopPlay(); render(true); });
   let rz; listen(window, 'resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.model) { drawMensal(S.model, false); drawAcum(S.model, false); drawVar(S.model, false); } if (!$('pres').hidden) fitSlide(); }, 150); });
 
-  // ---------- Senha de administrador ----------
+  // ---------- Palavra-passe de administrador ----------
   const hex = (buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
   async function derive(pass, saltHex, iter) {
     const salt = new Uint8Array(saltHex.match(/../g).map((h) => parseInt(h, 16)));
@@ -626,13 +626,13 @@ export function mountPainel(root, api) {
   function openModal(mode) {
     mdlMode = mode;
     const set = mode === 'set' || mode === 'change';
-    $('mdl-t').textContent = mode === 'set' ? 'Definir senha de administrador' : mode === 'change' ? 'Nova senha de administrador' : 'Entrar como administrador';
-    $('mdl-n').textContent = mode === 'set' ? 'Ainda não existe senha. Como dono do painel, defina a senha que dá acesso à edição dos dados (mínimo 6 caracteres).'
-      : mode === 'change' ? 'Escreva a nova senha duas vezes. A senha anterior deixa de funcionar.'
-      : (S.cfg && S.cfg.hash ? 'Introduza a senha de administrador para editar os dados.' : 'O dono do painel ainda não definiu a senha de administrador.');
-    $('mdl-l1').textContent = set ? 'Nova senha' : 'Senha';
+    $('mdl-t').textContent = mode === 'set' ? 'Definir palavra-passe de administrador' : mode === 'change' ? 'Nova palavra-passe de administrador' : 'Entrar como administrador';
+    $('mdl-n').textContent = mode === 'set' ? 'Ainda não existe palavra-passe. Como dono do painel, defina a palavra-passe que dá acesso à edição dos dados (mínimo 6 caracteres).'
+      : mode === 'change' ? 'Escreva a nova palavra-passe duas vezes. A palavra-passe anterior deixa de funcionar.'
+      : (S.cfg && S.cfg.hash ? 'Introduza a palavra-passe de administrador para editar os dados.' : 'O dono do painel ainda não definiu a palavra-passe de administrador.');
+    $('mdl-l1').textContent = set ? 'Nova palavra-passe' : 'Palavra-passe';
     $('mdl-f2').hidden = !set;
-    $('mdl-ok').textContent = set ? 'Guardar senha' : 'Entrar';
+    $('mdl-ok').textContent = set ? 'Guardar palavra-passe' : 'Entrar';
     $('mdl-reset').hidden = !(mode === 'login' && S.isOwner);
     $('mdl-p1').value = ''; $('mdl-p2').value = ''; $('mdl-st').textContent = ''; $('mdl-st').className = 'st';
     $('modal').hidden = false;
@@ -645,17 +645,17 @@ export function mountPainel(root, api) {
   $('mdl-ok').addEventListener('click', async () => {
     const st = $('mdl-st'); const p1 = $('mdl-p1').value, p2 = $('mdl-p2').value;
     const err = (t) => { st.textContent = t; st.className = 'st err'; };
-    if (!(window.crypto && crypto.subtle)) { err('Este navegador não suporta a verificação da senha.'); return; }
+    if (!(window.crypto && crypto.subtle)) { err('Este navegador não suporta a verificação da palavra-passe.'); return; }
     if (mdlMode === 'login') {
-      if (!S.cfg || !S.cfg.hash) { err('O administrador ainda não definiu a senha.'); return; }
+      if (!S.cfg || !S.cfg.hash) { err('O administrador ainda não definiu a palavra-passe.'); return; }
       st.textContent = 'A verificar…'; st.className = 'st';
       const h = await derive(p1, S.cfg.salt, S.cfg.iter || 150000);
       if (h === S.cfg.hash) { closeModal(); setAdmin(true); openEditor(); }
-      else { err('Senha incorrecta.'); $('mdl-p1').select(); }
+      else { err('Palavra-passe incorrecta.'); $('mdl-p1').select(); }
       return;
     }
-    if (p1.length < 6) { err('A senha precisa de pelo menos 6 caracteres.'); return; }
-    if (p1 !== p2) { err('As duas senhas não coincidem.'); return; }
+    if (p1.length < 6) { err('A palavra-passe precisa de pelo menos 6 caracteres.'); return; }
+    if (p1 !== p2) { err('As duas palavras-passe não coincidem.'); return; }
     st.textContent = 'A guardar…'; st.className = 'st';
     try {
       const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
@@ -665,9 +665,9 @@ export function mountPainel(root, api) {
       await S.db.doc('config/admin').set(body);
       const wasSet = mdlMode === 'set';
       S.cfg = body; closeModal(); setAdmin(true); openEditor();
-      logHist(null, wasSet ? 'Senha de administrador definida' : 'Senha de administrador alterada', '');
-      edStatus(wasSet ? 'Senha definida. Está agora como administrador.' : 'Senha alterada.', 'okk');
-    } catch (e) { err(e && e.code === 'invalid_argument' ? 'Só o dono do painel pode definir a senha.' : 'Não foi possível guardar a senha. Tente de novo.'); }
+      logHist(null, wasSet ? 'Palavra-passe de administrador definida' : 'Palavra-passe de administrador alterada', '');
+      edStatus(wasSet ? 'Palavra-passe definida. Está agora como administrador.' : 'Palavra-passe alterada.', 'okk');
+    } catch (e) { err(e && e.code === 'invalid_argument' ? 'Só o dono do painel pode definir a palavra-passe.' : 'Não foi possível guardar a palavra-passe. Tente de novo.'); }
   });
   // A edição usa a sessão de administrador da livraria; o servidor (RLS) recusa escritas de outros papéis.
   $('btn-admin').addEventListener('click', () => {

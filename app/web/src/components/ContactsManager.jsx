@@ -565,7 +565,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
     return (
       <div className="border rounded-2xl p-8 text-center bg-muted/10 space-y-3">
         <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
-        <h3 className="font-semibold">Sessão administrativa necessária</h3>
+        <h3 className="text-lg font-semibold">Sessão administrativa necessária</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           Precisa de permissões de administrador ou marketing para gerir contactos.
         </p>
@@ -738,7 +738,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                         <User className="h-8 w-8 text-primary" />
                       </div>
                     )}
-                    <h3 className="font-bold mt-2">{selectedContact.name}</h3>
+                    <h3 className="text-lg font-bold mt-2">{selectedContact.name}</h3>
                     <Badge variant="outline" className="mt-1 text-[10px]">{SOURCE_LABELS[selectedContact.source]}</Badge>
                   </div>
 

@@ -1,17 +1,18 @@
 /**
- * Comunidade: leitura pela vista pública `community_posts_public` (sem email nem id da conta) e
- * escrita nas tabelas, sempre em nome de quem tem sessão (o RLS e os triggers fixam o autor).
- * Migração: supabase/migrations/20261106190000_comunidade.sql.
+ * Comunidade: leitura pelas funções públicas `community_feed`, `community_replies` e
+ * `community_post` (sem email nem id da conta) e escrita nas tabelas, sempre em nome de quem tem
+ * sessão (o RLS e os triggers fixam o autor). Migrações: 20261106190000_comunidade,
+ * 20261106220000_comunidade_links_seguros e 20261106230000_leituras_publicas_por_funcoes.
  */
 import { supabase } from '@/lib/supabaseClient';
 
 export const PAGE_SIZE = 20;
-const POST_FIELDS = 'id, parent_id, book_id, book_title, body, quote, quote_page, links, likes_count, created, updated, author_name, mine';
 
 /** A tabela ainda não existe (migração por aplicar): o site mostra "em breve" em vez de um erro. */
 export function isMissingTable(error) {
   const code = String(error?.code || '');
-  return code === '42P01' || code === 'PGRST205' || /does not exist|Could not find the table/i.test(String(error?.message || ''));
+  return code === '42P01' || code === '42883' || code === 'PGRST205' || code === 'PGRST202'
+    || /does not exist|Could not find the (table|function)/i.test(String(error?.message || ''));
 }
 
 function raise(error) {
@@ -23,10 +24,7 @@ function raise(error) {
 
 /** Publicações (sem as respostas), mais recentes primeiro. `before` é a data da última já mostrada. */
 export async function loadPosts({ bookId = null, before = null, limit = PAGE_SIZE } = {}) {
-  let q = supabase.from('community_posts_public').select(POST_FIELDS).is('parent_id', null);
-  if (bookId) q = q.eq('book_id', bookId);
-  if (before) q = q.lt('created', before);
-  const { data, error } = await q.order('created', { ascending: false }).limit(limit);
+  const { data, error } = await supabase.rpc('community_feed', { p_book_id: bookId || null, p_before: before || null, p_limit: limit });
   raise(error);
   return data || [];
 }
@@ -35,17 +33,16 @@ export async function loadPosts({ bookId = null, before = null, limit = PAGE_SIZ
 export async function loadReplies(parentIds) {
   const ids = [...new Set((parentIds || []).filter(Boolean))];
   if (!ids.length) return [];
-  const { data, error } = await supabase.from('community_posts_public').select(POST_FIELDS)
-    .in('parent_id', ids).order('created', { ascending: true }).limit(500);
+  const { data, error } = await supabase.rpc('community_replies', { p_parent_ids: ids });
   raise(error);
   return data || [];
 }
 
-/** Uma publicação pela vista (depois de criar, para vir com o nome do autor). */
+/** Uma publicação (depois de criar, para vir com o nome do autor). */
 export async function loadPost(id) {
-  const { data, error } = await supabase.from('community_posts_public').select(POST_FIELDS).eq('id', id).maybeSingle();
+  const { data, error } = await supabase.rpc('community_post', { p_id: id });
   raise(error);
-  return data;
+  return (data || [])[0] || null;
 }
 
 /** Ids das publicações de que quem lê gosta (só as suas: o RLS não deixa ver as dos outros). */

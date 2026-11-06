@@ -105,7 +105,7 @@ function ProductDetailPage() {
       const availableQuantity = selectedVariant.inventory_quantity;
       try {
         await addToCart(product, selectedVariant, quantity, availableQuantity, { silent: true });
-        // Com o carrinho aberto, o aviso ficava por cima de "Continuar para Checkout".
+        // Com o carrinho aberto, o aviso ficava por cima de "Continuar para finalizar a compra".
         if (openCart) {
           setIsCartOpen(true);
         } else {

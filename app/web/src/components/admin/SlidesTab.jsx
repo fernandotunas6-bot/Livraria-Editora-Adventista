@@ -351,7 +351,7 @@ export default function SlidesTab({ onChange }) {
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold truncate">{s.title}</h3>
+                  <h3 className="text-base font-semibold truncate">{s.title}</h3>
                   {s.is_primary && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1"><Crown className="h-3 w-3" /> Principal</span>}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-marca/10 text-primary font-medium">
                     {SLIDE_TEMPLATES.find((t) => t.id === (s.template || 'classic'))?.label || 'Clássico'}

@@ -1,8 +1,8 @@
 /**
- * Materiais para descarregar. O público lê a vista `downloads_public` (sem o caminho do
- * ficheiro); descarregar passa por `start_download`, que confirma o acesso e conta, e por um link
- * temporário do bucket privado `downloads`. A equipa do catálogo escreve na tabela.
- * Migração: supabase/migrations/20261106200000_materiais_para_descarregar.sql.
+ * Materiais para descarregar. O público lê a função `downloads_list` (sem o caminho do
+ * ficheiro); descarregar passa por `start_download`, que confirma o acesso, limita e conta, e por
+ * um link temporário do bucket privado `downloads`. A equipa do catálogo escreve na tabela.
+ * Migrações: 20261106200000_materiais_para_descarregar e 20261106230000_leituras_publicas_por_funcoes.
  */
 import { supabase } from '@/lib/supabaseClient';
 import { isMissingTable } from '@/lib/communityApi';
@@ -10,7 +10,6 @@ import { downloadFileName, newPdfPath } from '@/lib/downloads';
 
 export { isMissingTable };
 
-const PUBLIC_FIELDS = 'id, title, description, kind, edition, cover, file_size, access, book_id, variant, sort_order, download_count, created, book_title, can_download';
 const ADMIN_FIELDS = 'id, title, description, kind, edition, cover, file_path, file_name, file_size, access, book_id, variant, published, sort_order, download_count, created, updated';
 const LINK_SECONDS = 120;
 
@@ -23,9 +22,7 @@ function raise(error) {
 
 /** Materiais publicados; com `bookId`, só os desse produto. */
 export async function loadDownloads({ bookId = null } = {}) {
-  let q = supabase.from('downloads_public').select(PUBLIC_FIELDS);
-  if (bookId) q = q.eq('book_id', bookId);
-  const { data, error } = await q.order('sort_order', { ascending: true }).order('created', { ascending: false }).limit(300);
+  const { data, error } = await supabase.rpc('downloads_list', { p_book_id: bookId || null });
   raise(error);
   return data || [];
 }

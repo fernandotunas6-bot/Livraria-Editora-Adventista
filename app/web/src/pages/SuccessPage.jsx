@@ -277,7 +277,7 @@ const SuccessPage = () => {
                   <div key={step} className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-marca/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
                     <div>
-                      <h3 className="font-medium mb-1">{stepTitle}</h3>
+                      <h3 className="text-base font-semibold mb-1">{stepTitle}</h3>
                       <p className="text-sm text-muted-foreground">{desc}</p>
                     </div>
                   </div>

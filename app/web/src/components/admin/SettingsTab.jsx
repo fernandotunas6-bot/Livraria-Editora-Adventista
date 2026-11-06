@@ -508,7 +508,7 @@ export default function SettingsTab() {
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.maintenance_mode} onCheckedChange={(v) => set('maintenance_mode', v)} />
-            <Label>Modo manutenção (bloqueia checkout)</Label>
+            <Label>Modo manutenção (bloqueia as compras)</Label>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.google_oauth_enabled} onCheckedChange={(v) => set('google_oauth_enabled', v)} />
@@ -681,7 +681,7 @@ export default function SettingsTab() {
 
         <TabsContent value="messaging" className="space-y-6 max-w-xl">
           <div>
-            <h3 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
             <p className="text-xs text-muted-foreground mt-1">Enviado automaticamente após checkout (SendGrid ou SMTP).</p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
@@ -735,7 +735,7 @@ export default function SettingsTab() {
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>
             <p className="text-xs text-muted-foreground mt-1">Gere chaves VAPID em <a href="https://vapidkeys.com" target="_blank" rel="noreferrer" className="text-primary underline">vapidkeys.com</a></p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
@@ -749,7 +749,7 @@ export default function SettingsTab() {
           <SecretField {...secretProps('vapid_private_key', 'Chave privada VAPID')} className="font-mono text-xs" />
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Widget de ajuda fixo no site com sugestões, catálogo e links. Recomendado: <strong>Gemini Flash Lite</strong> (mais barato). Fallback automático para FAQ sem chave.
             </p>
@@ -794,7 +794,7 @@ export default function SettingsTab() {
           {hasFloating && (
             <div className="border-t pt-6 space-y-3">
               <div>
-                <h3 className="font-semibold">Botões flutuantes</h3>
+                <h3 className="text-lg font-semibold">Botões flutuantes</h3>
                 <p className="text-xs text-muted-foreground mt-1">
                   Em que páginas aparecem o botão do assistente e o de voltar ao topo. Tire-os onde taparem botões ou formulários, sobretudo no telemóvel.
                 </p>
