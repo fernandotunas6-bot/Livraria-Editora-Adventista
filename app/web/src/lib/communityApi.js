@@ -89,7 +89,7 @@ export async function deletePost(id) {
 /** Publicações denunciadas ou ocultas, para o painel (a equipa lê a tabela pelo RLS). */
 export async function loadModerationQueue() {
   const { data, error } = await supabase.from('community_posts')
-    .select('id, parent_id, book_id, body, quote, links, reports_count, hidden, created')
+    .select('id, parent_id, book_id, body, quote, links, reports_count, hidden, moderation_note, created')
     .or('reports_count.gt.0,hidden.eq.true')
     .order('reports_count', { ascending: false }).order('created', { ascending: false }).limit(200);
   raise(error);
@@ -116,4 +116,36 @@ export async function restorePost(id) {
   const del = await supabase.from('community_reports').delete().eq('post_id', id);
   raise(del.error);
   await setHidden(id, false);
+}
+
+// ── Sites bloqueados (links maliciosos e de conteúdo adulto) ─────────────
+// Migração 20261106220000_comunidade_links_seguros. Juntar um domínio oculta logo as
+// publicações que o têm; a base de dados recusa-o nas próximas.
+
+export const BLOCK_CATEGORIES = [
+  { value: 'adulto', label: 'Conteúdo adulto' },
+  { value: 'malicioso', label: 'Perigoso (burla, vírus)' },
+  { value: 'encurtador', label: 'Encurtador de links' },
+  { value: 'outro', label: 'Outro motivo' },
+];
+
+export async function loadBlockedDomains() {
+  const { data, error } = await supabase.from('community_blocked_domains')
+    .select('domain, category, source, note, created')
+    .order('created', { ascending: false }).limit(1000);
+  raise(error);
+  return data || [];
+}
+
+export async function addBlockedDomain(domain, category = 'outro', note = '') {
+  const { error } = await supabase.from('community_blocked_domains')
+    .insert({ domain: String(domain || '').trim(), category, note: String(note || '').slice(0, 200) });
+  if (error?.code === '23505') throw new Error('Esse site já está bloqueado.');
+  if (error?.code === '23514') throw new Error('Escreva só o nome do site, por exemplo exemplo.com.');
+  raise(error);
+}
+
+export async function removeBlockedDomain(domain) {
+  const { error } = await supabase.from('community_blocked_domains').delete().eq('domain', domain);
+  raise(error);
 }

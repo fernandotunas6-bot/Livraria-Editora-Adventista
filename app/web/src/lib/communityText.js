@@ -2,7 +2,7 @@
  * Regras do texto das publicações da comunidade: os mesmos limites que a base de dados
  * (`community_posts`, migração 20261106190000_comunidade), para o erro aparecer antes de enviar.
  */
-import { MAX_LINKS, extractLinks, safeHref } from './communityLinks';
+import { MAX_LINKS, extractLinks, linkProblem, safeHref } from './communityLinks';
 
 export const MAX_BODY = 2000;
 export const MAX_QUOTE = 500;
@@ -29,8 +29,13 @@ export function preparePost({ body, quote = '', quotePage = '', links = [], book
   if (extra.some((l) => !safeHref(l))) {
     return { error: 'Há um link inválido: use um endereço que comece por http:// ou https://.' };
   }
+  // Os endereços do texto e da citação também viram links: as mesmas regras para todos.
+  const written = [...(String(text).match(/https?:\/\/[^\s<>"']+/gi) || []), ...(q.match(/https?:\/\/[^\s<>"']+/gi) || [])]
+    .map((raw) => raw.replace(/[.,;:!?)\]]+$/, ''));
+  const problem = [...written, ...extra].map(linkProblem).find(Boolean);
+  if (problem) return { error: problem };
   const all = [...new Set([...extractLinks(text, Infinity), ...extra.map(safeHref)])];
-  if (all.length > MAX_LINKS) return { error: `No máximo ${MAX_LINKS} links por publicação.` };
+  if (new Set([...all, ...extractLinks(q, Infinity)]).size > MAX_LINKS) return { error: `No máximo ${MAX_LINKS} links por publicação.` };
   return {
     data: {
       body: text,

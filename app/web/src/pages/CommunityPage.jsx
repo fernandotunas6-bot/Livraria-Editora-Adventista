@@ -25,7 +25,7 @@ export default function CommunityPage() {
           </p>
           <CommunityFeed />
           <p className="mt-8 text-xs text-muted-foreground">
-            Seja respeitoso. Publicações com três denúncias ficam ocultas até a equipa as rever. Os links são de outros utilizadores: abra-os com cuidado.
+            Seja respeitoso. Links para conteúdo adulto, encurtadores e sites perigosos não são aceites, e as publicações com três denúncias ficam ocultas até a equipa as rever. Os links são de outros utilizadores: abra-os com cuidado.
           </p>
         </div>
       </main>

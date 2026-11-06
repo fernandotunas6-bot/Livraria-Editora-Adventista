@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, Flag, Heart, MessageCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { linkHost, linkifySegments } from '@/lib/communityLinks';
+import { cleanLinks, linkHost, linkifySegments } from '@/lib/communityLinks';
 import { initials, relativeTime } from '@/lib/communityText';
 import PostComposer from '@/components/community/PostComposer';
 
@@ -109,7 +109,8 @@ export default function PostCard({ post, replies = [], liked, signedIn, onLike, 
   const [replying, setReplying] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const visibleReplies = showAll ? replies : replies.slice(-3);
-  const links = Array.isArray(post.links) ? post.links : [];
+  // Só os links que as regras de hoje aceitam (um publicado antes delas deixa de aparecer).
+  const links = cleanLinks(post.links);
 
   return (
     <article className="rounded-2xl border bg-card p-4 shadow-sm" aria-label={`Publicação de ${post.author_name}`}>

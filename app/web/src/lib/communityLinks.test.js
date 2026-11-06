@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LINKS, cleanLinks, extractLinks, linkHost, linkifySegments, safeHref } from './communityLinks';
+import { MAX_LINKS, cleanLinks, extractLinks, linkHost, linkProblem, linkifySegments, safeHref } from './communityLinks';
 
 describe('safeHref', () => {
   it('aceita só http e https', () => {
@@ -62,4 +62,42 @@ describe('linkifySegments', () => {
     expect(linkifySegments('javascript:alert(1)')).toEqual([{ type: 'text', value: 'javascript:alert(1)' }]);
     expect(linkifySegments('')).toEqual([]);
   });
+});
+
+describe('linkProblem (links maliciosos e de conteúdo adulto)', () => {
+  it('aceita sites normais, incluindo nomes parecidos com palavras bloqueadas', () => {
+    for (const ok of [
+      'https://www.wikipedia.org/wiki/Angola', 'https://adventistas.org/pt/', 'https://www.youtube.com/watch?v=abc',
+      'https://youtu.be/abc', 'https://wa.me/244923000000', 'https://www.sussex.ac.uk/', 'https://sextafeira.ao/',
+      'https://site.org/vencer-a-pornografia', 'https://site.com:443/x', 'https://github.com/a/b/blob/main/x.js',
+      'https://example.com.',
+    ]) expect(linkProblem(ok)).toBe('');
+  });
+
+  it('recusa conteúdo adulto pelo nome, pela palavra, pelo domínio de topo, pela lista e pelo caminho', () => {
+    for (const bad of [
+      'https://www.pornhub.com/x', 'https://pt.xvideos.com/', 'https://free-sex.net/', 'https://sexy-girls.com/',
+      'https://site.xxx/', 'https://tube8.com/v', 'https://m.tube8.com/v', 'https://onlyfans.com/x', 'https://reddit.com/r/nsfw',
+    ]) expect(linkProblem(bad)).toMatch(/conteúdo adulto/);
+  });
+
+  it('recusa encurtadores, IP loggers, IPs, portas, letras disfarçadas e programas', () => {
+    expect(linkProblem('https://bit.ly/abc')).toMatch(/encurtados/);
+    expect(linkProblem('https://grabify.link/X1')).toMatch(/perigoso/);
+    for (const ip of ['http://192.168.1.1/admin', 'http://2130706433/', 'https://[::1]/']) expect(linkProblem(ip)).toMatch(/IP/);
+    expect(linkProblem('https://site.com:8080/x')).toMatch(/porta/);
+    expect(linkProblem('https://xn--pypal-4ve.com/')).toMatch(/disfarçadas/);
+    expect(linkProblem('https://site.org/files/app.apk')).toMatch(/executáveis/);
+    expect(linkProblem('https://site.org/setup.exe?x=1')).toMatch(/executáveis/);
+    expect(linkProblem('https://site.zip/')).toMatch(/\.zip/);
+    expect(linkProblem('https://user:pw@site.com/')).toMatch(/palavra-passe/);
+    expect(linkProblem('javascript:alert(1)')).toMatch(/inválido/);
+  });
+
+  it('não mostra como link nem guarda um link recusado', () => {
+    const segs = linkifySegments('veja https://www.pornhub.com/x e https://adventistas.org');
+    expect(segs.filter((s) => s.type === 'link').map((s) => s.href)).toEqual(['https://adventistas.org/']);
+    expect(cleanLinks(['https://bit.ly/x', 'https://adventistas.org'])).toEqual(['https://adventistas.org/']);
+  });
+
 });

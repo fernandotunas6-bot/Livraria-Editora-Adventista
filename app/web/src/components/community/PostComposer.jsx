@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { searchProducts } from '@/api/EcommerceApi';
-import { MAX_LINKS, linkHost, safeHref } from '@/lib/communityLinks';
+import { MAX_LINKS, linkHost, linkProblem, safeHref } from '@/lib/communityLinks';
 import { MAX_BODY, MAX_QUOTE } from '@/lib/communityText';
 
 /** Escolher o livro de que se fala, com a pesquisa do catálogo. */
@@ -88,6 +88,8 @@ export default function PostComposer({ onSubmit, onCancel, compact = false, plac
   const addLink = () => {
     const href = safeHref(linkInput);
     if (!href) { setError('Esse link não serve: use um endereço que comece por http:// ou https://.'); return; }
+    const problem = linkProblem(linkInput);
+    if (problem) { setError(problem); return; }
     if (links.includes(href)) { setLinkInput(''); return; }
     if (links.length >= MAX_LINKS) { setError(`No máximo ${MAX_LINKS} links por publicação.`); return; }
     setLinks((l) => [...l, href]);

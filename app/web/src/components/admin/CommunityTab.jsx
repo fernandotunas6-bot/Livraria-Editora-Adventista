@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { deletePost, isMissingTable, loadModerationQueue, restorePost, setHidden } from '@/lib/communityApi';
 import { linkHost } from '@/lib/communityLinks';
 import { relativeTime } from '@/lib/communityText';
+import BlockedDomainsPanel from '@/components/admin/BlockedDomainsPanel';
 
 /**
  * Moderação da comunidade: publicações denunciadas ou ocultas. À terceira denúncia a base de
@@ -85,6 +86,9 @@ export default function CommunityTab() {
               {Array.isArray(p.links) && p.links.length > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">Links: {p.links.map(linkHost).join(', ')}</p>
               )}
+              {p.moderation_note && (
+                <p className="mt-1 text-xs font-medium text-destructive">{p.moderation_note}</p>
+              )}
               {p.reasons.length > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">Motivos: {[...new Set(p.reasons)].join(' · ')}</p>
               )}
@@ -106,6 +110,8 @@ export default function CommunityTab() {
           ))}
         </ul>
       )}
+
+      <BlockedDomainsPanel />
     </div>
   );
 }

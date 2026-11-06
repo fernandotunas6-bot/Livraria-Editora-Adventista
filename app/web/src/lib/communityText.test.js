@@ -8,6 +8,13 @@ describe('cleanBody', () => {
 });
 
 describe('preparePost', () => {
+  it('recusa links de conteúdo adulto ou perigosos no texto, na citação e na lista', () => {
+    expect(preparePost({ body: 'veja https://www.pornhub.com/x' }).error).toMatch(/conteúdo adulto/);
+    expect(preparePost({ body: 'citação', quote: 'em https://bit.ly/abc' }).error).toMatch(/encurtados/);
+    expect(preparePost({ body: 'olá', links: ['https://grabify.link/a'] }).error).toMatch(/perigoso/);
+    expect(preparePost({ body: 'leia https://adventistas.org.' }).data.links).toEqual(['https://adventistas.org/']);
+  });
+
   it('recusa texto vazio ou comprido de mais', () => {
     expect(preparePost({ body: '   ' }).error).toMatch(/Escreva/);
     expect(preparePost({ body: 'x'.repeat(MAX_BODY + 1) }).error).toMatch(/máximo/);
