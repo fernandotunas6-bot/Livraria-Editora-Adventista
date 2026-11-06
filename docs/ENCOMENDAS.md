@@ -46,6 +46,15 @@ Três identificadores, todos fixos depois de atribuídos:
 - **Privacidade.** Os clientes só vêem o próprio perfil (RLS de `profiles`); os códigos de outros clientes não são acessíveis pela API. `private.guest_customer_codes` tem RLS activo e sem políticas: só o service role e as funções da base de dados leem.
 - **Migrações:** `20261106033302_codigos_cliente_funcionario` (esquema, triggers, pesquisa e dados existentes) e `20261106033425_codigo_cliente_tambem_na_equipa` (listagem).
 
+### 1.2 Pagamento e envio
+
+- **Pagar depois de encomendar** (transferência e Multicaixa Express, `type` `transfer`/`p2p`). O checkout já não pede a referência: a encomenda nasce com `payment_status = pending` e o stock reservado. O cliente paga com o número da encomenda no descritivo e indica a referência na página de sucesso ou no rastreio (`POST /order/payment-reference`, com número + email, ou número + telefone no levantamento sem email). A encomenda passa a `awaiting_confirmation`, a equipa recebe o aviso `payment_reported` e confirma no painel (`/admin/orders/payment-status`). Se o cliente já trouxer a referência no checkout, a encomenda nasce `awaiting_confirmation`.
+- **Pagamento por envio**: `payment_methods.shipping_methods` (vazio = todos). "Pagar no Balcão" só no levantamento. O servidor recusa combinações que não servem.
+- **Portes**: 0 é um valor válido nas definições (portes grátis, ou limiar 0 = sempre grátis). O expresso por configurar vale o dobro da entrega normal. Regra igual no servidor (`checkoutRules.settingNumber`, `place_order`) e no site (`lib/shipping.js`).
+- **Canal de venda** só `web_purchase` ou `whatsapp`; outro valor conta como compra online.
+- **Assinatura no checkout opcional**; na confirmação de entrega só PNG até 300 KB.
+- Migração `20261106050000_pagamentos_por_envio`: aplica-se no merge, com a Edge Function e o site.
+
 ## 2. Passos e avisos ao cliente
 
 `notifyOrderStep` (Edge Function) é o ponto único para cada passo: pagamento confirmado e cada estado da entrega (confirmada, a preparar, expedida/pronta para levantar, em trânsito, saiu para entrega, entregue, cancelada).

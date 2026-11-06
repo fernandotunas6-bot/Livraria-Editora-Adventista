@@ -63,7 +63,44 @@ Só avisa; nunca bloqueia nem altera dados. Os textos são fixos e curtos, em fr
 - Português de Angola/Portugal: "guardar", "eliminar", "telemóvel", "activo".
 - Rótulos curtos (2 a 4 palavras). Sem pontos finais nos rótulos; com ponto final nas frases de aviso.
 
-## 7. Verificação
+## 7. Cores do tema
+
+| Classe | Variável | Para quê |
+|---|---|---|
+| `primary` | `--primary` | Texto, preços, botões. No tema claro é a variante legível da cor da marca (`--brand-ink`). |
+| `marca` | `--marca` → `--brand-primary-hsl` | Só decoração: fundos claros (`bg-marca/5`, `/10`), bordas, anéis de foco. **Nunca texto**: sobre branco não chega ao contraste da WCAG. |
+
+As duas vêm de Configurações → cor principal (`applyShopTheme` em `app/web/src/lib/shopTheme.js`). Não se escreve `#0ea5c9` (nem outra cor da marca) à mão: deixava o painel sem efeito nesses sítios. Cores escolhidas pelos utilizadores (grupos de contactos) e as dos gráficos ficam como valores.
+
+## 8. Ficha de produto
+
+Ordem, de cima para baixo, no telemóvel e no computador:
+
+1. Título, gancho, subtítulo, códigos (`LIV-…`, ISBN), editora e idioma.
+2. Preço.
+3. Edição (variantes) e quantidade.
+4. **Comprar Agora** e **Adicionar ao Carrinho**, logo a seguir ao preço. No computador ficam no primeiro ecrã.
+5. Amostra, WhatsApp, stock.
+6. Resumo da descrição (até 280 caracteres) com "Ler a descrição completa", que leva ao separador Detalhes. O texto completo só aparece uma vez, em Detalhes.
+7. Benefícios e público.
+
+A capa mostra-se **inteira**: `aspect-[3/4]` com `object-contain`, em todos os tamanhos. Num livro a capa é o produto; `object-cover` cortava-a.
+
+"Comprar Agora" abre o carrinho sem aviso por cima (o aviso tapava "Continuar para Checkout"). "Adicionar ao Carrinho", nos cartões e na pré-visualização rápida, fica na página e mostra o aviso com "Ver": quem junta vários livros não é interrompido.
+
+## 9. Carrinho e checkout
+
+- **Passos com nome**: "1. Carrinho", "2. Dados e pagamento".
+- **Avisos fora do resumo recolhível.** No telemóvel o resumo vem fechado; tudo o que o cliente precisa de saber para avançar (manutenção, conta) fica sempre à vista.
+- **Não exige conta**, nem para entrega. O cliente acompanha a encomenda pelo número e email (Rastrear encomenda).
+- **Campos**: cada campo tem rótulo ligado (`htmlFor`/`id`, ou `aria-label`) e `autocomplete` (`name`, `email`, `tel`, `street-address`). No seletor de morada os ids vêm de `useId()`.
+- **Pagamentos**: só os que servem para o envio escolhido (`payment_methods.shipping_methods`; "Pagar no Balcão" só no levantamento). Quando se paga diz-se em português: "paga na entrega", "paga no levantamento", "paga depois de encomendar".
+- **Pagar depois** (transferência, Multicaixa): sem referência obrigatória no checkout. Depois de confirmar, a página de sucesso e o rastreio mostram a caixa "Como pagar" (`PayLaterBox`): total, número da encomenda como descritivo, dados para copiar e o campo da referência.
+- **Dados de pagamento** (IBAN, número) na fonte normal com algarismos de largura fixa, não monoespaçada: nesta o "O" de AO06 e o zero eram iguais. Botão "Copiar".
+- **Assinatura opcional.** Quem recebe assina na entrega.
+- **Resumo antes do botão** só com o que o cliente escreveu; nunca "— ·" nem uma cidade por omissão.
+
+## 10. Verificação
 
 - Teste unitário de regras: `app/web/src/lib/personDataChecks.test.js`.
 - Antes de fechar uma alteração de elemento: `npm run lint` em `app/web`, `npx vitest run`, e uma olhada na ficha e na lista com tema claro e escuro, e em telemóvel (16px de margem, sem scroll horizontal).

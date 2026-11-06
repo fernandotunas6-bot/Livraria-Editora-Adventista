@@ -11,6 +11,23 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
 - **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
 
+## Análise crítica e correcções do checkout (2026-11-06)
+
+Feito no código (PR #9), a publicar no merge:
+- **Comprar sem conta**, também com entrega. **Pagar depois de encomendar** (transferência, Multicaixa): a referência indica-se na página de sucesso ou no rastreio (`/order/payment-reference`); a equipa recebe `payment_reported`.
+- Pagamentos filtrados por envio ("Pagar no Balcão" só no levantamento), portes 0 válidos, unidades do expresso, canal de venda em lista fechada, assinatura do checkout opcional, `/confirm-delivery` só PNG até 300 KB.
+- Ficha: capa inteira e botões logo a seguir ao preço. Checkout: avisos visíveis no telemóvel, campos com rótulo e `autocomplete`, passos com nome, IBAN legível com "Copiar". Cartões não abrem o carrinho a cada livro.
+- Cor da marca como token (`marca`, 145 sítios) em vez de `#0ea5c9` escrito à mão. Spec em [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md).
+- **Migração `20261106050000_pagamentos_por_envio` por aplicar**: de propósito, entra no merge pelo `supabase db push`, ao mesmo tempo que a Edge Function e o site que a usam. Foi testada em transacção revertida. (Aplicá-la antes deixava as instruções novas de pagamento no site antigo.)
+
+Por decidir ou configurar (dono):
+- **Multicaixa Express activo com `923 000 000`**, que parece fictício, e um link de `pay.kursinha.com` por confirmar.
+- **`contacto@livrariaadventista.ao` não recebe email** (o `.ao` não tem MX). As instruções novas já não o usam; o rodapé e outras páginas podem usar.
+- **SMTP no Auth** (sem ele o registo por email não funciona) e ligar os emails de encomenda (`order_email_enabled`, integração SMTP). **Não** ligar a confirmação automática de email: com a regra RLS por email, quem registasse o email de um cliente veria as encomendas dele.
+- Telefone e WhatsApp da loja nas definições (estão vazios).
+- MFA nos 3 administradores (nenhum tem).
+- Stock por loja e libertar o stock de encomendas por pagar ao fim de N dias: precisam de desenho (hoje há só o alerta das 48 h).
+
 ## Dados fidedignos, chat e spec de elementos (2026-11-06)
 
 - **Telefones:** todas as encomendas e perfis estão em `+244 XXX XXX XXX` (migração `20261106034217_perfis_telefones_e_nomes`, mesma regra de `angolaPhone.js`). Um número incompleto não é inventado: fica como está e a ficha assinala-o. Hoje o administrador `admin@livraria.ao` não tem telefone.
@@ -27,8 +44,8 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 - **`main`:** a migração do Supabase (o antigo PR #3) está integrada no `main` desde 2026-11-02 (commit `f4d9885`). Atenção: um `main` **local** antigo, da era PocketBase, ainda existe em algumas cópias de trabalho e está 114 commits atrás — usar sempre `origin/main` como referência.
 - **Supabase:** projecto "Livraria Adventista", ref `bggqkjjqbjhbjsckzopj`, organização "Colpotor" (plano grátis), região eu-north-1.
 - **Cloudflare Pages** — hoje na conta `canguelev@fata.adventist.org`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `valentinocanguele@gmail.com`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
-  - `livraria-editora-adventista` — **o novo**, criado a 2026-11-03, ramo de produção `main`, ainda **sem nenhum deploy**. É o que vai receber o domínio `livrariaadventista.ao`.
-  - `livraria-adventista` — **o que serve produção hoje**, em https://livraria-adventista.pages.dev, com o código do `main`. Fica como está até o domínio `.ao` estar activo e verificado; só depois se decide desligá-lo.
+  - `livraria-editora-adventista` — **o que serve produção hoje** (verificado a 2026-11-06), em `livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev`, ramo `main`. Vai receber também o `.ao` ([DOMINIO.md](DOMINIO.md)).
+  - `livraria-adventista` — **o antigo**, em https://livraria-adventista.pages.dev. Já não recebe deploys e está desactualizado: a 2026-11-06 os livros apareciam sem capa (a CSP antiga não aceita o domínio novo das capas). Deve redireccionar para `livrariaadventista.com` ou ser desligado — decisão do dono.
   - **O domínio `livrariaadventista.ao` não está registado:** os servidores autoritativos do registo `.ao` devolvem `NXDOMAIN` (verificado a 2026-11-03; `dns.ao` devolve `NOERROR` na mesma consulta). O Cloudflare não vende `.ao` — o registo é só por revendedores autorizados do DNS.ao. Passos em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
   - Foi publicado à mão com o Wrangler porque o Actions está bloqueado.
   - Cada ramo tem o seu URL de pré-visualização (`<ramo>.livraria-adventista.pages.dev`, ver `wrangler pages deployment list`). O `main` antigo (PocketBase) está em `main-pocketbase`, e esse e os ramos `cursor/*` não têm backend.
