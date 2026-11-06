@@ -15,7 +15,7 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 
 Feito no código (PR #9), a publicar no merge:
 - **Comprar sem conta**, também com entrega. **Pagar depois de encomendar** (transferência, Multicaixa): a referência indica-se na página de sucesso ou no rastreio (`/order/payment-reference`); a equipa recebe `payment_reported`.
-- Pagamentos filtrados por envio ("Pagar no Balcão" só no levantamento), portes 0 válidos, unidades do expresso, canal de venda em lista fechada, assinatura do checkout opcional, `/confirm-delivery` só PNG até 300 KB.
+- Pagamentos filtrados por envio ("Pagar no Balcão" só no levantamento, editável no painel → Pagamentos), portes 0 válidos, unidades do expresso, canal de venda em lista fechada, assinatura do checkout opcional, `/confirm-delivery` só PNG até 300 KB.
 - Ficha: capa inteira e botões logo a seguir ao preço. Checkout: avisos visíveis no telemóvel, campos com rótulo e `autocomplete`, passos com nome, IBAN legível com "Copiar". Cartões não abrem o carrinho a cada livro.
 - Cor da marca como token (`marca`, 145 sítios) em vez de `#0ea5c9` escrito à mão. Spec em [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md).
 - **Migração `20261106050000_pagamentos_por_envio` por aplicar**: de propósito, entra no merge pelo `supabase db push`, ao mesmo tempo que a Edge Function e o site que a usam. Foi testada em transacção revertida. (Aplicá-la antes deixava as instruções novas de pagamento no site antigo.)
@@ -26,7 +26,9 @@ Por decidir ou configurar (dono):
 - **SMTP no Auth** (sem ele o registo por email não funciona) e ligar os emails de encomenda (`order_email_enabled`, integração SMTP). **Não** ligar a confirmação automática de email: com a regra RLS por email, quem registasse o email de um cliente veria as encomendas dele.
 - Telefone e WhatsApp da loja nas definições (estão vazios).
 - MFA nos 3 administradores (nenhum tem).
-- Stock por loja e libertar o stock de encomendas por pagar ao fim de N dias: precisam de desenho (hoje há só o alerta das 48 h).
+- **Cancelar encomendas por pagar**: já existe, desligado (Configurações → Regras da loja → dias; 0 = nunca). Escolher o prazo.
+- **Assistente com IA**: teto diário de 500 respostas com IA na loja toda e 60 por visitante (Configurações → Assistente). O aviso "serviço de IA externo" já aparece no assistente; confirmar com quem trata da protecção de dados se a Lei 22/11 pede mais (as mensagens podem ir para a Google ou para a DeepSeek, na China).
+- Stock por loja: precisa de desenho (que lojas têm que livros, e se as vendas ao balcão passam a descontar stock).
 
 ## Dados fidedignos, chat e spec de elementos (2026-11-06)
 

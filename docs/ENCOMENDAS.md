@@ -53,6 +53,8 @@ Três identificadores, todos fixos depois de atribuídos:
 - **Portes**: 0 é um valor válido nas definições (portes grátis, ou limiar 0 = sempre grátis). O expresso por configurar vale o dobro da entrega normal. Regra igual no servidor (`checkoutRules.settingNumber`, `place_order`) e no site (`lib/shipping.js`).
 - **Canal de venda** só `web_purchase` ou `whatsapp`; outro valor conta como compra online.
 - **Assinatura no checkout opcional**; na confirmação de entrega só PNG até 300 KB.
+- **Cancelar por falta de pagamento** (Configurações → Regras da loja, `unpaid_cancel_days`; 0 = nunca, o valor por omissão). A vigilância de hora a hora cancela as encomendas de transferência/Multicaixa ainda pendentes, sem referência e não preparadas, mais velhas que o prazo. O stock volta pelo trigger, o cliente recebe "Encomenda cancelada" e a equipa um aviso. Quem já indicou a referência nunca é cancelado pelo relógio. Regra em `checkoutRules.unpaidOrdersToCancel`, com testes.
+- **Painel → Pagamentos**: cada método tem "Disponível para" (entrega, expresso, levantamento); nenhum marcado = todos.
 - Migração `20261106050000_pagamentos_por_envio`: aplica-se no merge, com a Edge Function e o site.
 
 ## 2. Passos e avisos ao cliente
