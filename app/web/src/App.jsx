@@ -25,6 +25,7 @@ const AboutPage = lazy(() => import('@/pages/AboutPage.jsx'));
 const StoresPage = lazy(() => import('@/pages/StoresPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 const ShippingReturnsPage = lazy(() => import('@/pages/ShippingReturnsPage.jsx'));
 const SuccessPage = lazy(() => import('@/pages/SuccessPage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
@@ -201,15 +202,7 @@ function App() {
               <Route path="/painel-vendas-huambo.html" element={<Navigate to="/admin?tab=vendas-huambo" replace />} />
               <Route path="/painel-vendas-huambo" element={<Navigate to="/admin?tab=vendas-huambo" replace />} />
 
-              <Route path="*" element={
-                <div className="min-h-screen flex items-center justify-center bg-background">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-foreground mb-4">404</h1>
-                    <p className="text-xl text-muted-foreground mb-8">Página não encontrada</p>
-                    <a href="/" className="inline-block px-4 py-3 text-primary hover:underline font-medium">Voltar ao Início</a>
-                  </div>
-                </div>
-              } />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </RouteErrorBoundary>
