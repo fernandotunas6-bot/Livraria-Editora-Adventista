@@ -71,8 +71,13 @@ const SuccessPage = () => {
   // Transferência e Multicaixa: paga-se agora, depois de encomendar. Até lá a compra não está
   // "confirmada": está registada e com o stock reservado.
   const payLater = !isWhatsApp && isPaidUpfront(orderData?.paymentType);
-  const title = isWhatsApp ? 'Pedido WhatsApp Registado!' : payLater ? 'Encomenda Registada!' : 'Compra Confirmada!';
-  const subtitle = payLater
+  // Aberta sem encomenda (link guardado, botão "voltar"), a página dizia "Compra Confirmada! Obrigado
+  // pela sua compra" a quem não tinha comprado nada.
+  const title = !hasOrder ? 'Nenhuma encomenda para mostrar'
+    : isWhatsApp ? 'Pedido WhatsApp Registado!' : payLater ? 'Encomenda Registada!' : 'Compra Confirmada!';
+  const subtitle = !hasOrder
+    ? 'Esta página aparece depois de uma compra. Se já comprou, encontre a encomenda em Rastrear encomenda, com o número e o email da compra.'
+    : payLater
     ? 'Os livros estão reservados para si. Falta o pagamento: veja abaixo como pagar e onde indicar a referência.'
     : isWhatsApp
     ? (waApiActive
@@ -116,7 +121,7 @@ const SuccessPage = () => {
   return (
     <>
       <Helmet>
-        <title>{pageTitle(isWhatsApp ? 'Pedido WhatsApp' : 'Compra Confirmada')}</title>
+        <title>{pageTitle(!hasOrder ? 'Encomenda' : isWhatsApp ? 'Pedido WhatsApp' : 'Compra Confirmada')}</title>
         <meta name="description" content={subtitle} />
       </Helmet>
 
@@ -127,16 +132,20 @@ const SuccessPage = () => {
         <div className="container-custom">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto text-center">
             <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${isWhatsApp ? 'bg-green-500/10' : 'bg-marca/10'}`}>
-              {isWhatsApp ? (
+              {!hasOrder ? (
+                <Package className="h-10 w-10 text-primary" aria-hidden="true" />
+              ) : isWhatsApp ? (
                 <MessageCircle className="h-10 w-10 text-green-600" />
               ) : (
                 <CheckCircle className="h-10 w-10 text-primary" />
               )}
             </div>
 
-            <span className={`inline-block text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full mb-4 ${isWhatsApp ? 'bg-green-500/10 text-green-700' : 'bg-marca/10 text-primary'}`}>
-              {isWhatsApp ? 'Encomenda via WhatsApp' : 'Compra Online'}
-            </span>
+            {hasOrder && (
+              <span className={`inline-block text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full mb-4 ${isWhatsApp ? 'bg-green-500/10 text-green-700' : 'bg-marca/10 text-primary'}`}>
+                {isWhatsApp ? 'Encomenda via WhatsApp' : 'Compra Online'}
+              </span>
+            )}
 
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{title}</h1>
             <p className="text-muted-foreground text-lg mb-8">{subtitle}</p>
@@ -203,7 +212,7 @@ const SuccessPage = () => {
                 <div className="grid sm:grid-cols-2 gap-3">
                   <Button
                     variant={receiptChoice === 'whatsapp' ? 'default' : 'outline'}
-                    className={`py-6 h-auto flex-col gap-2 ${receiptChoice === 'whatsapp' ? 'btn-primary' : 'border-green-500/40 text-green-700 hover:bg-green-50'}`}
+                    className={`py-6 h-auto sm:h-auto whitespace-normal flex-col gap-2 ${receiptChoice === 'whatsapp' ? 'btn-primary' : 'border-green-500/40 text-green-700 hover:bg-green-50'}`}
                     onClick={handleReceiptWhatsApp}
                   >
                     <MessageCircle className="h-6 w-6" />
@@ -212,7 +221,7 @@ const SuccessPage = () => {
                   </Button>
                   <Button
                     variant={receiptChoice === 'download' ? 'default' : 'outline'}
-                    className={`py-6 h-auto flex-col gap-2 ${receiptChoice === 'download' ? 'btn-primary' : ''}`}
+                    className={`py-6 h-auto sm:h-auto whitespace-normal flex-col gap-2 ${receiptChoice === 'download' ? 'btn-primary' : ''}`}
                     onClick={handleReceiptDownload}
                   >
                     <Download className="h-6 w-6" />
@@ -236,7 +245,7 @@ const SuccessPage = () => {
             {ready && !isAuthed && hasOrder && !isWhatsApp && (
               <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-6 text-left flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1">
-                  <h2 className="font-semibold mb-1">Acompanhe esta encomenda na sua conta</h2>
+                  <h2 className="text-lg font-semibold mb-1">Acompanhe esta encomenda na sua conta</h2>
                   <p className="text-sm text-muted-foreground">
                     Crie conta com {orderData?.email ? <strong>{orderData.email}</strong> : 'o email da compra'} e veja o estado da entrega
                     sempre que quiser. Demora segundos.
@@ -252,6 +261,15 @@ const SuccessPage = () => {
               </div>
             )}
 
+            {!hasOrder && (
+              <div className="mb-8">
+                <Button asChild size="lg" className="btn-primary">
+                  <Link to="/track">Rastrear encomenda</Link>
+                </Button>
+              </div>
+            )}
+
+            {hasOrder && (
             <div className="bg-card border border-border rounded-xl p-8 mb-8 text-left">
               <h2 className="text-xl font-semibold mb-4">Próximos passos</h2>
               <div className="space-y-4">
@@ -259,13 +277,14 @@ const SuccessPage = () => {
                   <div key={step} className="flex gap-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-marca/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
                     <div>
-                      <h3 className="font-medium mb-1">{stepTitle}</h3>
+                      <h3 className="text-base font-semibold mb-1">{stepTitle}</h3>
                       <p className="text-sm text-muted-foreground">{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/shop">

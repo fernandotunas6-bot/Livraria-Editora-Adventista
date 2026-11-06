@@ -1,3 +1,4 @@
+import { cartItemTitle } from '@/lib/productTypes';
 export function buildWhatsAppUrl(phone, message) {
   const digits = (phone || '').replace(/\D/g, '');
   const num = digits.startsWith('244') ? digits : `244${digits.replace(/^0/, '')}`;
@@ -27,11 +28,12 @@ export function buildWhatsAppOrderMessage({ cartItems, form, totalFormatted, ord
     `📱 ${form.phone}`,
     `📍 ${form.address}${form.city ? `, ${form.city}` : ''}`,
     '',
-    '*Livros:*',
+    '*Produtos:*',
   ];
   cartItems.forEach((item) => {
     const price = item.variant.sale_price_formatted || item.variant.price_formatted;
-    lines.push(`• ${item.quantity}× ${item.product.title} — ${price}`);
+    // Com a variante (tamanho, edição): sem ela, M e L do mesmo uniforme eram iguais.
+    lines.push(`• ${item.quantity}× ${cartItemTitle(item)} — ${price}`);
   });
   lines.push('', `*Total: ${totalFormatted}*`);
   if (form.paymentMethod) lines.push(`Pagamento: ${form.paymentMethod}`);

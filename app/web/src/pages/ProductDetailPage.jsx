@@ -11,7 +11,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +22,6 @@ import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
-import BookPreviewModal from '@/components/BookPreviewModal';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import SampleReaderModal from '@/components/SampleReaderModal';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
@@ -30,6 +29,9 @@ import DiscoveryFeed from '@/components/DiscoveryFeed.jsx';
 import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
+import { hasReadingSample, variantNames } from '@/lib/productTypes';
+import CommunityFeed from '@/components/community/CommunityFeed';
+import ProductDownloads from '@/components/downloads/ProductDownloads';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -63,7 +65,6 @@ function ProductDetailPage() {
   const { id } = useParams();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [sampleReaderOpen, setSampleReaderOpen] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [product, setProduct] = useState(null);
   // A barra de compra do fundo observa estes botões: só aparece quando eles saem do ecrã.
   // Em estado, e não num `ref`: o observador precisa de saber quando o elemento aparece, e
@@ -104,7 +105,7 @@ function ProductDetailPage() {
       const availableQuantity = selectedVariant.inventory_quantity;
       try {
         await addToCart(product, selectedVariant, quantity, availableQuantity, { silent: true });
-        // Com o carrinho aberto, o aviso ficava por cima de "Continuar para Checkout".
+        // Com o carrinho aberto, o aviso ficava por cima de "Continuar para finalizar a compra".
         if (openCart) {
           setIsCartOpen(true);
         } else {
@@ -191,7 +192,9 @@ function ProductDetailPage() {
           addRecentlyViewed(productWithQuantities);
 
           if (productWithQuantities.variants && productWithQuantities.variants.length > 0) {
-            setSelectedVariant(productWithQuantities.variants[0]);
+            // Começa na primeira variante com stock: abrir num tamanho esgotado parecia o produto todo esgotado.
+            const vs = productWithQuantities.variants;
+            setSelectedVariant(vs.find((v) => v.inventory_quantity > 0) || vs[0]);
           }
 
           const bookGenre = productWithQuantities.type?.value || productWithQuantities.category || '';
@@ -400,14 +403,16 @@ function ProductDetailPage() {
 
             {product.variants.length > 1 && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3 text-foreground">Edição</h3>
+                <h3 className="text-sm font-semibold mb-3 text-foreground">{variantNames(product.product_type).one}</h3>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map(variant => (
                     <Button
                       key={variant.id}
+                      aria-pressed={selectedVariant?.id === variant.id}
+                      aria-label={variant.inventory_quantity > 0 ? undefined : `${variant.title} (esgotado)`}
                       variant={selectedVariant?.id === variant.id ? 'default' : 'outline'}
                       onClick={() => handleVariantSelect(variant)}
-                      className={`transition-all ${selectedVariant?.id === variant.id ? 'btn-primary' : 'border-border hover:border-primary'}`}
+                      className={`transition-all ${selectedVariant?.id === variant.id ? 'btn-primary' : 'border-border hover:border-primary'} ${variant.inventory_quantity > 0 ? '' : 'line-through opacity-60'}`}
                     >
                       {variant.title}
                     </Button>
@@ -418,11 +423,11 @@ function ProductDetailPage() {
 
             <div className="flex items-center gap-4 mb-8">
               <div className="flex items-center border border-border rounded-lg">
-                <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted">
+                <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted" aria-label="Diminuir quantidade">
                   <Minus size={18} />
                 </Button>
                 <span className="w-12 text-center font-semibold text-foreground">{quantity}</span>
-                <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="rounded-r-lg hover:bg-muted">
+                <Button onClick={() => handleQuantityChange(1)} variant="ghost" size="icon" className="rounded-r-lg hover:bg-muted" aria-label="Aumentar quantidade">
                   <Plus size={18} />
                 </Button>
               </div>
@@ -457,14 +462,19 @@ function ProductDetailPage() {
                 <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
               </Button>
             </div>
-            <Button
-              onClick={() => setShowPreview(true)}
-              variant="outline"
-              className="w-full mb-3 border-marca/40 text-primary hover:bg-marca/5 py-6 text-lg rounded-xl"
-            >
-              <BookOpen className="mr-2 h-5 w-5" />
-              Ler Amostra Grátis (Primeiras Páginas)
-            </Button>
+            {/* Só com páginas verdadeiras do livro, carregadas no painel. */}
+            {hasReadingSample(product) && (
+              <Button
+                onClick={() => setSampleReaderOpen(true)}
+                variant="outline"
+                className="w-full mb-3 border-marca/40 text-primary hover:bg-marca/5 py-6 text-lg rounded-xl"
+              >
+                <BookOpen className="mr-2 h-5 w-5" />
+                Ler Amostra Grátis (Primeiras Páginas)
+              </Button>
+            )}
+            {/* PDFs ligados ao produto: gratuitos, ou para quem o comprou (materiais). */}
+            <ProductDownloads productId={product.id} product={product} />
             {(settings.whatsapp || settings.contact_phone) && (
               <Button
                 variant="outline"
@@ -485,7 +495,10 @@ function ProductDetailPage() {
 
             {isStockManaged && !canAddToCart && product.purchasable && (
               <p className="text-sm text-destructive flex items-center justify-center gap-2 mb-4">
-                <XCircle size={16} /> Stock insuficiente. Apenas {availableStock} disponível{availableStock !== 1 ? 'eis' : ''}.
+                <XCircle size={16} />
+                {availableStock > 0
+                  ? `Stock insuficiente. Apenas ${availableStock} disponíve${availableStock !== 1 ? 'is' : 'l'}.`
+                  : variantNames(product.product_type).soldOut}
               </p>
             )}
 
@@ -551,16 +564,17 @@ function ProductDetailPage() {
           <Tabs defaultValue="details" id="detalhes-produto" className="scroll-mt-24">
             <TabsList className="mb-8 flex-wrap h-auto gap-1">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
-              {product.preview_enabled && product.sample_pages?.length > 0 && (
+              {hasReadingSample(product) && (
                 <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1.5" />Pré-visualização</TabsTrigger>
               )}
               {(product.author_bio || product.author_photo) && (
                 <TabsTrigger value="author"><User className="h-4 w-4 mr-1.5" />Sobre o Autor</TabsTrigger>
               )}
               {product.variants?.length > 1 && (
-                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />Versões</TabsTrigger>
+                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type).many}</TabsTrigger>
               )}
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
+              <TabsTrigger value="discussion"><MessagesSquare className="h-4 w-4 mr-1.5" />Discussão</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="max-w-3xl">
@@ -571,7 +585,7 @@ function ProductDetailPage() {
               )}
             </TabsContent>
 
-            {product.preview_enabled && product.sample_pages?.length > 0 && (
+            {hasReadingSample(product) && (
               <TabsContent value="preview">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <p className="text-sm text-muted-foreground">Explore as primeiras páginas antes de comprar.</p>
@@ -615,24 +629,29 @@ function ProductDetailPage() {
               <TabsContent value="versions">
                 <div className="grid sm:grid-cols-2 gap-4 max-w-3xl">
                   {product.variants.map((v) => (
-                    <div
+                    <button
+                      type="button"
                       key={v.id}
-                      role="button"
-                      tabIndex={0}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedVariant?.id === v.id ? 'ring-2 ring-marca border-marca/40' : 'hover:border-marca/30'}`}
+                      aria-pressed={selectedVariant?.id === v.id}
+                      className={`text-left p-4 rounded-xl border cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedVariant?.id === v.id ? 'ring-2 ring-marca border-marca/40' : 'hover:border-marca/30'}`}
                       onClick={() => handleVariantSelect(v)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleVariantSelect(v)}
                     >
                       <p className="font-semibold">{v.title}</p>
                       {v.format && <p className="text-sm text-muted-foreground">{v.format}</p>}
                       {v.isbn && <p className="text-xs font-mono text-muted-foreground mt-1">ISBN: {v.isbn}</p>}
                       <p className="text-primary font-bold mt-2">{v.sale_price_formatted || v.price_formatted}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{v.inventory_quantity} em stock</p>
-                    </div>
+                      <p className="text-xs text-muted-foreground mt-1">{v.inventory_quantity > 0 ? `${v.inventory_quantity} em stock` : 'Esgotado'}</p>
+                    </button>
                   ))}
                 </div>
               </TabsContent>
             )}
+
+            {/* Conversa aberta sobre o livro, com respostas, citações e links (a comunidade, filtrada
+                por este livro). As avaliações ficam no separador ao lado. */}
+            <TabsContent value="discussion" className="mt-6 max-w-2xl">
+              <CommunityFeed book={{ id: product.id, title: product.title }} />
+            </TabsContent>
 
             <TabsContent value="reviews" className="space-y-8 mt-6">
               <div className="grid md:grid-cols-12 gap-8">
@@ -854,7 +873,6 @@ function ProductDetailPage() {
         pages={product.sample_pages || []}
         title={product.title}
       />
-      <BookPreviewModal product={product} open={showPreview} onClose={() => setShowPreview(false)} onCartOpen={() => setIsCartOpen(true)} />
 
       <RecentlyViewed currentId={product.id} />
 

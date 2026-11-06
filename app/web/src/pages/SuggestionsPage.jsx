@@ -84,7 +84,7 @@ export default function SuggestionsPage() {
       <main className="section-spacing bg-background">
         <div className="container-custom">
           {loading && (
-            <div className={PRODUCT_GRID_CLASS} aria-busy="true" aria-label="A carregar sugestões">
+            <div className={PRODUCT_GRID_CLASS} role="status" aria-busy="true" aria-label="A carregar sugestões">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
               ))}

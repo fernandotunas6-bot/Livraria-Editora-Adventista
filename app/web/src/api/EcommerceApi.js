@@ -3,7 +3,7 @@ import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
-import { looksLikeProductCode, normalizeProductCode } from '@/lib/productTypes';
+import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
@@ -213,6 +213,15 @@ export async function getFeaturedProducts(limit = 8) {
   return { products: items.slice(0, limit).map((b) => bookToProduct(b, collectionsMap)) };
 }
 
+/** Stock vendável de uma variante: o dela, sem passar o do produto (o `place_order` verifica os dois). */
+export function variantStock(book, version) {
+  const total = Math.max(0, Math.floor(Number(book?.stock) || 0));
+  const raw = version?.stock;
+  if (raw === null || raw === undefined || String(raw).trim() === '') return total;
+  const own = Number(raw);
+  return Number.isFinite(own) ? Math.max(0, Math.min(Math.floor(own), total)) : total;
+}
+
 export async function getProduct(id) {
   const book = await pb.collection('stock_books').getOne(id);
   const collectionsMap = await getCollectionsMap();
@@ -228,13 +237,14 @@ export async function getProduct(id) {
       const saleInCents = sale != null ? Math.round(sale * 100) : null;
       return {
         id: `${book.id}-v${i}`,
-        title: v.label || v.title || `Edição ${i + 1}`,
+        title: v.label || v.title || `${variantNames(book.product_type).one} ${i + 1}`,
         price_in_cents: priceInCents,
         sale_price_in_cents: saleInCents,
         price_formatted: formatCurrency(priceInCents),
         sale_price_formatted: saleInCents != null ? formatCurrency(saleInCents) : null,
         currency_info: CURRENCY,
-        inventory_quantity: Number(v.stock ?? book.stock) || 0,
+        // O `place_order` exige stock no produto e na variante: o disponível é o menor dos dois.
+        inventory_quantity: variantStock(book, v),
         manage_inventory: true,
         image_url: v.cover || book.cover || null,
         format: v.format || '',
@@ -339,7 +349,7 @@ export async function initializeCheckout({
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.error || 'Erro no checkout');
+  if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
   return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
 }
 

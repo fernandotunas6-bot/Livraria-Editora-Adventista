@@ -21,6 +21,7 @@ import { getPaymentMethods, getPhysicalStores } from '@/api/PlatformApi';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
 import { calcShippingCents, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
+import { cartItemTitle, cartVariantLabel } from '@/lib/productTypes';
 import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
 import AngolaAddressSelector, { validateAngolaAddress, angolaAddressToPayload } from '@/components/AngolaAddressSelector';
@@ -194,7 +195,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const itemCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
   const orderItemsForReceipt = cartItems.map((item) => ({
-    title: item.product.title,
+    title: cartItemTitle(item),
     quantity: item.quantity,
     price: (item.variant.sale_price_in_cents ?? item.variant.price_in_cents) / 100,
   }));
@@ -221,7 +222,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
   const handleCheckout = useCallback(async (viaWhatsApp = false) => {
     if (maintenanceMode) {
-      toast({ variant: 'destructive', title: 'Loja em manutenção', description: 'O checkout está temporariamente indisponível. Tente mais tarde ou contacte-nos.' });
+      toast({ variant: 'destructive', title: 'Loja em manutenção', description: 'As compras estão temporariamente indisponíveis. Tente mais tarde ou contacte-nos.' });
       return;
     }
     const needsAddress = form.shippingMethod !== 'pickup';
@@ -374,7 +375,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       window.location.href = `/success?${params.toString()}`;
     } catch (error) {
       toast({
-        title: viaWhatsApp ? 'Erro no pedido WhatsApp' : 'Erro no checkout',
+        title: viaWhatsApp ? 'Erro no pedido WhatsApp' : 'Não foi possível finalizar a compra',
         description: error.message || 'Não foi possível finalizar.',
         variant: 'destructive',
       });
@@ -419,7 +420,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     {step === 'cart' ? 'Carrinho' : 'Finalizar Compra'}
                   </h2>
                   {itemCount > 0 && (
-                    <p className="text-xs text-muted-foreground">{itemCount} item{itemCount !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-muted-foreground">{itemCount} {itemCount === 1 ? 'item' : 'itens'}</p>
                   )}
                 </div>
               </div>
@@ -448,7 +449,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       <ShoppingCartIcon size={48} className="mb-4 opacity-40" />
                       <p className="mb-4">O carrinho está vazio.</p>
                       <Button variant="outline" onClick={() => { setIsCartOpen(false); }} asChild>
-                        <Link to="/shop">Explorar Livros</Link>
+                        <Link to="/shop">Explorar o catálogo</Link>
                       </Button>
                     </div>
                   ) : (
@@ -462,6 +463,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         />
                         <div className="flex-grow min-w-0">
                           <h3 className="font-semibold text-sm line-clamp-2">{item.product.title}</h3>
+                          {/* A variante (tamanho, edição): M e L do mesmo uniforme eram duas linhas iguais. */}
+                          {cartVariantLabel(item.variant) && (
+                            <p className="text-xs font-medium text-foreground/80">{cartVariantLabel(item.variant)}</p>
+                          )}
                           <p className="text-xs text-muted-foreground">{item.product.subtitle}</p>
                           <p className="text-sm text-primary font-bold mt-1">
                             {item.variant.sale_price_formatted || item.variant.price_formatted}
@@ -789,7 +794,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
                 {step === 'cart' ? (
                   <Button className="w-full btn-primary py-6 text-base" onClick={() => setStep('checkout')} disabled={maintenanceMode}>
-                    {maintenanceMode ? 'Checkout indisponível' : 'Continuar para Checkout'}
+                    {maintenanceMode ? 'Compras indisponíveis' : 'Continuar para finalizar a compra'}
                   </Button>
                 ) : (
                   <>

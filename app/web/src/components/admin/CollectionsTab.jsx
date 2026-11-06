@@ -300,7 +300,7 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate">{c.title}</h3>
+                  <h3 className="text-base font-semibold truncate">{c.title}</h3>
                   <p className="text-xs text-muted-foreground truncate">{c.marketing_tagline || `/colecoes/${c.slug || c.id}`}</p>
                   <div className="flex flex-wrap gap-2 mt-1 items-center">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${c.active ? 'bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
@@ -346,7 +346,7 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
             <>
               <div className="flex items-start justify-between gap-2 mb-4">
                 <div className="min-w-0">
-                  <h3 className="font-bold truncate">{selected.title}</h3>
+                  <h3 className="text-base font-bold truncate">{selected.title}</h3>
                   <p className="text-sm text-muted-foreground">{collectionBooks.length} livro(s) nesta coleção</p>
                 </div>
                 {selected.active && (

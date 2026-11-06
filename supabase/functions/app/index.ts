@@ -48,6 +48,7 @@ import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, paymentStatusChange,
   saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
+import { floatingPagesFrom } from "./floatingPages.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -656,7 +657,9 @@ async function orderPaymentLink(order: Row) {
 async function sendOrderConfirmationEmail(order: Row, settings: Row | null) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
   const paymentLink = await orderPaymentLink(order);
-  const letter = orderCreatedLetter(emailBrand(settings), order, paymentLink);
+  // Transferência e Multicaixa pagam-se depois de encomendar; entrega e balcão não pedem pagamento.
+  const { data: method } = await db.from("payment_methods").select("type").eq("code", order.payment_method_code || "").maybeSingle();
+  const letter = orderCreatedLetter(emailBrand(settings), order, paymentLink, { payLater: isPaidUpfront(method?.type) });
   return sendLetter(settings, order.customer_email, letter, {
     context: "order",
     customer_name: order.customer_name,
@@ -1173,7 +1176,7 @@ route("GET", "/settings", async () => {
   if (!rec) {
     return json({
       site_name: "Livraria Adventista", tagline: "Literatura que edifica e transforma", primary_color: "#0ea5c9",
-      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "",
+      logo_url: "", favicon_url: "", contact_email: "", contact_phone: "",
       contact_address: "Luanda, Angola", pwa_enabled: true, pwa_theme_color: "#0c4a6e", shipping_free_threshold: 20000,
       shipping_cost: 1500, maintenance_mode: false, google_oauth_enabled: false,
       header_welcome_logged: "Bem-vindo de volta, {nome}",
@@ -1261,6 +1264,9 @@ route("GET", "/settings", async () => {
       : [],
     google_maps_embed_key: rec.google_maps_embed_key || "",
     order_email_enabled: !!rec.order_email_enabled,
+    // Páginas sem o assistente e sem "Voltar ao topo" (escolha do painel). null = as de omissão do site.
+    chat_hidden_on: floatingPagesFrom(rec.chat_hidden_on),
+    scroll_top_hidden_on: floatingPagesFrom(rec.scroll_top_hidden_on),
     push_enabled: !!rec.push_enabled,
     vapid_public_key: rec.vapid_public_key || "",
     chat_enabled: orTrue(rec.chat_enabled),
@@ -1569,8 +1575,10 @@ route("POST", "/order-feedback", async ({ body, ip }) => {
   const event = outcome === "ok"
     ? timelineEvent("customer_confirmed", "Cliente confirmou a recepção", "Recebeu tudo bem.", "")
     : timelineEvent("customer_problem", "Cliente reportou um problema", message, "");
+  // Só "Recebi tudo bem" é confirmação: customer_confirmed_at conta como compra feita (compra
+  // verificada, PDFs pagos). "Tenho um problema" (por exemplo, "não recebi") limpa-a.
   const { error } = await db.from("orders").update({
-    customer_confirmed_at: at,
+    customer_confirmed_at: outcome === "ok" ? at : null,
     customer_feedback: { outcome, message: outcome === "problem" ? message : "", at },
     delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), event],
   }).eq("id", id);
@@ -2004,16 +2012,22 @@ route("GET", "/messaging/status", async () => {
 // Recibo por WhatsApp: só para o telefone registado na encomenda e com o texto montado aqui,
 // a partir da encomenda. O texto enviado pelo browser é ignorado, para que ninguém use o número
 // oficial da loja para mandar mensagens escritas por si.
-function buildReceiptText(order: Row, siteName: string, paymentLink = "") {
+// `payLaterUrl`: endereço do rastreio, quando a encomenda é paga antes do envio (transferência,
+// Multicaixa) e ainda não foi paga — o recibo diz como pagar e onde indicar a referência.
+function buildReceiptText(order: Row, siteName: string, paymentLink = "", payLaterUrl = "") {
   const lines = [
     `🧾 *Recibo — ${siteName}*`, `Nº: ${order.order_number || ""}`, "",
-    `Olá ${order.customer_name || ""}!`, "", "*Livros:*",
-    ...(order.items || []).map((it: Row) => `• ${it.quantity || 1}× ${it.title || "Livro"} — ${fmtMoneyKz(Number(it.price || 0) * Number(it.quantity || 1))}`),
+    // "Produtos": a loja vende livros, Bíblias, uniformes, material de igreja…
+    `Olá ${order.customer_name || ""}!`, "", "*Produtos:*",
+    ...(order.items || []).map((it: Row) => `• ${it.quantity || 1}× ${it.title || "Produto"} — ${fmtMoneyKz(Number(it.price || 0) * Number(it.quantity || 1))}`),
   ];
   if (Number(order.shipping_cost)) lines.push(`Portes: ${fmtMoneyKz(order.shipping_cost)}`);
   lines.push("", `*Total: ${fmtMoneyKz(order.total)}*`);
   if (paymentLabel(order)) lines.push(`Pagamento: ${paymentLabel(order)}`);
   if (paymentLink) lines.push(`Link de pagamento: ${paymentLink}`);
+  if (payLaterUrl) {
+    lines.push("", `Para pagar: use o número ${order.order_number || ""} no descritivo e indique a referência em ${payLaterUrl}`);
+  }
   lines.push("", "Obrigado pela sua compra! 📚");
   return lines.join("\n");
 }
@@ -2033,7 +2047,11 @@ route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
   if (!await checkRateLimit("whatsapp_receipt_order", order.id, storeRules(settings).receiptPerOrder)) throw tooMany("O recibo desta encomenda já foi enviado. Aguarde um minuto.");
   const config = await getWhatsAppConfig();
   if (!config) return json({ sent: false, fallback: true, message: "API WhatsApp não configurada — use link manual." });
-  const text = buildReceiptText(order, settings?.site_name || "Livraria Adventista", await orderPaymentLink(order));
+  const { data: method } = await db.from("payment_methods").select("type").eq("code", order.payment_method_code || "").maybeSingle();
+  const site = emailBrand(settings).siteUrl.replace(/\/$/, "");
+  const payLaterUrl = isPaidUpfront(method?.type) && !["paid", "refunded"].includes(order.payment_status) && order.status !== "cancelled" && site
+    ? `${site}/track` : "";
+  const text = buildReceiptText(order, settings?.site_name || "Livraria Adventista", await orderPaymentLink(order), payLaterUrl);
   const result = await sendWhatsAppMessage(phone, text, config, undefined, { context: "receipt", customer_name: order.customer_name, order_number: order.order_number });
   return json({
     sent: !!result.ok,
