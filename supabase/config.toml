@@ -5,3 +5,8 @@ project_id = "bggqkjjqbjhbjsckzopj"
 # porque também serve rotas públicas (catálogo, checkout, rastreio).
 [functions.app]
 verify_jwt = false
+
+# Versão do Postgres de produção (17). O CI arranca um Postgres local com esta versão e aplica
+# todas as migrações do zero (job "Migrações aplicam do zero" em .github/workflows/ci.yml).
+[db]
+major_version = 17
