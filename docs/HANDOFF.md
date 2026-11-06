@@ -13,12 +13,17 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 
 ## Análise crítica e correcções do checkout (2026-11-06)
 
-Feito no código (PR #9), a publicar no merge:
+Feito no código (PR #9), **publicado em produção a 2026-11-06** (commit `d8c3e81`, à mão, com os tokens do Cloudflare e do Supabase da sessão):
+- Migração `20261106050000_pagamentos_por_envio` aplicada pela API de gestão do Supabase (numa transacção, registada em `schema_migrations` com o mesmo md5 do ficheiro). O `supabase db push` não serve a partir de uma sessão na nuvem: a ligação directa ao Postgres fica pendurada.
+- Edge Function `app` v19 (`supabase functions deploy app --use-api --no-verify-jwt`).
+- Site com `npm run deploy:site` no projecto `livraria-editora-adventista` (conta `valentinocanguele@gmail.com`); o script confirmou o deploy e as páginas.
+
+O que entrou:
 - **Comprar sem conta**, também com entrega. **Pagar depois de encomendar** (transferência, Multicaixa): a referência indica-se na página de sucesso ou no rastreio (`/order/payment-reference`); a equipa recebe `payment_reported`.
 - Pagamentos filtrados por envio ("Pagar no Balcão" só no levantamento, editável no painel → Pagamentos), portes 0 válidos, unidades do expresso, canal de venda em lista fechada, assinatura do checkout opcional, `/confirm-delivery` só PNG até 300 KB.
 - Ficha: capa inteira e botões logo a seguir ao preço. Checkout: avisos visíveis no telemóvel, campos com rótulo e `autocomplete`, passos com nome, IBAN legível com "Copiar". Cartões não abrem o carrinho a cada livro.
 - Cor da marca como token (`marca`, 145 sítios) em vez de `#0ea5c9` escrito à mão. Spec em [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md).
-- **Migração `20261106050000_pagamentos_por_envio` por aplicar**: de propósito, entra no merge pelo `supabase db push`, ao mesmo tempo que a Edge Function e o site que a usam. Foi testada em transacção revertida. (Aplicá-la antes deixava as instruções novas de pagamento no site antigo.)
+- Migração `20261106050000_pagamentos_por_envio`: aplicada ao mesmo tempo que a Edge Function e o site que a usam (ver acima).
 
 Por decidir ou configurar (dono):
 - **Multicaixa Express activo com `923 000 000`**, que parece fictício, e um link de `pay.kursinha.com` por confirmar.
