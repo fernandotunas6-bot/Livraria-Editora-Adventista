@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -38,6 +38,7 @@ const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
 const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
 const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
+const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
@@ -405,6 +406,7 @@ const AdminPage = () => {
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
       canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
       canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
+      canManageCatalog && { value: 'community', label: 'Comunidade', icon: MessagesSquare },
     ] },
     { label: 'Sistema', tabs: [
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
@@ -538,6 +540,13 @@ const AdminPage = () => {
               <TabsContent value="support">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <SupportCenter />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageCatalog && (
+              <TabsContent value="community">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <CommunityTab />
                 </Suspense>
               </TabsContent>
             )}

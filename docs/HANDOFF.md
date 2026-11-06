@@ -2,6 +2,13 @@
 
 Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Comunidade de leitores (2026-11-06, ramo `claude/elegant-noether-ebflws`)
+
+- **Pedido do dono:** discutir livros ou qualquer assunto, com subcomentários, referências a livros e links, "estilo rede social". Escolhas: feed geral, links publicados logo (com denúncia).
+- **Feito (Fase 1):** `/comunidade`, separador **Discussão** na ficha, moderação no painel (Clientes → Comunidade), link "Comunidade" no menu. Migração `20261106190000_comunidade`, **ainda não aplicada** (vai no merge), testada em produção numa transacção anulada: resposta a resposta, `javascript:` e credenciais recusados; contadores protegidos; terceira denúncia oculta; anónimo não publica; a vista não tem email nem `user_id`; limite de 10 publicações por hora.
+- **Por fazer:** Fase 2 (PDFs e revistas para descarregar) e Fase 3 (faixa de aviso no cabeçalho), no plano. Notificações de respostas: não há (decisão por tomar).
+- **Riscos que ficam com o dono:** links sem moderação prévia (phishing/spam, mitigado por denúncia, ocultação e limite); as publicações são públicas com o nome do perfil, e a política de privacidade deve passar a cobrir a comunidade.
+
 ## Variantes e amostra de leitura (2026-11-06, ramo `claude/elegant-noether-ebflws`)
 
 - **Produtos com tamanhos ou edições** só se compram com um escolhido: o cartão, a vista rápida e os destaques levam à ficha ("Escolher"), e o `place_order` recusa sem variante. Migração `20261106170000_variante_obrigatoria`, **ainda não aplicada**: vai no merge, com o `supabase db push`. Testada numa transacção anulada.

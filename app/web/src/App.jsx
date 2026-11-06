@@ -27,6 +27,7 @@ const StoresPage = lazy(() => import('@/pages/StoresPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
+const CommunityPage = lazy(() => import('@/pages/CommunityPage.jsx'));
 const ShippingReturnsPage = lazy(() => import('@/pages/ShippingReturnsPage.jsx'));
 const SuccessPage = lazy(() => import('@/pages/SuccessPage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
@@ -188,6 +189,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/track" element={<TrackOrderPage />} />
               <Route path="/sugestoes" element={<SuggestionsPage />} />
+              <Route path="/comunidade" element={<CommunityPage />} />
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />

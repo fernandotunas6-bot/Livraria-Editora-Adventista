@@ -11,7 +11,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,6 +30,7 @@ import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
 import { hasReadingSample, variantNames } from '@/lib/productTypes';
+import CommunityFeed from '@/components/community/CommunityFeed';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -570,6 +571,7 @@ function ProductDetailPage() {
                 <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type).many}</TabsTrigger>
               )}
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
+              <TabsTrigger value="discussion"><MessagesSquare className="h-4 w-4 mr-1.5" />Discussão</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="max-w-3xl">
@@ -641,6 +643,12 @@ function ProductDetailPage() {
                 </div>
               </TabsContent>
             )}
+
+            {/* Conversa aberta sobre o livro, com respostas, citações e links (a comunidade, filtrada
+                por este livro). As avaliações ficam no separador ao lado. */}
+            <TabsContent value="discussion" className="mt-6 max-w-2xl">
+              <CommunityFeed book={{ id: product.id, title: product.title }} />
+            </TabsContent>
 
             <TabsContent value="reviews" className="space-y-8 mt-6">
               <div className="grid md:grid-cols-12 gap-8">

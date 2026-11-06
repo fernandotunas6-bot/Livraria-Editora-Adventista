@@ -98,6 +98,16 @@ A capa mostra-se **inteira**: `aspect-[3/4]` com `object-contain`, em todos os t
 
 O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A regra está em `lib/floatingButtons.js` (`isFloatingHidden`), e a escolha é do painel: Configurações → Assistente IA → **Botões flutuantes**, com uma caixa por página para cada botão (marcado = aparece). Por omissão ficam fora da ficha do produto, da encomenda feita e do rastreio, e de entrar e recuperar a palavra-passe, onde tapavam os botões de compra, os avisos de stock e o formulário de pagamento. O regresso ao topo ao mudar de página acontece sempre; só o botão é que se esconde.
 
+### Comunidade
+
+`/comunidade` (feed geral) e o separador **Discussão** da ficha (o mesmo feed filtrado pelo livro) usam `components/community/` (`CommunityFeed`, `PostCard`, `PostComposer`) e `hooks/useCommunity.jsx`.
+
+- **Publicação:** texto (até 2000), livro opcional (pesquisa do catálogo), citação com página (escrita por quem publica: o sistema não tem o texto dos livros) e até 5 links. Respostas num só nível.
+- **Links de utilizadores:** só http(s) (`lib/communityLinks.js`), sempre com `rel="nofollow ugc noopener noreferrer"` e `target="_blank"`, mostrados pelo domínio com "link externo". Nunca `dangerouslySetInnerHTML`: o texto passa por `linkifySegments`.
+- **Autor:** nome do perfil e iniciais; nunca email nem foto (o endereço da foto teria o id da conta).
+- **Moderação:** "Denunciar" com motivo; à 3.ª denúncia fica oculta. A equipa decide no painel → Clientes → Comunidade.
+- Sem a migração `comunidade` aplicada, mostra "A comunidade abre em breve".
+
 ## 9. Carrinho e checkout
 
 - **Passos com nome**: "1. Carrinho", "2. Dados e pagamento".

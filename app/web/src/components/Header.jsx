@@ -23,6 +23,7 @@ const NAV_LINKS = [
   { to: '/', label: 'Início' },
   { to: '/shop', label: 'Livros' },
   { to: '/colecoes', label: 'Coleções' },
+  { to: '/comunidade', label: 'Comunidade' },
   { to: '/lojas', label: 'Lojas' },
   { to: '/about', label: 'Sobre' },
   { to: '/faq', label: 'Ajuda' },
