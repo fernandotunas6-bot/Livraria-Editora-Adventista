@@ -46,6 +46,7 @@ import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.
 import { createRateLimit } from "./rateLimit.ts";
 import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, saleChannelFrom, settingNumber,
+  unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -232,6 +233,10 @@ function storeRules(settings: Row | null) {
     checkoutRate: clampInt(settings?.checkout_rate_per_minute, 1, 60, 15),
     trackRate: clampInt(settings?.track_rate_per_minute, 1, 120, 20),
     receiptPerOrder: clampInt(settings?.receipt_per_order_per_minute, 1, 10, 3),
+    // 0 = nunca cancela (o valor por omissão): a loja decide se e quando.
+    unpaidCancelDays: clampInt(settings?.unpaid_cancel_days, 0, 60, 0),
+    // Respostas com IA por dia na loja toda (custo). 0 = assistente sempre sem IA.
+    chatAiDailyLimit: clampInt(settings?.chat_ai_daily_limit, 0, 100000, 500),
   };
 }
 
@@ -2552,7 +2557,7 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 // Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
 // ---------------------------------------------------------------------------
 
-const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
 
 /** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
 async function ordersForWatch() {
@@ -2563,12 +2568,50 @@ async function ordersForWatch() {
 }
 
 /**
+ * Cancela as encomendas pagas antes do envio (transferência, Multicaixa) que ficaram sem pagamento
+ * nem referência durante `unpaid_cancel_days` dias (Configurações → Regras da loja; 0 = nunca).
+ * O stock volta ao catálogo pelo trigger orders_before_update, como num cancelamento no painel, e o
+ * cliente e a equipa são avisados. Muda as encomendas em memória, para não gerarem alertas.
+ */
+async function cancelUnpaidOrders(orders: Row[]) {
+  const days = storeRules(await getSettings(true)).unpaidCancelDays;
+  if (days <= 0) return 0;
+  const { data: methods } = await db.from("payment_methods").select("code, type");
+  const upfront = new Set((methods || []).filter((m: Row) => isPaidUpfront(m.type)).map((m: Row) => String(m.code)));
+  let cancelled = 0;
+  for (const o of unpaidOrdersToCancel(orders, upfront, days)) {
+    // As condições repetem-se no update: se a equipa confirmou o pagamento entretanto, não cancela.
+    const { data: saved, error } = await db.from("orders")
+      .update({ status: "cancelled", delivery_status: "cancelled" })
+      .eq("id", o.id).eq("payment_status", "pending").neq("status", "cancelled")
+      .select().maybeSingle();
+    if (error || !saved) continue;
+    cancelled += 1;
+    Object.assign(o, { status: "cancelled", delivery_status: "cancelled" });
+    const ref = o.order_number || o.id;
+    await notifyOrderStaff(
+      "order_stuck",
+      `Cancelada por falta de pagamento — ${ref}`,
+      `${o.customer_name || "Cliente"} não pagou nem indicou a referência em ${days} dia(s). O stock voltou ao catálogo.`,
+      o.id,
+    );
+    try {
+      await notifyOrderStep(saved, "cancelled", { description: `O pagamento não chegou em ${days} dia(s). Se já pagou, contacte-nos com o número da encomenda.` });
+    } catch (err) {
+      console.log("Aviso de cancelamento por falta de pagamento:", err);
+    }
+  }
+  return cancelled;
+}
+
+/**
  * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa (staff_notifications)
  * só dos alertas novos ou que passaram a críticos, e fecha os que deixaram de existir.
  * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
  */
 async function runOrderWatch(summary = false) {
   const orders = await ordersForWatch();
+  const cancelled = await cancelUnpaidOrders(orders);
   const alerts = orderAlerts(orders);
   const now = nowISO();
   const { data: open } = await db.from("order_alerts").select("order_id, kind, severity").is("resolved_at", null);
@@ -2597,7 +2640,7 @@ async function runOrderWatch(summary = false) {
   }
   let summarySent = 0;
   if (summary) summarySent = await sendDailySummary(orders, alerts);
-  return { orders: orders.length, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
+  return { orders: orders.length, cancelled, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
 }
 
 /** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
@@ -3235,6 +3278,21 @@ function faqFallback(message: string, settings: Row | null, books: Row[]) {
   };
 }
 
+/**
+ * Teto diário de respostas com IA (custo): até 60 por IP e `chat_ai_daily_limit` na loja toda.
+ * Acima dele o assistente responde com as perguntas frequentes, sem IA. Sem a função
+ * check_rate_limit_daily (antes da migração 20261106050000) não há teto, como antes.
+ */
+async function aiQuotaAvailable(ip: string, settings: Row | null) {
+  const total = storeRules(settings).chatAiDailyLimit;
+  if (total <= 0) return false;
+  const within = async (bucket: string, client: string, max: number) => {
+    const { data, error } = await db.rpc("check_rate_limit_daily", { p_bucket: bucket, p_client: client, p_max: max });
+    return error ? true : data !== false;
+  };
+  return await within("chat-ia-ip", ip, Math.min(60, total)) && await within("chat-ia", "loja", total);
+}
+
 route("POST", "/chat", async ({ body, ip }) => {
   if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
@@ -3265,7 +3323,7 @@ route("POST", "/chat", async ({ body, ip }) => {
   let parsed = null;
   let usedAi = false;
   let provider = "faq";
-  if (pref !== "faq") {
+  if (pref !== "faq" && (keys.gemini || keys.deepseek) && await aiQuotaAvailable(ip, settings)) {
     let use = "";
     if (pref === "gemini" && keys.gemini) use = "gemini";
     else if (pref === "deepseek" && keys.deepseek) use = "deepseek";

@@ -38,3 +38,28 @@ export function isPngSignature(value: unknown, maxLength: number): value is stri
 export function cleanPaymentReference(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
 }
+
+type OrderLike = {
+  id?: string; status?: string; delivery_status?: string; payment_status?: string;
+  payment_reference?: string; payment_method_code?: string; created?: string;
+};
+
+/**
+ * Encomendas a cancelar por falta de pagamento: pagas antes do envio (o método está em
+ * `upfrontCodes`), ainda pendentes e sem referência indicada, ainda não preparadas, e criadas há
+ * mais de `days` dias. `days` 0 (o valor por omissão) desliga a regra: nada é cancelado.
+ * Quem já indicou a referência fica de fora: espera pela equipa, não pelo relógio.
+ */
+export function unpaidOrdersToCancel<T extends OrderLike>(orders: T[], upfrontCodes: Set<string>, days: number, now = Date.now()): T[] {
+  if (!(days > 0)) return [];
+  const limit = now - days * 24 * 3600_000;
+  return orders.filter((o) => {
+    const created = new Date(String(o.created || "")).getTime();
+    return o.status !== "cancelled"
+      && ["received", "confirmed"].includes(o.delivery_status || "received")
+      && (o.payment_status || "pending") === "pending"
+      && !String(o.payment_reference || "").trim()
+      && upfrontCodes.has(String(o.payment_method_code || ""))
+      && Number.isFinite(created) && created < limit;
+  });
+}

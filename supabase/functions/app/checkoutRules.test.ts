@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, saleChannelFrom, settingNumber,
+  unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
 describe("settingNumber", () => {
@@ -70,5 +71,35 @@ describe("cleanPaymentReference", () => {
     expect(cleanPaymentReference("  REF  123\n456 ")).toBe("REF 123 456");
     expect(cleanPaymentReference("x".repeat(200))).toHaveLength(120);
     expect(cleanPaymentReference(null)).toBe("");
+  });
+});
+
+describe("unpaidOrdersToCancel", () => {
+  const agora = Date.parse("2026-11-10T12:00:00Z");
+  const dia = 24 * 3600_000;
+  const base = {
+    status: "pending", delivery_status: "received", payment_status: "pending", payment_reference: "",
+    payment_method_code: "transferencia", created: new Date(agora - 4 * dia).toISOString(),
+  };
+  const upfront = new Set(["transferencia", "multicaixa"]);
+
+  it("com 0 dias não cancela nada", () => {
+    expect(unpaidOrdersToCancel([{ ...base, id: "a" }], upfront, 0, agora)).toEqual([]);
+  });
+  it("cancela a transferência por pagar mais velha que o prazo", () => {
+    expect(unpaidOrdersToCancel([{ ...base, id: "a" }], upfront, 3, agora).map((o) => o.id)).toEqual(["a"]);
+  });
+  it("não cancela dentro do prazo, com referência, já paga, a pagar na entrega, preparada ou cancelada", () => {
+    const fora = [
+      { ...base, id: "novo", created: new Date(agora - 1 * dia).toISOString() },
+      { ...base, id: "com-ref", payment_reference: "REF123" },
+      { ...base, id: "a-confirmar", payment_status: "awaiting_confirmation" },
+      { ...base, id: "paga", payment_status: "paid" },
+      { ...base, id: "na-entrega", payment_method_code: "entrega" },
+      { ...base, id: "preparada", delivery_status: "preparing" },
+      { ...base, id: "cancelada", status: "cancelled" },
+      { ...base, id: "sem-data", created: "" },
+    ];
+    expect(unpaidOrdersToCancel(fora, upfront, 3, agora)).toEqual([]);
   });
 });
