@@ -18,6 +18,8 @@ import { isUploadPending } from '@/lib/mediaUpload';
 import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { clearSecret, loadSecretStatus, secretsForSave, withoutSecrets } from '@/lib/siteSecrets';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FLOATING_PAGES, hiddenPages } from '@/lib/floatingButtons';
 
 /**
  * Campo de palavra-passe ou chave. Com a migração `segredos_fora_da_api` o valor guardado
@@ -178,6 +180,8 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
   const [hasNewRules, setHasNewRules] = useState(false);
+  // Colunas da migração 20261106180000 (páginas sem os botões flutuantes).
+  const [hasFloating, setHasFloating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // Que segredos estão guardados (sem os valores). `null` = base de dados sem a migração.
@@ -197,6 +201,7 @@ export default function SettingsTab() {
         setHasAboutImages('about_top_image_url' in r);
         setHasAboutTeam('about_team' in r);
         setHasNewRules('unpaid_cancel_days' in r);
+        setHasFloating('chat_hidden_on' in r);
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
         setLogoRemoved(false);
@@ -281,6 +286,8 @@ export default function SettingsTab() {
           deepseek_api_key: r.deepseek_api_key || '',
           chat_model: r.chat_model || '',
           chat_welcome: r.chat_welcome || '',
+          chat_hidden_on: hiddenPages(r, 'chat'),
+          scroll_top_hidden_on: hiddenPages(r, 'top'),
         });
       }
     } catch {
@@ -406,6 +413,15 @@ export default function SettingsTab() {
       if (faviconRemoved && id) {
         await removeImageFromRecord('site_settings', id, 'favicon', 'favicon_url');
         data.favicon_url = '';
+      }
+
+      // Páginas sem os botões flutuantes: só com as colunas da migração, e só chaves conhecidas.
+      if (hasFloating) {
+        data.chat_hidden_on = hiddenPages(form, 'chat');
+        data.scroll_top_hidden_on = hiddenPages(form, 'top');
+      } else {
+        delete data.chat_hidden_on;
+        delete data.scroll_top_hidden_on;
       }
 
       // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
@@ -774,6 +790,50 @@ export default function SettingsTab() {
             <Label>Mensagem de boas-vindas</Label>
             <Textarea rows={2} value={form.chat_welcome} onChange={(e) => set('chat_welcome', e.target.value)} placeholder="Olá! Sou o assistente da livraria…" />
           </div>
+
+          {hasFloating && (
+            <div className="border-t pt-6 space-y-3">
+              <div>
+                <h3 className="font-semibold">Botões flutuantes</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Em que páginas aparecem o botão do assistente e o de voltar ao topo. Tire-os onde taparem botões ou formulários, sobretudo no telemóvel.
+                </p>
+              </div>
+              <div className="rounded-lg border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th scope="col" className="text-left font-medium px-3 py-2">Página</th>
+                      <th scope="col" className="font-medium px-3 py-2 w-28">Assistente</th>
+                      <th scope="col" className="font-medium px-3 py-2 w-28">Voltar ao topo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FLOATING_PAGES.map((page) => (
+                      <tr key={page.key} className="border-t">
+                        <th scope="row" className="text-left font-normal px-3 py-2">{page.label}</th>
+                        {[['chat_hidden_on', 'Assistente'], ['scroll_top_hidden_on', 'Voltar ao topo']].map(([field, name]) => {
+                          const hidden = (form[field] || []).includes(page.key);
+                          return (
+                            <td key={field} className="px-3 py-2 text-center">
+                              <Checkbox
+                                checked={!hidden}
+                                aria-label={`${name} em ${page.label}`}
+                                onCheckedChange={(v) => set(field, v
+                                  ? (form[field] || []).filter((k) => k !== page.key)
+                                  : [...(form[field] || []), page.key])}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">Marcado = aparece. O assistente também se desliga por completo em "Mostrar assistente no site".</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="shipping" className="space-y-4 max-w-xl">

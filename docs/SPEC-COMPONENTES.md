@@ -94,6 +94,10 @@ A capa mostra-se **inteira**: `aspect-[3/4]` com `object-contain`, em todos os t
 
 **Amostra de leitura:** só com `preview_enabled` e páginas carregadas no painel (`hasReadingSample`), e abre sempre o leitor das páginas reais (`SampleReaderModal`). Não há amostra gerada: a antiga inventava um prefácio e um capítulo iguais para todos os produtos.
 
+### Botões flutuantes
+
+O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A regra está em `lib/floatingButtons.js` (`isFloatingHidden`), e a escolha é do painel: Configurações → Assistente IA → **Botões flutuantes**, com uma caixa por página para cada botão (marcado = aparece). Por omissão ficam fora da ficha do produto, da encomenda feita e do rastreio, e de entrar e recuperar a palavra-passe, onde tapavam os botões de compra, os avisos de stock e o formulário de pagamento. O regresso ao topo ao mudar de página acontece sempre; só o botão é que se esconde.
+
 ## 9. Carrinho e checkout
 
 - **Passos com nome**: "1. Carrinho", "2. Dados e pagamento".

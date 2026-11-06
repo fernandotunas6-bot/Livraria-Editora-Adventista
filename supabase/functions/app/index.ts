@@ -48,6 +48,7 @@ import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, paymentStatusChange,
   saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
+import { floatingPagesFrom } from "./floatingPages.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1175,7 +1176,7 @@ route("GET", "/settings", async () => {
   if (!rec) {
     return json({
       site_name: "Livraria Adventista", tagline: "Literatura que edifica e transforma", primary_color: "#0ea5c9",
-      logo_url: "", favicon_url: "", contact_email: "contacto@livrariaadventista.ao", contact_phone: "",
+      logo_url: "", favicon_url: "", contact_email: "", contact_phone: "",
       contact_address: "Luanda, Angola", pwa_enabled: true, pwa_theme_color: "#0c4a6e", shipping_free_threshold: 20000,
       shipping_cost: 1500, maintenance_mode: false, google_oauth_enabled: false,
       header_welcome_logged: "Bem-vindo de volta, {nome}",
@@ -1263,6 +1264,9 @@ route("GET", "/settings", async () => {
       : [],
     google_maps_embed_key: rec.google_maps_embed_key || "",
     order_email_enabled: !!rec.order_email_enabled,
+    // Páginas sem o assistente e sem "Voltar ao topo" (escolha do painel). null = as de omissão do site.
+    chat_hidden_on: floatingPagesFrom(rec.chat_hidden_on),
+    scroll_top_hidden_on: floatingPagesFrom(rec.scroll_top_hidden_on),
     push_enabled: !!rec.push_enabled,
     vapid_public_key: rec.vapid_public_key || "",
     chat_enabled: orTrue(rec.chat_enabled),

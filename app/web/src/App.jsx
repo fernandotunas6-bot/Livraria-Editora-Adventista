@@ -4,11 +4,12 @@ import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useNavig
 import { CartProvider } from '@/hooks/useCart';
 import { AuthProvider } from '@/hooks/useAuth';
 import { AuthDialogProvider } from '@/hooks/useAuthDialog';
-import { SiteSettingsProvider } from '@/hooks/useSiteSettings';
+import { SiteSettingsProvider, useSiteSettings } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
+import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
@@ -130,7 +131,9 @@ function AuthRedirectNotice() {
 
 function GlobalWidgets() {
   const { pathname } = useLocation();
-  const showAssistant = pathname !== '/login';
+  const { settings } = useSiteSettings();
+  // Páginas sem o assistente: escolha do painel (lib/floatingButtons.js).
+  const showAssistant = !isFloatingHidden('chat', pathname, settings);
 
   return (
     <Suspense fallback={null}>

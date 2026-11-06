@@ -7,6 +7,7 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Produtos com tamanhos ou edições** só se compram com um escolhido: o cartão, a vista rápida e os destaques levam à ficha ("Escolher"), e o `place_order` recusa sem variante. Migração `20261106170000_variante_obrigatoria`, **ainda não aplicada**: vai no merge, com o `supabase db push`. Testada numa transacção anulada.
 - **A amostra de leitura inventada saiu** (prefácio e capítulo fictícios iguais para todos os produtos). O botão só aparece com páginas reais carregadas no painel → Livro → Amostra, e hoje nenhum produto as tem.
 - Detalhes em [AUDITORIA.md](AUDITORIA.md), secção 9.11, e na spec ([SPEC-COMPONENTES.md](SPEC-COMPONENTES.md), secção 8).
+- **Botões flutuantes por página** (pedido do dono): o assistente e o "Voltar ao topo" escolhem-se em Configurações → Assistente IA → Botões flutuantes. Por omissão saem da ficha do produto, da encomenda/rastreio e de entrar. Migração `20261106180000_botoes_flutuantes_por_pagina` (colunas `chat_hidden_on` e `scroll_top_hidden_on`), **também no merge**; até lá o site já usa as páginas por omissão e a tabela do painel não aparece.
 
 ## Códigos de cliente e de funcionário (2026-11-06)
 
