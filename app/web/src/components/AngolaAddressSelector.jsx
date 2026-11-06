@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import { Loader2, MapPin, Phone, Users } from 'lucide-react';
 import { getGeoMunicipalities, getGeoProvinces, getGeoLocalities } from '@/api/PlatformApi';
 import geoFallback from '@/data/angola-geo-2024.json';
@@ -148,6 +148,9 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
   }, [v.municipalityId, v.provinceId, provinces, municipalities]);
 
   const set = (patch) => onChange({ ...v, ...patch });
+  // Rótulos ligados aos campos (leitores de ecrã, e tocar no rótulo foca o campo).
+  const uid = useId();
+  const fid = (name) => `${uid}-${name}`;
 
   const onProvince = (id) => {
     const p = provinces.find((x) => x.id === id);
@@ -185,7 +188,7 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
   const showCustomLocality = localities.length === 0 || v.localityCustom || (!v.localityId && v.localityName === '');
 
   return (
-    <div className="space-y-3 rounded-lg border border-[#0ea5c9]/20 bg-[#0ea5c9]/5 p-3">
+    <div className="space-y-3 rounded-lg border border-marca/20 bg-marca/5 p-3">
       <div className="flex items-center gap-2 text-sm font-medium text-primary">
         <MapPin className="h-4 w-4" />
         Local de entrega em Angola
@@ -194,9 +197,9 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Província *</Label>
+          <Label htmlFor={fid('provincia')}>Província *</Label>
           <Select value={v.provinceId || ''} onValueChange={onProvince} disabled={disabled || loadingProvinces}>
-            <SelectTrigger>
+            <SelectTrigger id={fid('provincia')}>
               <SelectValue placeholder={loadingProvinces ? 'A carregar...' : 'Seleccione a província'} />
             </SelectTrigger>
             <SelectContent>
@@ -208,13 +211,13 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
         </div>
 
         <div className="space-y-2">
-          <Label>Município *</Label>
+          <Label htmlFor={fid('municipio')}>Município *</Label>
           <Select
             value={v.municipalityId || ''}
             onValueChange={onMunicipality}
             disabled={disabled || !v.provinceId || loadingMunis}
           >
-            <SelectTrigger>
+            <SelectTrigger id={fid('municipio')}>
               <SelectValue placeholder={!v.provinceId ? 'Escolha a província primeiro' : loadingMunis ? 'A carregar...' : 'Seleccione o município'} />
             </SelectTrigger>
             <SelectContent>
@@ -226,14 +229,14 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label>Bairro / Comuna / Localidade *</Label>
+          <Label htmlFor={localities.length > 0 ? fid('localidade') : fid('localidade-outra')}>Bairro / Comuna / Localidade *</Label>
           {localities.length > 0 && (
             <Select
               value={v.localityId || (v.localityCustom ? '__custom__' : '')}
               onValueChange={onLocality}
               disabled={disabled || !v.municipalityId || loadingLocs}
             >
-              <SelectTrigger>
+              <SelectTrigger id={fid('localidade')}>
                 <SelectValue placeholder={loadingLocs ? 'A carregar...' : 'Seleccione ou escreva abaixo'} />
               </SelectTrigger>
               <SelectContent>
@@ -249,6 +252,9 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
           )}
           {(showCustomLocality || localities.length === 0) && (
             <Input
+              id={fid('localidade-outra')}
+              aria-label="Bairro, comuna ou localidade"
+              autoComplete="address-level3"
               value={v.localityCustom || v.localityName}
               onChange={(e) => set({ localityCustom: e.target.value, localityName: '', localityId: '' })}
               placeholder="Ex.: Bairro Operário, Comuna X, aldeia..."
@@ -258,8 +264,10 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label>Rua / Avenida / Morada *</Label>
+          <Label htmlFor={fid('rua')}>Rua / Avenida / Morada *</Label>
           <Textarea
+            id={fid('rua')}
+            autoComplete="street-address"
             rows={2}
             value={v.street}
             onChange={(e) => set({ street: e.target.value })}
@@ -269,8 +277,10 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label>Ponto de referência *</Label>
+          <Label htmlFor={fid('referencia')}>Ponto de referência *</Label>
           <Input
+            id={fid('referencia')}
+            autoComplete="off"
             value={v.reference}
             onChange={(e) => set({ reference: e.target.value })}
             placeholder="Ex.: junto ao mercado, escola, poste, casa cor..."
@@ -282,11 +292,12 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <Label className="flex items-center gap-1.5">
+          <Label htmlFor={fid('telefone')} className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5 text-primary" />
             Telefone de contacto *
           </Label>
           <PhoneInput
+            id={fid('telefone')}
             value={v.phone}
             onChange={(phone) => set({ phone })}
             disabled={disabled}
@@ -303,12 +314,16 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
           </Label>
           <div className="grid sm:grid-cols-2 gap-3">
             <Input
+              aria-label="Nome do parente ou contacto próximo"
+              autoComplete="off"
               value={v.relativeName}
               onChange={(e) => set({ relativeName: e.target.value })}
               placeholder="Nome do familiar"
               disabled={disabled}
             />
+            <Label htmlFor={fid('telefone-parente')} className="sr-only">Telefone do parente</Label>
             <PhoneInput
+              id={fid('telefone-parente')}
               value={v.relativePhone}
               onChange={(relativePhone) => set({ relativePhone })}
               disabled={disabled}

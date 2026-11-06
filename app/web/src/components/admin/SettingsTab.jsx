@@ -79,7 +79,7 @@ const empty = {
   maintenance_mode: false,
   google_oauth_enabled: false,
   header_welcome_logged: 'Bem-vindo de volta, {nome}',
-  header_welcome_guest: 'Envio em todo o país · Crie a sua conta para acompanhar encomendas',
+  header_welcome_guest: 'Envio em todo o país · Compre sem conta',
   header_cta_text: 'Explorar novidades',
   header_cta_link: '/shop',
   footer_tagline: '',
@@ -452,7 +452,7 @@ export default function SettingsTab() {
                   <TabsTrigger
                     key={value}
                     value={value}
-                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-[#0ea5c9]/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-marca/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                   >
                     <Icon className="h-4 w-4" />{label}
                   </TabsTrigger>

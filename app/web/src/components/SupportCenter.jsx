@@ -39,6 +39,7 @@ const NOTIFICATION_KINDS = {
   order_stuck: 'Encomenda parada',
   order_problem: 'Problema do cliente',
   order_confirmed: 'Cliente confirmou a recepção',
+  payment_reported: 'Pagamento indicado pelo cliente',
 };
 
 function formatDate(value) {
