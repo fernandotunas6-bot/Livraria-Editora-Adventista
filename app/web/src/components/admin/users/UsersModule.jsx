@@ -347,7 +347,7 @@ export default function UsersModule() {
         </Tabs>
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome, email ou telefone…" className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome, email, telefone ou código (CLI-, FUN-)…" className="pl-9" />
         </div>
         <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
           <SelectTrigger className="w-full lg:w-[190px]"><SelectValue /></SelectTrigger>
@@ -391,6 +391,9 @@ export default function UsersModule() {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{u.name || '—'}{u.id && u.id === me?.id ? ' (você)' : ''}</p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                        {(u.customer_code || u.staff_code) && (
+                          <p className="text-[11px] font-mono text-muted-foreground truncate">{[u.customer_code, u.staff_code].filter(Boolean).join(' · ')}</p>
+                        )}
                       </div>
                     </div>
                   </TableCell>

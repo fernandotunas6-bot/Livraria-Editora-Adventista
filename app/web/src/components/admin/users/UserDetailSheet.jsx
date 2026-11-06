@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Mail, Phone, ShoppingBag, CalendarClock, LogIn, KeyRound, MessageCircle, Copy } from 'lucide-react';
+import { Loader2, Mail, Phone, ShoppingBag, CalendarClock, LogIn, KeyRound, MessageCircle, Copy, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
@@ -111,6 +111,8 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
           <div className="grid gap-3 sm:grid-cols-2">
             <Info icon={Mail} label="Email">{person.email || '—'}</Info>
             <Info icon={Phone} label="Telefone">{displayAngolaPhone(person.phone)}</Info>
+            {person.customer_code && <Info icon={Hash} label="Código de cliente"><span className="font-mono">{person.customer_code}</span></Info>}
+            {person.staff_code && <Info icon={Hash} label="Código de funcionário"><span className="font-mono">{person.staff_code}</span></Info>}
             {person.has_account && <Info icon={CalendarClock} label="Conta criada">{formatDate(person.created, true)}</Info>}
             {person.has_account && <Info icon={LogIn} label="Último acesso">{formatDate(person.last_sign_in_at, true)}</Info>}
           </div>
