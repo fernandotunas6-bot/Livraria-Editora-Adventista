@@ -3085,6 +3085,11 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
     const email = normalizeEmail(body.email);
     if (!isEmail(email)) throw bad("Indique um email válido.");
     if (email !== normalizeEmail(target.email)) {
+      // Mudar o email e depois pedir um link de acesso (que vai para o email novo) era entrar na
+      // conta do cliente: histórico, moradas, dados. Um gestor com `manage_users` continua a
+      // corrigir nome e telefone e a mandar o link para o email do próprio cliente; trocar o
+      // endereço da conta fica para um administrador.
+      if (auth!.role !== "admin") throw new HttpError(403, "Só administradores podem mudar o email de uma conta.");
       const { error } = await db.auth.admin.updateUserById(target.id, { email, email_confirm: true });
       if (error) {
         if (/already|registered|exists/i.test(error.message)) throw new HttpError(409, "Já existe uma conta com este email.");

@@ -115,7 +115,10 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="uf-email">Email</Label>
-              <Input id="uf-email" type="email" required value={form.email} onChange={(e) => set({ email: e.target.value })} />
+              <Input id="uf-email" type="email" required value={form.email} onChange={(e) => set({ email: e.target.value })} disabled={isEdit && !isAdmin} />
+              {isEdit && !isAdmin && (
+                <p className="text-xs text-muted-foreground">Só um administrador pode mudar o email de uma conta.</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="uf-phone">Telefone</Label>
