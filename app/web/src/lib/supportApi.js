@@ -265,3 +265,58 @@ export async function listSupportAssignees() {
     profile.role === 'admin' || profile.permissions?.manage_orders === true
   ));
 }
+
+/** Respostas da equipa ainda por ler (o ponto no botão do chat). */
+export async function countUnreadSupportReplies() {
+  const { count, error } = await supabase
+    .from('customer_notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('kind', 'support')
+    .is('read_at', null);
+  if (error) return 0;
+  return count || 0;
+}
+
+/** O cliente viu a conversa no chat: os avisos dessa conversa ficam lidos. */
+export async function markThreadNotificationsRead(threadId) {
+  if (!threadId) return;
+  const { data, error } = await supabase
+    .from('customer_notifications')
+    .select('id')
+    .eq('thread_id', threadId)
+    .is('read_at', null)
+    .limit(50);
+  if (error || !data?.length) return;
+  await Promise.all(data.map((n) => supabase.rpc('customer_mark_notification_read', { p_notification_id: n.id })));
+}
+
+const SAVED_REPLY_FIELDS = 'id, title, body';
+
+export async function listSavedReplies() {
+  const { data, error } = await supabase.from('support_saved_replies').select(SAVED_REPLY_FIELDS).order('title');
+  if (error) return [];
+  return data || [];
+}
+
+export async function saveSavedReply({ title, body }) {
+  const row = { title: String(title || '').trim(), body: String(body || '').trim() };
+  if (row.title.length < 2) throw new Error('Dê um título à resposta rápida.');
+  if (row.body.length < 2) throw new Error('A resposta rápida está vazia.');
+  const { error } = await supabase.from('support_saved_replies').insert(row);
+  if (error) throw new Error(/saved_replies_title_key/.test(error.message) ? 'Já existe uma resposta rápida com esse título.' : error.message);
+}
+
+export async function deleteSavedReply(id) {
+  const { error } = await supabase.from('support_saved_replies').delete().eq('id', id);
+  throwOnError(error);
+}
+
+/** Preenche {nome}, {pedido} e {encomenda} de uma resposta rápida. */
+export function fillSavedReply(body, thread) {
+  const first = String(thread?.customer?.name || '').trim().split(/\s+/)[0];
+  return String(body || '')
+    .replaceAll('{nome}', first || 'cliente')
+    .replaceAll('{pedido}', thread?.ticket_number ? `#${thread.ticket_number}` : '')
+    .replaceAll('{encomenda}', thread?.order?.order_number || thread?.order_id || 'a sua encomenda')
+    .replace(/[ \t]{2,}/g, ' ');
+}

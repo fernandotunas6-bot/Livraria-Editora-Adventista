@@ -81,6 +81,8 @@ aparecem com **Fora do prazo**. Mudar a prioridade recalcula os prazos.
   rastreio diz "Recebida pela equipa", sem o nome de quem assumiu.
 - Pedidos de ajuda: registo de cada mudança de estado, responsável, prioridade, categoria e
   equipa (`support_ticket_events`, só a equipa lê). No máximo 5 pedidos em aberto por cliente.
+- O agendador dos avisos (de 2 em 2 minutos) só chama a Edge Function quando há algo para enviar
+  agora: com a loja fechada, só se houver um aviso crítico ou uma resposta a um cliente.
 - As rotas do agendador (`/cron/order-watch`, `/cron/staff-dispatch`) exigem o token da fila;
   cada canal tem chave de idempotência (não repete mensagens).
 

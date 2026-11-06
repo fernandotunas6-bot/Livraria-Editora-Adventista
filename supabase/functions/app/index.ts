@@ -42,6 +42,7 @@ import {
   thankYouLetter,
   dailySummaryLetter,
   staffAlertLetter,
+  supportReplyLetter,
   testLetter,
   welcomeLetter,
   PREVIEW_TEMPLATES,
@@ -2669,6 +2670,58 @@ async function runOrderWatch(summary = false) {
 }
 
 /**
+ * Respostas da equipa a pedidos de ajuda: email (com o texto da resposta) e push ao cliente.
+ * O aviso dentro do site foi escrito pela base de dados; aqui só os outros canais, uma vez.
+ */
+async function dispatchCustomerSupportNotifications(limit = 50) {
+  const cutoff = new Date(Date.now() - 2 * 24 * 3600_000).toISOString();
+  await db.from("customer_notifications").update({ dispatched_at: nowISO() })
+    .is("dispatched_at", null).lt("created_at", cutoff);
+  const { data: pending, error } = await db.from("customer_notifications")
+    .select("id, customer_id, thread_id, title, body, created_at")
+    .is("dispatched_at", null).eq("kind", "support").order("created_at", { ascending: true }).limit(limit);
+  if (error) {
+    console.log("dispatchCustomerSupportNotifications:", error.message);
+    return { pending: 0, sent: 0 };
+  }
+  if (!pending?.length) return { pending: 0, sent: 0 };
+  const settings = await getSettings();
+  const brand = emailBrand(settings);
+  let sent = 0;
+  for (const n of pending as Row[]) {
+    let ok = false;
+    try {
+      const [{ data: person }, { data: thread }, { data: lastReply }] = await Promise.all([
+        db.from("profiles").select("name, email").eq("id", n.customer_id).maybeSingle(),
+        n.thread_id ? db.from("support_threads").select("ticket_number, subject").eq("id", n.thread_id).maybeSingle() : Promise.resolve({ data: null }),
+        n.thread_id
+          ? db.from("support_messages").select("body, sender_id").eq("thread_id", n.thread_id).eq("author_kind", "staff")
+            .order("id", { ascending: false }).limit(1).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      const { data: staff } = lastReply?.sender_id
+        ? await db.from("profiles").select("name").eq("id", lastReply.sender_id).maybeSingle()
+        : { data: null };
+      if (person?.email && thread?.ticket_number && lastReply?.body) {
+        ok = await sendLetter(settings, person.email, supportReplyLetter(brand, {
+          name: person.name || "", ticketNumber: thread.ticket_number, subject: thread.subject || "",
+          text: lastReply.body, staffName: chatFirstName(staff?.name),
+        }), { context: "support_reply", customer_name: person.name || "", dedupe: `cust:${n.id}:email` });
+      }
+      const pushed = await sendUserPush(String(n.customer_id), settings, {
+        title: n.title || "Resposta da equipa", body: clipText(lastReply?.body || n.body || "", 160), url: "/?atendimento=1",
+      });
+      ok = ok || pushed > 0;
+    } catch (err) {
+      console.log("resposta ao cliente:", (err as Error)?.message || err);
+    }
+    await db.from("customer_notifications").update({ dispatched_at: nowISO() }).eq("id", n.id);
+    if (ok) sent++;
+  }
+  return { pending: pending.length, sent };
+}
+
+/**
  * Envia por email, WhatsApp e push os avisos à equipa ainda por enviar (os do painel já lá
  * estão). Canais por tipo e gravidade (opsRouting.ts) e pelas preferências das equipas de cada
  * pessoa. Fora do horário só sai o crítico; o resto fica para a abertura. Cada canal tem a sua
@@ -2793,9 +2846,9 @@ route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
-  const r = await dispatchStaffNotifications();
-  if (r.pending) console.log("Avisos à equipa (cron):", JSON.stringify(r));
-  return json(r);
+  const [staff, customers] = await Promise.all([dispatchStaffNotifications(), dispatchCustomerSupportNotifications()]);
+  if (staff.pending || customers.pending) console.log("Avisos (cron):", JSON.stringify({ staff, customers }));
+  return json({ ...staff, customers });
 });
 
 const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];
@@ -2820,12 +2873,12 @@ route("GET", "/admin/ops/routing", async ({ auth }) => {
       return { id: r.profile_id, name: p.name || p.email || "—", lead: !!r.is_lead, has_phone: !!String(p.phone || "").trim() };
     });
   };
-  const rows = [];
-  for (const place of places) {
-    for (const duty of DUTIES.filter((d) => d !== "urgent")) {
-      rows.push({ ...place, duty, recipients: await describe(duty, place.store_id, false), escalation: await describe(duty, place.store_id, true) });
-    }
-  }
+  // Em paralelo: com 3 lojas eram 48 consultas seguidas (vários segundos a partir de Angola).
+  const rows = await Promise.all(places.flatMap((place) => DUTIES.filter((d) => d !== "urgent").map(async (duty) => ({
+    ...place, duty,
+    recipients: await describe(duty, place.store_id, false),
+    escalation: await describe(duty, place.store_id, true),
+  }))));
   return json({ rows, hours: await opsHours(), whatsapp_configured: !!(await getWhatsAppConfig()), push_enabled: !!(await getSettings())?.push_enabled });
 });
 

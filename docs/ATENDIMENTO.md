@@ -45,7 +45,14 @@ No painel → Atendimento, cada pedido traz:
 - o **resumo da passagem**: motivo, assunto, encomenda (estado e pagamento) e o que o cliente
   escreveu;
 - a conversa inteira, incluindo as respostas do assistente;
-- **notas internas** (separador "Nota interna"), que o cliente nunca vê.
+- **notas internas** (separador "Nota interna"), que o cliente nunca vê;
+- **respostas rápidas**: textos guardados pela equipa, com `{nome}`, `{pedido}` e `{encomenda}`
+  preenchidos automaticamente (há quatro para começar: pagamento confirmado, a tratar, pedir
+  comprovativo, devolução aceite).
+
+Quando a equipa responde, o cliente recebe a resposta **por email** (com o texto e um botão para
+continuar no site) e por push, além do aviso na conta; o botão do chat mostra um **ponto com o
+número de respostas por ler**, que desaparece quando abre a conversa.
 
 Responder a uma conversa que ainda está com o assistente é assumi-la: fica atribuída a quem
 respondeu e o assistente deixa de responder. Com responsável, só ele é avisado das mensagens

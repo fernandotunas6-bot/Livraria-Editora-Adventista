@@ -10,7 +10,12 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => auth }));
 vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ settings: { whatsapp: '923 000 000' } }) }));
 vi.mock('@/hooks/useChatPosition', () => ({ useChatPosition: () => ({ fixedStyle: {} }) }));
 vi.mock('@/components/SupportCenter', () => ({ default: () => <div>centro de atendimento</div> }));
-vi.mock('@/lib/supportApi', () => ({ rateSupportThread: vi.fn(async () => {}) }));
+const support = {
+  rateSupportThread: vi.fn(async () => {}),
+  countUnreadSupportReplies: vi.fn(async () => 0),
+  markThreadNotificationsRead: vi.fn(async () => {}),
+};
+vi.mock('@/lib/supportApi', () => support);
 
 const api = {
   fetchChatConfig: vi.fn(),
@@ -197,5 +202,22 @@ describe('LivrariaAssistant', () => {
     await submit();
     expect(api.loadChatSession).not.toHaveBeenCalled();
     expect(text()).toContain('Resposta antiga');
+  });
+
+  it('cliente com conta: ponto no botão com as respostas da equipa por ler; ao abrir o pedido, ficam lidas', async () => {
+    Object.assign(auth, { user: { id: 'u1' }, isAuthed: true });
+    support.countUnreadSupportReplies.mockResolvedValueOnce(2).mockResolvedValue(0);
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't9', status: 'pending', ticket_number: 1009 },
+      messages: [{ id: 5, role: 'staff', text: 'Já seguiu.', author: 'Ana' }],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    const launcher = document.querySelector('button[title="Ajuda"]');
+    expect(launcher.getAttribute('aria-label')).toContain('2 resposta(s) da equipa por ler');
+    expect(launcher.textContent).toContain('2');
+    await openChat();
+    expect(support.markThreadNotificationsRead).toHaveBeenCalledWith('t9');
   });
 });

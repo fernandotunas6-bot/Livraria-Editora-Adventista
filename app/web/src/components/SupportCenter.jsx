@@ -20,6 +20,10 @@ import {
   listSupportMessages,
   listSupportThreads,
   listSupportTeams,
+  listSavedReplies,
+  saveSavedReply,
+  deleteSavedReply,
+  fillSavedReply,
   setSupportTeam,
   slaState,
   markCustomerNotificationRead,
@@ -106,6 +110,8 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   const [orders, setOrders] = useState([]);
   const [assignees, setAssignees] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [savedReplies, setSavedReplies] = useState([]);
+  const [showSaved, setShowSaved] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [threadSearch, setThreadSearch] = useState('');
   const [threadStatusFilter, setThreadStatusFilter] = useState('active');
@@ -145,6 +151,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       if (staff) {
         setAssignees(extra);
         listSupportTeams().then(setTeams).catch(() => {});
+        listSavedReplies().then(setSavedReplies).catch(() => {});
       } else setOrders(extra);
     } catch (err) {
       setError(err.message || 'Não foi possível carregar o atendimento.');
@@ -654,6 +661,69 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                   {mode === 'note' && <Lock className="mr-1 inline h-3 w-3" />}{label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setShowSaved((v) => !v)}
+                aria-expanded={showSaved}
+                className="ml-auto rounded-md px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                Respostas rápidas{savedReplies.length ? ` (${savedReplies.length})` : ''}
+              </button>
+            </div>
+          )}
+          {staff && showSaved && (
+            <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+              {savedReplies.length === 0 && <p className="p-2 text-xs text-muted-foreground">Ainda não há respostas rápidas.</p>}
+              {savedReplies.map((r) => (
+                <div key={r.id} className="flex items-start gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = fillSavedReply(r.body, selectedThread);
+                      setMessageDraft((d) => (d.trim() ? `${d.trim()}\n\n${text}` : text));
+                      setComposeMode('reply');
+                      setShowSaved(false);
+                    }}
+                    className="min-w-0 flex-1 rounded-md p-2 text-left text-xs hover:bg-background"
+                  >
+                    <span className="block font-semibold">{r.title}</span>
+                    <span className="line-clamp-2 text-muted-foreground">{fillSavedReply(r.body, selectedThread)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Apagar a resposta rápida ${r.title}`}
+                    onClick={async () => {
+                      if (!window.confirm(`Apagar a resposta rápida "${r.title}"?`)) return;
+                      try {
+                        await deleteSavedReply(r.id);
+                        setSavedReplies((list) => list.filter((x) => x.id !== r.id));
+                      } catch (err) {
+                        setError(err.message);
+                      }
+                    }}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                disabled={!messageDraft.trim()}
+                onClick={async () => {
+                  const title = window.prompt('Título da resposta rápida (use {nome}, {pedido} e {encomenda} no texto):', '');
+                  if (!title) return;
+                  try {
+                    await saveSavedReply({ title, body: messageDraft });
+                    setSavedReplies(await listSavedReplies());
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
+                className="w-full rounded-md border border-dashed p-2 text-xs font-semibold text-primary disabled:opacity-50"
+              >
+                Guardar o texto escrito como resposta rápida
+              </button>
             </div>
           )}
           <div className="flex items-end gap-2">

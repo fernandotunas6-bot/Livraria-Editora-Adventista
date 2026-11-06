@@ -13,6 +13,7 @@ import ChatRichMessage from '@/components/assistant/ChatRichMessage';
 import HandoffCard from '@/components/assistant/HandoffCard';
 import SupportRating from '@/components/assistant/SupportRating';
 import SupportCenter from '@/components/SupportCenter';
+import { countUnreadSupportReplies, markThreadNotificationsRead } from '@/lib/supportApi';
 
 const DEFAULT_WELCOME = 'Olá! Sou o assistente da livraria. Posso ver as suas encomendas, responder sobre envios, pagamentos e devoluções, e encontrar livros. Se precisar, passo a conversa à nossa equipa.';
 
@@ -76,6 +77,19 @@ export default function LivrariaAssistant() {
   const lastRef = useRef(null);
   const inputRef = useRef(null);
   const tempId = useRef(0);
+  // Respostas da equipa por ler: o ponto no botão, para o cliente saber sem abrir o chat.
+  const [unread, setUnread] = useState(0);
+  const watchReplies = isAuthed && !canUseStaffInbox;
+  const refreshUnread = useCallback(async () => {
+    if (!watchReplies) { setUnread(0); return; }
+    setUnread(await countUnreadSupportReplies().catch(() => 0));
+  }, [watchReplies]);
+  useEffect(() => {
+    refreshUnread();
+    if (!watchReplies) return undefined;
+    const timer = window.setInterval(() => { if (!document.hidden) refreshUnread(); }, 60000);
+    return () => window.clearInterval(timer);
+  }, [watchReplies, refreshUnread]);
 
   useEffect(() => {
     fetchChatConfig().then((cfg) => {
@@ -142,6 +156,14 @@ export default function LivrariaAssistant() {
     const timer = window.setInterval(() => refreshSession({ quiet: true }), POLL_MS);
     return () => window.clearInterval(timer);
   }, [open, legacy, withTeam, status, refreshSession]);
+
+  // Aberto numa conversa com a equipa: as respostas dessa conversa ficam lidas.
+  const openTicketId = open && session.conversation?.ticket_number ? session.conversation.id : '';
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    if (!openTicketId || !watchReplies) return;
+    markThreadNotificationsRead(openTicketId).then(refreshUnread).catch(() => {});
+  }, [openTicketId, lastMessageId, watchReplies, refreshUnread]);
 
   // Resposta nova com o início à vista (com livros, era mais alta do que a janela); a pergunta
   // do cliente e o indicador "a escrever" descem até ao fundo.
@@ -277,8 +299,8 @@ export default function LivrariaAssistant() {
             title="Ajuda"
             // Cor da marca com um aro branco: o azul-escuro de antes perdia-se no carrossel e no
             // rodapé, ambos escuros. O aro separa o botão de qualquer fundo, claro ou escuro.
-            className="pointer-events-auto flex h-12 items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,0.28)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-4 focus-visible:ring-white 2xl:pr-4"
-            aria-label={showSupportTab ? 'Ajuda, mensagens e atendimento' : 'Assistente da livraria'}
+            className="pointer-events-auto relative flex h-12 items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,0.28)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-4 focus-visible:ring-white 2xl:pr-4"
+            aria-label={`${showSupportTab ? 'Ajuda, mensagens e atendimento' : 'Assistente da livraria'}${unread ? ` — ${unread} resposta(s) da equipa por ler` : ''}`}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}
           >
@@ -294,6 +316,11 @@ export default function LivrariaAssistant() {
               <MessageCircle className="h-5 w-5 shrink-0" />
             )}
             <span className="hidden text-sm font-semibold 2xl:inline">Ajuda</span>
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white ring-2 ring-white" aria-hidden>
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
           </motion.button>
         )}
       </AnimatePresence>

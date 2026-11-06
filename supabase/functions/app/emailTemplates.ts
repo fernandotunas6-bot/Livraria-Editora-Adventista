@@ -617,6 +617,37 @@ export function dailySummaryLetter(
 }
 
 /**
+ * A equipa respondeu a um pedido de ajuda. Leva o texto da resposta (o cliente lê-a no email,
+ * sem ter de entrar) e o botão para continuar a conversa no site.
+ */
+export function supportReplyLetter(
+  brand: Brand,
+  reply: { name: string; ticketNumber: number | string; subject: string; text: string; staffName?: string },
+): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const first = String(reply.name || "").trim().split(/\s+/)[0] || "";
+  const text = String(reply.text || "").trim();
+  const shown = text.length > 1500 ? `${text.slice(0, 1500)}…` : text;
+  return {
+    subject: `Resposta ao seu pedido #${reply.ticketNumber} — ${brand.siteName}`,
+    doc: {
+      preheader: shown.slice(0, 120),
+      symbol: "✉",
+      tone: "brand",
+      title: `Respondemos ao seu pedido #${reply.ticketNumber}`,
+      subtitle: reply.subject,
+      lead: [
+        `${first ? `Olá ${first}, a` : "A"} nossa equipa${reply.staffName ? ` (${reply.staffName})` : ""} respondeu:`,
+        ...shown.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+      ],
+      cta: site ? { label: "Responder no site", url: `${site}/?atendimento=1` } : undefined,
+      notes: ["Para responder, use o botão acima: as respostas a este email não chegam à equipa."],
+      reason: "Recebe esta mensagem porque pediu ajuda à nossa equipa.",
+    },
+  };
+}
+
+/**
  * Aviso a uma pessoa da equipa (encomenda nova, alerta, escalada, pedido de ajuda). Curto: o
  * que aconteceu e um botão para o sítio do painel onde se trata.
  */
