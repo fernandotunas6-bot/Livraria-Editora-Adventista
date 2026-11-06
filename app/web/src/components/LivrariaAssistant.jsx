@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Sparkles, Bell, RotateCcw, Headset, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -461,6 +461,23 @@ export default function LivrariaAssistant() {
                     {notice}
                   </p>
                 )}
+
+                {/* As mensagens podem ir para um fornecedor de IA fora de Angola (Gemini, DeepSeek):
+                    o visitante tem de o saber antes de escrever. Com a equipa responde uma pessoa,
+                    por isso o aviso sai. Fica acima do formulário, que é o último elemento e leva
+                    o espaço da safe-area do telemóvel. */}
+                {!withTeam && (
+                  <p className="shrink-0 px-3 pt-1 text-center text-[10px] text-muted-foreground">
+                    As respostas podem ser geradas por um serviço de IA externo. Não escreva dados pessoais nem de pagamento.
+                  </p>
+                )}
+                <p className="shrink-0 px-2 pb-1 pt-1 text-center text-[10px] text-muted-foreground">
+                  <Link to="/faq" className="text-primary hover:underline">FAQ</Link>
+                  {' · '}
+                  <Link to="/contact" className="text-primary hover:underline">Contacto</Link>
+                  {' · '}
+                  <Link to="/shop" className="text-primary hover:underline">Catálogo</Link>
+                </p>
 
                 <form
                   className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-3"

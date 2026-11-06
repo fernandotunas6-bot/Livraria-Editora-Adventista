@@ -101,7 +101,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
             placeholder="Pesquisar por título, autor ou código..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10 py-5 rounded-xl border-2 border-muted focus-visible:ring-1 focus-visible:ring-[#0ea5c9] w-full bg-background"
+            className="pl-10 pr-10 py-5 rounded-xl border-2 border-muted focus-visible:ring-1 focus-visible:ring-marca w-full bg-background"
           />
           {searchQuery && (
             <button
@@ -124,7 +124,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
                 size="sm"
                 onClick={() => setSelectedCategory(category)}
                 className={`rounded-full shrink-0 text-xs px-4 h-9 ${
-                  isSelected ? 'btn-primary bg-primary text-white hover:bg-[#0ea5c9]/90' : 'hover:border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/5'
+                  isSelected ? 'btn-primary bg-primary text-white hover:bg-marca/90' : 'hover:border-marca/30 hover:bg-marca/5'
                 }`}
               >
                 {category === 'all' ? 'Todos os Géneros' : category}
@@ -153,7 +153,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
                 setSearchQuery('');
                 setSelectedCategory('all');
               }}
-              className="rounded-xl border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10"
+              className="rounded-xl border-marca text-primary hover:bg-marca/10"
             >
               Limpar Filtros
             </Button>

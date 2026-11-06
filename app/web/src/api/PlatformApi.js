@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
   maintenance_mode: false,
   google_oauth_enabled: false,
   header_welcome_logged: 'Bem-vindo de volta, {nome}',
-  header_welcome_guest: 'Envio em todo o país · Crie a sua conta para acompanhar encomendas',
+  header_welcome_guest: 'Envio em todo o país · Compre sem conta',
   header_cta_text: 'Explorar novidades',
   header_cta_link: '/shop',
   footer_tagline: '',
@@ -121,6 +121,21 @@ export async function trackOrder(orderNumber, email) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Encomenda não encontrada');
+  return data;
+}
+
+/**
+ * Referência do pagamento indicada depois de encomendar (transferência, Multicaixa Express).
+ * Identifica a encomenda pelo número e email, ou número e telefone.
+ */
+export async function reportPaymentReference({ orderNumber, email = '', phone = '', reference }) {
+  const res = await fetch(`${APP_API_URL}/order/payment-reference`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderNumber, email, phone, reference }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível registar a referência');
   return data;
 }
 

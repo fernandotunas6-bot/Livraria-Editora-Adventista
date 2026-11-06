@@ -720,7 +720,7 @@ const AdminPage = () => {
                           </tr>
                         )}
                         {filteredBooks.map((b) => (
-                          <tr key={b.id} className={`hover:bg-muted/30 ${selectedBookIds.includes(b.id) ? 'bg-[#0ea5c9]/5' : ''}`}>
+                          <tr key={b.id} className={`hover:bg-muted/30 ${selectedBookIds.includes(b.id) ? 'bg-marca/5' : ''}`}>
                             <td className="pl-4">
                               <Checkbox
                                 aria-label={`Seleccionar ${b.title}`}
@@ -889,7 +889,7 @@ const AdminPage = () => {
                               <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusColor(o.status)}`}>
                                 {getOrderStatusLabel(o.status)}
                               </span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-[#0ea5c9]/10 text-primary'}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-marca/10 text-primary'}`}>
                                 {getOrderChannelLabel(o)}
                               </span>
                               {o.delivery_status && (

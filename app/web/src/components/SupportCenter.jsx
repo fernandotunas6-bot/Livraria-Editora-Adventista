@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { normalizeForSearch } from '@/lib/searchUtils';
+import { CodeChip } from '@/components/admin/users/userFormat';
 import { getDeliveryStatusLabel, getOrderStatusLabel, getPaymentStatusLabel } from '@/lib/orderUtils';
 import SupportRating from '@/components/assistant/SupportRating';
 import SupportReport from '@/components/admin/SupportReport';
@@ -84,6 +85,7 @@ const NOTIFICATION_KINDS = {
   ticket_sla: 'Prazo de pedido de ajuda',
   escalation: 'Escalada: ninguém assumiu',
   ops_test: 'Teste de avisos',
+  payment_reported: 'Pagamento indicado pelo cliente',
 };
 
 // Avisos da vigilância: levam ao Acompanhamento, onde se assume e trata.
@@ -189,6 +191,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
         thread.subject,
         thread.customer?.name,
         thread.customer?.email,
+        thread.customer?.customer_code,
         thread.order?.order_number,
         thread.order_id,
         thread.ticket_number ? `#${thread.ticket_number}` : '',
@@ -431,8 +434,11 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                   <span className="truncate">{threadTitle(thread)}</span>
                 </span>
                 {staff && (
-                  <span className="mt-1 block truncate text-xs text-muted-foreground">
-                    {thread.customer?.name || thread.customer?.email || (thread.customer_id ? 'Cliente' : 'Visitante sem conta')}
+                  <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="truncate">
+                      {thread.customer?.name || thread.customer?.email || (thread.customer_id ? 'Cliente' : 'Visitante sem conta')}
+                    </span>
+                    <CodeChip code={thread.customer?.customer_code} />
                   </span>
                 )}
               </span>
@@ -474,6 +480,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedThread.customer?.name || selectedThread.customer?.email || (selectedThread.customer_id ? 'Cliente' : 'Visitante sem conta')}
                 {selectedThread.customer?.email && selectedThread.customer?.name ? ` · ${selectedThread.customer.email}` : ''}
+                {selectedThread.customer?.customer_code && <span className="ml-2 align-middle"><CodeChip code={selectedThread.customer.customer_code} /></span>}
               </p>
             )}
           </div>

@@ -102,7 +102,7 @@ export default function BooksBulkBar({ selected, onClear, onDone }) {
   };
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#0ea5c9]/40 bg-[#0ea5c9]/5 p-3">
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-marca/40 bg-marca/5 p-3">
       <span className="text-sm font-semibold mr-1">{selected.length} seleccionado(s)</span>
       <Button size="sm" variant="outline" disabled={busy} onClick={() => run('Livros visíveis na loja', () => ({ active: true }))}>
         <Eye className="h-4 w-4 mr-1" />Mostrar

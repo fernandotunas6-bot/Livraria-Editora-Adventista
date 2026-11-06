@@ -53,7 +53,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
         product,
         onCartOpen
       });
-      if (onCartOpen) onCartOpen();
+      // O carrinho já não abre a cada livro: interrompia quem quer juntar vários. O aviso tem "Ver".
       onClose();
     } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: err.message });

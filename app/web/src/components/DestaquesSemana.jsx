@@ -47,7 +47,7 @@ export default function DestaquesSemana({ onCartOpen }) {
 
   if (loading) {
     return (
-      <div className="w-full bg-[#0ea5c9]/5 py-12">
+      <div className="w-full bg-marca/5 py-12">
         <div className="container-custom">
           <div className="h-96 w-full rounded-2xl bg-muted animate-pulse flex items-center justify-center">
             <p className="text-muted-foreground">Carregando Destaques da Semana...</p>
@@ -90,7 +90,7 @@ export default function DestaquesSemana({ onCartOpen }) {
       onMouseLeave={() => setPaused(false)}
     >
       {/* Decorative ambient blobs */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#0ea5c9]/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -right-40 w-96 h-96 bg-marca/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="container-custom relative z-10">
@@ -100,7 +100,7 @@ export default function DestaquesSemana({ onCartOpen }) {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#0ea5c9]/20 text-[#22d3ee] mb-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-marca/20 text-[#22d3ee] mb-3">
               <Sparkles className="h-3.5 w-3.5" /> DESTAQUES DA SEMANA
             </span>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight">Destaques do Catálogo</h2>

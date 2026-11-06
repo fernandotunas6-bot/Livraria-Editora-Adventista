@@ -117,7 +117,7 @@ export default function ChatRichMessage({
             <li key={p.id}>
               <Link
                 to={`/product/${p.id}`}
-                className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-2 pr-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-2 pr-3 transition-colors hover:border-marca/50 hover:bg-marca/5"
               >
                 {p.cover ? (
                   <img src={p.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover bg-muted shadow-sm" />
@@ -148,7 +148,9 @@ export default function ChatRichMessage({
           {links.map((link, i) => {
             const href = link.path || link.url;
             const label = link.label || href;
-            const cls = `${chip} border-primary/20 bg-primary/10 text-primary hover:bg-primary/15`;
+            // A cor viva da marca fica no fundo e na borda; o texto usa o token legível
+            // (`primary` = cor da marca escurecida), que sobre branco passa o contraste da WCAG.
+            const cls = `${chip} border-marca/20 bg-marca/10 text-primary hover:bg-marca/20`;
             return href?.startsWith('/') ? (
               <Link key={i} to={href} className={cls}>
                 {label} <ChevronRight className="h-3 w-3" />

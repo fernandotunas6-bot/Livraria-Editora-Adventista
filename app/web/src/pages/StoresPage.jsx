@@ -89,7 +89,7 @@ export default function StoresPage() {
                 {provinces.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por província">
                     {['', ...provinces].map((p) => (
-                      <Button key={p || 'all'} type="button" size="sm" variant={province === p ? 'default' : 'outline'} onClick={() => setProvince(p)} className={province === p ? 'bg-primary hover:bg-[#0ea5c9]/90' : ''}>
+                      <Button key={p || 'all'} type="button" size="sm" variant={province === p ? 'default' : 'outline'} onClick={() => setProvince(p)} className={province === p ? 'bg-primary hover:bg-marca/90' : ''}>
                         {p || 'Todas'}
                       </Button>
                     ))}
@@ -147,7 +147,7 @@ export default function StoresPage() {
                     return (
                       <li key={s.id} id={s.id}>
                         <article
-                          className={`rounded-2xl border bg-background overflow-hidden transition-all ${active ? 'border-[#0ea5c9] shadow-lg ring-2 ring-[#0ea5c9]/15' : 'border-border hover:border-[#0ea5c9]/40'}`}
+                          className={`rounded-2xl border bg-background overflow-hidden transition-all ${active ? 'border-marca shadow-lg ring-2 ring-marca/15' : 'border-border hover:border-marca/40'}`}
                         >
                           <button type="button" className="w-full text-left flex gap-4 p-4" onClick={() => setSelectedId(s.id)} aria-pressed={active}>
                             <StoreThumb store={s} className="h-20 w-24 shrink-0 rounded-xl" />
