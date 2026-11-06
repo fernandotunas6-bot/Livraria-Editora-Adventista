@@ -803,6 +803,108 @@ O Storage teve 3 175 pedidos de capas, nenhum 4xx.
 - `scripts/configurar-auth.sh --google <json>`: confirma a chave na Google, pede confirmação e
   põe-na no Supabase. A chave nunca aparece no ecrã nem nos argumentos.
 
+## 9.8 Revisão crítica de rotas, segurança e lógica (2026-11-06)
+
+Passagem pedida sobre o sistema todo: encaminhamento, autorização e regras de negócio.
+Cada ponto foi verificado no código, não de memória. `npm test` (551 testes), `npm run lint`,
+`npm run build` e `scripts/verificar-segredos.mjs` passam.
+
+### Verificado sem problemas
+
+- **As 69 rotas da Edge Function têm guarda.** Mapeadas uma a uma: `/admin/*` com
+  `requirePermission` na chave certa, `/contacts/*` com `requireCrm`, `/cron/*` com token em
+  comparação de tempo constante (`secretsMatch`) e 404 quando o token não está configurado.
+  As de gestão de contas passam por `loadTarget` + `assertCanManage`, e o `loadTarget` verifica
+  a permissão **antes** de ir à base (o achado 15 continua fechado).
+- **MFA a valer nos dois lados.** `mfaPending()` na função e `private.mfa_satisfied()` dentro de
+  `is_admin`, `is_staff` **e** `has_permission`. Uma sessão `aal1` de uma conta com factor
+  verificado vale como cliente, pela REST API ou pela função.
+- **Escalada por `profiles` fechada** pelo trigger `profiles_protect_privileges`: quem não é
+  admin não muda `role`, `permissions` nem `email`, e um INSERT nasce sempre `member`.
+- **`place_order` não aceita preços do cliente.** O carrinho envia `book_id`, `quantity` e
+  `variant`; o preço vem de `effective_price`. Usa `for update`, relê o stock em cada iteração
+  (o mesmo livro duas vezes no carrinho não passa) e a idempotência trata o `23505` devolvendo
+  a encomenda original.
+- **As 77 funções `security definer` têm `set search_path = ''`.** Conferidas todas.
+- **Rotas públicas de encomendas** identificam por nº + email/telefone e dão **o mesmo erro**
+  para encomenda inexistente e contacto errado (não dizem que números existem). O
+  `receipt_token` está revogado a `anon, authenticated` ao nível da coluna.
+- **Isolamento por RLS** em encomendas, perfis, listas de desejos, avaliações e inbox seguro.
+- **XSS**: todos os `dangerouslySetInnerHTML` passam pelo `sanitizeHtml` (DOMPurify com lista
+  branca). A excepção, `ui/chart.jsx`, gera CSS a partir de configuração do próprio código.
+- **CSP real e sem `unsafe-inline` em scripts**; `frame-ancestors`, HSTS e `Permissions-Policy`
+  presentes. Firestore fechado a leitura e escrita.
+- **CI** corre em `pull_request` (não `pull_request_target`), com permissões mínimas, scanner de
+  segredos e `npm audit`. O painel de vendas antigo é importado como módulo dentro do separador
+  com guarda, não servido como página.
+- Portes e promoções do produto: `lib/shipping.js` e `lib/pricing.js` espelham as contas do
+  `place_order`.
+
+### Corrigido nesta passagem
+
+| # | Achado | Gravidade | Onde |
+|---|---|---|---|
+| 28 | Bucket público `media` aceitava SVG, e qualquer cliente registado podia enviar | Média | migração `svg_fora_do_bucket_publico`, `lib/imageTypes.js` |
+| 29 | Promoções das variantes sem janela de datas e sem exigir desconto | Baixa/Média | migração `promocoes_das_variantes`, `lib/pricing.js` |
+| 30 | `private.has_permission` aceitava a string `"true"`; `can()` não | Baixa | migração `permissoes_so_booleanos` |
+| 31 | `folder_id` interpolado na consulta ao Google Drive sem validação | Baixa | `index.ts` (`DRIVE_FOLDER_ID`) |
+| 32 | `_headers` dizia "Em falta: Content-Security-Policy" debaixo do CSP já definido | Trivial | `app/web/public/_headers` |
+
+**28 — SVG num bucket público.** O `allowed_mime_types` do `media` incluía `image/svg+xml`, o
+`private.can_write_media` deixa qualquer conta escrever em `users/<o-seu-id>/` (é por onde passa
+a foto de perfil) e o site só validava o **tamanho** da foto — o `accept` de um
+`<input type="file">` é uma sugestão da janela de ficheiros, não um controlo. Um cliente comum
+conseguia pôr um SVG com `<script>` em
+`<projecto>.supabase.co/storage/v1/object/public/media/users/<id>/x.svg`, servido como
+`image/svg+xml`, que o browser executa quando o endereço é aberto directamente (num `<img>` não
+executa). Não alcança a origem da loja, onde vive a sessão, mas é execução de código na origem
+`*.supabase.co` — a mesma de `/auth/v1/*` — e phishing num domínio do próprio projecto, a partir
+de uma conta sem permissões. Era também incoerente com as duas decisões já tomadas sobre SVG: o
+`sanitizeHtml` põe `svg` em `FORBID_TAGS` e as assinaturas só aceitam PNG (`isPngSignature`).
+O bucket passa a recusar SVG (é o controlo que manda) e o site valida o tipo em
+`lib/imageTypes.js`, com testes. Ficheiros já enviados não são tocados: `allowed_mime_types` é
+verificado no envio. Para substituir um logótipo SVG, usar PNG ou WebP.
+
+**29 — promoções das variantes.** `effective_price` exige que o promocional seja menor que o
+preço de tabela **e** que a janela `sale_starts_at`/`sale_ends_at` esteja aberta. O caminho das
+variantes não exigia nenhuma das duas, nos dois lados: uma promoção agendada para a semana
+seguinte já descontava, e um `sale_price` acima do preço da variante era cobrado como se fosse
+desconto (com o preço verdadeiro riscado por baixo). O site e o servidor concordavam entre si,
+por isso não havia diferença entre o preço mostrado e o cobrado — a regra de negócio é que
+estava inconsistente. A regra passou a ser a mesma nos dois (`variantPrices`, com testes).
+Ao escrever a migração apareceu um segundo problema no mesmo bloco: as variáveis do plpgsql
+sobrevivem ao ciclo, e o preço de tabela da variante de um item ia para o `list_price` do item
+seguinte. Passam a ser reiniciadas em cada volta, e o `list_price` é o da variante da linha (é o
+valor que o recibo e o painel riscam).
+
+**30 — `has_permission`.** Estava `permissions ->> chave = 'true'`, e o `->>` devolve o texto
+`'true'` tanto para o booleano `true` como para a string `"true"`: `{"manage_users": "true"}`
+dava a permissão. O `can()` da função sempre foi estrito (`=== true`, com teste), portanto o
+desacordo estava no lado que manda de facto, o RLS, e abria em vez de fechar. Não era
+explorável — só admin e o service role escrevem `permissions`, e `cleanPermissions` força
+booleanos — mas as duas declaram ser cópia fiel uma da outra. Passa a `permissions -> chave =
+'true'::jsonb`.
+
+**31 — `folder_id` do Drive.** O id ia dentro de apóstrofes na consulta (`'<id>' in parents`) e
+vinha da query string. Uma apóstrofe fechava a string e acrescentava condições — com sessão de
+equipa, mas a listar pastas que a chave alcança e que não foram pedidas. Valida-se o conjunto de
+caracteres (o comprimento é largo de propósito, para aceitar os aliases curtos do Drive).
+
+Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes_e_svg.sql`.
+
+### Observações de desenho (não são falhas, decisão do dono)
+
+- O separador **"Vendas por loja"** é visível a qualquer gestor com uma permissão qualquer
+  (`canAccessAdmin` na UI, `is_staff()` no RLS — coerentes entre si). Um gestor só com
+  `manage_catalog` vê a facturação.
+- Um gestor com `manage_users` pode mudar o email de um cliente e pedir um link de acesso — na
+  prática, assumir a conta. O código já mitiga (o link só volta a um admin e só quando o email
+  falhou) e é inerente à permissão, mas vale a pena ficar escrito.
+- O carrinho só actualiza o preço das variantes `-default` quando revalida
+  (`useCart.jsx`): uma variante com nome guarda o preço de quando foi posta no carrinho. Não há
+  risco de cobrar a mais (o servidor recalcula no checkout), só de mostrar um preço velho.
+- CORS `*` na Edge Function: aceitável, a autenticação é por token e não por cookie.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

@@ -1306,6 +1306,15 @@ route("GET", "/admin/media-config", async ({ auth }) => {
   });
 });
 
+/**
+ * Id de pasta do Google Drive: o que a Google emite, e nada que altere a consulta.
+ *
+ * O que protege é o conjunto de caracteres (sem apóstrofe não há como fechar a string da
+ * consulta), não o comprimento — por isso o limite é largo de propósito, para aceitar tanto
+ * os ids longos como os aliases curtos que o Drive entende (`root`).
+ */
+const DRIVE_FOLDER_ID = /^[A-Za-z0-9_-]{3,200}$/;
+
 route("GET", "/admin/drive-images", async ({ auth, url }) => {
   if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
   const drive = await getIntegration("google_drive", true);
@@ -1314,6 +1323,11 @@ route("GET", "/admin/drive-images", async ({ auth, url }) => {
   const apiKey = config.api_key || "";
   const folderId = url.searchParams.get("folder_id") || config.folder_id || "";
   if (!apiKey || !folderId) throw bad("Configure API key e pasta do Google Drive.");
+  // O id vai dentro de apóstrofes na consulta ao Drive (`'<id>' in parents`), e vem da query
+  // string. Sem validar, uma apóstrofe fechava a string e acrescentava condições à consulta —
+  // com sessão de equipa, mas a listar pastas que a chave alcança e que não foram pedidas.
+  // Um id do Drive é só letras, dígitos, `-` e `_`.
+  if (!DRIVE_FOLDER_ID.test(folderId)) throw bad("Identificador de pasta do Google Drive inválido.");
   const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
   const fields = encodeURIComponent("files(id,name,mimeType,thumbnailLink)");
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&key=${encodeURIComponent(apiKey)}&supportsAllDrives=true&includeItemsFromAllDrives=true`);
