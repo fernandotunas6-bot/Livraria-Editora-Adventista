@@ -48,3 +48,22 @@ export function orderItemTitle(item) {
   const variant = String(item?.variant_label || '').trim();
   return variant ? `${title} (${variant})` : title;
 }
+
+/**
+ * Nome da variante escolhida no carrinho (tamanho, edição): "M · Azul". Vazio na variante única
+ * ("Standard"), que não precisa de ser dita. As variantes reais têm o id `<produto>-v<n>`
+ * (getProduct em api/EcommerceApi.js). Sem isto, M e L do mesmo uniforme eram duas linhas iguais
+ * no carrinho, na mensagem de WhatsApp e no recibo.
+ */
+export function cartVariantLabel(variant) {
+  if (!variant || !/-v\d+$/.test(String(variant.id || ''))) return '';
+  return [variant.title, variant.format].map((s) => String(s || '').trim()).filter(Boolean)
+    .filter((s, i, all) => all.indexOf(s) === i).join(' · ');
+}
+
+/** Título de uma linha do carrinho com a variante: "Uniforme — camisa (M · Azul)". */
+export function cartItemTitle(item) {
+  const title = String(item?.product?.title || 'Produto');
+  const variant = cartVariantLabel(item?.variant);
+  return variant ? `${title} (${variant})` : title;
+}

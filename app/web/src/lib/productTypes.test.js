@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PRODUCT_TYPES, isBookType, looksLikeProductCode, normalizeProductCode, productTypeLabel } from './productTypes';
+import { PRODUCT_TYPES, cartItemTitle, cartVariantLabel, isBookType, looksLikeProductCode, normalizeProductCode, productTypeLabel } from './productTypes';
 
 describe('productTypes', () => {
   it('normaliza códigos escritos de várias formas', () => {
@@ -27,5 +27,18 @@ describe('productTypes', () => {
     expect(productTypeLabel('xyz')).toBe('Livro');
     expect(isBookType('uniforme')).toBe(false);
     expect(isBookType(undefined)).toBe(true);
+  });
+});
+
+describe('cartVariantLabel e cartItemTitle', () => {
+  it('diz o tamanho ou a edição escolhida', () => {
+    expect(cartVariantLabel({ id: 'abc-v1', title: 'M', format: 'Azul' })).toBe('M · Azul');
+    expect(cartItemTitle({ product: { title: 'Uniforme — camisa' }, variant: { id: 'abc-v0', title: 'L' } })).toBe('Uniforme — camisa (L)');
+  });
+  it('não repete o mesmo texto nem fala da variante única', () => {
+    expect(cartVariantLabel({ id: 'abc-v2', title: 'Capa dura', format: 'Capa dura' })).toBe('Capa dura');
+    expect(cartVariantLabel({ id: 'abc', title: 'Standard' })).toBe('');
+    expect(cartItemTitle({ product: { title: 'Nisto Cremos' }, variant: { id: 'abc', title: 'Standard' } })).toBe('Nisto Cremos');
+    expect(cartItemTitle({})).toBe('Produto');
   });
 });

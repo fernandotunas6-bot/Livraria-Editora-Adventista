@@ -21,6 +21,7 @@ import { getPaymentMethods, getPhysicalStores } from '@/api/PlatformApi';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
 import { calcShippingCents, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
+import { cartItemTitle, cartVariantLabel } from '@/lib/productTypes';
 import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
 import AngolaAddressSelector, { validateAngolaAddress, angolaAddressToPayload } from '@/components/AngolaAddressSelector';
@@ -194,7 +195,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const itemCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
   const orderItemsForReceipt = cartItems.map((item) => ({
-    title: item.product.title,
+    title: cartItemTitle(item),
     quantity: item.quantity,
     price: (item.variant.sale_price_in_cents ?? item.variant.price_in_cents) / 100,
   }));
@@ -448,7 +449,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       <ShoppingCartIcon size={48} className="mb-4 opacity-40" />
                       <p className="mb-4">O carrinho está vazio.</p>
                       <Button variant="outline" onClick={() => { setIsCartOpen(false); }} asChild>
-                        <Link to="/shop">Explorar Livros</Link>
+                        <Link to="/shop">Explorar o catálogo</Link>
                       </Button>
                     </div>
                   ) : (
@@ -462,6 +463,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         />
                         <div className="flex-grow min-w-0">
                           <h3 className="font-semibold text-sm line-clamp-2">{item.product.title}</h3>
+                          {/* A variante (tamanho, edição): M e L do mesmo uniforme eram duas linhas iguais. */}
+                          {cartVariantLabel(item.variant) && (
+                            <p className="text-xs font-medium text-foreground/80">{cartVariantLabel(item.variant)}</p>
+                          )}
                           <p className="text-xs text-muted-foreground">{item.product.subtitle}</p>
                           <p className="text-sm text-primary font-bold mt-1">
                             {item.variant.sale_price_formatted || item.variant.price_formatted}
