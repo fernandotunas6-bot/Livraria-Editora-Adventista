@@ -398,7 +398,8 @@ const AdminPage = () => {
       canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
     ] },
     { label: 'Relatórios', tabs: [
-      canAccessAdmin && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
+      // Facturação: com a permissão de encomendas, como na base (migração vendas_so_com_encomendas).
+      canManageOrders && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
     ] },
     { label: 'Clientes', tabs: [
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
@@ -412,7 +413,10 @@ const AdminPage = () => {
   ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
   const allowedTabs = tabGroups.flatMap((g) => g.tabs.map((t) => t.value));
   const requestedTab = searchParams.get('tab');
-  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : defaultTab;
+  // O separador por omissão pode não estar entre os permitidos (um gestor só com Marketing caía
+  // em Pagamentos): nesse caso abre o primeiro a que a pessoa tem acesso.
+  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab
+    : allowedTabs.includes(defaultTab) ? defaultTab : (allowedTabs[0] || defaultTab);
   const setActiveTab = (value) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     next.set('tab', value);

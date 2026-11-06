@@ -1006,6 +1006,25 @@ erro de envio. A foto de perfil dizia só PNG/JPG. Os textos usam agora `ALLOWED
   desenvolvimento local. O risco é baixo — um link desviado para lá só chega ao computador da
   própria vítima —, mas sai se ninguém desenvolver contra a base de produção.
 
+## 9.10 Pendentes fechados (2026-11-06)
+
+O que as secções 9.8 e 9.9 deixaram como observação ou decisão do dono, fechado a pedido.
+
+| # | O quê | Onde |
+|---|---|---|
+| 38 | Um gestor com `manage_users` mudava o email de um cliente e pedia um link de acesso, que ia para o email novo: entrava na conta | `/admin/users/update` recusa a troca de email a quem não é admin; o formulário bloqueia o campo |
+| 39 | "Vendas por loja" (facturação, metas, notas) visível a qualquer gestor com uma permissão qualquer | migração `vendas_so_com_encomendas` (leitura com `manage_orders`) e o separador com `canManageOrders` |
+| 40 | O carrinho só revalidava o preço da edição normal: um tamanho ou edição extra guardava o preço de quando entrou, e o cliente via um preço e pagava outro | `refreshCart` usa `variantPrices` e o stock da edição; uma edição que deixou de existir sai do carrinho |
+| 41 | Um gestor sem nenhuma das quatro permissões principais abria o painel em Pagamentos, mesmo sem acesso | o separador por omissão é o primeiro permitido |
+| 42 | `http://localhost:3000/**` na lista de redirecionamentos do Auth de produção | retirado de `supabase/auth/config.json` |
+
+A migração foi verificada num Postgres local: substitui as duas políticas, e quem só tem
+`manage_catalog` deixa de ler as vendas.
+
+**Para aplicar à mão:** o `supabase/auth/config.json` não vai pelo deploy — aplica-se com
+`bash scripts/configurar-auth.sh` (mostra a diferença e pede confirmação). Para voltar a
+desenvolver contra a base de produção, repor `http://localhost:3000/**` nesse ficheiro.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.
