@@ -172,7 +172,7 @@ const Footer = () => {
 
           <div className="lg:col-span-4">
             <div className="relative rounded-2xl bg-white/5 border border-white/10 p-6 shadow-xl backdrop-blur-md overflow-hidden">
-              <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-[#0ea5c9]/20 rounded-full blur-xl pointer-events-none" />
+              <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-marca/20 rounded-full blur-xl pointer-events-none" />
               
               <AnimatePresence mode="wait">
                 {!subscribed ? (
@@ -184,7 +184,7 @@ const Footer = () => {
                     className="space-y-4"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="flex h-7 px-2.5 items-center justify-center rounded-full text-[10px] font-bold bg-[#0ea5c9]/20 text-[#22d3ee] border border-[#0ea5c9]/30">
+                      <span className="flex h-7 px-2.5 items-center justify-center rounded-full text-[10px] font-bold bg-marca/20 text-[#22d3ee] border border-marca/30">
                         <Sparkles className="h-3 w-3 mr-1" /> OFERTA
                       </span>
                       <span className="text-xs text-[#22d3ee] font-medium">-10% no 1º livro</span>
@@ -208,7 +208,7 @@ const Footer = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="bg-background/5 border-background/10 text-background placeholder:text-background/40 pl-10 focus-visible:ring-[#0ea5c9] focus-visible:border-[#0ea5c9] h-11 rounded-xl"
+                          className="bg-background/5 border-background/10 text-background placeholder:text-background/40 pl-10 focus-visible:ring-marca focus-visible:border-marca h-11 rounded-xl"
                         />
                       </div>
                       <Button 

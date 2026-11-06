@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine,
+  ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine, Copy,
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,8 @@ import { useIntegrations } from '@/hooks/useIntegrations';
 import { getPaymentMethods, getPhysicalStores } from '@/api/PlatformApi';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
-import { calcShippingCents, SHIPPING_METHODS, getShippingLabel } from '@/lib/shipping';
+import { calcShippingCents, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
+import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
 import AngolaAddressSelector, { validateAngolaAddress, angolaAddressToPayload } from '@/components/AngolaAddressSelector';
 import SignaturePad from '@/components/SignaturePad';
@@ -129,7 +130,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   }, [isCartOpen]);
 
   const subtotalCents = getCartTotalCents();
-  const FREE_SHIPPING_THRESHOLD = (Number(settings.shipping_free_threshold) || 20000) * 100;
+  const FREE_SHIPPING_THRESHOLD = shippingRules(settings).freeThresholdCents;
   const freeShippingRemaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotalCents);
   const freeShippingProgress = FREE_SHIPPING_THRESHOLD > 0
     ? Math.min(100, (subtotalCents / FREE_SHIPPING_THRESHOLD) * 100)
@@ -168,6 +169,27 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   }, [isCartOpen]);
 
   const shippingCents = calcShippingCents(form.shippingMethod, subtotalCents, settings);
+
+  // Só os métodos que servem para o envio escolhido ("Pagar no Balcão" só no levantamento).
+  // Se o escolhido deixar de servir, passa ao primeiro que serve.
+  const availableMethods = useMemo(
+    () => paymentMethodsFor(paymentMethods, form.shippingMethod),
+    [paymentMethods, form.shippingMethod],
+  );
+  useEffect(() => {
+    if (availableMethods.length && !availableMethods.some((m) => m.code === form.paymentMethod)) {
+      setForm((f) => ({ ...f, paymentMethod: availableMethods[0].code, paymentReference: '' }));
+    }
+  }, [availableMethods, form.paymentMethod]);
+
+  const copyText = async (text, what) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${what} copiado` });
+    } catch {
+      toast({ variant: 'destructive', title: 'Não foi possível copiar', description: 'Seleccione o texto e copie à mão.' });
+    }
+  };
   const totalCents = subtotalCents + shippingCents;
   const itemCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
@@ -208,15 +230,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     );
 
     // Levantamento na loja: basta saber quem vem buscar e como lhe ligar.
-    // Entrega ao domicílio: conta obrigatória, email, morada e assinatura.
-    if (needsAddress && !user) {
-      toast({
-        variant: 'destructive',
-        title: 'Entre na sua conta para entrega ao domicílio',
-        description: 'A entrega precisa de conta para acompanhar a encomenda. Para levar na loja não é preciso.',
-      });
-      return;
-    }
+    // Entrega ao domicílio: email e morada. Não exige conta: o cliente acompanha a encomenda com
+    // o número e o email (Rastrear encomenda), e o registo por email depende do SMTP do Auth.
     if (!form.name.trim() || !effectivePhone || (needsAddress && !form.email.trim())) {
       toast({ variant: 'destructive', title: 'Preencha todos os campos obrigatórios' });
       return;
@@ -237,27 +252,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       return;
     }
 
-    // Validate payment reference for transfer/P2P methods
-    const selectedMethod = paymentMethods.find((m) => m.code === form.paymentMethod);
-    if (selectedMethod && (selectedMethod.type === 'p2p' || selectedMethod.type === 'transfer') && !form.paymentReference.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Referência de pagamento obrigatória',
-        description: 'Indique a referência, número ou comprovativo do pagamento por transferência / Multicaixa Express.'
-      });
-      return;
-    }
+    // Transferência e Multicaixa: paga-se depois de encomendar, com o número da encomenda; a
+    // referência indica-se na página seguinte (ou no rastreio). Já não se pede aqui.
 
-    // A assinatura é a prova de quem recebeu em casa; ao balcão os livros são entregues em mão.
-    const checkoutSignature = needsAddress ? signatureRef.current?.getDataURL() : '';
-    if (needsAddress && !checkoutSignature) {
-      toast({
-        variant: 'destructive',
-        title: 'Assinatura obrigatória',
-        description: 'Assine no quadro para confirmar a compra.',
-      });
-      return;
-    }
+    // Assinatura opcional: quem recebe assina na entrega. Se o cliente assinar, vai no recibo.
+    const checkoutSignature = needsAddress ? (signatureRef.current?.getDataURL() || '') : '';
 
     // Trancar antes da ida à rede, não depois. O `refreshCart` aqui abaixo é um pedido ao
     // servidor; enquanto corria, o `checkingOut` ainda era falso, por isso os dois botões de
@@ -321,6 +320,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       saveLastOrder({
         orderId,
         orderNumber,
+        // Para a página de sucesso explicar como pagar e receber a referência depois.
+        paymentType: paymentMethodInfo?.type || '',
+        paymentAccountInfo: paymentMethodInfo?.account_info || '',
+        paymentInstructions: paymentMethodInfo?.instructions || '',
         paymentLink: paymentMethodInfo?.payment_link || '',
         paymentReference: (form.paymentReference || '').trim(),
         total,
@@ -427,10 +430,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
             {/* Steps indicator */}
             {cartItems.length > 0 && (
-              <div className="flex gap-2 px-5 py-3 border-b border-border bg-muted/30">
-                <div className={`flex-1 h-1 rounded-full ${step === 'cart' ? 'bg-primary' : 'bg-[#0ea5c9]/40'}`} />
-                <div className={`flex-1 h-1 rounded-full ${step === 'checkout' ? 'bg-primary' : 'bg-muted'}`} />
-              </div>
+              <ol className="flex gap-2 px-5 py-2.5 border-b border-border bg-muted/30 text-[11px] font-medium" aria-label="Passos da compra">
+                {[['cart', '1. Carrinho'], ['checkout', '2. Dados e pagamento']].map(([id, label]) => (
+                  <li key={id} className="flex-1 space-y-1" aria-current={step === id ? 'step' : undefined}>
+                    <span className={step === id ? 'text-primary' : 'text-muted-foreground'}>{label}</span>
+                    <span className={`block h-1 rounded-full ${step === id ? 'bg-primary' : id === 'cart' ? 'bg-primary/40' : 'bg-muted'}`} />
+                  </li>
+                ))}
+              </ol>
             )}
 
             <div className="flex-grow overflow-y-auto relative" ref={cartScrollRef}>
@@ -500,7 +507,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         return (
                           <div
                             key={opt.id}
-                            className={`flex items-start space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${form.shippingMethod === opt.id ? 'border-[#0ea5c9] bg-[#0ea5c9]/5' : 'hover:bg-muted/50'}`}
+                            className={`flex items-start space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${form.shippingMethod === opt.id ? 'border-marca bg-marca/5' : 'hover:bg-muted/50'}`}
                             onClick={() => setForm({ ...form, shippingMethod: opt.id })}
                           >
                             <RadioGroupItem value={opt.id} id={`ship-${opt.id}`} className="mt-1" />
@@ -540,21 +547,21 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       <MapPin className="h-4 w-4" /> {form.shippingMethod === 'pickup' ? 'Dados de Contacto' : 'Dados de Entrega'}
                     </div>
                     <div className="space-y-2">
-                      <Label>Nome completo *</Label>
-                      <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="O seu nome" />
+                      <Label htmlFor="checkout-nome">Nome completo *</Label>
+                      <Input id="checkout-nome" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="O seu nome" />
                     </div>
                     <div className="space-y-2">
-                      <Label>
+                      <Label htmlFor="checkout-email">
                         Email {form.shippingMethod === 'pickup'
                           ? <span className="text-muted-foreground font-normal">(opcional — para receber o recibo)</span>
-                          : '*'}
+                          : <>* <span className="text-muted-foreground font-normal">(para acompanhar a encomenda)</span></>}
                       </Label>
-                      <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" />
+                      <Input id="checkout-email" type="email" autoComplete="email" inputMode="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" />
                     </div>
                     {form.shippingMethod === 'pickup' && (
                       <div className="space-y-2">
-                        <Label>Telefone *</Label>
-                        <PhoneInput value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
+                        <Label htmlFor="checkout-telefone">Telefone *</Label>
+                        <PhoneInput id="checkout-telefone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
                       </div>
                     )}
                     {form.shippingMethod !== 'pickup' && (
@@ -587,7 +594,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       <CreditCard className="h-4 w-4" /> Método de Pagamento
                     </div>
                     <RadioGroup value={form.paymentMethod} onValueChange={(v) => setForm({ ...form, paymentMethod: v, paymentReference: '' })}>
-                      {paymentMethods.length > 0 ? paymentMethods.map((m) => (
+                      {availableMethods.length > 0 ? availableMethods.map((m) => (
                         <div key={m.code} className="space-y-2">
                           {/* O cartão todo selecciona: num telemóvel, só o texto ser tocável obriga
                               a acertar no sítio certo. */}
@@ -596,68 +603,65 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             onClick={() => setForm({ ...form, paymentMethod: m.code, paymentReference: '' })}
                             className={`flex items-start gap-2 p-3 rounded-lg border transition-colors cursor-pointer ${form.paymentMethod === m.code ? 'border-[var(--brand-primary)] bg-[rgb(var(--brand-primary-rgb)/0.05)]' : 'hover:bg-muted/50'}`}
                           >
-                            <RadioGroupItem value={m.code} id={m.code} className="mt-1" />
-                            <Label htmlFor={m.code} className="cursor-pointer flex-1">
+                            <RadioGroupItem value={m.code} id={`pagamento-${m.code}`} className="mt-1" />
+                            <Label htmlFor={`pagamento-${m.code}`} className="cursor-pointer flex-1">
                               <span className="font-medium flex items-center gap-2 flex-wrap">
                                 {m.icon && <span>{m.icon}</span>}
                                 {m.name}
                                 {/* "p2p"/"offline" é jargão nosso; o cliente precisa é de saber quando paga. */}
-                                <span className="text-[10px] text-muted-foreground font-normal">
-                                  {m.type === 'p2p' || m.type === 'transfer' ? 'paga antes do envio' : 'paga na entrega'}
-                                </span>
+                                <span className="text-[10px] text-muted-foreground font-normal">{paymentMoment(m, form.shippingMethod)}</span>
                               </span>
-                              {m.account_info && <span className="block text-xs text-muted-foreground font-mono mt-0.5">{m.account_info}</span>}
+                              {m.account_info && (
+                                // Fonte normal (Inter), não monoespaçada: nesta o "O" de AO06 e o zero eram iguais.
+                                <span className="block text-xs text-foreground/80 tabular-nums tracking-wide mt-0.5 break-words">{m.account_info}</span>
+                              )}
                               {form.paymentMethod === m.code && m.instructions && (
                                 <p className="text-xs text-muted-foreground mt-2 p-2 rounded-md bg-muted/50 whitespace-pre-wrap">{m.instructions}</p>
                               )}
                             </Label>
                           </div>
-                          {form.paymentMethod === m.code && (m.type === 'p2p' || m.type === 'transfer') && (
+                          {form.paymentMethod === m.code && isPaidUpfront(m.type) && (
                             <div className="ml-0 sm:ml-6 space-y-2">
-                              {m.payment_link && (
-                                <a
-                                  href={m.payment_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-                                >
-                                  <CreditCard className="h-4 w-4" /> Pagar agora com {m.name}
-                                </a>
+                              {m.account_info && (
+                                <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => copyText(m.account_info, 'Dados de pagamento')}>
+                                  <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar dados de pagamento
+                                </Button>
                               )}
-                              {m.payment_link && (
-                                <p className="text-xs text-muted-foreground">Depois de pagar, escreva abaixo a referência ou o número do comprovativo.</p>
-                              )}
-                              {m.qr_url && <img src={m.qr_url} alt="QR pagamento" className="h-32 w-32 rounded-lg border" />}
-                              <Input placeholder="Referência / comprovativo de pagamento" value={form.paymentReference} onChange={(e) => setForm({ ...form, paymentReference: e.target.value })} />
+                              <p className="text-xs text-muted-foreground">
+                                Paga <strong>depois</strong> de confirmar: na página seguinte mostramos o número da encomenda para usar como referência,
+                                {m.payment_link ? ' o link de pagamento' : ''} e onde indicar o comprovativo. O stock fica reservado para si.
+                              </p>
+                              {m.qr_url && <img src={m.qr_url} alt={`QR de pagamento ${m.name}`} className="h-32 w-32 rounded-lg border" />}
+                              <Label htmlFor="checkout-referencia" className="text-xs font-normal text-muted-foreground">Já pagou? Referência do pagamento (opcional)</Label>
+                              <Input id="checkout-referencia" autoComplete="off" placeholder="Referência ou n.º do comprovativo" value={form.paymentReference} onChange={(e) => setForm({ ...form, paymentReference: e.target.value })} />
                             </div>
                           )}
                         </div>
                       )) : (
-                        <>
-                          <div className="flex items-center space-x-2 p-3 rounded-lg border"><RadioGroupItem value="entrega" id="entrega" /><Label htmlFor="entrega">Pagamento na entrega</Label></div>
-                          <div className="flex items-center space-x-2 p-3 rounded-lg border"><RadioGroupItem value="transferencia" id="transferencia" /><Label htmlFor="transferencia">Transferência bancária</Label></div>
-                        </>
+                        // Sem lista (falhou a carregar ou não há métodos activos): só o pagamento na
+                        // entrega, que o servidor aceita quando não há métodos configurados.
+                        <div className="flex items-center space-x-2 p-3 rounded-lg border"><RadioGroupItem value="entrega" id="pagamento-entrega" /><Label htmlFor="pagamento-entrega">Pagamento na entrega</Label></div>
                       )}
                     </RadioGroup>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Notas (opcional)</Label>
-                    <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Instruções de entrega..." />
+                    <Label htmlFor="checkout-notas">Notas (opcional)</Label>
+                    <Textarea id="checkout-notas" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Instruções de entrega..." />
                   </div>
 
                   {form.shippingMethod !== 'pickup' && (
                   <div className="space-y-3 pt-2 border-t border-border">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                      <PenLine className="h-4 w-4" /> Assinatura
+                      <PenLine className="h-4 w-4" /> Assinatura <span className="text-muted-foreground font-normal">(opcional)</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Assine à mão para confirmar a compra. A imagem fica no recibo em preto e branco, com o seu nome e data.
+                      Não é obrigatória: quem receber a encomenda assina na entrega. Se assinar aqui, a assinatura fica no recibo em preto e branco.
                     </p>
                     <SignaturePad
                       ref={signatureRef}
-                      label="Assinatura do comprador *"
-                      hint="Desenhe a sua assinatura com o dedo ou rato."
+                      label="Assinatura do comprador"
+                      hint="Desenhe a sua assinatura com o dedo ou rato, se quiser."
                     />
                   </div>
                   )}
@@ -672,7 +676,22 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
             </div>
 
             {cartItems.length > 0 && (
-              <div className="p-5 border-t border-border bg-muted/20 space-y-3">
+              <div className="p-4 sm:p-5 border-t border-border bg-muted/20 space-y-3">
+                {/* Avisos fora do resumo recolhível: no telemóvel o resumo vem fechado, e o aviso
+                    ficava escondido — o cliente via o botão e não sabia o que lhe faltava. */}
+                {maintenanceMode && (
+                  <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200">
+                    A loja está em manutenção — o checkout online está temporariamente desactivado.
+                  </div>
+                )}
+                {!user && step === 'checkout' && (
+                  <p className="text-xs text-muted-foreground">
+                    Não precisa de conta: acompanhe a encomenda com o número e o email em <strong>Rastrear encomenda</strong>.{' '}
+                    <button type="button" className="text-primary font-medium hover:underline" onClick={() => openAuth({ mode: 'login', defaultEmail: form.email, defaultName: form.name })}>
+                      Entrar
+                    </button>{' '}guarda os seus dados para a próxima.
+                  </p>
+                )}
                 {/* Telemóvel: barra que abre/fecha o detalhe. No computador não aparece. */}
                 <button
                   type="button"
@@ -691,30 +710,6 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 </button>
 
                 <div className={`${summaryOpen ? 'block' : 'hidden'} sm:block space-y-3`}>
-                {maintenanceMode && (
-                  <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900">
-                    A loja está em manutenção — o checkout online está temporariamente desactivado.
-                  </div>
-                )}
-                {!user && step === 'checkout' && (
-                  form.shippingMethod === 'pickup' ? (
-                    <div className="text-xs p-3 rounded-lg bg-muted/60 border border-border text-muted-foreground">
-                      A levantar na loja não precisa de conta: pague e leve o recibo no balcão.{' '}
-                      <button type="button" className="text-primary font-medium hover:underline" onClick={() => openAuth({ mode: 'login', defaultEmail: form.email, defaultName: form.name })}>
-                        Entrar
-                      </button>{' '}guarda os seus dados para a próxima.
-                    </div>
-                  ) : (
-                    <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900">
-                      <strong>A entrega ao domicílio precisa de conta</strong>, para poder acompanhar a
-                      encomenda e confirmar a recepção.{' '}
-                      <button type="button" className="font-semibold underline" onClick={() => openAuth({ reason: 'delivery', mode: 'signup', defaultEmail: form.email, defaultName: form.name })}>
-                        Entrar ou criar conta
-                      </button>
-                      {' '}— ou escolha <strong>Levantamento na loja</strong>, que não pede nada disto.
-                    </div>
-                  )
-                )}
                 <div className="flex gap-3 text-[10px] text-muted-foreground justify-center pb-1">
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-green-600" /> Compra segura</span>
                   <span className="flex items-center gap-1"><Lock className="h-3 w-3 text-green-600" /> Dados protegidos</span>
@@ -722,7 +717,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 </div>
                 <div className="space-y-1.5 text-sm">
                   {form.shippingMethod === 'delivery' && freeShippingRemaining > 0 && subtotalCents > 0 && (
-                    <div className="rounded-lg border border-[#0ea5c9]/20 bg-[#0ea5c9]/5 p-2.5 mb-2">
+                    <div className="rounded-lg border border-marca/20 bg-marca/5 p-2.5 mb-2">
                       <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
                         <span>Envio grátis</span>
                         <span>Faltam {formatCurrency(freeShippingRemaining)}</span>
@@ -764,7 +759,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             key={opt.id}
                             type="button"
                             onClick={() => setForm({ ...form, shippingMethod: opt.id })}
-                            className={`w-full flex items-center justify-between p-2 rounded-md text-xs transition-colors ${selected ? 'bg-[#0ea5c9]/10 border border-[#0ea5c9]/30' : 'hover:bg-muted/50'}`}
+                            className={`w-full flex items-center justify-between p-2 rounded-md text-xs transition-colors ${selected ? 'bg-marca/10 border border-marca/30' : 'hover:bg-muted/50'}`}
                           >
                             <span className="flex items-center gap-1.5 font-medium">
                               <Icon className="h-3.5 w-3.5" /> {opt.label}
@@ -798,14 +793,22 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   </Button>
                 ) : (
                   <>
-                    <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-2 space-y-0.5">
-                      <p className="truncate sm:whitespace-normal"><strong>{form.name || '—'}</strong> · {form.email}</p>
-                      <p className="truncate sm:whitespace-normal">{form.shippingMethod === 'pickup'
-                        ? `Levantamento: ${form.pickupStore || 'Loja física'}`
-                        : angolaAddressToPayload(deliveryAddress).deliveryAddressFull}
-                      </p>
-                    </div>
-                    <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode || (!user && form.shippingMethod !== 'pickup')}>
+                    {/* Resumo de quem e para onde, só com o que o cliente já escreveu: antes mostrava
+                        "— ·" e "Luanda, Angola" a quem ainda não tinha preenchido nada. */}
+                    {(form.name.trim() || form.email.trim() || (form.shippingMethod === 'pickup' ? form.pickupStore : deliveryAddress.street.trim())) && (
+                      <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-2 space-y-0.5">
+                        <p className="truncate sm:whitespace-normal">
+                          {form.name.trim() && <strong>{form.name.trim()}</strong>}
+                          {form.name.trim() && form.email.trim() ? ' · ' : ''}
+                          {form.email.trim()}
+                        </p>
+                        <p className="truncate sm:whitespace-normal">{form.shippingMethod === 'pickup'
+                          ? (form.pickupStore ? `Levantamento: ${form.pickupStore}` : 'Levantamento na loja')
+                          : (deliveryAddress.street.trim() ? angolaAddressToPayload(deliveryAddress).deliveryAddressFull : 'Entrega ao domicílio')}
+                        </p>
+                      </div>
+                    )}
+                    <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode}>
                       {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Confirmar Compra · {formatCurrency(totalCents)}
                     </Button>

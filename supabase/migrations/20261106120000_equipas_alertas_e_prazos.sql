@@ -206,10 +206,11 @@ alter table public.staff_notifications
   add column if not exists channels jsonb not null default '{}'::jsonb;
 alter table public.staff_notifications add constraint staff_notifications_severity_check
   check (severity in ('normal', 'high', 'critical'));
+-- Mantém os tipos que já existem (incluindo 'payment_reported', de 20261106050000).
 alter table public.staff_notifications drop constraint if exists staff_notifications_kind_check;
 alter table public.staff_notifications add constraint staff_notifications_kind_check
   check (kind = any (array[
-    'new_order', 'support', 'order_stuck', 'order_problem', 'order_confirmed',
+    'new_order', 'support', 'order_stuck', 'order_problem', 'order_confirmed', 'payment_reported',
     'order_overdue', 'order_unacknowledged', 'ticket_sla', 'escalation', 'ops_test'
   ]));
 -- Os avisos que já existem não saem agora por email nem WhatsApp.
@@ -266,6 +267,8 @@ alter table public.orders enable trigger user;
 create index if not exists orders_unacknowledged_idx on public.orders (created) where acknowledged_at is null;
 
 -- Mexer no estado, no pagamento ou na entrega é assumir (quem o faz já está a tratar dela).
+-- O cliente também muda o pagamento (indica a referência: 'awaiting_confirmation'), e isso não
+-- é a equipa a assumir: só contam os estados que são decisões da equipa.
 create or replace function private.orders_implicit_acknowledge()
 returns trigger
 language plpgsql
@@ -275,7 +278,8 @@ as $$
 begin
   if new.acknowledged_at is null and (
     new.status is distinct from old.status
-    or new.payment_status is distinct from old.payment_status
+    or (new.payment_status is distinct from old.payment_status
+        and coalesce(new.payment_status, '') not in ('', 'pending', 'awaiting_confirmation'))
     or new.delivery_status is distinct from old.delivery_status
   ) then
     new.acknowledged_at := now();

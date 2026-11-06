@@ -79,7 +79,7 @@ const empty = {
   maintenance_mode: false,
   google_oauth_enabled: false,
   header_welcome_logged: 'Bem-vindo de volta, {nome}',
-  header_welcome_guest: 'Envio em todo o país · Crie a sua conta para acompanhar encomendas',
+  header_welcome_guest: 'Envio em todo o país · Compre sem conta',
   header_cta_text: 'Explorar novidades',
   header_cta_link: '/shop',
   footer_tagline: '',
@@ -101,6 +101,8 @@ const empty = {
   checkout_rate_per_minute: 15,
   track_rate_per_minute: 20,
   receipt_per_order_per_minute: 3,
+  unpaid_cancel_days: 0,
+  chat_ai_daily_limit: 500,
   low_stock_threshold: 5,
   book_code_prefix: 'LIV-',
   ui_glass_enabled: true,
@@ -177,6 +179,8 @@ export default function SettingsTab() {
   // recusar o registo inteiro e partir o gravar das Configurações.
   const [hasAboutImages, setHasAboutImages] = useState(false);
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
+  // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
+  const [hasNewRules, setHasNewRules] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // Que segredos estão guardados (sem os valores). `null` = base de dados sem a migração.
@@ -195,6 +199,7 @@ export default function SettingsTab() {
         setRecordId(r.id);
         setHasAboutImages('about_top_image_url' in r);
         setHasAboutTeam('about_team' in r);
+        setHasNewRules('unpaid_cancel_days' in r);
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
         setLogoRemoved(false);
@@ -250,6 +255,8 @@ export default function SettingsTab() {
           checkout_rate_per_minute: r.checkout_rate_per_minute ?? empty.checkout_rate_per_minute,
           track_rate_per_minute: r.track_rate_per_minute ?? empty.track_rate_per_minute,
           receipt_per_order_per_minute: r.receipt_per_order_per_minute ?? empty.receipt_per_order_per_minute,
+          unpaid_cancel_days: r.unpaid_cancel_days ?? empty.unpaid_cancel_days,
+          chat_ai_daily_limit: r.chat_ai_daily_limit ?? empty.chat_ai_daily_limit,
           low_stock_threshold: r.low_stock_threshold ?? empty.low_stock_threshold,
           book_code_prefix: r.book_code_prefix ?? empty.book_code_prefix,
           ui_glass_enabled: r.ui_glass_enabled !== false,
@@ -357,6 +364,10 @@ export default function SettingsTab() {
           about_top_image_url: sanitizeImageUrlForSave(form.about_top_image_url),
           about_side_image_url: sanitizeImageUrlForSave(form.about_side_image_url),
         } : {}),
+        ...(hasNewRules ? {
+          unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
+          chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
+        } : {}),
         ...(hasAboutTeam ? {
           // Sem nome não é ninguém: essas linhas não são gravadas.
           about_team: (form.about_team || [])
@@ -459,7 +470,7 @@ export default function SettingsTab() {
                   <TabsTrigger
                     key={value}
                     value={value}
-                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-[#0ea5c9]/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-marca/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                   >
                     <Icon className="h-4 w-4" />{label}
                   </TabsTrigger>
@@ -786,6 +797,13 @@ export default function SettingsTab() {
             <>
               <SecretField {...secretProps('gemini_api_key', 'Chave Gemini')} placeholder="AIza… ou variável GEMINI_API_KEY" className="font-mono text-xs" />
               <SecretField {...secretProps('deepseek_api_key', 'Chave DeepSeek')} placeholder="sk-… ou variável DEEPSEEK_API_KEY (opcional)" className="font-mono text-xs" />
+              {hasNewRules && (
+                <div className="space-y-2">
+                  <Label htmlFor="chat-ia-limite">Respostas com IA por dia (loja toda)</Label>
+                  <Input id="chat-ia-limite" type="number" min={0} max={100000} value={form.chat_ai_daily_limit} onChange={(e) => set('chat_ai_daily_limit', e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Limita o custo da IA. Acima disto, e acima de 60 por visitante, o assistente responde com as perguntas frequentes. 0 = nunca usa IA.</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Modelo (opcional)</Label>
                 <Input value={form.chat_model} onChange={(e) => set('chat_model', e.target.value)} placeholder="gemini-2.0-flash-lite ou deepseek-chat" className="font-mono text-xs" />
@@ -855,6 +873,16 @@ export default function SettingsTab() {
             <Input type="number" min={0} max={5000} value={form.checkout_notes_max} onChange={(e) => set('checkout_notes_max', e.target.value)} />
             <p className="text-xs text-muted-foreground">0 a 5000. Com 0, as notas do cliente não são guardadas.</p>
           </div>
+          {hasNewRules && (
+            <div className="space-y-2">
+              <Label htmlFor="cancelar-por-pagar">Cancelar encomendas por pagar ao fim de (dias)</Label>
+              <Input id="cancelar-por-pagar" type="number" min={0} max={60} value={form.unpaid_cancel_days} onChange={(e) => set('unpaid_cancel_days', e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Só transferência e Multicaixa, sem pagamento nem referência indicada, ainda não preparadas. O stock volta ao catálogo e o
+                cliente e a equipa são avisados. 0 = nunca (a encomenda fica à espera, com alerta às 48 h).
+              </p>
+            </div>
+          )}
           <div className="rounded-lg border p-4 space-y-4 bg-muted/20">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Protecção contra abusos (por minuto)</p>
             <div className="grid sm:grid-cols-3 gap-3">

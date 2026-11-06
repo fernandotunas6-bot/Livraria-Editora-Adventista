@@ -78,7 +78,7 @@ async function hydrateThreads(threads, staff) {
   const orderIds = [...new Set(threads.map((thread) => thread.order_id).filter(Boolean))];
   const [profilesResult, ordersResult] = await Promise.all([
     staff && customerIds.length
-      ? supabase.from('profiles').select('id, name, email').in('id', customerIds)
+      ? supabase.from('profiles').select('id, name, email, customer_code').in('id', customerIds)
       : Promise.resolve({ data: [], error: null }),
     orderIds.length
       ? supabase.from('orders')

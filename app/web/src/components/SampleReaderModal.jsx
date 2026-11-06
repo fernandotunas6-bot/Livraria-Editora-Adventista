@@ -92,7 +92,7 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
             <p className="text-xs text-muted-foreground">{urls.length} página(s) de amostra</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="bg-primary hover:bg-[#0ea5c9]/90 text-white" onClick={() => setReadingMode(true)}>
+            <Button size="sm" className="bg-primary hover:bg-marca/90 text-white" onClick={() => setReadingMode(true)}>
               <BookOpen className="h-4 w-4 mr-1.5" /> Modo Leitura
             </Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
@@ -103,7 +103,7 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
             <button
               key={i}
               type="button"
-              className="rounded-xl overflow-hidden border hover:border-[#0ea5c9]/50 transition-all text-left"
+              className="rounded-xl overflow-hidden border hover:border-marca/50 transition-all text-left"
               onClick={() => { setPageIndex(i); setReadingMode(true); }}
             >
               <img src={url} alt={`Página ${i + 1}`} className="w-full h-auto object-contain bg-muted/30" />

@@ -104,12 +104,16 @@ function ProductDetailPage() {
       const availableQuantity = selectedVariant.inventory_quantity;
       try {
         await addToCart(product, selectedVariant, quantity, availableQuantity, { silent: true });
-        toast({
-          variant: 'cart-success',
-          product,
-          onCartOpen: () => setIsCartOpen(true)
-        });
-        if (openCart) setIsCartOpen(true);
+        // Com o carrinho aberto, o aviso ficava por cima de "Continuar para Checkout".
+        if (openCart) {
+          setIsCartOpen(true);
+        } else {
+          toast({
+            variant: 'cart-success',
+            product,
+            onCartOpen: () => setIsCartOpen(true)
+          });
+        }
       } catch (error) {
         toast({
           variant: 'destructive',
@@ -245,6 +249,13 @@ function ProductDetailPage() {
   const isStockManaged = selectedVariant?.manage_inventory ?? false;
   const canAddToCart = !isStockManaged || quantity <= availableStock;
 
+  // Texto simples da descrição (já sem HTML), para o resumo junto ao botão de compra.
+  const descriptionText = typeof DOMParser !== 'undefined' && product.description
+    ? (new DOMParser().parseFromString(sanitizeHtml(product.description), 'text/html').body.textContent || '').replace(/\s+/g, ' ').trim()
+    : '';
+  const descriptionTruncated = descriptionText.length > 280;
+  const descriptionExcerpt = descriptionTruncated ? `${descriptionText.slice(0, 280).replace(/\s+\S*$/, '')}…` : descriptionText;
+
   const currentImage = product.images[currentImageIndex];
   const hasMultipleImages = product.images.length > 1;
 
@@ -278,11 +289,11 @@ function ProductDetailPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] sm:aspect-square mb-4">
+            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] max-h-[78vh] mx-auto w-full mb-4">
               <img
                 src={!currentImage?.url ? placeholderImage : currentImage.url}
                 alt={product.title}
-                className="w-full h-full object-contain p-3 sm:object-cover sm:p-0"
+                className="w-full h-full object-contain p-3"
               />
 
               {hasMultipleImages && (
@@ -387,30 +398,6 @@ function ProductDetailPage() {
               )}
             </div>
 
-            {product.description && (
-              <div className="prose prose-sm max-w-none text-muted-foreground mb-8" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
-            )}
-
-            {Array.isArray(product.benefit_bullets) && product.benefit_bullets.length > 0 && (
-              <div className="mb-8 p-4 rounded-xl bg-[#0ea5c9]/5 border border-[#0ea5c9]/15">
-                <p className="font-semibold mb-3 text-foreground">Porquê este livro?</p>
-                <ul className="space-y-2">
-                  {product.benefit_bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {product.target_audience && (
-              <p className="text-sm text-muted-foreground mb-8">
-                <span className="font-medium text-foreground">Ideal para:</span> {product.target_audience}
-              </p>
-            )}
-
             {product.variants.length > 1 && (
               <div className="mb-6">
                 <h3 className="text-sm font-semibold mb-3 text-foreground">Edição</h3>
@@ -452,10 +439,10 @@ function ProductDetailPage() {
                 Comprar Agora
               </Button>
               <Button
-                onClick={() => handleAddToCart(true)}
+                onClick={() => handleAddToCart(false)}
                 size="lg"
                 variant="outline"
-                className="flex-1 text-lg py-6 border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10"
+                className="flex-1 text-lg py-6 border-marca text-primary hover:bg-marca/10"
                 disabled={!canAddToCart || !product.purchasable}
               >
                 Adicionar ao Carrinho
@@ -473,7 +460,7 @@ function ProductDetailPage() {
             <Button
               onClick={() => setShowPreview(true)}
               variant="outline"
-              className="w-full mb-3 border-[#0ea5c9]/40 text-primary hover:bg-[#0ea5c9]/5 py-6 text-lg rounded-xl"
+              className="w-full mb-3 border-marca/40 text-primary hover:bg-marca/5 py-6 text-lg rounded-xl"
             >
               <BookOpen className="mr-2 h-5 w-5" />
               Ler Amostra Grátis (Primeiras Páginas)
@@ -508,6 +495,43 @@ function ProductDetailPage() {
               </p>
             )}
 
+            {/* Resumo da descrição depois do botão de compra: o texto completo, em "Detalhes",
+                empurrava o botão para fora do primeiro ecrã. */}
+            {descriptionExcerpt && (
+              <div className="mb-6">
+                <p className="text-muted-foreground leading-relaxed">{descriptionExcerpt}</p>
+                {descriptionTruncated && (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('detalhes-produto')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="mt-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    Ler a descrição completa
+                  </button>
+                )}
+              </div>
+            )}
+
+            {Array.isArray(product.benefit_bullets) && product.benefit_bullets.length > 0 && (
+              <div className="mb-8 p-4 rounded-xl bg-marca/5 border border-marca/15">
+                <p className="font-semibold mb-3 text-foreground">Porquê este livro?</p>
+                <ul className="space-y-2">
+                  {product.benefit_bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {product.target_audience && (
+              <p className="text-sm text-muted-foreground mb-8">
+                <span className="font-medium text-foreground">Ideal para:</span> {product.target_audience}
+              </p>
+            )}
+
             {product.additional_info?.length > 0 && (
               <div className="mt-8 space-y-6">
                 {product.additional_info
@@ -524,7 +548,7 @@ function ProductDetailPage() {
         </div>
 
         <div className="mt-16 border-t border-border pt-10">
-          <Tabs defaultValue="details">
+          <Tabs defaultValue="details" id="detalhes-produto" className="scroll-mt-24">
             <TabsList className="mb-8 flex-wrap h-auto gap-1">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
               {product.preview_enabled && product.sample_pages?.length > 0 && (
@@ -551,7 +575,7 @@ function ProductDetailPage() {
               <TabsContent value="preview">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <p className="text-sm text-muted-foreground">Explore as primeiras páginas antes de comprar.</p>
-                  <Button size="sm" className="bg-primary hover:bg-[#0ea5c9]/90 text-white" onClick={() => setSampleReaderOpen(true)}>
+                  <Button size="sm" className="bg-primary hover:bg-marca/90 text-white" onClick={() => setSampleReaderOpen(true)}>
                     <BookOpen className="h-4 w-4 mr-1.5" /> Modo Leitura
                   </Button>
                 </div>
@@ -573,7 +597,7 @@ function ProductDetailPage() {
               <TabsContent value="author">
                 <div className="flex flex-col sm:flex-row gap-6 max-w-3xl">
                   {product.author_photo && (
-                    <img src={product.author_photo} alt={product.subtitle} className="w-32 h-32 rounded-full object-cover ring-4 ring-[#0ea5c9]/20 shrink-0" />
+                    <img src={product.author_photo} alt={product.subtitle} className="w-32 h-32 rounded-full object-cover ring-4 ring-marca/20 shrink-0" />
                   )}
                   <div>
                     <h3 className="text-2xl font-bold mb-2">{product.subtitle}</h3>
@@ -595,7 +619,7 @@ function ProductDetailPage() {
                       key={v.id}
                       role="button"
                       tabIndex={0}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedVariant?.id === v.id ? 'ring-2 ring-[#0ea5c9] border-[#0ea5c9]/40' : 'hover:border-[#0ea5c9]/30'}`}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedVariant?.id === v.id ? 'ring-2 ring-marca border-marca/40' : 'hover:border-marca/30'}`}
                       onClick={() => handleVariantSelect(v)}
                       onKeyDown={(e) => e.key === 'Enter' && handleVariantSelect(v)}
                     >
@@ -713,12 +737,12 @@ function ProductDetailPage() {
                             placeholder="Partilhe a sua opinião sobre este livro..."
                             rows={4}
                             maxLength={1000}
-                            className="w-full text-sm p-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-[#0ea5c9] bg-background"
+                            className="w-full text-sm p-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-marca bg-background"
                             required
                           />
                         </div>
 
-                        <Button type="submit" disabled={submitting} className="w-full btn-primary h-11 bg-primary text-white hover:bg-[#0ea5c9]/90">
+                        <Button type="submit" disabled={submitting} className="w-full btn-primary h-11 bg-primary text-white hover:bg-marca/90">
                           {submitting ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -737,7 +761,7 @@ function ProductDetailPage() {
                     ) : (
                       <div className="text-center py-6">
                         <p className="text-sm text-muted-foreground mb-4">Inicie sessão para deixar uma avaliação e partilhar a sua experiência.</p>
-                        <Button type="button" variant="outline" className="w-full border-[#0ea5c9] text-primary hover:bg-[#0ea5c9]/10" onClick={() => openAuth({ reason: 'review', mode: 'login' })}>
+                        <Button type="button" variant="outline" className="w-full border-marca text-primary hover:bg-marca/10" onClick={() => openAuth({ reason: 'review', mode: 'login' })}>
                           Entrar na conta
                         </Button>
                       </div>
@@ -765,7 +789,7 @@ function ProductDetailPage() {
                         <div key={r.id} className="p-4 border rounded-xl bg-card hover:shadow-sm transition-all">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-[#0ea5c9]/10 text-primary font-bold flex items-center justify-center text-sm shrink-0 border border-[#0ea5c9]/25">
+                              <div className="h-9 w-9 rounded-full bg-marca/10 text-primary font-bold flex items-center justify-center text-sm shrink-0 border border-marca/25">
                                 {r.userAvatar ? (
                                   <img src={r.userAvatar} alt={r.userName} className="h-full w-full rounded-full object-cover" />
                                 ) : (

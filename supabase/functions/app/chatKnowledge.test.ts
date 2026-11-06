@@ -35,4 +35,12 @@ describe("chatKnowledge", () => {
     expect(kz(20000)).toBe("20 000 Kz");
     expect(kz(1500)).toBe("1 500 Kz");
   });
+
+  it("portes a 0 (entrega grátis) valem 0, como no checkout; vazio usa o valor por omissão", () => {
+    const k = buildKnowledge({ shipping_cost: 0, shipping_express_cost: "" });
+    expect(k.shippingCost).toBe(0);
+    expect(k.expressCost).toBe(0);
+    expect(knowledgeText(k)).toContain("Entrega ao domicílio: grátis");
+    expect(buildKnowledge({ shipping_cost: "" }).shippingCost).toBe(1500);
+  });
 });

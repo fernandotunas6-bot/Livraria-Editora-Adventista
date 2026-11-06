@@ -131,7 +131,7 @@ const SignaturePad = forwardRef(function SignaturePad(
         <canvas
           ref={canvasRef}
           className={`w-full ${height} border-2 rounded-xl touch-none cursor-crosshair bg-white ${
-            hasStroke ? 'border-green-500/40' : 'border-dashed border-[#0ea5c9]/40'
+            hasStroke ? 'border-green-500/40' : 'border-dashed border-marca/40'
           } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           onMouseDown={startDraw}
           onMouseMove={draw}

@@ -42,6 +42,25 @@ export function Pill({ className, children }) {
   );
 }
 
+/** Código de cliente (CLI-) ou de funcionário (FUN-). Pequeno, monoespaçado, sem quebras de linha. */
+export function CodeChip({ code }) {
+  if (!code) return null;
+  const staff = code.startsWith('FUN-');
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-md border px-1.5 py-px font-mono text-[11px] leading-4 tabular-nums whitespace-nowrap',
+        staff
+          ? 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      )}
+      title={staff ? 'Código de funcionário' : 'Código de cliente'}
+    >
+      {code}
+    </span>
+  );
+}
+
 export function PersonAvatar({ person, className }) {
   const avatar = person?.avatar || '';
   const src = !avatar ? '' : /^https?:\/\//.test(avatar) ? avatar : person?.id ? mediaUrl('users', person.id, avatar) : '';

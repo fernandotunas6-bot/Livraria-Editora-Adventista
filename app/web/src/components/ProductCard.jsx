@@ -48,7 +48,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
         product,
         onCartOpen
       });
-      if (onCartOpen) onCartOpen();
+      // O carrinho já não abre a cada livro: interrompia quem quer juntar vários. O aviso tem "Ver".
       setAdded(true);
     } catch (err) {
       toast({ variant: 'destructive', title: 'Stock insuficiente', description: err.message });

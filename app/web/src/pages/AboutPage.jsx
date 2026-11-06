@@ -40,7 +40,7 @@ const AboutPage = () => {
         <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0">
             <img src={topImage} alt="Capas de livros do catálogo da livraria" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0c4a6e]/80 to-[#0ea5c9]/40" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0c4a6e]/80 to-marca/40" />
           </div>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: MOTION.base }} className="relative z-10 container-custom text-center text-white">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">A Nossa História</h1>
@@ -121,7 +121,7 @@ const AboutPage = () => {
             <div className="grid md:grid-cols-2 gap-8">
               {values.map((value, index) => (
                 <motion.div key={index} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} className="bg-card rounded-xl p-8 border border-border">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#0ea5c9]/10 mb-4">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-marca/10 mb-4">
                     <value.icon className="h-6 w-6 text-primary" />
                   </div>
                   <h3 className="text-2xl font-semibold mb-3">{value.title}</h3>

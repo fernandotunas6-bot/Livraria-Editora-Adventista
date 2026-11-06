@@ -253,4 +253,10 @@ describe("histórico para a IA", async () => {
     expect(history[1].content).toContain("[Equipa] Sai amanhã.");
     expect(message).toBe("Obrigado\nE o recibo?");
   });
+
+  it("com portes a 0, diz que a entrega é grátis (não «0 Kz»)", () => {
+    const k0 = buildKnowledge({ shipping_cost: 0 });
+    expect(ruleReply(ctx("quanto custa a entrega?", { knowledge: k0 })).reply).toContain("A entrega ao domicílio é grátis");
+    expect(ruleReply(ctx("Envio grátis?", { knowledge: k0 })).reply).not.toContain("0 Kz");
+  });
 });

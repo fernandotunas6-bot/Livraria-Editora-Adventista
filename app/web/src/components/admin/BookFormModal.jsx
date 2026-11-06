@@ -105,9 +105,9 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
         animate={{ opacity: 1, y: 0, scale: 1 }}
         className="bg-background rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-border flex flex-col"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-[#0ea5c9]/10 to-transparent">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-marca/10 to-transparent">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#0ea5c9]/15 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-marca/15 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -267,7 +267,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                     <Label>Descrição</Label>
                     <RichTextEditor value={form.description} onChange={(v) => set('description', v)} placeholder={isBook ? 'Sinopse do livro...' : 'Descrição, materiais, medidas, cuidados...'} />
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[#0ea5c9]/5 border border-[#0ea5c9]/20">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-marca/5 border border-marca/20">
                     <Switch checked={form.featured} onCheckedChange={(v) => set('featured', v)} />
                     <Label className="cursor-pointer">Destacar na homepage</Label>
                   </div>
@@ -488,7 +488,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                 </TabsContent>
 
                 <TabsContent value="stats" className="space-y-4 mt-0">
-                  <div className="rounded-xl bg-gradient-to-r from-[#0ea5c9]/10 to-[#0ea5c9]/5 border border-[#0ea5c9]/20 p-4 text-sm text-foreground">
+                  <div className="rounded-xl bg-gradient-to-r from-marca/10 to-marca/5 border border-marca/20 p-4 text-sm text-foreground">
                     <h4 className="font-semibold text-primary mb-1">Métricas reais</h4>
                     <p className="text-muted-foreground">Contadas automaticamente: vendas quando uma encomenda é registada e visualizações quando alguém abre a página do livro.</p>
                   </div>

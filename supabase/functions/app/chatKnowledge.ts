@@ -9,6 +9,8 @@
 // publicada quando muda `supabase/` (deploy-supabase.yml) e não pode importar o site. O
 // chatKnowledge.test.ts falha se as duas deixarem de dizer o mesmo.
 
+import { settingNumber } from "./checkoutRules.ts";
+
 type Row = Record<string, any>;
 
 export const FAQ_SECTIONS = [
@@ -62,10 +64,6 @@ export type Knowledge = {
   stores: { name: string; province: string; address: string; phone: string; hours: string }[];
 };
 
-const num = (value: unknown, fallback: number) => {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-};
 const str = (value: unknown, max = 300) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** Kz com espaço como separador de milhares (como no site), igual em qualquer runtime. */
@@ -75,12 +73,15 @@ export function kz(value: number) {
 }
 
 export function buildKnowledge(settings: Row | null, paymentMethods: Row[] = [], stores: Row[] = []): Knowledge {
-  const shippingCost = num(settings?.shipping_cost, 0) || DEFAULTS.shipping;
+  // As mesmas regras do checkout (checkoutRules.settingNumber e place_order): 0 é um valor válido
+  // (entrega grátis); só o campo vazio usa o valor por omissão. Expressa por configurar = dobro.
+  const shippingCost = settingNumber(settings?.shipping_cost, DEFAULTS.shipping);
+  const express = settingNumber(settings?.shipping_express_cost, 0);
   return {
     siteName: str(settings?.site_name, 80) || "Livraria Adventista",
-    freeThreshold: num(settings?.shipping_free_threshold, 0) || DEFAULTS.free,
+    freeThreshold: settingNumber(settings?.shipping_free_threshold, DEFAULTS.free),
     shippingCost,
-    expressCost: num(settings?.shipping_express_cost, 0) || shippingCost * 2,
+    expressCost: express > 0 ? express : shippingCost * 2,
     whatsapp: str(settings?.whatsapp, 40),
     phone: str(settings?.contact_phone, 40),
     email: str(settings?.contact_email, 120),
@@ -97,11 +98,14 @@ export function buildKnowledge(settings: Row | null, paymentMethods: Row[] = [],
   };
 }
 
+/** Valor dos portes em texto: 0 é "grátis", não "0 Kz". */
+export const shippingText = (value: number) => (value > 0 ? kz(value) : "grátis");
+
 function fill(text: string, k: Knowledge) {
   return text
     .replaceAll("{free_threshold}", kz(k.freeThreshold))
-    .replaceAll("{shipping_cost}", kz(k.shippingCost))
-    .replaceAll("{express_cost}", kz(k.expressCost));
+    .replaceAll("{shipping_cost}", shippingText(k.shippingCost))
+    .replaceAll("{express_cost}", shippingText(k.expressCost));
 }
 
 export const faqAnswers = (k: Knowledge) =>

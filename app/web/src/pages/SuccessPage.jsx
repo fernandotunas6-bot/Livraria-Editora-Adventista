@@ -15,6 +15,8 @@ import { useIntegrations } from '@/hooks/useIntegrations';
 import { useToast } from '@/hooks/use-toast';
 import { loadLastOrder, downloadReceipt, sendReceiptViaWhatsApp, receiptBrand } from '@/lib/receipt';
 import { showLocalNotification, subscribeToPush, isPushSupported } from '@/lib/pushNotifications';
+import { isPaidUpfront } from '@/lib/paymentMethods';
+import PayLaterBox from '@/components/PayLaterBox';
 
 const SuccessPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -66,8 +68,13 @@ const SuccessPage = () => {
     notify();
   }, [hasOrder, isWhatsApp, orderNumber, settings.push_enabled, settings.vapid_public_key]);
 
-  const title = isWhatsApp ? 'Pedido WhatsApp Registado!' : 'Compra Confirmada!';
-  const subtitle = isWhatsApp
+  // Transferência e Multicaixa: paga-se agora, depois de encomendar. Até lá a compra não está
+  // "confirmada": está registada e com o stock reservado.
+  const payLater = !isWhatsApp && isPaidUpfront(orderData?.paymentType);
+  const title = isWhatsApp ? 'Pedido WhatsApp Registado!' : payLater ? 'Encomenda Registada!' : 'Compra Confirmada!';
+  const subtitle = payLater
+    ? 'Os livros estão reservados para si. Falta o pagamento: veja abaixo como pagar e onde indicar a referência.'
+    : isWhatsApp
     ? (waApiActive
       ? 'O seu pedido foi registado e a confirmação foi enviada automaticamente para o seu WhatsApp.'
       : 'O seu pedido foi registado no sistema. Continue a conversa no WhatsApp para confirmar pagamento e entrega.')
@@ -119,7 +126,7 @@ const SuccessPage = () => {
       <main className="section-spacing bg-background min-h-[60vh] flex items-center">
         <div className="container-custom">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto text-center">
-            <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${isWhatsApp ? 'bg-green-500/10' : 'bg-[#0ea5c9]/10'}`}>
+            <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${isWhatsApp ? 'bg-green-500/10' : 'bg-marca/10'}`}>
               {isWhatsApp ? (
                 <MessageCircle className="h-10 w-10 text-green-600" />
               ) : (
@@ -127,7 +134,7 @@ const SuccessPage = () => {
               )}
             </div>
 
-            <span className={`inline-block text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full mb-4 ${isWhatsApp ? 'bg-green-500/10 text-green-700' : 'bg-[#0ea5c9]/10 text-primary'}`}>
+            <span className={`inline-block text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full mb-4 ${isWhatsApp ? 'bg-green-500/10 text-green-700' : 'bg-marca/10 text-primary'}`}>
               {isWhatsApp ? 'Encomenda via WhatsApp' : 'Compra Online'}
             </span>
 
@@ -155,8 +162,24 @@ const SuccessPage = () => {
               </div>
             )}
 
-            {hasOrder && /^https:\/\//.test(orderData?.paymentLink || '') && (
-              <div className="bg-card border border-[#0ea5c9]/40 rounded-xl p-6 mb-6 text-left space-y-3">
+            {hasOrder && payLater && (
+              <div className="mb-6">
+                <PayLaterBox
+                  orderNumber={orderNumber || orderData.orderNumber}
+                  email={orderData.email || ''}
+                  phone={orderData.phone || ''}
+                  total={orderData.total || total}
+                  methodName={orderData.paymentMethod || ''}
+                  accountInfo={orderData.paymentAccountInfo || ''}
+                  instructions={orderData.paymentInstructions || ''}
+                  paymentLink={orderData.paymentLink || ''}
+                  referenceAlreadySent={!!orderData.paymentReference}
+                />
+              </div>
+            )}
+
+            {hasOrder && !payLater && /^https:\/\//.test(orderData?.paymentLink || '') && (
+              <div className="bg-card border border-marca/40 rounded-xl p-6 mb-6 text-left space-y-3">
                 <h2 className="font-semibold text-lg">Pagamento</h2>
                 <p className="text-sm text-muted-foreground">
                   {orderData.paymentReference
@@ -234,7 +257,7 @@ const SuccessPage = () => {
               <div className="space-y-4">
                 {nextSteps.map(({ step, title: stepTitle, desc }) => (
                   <div key={step} className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-marca/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
                     <div>
                       <h3 className="font-medium mb-1">{stepTitle}</h3>
                       <p className="text-sm text-muted-foreground">{desc}</p>
@@ -253,7 +276,7 @@ const SuccessPage = () => {
               </Link>
               {isAuthed ? (
                 <Link to="/profile" state={{ tab: 'orders' }}>
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto border-[#0ea5c9] text-primary">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
                     <User className="mr-2 h-5 w-5" /> Ver {isWhatsApp ? 'Pedidos' : 'Compras'}
                   </Button>
                 </Link>

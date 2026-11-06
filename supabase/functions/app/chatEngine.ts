@@ -13,7 +13,7 @@
 //  - O texto do cliente e da base de dados é informação, não instruções (injecção de prompt):
 //    vai delimitado, e a resposta da IA é filtrada (ligações, livros e tamanho).
 
-import { type Knowledge, faqAnswers, kz, knowledgeText } from "./chatKnowledge.ts";
+import { type Knowledge, faqAnswers, kz, knowledgeText, shippingText } from "./chatKnowledge.ts";
 import { orderStage } from "./orderWatch.ts";
 
 type Row = Record<string, any>;
@@ -376,7 +376,9 @@ export function ruleReply(ctx: ChatContext): EngineReply {
       break;
 
     case "free_shipping":
-      out.reply = `O envio é grátis em encomendas a partir de ${kz(k.freeThreshold)}, em todo o território nacional. O levantamento numa loja é sempre grátis.`;
+      out.reply = k.shippingCost > 0
+        ? `O envio é grátis em encomendas a partir de ${kz(k.freeThreshold)}, em todo o território nacional. O levantamento numa loja é sempre grátis.`
+        : "A entrega ao domicílio é sempre grátis, e o levantamento numa loja também.";
       out.links = [LINKS.shipping];
       break;
 
@@ -386,7 +388,9 @@ export function ruleReply(ctx: ChatContext): EngineReply {
       break;
 
     case "shipping_cost":
-      out.reply = `Entrega ao domicílio: ${kz(k.shippingCost)} por encomenda (grátis a partir de ${kz(k.freeThreshold)}). Entrega expressa: ${kz(k.expressCost)}, 24 a 48 horas em Luanda. Levantamento na loja: grátis.`;
+      out.reply = k.shippingCost > 0
+        ? `Entrega ao domicílio: ${kz(k.shippingCost)} por encomenda (grátis a partir de ${kz(k.freeThreshold)}). Entrega expressa: ${shippingText(k.expressCost)}, 24 a 48 horas em Luanda. Levantamento na loja: grátis.`
+        : `A entrega ao domicílio é grátis. Entrega expressa: ${shippingText(k.expressCost)}, 24 a 48 horas em Luanda. Levantamento na loja: grátis.`;
       out.links = [LINKS.shipping];
       break;
 
