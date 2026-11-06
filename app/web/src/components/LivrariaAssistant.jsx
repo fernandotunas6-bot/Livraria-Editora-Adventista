@@ -462,8 +462,18 @@ export default function LivrariaAssistant() {
                   </p>
                 )}
 
+                {/* As mensagens podem ir para um fornecedor de IA fora de Angola (Gemini, DeepSeek):
+                    o visitante tem de o saber antes de escrever. Com a equipa responde uma pessoa,
+                    por isso o aviso sai. Fica acima do formulário, que é o último elemento e leva o
+                    espaço da safe-area do telemóvel. Não diz "dados pessoais": o assistente pede o
+                    número e o email da compra para mostrar uma encomenda. */}
+                {!withTeam && (
+                  <p className="shrink-0 border-t border-border bg-background px-3 pt-1.5 text-center text-[10px] text-muted-foreground">
+                    As respostas do assistente podem ser geradas por um serviço de IA externo. Não escreva palavras-passe nem dados de pagamento.
+                  </p>
+                )}
                 <form
-                  className={`flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pt-3 ${withTeam ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-3' : 'pb-2'}`}
+                  className={`flex shrink-0 items-center gap-2 bg-background px-3 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-3 ${withTeam ? 'border-t border-border pt-3' : ''}`}
                   onSubmit={(e) => { e.preventDefault(); send(input); }}
                 >
                   <Input
@@ -487,13 +497,6 @@ export default function LivrariaAssistant() {
                     {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </button>
                 </form>
-                {/* As mensagens podem ir para um fornecedor de IA fora de Angola (Gemini, DeepSeek):
-                    o visitante tem de o saber antes de escrever. */}
-                {!withTeam && (
-                  <p className="shrink-0 bg-background px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] text-center text-[10px] text-muted-foreground sm:pb-2">
-                    As respostas do assistente podem ser geradas por um serviço de IA externo. Não escreva palavras-passe nem dados de pagamento.
-                  </p>
-                )}
               </>
             ) : (
               <div className="flex-1 p-6 text-center text-sm text-muted-foreground">
