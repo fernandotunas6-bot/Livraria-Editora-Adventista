@@ -1025,6 +1025,39 @@ A migração foi verificada num Postgres local: substitui as duas políticas, e 
 `bash scripts/configurar-auth.sh` (mostra a diferença e pede confirmação). Para voltar a
 desenvolver contra a base de produção, repor `http://localhost:3000/**` nesse ficheiro.
 
+## 9.11 Produtos que não são livros, e a amostra de leitura (2026-11-06)
+
+Passagem pela compra de produtos com variantes (uniformes, t-shirts, edições) e pelos botões
+da ficha. Nenhum produto em produção tem variantes ainda (os 102 são livros sem `versions`), por
+isso o caso foi simulado: no navegador, alterando só a resposta da API, e na base de dados numa
+transacção anulada.
+
+| # | Achado | Gravidade |
+|---|---|---|
+| 43 | "Comprar" no cartão, na vista rápida e nos destaques punha um produto com tamanhos no carrinho **sem tamanho**, e o `place_order` aceitava: encomenda sem tamanho, ao preço base | Alta (vendas) |
+| 44 | "Ler Amostra Grátis" abria, em **todos** os produtos, páginas inventadas: um prefácio que dizia que o autor "é reconhecido internacionalmente" e um "Capítulo 1: O Poder dos Pequenos Passos", iguais para qualquer livro (e para um uniforme) | Alta (confiança) |
+| 45 | Stock de uma variante maior que o do produto: a ficha dizia "9 em stock" e o servidor recusava a 5.ª unidade | Média |
+| 46 | Os destaques da semana diziam "Adicionado ao carrinho!" mesmo quando o stock não chegava (o erro ficava por tratar), abriam o carrinho a cada clique e mostravam o preço de tabela durante uma promoção | Média |
+| 47 | Variantes chamadas "Edição" numa t-shirt; "disponíveleis" na mensagem de stock (ficha e carrinho) | Baixa |
+
+**43.** Migração `20261106170000_variante_obrigatoria`: o `place_order` recusa um produto com
+`versions` sem variante ("Escolha o tamanho ou a edição de: …"). No site, `needsVariantChoice`
+muda o botão para "Escolher" e leva à ficha; o `addToCart` recusa a variante base desses
+produtos, e o carrinho tira-a ao revalidar. Teste em transacção anulada: sem variante → recusa;
+M → aceite com `variant_label` "M"; L esgotado → "Stock insuficiente (L)"; livro sem variantes
+→ aceite. Confirmado depois que a função em produção ficou igual.
+
+**44.** O `BookPreviewModal` foi apagado. O botão só aparece com `preview_enabled` e páginas
+carregadas no painel (`hasReadingSample`), e abre as páginas reais (`SampleReaderModal`). Hoje
+nenhum produto tem amostra, por isso o botão desaparece até a equipa carregar páginas.
+
+**45.** `variantStock` (`api/EcommerceApi.js`): o menor entre o da variante e o do produto, como o
+carrinho já fazia ao revalidar. A ficha abre na primeira variante com stock; uma esgotada aparece
+riscada e diz "Este tamanho esgotou. Escolha outro.".
+
+**46–47.** Os destaques seguem os cartões (aviso com "Ver", erro mostrado, preço em vigor).
+`variantNames` dá Tamanho, Edição ou Opção conforme o tipo.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.

@@ -2,6 +2,12 @@
 
 Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Variantes e amostra de leitura (2026-11-06, ramo `claude/elegant-noether-ebflws`)
+
+- **Produtos com tamanhos ou edições** só se compram com um escolhido: o cartão, a vista rápida e os destaques levam à ficha ("Escolher"), e o `place_order` recusa sem variante. Migração `20261106170000_variante_obrigatoria`, **ainda não aplicada**: vai no merge, com o `supabase db push`. Testada numa transacção anulada.
+- **A amostra de leitura inventada saiu** (prefácio e capítulo fictícios iguais para todos os produtos). O botão só aparece com páginas reais carregadas no painel → Livro → Amostra, e hoje nenhum produto as tem.
+- Detalhes em [AUDITORIA.md](AUDITORIA.md), secção 9.11, e na spec ([SPEC-COMPONENTES.md](SPEC-COMPONENTES.md), secção 8).
+
 ## Códigos de cliente e de funcionário (2026-11-06)
 
 - **Feito e aplicado** no Supabase (`bggqkjjqbjhbjsckzopj`): `20261106033302_codigos_cliente_funcionario` e `20261106033425_codigo_cliente_tambem_na_equipa`, com o mesmo SQL dos ficheiros em `supabase/migrations/`.

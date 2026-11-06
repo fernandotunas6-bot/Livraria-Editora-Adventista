@@ -78,15 +78,21 @@ Ordem, de cima para baixo, no telemóvel e no computador:
 
 1. Título, gancho, subtítulo, códigos (`LIV-…`, ISBN), editora e idioma.
 2. Preço.
-3. Edição (variantes) e quantidade.
+3. Variantes e quantidade. O nome segue o tipo (`variantNames` em `lib/productTypes.js`): **Tamanho** no vestuário, uniformes e Desbravadores, **Edição** nos livros, bíblias e revistas, **Opção** no resto. Abre na primeira com stock; uma esgotada aparece riscada e, escolhida, diz "Este tamanho esgotou. Escolha outro.".
 4. **Comprar Agora** e **Adicionar ao Carrinho**, logo a seguir ao preço. No computador ficam no primeiro ecrã.
-5. Amostra, WhatsApp, stock.
+5. Amostra (só com páginas reais, ver abaixo), WhatsApp, stock.
 6. Resumo da descrição (até 280 caracteres) com "Ler a descrição completa", que leva ao separador Detalhes. O texto completo só aparece uma vez, em Detalhes.
 7. Benefícios e público.
 
 A capa mostra-se **inteira**: `aspect-[3/4]` com `object-contain`, em todos os tamanhos. Num livro a capa é o produto; `object-cover` cortava-a.
 
 "Comprar Agora" abre o carrinho sem aviso por cima (o aviso tapava "Continuar para Checkout"). "Adicionar ao Carrinho", nos cartões e na pré-visualização rápida, fica na página e mostra o aviso com "Ver": quem junta vários livros não é interrompido.
+
+**Produtos com variantes** (`needsVariantChoice`) não se compram no cartão, na vista rápida nem nos destaques, que só conhecem a variante base: o botão diz "Escolher" (no cartão) ou "Escolher o tamanho" / "Escolher a edição" e leva à ficha. O `addToCart` recusa a variante base desses produtos, o carrinho tira-a ao revalidar e o `place_order` também a recusa.
+
+**Stock de uma variante:** o menor entre o dela e o do produto (`variantStock` em `api/EcommerceApi.js`), porque o `place_order` verifica os dois.
+
+**Amostra de leitura:** só com `preview_enabled` e páginas carregadas no painel (`hasReadingSample`), e abre sempre o leitor das páginas reais (`SampleReaderModal`). Não há amostra gerada: a antiga inventava um prefácio e um capítulo iguais para todos os produtos.
 
 ## 9. Carrinho e checkout
 
