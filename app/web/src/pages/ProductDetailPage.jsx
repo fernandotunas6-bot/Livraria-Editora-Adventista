@@ -31,6 +31,7 @@ import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
 import { hasReadingSample, variantNames } from '@/lib/productTypes';
 import CommunityFeed from '@/components/community/CommunityFeed';
+import ProductDownloads from '@/components/downloads/ProductDownloads';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -472,6 +473,8 @@ function ProductDetailPage() {
                 Ler Amostra Grátis (Primeiras Páginas)
               </Button>
             )}
+            {/* PDFs ligados ao produto: gratuitos, ou para quem o comprou (materiais). */}
+            <ProductDownloads productId={product.id} product={product} />
             {(settings.whatsapp || settings.contact_phone) && (
               <Button
                 variant="outline"

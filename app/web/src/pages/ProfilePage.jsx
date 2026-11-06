@@ -5,8 +5,9 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { motion } from 'framer-motion';
 import {
   User, Mail, Shield, ShoppingBag, Settings, LogOut, Loader2,
-  Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell
+  Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell, FileDown
 } from 'lucide-react';
+import MyDownloads from '@/components/downloads/MyDownloads';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
@@ -58,7 +59,7 @@ const ProfilePage = () => {
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
   const [searchParams, setSearchParams] = useSearchParams();
-  const PROFILE_TABS = ['orders', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
+  const PROFILE_TABS = ['orders', 'pdfs', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
@@ -336,6 +337,7 @@ const ProfilePage = () => {
             <Tabs value={activeTab} onValueChange={changeTab} className="w-full">
               <TabsList className="mb-6 flex flex-wrap gap-2">
                 <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
+                <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
                 <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Definições</TabsTrigger>
                 <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" />Segurança</TabsTrigger>
                 <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" />Lista de Desejos</TabsTrigger>
@@ -550,6 +552,10 @@ const ProfilePage = () => {
                     Terminar sessão em todos os aparelhos
                   </Button>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="pdfs">
+                {activeTab === 'pdfs' && <MyDownloads userId={user?.id} />}
               </TabsContent>
 
               <TabsContent value="wishlist">

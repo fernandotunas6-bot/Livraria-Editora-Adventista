@@ -381,7 +381,17 @@ export default function MegaMenu() {
             </div>
           );
         })}
-        {/* Link simples, como o "Início": a página Sobre não precisa de painel. */}
+        {/* Links simples, como o "Início": Comunidade, Materiais e Sobre não precisam de painel. */}
+        {[{ to: '/comunidade', label: 'Comunidade' }, { to: '/materiais', label: 'Materiais' }].map(({ to, label }) => (
+          <Link
+            key={to}
+            to={to}
+            className={`px-3 py-2 rounded-full text-sm font-semibold transition-colors hover:text-[#22d3ee] ${location.pathname === to ? 'text-[#22d3ee]' : 'text-white/80'}`}
+            onMouseEnter={() => schedule(null, CLOSE_DELAY)}
+          >
+            {label}
+          </Link>
+        ))}
         <Link
           to="/about"
           className={`px-3 py-2 rounded-full text-sm font-semibold transition-colors hover:text-[#22d3ee] ${location.pathname === '/about' ? 'text-[#22d3ee]' : 'text-white/80'}`}
