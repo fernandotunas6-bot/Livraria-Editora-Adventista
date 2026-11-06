@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getProduct, getProductQuantities, getRelatedProducts, trackBookView } from '@/api/EcommerceApi';
+import { formatCurrency, getProduct, getProductQuantities, trackBookView } from '@/api/EcommerceApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { shareBookOnWhatsApp } from '@/lib/whatsapp';
-import RelatedProducts from '@/components/RelatedProducts';
+import { discountPercent } from '@/lib/productGrid';
+import { shippingRules } from '@/lib/shipping';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
-  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp
+  XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp,
+  Truck, Wallet, Store,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -74,7 +76,14 @@ function ProductDetailPage() {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [relatedProducts, setRelatedProducts] = useState([]);
+  // Separadores controlados: as estrelas do topo e o "Ler a descrição completa" abrem o
+  // separador certo e levam o ecrã até lá.
+  const [tab, setTab] = useState('details');
+  const tabsRef = useRef(null);
+  const openTab = (value) => {
+    setTab(value);
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const { addToCart } = useCart();
   const { toast } = useToast();
   const { settings } = useSiteSettings();
@@ -193,11 +202,6 @@ function ProductDetailPage() {
           if (productWithQuantities.variants && productWithQuantities.variants.length > 0) {
             setSelectedVariant(productWithQuantities.variants[0]);
           }
-
-          const bookGenre = productWithQuantities.type?.value || productWithQuantities.category || '';
-          getRelatedProducts(productWithQuantities.subtitle, productWithQuantities.id, 4, bookGenre)
-            .then((res) => setRelatedProducts(res.products || []))
-            .catch(() => {});
         } catch (quantityError) {
           throw quantityError;
         }
@@ -256,6 +260,41 @@ function ProductDetailPage() {
   const descriptionTruncated = descriptionText.length > 280;
   const descriptionExcerpt = descriptionTruncated ? `${descriptionText.slice(0, 280).replace(/\s+\S*$/, '')}…` : descriptionText;
 
+  const genre = product.type?.value || '';
+  const discount = discountPercent(selectedVariant);
+
+  // Uma linha só sobre o stock, logo abaixo do preço, em vez dos três avisos soltos que
+  // estavam espalhados pela coluna.
+  const availability = !product.purchasable
+    ? { ok: false, label: 'Esgotado de momento' , tone: 'text-destructive' }
+    : isStockManaged && availableStock <= 0
+      ? { ok: false, label: 'Esta edição está esgotada', tone: 'text-destructive' }
+      : isStockManaged && !canAddToCart
+        ? { ok: false, label: `Só ${availableStock} disponíve${availableStock === 1 ? 'l' : 'is'}`, tone: 'text-destructive' }
+        : isStockManaged && product.stock_low
+          ? { ok: true, label: `Restam ${availableStock} — pode esgotar em breve`, tone: 'text-orange-700 dark:text-orange-400' }
+          : { ok: true, label: 'Em stock, pronto a enviar', tone: 'text-emerald-700 dark:text-emerald-400' };
+
+  // O limiar vem das mesmas regras do carrinho e do servidor (`shippingRules`): um limiar a 0
+  // nas Configurações significa envio sempre grátis, e não os 20 000 Kz por omissão.
+  const { freeThresholdCents } = shippingRules(settings);
+  const shippingLine = freeThresholdCents > 0
+    ? `Grátis a partir de ${formatCurrency(freeThresholdCents)}.`
+    : 'Grátis em todas as encomendas.';
+
+  // Ficha técnica: o que se compara entre edições e se pergunta ao telefone.
+  const specs = [
+    ['Autor', product.subtitle],
+    ['Editora', product.publisher],
+    ['Idioma', product.language],
+    ['Páginas', product.pages > 0 ? product.pages : null],
+    ['Ano', product.year > 0 ? product.year : null],
+    ['ISBN', product.isbn],
+    ['Género', genre],
+    ['Código', product.book_code],
+    ['SKU', product.sku && product.sku !== product.book_code ? product.sku : null],
+  ].filter(([, value]) => value);
+
   const currentImage = product.images[currentImageIndex];
   const hasMultipleImages = product.images.length > 1;
 
@@ -270,21 +309,27 @@ function ProductDetailPage() {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main className="container-custom py-12">
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-          <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Início</Link>
-          <span>/</span>
-          <Link to="/shop" className="-my-1.5 inline-block py-1.5 hover:text-primary transition-colors">Loja</Link>
-          <span>/</span>
-          <span className="text-foreground">{product.title}</span>
+        <nav aria-label="Caminho" className="mb-8 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <Link to="/" className="-my-1.5 shrink-0 py-1.5 transition-colors hover:text-primary">Início</Link>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
+          <Link to="/shop" className="-my-1.5 shrink-0 py-1.5 transition-colors hover:text-primary">Loja</Link>
+          {genre && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
+              <Link to={`/shop?category=${encodeURIComponent(genre)}`} className="-my-1.5 truncate py-1.5 transition-colors hover:text-primary">{genre}</Link>
+            </>
+          )}
+          <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 opacity-60 md:block" aria-hidden="true" />
+          <span className="hidden truncate text-foreground md:block" aria-current="page">{product.title}</span>
         </nav>
 
         {/* `min-w-0` nas duas colunas: um item de grid tem `min-width: auto` por omissão e
             recusa-se a encolher abaixo do conteúdo. Era o que empurrava a coluna para 399px
             dentro de um contentor de 343 e dava 40px de deslocamento horizontal no
             telemóvel — a página inteira arrastava-se para o lado. */}
-        <div className="grid lg:grid-cols-2 gap-12">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
           <motion.div
-            className="min-w-0"
+            className="min-w-0 lg:sticky lg:top-24 lg:self-start"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
@@ -315,7 +360,12 @@ function ProductDetailPage() {
                 </>
               )}
 
-              {product.ribbon_text && (
+              {discount > 0 && product.purchasable && (
+                <span className="absolute left-4 top-4 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-bold text-white shadow tabular-nums">
+                  −{discount}%
+                </span>
+              )}
+              {!discount && product.ribbon_text && (
                 <div className="absolute top-4 left-4 bg-brand-solid text-sm font-bold px-4 py-2 rounded-full">
                   {product.ribbon_text}
                 </div>
@@ -354,48 +404,45 @@ function ProductDetailPage() {
               <p className="text-lg text-primary font-medium mb-2">{product.marketing_hook}</p>
             )}
             {product.subtitle && (
-              <p className="text-xl text-muted-foreground mb-4">{product.subtitle}</p>
+              <p className="mb-2 text-xl text-muted-foreground">
+                de{' '}
+                <Link to={`/shop?author=${encodeURIComponent(product.subtitle)}`} className="font-medium text-primary hover:underline">
+                  {product.subtitle}
+                </Link>
+              </p>
             )}
+            <button
+              type="button"
+              onClick={() => openTab('reviews')}
+              className="mb-4 flex w-fit items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <StarRating rating={Math.round(stats.average)} size={16} />
+              {stats.total > 0
+                ? <span>{stats.average} · {stats.total} {stats.total === 1 ? 'avaliação' : 'avaliações'}</span>
+                : <span>Seja o primeiro a avaliar</span>}
+            </button>
             {product.social_proof && (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 inline-block">
                 ✓ {product.social_proof}
               </p>
             )}
 
-            {(product.book_code || product.sku || product.isbn) && (
-              <div className="flex flex-wrap gap-3 mb-6 text-sm">
-                {product.book_code && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-primary">
-                    Código: {product.book_code}
-                  </span>
+            {/* A ficha técnica (códigos, editora, idioma, páginas, ano) está em "Detalhes":
+                aqui em cima só o que decide a compra. */}
+            <div className="mb-8">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-4xl font-bold text-brand-ink tabular-nums">{price}</span>
+                {selectedVariant?.sale_price_in_cents && (
+                  <span className="text-2xl text-muted-foreground line-through tabular-nums">{originalPrice}</span>
                 )}
-                {product.sku && product.sku !== product.book_code && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-muted-foreground">
-                    SKU: {product.sku}
-                  </span>
-                )}
-                {product.isbn && (
-                  <span className="px-3 py-1 rounded-lg bg-muted font-mono text-muted-foreground">
-                    ISBN: {product.isbn}
-                  </span>
+                {discount > 0 && (
+                  <span className="rounded-full bg-rose-600/10 px-2 py-0.5 text-sm font-semibold text-rose-700">Poupa {discount}%</span>
                 )}
               </div>
-            )}
-
-            {(product.publisher || product.language || product.pages || product.year) && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 text-sm">
-                {product.publisher && <div><span className="text-muted-foreground">Editora</span><p className="font-medium">{product.publisher}</p></div>}
-                {product.language && <div><span className="text-muted-foreground">Idioma</span><p className="font-medium">{product.language}</p></div>}
-                {product.pages > 0 && <div><span className="text-muted-foreground">Páginas</span><p className="font-medium">{product.pages}</p></div>}
-                {product.year > 0 && <div><span className="text-muted-foreground">Ano</span><p className="font-medium">{product.year}</p></div>}
-              </div>
-            )}
-
-            <div className="flex items-baseline gap-3 mb-8">
-              <span className="text-4xl font-bold text-brand-ink">{price}</span>
-              {selectedVariant?.sale_price_in_cents && (
-                <span className="text-2xl text-muted-foreground line-through">{originalPrice}</span>
-              )}
+              <p className={`mt-2 flex items-center gap-1.5 text-sm font-medium ${availability.tone}`}>
+                {availability.ok ? <CheckCircle size={16} aria-hidden="true" /> : <XCircle size={16} aria-hidden="true" />}
+                {availability.label}
+              </p>
             </div>
 
             {product.variants.length > 1 && (
@@ -476,24 +523,21 @@ function ProductDetailPage() {
               </Button>
             )}
 
-
-            {isStockManaged && canAddToCart && product.purchasable && (
-              <p className="text-sm text-brand-ink flex items-center justify-center gap-2 mb-4">
-                <CheckCircle size={16} /> {availableStock} em stock
-              </p>
-            )}
-
-            {isStockManaged && !canAddToCart && product.purchasable && (
-              <p className="text-sm text-destructive flex items-center justify-center gap-2 mb-4">
-                <XCircle size={16} /> Stock insuficiente. Apenas {availableStock} disponível{availableStock !== 1 ? 'eis' : ''}.
-              </p>
-            )}
-
-            {!product.purchasable && (
-              <p className="text-sm text-destructive flex items-center justify-center gap-2 mb-4">
-                <XCircle size={16} /> Indisponível no momento
-              </p>
-            )}
+            {/* O que acontece depois de comprar: a dúvida que trazia as pessoas ao WhatsApp. */}
+            <ul className="mb-6 space-y-2.5 border-t border-border pt-4 text-sm">
+              <li className="flex items-start gap-2.5">
+                <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span><strong className="font-medium text-foreground">Entrega em todo o país.</strong> <span className="text-muted-foreground">{shippingLine}</span></span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span><strong className="font-medium text-foreground">Pagamento na entrega</strong> <span className="text-muted-foreground">ou por transferência.</span></span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Store className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary hover:underline">ver moradas</Link>.</span>
+              </li>
+            </ul>
 
             {/* Resumo da descrição depois do botão de compra: o texto completo, em "Detalhes",
                 empurrava o botão para fora do primeiro ecrã. */}
@@ -503,7 +547,7 @@ function ProductDetailPage() {
                 {descriptionTruncated && (
                   <button
                     type="button"
-                    onClick={() => document.getElementById('detalhes-produto')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    onClick={() => openTab('details')}
                     className="mt-1 text-sm font-medium text-primary hover:underline"
                   >
                     Ler a descrição completa
@@ -547,8 +591,8 @@ function ProductDetailPage() {
           </motion.div>
         </div>
 
-        <div className="mt-16 border-t border-border pt-10">
-          <Tabs defaultValue="details" id="detalhes-produto" className="scroll-mt-24">
+        <div ref={tabsRef} className="mt-16 scroll-mt-24 border-t border-border pt-10">
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="mb-8 flex-wrap h-auto gap-1">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
               {product.preview_enabled && product.sample_pages?.length > 0 && (
@@ -563,12 +607,30 @@ function ProductDetailPage() {
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="max-w-3xl">
-              {product.description ? (
-                <div className="prose max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
-              ) : (
-                <p className="text-muted-foreground">Sem descrição disponível.</p>
-              )}
+            <TabsContent value="details">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+                <div className="min-w-0">
+                  {product.description ? (
+                    <div className="prose max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
+                  ) : (
+                    <p className="text-muted-foreground">Sem descrição disponível.</p>
+                  )}
+                </div>
+
+                {specs.length > 0 && (
+                  <aside className="min-w-0">
+                    <h3 className="mb-3 text-base font-semibold text-foreground">Características</h3>
+                    <dl className="divide-y divide-border rounded-xl border border-border bg-card text-sm">
+                      {specs.map(([label, value]) => (
+                        <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
+                          <dt className="shrink-0 text-muted-foreground">{label}</dt>
+                          <dd className="min-w-0 break-words text-right font-medium text-foreground">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </aside>
+                )}
+              </div>
             </TabsContent>
 
             {product.preview_enabled && product.sample_pages?.length > 0 && (
@@ -844,8 +906,6 @@ function ProductDetailPage() {
             </TabsContent>
           </Tabs>
         </div>
-
-        <RelatedProducts products={relatedProducts} author={product.subtitle} onCartOpen={() => setIsCartOpen(true)} />
       </main>
 
       <SampleReaderModal
