@@ -121,6 +121,7 @@ export function indexRegistry(reg) {
   const pastors = byId(reg.pastors);
   const provinces = byId(reg.provinces);
   const municipalities = byId(reg.municipalities);
+  const churchesById = byId(reg.churches);
   const current = (reg.assignments || []).filter((a) => !a.end_date);
   const titularOf = new Map();
   const associatesOf = new Map();
@@ -137,7 +138,7 @@ export function indexRegistry(reg) {
   const historyOf = (pastorId) => (reg.assignments || []).filter((a) => a.pastor_id === pastorId)
     .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
   return {
-    fields, districts, pastors, provinces, municipalities, titularOf, associatesOf, districtsOfPastor, churchesOf, historyOf,
+    fields, districts, pastors, provinces, municipalities, churchesById, titularOf, associatesOf, districtsOfPastor, churchesOf, historyOf,
     fieldName: (id) => fields.get(id)?.name || '',
     districtName: (id) => districts.get(id)?.name || '',
     provinceName: (id) => provinces.get(id)?.name || '',

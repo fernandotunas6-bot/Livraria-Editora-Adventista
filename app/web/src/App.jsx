@@ -37,6 +37,8 @@ const CollectionsPage = lazy(() => import('@/pages/CollectionsPage.jsx'));
 const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
 const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
 const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
+const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx'));
+const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
@@ -191,6 +193,12 @@ function App() {
               <Route path="/rastreio" element={<Navigate to="/track" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/perfil" element={<Navigate to="/profile" replace />} />
+
+              {/* Colportagem: o link de candidatura é próprio, para quem se quer tornar colportor. */}
+              <Route path="/colportor" element={<ColporteurAreaPage />} />
+              <Route path="/colportor/candidatura" element={<ColporteurApplyPage />} />
+              <Route path="/ser-colportor" element={<Navigate to="/colportor/candidatura" replace />} />
+              <Route path="/colportores" element={<Navigate to="/colportor/candidatura" replace />} />
 
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin.html" element={<Navigate to="/admin" replace />} />
