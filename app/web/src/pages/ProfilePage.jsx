@@ -31,6 +31,8 @@ import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { Switch } from '@/components/ui/switch';
+import { getPaymentMethods } from '@/api/PlatformApi';
+import { isPaidUpfront } from '@/lib/paymentMethods';
 import { isPushSupported, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
 
 
@@ -43,6 +45,14 @@ const ProfilePage = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { settings } = useSiteSettings();
+  // Métodos pagos antes do envio (transferência, Multicaixa): as encomendas por pagar com eles
+  // mostram "Indicar pagamento", que abre o rastreio com a caixa "Como pagar".
+  const [upfrontCodes, setUpfrontCodes] = useState(() => new Set());
+  useEffect(() => {
+    getPaymentMethods()
+      .then((res) => setUpfrontCodes(new Set((res.methods || []).filter((m) => isPaidUpfront(m.type)).map((m) => m.code))))
+      .catch(() => {});
+  }, []);
   const [isCartOpen, setIsCartOpen] = useState(false);
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
@@ -350,6 +360,13 @@ const ProfilePage = () => {
                                   <Button variant="ghost" size="sm" className="h-7 text-xs text-primary px-2" asChild>
                                     <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
                                       <Truck className="h-3 w-3 mr-1" /> Rastrear
+                                    </Link>
+                                  </Button>
+                                )}
+                                {o.order_number && o.payment_status === 'pending' && o.status !== 'cancelled' && upfrontCodes.has(o.payment_method_code) && (
+                                  <Button variant="outline" size="sm" className="h-7 text-xs px-2 border-marca/40 text-primary" asChild>
+                                    <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
+                                      Indicar pagamento
                                     </Link>
                                   </Button>
                                 )}
