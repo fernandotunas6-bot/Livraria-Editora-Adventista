@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import PayLaterBox from '@/components/PayLaterBox';
+import { formatCurrency } from '@/api/EcommerceApi';
 import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -140,6 +142,19 @@ export default function TrackOrderPage() {
 
             {order && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                {/* Falta pagar (transferência, Multicaixa): é o passo que o cliente tem por fazer. */}
+                {order.payment_upfront && !['paid', 'refunded'].includes(order.payment_status) && order.status !== 'cancelled' && (
+                  <PayLaterBox
+                    orderNumber={order.order_number}
+                    email={email.trim()}
+                    total={order.total}
+                    methodName={order.payment_method_name}
+                    accountInfo={order.payment_account_info}
+                    instructions={order.payment_instructions}
+                    paymentLink={order.payment_link}
+                    referenceAlreadySent={order.payment_reference_present || order.payment_status === 'awaiting_confirmation'}
+                  />
+                )}
                 <div className="bg-card border rounded-2xl p-6">
                   <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                     <div>
@@ -167,7 +182,7 @@ export default function TrackOrderPage() {
                   <div className="grid sm:grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-muted-foreground">Total</span>
-                      <p className="font-bold">Kz {Number(order.total).toFixed(2)}</p>
+                      <p className="font-bold">{formatCurrency(Number(order.total || 0) * 100)}</p>
                     </div>
                     {order.estimated_delivery && (
                       <div>

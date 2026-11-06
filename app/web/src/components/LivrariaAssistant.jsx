@@ -116,7 +116,7 @@ export default function LivrariaAssistant() {
             exit={{ opacity: 0, scale: 0.85 }}
             onClick={() => setOpen(true)}
             title="Ajuda"
-            className="pointer-events-auto flex items-center gap-2 p-3.5 2xl:pl-3.5 2xl:pr-4 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#0ea5c9]"
+            className="pointer-events-auto flex items-center gap-2 p-3.5 2xl:pl-3.5 2xl:pr-4 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-marca"
             aria-label={showSupportTab ? 'Ajuda, notificações e atendimento' : 'Assistente da livraria'}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}
@@ -236,6 +236,7 @@ export default function LivrariaAssistant() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Pergunte sobre livros, envios, pagamentos…"
+                    aria-label="Mensagem para o assistente"
                     className="h-9 text-sm"
                     disabled={loading}
                     maxLength={800}
@@ -245,6 +246,11 @@ export default function LivrariaAssistant() {
                   </Button>
                 </form>
 
+                {/* As mensagens podem ir para um fornecedor de IA fora de Angola (Gemini, DeepSeek):
+                    o visitante tem de o saber antes de escrever. */}
+                <p className="text-[10px] text-center text-muted-foreground px-3 pt-1">
+                  As respostas podem ser geradas por um serviço de IA externo. Não escreva dados pessoais nem de pagamento.
+                </p>
                 <p className="text-[10px] text-center text-muted-foreground pb-2 px-2">
                   <Link to="/faq" className="text-primary hover:underline">FAQ</Link>
                   {' · '}

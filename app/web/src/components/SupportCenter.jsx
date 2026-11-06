@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { normalizeForSearch } from '@/lib/searchUtils';
+import { CodeChip } from '@/components/admin/users/userFormat';
 import { getDeliveryStatusLabel, getOrderStatusLabel, getPaymentStatusLabel } from '@/lib/orderUtils';
 import {
   createSupportThread,
@@ -38,6 +39,7 @@ const NOTIFICATION_KINDS = {
   order_stuck: 'Encomenda parada',
   order_problem: 'Problema do cliente',
   order_confirmed: 'Cliente confirmou a recepção',
+  payment_reported: 'Pagamento indicado pelo cliente',
 };
 
 function formatDate(value) {
@@ -121,6 +123,7 @@ export default function SupportCenter({ compact = false }) {
         thread.subject,
         thread.customer?.name,
         thread.customer?.email,
+        thread.customer?.customer_code,
         thread.order?.order_number,
         thread.order_id,
       ].some((value) => normalizeForSearch(value).includes(query));
@@ -341,7 +344,12 @@ export default function SupportCenter({ compact = false }) {
             <span className="flex items-start justify-between gap-2">
               <span className="min-w-0">
                 <span className="block truncate font-semibold">{thread.subject}</span>
-                {staff && <span className="mt-1 block truncate text-xs text-muted-foreground">{thread.customer?.name || thread.customer?.email || 'Cliente'}</span>}
+                {staff && (
+                  <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="truncate">{thread.customer?.name || thread.customer?.email || 'Cliente'}</span>
+                    <CodeChip code={thread.customer?.customer_code} />
+                  </span>
+                )}
               </span>
               {unread && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />}
             </span>
@@ -370,6 +378,7 @@ export default function SupportCenter({ compact = false }) {
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedThread.customer?.name || selectedThread.customer?.email || 'Cliente'}
                 {selectedThread.customer?.email && selectedThread.customer?.name ? ` · ${selectedThread.customer.email}` : ''}
+                {selectedThread.customer?.customer_code && <span className="ml-2 align-middle"><CodeChip code={selectedThread.customer.customer_code} /></span>}
               </p>
             )}
           </div>

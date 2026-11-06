@@ -237,9 +237,10 @@ const Header = ({ onCartOpen, pinned = false }) => {
           </span>
         ) : (
           <span>
-            {settings.header_welcome_guest || 'Envio em todo o país · Crie a sua conta para acompanhar encomendas'}
+            {settings.header_welcome_guest || 'Envio em todo o país · Compre sem conta'}
             {' · '}
-            <button type="button" onClick={() => openAuth({ mode: 'signup' })} className="underline underline-offset-2 hover:text-white">Crie a sua conta</button>
+            {/* Comprar não exige conta; o cliente acompanha a encomenda pelo número e email. */}
+            <Link to="/track" className="underline underline-offset-2 hover:text-white">Rastrear encomenda</Link>
           </span>
         )}
       </div>
@@ -408,7 +409,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
         >
           {/* Secção de conta no mobile */}
           {isAuthed ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0ea5c9]/5 border border-[#0ea5c9]/15">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-marca/5 border border-marca/15">
               <UserAvatar user={user} size="lg" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate text-white">{getUserDisplayName(user)}</p>

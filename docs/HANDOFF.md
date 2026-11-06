@@ -2,6 +2,43 @@
 
 Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Códigos de cliente e de funcionário (2026-11-06)
+
+- **Feito e aplicado** no Supabase (`bggqkjjqbjhbjsckzopj`): `20261106033302_codigos_cliente_funcionario` e `20261106033425_codigo_cliente_tambem_na_equipa`, com o mesmo SQL dos ficheiros em `supabase/migrations/`.
+- **Estado dos dados depois da migração:** 3 administradores com `FUN-001`…`FUN-003`; 1 cliente sem conta (`CLI-000001`, com 4 encomendas); todas as encomendas com `customer_code`. Nenhum cliente com conta ainda, por isso o `CLI-` de conta foi testado só em transacção revertida.
+- **Teste de ponta a ponta** (transacção revertida): compra sem conta → `CLI-000002`; ao criar conta, o mesmo código; ao passar a gestor, mantém `CLI-` e recebe `FUN-004`; a pesquisa encontra a conta pelo código.
+- **Produtos:** revistos, sem alterações. Os 9 tipos têm prefixo e contador, e `normalize_product_code` (SQL) e `normalizeProductCode` (JS) usam a mesma expressão.
+- **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
+- **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
+
+## Análise crítica e correcções do checkout (2026-11-06)
+
+Feito no código (PR #9), a publicar no merge:
+- **Comprar sem conta**, também com entrega. **Pagar depois de encomendar** (transferência, Multicaixa): a referência indica-se na página de sucesso ou no rastreio (`/order/payment-reference`); a equipa recebe `payment_reported`.
+- Pagamentos filtrados por envio ("Pagar no Balcão" só no levantamento, editável no painel → Pagamentos), portes 0 válidos, unidades do expresso, canal de venda em lista fechada, assinatura do checkout opcional, `/confirm-delivery` só PNG até 300 KB.
+- Ficha: capa inteira e botões logo a seguir ao preço. Checkout: avisos visíveis no telemóvel, campos com rótulo e `autocomplete`, passos com nome, IBAN legível com "Copiar". Cartões não abrem o carrinho a cada livro.
+- Cor da marca como token (`marca`, 145 sítios) em vez de `#0ea5c9` escrito à mão. Spec em [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md).
+- **Migração `20261106050000_pagamentos_por_envio` por aplicar**: de propósito, entra no merge pelo `supabase db push`, ao mesmo tempo que a Edge Function e o site que a usam. Foi testada em transacção revertida. (Aplicá-la antes deixava as instruções novas de pagamento no site antigo.)
+
+Por decidir ou configurar (dono):
+- **Multicaixa Express activo com `923 000 000`**, que parece fictício, e um link de `pay.kursinha.com` por confirmar.
+- **`contacto@livrariaadventista.ao` não recebe email** (o `.ao` não tem MX). As instruções novas já não o usam; o rodapé e outras páginas podem usar.
+- **SMTP no Auth** (sem ele o registo por email não funciona) e ligar os emails de encomenda (`order_email_enabled`, integração SMTP). **Não** ligar a confirmação automática de email: com a regra RLS por email, quem registasse o email de um cliente veria as encomendas dele.
+- Telefone e WhatsApp da loja nas definições (estão vazios).
+- MFA nos 3 administradores (nenhum tem).
+- **Cancelar encomendas por pagar**: já existe, desligado (Configurações → Regras da loja → dias; 0 = nunca). Escolher o prazo.
+- **Assistente com IA**: teto diário de 500 respostas com IA na loja toda e 60 por visitante (Configurações → Assistente). O aviso "serviço de IA externo" já aparece no assistente; confirmar com quem trata da protecção de dados se a Lei 22/11 pede mais (as mensagens podem ir para a Google ou para a DeepSeek, na China).
+- Stock por loja: precisa de desenho (que lojas têm que livros, e se as vendas ao balcão passam a descontar stock).
+
+## Dados fidedignos, chat e spec de elementos (2026-11-06)
+
+- **Telefones:** todas as encomendas e perfis estão em `+244 XXX XXX XXX` (migração `20261106034217_perfis_telefones_e_nomes`, mesma regra de `angolaPhone.js`). Um número incompleto não é inventado: fica como está e a ficha assinala-o. Hoje o administrador `admin@livraria.ao` não tem telefone.
+- **Nomes:** nenhum perfil tinha nome vazio, por isso a regra "nome a partir da encomenda" não alterou nada agora; fica activa para os próximos.
+- **Emails:** verificados. Não há perfis com emails repetidos (com maiúsculas ou espaços), e o email de cada perfil é igual ao da conta de acesso. Nada a corrigir.
+- **Ficha do utilizador:** caixa "Dados por confirmar" (sem email, nome ou telefone; telefone incompleto; email da conta por confirmar). Só avisa. Regras em `app/web/src/lib/personDataChecks.js`, com testes.
+- **Chat de suporte (equipa):** cada conversa mostra o `CLI-` do cliente e a pesquisa aceita o código. O cliente não vê o código.
+- **Spec:** [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md) descreve os elementos pequenos (código, etiqueta, campo, aviso) com as classes reais.
+
 ## Onde está o trabalho
 
 - **Repositório:** [fernandotunas6-bot/Livraria-Editora-Adventista](https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista) (privado). O projecto foi migrado a 2026-11-03 de `ValentinoCanguele/livraria_Cunhinga`, com todo o histórico e os ramos. Ver [docs/MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md) para o que ficou por configurar do lado do GitHub.
@@ -9,8 +46,8 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 - **`main`:** a migração do Supabase (o antigo PR #3) está integrada no `main` desde 2026-11-02 (commit `f4d9885`). Atenção: um `main` **local** antigo, da era PocketBase, ainda existe em algumas cópias de trabalho e está 114 commits atrás — usar sempre `origin/main` como referência.
 - **Supabase:** projecto "Livraria Adventista", ref `bggqkjjqbjhbjsckzopj`, organização "Colpotor" (plano grátis), região eu-north-1.
 - **Cloudflare Pages** — hoje na conta `canguelev@fata.adventist.org`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `valentinocanguele@gmail.com`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
-  - `livraria-editora-adventista` — **o novo**, criado a 2026-11-03, ramo de produção `main`, ainda **sem nenhum deploy**. É o que vai receber o domínio `livrariaadventista.ao`.
-  - `livraria-adventista` — **o que serve produção hoje**, em https://livraria-adventista.pages.dev, com o código do `main`. Fica como está até o domínio `.ao` estar activo e verificado; só depois se decide desligá-lo.
+  - `livraria-editora-adventista` — **o que serve produção hoje** (verificado a 2026-11-06), em `livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev`, ramo `main`. Vai receber também o `.ao` ([DOMINIO.md](DOMINIO.md)).
+  - `livraria-adventista` — **o antigo**, em https://livraria-adventista.pages.dev. Já não recebe deploys e está desactualizado: a 2026-11-06 os livros apareciam sem capa (a CSP antiga não aceita o domínio novo das capas). Deve redireccionar para `livrariaadventista.com` ou ser desligado — decisão do dono.
   - **O domínio `livrariaadventista.ao` não está registado:** os servidores autoritativos do registo `.ao` devolvem `NXDOMAIN` (verificado a 2026-11-03; `dns.ao` devolve `NOERROR` na mesma consulta). O Cloudflare não vende `.ao` — o registo é só por revendedores autorizados do DNS.ao. Passos em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
   - Foi publicado à mão com o Wrangler porque o Actions está bloqueado.
   - Cada ramo tem o seu URL de pré-visualização (`<ramo>.livraria-adventista.pages.dev`, ver `wrangler pages deployment list`). O `main` antigo (PocketBase) está em `main-pocketbase`, e esse e os ramos `cursor/*` não têm backend.

@@ -75,7 +75,7 @@ export function BrandLogo({ className, linkTo = '/', variant = 'default', showTe
           <div
             className={cn(
               'flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-lg shrink-0 overflow-hidden',
-              isLight ? 'bg-white/10' : 'bg-[#0ea5c9]/10'
+              isLight ? 'bg-white/10' : 'bg-marca/10'
             )}
             style={!isLight ? { backgroundColor: `${primaryColor}18` } : undefined}
           >

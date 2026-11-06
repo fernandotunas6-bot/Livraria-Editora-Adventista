@@ -44,6 +44,10 @@ import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
 import { createRateLimit } from "./rateLimit.ts";
+import {
+  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, saleChannelFrom, settingNumber,
+  unpaidOrdersToCancel,
+} from "./checkoutRules.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -229,6 +233,10 @@ function storeRules(settings: Row | null) {
     checkoutRate: clampInt(settings?.checkout_rate_per_minute, 1, 60, 15),
     trackRate: clampInt(settings?.track_rate_per_minute, 1, 120, 20),
     receiptPerOrder: clampInt(settings?.receipt_per_order_per_minute, 1, 10, 3),
+    // 0 = nunca cancela (o valor por omissão): a loja decide se e quando.
+    unpaidCancelDays: clampInt(settings?.unpaid_cancel_days, 0, 60, 0),
+    // Respostas com IA por dia na loja toda (custo). 0 = assistente sempre sem IA.
+    chatAiDailyLimit: clampInt(settings?.chat_ai_daily_limit, 0, 100000, 500),
   };
 }
 
@@ -1169,7 +1177,7 @@ route("GET", "/settings", async () => {
       contact_address: "Luanda, Angola", pwa_enabled: true, pwa_theme_color: "#0c4a6e", shipping_free_threshold: 20000,
       shipping_cost: 1500, maintenance_mode: false, google_oauth_enabled: false,
       header_welcome_logged: "Bem-vindo de volta, {nome}",
-      header_welcome_guest: "Envio em todo o país · Crie a sua conta para acompanhar encomendas",
+      header_welcome_guest: "Envio em todo o país · Compre sem conta",
       header_cta_text: "Explorar novidades", header_cta_link: "/shop", footer_tagline: "", footer_copyright: "",
       footer_columns: null, show_stores_in_footer: true, ui_glass_enabled: true, ui_glass_opacity: 0.72,
       shop_bg_mode: "image", shop_bg_image_url: DEFAULT_SHOP_BG, shop_bg_video_url: "", shop_bg_overlay: 0.55,
@@ -1210,14 +1218,14 @@ route("GET", "/settings", async () => {
     pwa_name: rec.pwa_name || rec.site_name,
     pwa_short_name: rec.pwa_short_name || "LA",
     pwa_theme_color: rec.pwa_theme_color || "#0c4a6e",
-    shipping_free_threshold: Number(rec.shipping_free_threshold) || 20000,
-    shipping_cost: Number(rec.shipping_cost) || 1500,
-    shipping_express_cost: Number(rec.shipping_express_cost) || 0,
+    shipping_free_threshold: settingNumber(rec.shipping_free_threshold, 20000),
+    shipping_cost: settingNumber(rec.shipping_cost, 1500),
+    shipping_express_cost: settingNumber(rec.shipping_express_cost, 0),
     maintenance_mode: !!rec.maintenance_mode,
     order_number_prefix: storeRules(rec).orderPrefix,
     google_oauth_enabled: !!rec.google_oauth_enabled,
     header_welcome_logged: rec.header_welcome_logged || "Bem-vindo de volta, {nome}",
-    header_welcome_guest: rec.header_welcome_guest || "Envio em todo o país · Crie a sua conta para acompanhar encomendas",
+    header_welcome_guest: rec.header_welcome_guest || "Envio em todo o país · Compre sem conta",
     header_cta_text: rec.header_cta_text || "Explorar novidades",
     header_cta_link: rec.header_cta_link || "/shop",
     footer_tagline: rec.footer_tagline || "",
@@ -1350,6 +1358,8 @@ route("GET", "/payment-methods", async () => {
       id: r.id, name: r.name, code: r.code, type: r.type || "offline", instructions: r.instructions || "",
       account_info: r.account_info || "", qr_url: r.qr_url || fileUrl("payment_methods", r, "qr_code"), icon: r.icon || "",
       payment_link: r.payment_link || "",
+      // Envios em que o método aparece; null = todos (ver checkoutRules.paymentAllowedForShipping).
+      shipping_methods: Array.isArray(r.shipping_methods) && r.shipping_methods.length ? r.shipping_methods : null,
     })),
   });
 });
@@ -1369,7 +1379,20 @@ route("POST", "/track", async ({ body, ip }) => {
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
   const order = await findOrderByNumberAndEmail(orderNumber, email);
   if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
+  // Como pagar, para quem paga depois de encomendar (transferência, Multicaixa): são os dados
+  // públicos que o checkout já mostra. A página usa-os para pedir a referência do pagamento.
+  const { data: method } = await db.from("payment_methods")
+    .select("name, type, instructions, account_info, payment_link").eq("code", order.payment_method_code || "").maybeSingle();
+  const payLater = isPaidUpfront(method?.type) && !["paid", "refunded"].includes(order.payment_status) && order.status !== "cancelled";
   return json({
+    payment_method_name: order.payment_method_name || method?.name || "",
+    payment_upfront: isPaidUpfront(method?.type),
+    payment_reference_present: !!order.payment_reference,
+    ...(payLater ? {
+      payment_instructions: method?.instructions || "",
+      payment_account_info: method?.account_info || "",
+      payment_link: /^https:\/\//.test(String(method?.payment_link || "")) ? method!.payment_link : "",
+    } : {}),
     order_number: order.order_number, status: order.status, delivery_status: order.delivery_status || "received",
     total: order.total, customer_name: order.customer_name, phone: order.phone || "",
     delivery_relative_name: order.delivery_relative_name || "", delivery_relative_phone: order.delivery_relative_phone || "",
@@ -1388,6 +1411,63 @@ route("POST", "/track", async ({ body, ip }) => {
     estimated_delivery: order.estimated_delivery || "", payment_status: order.payment_status || "pending",
     timeline: order.delivery_timeline || [], created: order.created,
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
+  });
+});
+
+/** Últimos 9 dígitos do telefone (sem o 244 nem o 0 inicial), para comparar números escritos de formas diferentes. */
+const phoneKey = (phone: unknown) => normalizePhone(String(phone || "")).slice(-9);
+
+/**
+ * O cliente indica a referência do pagamento (transferência, Multicaixa Express) depois de
+ * encomendar. Antes pedia-se no checkout, o que obrigava a pagar sem número de encomenda e sem
+ * saber se havia stock. Identifica-se como no rastreio: número da encomenda e email, ou número e
+ * telefone (no levantamento o email é opcional). A encomenda fica "a aguardar confirmação" e a
+ * equipa é avisada; quem confirma o pagamento é a equipa, no painel.
+ */
+route("POST", "/order/payment-reference", async ({ body, ip }) => {
+  if (!await checkRateLimit("payment-reference", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const orderNumber = String(body.orderNumber || "").trim().slice(0, 60);
+  const email = normalizeEmail(body.email || "");
+  const phone = phoneKey(body.phone);
+  const reference = cleanPaymentReference(body.reference);
+  if (!orderNumber || (!email && phone.length < 9)) throw bad("Indique o número da encomenda e o email ou o telefone.");
+  if (reference.length < 4) throw bad("Indique a referência do pagamento (pelo menos 4 caracteres).");
+
+  let order: Row | null = null;
+  if (email) {
+    order = await findOrderByNumberAndEmail(orderNumber, email);
+  } else {
+    const { data } = await db.from("orders").select("*").eq("order_number", orderNumber).limit(1);
+    order = data?.[0] && phoneKey(data[0].phone) === phone ? data[0] : null;
+  }
+  // A mesma resposta para número inexistente e contacto errado: não revela que números existem.
+  if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o contacto.");
+  if (order.status === "cancelled") throw bad("Esta encomenda foi cancelada.");
+  if (["paid", "refunded"].includes(order.payment_status)) throw bad("O pagamento desta encomenda já foi confirmado.");
+  const { data: method } = await db.from("payment_methods").select("name, type").eq("code", order.payment_method_code || "").maybeSingle();
+  if (!isPaidUpfront(method?.type)) throw bad("Esta encomenda paga-se na entrega ou no balcão: não precisa de referência.");
+
+  const { error } = await db.from("orders").update({
+    payment_reference: reference,
+    payment_status: "awaiting_confirmation",
+    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), timelineEvent(
+      order.delivery_status || "received", "Pagamento indicado pelo cliente", `Referência: ${reference}`, "",
+    )],
+  }).eq("id", order.id);
+  if (error) throw error;
+
+  const ref = order.order_number || order.id;
+  await notifyOrderStaff(
+    "payment_reported",
+    `Pagamento indicado na encomenda ${ref}`,
+    `${order.customer_name || "O cliente"} indicou a referência ${reference} (${method?.name || "pagamento"}). Confirme no painel.`,
+    order.id,
+  );
+  return json({
+    ok: true,
+    order_number: ref,
+    payment_status: "awaiting_confirmation",
+    message: "Recebemos a referência. A equipa confirma o pagamento e avisa-o.",
   });
 });
 
@@ -1487,8 +1567,9 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
   const signature = String(body.signature || "").trim();
   if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
   if (!recipientName) throw bad("Nome de quem recebe é obrigatório.");
-  if (!signature.startsWith("data:image")) throw bad("Assinatura inválida.");
-  if (signature.length > 600_000) throw bad("Assinatura demasiado grande.");
+  // Só a imagem PNG que o quadro de assinatura gera. Aceitava qualquer `data:image` (SVG incluído,
+  // que pode levar código) até 600 KB.
+  if (!isPngSignature(signature, 300_000)) throw bad("Assinatura inválida. Assine outra vez no quadro.");
 
   const order = await findOrderByNumberAndEmail(orderNumber, email);
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
@@ -1715,13 +1796,11 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   }
   if (isPickup && !pickupStore && !address) throw bad("Seleccione a loja de levantamento.");
 
-  // Assinatura: obrigatória na entrega (é a prova de quem recebeu), opcional no levantamento.
+  // Assinatura no checkout: opcional. Não prova a recepção (quem recebe assina na entrega, em
+  // /confirm-delivery) e é um dado pessoal a mais. Quem quiser assina, e a assinatura vai no recibo.
   const signature = typeof data.checkoutSignature === "string" ? data.checkoutSignature : "";
-  const signatureOk = signature.startsWith("data:image/png;base64,") && signature.length <= 200000;
-  if (!isPickup && !signatureOk) {
-    throw bad("Assinatura do comprador obrigatória. Assine no quadro.");
-  }
-  if (isPickup && signature && !signatureOk) throw bad("Assinatura inválida.");
+  const signatureOk = isPngSignature(signature, 200000);
+  if (signature && !signatureOk) throw bad("Assinatura inválida.");
 
   if (settings?.maintenance_mode) throw bad("Loja em manutenção. Tente mais tarde.");
 
@@ -1740,17 +1819,22 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
 
   const paymentCode = clip(data.paymentMethodCode || data.paymentMethod || "entrega", 60);
   // Só os métodos de pagamento que o admin tem activos. Se nenhum estiver activo, aceita "entrega".
-  const { data: activeMethods } = await db.from("payment_methods").select("code, name, type, requires_reference").eq("enabled", true);
+  // `*` e não uma lista de colunas: `shipping_methods` só existe depois da migração
+  // 20261106050000, e uma coluna em falta partia o checkout.
+  const { data: activeMethods } = await db.from("payment_methods").select("*").eq("enabled", true);
   const paymentMethodRow = (activeMethods || []).find((m: Row) => m.code === paymentCode);
   if (!paymentMethodRow && !(paymentCode === "entrega" && !(activeMethods || []).length)) throw bad("Método de pagamento indisponível.");
-  // Pelo tipo configurado em Pagamentos: P2P e transferência são pagos antes da entrega, por isso
-  // exigem referência e ficam "a aguardar confirmação"; os métodos offline (entrega, balcão) ficam pendentes.
-  const paidUpfront = ["p2p", "transfer"].includes(paymentMethodRow?.type);
-  if ((paidUpfront || paymentMethodRow?.requires_reference) && !clip(data.paymentReference, 120)) {
-    throw bad("Indique a referência ou o comprovativo do pagamento.");
+  // "Pagar no Balcão" só no levantamento, por exemplo (payment_methods.shipping_methods).
+  if (paymentMethodRow && !paymentAllowedForShipping(paymentMethodRow, shippingMethod)) {
+    throw bad(`${paymentMethodRow.name} não está disponível para ${isPickup ? "levantamento na loja" : "entrega ao domicílio"}.`);
   }
-  const isP2P = paidUpfront;
-  const saleChannel = clip(data.saleChannel || data.orderType || "web_purchase", 40);
+  // Transferência e Multicaixa Express são pagos antes do envio, mas depois de encomendar: o
+  // cliente paga com o número da encomenda e indica a referência na página da encomenda
+  // (/order/payment-reference). Pedir a referência aqui obrigava a pagar sem saber se havia stock
+  // e sem número para referenciar. Se já a trouxer, a encomenda fica "a aguardar confirmação".
+  const paymentReference = cleanPaymentReference(data.paymentReference);
+  const paidUpfront = isPaidUpfront(paymentMethodRow?.type);
+  const saleChannel = saleChannelFrom(data.saleChannel || data.orderType);
   const isWhatsApp = saleChannel === "whatsapp";
   // Morada de entrega numa linha (o levantamento não tem morada: tem a loja, em pickup_store).
   const deliveryAddress = clip(data.deliveryAddressFull, 600) || address;
@@ -1777,8 +1861,8 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     pickup_store: pickupStore,
     payment_method_code: paymentCode,
     payment_method_name: paymentMethodRow?.name || LEGACY_PAYMENT_LABELS[paymentCode] || paymentCode,
-    payment_reference: clip(data.paymentReference, 120),
-    payment_status: isP2P ? "awaiting_confirmation" : "pending",
+    payment_reference: paymentReference,
+    payment_status: paidUpfront && paymentReference ? "awaiting_confirmation" : "pending",
     delivery_status: "received",
     delivery_timeline: [timelineEvent(
       "received",
@@ -1833,9 +1917,9 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     p_items: cartItems,
     p_shipping: {
       method: shippingMethod,
-      free_threshold: Number(settings?.shipping_free_threshold) || 20000,
-      cost: Number(settings?.shipping_cost) || 1500,
-      express_cost: Number(settings?.shipping_express_cost) || 0,
+      free_threshold: settingNumber(settings?.shipping_free_threshold, 20000),
+      cost: settingNumber(settings?.shipping_cost, 1500),
+      express_cost: settingNumber(settings?.shipping_express_cost, 0),
     },
   });
   // Só as mensagens escritas para o comprador ("Stock insuficiente para: …", "Livro
@@ -2473,7 +2557,7 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 // Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
 // ---------------------------------------------------------------------------
 
-const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, customer_feedback, customer_confirmed_at";
 
 /** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
 async function ordersForWatch() {
@@ -2484,12 +2568,50 @@ async function ordersForWatch() {
 }
 
 /**
+ * Cancela as encomendas pagas antes do envio (transferência, Multicaixa) que ficaram sem pagamento
+ * nem referência durante `unpaid_cancel_days` dias (Configurações → Regras da loja; 0 = nunca).
+ * O stock volta ao catálogo pelo trigger orders_before_update, como num cancelamento no painel, e o
+ * cliente e a equipa são avisados. Muda as encomendas em memória, para não gerarem alertas.
+ */
+async function cancelUnpaidOrders(orders: Row[]) {
+  const days = storeRules(await getSettings(true)).unpaidCancelDays;
+  if (days <= 0) return 0;
+  const { data: methods } = await db.from("payment_methods").select("code, type");
+  const upfront = new Set((methods || []).filter((m: Row) => isPaidUpfront(m.type)).map((m: Row) => String(m.code)));
+  let cancelled = 0;
+  for (const o of unpaidOrdersToCancel(orders, upfront, days)) {
+    // As condições repetem-se no update: se a equipa confirmou o pagamento entretanto, não cancela.
+    const { data: saved, error } = await db.from("orders")
+      .update({ status: "cancelled", delivery_status: "cancelled" })
+      .eq("id", o.id).eq("payment_status", "pending").neq("status", "cancelled")
+      .select().maybeSingle();
+    if (error || !saved) continue;
+    cancelled += 1;
+    Object.assign(o, { status: "cancelled", delivery_status: "cancelled" });
+    const ref = o.order_number || o.id;
+    await notifyOrderStaff(
+      "order_stuck",
+      `Cancelada por falta de pagamento — ${ref}`,
+      `${o.customer_name || "Cliente"} não pagou nem indicou a referência em ${days} dia(s). O stock voltou ao catálogo.`,
+      o.id,
+    );
+    try {
+      await notifyOrderStep(saved, "cancelled", { description: `O pagamento não chegou em ${days} dia(s). Se já pagou, contacte-nos com o número da encomenda.` });
+    } catch (err) {
+      console.log("Aviso de cancelamento por falta de pagamento:", err);
+    }
+  }
+  return cancelled;
+}
+
+/**
  * Corre a vigilância: grava os alertas em `order_alerts`, avisa a equipa (staff_notifications)
  * só dos alertas novos ou que passaram a críticos, e fecha os que deixaram de existir.
  * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
  */
 async function runOrderWatch(summary = false) {
   const orders = await ordersForWatch();
+  const cancelled = await cancelUnpaidOrders(orders);
   const alerts = orderAlerts(orders);
   const now = nowISO();
   const { data: open } = await db.from("order_alerts").select("order_id, kind, severity").is("resolved_at", null);
@@ -2518,7 +2640,7 @@ async function runOrderWatch(summary = false) {
   }
   let summarySent = 0;
   if (summary) summarySent = await sendDailySummary(orders, alerts);
-  return { orders: orders.length, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
+  return { orders: orders.length, cancelled, alerts: alerts.length, notified, resolved: known.size, summary_sent: summarySent };
 }
 
 /** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
@@ -3156,6 +3278,21 @@ function faqFallback(message: string, settings: Row | null, books: Row[]) {
   };
 }
 
+/**
+ * Teto diário de respostas com IA (custo): até 60 por IP e `chat_ai_daily_limit` na loja toda.
+ * Acima dele o assistente responde com as perguntas frequentes, sem IA. Sem a função
+ * check_rate_limit_daily (antes da migração 20261106050000) não há teto, como antes.
+ */
+async function aiQuotaAvailable(ip: string, settings: Row | null) {
+  const total = storeRules(settings).chatAiDailyLimit;
+  if (total <= 0) return false;
+  const within = async (bucket: string, client: string, max: number) => {
+    const { data, error } = await db.rpc("check_rate_limit_daily", { p_bucket: bucket, p_client: client, p_max: max });
+    return error ? true : data !== false;
+  };
+  return await within("chat-ia-ip", ip, Math.min(60, total)) && await within("chat-ia", "loja", total);
+}
+
 route("POST", "/chat", async ({ body, ip }) => {
   if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
@@ -3172,7 +3309,7 @@ route("POST", "/chat", async ({ body, ip }) => {
   const pref = settings ? (settings.chat_provider || "gemini") : "faq";
   const model = settings?.chat_model || "";
   const site = settings?.site_name || "Livraria Adventista";
-  const shipping = Number(settings?.shipping_free_threshold) || 20000;
+  const shipping = settingNumber(settings?.shipping_free_threshold, 20000);
   const catalog = books.map((b) => `- [${b.id}] ${b.title}${b.book_code ? ` (${b.book_code})` : ""} | ${b.author} | ${effectivePrice(b)} | stock:${b.stock}\n`).join("");
   const system = [
     `Assistente da ${site}. Responde em português de Portugal.`,
@@ -3186,7 +3323,7 @@ route("POST", "/chat", async ({ body, ip }) => {
   let parsed = null;
   let usedAi = false;
   let provider = "faq";
-  if (pref !== "faq") {
+  if (pref !== "faq" && (keys.gemini || keys.deepseek) && await aiQuotaAvailable(ip, settings)) {
     let use = "";
     if (pref === "gemini" && keys.gemini) use = "gemini";
     else if (pref === "deepseek" && keys.deepseek) use = "deepseek";

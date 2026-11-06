@@ -33,12 +33,12 @@ export function UserMenu({ compact = false, className }) {
         <Button
           variant="ghost"
           className={cn(
-            'gap-2 px-2 hover:bg-[#0ea5c9]/10 rounded-full h-auto py-1',
+            'gap-2 px-2 hover:bg-marca/10 rounded-full h-auto py-1',
             className,
           )}
           aria-label="Menu da conta"
         >
-          <UserAvatar user={user} size="md" className="ring-2 ring-[#0ea5c9]/20" />
+          <UserAvatar user={user} size="md" className="ring-2 ring-marca/20" />
           {!compact && (
             <>
               <span className="hidden md:flex flex-col items-start text-left leading-tight max-w-[120px]">
@@ -121,7 +121,7 @@ export function GuestAuthButton({ className, fullWidth = false }) {
       <Button
         variant="outline"
         size="sm"
-        className={cn('rounded-full bg-transparent border-[#0ea5c9]/30 hover:bg-[#0ea5c9]/10', fullWidth && 'w-full')}
+        className={cn('rounded-full bg-transparent border-marca/30 hover:bg-marca/10', fullWidth && 'w-full')}
         onClick={() => openAuth({ mode: 'login' })}
       >
         <User className="h-4 w-4 mr-2" />

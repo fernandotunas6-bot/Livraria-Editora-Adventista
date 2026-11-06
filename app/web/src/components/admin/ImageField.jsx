@@ -265,7 +265,7 @@ export default function ImageField({
                         type="button"
                         title={f.name}
                         onClick={() => selectDriveFile(f)}
-                        className="aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-[#0ea5c9] transition-shadow"
+                        className="aspect-square rounded-md overflow-hidden border hover:ring-2 hover:ring-marca transition-shadow"
                       >
                         <img src={f.thumb} alt={f.name} className="w-full h-full object-cover" />
                       </button>
@@ -291,7 +291,7 @@ export default function ImageField({
                           type="button"
                           title={item.rotulo}
                           onClick={() => selectGalleryItem(item)}
-                          className={`relative text-left rounded-md overflow-hidden border bg-background hover:ring-2 hover:ring-[#0ea5c9] transition-shadow ${chosen ? 'ring-2 ring-[#0ea5c9]' : ''}`}
+                          className={`relative text-left rounded-md overflow-hidden border bg-background hover:ring-2 hover:ring-marca transition-shadow ${chosen ? 'ring-2 ring-marca' : ''}`}
                         >
                           <img
                             src={item.mini}
@@ -322,7 +322,7 @@ export default function ImageField({
         </div>
       </div>
 
-      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-[#0ea5c9]/5 border border-[#0ea5c9]/15 text-[11px] text-muted-foreground">
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-marca/5 border border-marca/15 text-[11px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
         <span>{hint || defaultHint}</span>
       </div>

@@ -47,7 +47,7 @@ export default function ChatRichMessage({ message, onSuggestionClick }) {
               <Link
                 key={p.id}
                 to={`/product/${p.id}`}
-                className="flex gap-2 p-2 rounded-xl border bg-background hover:border-[#0ea5c9]/50 transition-colors"
+                className="flex gap-2 p-2 rounded-xl border bg-background hover:border-marca/50 transition-colors"
               >
                 {p.cover ? (
                   <img src={p.cover} alt="" className="h-14 w-10 object-cover rounded-md shrink-0 bg-muted" />
@@ -71,7 +71,7 @@ export default function ChatRichMessage({ message, onSuggestionClick }) {
             {message.links.map((link, i) => {
               const internal = link.path?.startsWith('/');
               const label = link.label || link.path;
-              const cls = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-[#0ea5c9]/10 text-[#0c4a6e] hover:bg-[#0ea5c9]/20 border border-[#0ea5c9]/20 transition-colors';
+              const cls = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-marca/10 text-[#0c4a6e] hover:bg-marca/20 border border-marca/20 transition-colors';
               return internal ? (
                 <Link key={i} to={link.path} className={cls}>
                   {label}

@@ -627,7 +627,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
 
       {/* Action bar */}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={handleSyncGoogle} disabled={actionLoading || !token} className="bg-primary hover:bg-[#0ea5c9]/90 text-white">
+        <Button size="sm" onClick={handleSyncGoogle} disabled={actionLoading || !token} className="bg-primary hover:bg-marca/90 text-white">
           {actionLoading && syncProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
           Sincronizar Google {syncProgress?.total ? `(${syncProgress.loaded || 0}/${syncProgress.total})` : syncProgress?.loaded ? `(${syncProgress.loaded})` : ''}
         </Button>
@@ -693,14 +693,14 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                   {contacts.map((c) => (
                     <div
                       key={c.id}
-                      className={`border rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all hover:border-[#0ea5c9]/40 ${selectedContact?.id === c.id ? 'border-[#0ea5c9] bg-[#0ea5c9]/5' : ''} ${selectedIds.includes(c.id) ? 'ring-1 ring-[#0ea5c9]/30' : ''}`}
+                      className={`border rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-all hover:border-marca/40 ${selectedContact?.id === c.id ? 'border-marca bg-marca/5' : ''} ${selectedIds.includes(c.id) ? 'ring-1 ring-marca/30' : ''}`}
                       onClick={() => setSelectedContact(c)}
                     >
                       <Checkbox checked={selectedIds.includes(c.id)} onCheckedChange={() => toggleSelect(c.id)} onClick={(e) => e.stopPropagation()} />
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="h-9 w-9 rounded-full object-cover border shrink-0" />
                       ) : (
-                        <div className="h-9 w-9 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center shrink-0">
+                        <div className="h-9 w-9 rounded-full bg-marca/10 flex items-center justify-center shrink-0">
                           <User className="h-4 w-4 text-primary" />
                         </div>
                       )}
@@ -734,7 +734,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
                     {selectedContact.photo_url ? (
                       <img src={selectedContact.photo_url} alt="" className="h-16 w-16 rounded-full mx-auto border object-cover" />
                     ) : (
-                      <div className="h-16 w-16 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center mx-auto">
+                      <div className="h-16 w-16 rounded-full bg-marca/10 flex items-center justify-center mx-auto">
                         <User className="h-8 w-8 text-primary" />
                       </div>
                     )}
@@ -1030,7 +1030,7 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowNotifyDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSendNotification} disabled={actionLoading} className="bg-primary hover:bg-[#0ea5c9]/90 text-white">
+            <Button onClick={handleSendNotification} disabled={actionLoading} className="bg-primary hover:bg-marca/90 text-white">
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
               Enviar
             </Button>

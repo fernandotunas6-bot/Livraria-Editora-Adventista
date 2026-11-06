@@ -303,7 +303,7 @@ export default function StoresTab() {
             key={key}
             type="button"
             onClick={() => setStatus(status === key ? 'all' : key)}
-            className={`text-left rounded-xl border p-4 transition-colors ${status === key ? 'border-[#0ea5c9] bg-[#0ea5c9]/5' : 'border-border bg-card hover:border-[#0ea5c9]/40'}`}
+            className={`text-left rounded-xl border p-4 transition-colors ${status === key ? 'border-marca bg-marca/5' : 'border-border bg-card hover:border-marca/40'}`}
           >
             <Icon className={`h-4 w-4 mb-2 ${warn ? 'text-amber-600' : 'text-primary'}`} />
             <p className="text-2xl font-bold tabular-nums">{value}</p>

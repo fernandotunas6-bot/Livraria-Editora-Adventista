@@ -88,7 +88,7 @@ export default function PwaInstallBanner() {
       aria-label="Instalar a aplicação"
       className="fixed safe-float-bottom [--float-gap:0.75rem] left-3 right-3 sm:left-auto sm:right-4 sm:max-w-sm z-40 bg-card border shadow-xl rounded-2xl p-3 sm:p-4 flex gap-3 items-center sm:items-start animate-in slide-in-from-bottom-4"
     >
-      <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-[#0ea5c9]/10 flex items-center justify-center shrink-0 overflow-hidden">
+      <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-marca/10 flex items-center justify-center shrink-0 overflow-hidden">
         {logoUrl ? (
           <img src={logoUrl} alt="" className="h-full w-full object-contain p-1" />
         ) : (

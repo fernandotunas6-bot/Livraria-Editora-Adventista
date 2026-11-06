@@ -28,6 +28,35 @@ A lista existe em dois sítios que têm de andar juntos: `app/web/src/lib/produc
 
 **Painel → Produtos:** separadores por tipo com contagem, "Adicionar" por tipo, etiqueta do tipo e número de tamanhos em cada linha, "Mudar tipo" nas acções em massa. Na loja, filtro "Tipo de produto" (`/shop?tipo=uniforme`).
 
+### 1.1 Códigos de cliente e de funcionário
+
+Três identificadores, todos fixos depois de atribuídos:
+
+| Código | Quem recebe | Onde fica | Formato |
+|---|---|---|---|
+| `LIV-`, `UNI-`, … (produto) | cada produto | `stock_books.book_code` | 3 dígitos, prefixo do tipo |
+| `CLI-` (cliente) | cada conta de cliente; cada pessoa que comprou só com email | `profiles.customer_code`, ou `private.guest_customer_codes` (sem conta) | 6 dígitos, ex.: `CLI-000001` |
+| `FUN-` (funcionário) | cada administrador e gestor | `profiles.staff_code` | 3 dígitos, ex.: `FUN-001` |
+
+- **Mesma pessoa, mesmo código.** Quem comprou sem conta e depois cria conta fica com o `CLI-` que já tinha: o trigger `profiles_codigos_pessoa` vai buscar o código ao mapeamento do email.
+- **Equipa que também compra.** Um administrador com encomendas não tem `CLI-` no perfil; a listagem e as encomendas usam o código do email. Se deixar de ser equipa e passar a cliente, mantém esse código.
+- **Encomendas.** `orders.customer_code` é preenchido pelo trigger `orders_codigo_cliente` a partir do email (na criação e quando o email muda). A encomenda, portanto, fica ligada ao cliente mesmo sem conta.
+- **Contadores.** Partilham `private.product_code_counters` com os de produto (`CLI-`, `FUN-`); a atribuição é `private.codigo_seguinte`.
+- **Pesquisa.** Em `/admin/users` a pesquisa aceita o código em qualquer grafia (`cli1`, `CLI-000001`, ` fun 3 `), via `public.normalize_person_code`. A listagem `admin_users_list` devolve `customer_code` e `staff_code`.
+- **Privacidade.** Os clientes só vêem o próprio perfil (RLS de `profiles`); os códigos de outros clientes não são acessíveis pela API. `private.guest_customer_codes` tem RLS activo e sem políticas: só o service role e as funções da base de dados leem.
+- **Migrações:** `20261106033302_codigos_cliente_funcionario` (esquema, triggers, pesquisa e dados existentes) e `20261106033425_codigo_cliente_tambem_na_equipa` (listagem).
+
+### 1.2 Pagamento e envio
+
+- **Pagar depois de encomendar** (transferência e Multicaixa Express, `type` `transfer`/`p2p`). O checkout já não pede a referência: a encomenda nasce com `payment_status = pending` e o stock reservado. O cliente paga com o número da encomenda no descritivo e indica a referência na página de sucesso ou no rastreio (`POST /order/payment-reference`, com número + email, ou número + telefone no levantamento sem email). A encomenda passa a `awaiting_confirmation`, a equipa recebe o aviso `payment_reported` e confirma no painel (`/admin/orders/payment-status`). Se o cliente já trouxer a referência no checkout, a encomenda nasce `awaiting_confirmation`.
+- **Pagamento por envio**: `payment_methods.shipping_methods` (vazio = todos). "Pagar no Balcão" só no levantamento. O servidor recusa combinações que não servem.
+- **Portes**: 0 é um valor válido nas definições (portes grátis, ou limiar 0 = sempre grátis). O expresso por configurar vale o dobro da entrega normal. Regra igual no servidor (`checkoutRules.settingNumber`, `place_order`) e no site (`lib/shipping.js`).
+- **Canal de venda** só `web_purchase` ou `whatsapp`; outro valor conta como compra online.
+- **Assinatura no checkout opcional**; na confirmação de entrega só PNG até 300 KB.
+- **Cancelar por falta de pagamento** (Configurações → Regras da loja, `unpaid_cancel_days`; 0 = nunca, o valor por omissão). A vigilância de hora a hora cancela as encomendas de transferência/Multicaixa ainda pendentes, sem referência e não preparadas, mais velhas que o prazo. O stock volta pelo trigger, o cliente recebe "Encomenda cancelada" e a equipa um aviso. Quem já indicou a referência nunca é cancelado pelo relógio. Regra em `checkoutRules.unpaidOrdersToCancel`, com testes.
+- **Painel → Pagamentos**: cada método tem "Disponível para" (entrega, expresso, levantamento); nenhum marcado = todos.
+- Migração `20261106050000_pagamentos_por_envio`: aplica-se no merge, com a Edge Function e o site.
+
 ## 2. Passos e avisos ao cliente
 
 `notifyOrderStep` (Edge Function) é o ponto único para cada passo: pagamento confirmado e cada estado da entrega (confirmada, a preparar, expedida/pronta para levantar, em trânsito, saiu para entrega, entregue, cancelada).
