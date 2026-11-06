@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { normalizeForSearch } from '@/lib/searchUtils';
 import { getDeliveryStatusLabel, getOrderStatusLabel, getPaymentStatusLabel } from '@/lib/orderUtils';
 import SupportRating from '@/components/assistant/SupportRating';
+import SupportReport from '@/components/admin/SupportReport';
+import { suggestSupportReply } from '@/lib/opsApi';
 import {
   addSupportNote,
   createSupportThread,
@@ -112,6 +114,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   const [teams, setTeams] = useState([]);
   const [savedReplies, setSavedReplies] = useState([]);
   const [showSaved, setShowSaved] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [threadSearch, setThreadSearch] = useState('');
   const [threadStatusFilter, setThreadStatusFilter] = useState('active');
@@ -663,9 +666,30 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
               ))}
               <button
                 type="button"
+                disabled={suggesting}
+                onClick={async () => {
+                  setSuggesting(true);
+                  setError('');
+                  try {
+                    const r = await suggestSupportReply(selectedThread.id);
+                    setMessageDraft((d) => (d.trim() ? `${d.trim()}\n\n${r.reply}` : r.reply));
+                    setComposeMode('reply');
+                  } catch (err) {
+                    setError(err.message || 'Não foi possível sugerir uma resposta.');
+                  } finally {
+                    setSuggesting(false);
+                  }
+                }}
+                title="Rascunho escrito pela IA com a conversa, as encomendas do cliente e as regras da loja. Leia e corrija antes de enviar."
+                className="ml-auto inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
+              >
+                {suggesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Sugerir resposta
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowSaved((v) => !v)}
                 aria-expanded={showSaved}
-                className="ml-auto rounded-md px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                className="rounded-md px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
               >
                 Respostas rápidas{savedReplies.length ? ` (${savedReplies.length})` : ''}
               </button>
@@ -799,6 +823,8 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
           </Button>
         </header>
       )}
+
+      {staff && !compact && <SupportReport />}
 
       <nav className="flex gap-2 border-b pb-2" aria-label="Área de atendimento">
         <Button

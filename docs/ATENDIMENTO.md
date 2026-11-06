@@ -95,3 +95,17 @@ externas, só livros do catálogo e as regras de passagem à equipa aplicam-se s
   `chatKnowledge.ts`
 - Site: `LivrariaAssistant.jsx`, `assistant/HandoffCard.jsx`, `assistant/SupportRating.jsx`,
   `SupportCenter.jsx`, `lib/assistantApi.js`, `lib/supportApi.js`
+
+## Fecho automático, indicadores e sugestões
+
+- **Fecho automático:** um pedido em que a equipa respondeu e o cliente não volta a escrever
+  recebe um aviso ("fechamos a dd/mm") e fecha dois dias depois, com convite a avaliar. Os dias
+  configuram-se em Equipas e alertas (7 por omissão; "Nunca" desliga). Uma mensagem nova do
+  cliente ou da equipa cancela o aviso.
+- **Indicadores** (Atendimento, no topo): pedidos abertos e em atraso, primeira resposta e
+  resolução (medianas e % dentro do prazo), satisfação, conversas com o assistente e quantas
+  passaram à equipa, tempo até assumir encomendas e escaladas. O mesmo resumo segue por email
+  à segunda-feira às 07:35 (Luanda) para os responsáveis das equipas e os administradores.
+- **Sugerir resposta** (com uma chave de IA nas Configurações): rascunho escrito com a conversa,
+  as encomendas do cliente e as regras da loja. É só um rascunho: lê-se, corrige-se e envia-se.
+  As notas internas entram no contexto mas a IA está instruída a não as revelar.

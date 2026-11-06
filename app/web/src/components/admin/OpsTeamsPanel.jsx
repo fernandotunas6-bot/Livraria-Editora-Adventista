@@ -300,6 +300,7 @@ export default function OpsTeamsPanel({ canEdit = false }) {
           <h3 className="font-semibold">Horário de funcionamento (hora de Luanda)</h3>
           <p className="text-sm text-muted-foreground">
             O tempo para assumir só conta dentro deste horário. Fora dele, só os avisos críticos saem por email, WhatsApp e push; os outros saem à abertura.
+            Um pedido em que a equipa respondeu e o cliente não volta a escrever recebe um aviso e fecha sozinho dois dias depois.
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <label className="space-y-1 text-sm">
@@ -331,6 +332,18 @@ export default function OpsTeamsPanel({ canEdit = false }) {
                 );
               })}
             </div>
+            <label className="space-y-1 text-sm">
+              <span className="block font-medium">Fechar pedidos sem resposta do cliente</span>
+              <select
+                disabled={!canEdit}
+                value={hours.auto_close_days ?? 7}
+                onChange={(e) => setHours({ ...hours, auto_close_days: Number(e.target.value) })}
+                className="h-10 rounded-md border bg-background px-3"
+              >
+                <option value={0}>Nunca</option>
+                {[3, 5, 7, 10, 14, 30].map((d) => <option key={d} value={d}>Ao fim de {d} dias (aviso {Math.max(d - 2, 1)} dias antes)</option>)}
+              </select>
+            </label>
             {canEdit && <Button type="button" variant="outline" onClick={saveHours} disabled={busy === 'hours'}>Guardar horário</Button>}
           </div>
         </section>

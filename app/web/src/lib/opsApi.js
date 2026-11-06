@@ -27,7 +27,7 @@ function throwOnError(error, fallback = 'Não foi possível guardar.') {
 
 const TEAM_FIELDS = 'id, name, store_id, duties, escalation_minutes, notify_email, notify_whatsapp, notify_push, active, created_at';
 const MEMBER_FIELDS = 'team_id, profile_id, is_lead';
-const OPS_FIELDS = 'open_hour, close_hour, open_days';
+const OPS_FIELDS = 'open_hour, close_hour, open_days, auto_close_days';
 
 export async function loadTeams() {
   const [teams, members, staff, stores, ops] = await Promise.all([
@@ -43,7 +43,7 @@ export async function loadTeams() {
     members: members.data || [],
     staff: (staff.data || []).filter((p) => p.role === 'admin' || p.permissions?.manage_orders === true || p.permissions?.manage_orders === 'true'),
     stores: stores.data || [],
-    hours: ops.data || { open_hour: 8, close_hour: 18, open_days: [1, 2, 3, 4, 5, 6] },
+    hours: ops.data || { open_hour: 8, close_hour: 18, open_days: [1, 2, 3, 4, 5, 6], auto_close_days: 7 },
   };
 }
 
@@ -92,13 +92,15 @@ export async function setTeamMembers(teamId, members) {
   }
 }
 
-export async function saveOpsHours({ open_hour, close_hour, open_days }) {
+export async function saveOpsHours({ open_hour, close_hour, open_days, auto_close_days }) {
   const open = Number(open_hour);
   const close = Number(close_hour);
+  const autoClose = Number(auto_close_days ?? 7);
   if (!(open >= 0 && close <= 24 && open < close)) throw new Error('A hora de abertura tem de ser antes da de fecho.');
   if (!open_days?.length) throw new Error('Escolha pelo menos um dia de funcionamento.');
+  if (!(autoClose === 0 || (autoClose >= 3 && autoClose <= 60))) throw new Error('O fecho automático é 0 (desligado) ou entre 3 e 60 dias.');
   const { data, error } = await supabase.from('staff_ops_settings')
-    .update({ open_hour: open, close_hour: close, open_days, updated_at: new Date().toISOString() })
+    .update({ open_hour: open, close_hour: close, open_days, auto_close_days: autoClose, updated_at: new Date().toISOString() })
     .eq('id', 1).select(OPS_FIELDS);
   throwOnError(error);
   if (!data?.length) throw new Error('Sem permissão: só quem gere utilizadores muda o horário.');
@@ -147,3 +149,6 @@ export async function dismissAlert(notificationId) {
   const { error } = await supabase.rpc('staff_mark_notification_read', { p_notification_id: notificationId });
   if (error) throw new Error(error.message);
 }
+
+export const loadSupportReport = (days = 7) => pb.send(`/admin/support/report?days=${days}`, { method: 'GET' });
+export const suggestSupportReply = (threadId) => pb.send('/admin/support/suggest-reply', { method: 'POST', body: { thread_id: threadId } });
