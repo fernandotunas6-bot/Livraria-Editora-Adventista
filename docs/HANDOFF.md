@@ -6,8 +6,16 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 
 - **Pedido do dono:** discutir livros ou qualquer assunto, com subcomentários, referências a livros e links, "estilo rede social". Escolhas: feed geral, links publicados logo (com denúncia).
 - **Feito (Fase 1):** `/comunidade`, separador **Discussão** na ficha, moderação no painel (Clientes → Comunidade), link "Comunidade" no menu. Migração `20261106190000_comunidade`, **ainda não aplicada** (vai no merge), testada em produção numa transacção anulada: resposta a resposta, `javascript:` e credenciais recusados; contadores protegidos; terceira denúncia oculta; anónimo não publica; a vista não tem email nem `user_id`; limite de 10 publicações por hora.
-- **Por fazer:** Fase 3 (faixa de aviso no cabeçalho), no plano. Notificações de respostas: não há (decisão por tomar). A Fase 2 está feita (secção seguinte).
+- **Por fazer:** notificações de respostas: não há (decisão por tomar). As Fases 2 e 3 estão feitas (secções seguintes).
 - **Riscos que ficam com o dono:** links sem moderação prévia (phishing/spam, mitigado por denúncia, ocultação e limite); as publicações são públicas com o nome do perfil, e a política de privacidade deve passar a cobrir a comunidade.
+
+## Faixa de aviso no cabeçalho (Fase 3, 2026-11-06, ramo `claude/quirky-hypatia-wnid2g`)
+
+- **Feito:** faixa no topo de todas as páginas da loja (as que usam o `Header`; o painel não), gerida em painel → Sistema → **Faixa de aviso** por quem tem `manage_settings` ou `manage_marketing`. Cada aviso tem texto (até 200 caracteres), tom (**urgente** âmbar, **promoção** verde, **informação** azul-escuro), link opcional com texto, datas de início e fim opcionais, "ligado" e "o visitante pode fechar". O painel mostra o que está no site agora e o estado de cada aviso (no ar, agendado, terminou, desligado), com pré-visualização no formulário.
+- **Qual aparece:** um de cada vez: urgente, depois promoção, depois informação; no mesmo tom, o que começou mais tarde. Fechado um, aparece o seguinte. O fecho fica guardado no navegador e volta a mostrar o aviso se o texto ou o link mudarem (mudar só as datas não).
+- **Onde fica:** no fluxo da página, por cima do cabeçalho: empurra o conteúdo em vez de tapar o título e sobe ao descer. A barra fina que aparece sobre a imagem de entrada fica logo abaixo (`--notice-offset`, medido pela faixa). Nas páginas com cabeçalho fixo (`pinned`: ficha, perfil, sucesso), a faixa fica por cima e o cabeçalho cola ao topo depois.
+- **Regras na base de dados:** migração `20261106210000_faixa_de_aviso`, **ainda não aplicada** (vai no merge). Os visitantes só lêem os avisos ligados e dentro das datas (RLS com `now()`); o link é um caminho do site ou http(s) sem `utilizador@` (`//outro.site`, `/\outro.site` e `javascript:` recusados), as mesmas regras de `lib/siteNotices.js`. Testada no Supabase local: anónimo e cliente não criam, editam nem apagam; o marketing gere; texto limpo; tom, datas e links inválidos recusados. No browser: computador e telemóvel, página com imagem de entrada e com cabeçalho fixo, fechar e recarregar, link interno, teclado, criação pelo painel.
+- **Custo:** um pedido ao PostgREST por visita (memória de 5 minutos entre páginas). Quem volta vê a faixa logo, pelo que ficou guardado no navegador (até 24 h); na primeira visita a faixa entra quando a resposta chega e empurra a página uma vez.
 
 ## Materiais para descarregar (Fase 2, 2026-11-06, ramo `claude/quirky-hypatia-wnid2g`)
 
