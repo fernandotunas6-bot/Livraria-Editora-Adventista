@@ -17,6 +17,16 @@ Objectivo: **https://livrariaadventista.ao** (sem `www`) passa a ser o endereço
 | Firebase, Authorized domains | `.ao` e `www.ao` juntados |
 | Google OAuth e Search Console | Feitos pelo dono |
 
+### Verificação de 2026-11-06
+
+A AngoWeb já não serve o `.ao`, mas os nameservers foram trocados para **`randy` e `riya`**.
+Estes pertencem a uma **segunda zona `livrariaadventista.ao`, criada noutra conta Cloudflare**,
+vazia. A conta do projecto (`Valentinocanguele@gmail.com's Account`, a do Pages e do token)
+continua com a zona `.ao` **pending** em `cody`/`hadlee`, com os registos todos. Não se recriam os
+registos na outra conta: o Pages está nesta conta e um domínio de outra conta não activa nele
+(o apex nem chega a validar). A correcção é pôr `cody`/`hadlee` na AngoWeb e apagar a zona
+duplicada da outra conta.
+
 ## 1. Bloqueio: nameservers do `.ao` (só o dono, no painel da AngoWeb)
 
 No painel do registador do `.ao` (AngoWeb), trocar os nameservers do domínio para:
