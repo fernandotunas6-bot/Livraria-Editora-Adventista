@@ -22,7 +22,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, endUserSessions } from '@/lib/usersApi';
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
-import { PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
+import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
 
 const PER_PAGE = 20;
 
@@ -392,7 +392,10 @@ export default function UsersModule() {
                         <p className="font-medium truncate">{u.name || '—'}{u.id && u.id === me?.id ? ' (você)' : ''}</p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                         {(u.customer_code || u.staff_code) && (
-                          <p className="text-[11px] font-mono text-muted-foreground truncate">{[u.customer_code, u.staff_code].filter(Boolean).join(' · ')}</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <CodeChip code={u.customer_code} />
+                            <CodeChip code={u.staff_code} />
+                          </div>
                         )}
                       </div>
                     </div>

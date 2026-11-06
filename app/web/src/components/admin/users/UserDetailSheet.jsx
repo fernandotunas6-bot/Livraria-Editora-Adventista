@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Mail, Phone, ShoppingBag, CalendarClock, LogIn, KeyRound, MessageCircle, Copy, Hash } from 'lucide-react';
+import { AlertTriangle, Loader2, Mail, Phone, ShoppingBag, CalendarClock, LogIn, KeyRound, MessageCircle, Copy, Hash } from 'lucide-react';
+import { personDataWarnings } from '@/lib/personDataChecks';
 import { Button } from '@/components/ui/button';
 import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
@@ -7,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { PERMISSIONS } from '@/lib/permissions';
 import { listUserOrders } from '@/lib/usersApi';
 import { formatOrderNumber, getDeliveryStatusColor, getDeliveryStatusLabel, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/orderUtils';
-import { PersonAvatar, Pill, ROLE_BADGE, PROVIDER_LABEL, accountState, formatDate, formatKz } from './userFormat';
+import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, PROVIDER_LABEL, accountState, formatDate, formatKz } from './userFormat';
 
 function Info({ icon: Icon, label, children }) {
   return (
@@ -111,11 +112,22 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
           <div className="grid gap-3 sm:grid-cols-2">
             <Info icon={Mail} label="Email">{person.email || '—'}</Info>
             <Info icon={Phone} label="Telefone">{displayAngolaPhone(person.phone)}</Info>
-            {person.customer_code && <Info icon={Hash} label="Código de cliente"><span className="font-mono">{person.customer_code}</span></Info>}
-            {person.staff_code && <Info icon={Hash} label="Código de funcionário"><span className="font-mono">{person.staff_code}</span></Info>}
+            {person.customer_code && <Info icon={Hash} label="Código de cliente"><CodeChip code={person.customer_code} /></Info>}
+            {person.staff_code && <Info icon={Hash} label="Código de funcionário"><CodeChip code={person.staff_code} /></Info>}
             {person.has_account && <Info icon={CalendarClock} label="Conta criada">{formatDate(person.created, true)}</Info>}
             {person.has_account && <Info icon={LogIn} label="Último acesso">{formatDate(person.last_sign_in_at, true)}</Info>}
           </div>
+
+          {personDataWarnings(person).length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" /> Dados por confirmar
+              </p>
+              {personDataWarnings(person).map((w) => (
+                <p key={w} className="text-sm text-amber-800 dark:text-amber-200">{w}</p>
+              ))}
+            </div>
+          )}
 
           {person.role === 'manager' && (
             <div className="space-y-2">
