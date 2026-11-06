@@ -240,9 +240,9 @@ const ProfilePage = () => {
         <div className="container-custom py-10">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
             {/* Cabeçalho do perfil */}
-            <div className="bg-gradient-to-br from-[#0ea5c9]/10 via-background to-background border rounded-2xl p-6 md:p-8 mb-8">
+            <div className="bg-gradient-to-br from-marca/10 via-background to-background border rounded-2xl p-6 md:p-8 mb-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                <UserAvatar user={user} size="lg" className="h-20 w-20 text-2xl ring-4 ring-[#0ea5c9]/20" />
+                <UserAvatar user={user} size="lg" className="h-20 w-20 text-2xl ring-4 ring-marca/20" />
                 <div className="flex-1">
                   <h1 className="text-2xl md:text-3xl font-bold">{getUserDisplayName(user)}</h1>
                   <p className="text-muted-foreground flex items-center gap-2 mt-1">
@@ -250,7 +250,7 @@ const ProfilePage = () => {
                   </p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {isAdmin && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-[#0ea5c9]/15 text-primary">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-marca/15 text-primary">
                         <Shield className="h-3 w-3" /> Administrador
                       </span>
                     )}
@@ -274,8 +274,8 @@ const ProfilePage = () => {
 
             {/* Atalhos rápidos */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Link to="/shop" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-[#0ea5c9]/40 transition-colors group">
-                <div className="h-10 w-10 rounded-lg bg-[#0ea5c9]/10 flex items-center justify-center">
+              <Link to="/shop" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
+                <div className="h-10 w-10 rounded-lg bg-marca/10 flex items-center justify-center">
                   <BookOpen className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
@@ -284,8 +284,8 @@ const ProfilePage = () => {
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
               </Link>
-              <Link to="/track" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-[#0ea5c9]/40 transition-colors group">
-                <div className="h-10 w-10 rounded-lg bg-[#0ea5c9]/10 flex items-center justify-center">
+              <Link to="/track" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
+                <div className="h-10 w-10 rounded-lg bg-marca/10 flex items-center justify-center">
                   <Truck className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
@@ -304,7 +304,7 @@ const ProfilePage = () => {
                 </div>
               </div>
               {isAdmin && (
-                <Link to="/admin" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-[#0ea5c9]/40 transition-colors group">
+                <Link to="/admin" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
                   <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <Package className="h-5 w-5 text-purple-600" />
                   </div>
@@ -552,7 +552,7 @@ const ProfilePage = () => {
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                       {wishlist.map((item) => (
-                        <div key={item.id} className="border rounded-xl overflow-hidden bg-background hover:border-[#0ea5c9]/30 transition-all flex flex-col justify-between">
+                        <div key={item.id} className="border rounded-xl overflow-hidden bg-background hover:border-marca/30 transition-all flex flex-col justify-between">
                           <div className="p-4 flex gap-3">
                             <div className="h-20 w-16 bg-muted rounded-lg overflow-hidden shrink-0 border flex items-center justify-center">
                               {item.bookCover ? (

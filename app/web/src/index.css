@@ -36,6 +36,9 @@
        viva media 2,9 nos dois casos, contra os 4,5 que a WCAG pede. */
     --ring: var(--brand-ink-hsl, var(--brand-primary-hsl, 216 55% 24%));
     --primary: var(--brand-ink-hsl, var(--brand-primary-hsl, 216 55% 24%));
+    /* Cor viva da marca (Configurações → cor principal), só para decoração: fundos claros, bordas,
+       anéis de foco. Nunca para texto: sobre branco não chega ao contraste da WCAG. Classe `marca`. */
+    --marca: var(--brand-primary-hsl, 191 87% 42%);
     --primary-foreground: 0 0% 100%;
     --secondary: 210 25% 92%;
     --secondary-foreground: 215 25% 15%;
@@ -71,6 +74,7 @@
     /* No escuro é ao contrário: a cor viva destaca-se do fundo, a escurecida desapareceria. */
     --ring: var(--brand-primary-hsl, 157 18% 50%);
     --primary: var(--brand-primary-hsl, 157 18% 50%);
+    --marca: var(--brand-primary-hsl, 191 87% 42%);
     --primary-foreground: 0 0% 100%;
     --secondary: 30 20% 30%;
     --secondary-foreground: 0 0% 98%;

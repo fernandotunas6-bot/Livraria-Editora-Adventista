@@ -290,7 +290,7 @@ export default function PaymentsTab() {
                   <ArrowDown className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-[#0ea5c9]/10 flex items-center justify-center shrink-0">
+              <div className="h-10 w-10 rounded-lg bg-marca/10 flex items-center justify-center shrink-0">
                 <TypeIcon className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">

@@ -280,7 +280,7 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
               <div
                 key={c.id}
                 className={`flex gap-3 bg-card border rounded-xl p-3 sm:p-4 items-center cursor-pointer transition-colors ${
-                  selectedCollection === c.id ? 'ring-2 ring-[#0ea5c9]/40 border-[#0ea5c9]/30' : 'hover:bg-muted/20'
+                  selectedCollection === c.id ? 'ring-2 ring-marca/40 border-marca/30' : 'hover:bg-muted/20'
                 } ${c.active ? '' : 'opacity-70'}`}
                 onClick={() => { setSelectedCollection(c.id); setBookQuery(''); }}
               >
@@ -295,7 +295,7 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
                 {cover ? (
                   <img src={cover} alt={c.title} className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg shrink-0" />
                 ) : (
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-[#0ea5c9]/10 flex items-center justify-center shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-marca/10 flex items-center justify-center shrink-0">
                     <Layers className="h-6 w-6 text-primary" />
                   </div>
                 )}

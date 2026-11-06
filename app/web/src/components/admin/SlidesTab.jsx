@@ -353,7 +353,7 @@ export default function SlidesTab({ onChange }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold truncate">{s.title}</h3>
                   {s.is_primary && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1"><Crown className="h-3 w-3" /> Principal</span>}
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0ea5c9]/10 text-primary font-medium">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-marca/10 text-primary font-medium">
                     {SLIDE_TEMPLATES.find((t) => t.id === (s.template || 'classic'))?.label || 'Clássico'}
                   </span>
                 </div>
@@ -445,7 +445,7 @@ export default function SlidesTab({ onChange }) {
                 </TabsContent>
 
                 <TabsContent value="book" className="space-y-4">
-                  <div className="rounded-xl bg-[#0ea5c9]/5 border border-[#0ea5c9]/20 p-4 text-sm">
+                  <div className="rounded-xl bg-marca/5 border border-marca/20 p-4 text-sm">
                     Seleccione um livro para preencher automaticamente capa, título, autor e link do produto.
                   </div>
                   <div className="space-y-2">
@@ -508,7 +508,7 @@ export default function SlidesTab({ onChange }) {
                           key={t.id}
                           type="button"
                           onClick={() => { set('template', t.id); setPreviewTemplate(t.id); }}
-                          className={`text-left p-4 rounded-xl border transition-all ${form.template === t.id ? 'ring-2 ring-[#0ea5c9] border-[#0ea5c9]/40 bg-[#0ea5c9]/5' : 'hover:border-[#0ea5c9]/30'}`}
+                          className={`text-left p-4 rounded-xl border transition-all ${form.template === t.id ? 'ring-2 ring-marca border-marca/40 bg-marca/5' : 'hover:border-marca/30'}`}
                         >
                           <p className="font-semibold text-sm">{t.label}</p>
                           <p className="text-xs text-muted-foreground mt-1">{t.description}</p>
@@ -616,7 +616,7 @@ export default function SlidesTab({ onChange }) {
                   {/* Mini preview */}
                   <div className="rounded-xl border overflow-hidden">
                     <p className="text-xs font-medium text-muted-foreground px-3 py-2 border-b flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Pré-visualização</p>
-                    <div className="relative h-40 bg-gradient-to-r from-[#0c4a6e] to-[#0ea5c9] flex items-center p-4">
+                    <div className="relative h-40 bg-gradient-to-r from-[#0c4a6e] to-marca flex items-center p-4">
                       {previewTemplate === 'book_promo' && form.book_cover && (
                         <img src={form.book_cover} alt="" className="w-16 h-24 object-cover rounded shadow-lg mr-4" />
                       )}

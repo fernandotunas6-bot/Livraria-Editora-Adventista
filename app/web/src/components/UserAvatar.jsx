@@ -18,7 +18,7 @@ export default function UserAvatar({ user, className, fallbackClassName, size = 
       {avatarUrl && <AvatarImage src={avatarUrl} alt={user?.name || 'Utilizador'} />}
       <AvatarFallback
         className={cn(
-          'bg-gradient-to-br from-[#0ea5c9] to-[#0c4a6e] text-white font-semibold',
+          'bg-gradient-to-br from-marca to-[#0c4a6e] text-white font-semibold',
           fallbackClassName,
         )}
       >

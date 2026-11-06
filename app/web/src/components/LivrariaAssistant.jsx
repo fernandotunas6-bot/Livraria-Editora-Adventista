@@ -116,7 +116,7 @@ export default function LivrariaAssistant() {
             exit={{ opacity: 0, scale: 0.85 }}
             onClick={() => setOpen(true)}
             title="Ajuda"
-            className="pointer-events-auto flex items-center gap-2 p-3.5 2xl:pl-3.5 2xl:pr-4 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#0ea5c9]"
+            className="pointer-events-auto flex items-center gap-2 p-3.5 2xl:pl-3.5 2xl:pr-4 bg-[#0c4a6e] hover:bg-[#0a3d5c] text-white rounded-full shadow-[0_4px_24px_rgba(12,74,110,0.5)] border border-white/10 focus:outline-none focus:ring-2 focus:ring-marca"
             aria-label={showSupportTab ? 'Ajuda, notificações e atendimento' : 'Assistente da livraria'}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}

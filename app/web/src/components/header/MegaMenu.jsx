@@ -51,7 +51,7 @@ function ImageCard({ to, image, title, subtitle, onNavigate, tall = false }) {
     <Link
       to={to}
       onClick={onNavigate}
-      className="group/card block rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-[#0ea5c9]/50 hover:shadow-md transition-all"
+      className="group/card block rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-marca/50 hover:shadow-md transition-all"
     >
       <div className={`${tall ? 'aspect-[3/4]' : 'aspect-[4/3]'} bg-muted overflow-hidden`}>
         {image ? (
@@ -82,7 +82,7 @@ function ShortcutList({ title, items, onNavigate }) {
         {items.map(({ to, href, label, description, icon: Icon }) => {
           const content = (
             <>
-              <span className="mt-0.5 h-8 w-8 shrink-0 rounded-lg bg-[#0ea5c9]/10 text-primary flex items-center justify-center">
+              <span className="mt-0.5 h-8 w-8 shrink-0 rounded-lg bg-marca/10 text-primary flex items-center justify-center">
                 <Icon className="h-4 w-4" aria-hidden="true" />
               </span>
               <span className="min-w-0">
@@ -274,7 +274,7 @@ export default function MegaMenu() {
                 <Link
                   to="/track"
                   onClick={close}
-                  className="rounded-xl border border-border bg-gradient-to-br from-[#0ea5c9]/15 to-transparent p-5 flex flex-col justify-between hover:border-[#0ea5c9]/50 hover:shadow-md transition-all"
+                  className="rounded-xl border border-border bg-gradient-to-br from-marca/15 to-transparent p-5 flex flex-col justify-between hover:border-marca/50 hover:shadow-md transition-all"
                 >
                   <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center"><Truck className="h-5 w-5" /></span>
                   <span>
@@ -331,7 +331,7 @@ export default function MegaMenu() {
                 key={tab}
                 to={`/admin?tab=${tab}`}
                 onClick={close}
-                className="group/tile rounded-xl border border-border p-4 bg-gradient-to-br from-[#0ea5c9]/10 to-transparent hover:border-[#0ea5c9]/50 hover:shadow-md transition-all"
+                className="group/tile rounded-xl border border-border p-4 bg-gradient-to-br from-marca/10 to-transparent hover:border-marca/50 hover:shadow-md transition-all"
               >
                 <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center mb-6 transition-transform group-hover/tile:scale-110">
                   <Icon className="h-5 w-5" aria-hidden="true" />

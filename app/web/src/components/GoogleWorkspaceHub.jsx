@@ -283,7 +283,7 @@ const GoogleWorkspaceHub = () => {
     return (
       <div className="bg-background border border-muted/60 rounded-2xl p-6 md:p-8 shadow-sm">
         <div className="max-w-2xl mx-auto text-center space-y-6 py-4">
-          <div className="h-16 w-16 rounded-2xl bg-[#0ea5c9]/10 flex items-center justify-center mx-auto shadow-inner">
+          <div className="h-16 w-16 rounded-2xl bg-marca/10 flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 className="h-10 w-10 text-primary" />
           </div>
           <div className="space-y-2">
@@ -330,7 +330,7 @@ const GoogleWorkspaceHub = () => {
           {googleUser.photoURL ? (
             <img src={googleUser.photoURL} alt="Google Avatar" className="h-10 w-10 rounded-full border border-primary/20 shadow-sm" />
           ) : (
-            <div className="h-10 w-10 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center text-primary border">
+            <div className="h-10 w-10 rounded-full bg-marca/10 flex items-center justify-center text-primary border">
               <User className="h-5 w-5" />
             </div>
           )}
@@ -341,7 +341,7 @@ const GoogleWorkspaceHub = () => {
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {!token && (
-            <Button variant="default" size="sm" onClick={handleConnect} className="bg-primary hover:bg-[#0ea5c9]/90 text-white h-9">
+            <Button variant="default" size="sm" onClick={handleConnect} className="bg-primary hover:bg-marca/90 text-white h-9">
               <svg className="h-4 w-4 mr-1.5 fill-current" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -370,7 +370,7 @@ const GoogleWorkspaceHub = () => {
             variant={subTab === 'drive' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setSubTab('drive')}
-            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'drive' ? 'bg-[#0ea5c9]/10 text-primary hover:bg-[#0ea5c9]/15' : ''}`}
+            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'drive' ? 'bg-marca/10 text-primary hover:bg-marca/15' : ''}`}
           >
             <FolderOpen className="h-4 w-4 mr-1.5" /> Google Drive
           </Button>
@@ -378,7 +378,7 @@ const GoogleWorkspaceHub = () => {
             variant={subTab === 'calendar' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setSubTab('calendar')}
-            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'calendar' ? 'bg-[#0ea5c9]/10 text-primary hover:bg-[#0ea5c9]/15' : ''}`}
+            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'calendar' ? 'bg-marca/10 text-primary hover:bg-marca/15' : ''}`}
           >
             <Calendar className="h-4 w-4 mr-1.5" /> Calendário
           </Button>
@@ -386,7 +386,7 @@ const GoogleWorkspaceHub = () => {
             variant={subTab === 'gmail' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setSubTab('gmail')}
-            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'gmail' ? 'bg-[#0ea5c9]/10 text-primary hover:bg-[#0ea5c9]/15' : ''}`}
+            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'gmail' ? 'bg-marca/10 text-primary hover:bg-marca/15' : ''}`}
           >
             <Mail className="h-4 w-4 mr-1.5" /> Gmail
           </Button>
@@ -394,7 +394,7 @@ const GoogleWorkspaceHub = () => {
             variant={subTab === 'contacts' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setSubTab('contacts')}
-            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'contacts' ? 'bg-[#0ea5c9]/10 text-primary hover:bg-[#0ea5c9]/15' : ''}`}
+            className={`rounded-lg px-3 py-2 text-xs font-medium h-9 ${subTab === 'contacts' ? 'bg-marca/10 text-primary hover:bg-marca/15' : ''}`}
           >
             <Users className="h-4 w-4 mr-1.5" /> Contactos
           </Button>
@@ -431,7 +431,7 @@ const GoogleWorkspaceHub = () => {
                   onDrop={onDrop}
                   onClick={() => fileInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                    isDragging ? 'border-[#0ea5c9] bg-[#0ea5c9]/5' : 'border-muted/80 hover:border-[#0ea5c9]/60 hover:bg-muted/5'
+                    isDragging ? 'border-marca bg-marca/5' : 'border-muted/80 hover:border-marca/60 hover:bg-muted/5'
                   }`}
                 >
                   <input
@@ -459,7 +459,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
                       {filteredDriveFiles.map((file) => (
-                        <div key={file.id} className="border rounded-xl p-4 flex items-start justify-between bg-card hover:border-[#0ea5c9]/30 transition-all shadow-sm">
+                        <div key={file.id} className="border rounded-xl p-4 flex items-start justify-between bg-card hover:border-marca/30 transition-all shadow-sm">
                           <div className="flex items-start gap-3 min-w-0">
                             <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
                               <File className="h-5 w-5" />
@@ -549,7 +549,7 @@ const GoogleWorkspaceHub = () => {
                         />
                       </div>
                     </div>
-                    <Button type="submit" disabled={actionLoading} className="w-full bg-primary hover:bg-[#0ea5c9]/90 text-white h-9 text-xs font-semibold">
+                    <Button type="submit" disabled={actionLoading} className="w-full bg-primary hover:bg-marca/90 text-white h-9 text-xs font-semibold">
                       {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Calendar className="h-3.5 w-3.5 mr-1.5" />}
                       Agendar Evento
                     </Button>
@@ -569,7 +569,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="space-y-3">
                       {filteredEvents.map((ev) => (
-                        <div key={ev.id} className="border rounded-xl p-4 flex items-center justify-between bg-card hover:border-[#0ea5c9]/30 transition-all shadow-sm">
+                        <div key={ev.id} className="border rounded-xl p-4 flex items-center justify-between bg-card hover:border-marca/30 transition-all shadow-sm">
                           <div className="min-w-0 pr-2">
                             <p className="text-sm font-bold truncate text-foreground">{ev.summary || '(Sem Título)'}</p>
                             {ev.description && (
@@ -641,7 +641,7 @@ const GoogleWorkspaceHub = () => {
                         className="text-xs resize-none"
                       />
                     </div>
-                    <Button type="submit" disabled={actionLoading} className="w-full bg-primary hover:bg-[#0ea5c9]/90 text-white h-9 text-xs font-semibold">
+                    <Button type="submit" disabled={actionLoading} className="w-full bg-primary hover:bg-marca/90 text-white h-9 text-xs font-semibold">
                       {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
                       Enviar Email
                     </Button>
@@ -661,7 +661,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="space-y-3">
                       {filteredGmail.map((msg) => (
-                        <div key={msg.id} className="border rounded-xl p-4 bg-card hover:border-[#0ea5c9]/30 transition-all shadow-sm space-y-2">
+                        <div key={msg.id} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-sm space-y-2">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-foreground truncate">{msg.from}</p>
@@ -704,11 +704,11 @@ const GoogleWorkspaceHub = () => {
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                     {filteredContacts.map((c, i) => (
-                      <div key={i} className="border rounded-xl p-4 bg-card hover:border-[#0ea5c9]/30 transition-all shadow-sm flex items-center gap-3">
+                      <div key={i} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-sm flex items-center gap-3">
                         {c.photo ? (
                           <img src={c.photo} alt={c.name} className="h-10 w-10 rounded-full object-cover border" />
                         ) : (
-                          <div className="h-10 w-10 rounded-full bg-[#0ea5c9]/10 flex items-center justify-center text-primary border shrink-0">
+                          <div className="h-10 w-10 rounded-full bg-marca/10 flex items-center justify-center text-primary border shrink-0">
                             <User className="h-5 w-5" />
                           </div>
                         )}
@@ -737,7 +737,7 @@ const GoogleWorkspaceHub = () => {
                               size="icon"
                               onClick={() => startEmailToContact(c.email)}
                               title="Enviar Email via Gmail"
-                              className="text-primary hover:bg-[#0ea5c9]/10 h-8 w-8 shrink-0 rounded-full"
+                              className="text-primary hover:bg-marca/10 h-8 w-8 shrink-0 rounded-full"
                             >
                               <Mail className="h-4 w-4" />
                             </Button>
