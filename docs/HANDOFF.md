@@ -11,6 +11,15 @@ Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
 - **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
 
+## Dados fidedignos, chat e spec de elementos (2026-11-06)
+
+- **Telefones:** todas as encomendas e perfis estão em `+244 XXX XXX XXX` (migração `20261106034217_perfis_telefones_e_nomes`, mesma regra de `angolaPhone.js`). Um número incompleto não é inventado: fica como está e a ficha assinala-o. Hoje o administrador `admin@livraria.ao` não tem telefone.
+- **Nomes:** nenhum perfil tinha nome vazio, por isso a regra "nome a partir da encomenda" não alterou nada agora; fica activa para os próximos.
+- **Emails:** verificados. Não há perfis com emails repetidos (com maiúsculas ou espaços), e o email de cada perfil é igual ao da conta de acesso. Nada a corrigir.
+- **Ficha do utilizador:** caixa "Dados por confirmar" (sem email, nome ou telefone; telefone incompleto; email da conta por confirmar). Só avisa. Regras em `app/web/src/lib/personDataChecks.js`, com testes.
+- **Chat de suporte (equipa):** cada conversa mostra o `CLI-` do cliente e a pesquisa aceita o código. O cliente não vê o código.
+- **Spec:** [SPEC-COMPONENTES.md](SPEC-COMPONENTES.md) descreve os elementos pequenos (código, etiqueta, campo, aviso) com as classes reais.
+
 ## Onde está o trabalho
 
 - **Repositório:** [fernandotunas6-bot/Livraria-Editora-Adventista](https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista) (privado). O projecto foi migrado a 2026-11-03 de `ValentinoCanguele/livraria_Cunhinga`, com todo o histórico e os ramos. Ver [docs/MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md) para o que ficou por configurar do lado do GitHub.
