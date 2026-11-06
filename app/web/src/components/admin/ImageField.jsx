@@ -8,7 +8,7 @@ import pb from '@/lib/dataClient';
 import { normalizeImageUrl, isPersistableImageUrl } from '@/lib/imageUrl';
 import { listDriveFolderImages, openGoogleDrivePicker } from '@/lib/googleDrivePicker';
 import { uploadPublicImage } from '@/lib/mediaUpload';
-import { ALLOWED_IMAGE_ACCEPT, imageFileError } from '@/lib/imageTypes';
+import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
 
 // Galeria de imagens do site (feitas com as capas reais do catálogo), em public/images/site/opcoes.
 const GALLERY_URL = '/images/site/opcoes/galeria.json';
@@ -47,7 +47,7 @@ export default function ImageField({
   const inputRef = useRef(null);
   const uploadsNow = !!uploadFolder && !onFileChange;
 
-  const defaultHint = `Formatos: PNG, JPG, WebP, SVG · Máx. ${maxSizeMB}MB · Proporção recomendada: ${aspect}`;
+  const defaultHint = `Formatos: ${ALLOWED_IMAGE_LABEL} · Máx. ${maxSizeMB} MB · Proporção recomendada: ${aspect}`;
 
   useEffect(() => {
     if (!value?.startsWith('blob:')) {

@@ -11,7 +11,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import { pageTitle } from '@/lib/brand';
-import { ALLOWED_IMAGE_ACCEPT, imageFileError } from '@/lib/imageTypes';
+import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
 import { sessionDecision } from '@/lib/authSession';
@@ -438,7 +438,7 @@ const ProfilePage = () => {
                       <UserAvatar user={user} size="lg" className="h-20 w-20" />
                       <div>
                         <p className="text-sm text-muted-foreground mb-2">
-                          {user?.avatar ? 'Foto do Google ou upload personalizado' : 'Adicione a sua foto (PNG/JPG, máx. 2MB)'}
+                          {user?.avatar ? 'Foto do Google ou upload personalizado' : `Adicione a sua foto (${ALLOWED_IMAGE_LABEL}, máx. 2 MB)`}
                         </p>
                         <label className="cursor-pointer">
                           <input type="file" accept={ALLOWED_IMAGE_ACCEPT} className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />

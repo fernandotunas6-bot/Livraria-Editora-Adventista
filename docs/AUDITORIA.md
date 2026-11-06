@@ -892,6 +892,36 @@ caracteres (o comprimento é largo de propósito, para aceitar os aliases curtos
 
 Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes_e_svg.sql`.
 
+### Publicação e verificação (mesmo dia)
+
+- Integrado no `main` (PR #14, `463f177`). O deploy aplicou as três migrações em produção — o
+  `supabase db push` listou e aplicou `20261106120000`, `20261106121000` e `20261106122000` —,
+  publicou a Edge Function `app` e o site no Cloudflare Pages (que tinha falhado nos dois merges
+  anteriores e desta vez passou).
+- **A primeira versão do `permissoes_e_svg.sql` dava falsos negativos.** Definia a sessão
+  (`request.jwt.claims`) antes das actualizações de preparação, e os dois triggers de `profiles`
+  (`profiles_codigos_pessoa`, `profiles_protect_privileges`) repõem o papel e as permissões quando
+  `auth.uid()` não é nulo e a pessoa da sessão não é admin. Mal o utilizador do teste passava a
+  gestor, as actualizações seguintes eram revertidas em silêncio: com a migração correcta, A2 e A4
+  saíam como falhas. Corrigido — cada caso prepara sem sessão, confirma que a preparação ficou
+  gravada (senão pára com "PREPARAÇÃO FALHOU") e só depois verifica com sessão.
+- Verificado num Postgres 16 local, com as funções e os triggers extraídos tal e qual das
+  migrações: o script antigo contra a base nova dá A2 e A4 falsos; o novo contra a base nova passa
+  em tudo; o novo contra a base antiga apanha os dois bugs (A1 e B); um trigger que reverte o papel
+  faz disparar a guarda. Em todos, perfis e contadores iguais antes e depois.
+- O `place_order` foi verificado no mesmo Postgres, com o texto exacto da migração, contra a versão
+  anterior e contra a nova sem o reinício das variáveis por item. A anterior cobrava 3000 Kz por
+  uma variante de 2500 com `sale_price` 3000 e antecipava a promoção agendada; a nova cobra 2500 nos
+  dois casos; sem o reinício, o 2.º item de um carrinho herdava o `list_price` da variante do 1.º
+  (um desconto falso no recibo — o valor cobrado não mudava). Não há teste deste para correr em
+  produção, de propósito: inserir livros de teste dispara `nextval('private.book_code_seq')`, que o
+  rollback não desfaz, e deixava um buraco permanente nos códigos dos livros.
+- O `permissoes_e_svg.sql` não deixa rasto em produção: os únicos triggers de `profiles` são os dois
+  acima, ambos `before` e só sobre a própria linha, e o contador de códigos é uma tabela (desfeita
+  pelo rollback). O teste escolhe um admin que já tem `staff_code`, para nem lhe tocar.
+- **Por correr em produção:** o `permissoes_e_svg.sql`. O conector do Supabase da sessão estava
+  ligado a outra conta (via os projectos "Sga" e um inactivo, não o `bggqkjjqbjhbjsckzopj`).
+
 ### Observações de desenho (não são falhas, decisão do dono)
 
 - O separador **"Vendas por loja"** é visível a qualquer gestor com uma permissão qualquer
@@ -904,6 +934,77 @@ Verificação na base, depois de aplicar as migrações: `docs/testes/permissoes
   (`useCart.jsx`): uma variante com nome guarda o preço de quando foi posta no carrinho. Não há
   risco de cobrar a mais (o servidor recalcula no checkout), só de mostrar um preço velho.
 - CORS `*` na Edge Function: aceitável, a autenticação é por token e não por cookie.
+
+## 9.9 Segunda passagem: lógica de funcionamento e pormenores (2026-11-06)
+
+Passagem mais funda nas zonas que a 9.8 viu por cima: links de acesso, rotas públicas que
+devolvem configuração ou enviam mensagens, HTML dos emails, transições de estado das encomendas
+e textos do painel. `npm test` (560), `npm run lint`, `npm run build`, `deno check` e
+`scripts/verificar-segredos.mjs` passam.
+
+### Verificado sem problemas
+
+- **Links de acesso** (`/admin/users/access-link`, `/admin/users/create`): o `origin` vem do
+  corpo do pedido, mas o `redirectTo` fica limitado pela lista do Supabase Auth
+  (`supabase/auth/config.json`), que só tem os domínios da loja, o projecto Pages e o
+  `localhost:3000` — um gestor não consegue desviar um link de recuperação para fora.
+- **Rotas públicas de configuração**: `/integrations` filtra por lista branca
+  (`sanitizeIntegrationConfig`: código desconhecido dá `{}`, e das chaves só diz se existem);
+  `/settings` só expõe a chave pública VAPID; `/messaging/status` e `/chat/config` só booleanos.
+- **`/whatsapp/receipt`**: só para o telefone da própria encomenda, texto montado no servidor,
+  limite por IP e por encomenda.
+- **HTML dos emails**: os modelos produzem dados (`EmailDoc`) e só o `emailDocument()` gera HTML,
+  com `esc()` e `safeUrl()` — seguro por construção, com os testes do `emails.test.ts`.
+- **Push**: só vai para as subscrições do `customer_id` da encomenda; as anónimas nunca recebem.
+- **`/unsubscribe`**, **avisos de conta** (`/account/*`): token de 64 hex com a mesma resposta
+  para válido e inválido; avisos sempre para o email da sessão, com deduplicação e limites.
+- **Destino depois do login**: `safeInternalPath` recusa `//host` e `/\host`, com testes.
+- **Cancelamento automático** (`unpaidOrdersToCancel`): só encomendas pendentes, sem referência,
+  não enviadas e com pagamento antecipado.
+
+### Corrigido
+
+| # | Achado | Gravidade |
+|---|---|---|
+| 33 | Email de **reembolso** a quem nunca pagou | Média (cliente) |
+| 34 | "**Pagamento confirmado — vamos preparar a sua encomenda**" numa encomenda cancelada | Média (cliente) |
+| 35 | Respostas ao email de agradecimento sem tecto por encomenda | Baixa |
+| 36 | `successPath` deixava passar `//host` | Baixa |
+| 37 | Textos do painel a pedir SVG depois de o bucket o recusar (achado 28) | Baixa (equipa) |
+
+**33 — reembolso sem pagamento.** `/admin/orders/payment-status` aceitava qualquer transição, e
+`sendRefundEmail` envia "Devolvemos o valor da sua encomenda", com o total, em qualquer passagem
+para `refunded` — também a partir de `pending` ou `failed`. Passa a recusar o reembolso de uma
+encomenda que não está paga ("se o dinheiro chegou, marque-a primeiro como paga").
+
+**34 — pago numa encomenda cancelada.** O email de pago diz "Vamos preparar a sua encomenda", e
+uma encomenda cancelada não pode ser reaberta (o trigger `orders_before_update` não deixa). O
+caso é real: o cancelamento automático das encomendas por pagar e um pagamento que chega depois.
+O pagamento continua a gravar-se (é preciso para o reembolso), mas sem o email, e o painel
+mostra à equipa "o cliente não foi avisado do pagamento. Falta reembolsá-lo."
+
+As duas regras estão em `checkoutRules.ts` (`paymentStatusChange`), com testes. Desfazer um
+reembolso marcado por engano continua possível: o email e o WhatsApp de pago têm deduplicação.
+
+**35 — respostas ao agradecimento.** Responder outra vez é de propósito (o cliente pode mudar de
+ideias), mas cada resposta avisa cada pessoa da equipa e acrescenta um evento à linha do tempo,
+que o `/track` devolve inteira. O limite era só por IP. Passa a haver um tecto de 5 por
+encomenda e por dia (`check_rate_limit_daily`), verificado depois do token.
+
+**36 — `successPath`.** O `pathname` de `https://x.ao//evil.com` é `//evil.com`, um URL relativo
+ao protocolo. Não era explorável — o carrinho não usa o `url` da resposta e quem o envia é o
+próprio comprador —, mas a função prometia "nunca outro domínio". As barras do início colapsam
+numa só, como no `safeInternalPath`; a função passou para `checkoutRules.ts`, com testes.
+
+**37 — textos do painel.** O logótipo dizia "PNG/SVG com fundo transparente", e o fundo da loja e
+o texto por omissão do `ImageField` também ofereciam SVG — quem seguisse a indicação batia num
+erro de envio. A foto de perfil dizia só PNG/JPG. Os textos usam agora `ALLOWED_IMAGE_LABEL`.
+
+### Por decidir (dono)
+
+- `http://localhost:3000/**` na lista de redirecionamentos do Auth de produção serve o
+  desenvolvimento local. O risco é baixo — um link desviado para lá só chega ao computador da
+  própria vítima —, mas sai se ninguém desenvolver contra a base de produção.
 
 ## 10. Não verificado nesta auditoria
 
