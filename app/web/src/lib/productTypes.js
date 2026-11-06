@@ -24,6 +24,17 @@ export const productTypeLabel = (value) => productType(value).label;
 export const isBookType = (value) => !!productType(value).isBook;
 
 /**
+ * Como se chamam as variantes deste tipo na loja: tamanhos (vestuário, uniformes), edições
+ * (livros) ou opções (o resto). Uma t-shirt em M e L não tem "edições".
+ */
+export function variantNames(value) {
+  const t = productType(value);
+  if (t.sized) return { one: 'Tamanho', many: 'Tamanhos', pick: 'Escolher o tamanho', ask: 'escolha o tamanho', soldOut: 'Este tamanho esgotou. Escolha outro.' };
+  if (t.isBook) return { one: 'Edição', many: 'Edições', pick: 'Escolher a edição', ask: 'escolha a edição', soldOut: 'Esta edição esgotou. Escolha outra.' };
+  return { one: 'Opção', many: 'Opções', pick: 'Escolher a opção', ask: 'escolha a opção', soldOut: 'Esta opção esgotou. Escolha outra.' };
+}
+
+/**
  * Código de produto em forma normalizada: `liv-63`, `LIV063` e ` liv 63 ` dão `LIV-063`.
  * Igual a `public.normalize_product_code` na base de dados.
  */
@@ -40,6 +51,25 @@ const KNOWN_PREFIXES = new Set([...PRODUCT_TYPES.map((t) => t.prefix), 'COL']);
 export function looksLikeProductCode(value) {
   const m = String(value ?? '').match(CODE_RE);
   return !!m && KNOWN_PREFIXES.has(m[1].toUpperCase());
+}
+
+/**
+ * O produto tem tamanhos ou edições (`versions`) e obriga a escolher um? Então não se compra
+ * pelo cartão nem pela vista rápida (que só conhecem a variante `-default`): vai-se à página do
+ * produto. O `place_order` recusa um produto destes sem variante.
+ */
+export function needsVariantChoice(product) {
+  return Array.isArray(product?.versions) && product.versions.length > 0;
+}
+
+/**
+ * O produto tem amostra de leitura verdadeira (páginas carregadas no painel e a pré-visualização
+ * ligada)? Sem ela não há botão de amostra: a antiga "Amostra Grátis" inventava um prefácio e um
+ * capítulo iguais para todos os produtos, e o cliente lia-os como se fossem do livro.
+ */
+export function hasReadingSample(product) {
+  return !!product?.preview_enabled && Array.isArray(product?.sample_pages)
+    && product.sample_pages.some((p) => (typeof p === 'string' ? p : p?.url));
 }
 
 /** Nome de uma linha de encomenda com a variante: "Uniforme — camisa (M · Azul)". */

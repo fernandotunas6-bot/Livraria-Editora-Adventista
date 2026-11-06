@@ -9,8 +9,9 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { shareBookOnWhatsApp } from '@/lib/whatsapp';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
-import BookPreviewModal from '@/components/BookPreviewModal';
+import SampleReaderModal from '@/components/SampleReaderModal';
 import { MOTION } from '@/lib/motion';
+import { hasReadingSample, needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -172,16 +173,26 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '<p>Sem descrição disponível.</p>') }}
                   />
                   <div className="flex flex-col gap-2 mt-auto pt-2">
-                    {inStock ? (
+                    {inStock && needsVariantChoice(product) ? (
+                      // Tamanhos ou edições escolhem-se na página do produto: daqui só ia a variante base.
+                      <Button asChild className="btn-primary w-full">
+                        <Link to={`/product/${product.id}`} onClick={onClose}>
+                          <ShoppingCart className="h-4 w-4 mr-2" /> {variantNames(product.product_type).pick}
+                        </Link>
+                      </Button>
+                    ) : inStock ? (
                       <Button className="btn-primary w-full" onClick={handleAdd}>
                         <ShoppingCart className="h-4 w-4 mr-2" /> Adicionar ao Carrinho
                       </Button>
                     ) : (
                       <p className="text-destructive text-sm text-center py-2">Esgotado — contacte-nos para encomenda</p>
                     )}
-                    <Button variant="outline" className="w-full border-primary/40 text-primary hover:bg-primary/5" onClick={() => setShowPreview(true)}>
-                      <BookOpen className="h-4 w-4 mr-2" /> Ler Amostra Grátis
-                    </Button>
+                    {/* Só com páginas verdadeiras do livro, carregadas no painel. */}
+                    {hasReadingSample(product) && (
+                      <Button variant="outline" className="w-full border-primary/40 text-primary hover:bg-primary/5" onClick={() => setShowPreview(true)}>
+                        <BookOpen className="h-4 w-4 mr-2" /> Ler Amostra Grátis
+                      </Button>
+                    )}
                     <Button variant="outline" asChild className="w-full">
                       <Link to={`/product/${product.id}`} onClick={onClose}>
                         <Eye className="h-4 w-4 mr-2" /> Ver Página Completa
@@ -201,7 +212,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
       )}
     </AnimatePresence>
     {product && (
-      <BookPreviewModal product={product} open={showPreview} onClose={() => setShowPreview(false)} onCartOpen={onCartOpen} />
+      <SampleReaderModal pages={product.sample_pages || []} title={product.title} open={showPreview} onClose={() => setShowPreview(false)} />
     )}
     </>
   );

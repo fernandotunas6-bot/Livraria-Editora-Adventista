@@ -1,5 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Loader2, Eye, MessageCircle, Heart, Star, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -12,6 +12,7 @@ import { shareBookOnWhatsApp } from '@/lib/whatsapp';
 import QuickViewModal from '@/components/QuickViewModal';
 import { MOTION } from '@/lib/motion';
 import { PRODUCT_GRID_CLASS, discountPercent } from '@/lib/productGrid';
+import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -26,6 +27,12 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   const [added, setAdded] = useState(false);
   const { isInWishlist, toggleWishlist } = useWishlist();
   const isWish = isInWishlist(product.id);
+  const navigate = useNavigate();
+  // Com tamanhos ou edições, "Comprar" leva à página do produto: o cartão só conhece a variante
+  // `-default`, e um uniforme entrava no carrinho sem tamanho.
+  const mustChoose = needsVariantChoice(product);
+  const buyLabel = mustChoose ? 'Escolher' : 'Comprar';
+  const buyAria = mustChoose ? `${variantNames(product.product_type).pick} de ${product.title}` : undefined;
 
   const variant = product.variants?.[0];
   const inStock = product.purchasable && (variant?.inventory_quantity ?? 0) > 0;
@@ -40,6 +47,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
     e.preventDefault();
     e.stopPropagation();
     if (!variant || !inStock) return;
+    if (mustChoose) { navigate(`/product/${product.id}`); return; }
     setAdding(true);
     try {
       await addToCart(product, variant, 1, variant.inventory_quantity, { silent: true });
@@ -230,13 +238,14 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             className={`h-11 sm:h-8 flex-1 rounded-lg text-xs ${added ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-primary/30 hover:bg-primary/10'}`}
             onClick={handleAddToCart}
             disabled={adding}
+            aria-label={buyAria}
           >
             {adding
               ? <Loader2 className="h-4 w-4 animate-spin" />
               : added
                 ? <Check className="h-4 w-4 mr-1" />
                 : <ShoppingCart className="h-4 w-4 mr-1" />}
-            {added ? 'No carrinho' : 'Comprar'}
+            {added ? 'No carrinho' : buyLabel}
           </Button>
           <Link to={`/product/${product.id}`} className="hidden sm:block flex-1">
             <Button size="sm" variant="secondary" className="h-11 sm:h-8 w-full rounded-lg text-xs hover:bg-primary/10 hover:text-primary">
@@ -371,13 +380,14 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
                 className={`h-10 flex-1 rounded-lg px-2 text-xs sm:h-8 ${added ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-primary/30 hover:bg-primary/10'}`}
                 onClick={handleAddToCart}
                 disabled={adding}
+                aria-label={buyAria}
               >
                 {adding
                   ? <Loader2 className="h-4 w-4 animate-spin" />
                   : added
                     ? <Check className="mr-1 h-4 w-4" />
                     : <ShoppingCart className="mr-1 h-4 w-4" />}
-                {added ? 'No carrinho' : 'Comprar'}
+                {added ? 'No carrinho' : buyLabel}
               </Button>
               {/* Página do livro: só o ícone, para caber ao lado de "Comprar" num cartão de
                   cinco colunas (com texto, "Detalhes" ficava cortado). Em ecrã estreito fica só
