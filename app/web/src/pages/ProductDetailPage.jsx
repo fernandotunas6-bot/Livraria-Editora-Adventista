@@ -2,18 +2,20 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { formatCurrency, getProduct, getProductQuantities, trackBookView } from '@/api/EcommerceApi';
+import { formatCurrency, getProduct, trackBookView } from '@/api/EcommerceApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { shareBookOnWhatsApp } from '@/lib/whatsapp';
+import { buildBookShareMessage, buildWhatsAppShareUrl, shareBookOnWhatsApp } from '@/lib/whatsapp';
+import { copyText, nativeShare } from '@/lib/nativeShare';
 import { discountPercent } from '@/lib/productGrid';
 import { shippingRules } from '@/lib/shipping';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
   XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare,
-  Truck, Wallet, Store, Youtube,
+  Truck, Wallet, Store, Youtube, Share2,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +34,7 @@ import DiscoveryFeed from '@/components/DiscoveryFeed.jsx';
 import RelatedProducts from '@/components/RelatedProducts.jsx';
 import ProductVideo from '@/components/ProductVideo.jsx';
 import StickyBuyBar from '@/components/StickyBuyBar.jsx';
+import { deliveryWindow, formatWindow } from '@/lib/deliveryEstimate';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
 import { hasReadingSample, variantNames } from '@/lib/productTypes';
@@ -188,40 +191,20 @@ function ProductDetailPage() {
       try {
         setLoading(true);
         setError(null);
+        // O stock já vem com o livro (`bookToProduct` e `variantStock`). Havia um segundo pedido
+        // (`getProductQuantities`) que voltava a ler a mesma linha da mesma tabela para fazer a
+        // mesma conta: no telemóvel, mais uma ida à rede antes de a página aparecer.
         const fetchedProduct = await getProduct(id);
         trackBookView(fetchedProduct.id);
+        setProduct(fetchedProduct);
+        // Fica no navegador de quem visita, para poder voltar a este livro depois de ver
+        // outros. Nada vai para o servidor: é um atalho, não um registo de hábitos.
+        addRecentlyViewed(fetchedProduct);
 
-        try {
-          const quantitiesResponse = await getProductQuantities({
-            fields: 'inventory_quantity',
-            product_ids: [fetchedProduct.id]
-          });
-
-          const variantQuantityMap = new Map();
-          quantitiesResponse.variants.forEach(variant => {
-            variantQuantityMap.set(variant.id, variant.inventory_quantity);
-          });
-
-          const productWithQuantities = {
-            ...fetchedProduct,
-            variants: fetchedProduct.variants.map(variant => ({
-              ...variant,
-              inventory_quantity: variantQuantityMap.get(variant.id) ?? variant.inventory_quantity
-            }))
-          };
-
-          setProduct(productWithQuantities);
-          // Fica no navegador de quem visita, para poder voltar a este livro depois de ver
-          // outros. Nada vai para o servidor: é um atalho, não um registo de hábitos.
-          addRecentlyViewed(productWithQuantities);
-
-          if (productWithQuantities.variants && productWithQuantities.variants.length > 0) {
-            // Começa na primeira variante com stock: abrir num tamanho esgotado parecia o produto todo esgotado.
-            const vs = productWithQuantities.variants;
-            setSelectedVariant(vs.find((v) => v.inventory_quantity > 0) || vs[0]);
-          }
-        } catch (quantityError) {
-          throw quantityError;
+        if (fetchedProduct.variants && fetchedProduct.variants.length > 0) {
+          // Começa na primeira variante com stock: abrir num tamanho esgotado parecia o produto todo esgotado.
+          const vs = fetchedProduct.variants;
+          setSelectedVariant(vs.find((v) => v.inventory_quantity > 0) || vs[0]);
         }
       } catch (err) {
         setError(err.message || 'Não foi possível carregar o livro');
@@ -238,9 +221,23 @@ function ProductDetailPage() {
       <>
         <Header pinned onCartOpen={() => setIsCartOpen(true)} />
         <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
-        <div className="flex justify-center items-center h-[60vh]">
-          <Loader2 className="h-16 w-16 text-primary animate-spin" />
-        </div>
+        {/* A forma da ficha enquanto chega (capa, título, preço, botões), em vez de um
+            spinner num ecrã vazio: a página não salta quando o livro aparece. */}
+        <main className="container-custom py-6 md:py-12" aria-busy="true">
+          <p className="sr-only" role="status">A carregar o livro…</p>
+          <Skeleton className="mb-6 h-4 w-44" />
+          <div className="grid gap-8 md:grid-cols-2 md:gap-12">
+            <Skeleton className="mx-auto aspect-[3/4] w-full max-w-md rounded-2xl" />
+            <div className="space-y-4">
+              <Skeleton className="h-9 w-11/12" />
+              <Skeleton className="h-9 w-2/3" />
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-10 w-48" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+          </div>
+        </main>
         <Footer />
       </>
     );
@@ -298,12 +295,32 @@ function ProductDetailPage() {
           ? { ok: true, label: `Restam ${availableStock} — pode esgotar em breve`, tone: 'text-orange-700 dark:text-orange-400' }
           : { ok: true, label: 'Em stock, pronto a enviar', tone: 'text-emerald-700 dark:text-emerald-400' };
 
+  // Partilhar o livro: a folha do sistema no telemóvel; sem ela, copia-se a ligação; e se nem
+  // isso der, abre-se o WhatsApp para escolher a conversa.
+  const shareBook = async () => {
+    const url = `${window.location.origin}/product/${product.id}`;
+    const result = await nativeShare({
+      title: product.title,
+      text: product.subtitle ? `${product.title}, de ${product.subtitle}` : product.title,
+      url,
+    });
+    if (result !== 'unsupported') return;
+    if (await copyText(url)) {
+      toast({ title: 'Ligação copiada', description: 'Cole-a numa conversa para partilhar o livro.' });
+      return;
+    }
+    window.open(buildWhatsAppShareUrl(buildBookShareMessage(product)), '_blank', 'noopener,noreferrer');
+  };
+
   // O limiar vem das mesmas regras do carrinho e do servidor (`shippingRules`): um limiar a 0
   // nas Configurações significa envio sempre grátis, e não os 20 000 Kz por omissão.
   const { freeThresholdCents } = shippingRules(settings);
   const shippingLine = freeThresholdCents > 0
     ? `Grátis a partir de ${formatCurrency(freeThresholdCents)}.`
     : 'Grátis em todas as encomendas.';
+  // Quando chega, em datas (os prazos de "Envios e devoluções"), só para o que está em stock.
+  const arrivesLuanda = availability.ok ? formatWindow(deliveryWindow('luanda')) : '';
+  const arrivesProvinces = availability.ok ? formatWindow(deliveryWindow('provincias')) : '';
 
   // Ficha técnica: o que se compara entre edições e se pergunta ao telefone.
   const specs = [
@@ -532,14 +549,19 @@ function ProductDetailPage() {
               >
                 Adicionar ao Carrinho
               </Button>
+              {/* No telemóvel o botão ocupa a largura toda: com só o coração parecia um botão
+                  vazio. Lá diz o que faz; no computador fica o quadrado com o coração. */}
               <Button
                 onClick={() => toggleWishlist(product)}
                 size="lg"
                 variant="outline"
                 className={`px-4 py-6 border-2 transition-all duration-base ${isWish ? 'border-red-500 text-red-500 hover:bg-red-50' : 'border-border hover:bg-muted'}`}
                 title={isWish ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+                aria-label={isWish ? 'Remover dos favoritos' : 'Guardar nos favoritos'}
+                aria-pressed={isWish}
               >
-                <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                <Heart className={`h-6 w-6 ${isWish ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} aria-hidden="true" />
+                <span className="ml-2 text-base font-medium sm:hidden" aria-hidden="true">{isWish ? 'Nos favoritos' : 'Guardar nos favoritos'}</span>
               </Button>
             </div>
             {/* Só com páginas verdadeiras do livro, carregadas no painel. */}
@@ -555,22 +577,38 @@ function ProductDetailPage() {
             )}
             {/* PDFs ligados ao produto: gratuitos, ou para quem o comprou (materiais). */}
             <ProductDownloads productId={product.id} product={product} />
-            {(settings.whatsapp || settings.contact_phone) && (
-              <Button
-                variant="outline"
-                className="w-full mb-4 border-green-500/40 text-green-700 hover:bg-green-50"
-                onClick={() => shareBookOnWhatsApp(product, settings.whatsapp || settings.contact_phone)}
-              >
-                <MessageCircle className="mr-2 h-5 w-5" />
-                Partilhar / Pedir via WhatsApp
+            {/* Duas coisas diferentes que estavam num só botão: perguntar à livraria (abre a
+                conversa com ela) e partilhar o livro com alguém (a folha do telemóvel). */}
+            <div className="mb-4 flex gap-2">
+              {(settings.whatsapp || settings.contact_phone) && (
+                <Button
+                  variant="outline"
+                  className="min-h-11 flex-1 border-green-500/40 text-green-700 hover:bg-green-50"
+                  onClick={() => shareBookOnWhatsApp(product, settings.whatsapp || settings.contact_phone)}
+                >
+                  <MessageCircle className="mr-2 h-5 w-5" aria-hidden="true" />
+                  Perguntar pelo WhatsApp
+                </Button>
+              )}
+              <Button variant="outline" className="min-h-11 flex-1" onClick={shareBook}>
+                <Share2 className="mr-2 h-5 w-5" aria-hidden="true" />
+                Partilhar
               </Button>
-            )}
+            </div>
 
             {/* O que acontece depois de comprar: a dúvida que trazia as pessoas ao WhatsApp. */}
             <ul className="mb-6 space-y-2.5 border-t border-border pt-4 text-sm">
               <li className="flex items-start gap-2.5">
                 <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span><strong className="font-medium text-foreground">Entrega em todo o país.</strong> <span className="text-muted-foreground">{shippingLine}</span></span>
+                <span>
+                  <strong className="font-medium text-foreground">Entrega em todo o país.</strong> <span className="text-muted-foreground">{shippingLine}</span>
+                  {arrivesLuanda && (
+                    <span className="mt-0.5 block text-muted-foreground">
+                      Chegada estimada: <strong className="font-medium text-foreground">{arrivesLuanda}</strong> em Luanda,{' '}
+                      {arrivesProvinces} nas outras províncias. <Link to="/shipping-returns" className="text-primary underline underline-offset-2 hover:no-underline">Prazos</Link>
+                    </span>
+                  )}
+                </span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
@@ -985,6 +1023,7 @@ function ProductDetailPage() {
         price={price}
         originalPrice={originalPrice}
         onBuy={handleBuyNow}
+        onAdd={product.purchasable ? () => handleAddToCart(false) : undefined}
         disabled={!canAddToCart || !product.purchasable}
         label={product.purchasable ? 'Comprar' : 'Esgotado'}
       />

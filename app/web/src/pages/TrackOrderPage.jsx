@@ -36,8 +36,11 @@ export default function TrackOrderPage() {
   const { settings } = useSiteSettings();
   const { user, isAuthed } = useAuth();
   const location = useLocation();
+  // Também por ligação: /track?encomenda=LA-… (de um email, de uma mensagem). Só o número vai no
+  // endereço — o email nunca, que os endereços ficam em históricos e se partilham.
+  const linkedNumber = new URLSearchParams(location.search).get('encomenda') || '';
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [orderNumber, setOrderNumber] = useState(location.state?.orderNumber || '');
+  const [orderNumber, setOrderNumber] = useState(location.state?.orderNumber || linkedNumber);
   const [email, setEmail] = useState(location.state?.email || user?.email || '');
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState(null);
@@ -50,7 +53,7 @@ export default function TrackOrderPage() {
   }, [location.state, user?.email, email]);
 
   useEffect(() => {
-    const num = (location.state?.orderNumber || '').trim();
+    const num = (location.state?.orderNumber || linkedNumber).trim();
     const em = (location.state?.email || user?.email || '').trim();
     if (!num || !em) return;
     let cancelled = false;

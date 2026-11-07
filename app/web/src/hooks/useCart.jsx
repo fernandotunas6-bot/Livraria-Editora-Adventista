@@ -86,15 +86,28 @@ export const CartProvider = ({ children }) => {
     });
   }, [cartItems]);
 
+  // Tirar um livro deixa anular durante uns segundos (um toque fora do sítio no telemóvel
+  // tirava-o de vez, e era preciso voltar a procurá-lo): volta com a mesma quantidade e para
+  // o mesmo lugar da lista. O aviso sai fora da actualização do estado — dentro dela corria
+  // duas vezes no modo estrito do React.
   const removeFromCart = useCallback((variantId) => {
-    setCartItems((prevItems) => {
-      const item = prevItems.find((i) => i.variant.id === variantId);
-      if (item) {
-        toast.info(`"${item.product.title}" removido do carrinho.`);
-      }
-      return prevItems.filter((item) => item.variant.id !== variantId);
+    const index = cartItems.findIndex((i) => i.variant.id === variantId);
+    const item = index >= 0 ? cartItems[index] : null;
+    setCartItems((prevItems) => prevItems.filter((i) => i.variant.id !== variantId));
+    if (!item) return;
+    toast(`"${item.product.title}" saiu do carrinho.`, {
+      duration: 6000,
+      action: {
+        label: 'Anular',
+        onClick: () => setCartItems((prevItems) => {
+          if (prevItems.some((i) => i.variant.id === variantId)) return prevItems;
+          const next = [...prevItems];
+          next.splice(Math.min(index, next.length), 0, item);
+          return next;
+        }),
+      },
     });
-  }, []);
+  }, [cartItems]);
 
   const updateQuantity = useCallback((variantId, quantity) => {
     setCartItems((prevItems) =>
