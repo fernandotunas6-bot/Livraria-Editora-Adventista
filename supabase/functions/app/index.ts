@@ -1122,7 +1122,7 @@ function effectivePrice(b: Row) {
 }
 
 /** Endereço público da loja: o configurado no painel (`site_url`), senão o domínio principal. */
-const DEFAULT_SITE_URL = "https://livrariaadventista.com";
+const DEFAULT_SITE_URL = "https://livrariaadventista.ao";
 
 async function getNewBooksDigest(settings: Row | null) {
   const { data: books } = await db.from("stock_books").select("title, price, sale_price, sale_starts_at, sale_ends_at").eq("active", true).gt("stock", 0)

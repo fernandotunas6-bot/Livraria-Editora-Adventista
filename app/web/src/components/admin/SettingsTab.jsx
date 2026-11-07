@@ -760,9 +760,9 @@ export default function SettingsTab() {
             <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
               <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
                 <li>Crie conta grátis em <a href="https://www.brevo.com" target="_blank" rel="noreferrer" className="text-primary underline">brevo.com</a>.</li>
-                <li>Em <strong>Senders, domains &amp; dedicated IPs → Domains</strong>, adicione <strong>livrariaadventista.com</strong> e copie os registos DNS (Brevo code, DKIM, DMARC) para o Cloudflare (DNS do domínio).</li>
+                <li>Em <strong>Senders, domains &amp; dedicated IPs → Domains</strong>, adicione <strong>livrariaadventista.ao</strong> e copie os registos DNS (Brevo code, DKIM, DMARC) para o Cloudflare (DNS do domínio).</li>
                 <li>Em <strong>SMTP &amp; API → API keys</strong>, crie uma chave e cole-a aqui.</li>
-                <li>Use como remetente um endereço desse domínio (ex.: <em>loja@livrariaadventista.com</em>) e carregue em <strong>Enviar teste</strong>.</li>
+                <li>Use como remetente um endereço desse domínio (ex.: <em>loja@livrariaadventista.ao</em>) e carregue em <strong>Enviar teste</strong>.</li>
               </ol>
               <SecretField {...secretProps('brevo_api_key', 'Chave da API Brevo')} placeholder="xkeysib-…" className="font-mono text-sm" />
             </div>
@@ -771,7 +771,7 @@ export default function SettingsTab() {
             <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
               <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
                 <li>No Cloudflare (conta da loja), active o plano <strong>Workers Paid</strong> (5 USD/mês, 3000 emails incluídos).</li>
-                <li>Em <strong>Compute &amp; AI → Email Service → Email Sending → Onboard Domain</strong>, escolha <strong>livrariaadventista.com</strong> e aceite os registos DNS.</li>
+                <li>Em <strong>Compute &amp; AI → Email Service → Email Sending → Onboard Domain</strong>, escolha <strong>livrariaadventista.ao</strong> e aceite os registos DNS.</li>
                 <li>Crie um <strong>API token</strong> com permissão de envio de email e cole-o aqui, com o ID da conta.</li>
               </ol>
               <div className="space-y-2">
