@@ -523,6 +523,11 @@ declare
 begin
   v_changes := private.audit_diff(to_jsonb(old), to_jsonb(new),
     array['payment_status', 'status', 'total', 'shipping_cost', 'payment_reference']);
+  -- O estado geral acompanha cada passo da entrega (migração estado_geral_acompanha_a_entrega):
+  -- no registo de segurança interessa só quando se cancela ou se mexe numa cancelada.
+  if 'cancelled' not in (coalesce(old.status, ''), coalesce(new.status, '')) then
+    v_changes := v_changes - 'status';
+  end if;
   if v_changes = '{}'::jsonb then
     return null;
   end if;
@@ -542,8 +547,12 @@ $$;
 revoke execute on function private.audit_orders() from public, anon, authenticated;
 
 drop trigger if exists orders_audit on public.orders;
+-- Em qualquer actualização, e não `after update of status, …`: o `of` só olha para as colunas
+-- escritas no UPDATE, e o estado também muda por gatilho (cancelar só pela entrega, migração
+-- estado_geral_acompanha_a_entrega) — esse cancelamento escapava ao registo. A função
+-- compara o antes e o depois e sai logo quando nada do que interessa mudou.
 create trigger orders_audit
-  after update of payment_status, status, total, shipping_cost, payment_reference on public.orders
+  after update on public.orders
   for each row execute function private.audit_orders();
 
 -- Preços: um livro posto a 1 Kz e comprado logo a seguir é o golpe interno mais simples.

@@ -2684,6 +2684,20 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 
 const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
 
+/**
+ * Encomendas pagas no fim — na entrega ou no balcão (métodos sem `isPaidUpfront`). A
+ * vigilância não pede o pagamento destas antes de as preparar (`payLater` em orderWatch.ts):
+ * é a mesma divisão do cancelamento automático por falta de pagamento.
+ */
+async function payLaterCheck(): Promise<(o: Row) => boolean> {
+  const codes = await cached("payment:pay-later", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("payment_methods").select("code, type");
+    return (data || []).filter((m: Row) => m.code && !isPaidUpfront(m.type)).map((m: Row) => String(m.code));
+  });
+  const set = new Set(codes);
+  return (o: Row) => set.has(String(o.payment_method_code || ""));
+}
+
 /** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
 async function ordersForWatch() {
   const since = new Date(Date.now() - 120 * 24 * 3600_000).toISOString();
@@ -2806,11 +2820,11 @@ async function cancelUnpaidOrders(orders: Row[]) {
  * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
  */
 async function runOrderWatch(summary = false) {
-  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
+  const [orders, hours, teams, storeOf, payLater] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver(), payLaterCheck()]);
   // Primeiro os cancelamentos por falta de pagamento: deixam de gerar alertas nesta passagem.
   const cancelled = await cancelUnpaidOrders(orders);
   const ackMinutes = (o: Row) => escalationMinutes(teams, "new_order", storeOf(o));
-  const alerts = orderAlerts(orders, Date.now(), { ackMinutes, hours });
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes, hours, payLater });
   const byId = new Map<string, Row>(orders.map((o) => [String(o.id), o]));
   const now = nowISO();
   const { data: open } = await db.from("order_alerts")
@@ -2882,7 +2896,7 @@ async function runOrderWatch(summary = false) {
   }
 
   let summarySent = 0;
-  if (summary) summarySent = await sendDailySummary(orders, alerts);
+  if (summary) summarySent = await sendDailySummary(orders, alerts, payLater);
   const dispatched = await dispatchStaffNotifications();
   return { orders: orders.length, cancelled, alerts: alerts.length, notified, escalated, resolved: known.size, sla_alerts: slaAlerts, summary_sent: summarySent, dispatched };
 }
@@ -3095,7 +3109,7 @@ async function dispatchStaffNotifications(limit = 100) {
 }
 
 /** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
-async function sendDailySummary(orders: Row[], alerts: OrderAlert[]) {
+async function sendDailySummary(orders: Row[], alerts: OrderAlert[], payLater?: (o: Row) => boolean) {
   const settings = await getSettings(true);
   if (!settings) return 0;
   const { data: staff } = await db.from("profiles").select("email, name, role, permissions").in("role", ["admin", "manager"]);
@@ -3103,7 +3117,7 @@ async function sendDailySummary(orders: Row[], alerts: OrderAlert[]) {
   const day = new Date().toISOString().slice(0, 10);
   let sent = 0;
   for (const p of recipients) {
-    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders), alerts, STAGE_LABELS);
+    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders, Date.now(), { payLater }), alerts, STAGE_LABELS);
     const ok = await sendLetter(settings, p.email, letter, { context: "staff_summary", customer_name: p.name || "", dedupe: `summary:${day}:${normalizeEmail(p.email)}` });
     if (ok) sent++;
   }
@@ -3191,8 +3205,8 @@ route("POST", "/admin/ops/test", async ({ auth, body }) => {
 /** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
 route("GET", "/admin/orders/watch", async ({ auth }) => {
   requirePermission(auth, "manage_orders");
-  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
-  const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours });
+  const [orders, hours, teams, storeOf, payLater] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver(), payLaterCheck()]);
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours, payLater });
   const { data: since } = await db.from("order_alerts")
     .select("order_id, kind, first_seen_at, acknowledged_at, acknowledged_by, escalated_at").is("resolved_at", null);
   const state = new Map<string, Row>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
@@ -3205,7 +3219,7 @@ route("GET", "/admin/orders/watch", async ({ auth }) => {
     .slice(0, 50)
     .map((o) => ({ order_id: o.id, order_number: o.order_number || o.id, customer_name: o.customer_name || "", created: o.created, total: o.total, shipping_method: o.shipping_method || "", pickup_store: o.pickup_store || "" }));
   return json({
-    summary: watchSummary(orders),
+    summary: watchSummary(orders, Date.now(), { payLater }),
     stage_labels: STAGE_LABELS,
     unacknowledged,
     alerts: alerts.map((a) => {

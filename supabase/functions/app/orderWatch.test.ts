@@ -53,4 +53,40 @@ describe("orderWatch", () => {
     expect(s.deliveredToday).toBe(1);
     expect(orderStage({ status: "cancelled", delivery_status: "shipped" })).toBe("cancelled");
   });
+
+  describe("encomendas pagas no fim (na entrega ou no balcão)", () => {
+    const balcao = { id: "b", order_number: "ENC-B", payment_status: "pending", payment_method_code: "balcao", shipping_method: "pickup", created: hoursAgo(30) };
+    const payLater = (o: Record<string, unknown>) => o.payment_method_code === "balcao";
+
+    it("por preparar há mais de 24 h: falta prepará-la, não o pagamento", () => {
+      const alerts = alertsForOrder(balcao, NOW, { payLater });
+      expect(alerts.map((a) => a.kind)).toEqual(["not_prepared"]);
+      expect(alerts[0].label).toBe("Ainda não preparada");
+      expect(orderStage(balcao, true)).toBe("paid");
+    });
+
+    it("nem com 50 h aparece \"Pagamento por confirmar\"", () => {
+      const kinds = alertsForOrder({ ...balcao, created: hoursAgo(50) }, NOW, { payLater }).map((a) => a.kind);
+      expect(kinds).not.toContain("payment_pending");
+      expect(kinds).toContain("not_prepared");
+    });
+
+    it("já em preparação ou pronta: segue o passo da entrega, como as outras", () => {
+      const preparing = { ...balcao, delivery_status: "preparing", delivery_timeline: [{ status: "preparing", at: hoursAgo(10) }] };
+      expect(orderStage(preparing, true)).toBe("preparing");
+      expect(alertsForOrder(preparing, NOW, { payLater })).toEqual([]);
+    });
+
+    it("sem a regra (métodos pagos antes), continua a pedir o pagamento", () => {
+      const transferencia = { ...balcao, payment_method_code: "transferencia", created: hoursAgo(50) };
+      expect(alertsForOrder(transferencia, NOW, { payLater }).map((a) => a.kind)).toEqual(["payment_pending"]);
+      expect(orderStage(transferencia)).toBe("awaiting_payment");
+    });
+
+    it("o resumo conta-as em \"Por preparar\", não em \"Por pagar\"", () => {
+      const s = watchSummary([balcao, { ...balcao, id: "t", payment_method_code: "transferencia" }], NOW, { payLater });
+      expect(s.stages.paid).toBe(1);
+      expect(s.stages.awaiting_payment).toBe(1);
+    });
+  });
 });

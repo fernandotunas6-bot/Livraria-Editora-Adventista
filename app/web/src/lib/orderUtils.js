@@ -2,6 +2,8 @@ export const ORDER_STATUS = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-700' },
   confirmed: { label: 'Confirmada', color: 'bg-blue-500/10 text-blue-700' },
   shipped: { label: 'Enviada', color: 'bg-[#0ea5c9]/10 text-[#0ea5c9]' },
+  // Gravado pela base quando a entrega fica "Entregue" (migração estado_geral_acompanha_a_entrega).
+  delivered: { label: 'Concluída', color: 'bg-emerald-500/10 text-emerald-700' },
   cancelled: { label: 'Cancelada', color: 'bg-destructive/10 text-destructive' },
 };
 

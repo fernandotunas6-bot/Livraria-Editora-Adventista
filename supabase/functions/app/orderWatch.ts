@@ -40,7 +40,8 @@ export type OrderAlert = {
 /** Limites por passo, em horas. Passar o dobro do limite torna o alerta crítico. */
 export const WATCH_RULES: Record<StageAlertKind, { hours: number; label: string }> = {
   payment_pending: { hours: 48, label: "Pagamento por confirmar" },
-  not_prepared: { hours: 24, label: "Paga e ainda não preparada" },
+  // Paga, ou a pagar no fim (na entrega ou no balcão): em ambos os casos falta preparar.
+  not_prepared: { hours: 24, label: "Ainda não preparada" },
   preparing_too_long: { hours: 48, label: "Em preparação há demasiado tempo" },
   pickup_waiting: { hours: 7 * 24, label: "Pronta para levantamento e ainda não levantada" },
   in_transit_too_long: { hours: 72, label: "Expedida/em trânsito há demasiado tempo" },
@@ -61,6 +62,12 @@ export type WatchOptions = {
   /** Minutos de horário para alguém assumir uma encomenda nova (sem isto, a regra não corre). */
   ackMinutes?: (o: Row) => number;
   hours?: OpsHours;
+  /**
+   * Encomenda paga no fim — na entrega ou no balcão (métodos `offline`, ou seja, sem
+   * `isPaidUpfront`): o pagamento não é o passo que falta, falta prepará-la. A mesma divisão
+   * que o cancelamento automático por falta de pagamento já usa (`unpaidOrdersToCancel`).
+   */
+  payLater?: (o: Row) => boolean;
 };
 
 const time = (v: unknown) => {
@@ -71,13 +78,20 @@ const time = (v: unknown) => {
 const isPickup = (o: Row) => String(o.shipping_method || "") === "pickup";
 const isCancelled = (o: Row) => o.status === "cancelled" || o.delivery_status === "cancelled";
 
-/** Passo actual da encomenda, do ponto de vista da operação. */
-export function orderStage(o: Row): string {
+/**
+ * Passo actual da encomenda, do ponto de vista da operação.
+ *
+ * `payLater`: a encomenda paga-se no fim (na entrega ou no balcão). Sem pagamento ainda, o
+ * passo é o mesmo de uma paga — falta prepará-la. Antes ficava em "por pagar" e, ao fim de
+ * 48 h, a equipa recebia "Pagamento por confirmar" para uma encomenda que só se paga no
+ * levantamento, em vez de "ainda não preparada".
+ */
+export function orderStage(o: Row, payLater = false): string {
   if (isCancelled(o)) return "cancelled";
   const ds = String(o.delivery_status || "");
   if (ds === "delivered" || o.status === "delivered") return "delivered";
   if (["shipped", "in_transit", "out_for_delivery", "preparing"].includes(ds)) return ds;
-  if (o.payment_status === "paid") return "paid";
+  if (o.payment_status === "paid" || payLater) return "paid";
   return "awaiting_payment";
 }
 
@@ -118,7 +132,7 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
   if (fb?.outcome === "problem" && !fb.resolved_at) {
     out.push(alert(o, "customer_problem", (now - time(fb.at)) / HOUR, 0, String(fb.message || "")));
   }
-  const stage = orderStage(o);
+  const stage = orderStage(o, opts.payLater?.(o) ?? false);
   if (stage === "cancelled" || stage === "delivered") return out;
 
   // Encomenda nova que ninguém assumiu, contada só em horário de funcionamento: é crítica
@@ -162,7 +176,7 @@ export function orderAlerts(orders: Row[], now = Date.now(), opts: WatchOptions 
 
 export const STAGE_LABELS: Record<string, string> = {
   awaiting_payment: "Por pagar",
-  paid: "Pagas, por preparar",
+  paid: "Por preparar",
   preparing: "Em preparação",
   shipped: "Expedidas / prontas",
   in_transit: "Em trânsito",
@@ -172,12 +186,12 @@ export const STAGE_LABELS: Record<string, string> = {
 };
 
 /** Contagem por passo e números do dia, para o painel e o resumo diário. */
-export function watchSummary(orders: Row[], now = Date.now()) {
+export function watchSummary(orders: Row[], now = Date.now(), opts: Pick<WatchOptions, "payLater"> = {}) {
   const stages: Record<string, number> = Object.fromEntries(Object.keys(STAGE_LABELS).map((k) => [k, 0]));
   const dayAgo = now - 24 * HOUR;
   let newToday = 0, revenueToday = 0, deliveredToday = 0, confirmedByCustomer = 0;
   for (const o of orders) {
-    const st = orderStage(o);
+    const st = orderStage(o, opts.payLater?.(o) ?? false);
     stages[st] = (stages[st] || 0) + 1;
     if (time(o.created) >= dayAgo && st !== "cancelled") {
       newToday++;
