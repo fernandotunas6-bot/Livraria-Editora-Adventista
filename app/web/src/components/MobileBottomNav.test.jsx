@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OPEN_CART_EVENT, OPEN_HEADER_SEARCH_EVENT } from '@/lib/mobileNav';
+import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -35,7 +35,7 @@ describe('MobileBottomNav', () => {
   it('no telemóvel mostra os cinco atalhos, marca o activo e reserva o espaço', async () => {
     await mount('/');
     expect(nav()).not.toBeNull();
-    for (const t of ['Início', 'Categorias', 'Pesquisar', 'Carrinho', 'Conta']) expect(button(t), t).toBeTruthy();
+    for (const t of ['Início', 'Categorias', 'Comunidade', 'Carrinho', 'Conta']) expect(button(t), t).toBeTruthy();
     expect(button('Início').getAttribute('aria-current')).toBe('page');
     expect(document.documentElement.style.getPropertyValue('--barra-navegacao')).toBe('56px');
     expect(button('Carrinho').getAttribute('aria-label')).toBe('Carrinho com 3 itens');
@@ -51,17 +51,14 @@ describe('MobileBottomNav', () => {
     expect(nav()).toBeNull();
   });
 
-  it('Pesquisar abre a pesquisa do cabeçalho e Carrinho abre o carrinho da página', async () => {
-    const search = vi.fn();
+  it('Comunidade leva à comunidade e fica activa lá dentro; Carrinho abre o carrinho da página', async () => {
     const cart = vi.fn((e) => { e.detail.handled = true; });
-    window.addEventListener(OPEN_HEADER_SEARCH_EVENT, search);
     window.addEventListener(OPEN_CART_EVENT, cart);
-    await mount('/shop');
-    act(() => button('Pesquisar').click());
+    await mount('/comunidade/p/abc123');
+    expect(button('Comunidade').getAttribute('href')).toBe('/comunidade');
+    expect(button('Comunidade').getAttribute('aria-current')).toBe('page');
     act(() => button('Carrinho').click());
-    expect(search).toHaveBeenCalledOnce();
     expect(cart).toHaveBeenCalledOnce();
-    window.removeEventListener(OPEN_HEADER_SEARCH_EVENT, search);
     window.removeEventListener(OPEN_CART_EVENT, cart);
   });
 });

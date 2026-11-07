@@ -6,7 +6,7 @@ import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import CommunityFeed from '@/components/community/CommunityFeed';
-import { ClubBanner, CommunityHero, CommunitySidebar, FeedToolbar, TopicNav } from '@/components/community/CommunityParts';
+import { ClubBanner, CommunityHero, CommunitySidebar, FeedToolbar, MobileHighlights, TopicNav } from '@/components/community/CommunityParts';
 import { loadCurrentClub, loadSidebar, loadTopics } from '@/lib/communityApi';
 import { filtersFromSearch, searchFromFilters } from '@/lib/communityStyle';
 import { useAuth } from '@/hooks/useAuth';
@@ -80,6 +80,7 @@ export default function CommunityPage() {
 
             <div className="min-w-0 space-y-4" ref={feedRef}>
               <ClubBanner club={!filters.book && !filters.topic ? club : null} />
+              {!filters.book && !filters.topic && !filters.query && <MobileHighlights sidebar={sidebar} />}
               {activeTopic && (
                 <div className="rounded-2xl border border-editorial-filete bg-editorial-papel p-4">
                   <h2 className="text-2xl font-semibold text-editorial-tinta">{activeTopic.name}</h2>
@@ -99,7 +100,7 @@ export default function CommunityPage() {
               <CommunityFeed filters={filters} topics={topics} />
             </div>
 
-            <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+            <div className="hidden min-w-0 lg:sticky lg:top-24 lg:block lg:self-start">
               <CommunitySidebar sidebar={sidebar} />
             </div>
           </div>

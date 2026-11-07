@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3, Bell, FileDown, ShieldCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useHeaderReveal } from '@/hooks/useHeaderReveal';
@@ -204,6 +204,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   </span>
                 )}
               </Button>
+              <NotificationBell className="text-white hover:bg-white/15" />
               {isAuthed ? (
                 <Link to="/profile" aria-label="Minha conta">
                   <UserAvatar user={user} size="sm" className="ring-2 ring-white/40" />
@@ -485,6 +486,22 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 >
                   <ShoppingBag className="h-4 w-4 text-[#22d3ee]" /> Encomendas
                 </Link>
+                <Link
+                  to="/profile?tab=notifications"
+                  onClick={closeMobile}
+                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  tabIndex={mobileOpen ? 0 : -1}
+                >
+                  <Bell className="h-4 w-4 text-[#22d3ee]" /> Notificações
+                </Link>
+                <Link
+                  to="/profile?tab=pdfs"
+                  onClick={closeMobile}
+                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  tabIndex={mobileOpen ? 0 : -1}
+                >
+                  <FileDown className="h-4 w-4 text-[#22d3ee]" /> Os meus PDFs
+                </Link>
                 {canAccessAdmin && (
                   <Link
                     to="/admin"
@@ -522,6 +539,14 @@ const Header = ({ onCartOpen, pinned = false }) => {
               tabIndex={mobileOpen ? 0 : -1}
             >
               Rastrear Encomenda
+            </Link>
+            <Link
+              to="/privacidade"
+              onClick={closeMobile}
+              className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
+              tabIndex={mobileOpen ? 0 : -1}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Política de privacidade
             </Link>
           </nav>
         </div>
