@@ -74,6 +74,7 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
   const [templateLang, setTemplateLang] = useState(cfg.template_language || 'pt_PT');
   const [useTemplate, setUseTemplate] = useState(!!cfg.use_template);
   const [autoSend, setAutoSend] = useState(cfg.auto_send !== false);
+  const [staffTemplate, setStaffTemplate] = useState(cfg.staff_template_name || '');
   const [testPhone, setTestPhone] = useState('');
   const [testing, setTesting] = useState(false);
 
@@ -84,7 +85,8 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
     setTemplateLang(cfg.template_language || 'pt_PT');
     setUseTemplate(!!cfg.use_template);
     setAutoSend(cfg.auto_send !== false);
-  }, [app.id, cfg.phone_number_id, cfg.access_token, cfg.template_name, cfg.template_language, cfg.use_template, cfg.auto_send]);
+    setStaffTemplate(cfg.staff_template_name || '');
+  }, [app.id, cfg.phone_number_id, cfg.access_token, cfg.template_name, cfg.template_language, cfg.use_template, cfg.auto_send, cfg.staff_template_name]);
 
   const buildConfig = () => ({
     phone_number_id: phoneId.trim(),
@@ -93,6 +95,7 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
     template_language: templateLang.trim() || 'pt_PT',
     use_template: useTemplate,
     auto_send: autoSend,
+    staff_template_name: staffTemplate.trim(),
   });
 
   const handleTest = async () => {
@@ -150,6 +153,15 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
           </div>
         </div>
       )}
+      <div className="space-y-2">
+        <Label className="text-xs">Template dos avisos à equipa (opcional)</Label>
+        <Input value={staffTemplate} onChange={(e) => setStaffTemplate(e.target.value)} placeholder="alerta_equipa" className="font-mono text-xs" />
+        <p className="text-[11px] text-muted-foreground">
+          O WhatsApp só aceita texto livre até 24 h depois da última mensagem da pessoa. Para os avisos à equipa
+          (encomendas novas, alertas) chegarem sempre, aprove na Meta um template de categoria «Utility» com duas
+          variáveis no corpo — {'{{1}}'} o título e {'{{2}}'} o detalhe — e escreva aqui o nome.
+        </p>
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={() => onSave(app, buildConfig())}>
           Guardar WhatsApp Business

@@ -6,6 +6,8 @@
  * (alertas e resumo diário) e pelo painel de acompanhamento.
  */
 
+import { type OpsHours, DEFAULT_HOURS, deliveryDeadline, openMinutesBetween } from "./opsRouting.ts";
+
 type Row = Record<string, any>;
 
 export type AlertKind =
@@ -15,7 +17,11 @@ export type AlertKind =
   | "pickup_waiting"
   | "in_transit_too_long"
   | "out_for_delivery_too_long"
-  | "customer_problem";
+  | "customer_problem"
+  | "new_unacknowledged"
+  | "delivery_overdue";
+
+type StageAlertKind = Exclude<AlertKind, "customer_problem" | "new_unacknowledged" | "delivery_overdue">;
 
 export type OrderAlert = {
   order_id: string;
@@ -32,7 +38,7 @@ export type OrderAlert = {
 };
 
 /** Limites por passo, em horas. Passar o dobro do limite torna o alerta crítico. */
-export const WATCH_RULES: Record<Exclude<AlertKind, "customer_problem">, { hours: number; label: string }> = {
+export const WATCH_RULES: Record<StageAlertKind, { hours: number; label: string }> = {
   payment_pending: { hours: 48, label: "Pagamento por confirmar" },
   not_prepared: { hours: 24, label: "Paga e ainda não preparada" },
   preparing_too_long: { hours: 48, label: "Em preparação há demasiado tempo" },
@@ -42,6 +48,20 @@ export const WATCH_RULES: Record<Exclude<AlertKind, "customer_problem">, { hours
 };
 
 const HOUR = 3600_000;
+
+const OTHER_LABELS: Record<Exclude<AlertKind, StageAlertKind>, string> = {
+  customer_problem: "Cliente reportou um problema",
+  new_unacknowledged: "Encomenda nova por assumir",
+  delivery_overdue: "Entrega fora do prazo prometido",
+};
+export const alertLabel = (kind: AlertKind) =>
+  (kind in WATCH_RULES ? WATCH_RULES[kind as StageAlertKind].label : OTHER_LABELS[kind as Exclude<AlertKind, StageAlertKind>]);
+
+export type WatchOptions = {
+  /** Minutos de horário para alguém assumir uma encomenda nova (sem isto, a regra não corre). */
+  ackMinutes?: (o: Row) => number;
+  hours?: OpsHours;
+};
 
 const time = (v: unknown) => {
   const t = Date.parse(String(v || ""));
@@ -74,20 +94,25 @@ export function stageSince(o: Row): number {
   return time(o.created);
 }
 
-function alert(o: Row, kind: AlertKind, hours: number, limit: number, detail = ""): OrderAlert {
-  const label = kind === "customer_problem" ? "Cliente reportou um problema" : WATCH_RULES[kind].label;
+function alert(o: Row, kind: AlertKind, hours: number, limit: number, detail = "", critical?: boolean): OrderAlert {
   return {
     order_id: String(o.id),
     order_number: String(o.order_number || o.id),
     customer_name: String(o.customer_name || ""),
-    kind, label, hours: Math.floor(hours), limit,
-    severity: kind === "customer_problem" || (limit > 0 && hours >= limit * 2) ? "critical" : "warning",
+    kind, label: alertLabel(kind), hours: Math.floor(hours), limit,
+    severity: critical ?? (kind === "customer_problem" || (limit > 0 && hours >= limit * 2)) ? "critical" : "warning",
     detail,
   };
 }
 
+const dateAO = (ms: number) => {
+  const d = new Date(ms + HOUR);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+};
+
 /** Alertas de uma encomenda (pode ter mais de um, por exemplo parada e com problema). */
-export function alertsForOrder(o: Row, now = Date.now()): OrderAlert[] {
+export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}): OrderAlert[] {
   const out: OrderAlert[] = [];
   const fb = o.customer_feedback;
   if (fb?.outcome === "problem" && !fb.resolved_at) {
@@ -95,8 +120,27 @@ export function alertsForOrder(o: Row, now = Date.now()): OrderAlert[] {
   }
   const stage = orderStage(o);
   if (stage === "cancelled" || stage === "delivered") return out;
+
+  // Encomenda nova que ninguém assumiu, contada só em horário de funcionamento: é crítica
+  // (sobe logo aos responsáveis e às urgências), porque ninguém está a tratar dela.
+  if (opts.ackMinutes && !o.acknowledged_at && (stage === "awaiting_payment" || stage === "paid")) {
+    const limit = opts.ackMinutes(o);
+    const minutes = openMinutesBetween(time(o.created), now, opts.hours || DEFAULT_HOURS);
+    if (minutes >= limit) {
+      out.push(alert(o, "new_unacknowledged", minutes / 60, limit / 60, `há ${minutes} min em horário de funcionamento, sem ninguém a assumir`, true));
+    }
+  }
+
+  // Prazo prometido ao cliente ultrapassado: aviso no dia; crítico 2 dias depois.
+  const due = deliveryDeadline(o);
+  if (due && now > due.deadline) {
+    const late = (now - due.deadline) / HOUR;
+    out.push(alert(o, "delivery_overdue", late, 0,
+      `${due.basis === "estimated" ? "data prevista" : "prazo da política de envios"}: ${dateAO(due.deadline)}`, late >= 48));
+  }
+
   const hours = (now - stageSince(o)) / HOUR;
-  const rule = (kind: Exclude<AlertKind, "customer_problem">) => {
+  const rule = (kind: StageAlertKind) => {
     if (hours >= WATCH_RULES[kind].hours) out.push(alert(o, kind, hours, WATCH_RULES[kind].hours));
   };
   switch (stage) {
@@ -111,8 +155,8 @@ export function alertsForOrder(o: Row, now = Date.now()): OrderAlert[] {
 }
 
 /** Todos os alertas, os críticos primeiro e depois os mais antigos. */
-export function orderAlerts(orders: Row[], now = Date.now()): OrderAlert[] {
-  return orders.flatMap((o) => alertsForOrder(o, now))
+export function orderAlerts(orders: Row[], now = Date.now(), opts: WatchOptions = {}): OrderAlert[] {
+  return orders.flatMap((o) => alertsForOrder(o, now, opts))
     .sort((a, b) => Number(b.severity === "critical") - Number(a.severity === "critical") || b.hours - a.hours);
 }
 

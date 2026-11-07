@@ -115,12 +115,15 @@ const empty = {
   shop_bg_overlay: 0.55,
   google_maps_embed_key: '',
   order_email_enabled: false,
-  email_provider: 'smtp',
+  email_provider: 'brevo',
   sendgrid_api_key: '',
+  brevo_api_key: '',
+  cloudflare_email_token: '',
+  cloudflare_account_id: '',
   smtp_from_email: '',
   smtp_from_name: '',
   smtp_host: '',
-  smtp_port: 587,
+  smtp_port: 465,
   smtp_user: '',
   smtp_password: '',
   push_enabled: false,
@@ -269,12 +272,17 @@ export default function SettingsTab() {
           shop_bg_overlay: r.shop_bg_overlay ?? empty.shop_bg_overlay,
           google_maps_embed_key: r.google_maps_embed_key || '',
           order_email_enabled: !!r.order_email_enabled,
+          // Vazio na base de dados = SMTP no servidor (deliverEmail): o painel mostra o mesmo, para
+          // gravar outra definição não trocar o fornecedor em silêncio.
           email_provider: !r.email_provider ? 'smtp' : r.email_provider,
           sendgrid_api_key: r.sendgrid_api_key || '',
+          brevo_api_key: '',
+          cloudflare_email_token: '',
+          cloudflare_account_id: r.cloudflare_account_id || '',
           smtp_from_email: r.smtp_from_email || '',
           smtp_from_name: r.smtp_from_name || '',
           smtp_host: r.smtp_host || '',
-          smtp_port: r.smtp_port ?? 587,
+          smtp_port: r.smtp_port ?? 465,
           smtp_user: r.smtp_user || '',
           smtp_password: r.smtp_password || '',
           push_enabled: !!r.push_enabled,
@@ -396,7 +404,8 @@ export default function SettingsTab() {
         ui_glass_opacity: Number(form.ui_glass_opacity) || 0.72,
         // 0 é válido (sem escurecimento); só o campo vazio volta ao valor por omissão.
         shop_bg_overlay: form.shop_bg_overlay === '' || Number.isNaN(Number(form.shop_bg_overlay)) ? 0.55 : Number(form.shop_bg_overlay),
-        smtp_port: Number(form.smtp_port) || 587,
+        smtp_port: Number(form.smtp_port) || 465,
+        cloudflare_account_id: String(form.cloudflare_account_id || '').trim().slice(0, 64),
         shop_bg_mode: form.shop_bg_mode || 'gradient',
         primary_color: form.primary_color || '#0ea5c9',
         pwa_theme_color: form.pwa_theme_color || '#0c4a6e',
@@ -682,7 +691,10 @@ export default function SettingsTab() {
         <TabsContent value="messaging" className="space-y-6 max-w-xl">
           <div>
             <h3 className="text-lg font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
-            <p className="text-xs text-muted-foreground mt-1">Enviado automaticamente após checkout (SendGrid ou SMTP).</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Confirmações de encomenda, avisos de cada passo, respostas da equipa aos clientes e alertas à equipa.
+              O servidor envia por API: Brevo (grátis, 300 por dia) ou Cloudflare (o domínio da loja já lá está; plano pago).
+            </p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.order_email_enabled} onCheckedChange={(v) => set('order_email_enabled', v)} />
@@ -693,8 +705,10 @@ export default function SettingsTab() {
             <Select value={form.email_provider || 'smtp'} onValueChange={(v) => set('email_provider', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="sendgrid">SendGrid API</SelectItem>
-                <SelectItem value="smtp">SMTP personalizado (Hostinger, Brevo, etc.)</SelectItem>
+                <SelectItem value="brevo">Brevo — API (recomendado; grátis até 300 por dia)</SelectItem>
+                <SelectItem value="cloudflare">Cloudflare Email Sending — API (plano Workers Paid)</SelectItem>
+                <SelectItem value="sendgrid">SendGrid — API (sem plano gratuito)</SelectItem>
+                <SelectItem value="smtp">SMTP (só porta 465; 25 e 587 estão bloqueadas no Supabase)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -708,7 +722,10 @@ export default function SettingsTab() {
                 </div>
                 <div className="space-y-2">
                   <Label>Porta</Label>
-                  <Input type="number" value={form.smtp_port} onChange={(e) => set('smtp_port', e.target.value)} placeholder="587" />
+                  <Input type="number" value={form.smtp_port} onChange={(e) => set('smtp_port', e.target.value)} placeholder="465" />
+                  {[25, 587].includes(Number(form.smtp_port)) && (
+                    <p className="text-xs font-medium text-destructive">A porta {form.smtp_port} está bloqueada no Supabase: nenhum email sairia. Use 465 ou, melhor, a Brevo por API.</p>
+                  )}
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -722,6 +739,31 @@ export default function SettingsTab() {
           )}
           {form.email_provider === 'sendgrid' && (
             <SecretField {...secretProps('sendgrid_api_key', 'Chave SendGrid')} placeholder="SG...." className="font-mono text-sm" />
+          )}
+          {form.email_provider === 'brevo' && (
+            <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
+              <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+                <li>Crie conta grátis em <a href="https://www.brevo.com" target="_blank" rel="noreferrer" className="text-primary underline">brevo.com</a>.</li>
+                <li>Em <strong>Senders, domains &amp; dedicated IPs → Domains</strong>, adicione <strong>livrariaadventista.com</strong> e copie os registos DNS (Brevo code, DKIM, DMARC) para o Cloudflare (DNS do domínio).</li>
+                <li>Em <strong>SMTP &amp; API → API keys</strong>, crie uma chave e cole-a aqui.</li>
+                <li>Use como remetente um endereço desse domínio (ex.: <em>loja@livrariaadventista.com</em>) e carregue em <strong>Enviar teste</strong>.</li>
+              </ol>
+              <SecretField {...secretProps('brevo_api_key', 'Chave da API Brevo')} placeholder="xkeysib-…" className="font-mono text-sm" />
+            </div>
+          )}
+          {form.email_provider === 'cloudflare' && (
+            <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
+              <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+                <li>No Cloudflare (conta da loja), active o plano <strong>Workers Paid</strong> (5 USD/mês, 3000 emails incluídos).</li>
+                <li>Em <strong>Compute &amp; AI → Email Service → Email Sending → Onboard Domain</strong>, escolha <strong>livrariaadventista.com</strong> e aceite os registos DNS.</li>
+                <li>Crie um <strong>API token</strong> com permissão de envio de email e cole-o aqui, com o ID da conta.</li>
+              </ol>
+              <div className="space-y-2">
+                <Label>ID da conta Cloudflare</Label>
+                <Input value={form.cloudflare_account_id} onChange={(e) => set('cloudflare_account_id', e.target.value)} placeholder="701800d01d428c5141fa1fdb60ee01ae" className="font-mono text-xs" />
+              </div>
+              <SecretField {...secretProps('cloudflare_email_token', 'Token da API Cloudflare')} className="font-mono text-sm" />
+            </div>
           )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">

@@ -11,6 +11,7 @@
  */
 import { deliveryAddressLine, paymentLabel, pickupStoreName } from "./orderFields.ts";
 import { formatKz, type Brand, type EmailDoc, type SafeSymbol, type Step } from "./emails.ts";
+import { type OpsReport, fmtDuration } from "./opsReport.ts";
 
 type Row = Record<string, any>;
 /**
@@ -628,6 +629,112 @@ export function dailySummaryLetter(
       cta: site ? { label: "Abrir o acompanhamento", url: `${site}/admin?tab=acompanhamento` } : undefined,
       notes: alerts.length > 15 ? [`E mais ${alerts.length - 15}. Veja todas no painel.`] : [],
       reason: "Recebe este resumo porque gere encomendas na loja.",
+    },
+  };
+}
+
+/**
+ * A equipa respondeu a um pedido de ajuda. Leva o texto da resposta (o cliente lê-a no email,
+ * sem ter de entrar) e o botão para continuar a conversa no site.
+ */
+export function supportReplyLetter(
+  brand: Brand,
+  reply: { name: string; ticketNumber: number | string; subject: string; text: string; staffName?: string },
+): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const first = String(reply.name || "").trim().split(/\s+/)[0] || "";
+  const text = String(reply.text || "").trim();
+  const shown = text.length > 1500 ? `${text.slice(0, 1500)}…` : text;
+  return {
+    subject: `Resposta ao seu pedido #${reply.ticketNumber} — ${brand.siteName}`,
+    doc: {
+      preheader: shown.slice(0, 120),
+      symbol: "✉",
+      tone: "brand",
+      title: `Respondemos ao seu pedido #${reply.ticketNumber}`,
+      subtitle: reply.subject,
+      lead: [
+        `${first ? `Olá ${first}, a` : "A"} nossa equipa${reply.staffName ? ` (${reply.staffName})` : ""} respondeu:`,
+        ...shown.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+      ],
+      cta: site ? { label: "Responder no site", url: `${site}/?atendimento=1` } : undefined,
+      notes: ["Para responder, use o botão acima: as respostas a este email não chegam à equipa."],
+      reason: "Recebe esta mensagem porque pediu ajuda à nossa equipa.",
+    },
+  };
+}
+
+/** Relatório semanal do atendimento e da operação, para responsáveis e administradores. */
+export function weeklyReportLetter(brand: Brand, r: OpsReport): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const p = (v: number | null) => (v == null ? "—" : `${v}%`);
+  const tk = r.tickets;
+  const worry = tk.overdue_now > 0 || r.orders.overdue_now > 0 || r.orders.escalated_unacknowledged > 0;
+  return {
+    subject: `Atendimento e encomendas — semana até ${dateLong(r.to)}`,
+    doc: {
+      symbol: worry ? "!" : "✓",
+      tone: worry ? "warning" : "success",
+      title: "Relatório da semana",
+      subtitle: `${dateLong(r.from)} a ${dateLong(r.to)}`,
+      lead: [
+        `${tk.opened} pedido(s) de ajuda aberto(s), ${tk.closed} resolvido(s). Agora: ${tk.open_now} em aberto${tk.overdue_now ? `, ${tk.overdue_now} fora do prazo` : ""}.`,
+        `Encomendas: ${r.orders.created} nova(s); assumidas em ${fmtDuration(r.orders.acknowledged_minutes)} (mediana)${r.orders.escalated_unacknowledged ? `; ${r.orders.escalated_unacknowledged} subiram às urgências por ninguém as assumir` : ""}${r.orders.overdue_now ? `; ${r.orders.overdue_now} entrega(s) fora do prazo agora` : ""}.`,
+      ],
+      detailsTitle: "Indicadores",
+      details: [
+        { label: "Primeira resposta (mediana)", value: fmtDuration(tk.first_response_minutes) },
+        { label: "Resolução (mediana)", value: fmtDuration(tk.resolution_minutes) },
+        { label: "Primeira resposta dentro do prazo", value: p(tk.first_response_within_sla) },
+        { label: "Resolução dentro do prazo", value: p(tk.resolution_within_sla) },
+        { label: "Satisfação (4 ou 5 estrelas)", value: tk.csat_responses ? `${p(tk.csat_satisfied)} de ${tk.csat_responses} avaliação(ões)` : "sem avaliações" },
+        { label: "Conversas com o assistente", value: `${r.assistant.conversations} (${p(r.assistant.handoff_rate)} passaram à equipa)` },
+        { label: "Respostas do assistente avaliadas", value: `${r.assistant.helpful} ajudaram · ${r.assistant.not_helpful} não ajudaram` },
+      ],
+      cta: site ? { label: "Abrir o atendimento", url: `${site}/admin?tab=support` } : undefined,
+      reason: "Recebe este relatório porque é responsável de uma equipa ou administrador da loja.",
+    },
+  };
+}
+
+/** Aviso sobre um pedido de ajuda (vai ser fechado, foi fechado), com o botão para o chat. */
+export function supportNoticeLetter(brand: Brand, notice: { title: string; body: string }): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  return {
+    subject: `${notice.title} — ${brand.siteName}`,
+    doc: {
+      preheader: notice.body.slice(0, 120),
+      symbol: "✉",
+      tone: "neutral",
+      title: notice.title,
+      lead: [notice.body],
+      cta: site ? { label: "Abrir o chat", url: `${site}/?atendimento=1` } : undefined,
+      reason: "Recebe esta mensagem porque pediu ajuda à nossa equipa.",
+    },
+  };
+}
+
+/**
+ * Aviso a uma pessoa da equipa (encomenda nova, alerta, escalada, pedido de ajuda). Curto: o
+ * que aconteceu e um botão para o sítio do painel onde se trata.
+ */
+export function staffAlertLetter(
+  brand: Brand,
+  alert: { title: string; body: string; severity: "normal" | "high" | "critical"; path: string },
+): Letter {
+  const site = String(brand.siteUrl || "").replace(/\/$/, "");
+  const critical = alert.severity === "critical";
+  return {
+    subject: `${critical ? "[URGENTE] " : ""}${alert.title}`,
+    doc: {
+      preheader: alert.body.slice(0, 120),
+      symbol: critical ? "!" : "●",
+      tone: critical ? "danger" : alert.severity === "high" ? "warning" : "brand",
+      title: alert.title,
+      lead: [alert.body],
+      cta: site ? { label: "Abrir no painel", url: `${site}${alert.path}` } : undefined,
+      notes: critical ? ["Este aviso subiu de nível porque ninguém o assumiu a tempo. Abra o painel e assuma-o."] : [],
+      reason: "Recebe este aviso porque faz parte da equipa da loja e a sua equipa trata deste assunto.",
     },
   };
 }
