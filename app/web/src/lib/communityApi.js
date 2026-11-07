@@ -314,3 +314,12 @@ export async function setCommunityNotify(userId, on) {
   const { error } = await supabase.from('profiles').update({ community_notify: !!on }).eq('id', userId);
   raise(error);
 }
+
+/** Títulos e capas dos livros dos clubes (para a lista do painel). */
+export async function loadBookTitles(ids) {
+  const list = [...new Set((ids || []).filter(Boolean))];
+  if (!list.length) return {};
+  const { data, error } = await supabase.from('stock_books').select('id, title').in('id', list);
+  raise(error);
+  return Object.fromEntries((data || []).map((b) => [b.id, b.title]));
+}

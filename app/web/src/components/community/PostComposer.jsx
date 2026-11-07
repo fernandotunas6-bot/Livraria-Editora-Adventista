@@ -19,7 +19,7 @@ const PLACEHOLDERS = {
 };
 
 /** Escolher o livro de que se fala, com a pesquisa do catálogo e a capa. */
-function BookPicker({ value, onChange }) {
+export function BookPicker({ value, onChange }) {
   const id = useId();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);

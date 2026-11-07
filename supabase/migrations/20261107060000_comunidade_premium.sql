@@ -724,3 +724,59 @@ grant execute on function public.community_list_replies(text[]) to anon, authent
 grant execute on function public.community_reader(text) to anon, authenticated;
 grant execute on function public.community_reader_posts(text, timestamptz, int) to anon, authenticated;
 grant execute on function public.community_sidebar() to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Agendador: também acorda a função para os avisos da comunidade (só push). Respostas saem
+-- logo; os gostos esperam 30 minutos para chegarem agrupados num único push.
+-- ---------------------------------------------------------------------------
+create or replace function private.run_staff_dispatch()
+returns void
+language plpgsql
+security definer
+set search_path = net, extensions
+as $$
+declare
+  v_queue_url text;
+  v_token text;
+  v_open boolean;
+  v_local timestamp := now() at time zone 'Africa/Luanda';
+begin
+  select (extract(isodow from v_local)::smallint = any (s.open_days)
+          and extract(hour from v_local) >= s.open_hour
+          and extract(hour from v_local) < s.close_hour)
+  into v_open
+  from public.staff_ops_settings s where s.id = 1;
+  v_open := coalesce(v_open, true);
+
+  -- Com a loja fechada, só o crítico sai para a equipa (o resto espera pela abertura); as
+  -- respostas aos clientes e os avisos da comunidade saem a qualquer hora.
+  if not exists (
+    select 1 from public.staff_notifications n
+    where n.dispatched_at is null and n.created_at > now() - interval '2 days'
+      and (v_open or n.severity = 'critical')
+  ) and not exists (
+    select 1 from public.customer_notifications c
+    where c.dispatched_at is null and c.kind = 'support' and c.created_at > now() - interval '2 days'
+  ) and not exists (
+    select 1 from public.customer_notifications c
+    where c.dispatched_at is null and c.kind = 'community' and c.created_at > now() - interval '2 days'
+      and (c.title <> 'Gostaram da sua publicação' or c.created_at < now() - interval '30 minutes')
+  ) then
+    return;
+  end if;
+
+  select decrypted_secret into v_queue_url from vault.decrypted_secrets where name = 'email_queue_url' limit 1;
+  select decrypted_secret into v_token from vault.decrypted_secrets where name = 'email_queue_token' limit 1;
+  if v_queue_url is null or v_token is null then
+    raise notice 'Avisos: faltam os segredos email_queue_url/email_queue_token no Vault.';
+    return;
+  end if;
+  perform http_post(
+    url := regexp_replace(v_queue_url, '(/functions/v1/app).*$', '\1') || '/cron/staff-dispatch',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-queue-token', v_token),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+end;
+$$;
+revoke execute on function private.run_staff_dispatch() from public, anon, authenticated;
