@@ -2,6 +2,7 @@ import pb from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { getSearchRelevance } from '@/lib/searchUtils';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
@@ -490,7 +491,21 @@ export async function searchProducts(query, limit = 50) {
   }
   const v = escapeFilterValue(q);
   const filter = `(title ~ "${v}" || author ~ "${v}" || genre ~ "${v}" || book_code ~ "${v}" || isbn ~ "${v}") && ${VISIBLE}`;
-  const records = await pb.collection('stock_books').getList(1, limit, { filter, sort: BOOK_SORT });
+  // Pede-se um grupo maior do que o pedido e ordena-se por relevância antes de cortar.
+  //
+  // A base de dados ordena por `-featured,title` e só depois aplica o limite: com `limit` 6
+  // (é o que o selector de livros da comunidade usa), os 6 que voltavam eram "os mais
+  // destacados, por ordem alfabética" de entre os que combinam — e o livro que a pessoa
+  // escreveu podia nem estar lá. A relevância é a mesma da pesquisa do cabeçalho
+  // (`getSearchRelevance`): o título ganha ao autor, que ganha ao género.
+  const pool = Math.min(Math.max(limit * 5, 30), 200);
+  const records = await pb.collection('stock_books').getList(1, pool, { filter, sort: BOOK_SORT });
   const collectionsMap = await getCollectionsMap();
-  return { products: records.items.map((b) => bookToProduct(b, collectionsMap)) };
+  const products = records.items
+    .map((b) => bookToProduct(b, collectionsMap))
+    .map((p) => ({ p, r: getSearchRelevance(p, q) }))
+    .sort((a, b) => b.r - a.r || String(a.p.title || '').localeCompare(String(b.p.title || ''), 'pt'))
+    .slice(0, limit)
+    .map(({ p }) => p);
+  return { products };
 }

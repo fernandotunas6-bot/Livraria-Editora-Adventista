@@ -9,7 +9,8 @@ import { subscribeNewsletter } from '@/api/EcommerceApi';
 import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
 import { BRAND } from '@/lib/brand';
-import { isInternalLink, safeLinkUrl } from '@/lib/safeLink';
+import { safeLinkUrl } from '@/lib/safeLink';
+import SafeLink from '@/components/SafeLink.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Só caminhos que existem no App.jsx. O separador do perfil vai no URL (/profile?tab=…),
@@ -50,29 +51,22 @@ const DEFAULT_FOOTER_COLUMNS = [
 const ESTILO_LINK = 'block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors';
 
 /**
- * Uma ligação de uma coluna do rodapé.
+ * Uma ligação de uma coluna do rodapé. O endereço vem de `site_settings.footer_columns`,
+ * JSON escrito no painel: ver `components/SafeLink.jsx` para o que isso implica.
  *
- * O endereço vem de `site_settings.footer_columns`, JSON escrito no painel, e passa primeiro
- * pelo `safeLinkUrl` — ver lá porquê (resumo: o React não trava um `href="javascript:…"`, e
- * o rodapé está em quase todas as páginas). Um endereço que não passe não vira link nenhum:
- * fica só o texto, para quem escreveu a configuração ver que ali está algo e ir corrigi-lo.
- *
- * Se é interno ou externo decide-se pelo próprio endereço, e não pela etiqueta `internal` do
- * JSON: um `https://…` marcado como interno ia para o `<Link>` do React Router como se fosse
- * um caminho desta aplicação.
+ * A etiqueta `internal` do JSON é ignorada de propósito — quem decide é o próprio endereço.
+ * Um `https://…` marcado como interno ia para o `<Link>` do Router como se fosse um caminho
+ * desta aplicação.
  */
 function FooterLink({ link }) {
-  const url = safeLinkUrl(link?.url);
-  const rotulo = String(link?.label ?? '');
-  if (!url) return <span className="block py-1.5 text-sm text-background/40">{rotulo}</span>;
-
-  if (isInternalLink(url)) {
-    return <Link to={url} className={ESTILO_LINK}>{rotulo}</Link>;
-  }
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className={ESTILO_LINK}>
-      {rotulo}
-    </a>
+    <SafeLink
+      to={link?.url}
+      className={ESTILO_LINK}
+      fallbackClassName="block py-1.5 text-sm text-background/40"
+    >
+      {String(link?.label ?? '')}
+    </SafeLink>
   );
 }
 

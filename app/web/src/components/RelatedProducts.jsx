@@ -65,7 +65,7 @@ export default function RelatedProducts({ product, onCartOpen, onQuickView }) {
         title="Quem leu este, procurou também"
         description={razao ? `A começar pelos da mesma área — ${razao.toLowerCase()}` : 'Do mesmo autor, colecção ou género'}
         products={relacionados}
-        shopLink={`/shop?category=${encodeURIComponent(product.type?.value || '')}`}
+        shopLink={product.type?.value ? `/shop?category=${encodeURIComponent(product.type.value)}` : '/shop'}
         onCartOpen={onCartOpen}
         onQuickView={onQuickView}
       />

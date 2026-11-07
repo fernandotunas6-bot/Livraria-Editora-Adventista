@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Save, Palette, Smartphone, Truck, MessageSquare, LayoutTemplate, Store, Mail, Bell, Sparkles, RotateCcw, Image as ImageIcon, Phone, Brush, ShieldCheck } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
+import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
@@ -1000,16 +1001,22 @@ export default function SettingsTab() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Ordenação por defeito</Label>
-              <Select value={form.shop_default_sort} onValueChange={(v) => set('shop_default_sort', v)}>
+              {/* Da lista partilhada (lib/productSort.js), e não escrita aqui à mão: esta
+                  cópia tinha cinco critérios quando a loja passou a ter oito, com nomes
+                  diferentes ("Preço ↑" aqui, "Preço: do menor" na loja). Quem escolhesse aqui
+                  não conseguia pôr a loja a abrir pelas promoções ou pelos mais procurados. */}
+              <Select value={normalizeSort(form.shop_default_sort)} onValueChange={(v) => set('shop_default_sort', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="featured">Destaques</SelectItem>
-                  <SelectItem value="title">A – Z</SelectItem>
-                  <SelectItem value="price-low">Preço ↑</SelectItem>
-                  <SelectItem value="price-high">Preço ↓</SelectItem>
-                  <SelectItem value="newest">Mais recentes</SelectItem>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Por que ordem a loja abre. Quem lá estiver pode mudá-la, e o que estiver no
+                endereço (<code>?sort=</code>) manda sempre.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Livros por página</Label>

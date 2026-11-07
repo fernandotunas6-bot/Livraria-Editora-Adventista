@@ -3,6 +3,7 @@ import { getProducts, getProduct } from '@/api/EcommerceApi';
 import ProductRail from '@/components/home/ProductRail';
 import QuickViewModal from '@/components/QuickViewModal';
 import { buildShowcaseCategories, categoryShopLink } from '@/lib/catalogCategories';
+import { sortProducts } from '@/lib/productSort';
 
 /**
  * Faixas que não entram na página inicial: os destaques já têm a secção própria logo acima
@@ -63,21 +64,24 @@ export default function CatalogShowcase({ onCartOpen }) {
 
   const rails = useMemo(() => {
     if (!products.length) return [];
-    const disponivel = (p) => (p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0 ? 1 : 0);
-    // Em cada prateleira, os que se podem comprar já vêm primeiro.
-    const porDisponibilidade = (list) => [...list].sort((a, b) => disponivel(b) - disponivel(a));
-    const novidades = [...products].sort((a, b) => (b.order || 0) - (a.order || 0));
+    // A ordem é a mesma da loja (lib/productSort.js). Importa porque cada prateleira tem um
+    // "Ver todos" que leva à loja com esse critério: ordenar aqui de outra maneira fazia a
+    // prateleira e a página a que ela leva mostrarem listas diferentes com o mesmo nome.
+    //
+    // "Novidades" é a chegada à livraria (`created`), não o ano de publicação — era por este
+    // que a prateleira ordenava, e um clássico reeditado este mês contava como de 1950.
+    // Os esgotados vão para o fim em qualquer critério, o que já era a intenção aqui.
     return [
       {
         id: 'novidades',
         title: 'Novidades',
         description: 'Os títulos mais recentes da livraria',
-        books: porDisponibilidade(novidades.slice(0, 12)),
+        books: sortProducts(products, 'newest').slice(0, 12),
         shopLink: '/shop?sort=newest',
       },
       ...buildShowcaseCategories(products)
         .filter((cat) => !HIDDEN_ON_HOME.has(cat.id))
-        .map((cat) => ({ ...cat, books: porDisponibilidade(cat.books), shopLink: categoryShopLink(cat) })),
+        .map((cat) => ({ ...cat, books: sortProducts(cat.books, 'featured'), shopLink: categoryShopLink(cat) })),
     ];
   }, [products]);
 

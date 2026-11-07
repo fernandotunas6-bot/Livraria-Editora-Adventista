@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (809, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (826, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1320,6 +1320,31 @@ isso caem os quatro problemas de uma vez, e a colecção recebeu também a barra
 O **84** fechou com `lib/optionalColumns.js`: a decisão de enviar ou não uma coluna que nasceu
 numa migração passa a viver num sítio só, com `delete` em vez de um spread que nunca apagava
 nada, e com testes.
+
+### Terceira ronda (mesmo dia): o resto dos sítios com o mesmo padrão
+
+Os achados 85 a 87 vieram de procurar, no resto do código, o padrão que os causou — uma
+conversão ou uma ordenação escrita à mão onde já havia uma partilhada. A varredura encontrou
+mais quatro sítios.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 88 | **As prateleiras da página inicial continuavam a ordenar pelo ano de publicação.** O achado 77 foi corrigido na loja, nas categorias e nas colecções, mas a prateleira "Novidades" da página inicial, os "Destaques da Semana" e a lista curta do "Mais para si" ficaram com `(b.order) - (a.order)`. Pior: o "Ver todos" da prateleira aponta para `/shop?sort=newest`, que depois da correcção ordena por chegada — **a prateleira e a página a que ela leva passaram a mostrar listas diferentes com o mesmo nome**, por causa da própria correcção. | Média | ✅ as três usam `sortProducts` |
+| 89 | **O painel oferecia cinco critérios de ordenação quando a loja já tinha oito**, com nomes diferentes ("Preço ↑" no painel, "Preço: do menor" na loja). Era uma cópia da lista escrita à mão em `SettingsTab`. Quem configurasse a loja não conseguia pô-la a abrir pelas promoções nem pelos mais procurados. | Baixa | ✅ lê de `SORT_OPTIONS` |
+| 90 | **A pesquisa de livros devolvia resultados pela ordem da base de dados, não por relevância.** O `searchProducts` pedia `-featured,title` com o limite aplicado **pela base de dados**: com `limit` 6 — é o que o selector de livros da comunidade usa — os seis que voltavam eram "os mais destacados, por ordem alfabética" de entre os que combinam, e o livro que a pessoa escreveu podia nem estar lá. A pesquisa do cabeçalho já ordenava por relevância; esta não. | Média | ✅ pede um grupo maior e ordena por `getSearchRelevance` |
+| 91 | **O botão da barra do topo e o botão de cada slide tinham o mesmo problema do achado 74.** `settings.header_cta_link` e `slide.cta_link` são escritos no painel e iam directos para `<Link to>`. Verificado com as versões deste projecto que o **React Router 7 passa `javascript:`, `data:` e `//outro-site` intactos para o `href`** — como o React 18.3 faz com o `href` directo. | Média | ✅ `components/SafeLink.jsx` |
+
+**91 — um componente em vez de três correcções.** O site tem três sítios onde um endereço
+escrito no painel vira ligação: as colunas do rodapé, o botão da barra do topo e o botão de
+cada slide. Os três estavam expostos, e corrigir cada um à sua maneira voltaria a divergir.
+Ficou um `SafeLink`: o endereço passa pelo `safeLinkUrl`, e é o próprio endereço que decide
+se vai para o `<Link>` do Router ou para um `<a target="_blank">` — nunca uma etiqueta ao
+lado dele. O que for recusado não vira ligação nenhuma: fica o texto, para quem escreveu a
+configuração ver que ali há algo por corrigir.
+
+Dois dos testes do `SafeLink.test.jsx` não testam o nosso código: testam o React e o Router,
+e documentam a razão de o componente existir. Se um dia as bibliotecas passarem a filtrar
+isto sozinhas, esses testes falham e dizem-no.
 
 ### Acessibilidade
 
