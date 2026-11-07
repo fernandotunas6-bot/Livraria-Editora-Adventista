@@ -1,0 +1,30 @@
+{
+  "_": "Casos partilhados entre colporteurCommission.test.js e o teste SQL de private.colporteur_pct (PGlite). Mudar a regra obriga a mudar os dois lados.",
+  "basePct": 10,
+  "colporteurs": { "asp": "aspirante", "lic": "licenciado", "x": "aspirante" },
+  "rules": [
+    { "id": "r1", "category": null, "product_type": null, "sale_mode": null, "pct": 20, "valid_from": "2026-01-01", "valid_to": null },
+    { "id": "r2", "category": "licenciado", "product_type": null, "sale_mode": null, "pct": 30, "valid_from": "2026-01-01", "valid_to": null },
+    { "id": "r3", "category": "licenciado", "product_type": "biblia", "sale_mode": null, "pct": 25, "valid_from": "2026-01-01", "valid_to": null },
+    { "id": "r4", "category": null, "product_type": null, "sale_mode": "site", "pct": 15, "valid_from": "2026-01-01", "valid_to": null },
+    { "id": "r5", "category": "licenciado", "product_type": null, "sale_mode": "site", "pct": 35, "valid_from": "2026-01-01", "valid_to": null },
+    { "id": "r6", "category": null, "product_type": null, "sale_mode": "consignacao", "pct": 40, "valid_from": "2025-01-01", "valid_to": "2025-12-31" }
+  ],
+  "overrides": [
+    { "id": "o1", "colporteur": "x", "product_type": null, "sale_mode": null, "pct": 50, "valid_from": "2026-03-01", "valid_to": null },
+    { "id": "o2", "colporteur": "x", "product_type": "livro", "sale_mode": "consignacao", "pct": 55, "valid_from": "2026-03-01", "valid_to": null }
+  ],
+  "cases": [
+    { "colporteur": "asp", "productType": "livro", "saleMode": "consignacao", "date": "2026-06-01", "pct": 20, "source": "regra", "why": "só a regra geral" },
+    { "colporteur": "asp", "productType": "livro", "saleMode": "site", "date": "2026-06-01", "pct": 15, "source": "regra", "why": "o modo é mais específico do que nada" },
+    { "colporteur": "lic", "productType": "livro", "saleMode": "consignacao", "date": "2026-06-01", "pct": 30, "source": "regra", "why": "a categoria pesa mais" },
+    { "colporteur": "lic", "productType": "biblia", "saleMode": "consignacao", "date": "2026-06-01", "pct": 25, "source": "regra", "why": "categoria + tipo" },
+    { "colporteur": "lic", "productType": "biblia", "saleMode": "site", "date": "2026-06-01", "pct": 25, "source": "regra", "why": "categoria + tipo (6) ganha a categoria + modo (5)" },
+    { "colporteur": "lic", "productType": "livro", "saleMode": "site", "date": "2026-06-01", "pct": 35, "source": "regra", "why": "categoria + modo" },
+    { "colporteur": "asp", "productType": "livro", "saleMode": "consignacao", "date": "2025-06-01", "pct": 40, "source": "regra", "why": "regra antiga ainda em vigor nessa data" },
+    { "colporteur": "asp", "productType": "livro", "saleMode": "consignacao", "date": "2024-06-01", "pct": 10, "source": "base", "why": "antes de qualquer regra: a base" },
+    { "colporteur": "x", "productType": "livro", "saleMode": "consignacao", "date": "2026-06-01", "pct": 55, "source": "excepcao", "why": "excepção mais específica" },
+    { "colporteur": "x", "productType": "biblia", "saleMode": "site", "date": "2026-06-01", "pct": 50, "source": "excepcao", "why": "excepção geral ganha a qualquer regra" },
+    { "colporteur": "x", "productType": "livro", "saleMode": "consignacao", "date": "2026-02-01", "pct": 20, "source": "regra", "why": "a excepção ainda não começou" }
+  ]
+}
