@@ -12,6 +12,7 @@ import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import MegaMenu from '@/components/header/MegaMenu';
+import NotificationBell from '@/components/NotificationBell.jsx';
 import UserAvatar from '@/components/UserAvatar';
 import { UserMenu, GuestAuthButton } from '@/components/UserMenu';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
@@ -305,6 +306,8 @@ const Header = ({ onCartOpen, pinned = false }) => {
               </TooltipTrigger>
               <TooltipContent side="bottom">Ver Carrinho de Compras</TooltipContent>
             </Tooltip>
+
+            <NotificationBell className="text-white/80 hover:text-white hover:bg-white/10" />
 
             {isAuthed ? (
               <>

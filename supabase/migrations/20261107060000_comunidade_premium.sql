@@ -591,6 +591,35 @@ as $$
   limit 501;
 $$;
 
+-- Respostas de várias publicações (para os cartões do feed), a oficial primeiro em cada uma.
+create or replace function public.community_list_replies(p_parent_ids text[])
+returns table (
+  id text, parent_id text, book_id text, body text, quote text, quote_page text, links jsonb,
+  likes_count int, replies_count int, created timestamptz, updated timestamptz, last_activity_at timestamptz,
+  topic text, kind text, pinned boolean, is_official boolean,
+  author_name text, author_key text, author_is_staff boolean, mine boolean,
+  book_title text, book_author text, book_cover text
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select c.id, c.parent_id, c.book_id, c.body, c.quote, c.quote_page, c.links,
+         c.likes_count, c.replies_count, c.created, c.updated, coalesce(c.last_activity_at, c.created),
+         c.topic, c.kind, false, c.is_official,
+         left(coalesce(nullif(btrim(p.name), ''), 'Leitor'), 100), p.reader_key,
+         coalesce(p.role in ('admin', 'manager'), false),
+         coalesce(c.user_id = (select auth.uid()), false),
+         null::text, null::text, null::text
+  from public.community_posts c
+  left join public.profiles p on p.id = c.user_id
+  where not c.hidden
+    and c.parent_id = any(coalesce(p_parent_ids[1:100], array[]::text[]))
+  order by c.parent_id, c.is_official desc, c.created asc
+  limit 500;
+$$;
+
 -- Perfil público de um leitor: nome, desde quando, actividade e selos. Sem email nem fotografia.
 create or replace function public.community_reader(p_key text)
 returns table (
@@ -684,12 +713,14 @@ $$;
 revoke all on function public.community_current_club() from public;
 revoke all on function public.community_list(text, text, text, text, text, timestamptz, int, int) from public;
 revoke all on function public.community_thread(text) from public;
+revoke all on function public.community_list_replies(text[]) from public;
 revoke all on function public.community_reader(text) from public;
 revoke all on function public.community_reader_posts(text, timestamptz, int) from public;
 revoke all on function public.community_sidebar() from public;
 grant execute on function public.community_current_club() to anon, authenticated;
 grant execute on function public.community_list(text, text, text, text, text, timestamptz, int, int) to anon, authenticated;
 grant execute on function public.community_thread(text) to anon, authenticated;
+grant execute on function public.community_list_replies(text[]) to anon, authenticated;
 grant execute on function public.community_reader(text) to anon, authenticated;
 grant execute on function public.community_reader_posts(text, timestamptz, int) to anon, authenticated;
 grant execute on function public.community_sidebar() to anon, authenticated;
