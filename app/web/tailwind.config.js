@@ -24,6 +24,19 @@ module.exports = {
         foreground: "hsl(var(--foreground))",
         // Cor viva da marca, só para decoração (ver --marca em index.css).
         marca: "hsl(var(--marca))",
+        // Paleta editorial da comunidade: a dos emails da loja (supabase/functions/app/emails.ts).
+        // `ouro` é só para filetes e ícones; o texto dourado usa `ouro-texto` (contraste AA).
+        editorial: {
+          papel: "#fffdf8",
+          tela: "#f6f1e6",
+          filete: "#ebe1c9",
+          ouro: "#b8892f",
+          "ouro-texto": "#7a5716",
+          tinta: "#1d2a3f",
+          "tinta-suave": "#5c6574",
+          marinho: "#141e33",
+          petroleo: "#0a748f",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

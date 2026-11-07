@@ -8,6 +8,7 @@ import {
   Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell, FileDown
 } from 'lucide-react';
 import MyDownloads from '@/components/downloads/MyDownloads';
+import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
@@ -59,7 +60,7 @@ const ProfilePage = () => {
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
   const [searchParams, setSearchParams] = useSearchParams();
-  const PROFILE_TABS = ['orders', 'pdfs', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
+  const PROFILE_TABS = ['orders', 'pdfs', 'notifications', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
@@ -338,6 +339,7 @@ const ProfilePage = () => {
               <TabsList className="mb-6 flex flex-wrap gap-2">
                 <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
                 <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
+                <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" />Notificações</TabsTrigger>
                 <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Definições</TabsTrigger>
                 <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" />Segurança</TabsTrigger>
                 <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" />Lista de Desejos</TabsTrigger>
@@ -447,6 +449,10 @@ const ProfilePage = () => {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="notifications">
+                <NotificationsTab userId={user?.id} />
               </TabsContent>
 
               <TabsContent value="settings">

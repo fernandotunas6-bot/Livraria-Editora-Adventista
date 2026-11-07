@@ -130,7 +130,9 @@ const Footer = () => {
   }, {});
 
   return (
-    <footer className={`text-background ${settings.ui_glass_enabled !== false ? 'glass-surface-dark' : 'bg-foreground'}`}>
+    // Fundo sólido sempre: por baixo do rodapé não há nada para desfocar, e o "vidro" sobre o
+    // fundo claro deixava-o cinzento, com o texto abaixo do contraste mínimo (3,4:1).
+    <footer className="bg-foreground text-background">
       <div className="container-custom section-spacing">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-12">
           <div className="lg:col-span-4">
@@ -201,7 +203,7 @@ const Footer = () => {
 
                     <form onSubmit={handleNewsletterSubmit} className="space-y-3">
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-background/40" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-background/70" />
                         <Input
                           type="email"
                           aria-label="Email para receber novidades"
@@ -210,7 +212,7 @@ const Footer = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="bg-background/5 border-background/10 text-background placeholder:text-background/40 pl-10 focus-visible:ring-marca focus-visible:border-marca h-11 rounded-xl"
+                          className="bg-background/5 border-background/10 text-background placeholder:text-background/70 pl-10 focus-visible:ring-marca focus-visible:border-marca h-11 rounded-xl"
                         />
                       </div>
                       <Button 
@@ -274,7 +276,7 @@ const Footer = () => {
                 onChange={(e) => setTrackNumber(e.target.value)}
                 placeholder="Nº da encomenda"
                 aria-label="Número da encomenda"
-                className="bg-background/10 border-background/20 text-background placeholder:text-background/40"
+                className="bg-background/10 border-background/20 text-background placeholder:text-background/70"
               />
               <Input
                 type="email"
@@ -282,7 +284,7 @@ const Footer = () => {
                 onChange={(e) => setTrackEmail(e.target.value)}
                 placeholder="Email da compra"
                 aria-label="Email usado na compra"
-                className="bg-background/10 border-background/20 text-background placeholder:text-background/40"
+                className="bg-background/10 border-background/20 text-background placeholder:text-background/70"
               />
               <Button type="submit" className="btn-primary shrink-0" disabled={!trackNumber.trim()}>
                 Seguir
@@ -366,7 +368,7 @@ const Footer = () => {
                         <div className="p-3">
                           <p className="font-medium text-sm">{store.name}</p>
                           <p className="text-xs text-background/60 mt-1">{store.address}</p>
-                          {store.hours && <p className="text-xs text-background/50 mt-1">{store.hours}</p>}
+                          {store.hours && <p className="text-xs text-background/70 mt-1">{store.hours}</p>}
                           {store.maps_url && (
                             <a
                               href={store.maps_url}
@@ -399,7 +401,7 @@ const Footer = () => {
         )}
 
         <div className="border-t border-background/20 pt-8 text-center">
-          <p className="text-sm text-background/50">{copyright}</p>
+          <p className="text-sm text-background/70">{copyright}</p>
         </div>
       </div>
     </footer>

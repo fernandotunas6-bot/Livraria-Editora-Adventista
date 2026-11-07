@@ -20,6 +20,8 @@
 // app/web/.env ou das variáveis de ambiente. Se a base de dados não responder, o passo 1
 // faz-se na mesma e o deploy segue só sem os passos 2 e 3.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { ROUTES, headersFor } from './partilha-comunidade.mjs';
 import path from 'node:path';
 import {
   bookShareDescription, isSafeId, isSafeSlug, plainSummary, renderSharePage, rewriteSiteUrl, sitemapEntry, SITE_NAME,
@@ -151,4 +153,18 @@ try {
   process.exit(1);
 }
 for (const [name, html] of pages) write(name, html);
+
+// 4. Partilha das publicações da comunidade: a Pages Function (functions/comunidade/p/[id].js)
+// lê a configuração deste ficheiro gerado (fora do git) e só corre em /comunidade/p/*. As
+// respostas das Functions não recebem o `_headers`, por isso os cabeçalhos de segurança vão
+// com a configuração.
+const security = headersFor(read('_headers'));
+if (!security['Content-Security-Policy']) {
+  console.error('✘ _headers sem Content-Security-Policy em /*: a Function sairia sem ela');
+  process.exit(1);
+}
+const generated = path.join(path.dirname(fileURLToPath(import.meta.url)), 'gerado');
+mkdirSync(generated, { recursive: true });
+writeFileSync(path.join(generated, 'pages-config.mjs'), `// Gerado por scripts/seo-catalogo.mjs. Não editar nem versionar.\nexport default ${JSON.stringify({ supabaseUrl: api, supabaseKey: key, headers: security }, null, 2)};\n`);
+write('_routes.json', `${JSON.stringify(ROUTES, null, 2)}\n`);
 console.log(`→ sitemap e partilha: ${bookList.length} livros e ${collectionList.length} colecções`);

@@ -7,13 +7,15 @@ import { deletePost, isMissingTable, loadModerationQueue, restorePost, setHidden
 import { linkHost } from '@/lib/communityLinks';
 import { relativeTime } from '@/lib/communityText';
 import BlockedDomainsPanel from '@/components/admin/BlockedDomainsPanel';
+import { ClubsPanel, PostsPanel, TopicsPanel } from '@/components/admin/CommunityStaffPanels';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
  * Moderação da comunidade: publicações denunciadas ou ocultas. À terceira denúncia a base de
  * dados oculta sozinha; aqui a equipa decide se volta a mostrar (e limpa as denúncias), se a
  * deixa oculta ou se a apaga.
  */
-export default function CommunityTab() {
+function ReportsPanel({ onMissing }) {
   const { toast } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,12 +28,12 @@ export default function CommunityTab() {
       setItems(await loadModerationQueue());
       setMissing(false);
     } catch (e) {
-      if (isMissingTable(e)) setMissing(true);
+      if (isMissingTable(e)) { setMissing(true); onMissing?.(); }
       else toast({ variant: 'destructive', title: 'Não foi possível carregar', description: e.message });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, onMissing]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -56,7 +58,7 @@ export default function CommunityTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Comunidade: denúncias</h2>
+          <h3 className="text-base font-semibold">Denúncias</h3>
           <p className="text-sm text-muted-foreground">Publicações denunciadas ou ocultas. Com 3 denúncias ficam ocultas até decidir.</p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -110,8 +112,37 @@ export default function CommunityTab() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
 
-      <BlockedDomainsPanel />
+const SECTIONS = [
+  ['denuncias', 'Denúncias'],
+  ['publicacoes', 'Publicações'],
+  ['temas', 'Temas'],
+  ['clube', 'Clube do livro'],
+  ['sites', 'Sites bloqueados'],
+];
+
+/** Painel da comunidade: moderação, publicações, temas, clube do livro e sites bloqueados. */
+export default function CommunityTab() {
+  const [section, setSection] = useState('denuncias');
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Comunidade</h2>
+        <p className="text-sm text-muted-foreground">Moderar, destacar e organizar a comunidade de leitores.</p>
+      </div>
+      <Tabs value={section} onValueChange={setSection}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          {SECTIONS.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
+        </TabsList>
+        <TabsContent value="denuncias" className="pt-2"><ReportsPanel /></TabsContent>
+        <TabsContent value="publicacoes" className="pt-2"><PostsPanel /></TabsContent>
+        <TabsContent value="temas" className="pt-2"><TopicsPanel /></TabsContent>
+        <TabsContent value="clube" className="pt-2"><ClubsPanel /></TabsContent>
+        <TabsContent value="sites" className="pt-2"><BlockedDomainsPanel /></TabsContent>
+      </Tabs>
     </div>
   );
 }

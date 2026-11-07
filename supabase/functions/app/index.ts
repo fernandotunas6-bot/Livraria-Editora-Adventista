@@ -16,6 +16,7 @@ import {
 } from "./chatEngine.ts";
 import { buildKnowledge, knowledgeText, kz } from "./chatKnowledge.ts";
 import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
+import { communityPushPlan, communityPushUrl, type CommunityNotice } from "./communityPush.ts";
 import {
   DUTY_OF_ALERT, dispatchPlan, hoursFromRow, isOpenAt, openMinutesBetween, staffPrefs, ticketSlaBreach,
   type Duty, type OpsHours, type Severity,
@@ -2989,6 +2990,48 @@ async function dispatchCustomerSupportNotifications(limit = 50) {
 }
 
 /**
+ * Avisos da comunidade (respostas, respostas oficiais, gostos agrupados): só push, ao próprio
+ * autor, e só se não desligou os avisos no perfil. Os gostos esperam 30 minutos (communityPush.ts).
+ */
+async function dispatchCommunityNotifications(limit = 100) {
+  const { data: pending, error } = await db.from("customer_notifications")
+    .select("id, customer_id, title, body, href, read_at, created_at")
+    .is("dispatched_at", null).eq("kind", "community").order("created_at", { ascending: true }).limit(limit);
+  if (error) {
+    console.log("dispatchCommunityNotifications:", error.message);
+    return { pending: 0, sent: 0 };
+  }
+  if (!pending?.length) return { pending: 0, sent: 0 };
+  const ids = [...new Set(pending.map((n: Row) => String(n.customer_id)))];
+  const [{ data: people }, settings] = await Promise.all([
+    db.from("profiles").select("id, community_notify").in("id", ids),
+    getSettings(),
+  ]);
+  const notify = new Map<string, boolean>((people || []).map((p: Row) => [String(p.id), p.community_notify !== false]));
+  const now = Date.now();
+  let sent = 0;
+  let handled = 0;
+  for (const n of pending as Row[]) {
+    const plan = communityPushPlan(n as CommunityNotice, { now, notify: notify.get(String(n.customer_id)) ?? true });
+    if (plan === "wait") continue;
+    const { data: claimed } = await db.from("customer_notifications").update({ dispatched_at: nowISO() })
+      .eq("id", n.id).is("dispatched_at", null).select("id");
+    if (!claimed?.length) continue;
+    handled++;
+    if (plan === "skip") continue;
+    try {
+      const pushed = await sendUserPush(String(n.customer_id), settings, {
+        title: String(n.title || "Comunidade"), body: clipText(String(n.body || ""), 160), url: communityPushUrl(n.href),
+      });
+      if (pushed > 0) sent++;
+    } catch (err) {
+      console.log("aviso da comunidade:", (err as Error)?.message || err);
+    }
+  }
+  return { pending: handled, sent };
+}
+
+/**
  * Envia por email, WhatsApp e push os avisos à equipa ainda por enviar (os do painel já lá
  * estão). Canais por tipo e gravidade (opsRouting.ts) e pelas preferências das equipas de cada
  * pessoa. Fora do horário só sai o crítico; o resto fica para a abertura. Cada canal tem a sua
@@ -3123,9 +3166,11 @@ route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
-  const [staff, customers] = await Promise.all([dispatchStaffNotifications(), dispatchCustomerSupportNotifications()]);
-  if (staff.pending || customers.pending) console.log("Avisos (cron):", JSON.stringify({ staff, customers }));
-  return json({ ...staff, customers });
+  const [staff, customers, community] = await Promise.all([
+    dispatchStaffNotifications(), dispatchCustomerSupportNotifications(), dispatchCommunityNotifications(),
+  ]);
+  if (staff.pending || customers.pending || community.pending) console.log("Avisos (cron):", JSON.stringify({ staff, customers, community }));
+  return json({ ...staff, customers, community });
 });
 
 const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];
