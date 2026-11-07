@@ -6,6 +6,7 @@ import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import CommunityFeed from '@/components/community/CommunityFeed';
+import UnreadNotices from '@/components/community/UnreadNotices';
 import { ClubBanner, CommunityHero, CommunitySidebar, FeedToolbar, MobileHighlights, TopicNav } from '@/components/community/CommunityParts';
 import { loadCurrentClub, loadSidebar, loadTopics } from '@/lib/communityApi';
 import { filtersFromSearch, searchFromFilters } from '@/lib/communityStyle';
@@ -86,6 +87,7 @@ export default function CommunityPage() {
             </div>
 
             <div className="min-w-0 space-y-4" ref={feedRef}>
+              <UnreadNotices />
               <ClubBanner club={!filters.book && !filters.topic ? club : null} />
               {!filters.book && !filters.topic && !filters.query && <MobileHighlights sidebar={sidebar} />}
               {activeTopic && (

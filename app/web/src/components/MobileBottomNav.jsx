@@ -1,9 +1,11 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, LayoutGrid, MessagesSquare, ShoppingCart, User } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
+import { useNotifications } from '@/hooks/useNotifications';
 import { activeTab, bottomNavVisible, requestCartOpen } from '@/lib/mobileNav';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +27,7 @@ export default function MobileBottomNav() {
   const { pathname } = useLocation();
   const isMobile = useIsMobile();
   const { cartItems } = useCart();
+  const isAuthed = !!useAuth()?.isAuthed;
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   // A folha só é descarregada na primeira vez que se abre, e depois fica montada (para a
   // animação de fechar funcionar).
@@ -35,6 +38,8 @@ export default function MobileBottomNav() {
   // categorias aberta fica sempre.
   const hidden = useHideOnScroll(visible && !categoriesOpen);
   const cartCount = cartItems.reduce((n, item) => n + (item.quantity || 0), 0);
+  // Respostas e gostos por ler: o mesmo estado do sino (sem outro pedido à rede).
+  const { unreadCommunity } = useNotifications({ enabled: visible && isAuthed });
 
   useEffect(() => {
     const raiz = document.documentElement;
@@ -75,8 +80,20 @@ export default function MobileBottomNav() {
             <LayoutGrid className="h-5 w-5" aria-hidden="true" />
             Categorias
           </button>
-          <Link to="/comunidade" className={cn(item, cor(tab === 'comunidade'))} aria-current={tab === 'comunidade' ? 'page' : undefined}>
-            <MessagesSquare className="h-5 w-5" aria-hidden="true" />
+          <Link
+            to="/comunidade"
+            className={cn(item, cor(tab === 'comunidade'))}
+            aria-current={tab === 'comunidade' ? 'page' : undefined}
+            aria-label={unreadCommunity > 0 ? `Comunidade, ${unreadCommunity} ${unreadCommunity === 1 ? 'aviso' : 'avisos'} por ler` : undefined}
+          >
+            <span className="relative">
+              <MessagesSquare className="h-5 w-5" aria-hidden="true" />
+              {unreadCommunity > 0 && (
+                <span className="absolute -right-2 -top-1.5 min-w-[1.1rem] rounded-full bg-[#dc2626] px-1 text-center text-[10px] font-bold leading-[1.1rem] text-white tabular-nums" aria-hidden="true">
+                  {unreadCommunity > 9 ? '9+' : unreadCommunity}
+                </span>
+              )}
+            </span>
             Comunidade
           </Link>
           <button

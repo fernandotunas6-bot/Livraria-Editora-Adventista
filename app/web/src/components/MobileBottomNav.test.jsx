@@ -10,6 +10,16 @@ let mobile = true;
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mobile }));
 vi.mock('@/hooks/useCart', () => ({ useCart: () => ({ cartItems: [{ quantity: 2 }, { quantity: 1 }] }) }));
 vi.mock('@/api/EcommerceApi', () => ({ getProducts: vi.fn(async () => ({ products: [] })) }));
+let authed = false;
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: authed ? { id: 'u1' } : null, isAuthed: authed }) }));
+const loadNotifications = vi.fn(async () => [
+  { id: 'a', kind: 'community', read_at: null },
+  { id: 'b', kind: 'community', read_at: null },
+  { id: 'c', kind: 'support', read_at: null },
+  { id: 'd', kind: 'community', read_at: '2026-11-07T10:00:00Z' },
+]);
+vi.mock('@/lib/communityApi', () => ({ loadNotifications, markAllNotificationsRead: vi.fn(), markNotificationRead: vi.fn() }));
+const { resetNotificationsStore } = await import('@/hooks/useNotifications');
 
 const { default: MobileBottomNav } = await import('./MobileBottomNav');
 
@@ -24,9 +34,10 @@ async function mount(path) {
 const nav = () => document.querySelector('nav[aria-label="Navegação principal"]');
 const button = (text) => [...document.querySelectorAll('nav button, nav a')].find((b) => b.textContent.includes(text));
 
-beforeEach(() => { mobile = true; });
+beforeEach(() => { mobile = true; authed = false; loadNotifications.mockClear(); });
 afterEach(() => {
   act(() => root?.unmount());
+  resetNotificationsStore();
   host?.remove();
   document.documentElement.style.removeProperty('--barra-navegacao');
 });
@@ -60,5 +71,20 @@ describe('MobileBottomNav', () => {
     act(() => button('Carrinho').click());
     expect(cart).toHaveBeenCalledOnce();
     window.removeEventListener(OPEN_CART_EVENT, cart);
+  });
+
+  it('mostra as respostas da comunidade por ler (só as da comunidade) e sem sessão não pede nada', async () => {
+    await mount('/');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(loadNotifications).not.toHaveBeenCalled();
+    expect(button('Comunidade').getAttribute('aria-label')).toBeNull();
+    act(() => root.unmount());
+
+    authed = true;
+    await mount('/');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(loadNotifications).toHaveBeenCalledOnce();
+    expect(button('Comunidade').getAttribute('aria-label')).toBe('Comunidade, 2 avisos por ler');
+    expect(button('Comunidade').textContent).toContain('2');
   });
 });
