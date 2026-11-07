@@ -18,6 +18,8 @@ import RichTextEditor from '@/components/admin/RichTextEditor';
 import ImageField from '@/components/admin/ImageField';
 import StockHistory from '@/components/admin/StockHistory';
 import { useIntegrations } from '@/hooks/useIntegrations';
+import { isYoutubeUrl } from '@/lib/youtube';
+import ProductVideo from '@/components/ProductVideo';
 import { isUploadPending } from '@/lib/mediaUpload';
 
 const PLACEHOLDER_COVER = '/images/site/capa-por-definir.webp';
@@ -88,6 +90,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
       sample_pages: samplePages.filter(Boolean),
       versions: Array.isArray(form.versions) ? form.versions : [],
       preview_enabled: !!form.preview_enabled,
+      video_url: (form.video_url || '').trim(),
     });
   };
 
@@ -473,7 +476,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                   </Button>
                 </TabsContent>
 
-                <TabsContent value="media" className="space-y-4 mt-0">
+                <TabsContent value="media" className="space-y-6 mt-0">
                   <ImageField
                     label="Capa do Livro"
                     gallery="capa"
@@ -485,6 +488,40 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                     driveConfig={driveImageConfig}
                     uploadFolder="stock_books"
                   />
+
+                  {/* Vídeo de apresentação. Fica aqui, ao lado da capa, porque é a outra
+                      imagem que o produto tem. Só YouTube: é onde estão os vídeos da
+                      livraria, e a loja mostra-os sem cookies e sem custo para quem não os
+                      abre (ver lib/youtube.js). */}
+                  <div className="space-y-2">
+                    <Label htmlFor="campo-video">Vídeo de apresentação (YouTube)</Label>
+                    <Input
+                      id="campo-video"
+                      value={form.video_url || ''}
+                      onChange={(e) => set('video_url', e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      aria-describedby="ajuda-video"
+                      aria-invalid={!!form.video_url?.trim() && !isYoutubeUrl(form.video_url) ? 'true' : undefined}
+                    />
+                    {form.video_url?.trim() && !isYoutubeUrl(form.video_url) ? (
+                      <p id="ajuda-video" className="text-sm text-destructive">
+                        Não parece um endereço do YouTube. Cole o link da barra de endereço do
+                        vídeo, ou o do botão «Partilhar». Se gravar assim, o produto fica sem vídeo.
+                      </p>
+                    ) : (
+                      <p id="ajuda-video" className="text-xs text-muted-foreground">
+                        Aceita os endereços normais, os de <code>youtu.be</code> e os dos Shorts.
+                        Na ficha do produto aparece a miniatura com «play»; o vídeo só é
+                        descarregado quando o cliente o abre. Deixe vazio para não ter vídeo.
+                      </p>
+                    )}
+                    {isYoutubeUrl(form.video_url) && (
+                      <div className="pt-1">
+                        <p className="mb-2 text-xs font-medium text-muted-foreground">Como fica na ficha:</p>
+                        <ProductVideo url={form.video_url} title={form.title || 'Vídeo do produto'} className="max-w-md" />
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="stats" className="space-y-4 mt-0">

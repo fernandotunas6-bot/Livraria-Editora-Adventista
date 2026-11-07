@@ -1183,3 +1183,120 @@ novo, Firebase autorizado, as três migrações aplicadas, PR #1 integrado no `m
    português (achado 26).
 3. Telefones, coordenadas das lojas, descrições e stock real.
 4. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
+
+## 9.14 Análise crítica: segurança, visual, rodapé, navegação e sugestões (2026-11-07)
+
+Passagem pedida sobre o sistema todo, com peso nos pontos nomeados: segurança, visual em
+telemóvel e computador, os contextos em que o rodapé aparece, a navegação dos livros, a
+sugestão inteligente, o organizador de produtos e os links do YouTube.
+
+**Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
+projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
+advisors. O que foi feito: leitura do código, `npm test` (803, eram 753), `npm run lint`,
+`npm run build`, `scripts/verificar-segredos.mjs`, e **Chromium com a API do Supabase
+simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
+chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
+erros de consola, 0 pedidos falhados, 0 scroll horizontal, um `h1` por página.
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 74 | **`footer_columns` podia pôr um `href="javascript:…"` no rodapé de todas as páginas.** As colunas do rodapé são JSON escrito no painel (permissão "Configurações") e iam directas para `<a href>`. Confirmado nesta sessão que o **React 18.3 não bloqueia** um href destes: escreve um aviso na consola e rende o atributo tal e qual. | Média | ✅ `lib/safeLink.js` |
+| 75 | **A ordenação por preço ignorava as promoções.** Ordenava por `price_in_cents` (preço de tabela): um livro de 8 000 Kz em promoção a 1 900 ficava atrás de um de 4 000 em "do menor para o maior", com 1 900 escrito no cartão. | Média (vendas) | ✅ `lib/productSort.js` |
+| 76 | **"Novidades" ordenava ao contrário na página de categoria.** A loja fazia `(b.order) - (a.order)`, a categoria `(a.order) - (b.order)`: o mesmo critério, com o mesmo nome no ecrã, mostrava os livros mais antigos primeiro numa página e os mais recentes na outra. | Média | ✅ ordenação única |
+| 77 | **"Novidades" não era novidade nenhuma.** O `order` é `ano × 1000` — o ano de publicação, não a chegada à livraria. Um clássico reeditado este mês contava como de 1950, e dois livros do mesmo ano ficavam empatados sem desempate (ordem instável entre carregamentos, com livros a repetir-se ou a desaparecer entre páginas). | Média | ✅ passa a usar `created` |
+| 78 | **O `?sort=` era apagado do endereço.** O `useProductFilters` reescreve o endereço a partir dos filtros e não conhecia o `sort`: um link como `/shop?sort=newest` (que o painel lateral do "Mais para si" já usava) funcionava à chegada e perdia o parâmetro logo a seguir. | Baixa | ✅ a ordenação vive no endereço |
+| 79 | **No telemóvel, a política de privacidade era inalcançável a partir das páginas principais.** Início, loja, categorias e colecções escondem o rodapé (`hidden md:block`), e a barra inferior só tem Início, Categorias, Pesquisar, Carrinho e Conta. A única ligação para a política está no rodapé. Com o grosso do tráfego a entrar por telemóvel, a maioria das visitas nunca via a política, nem os métodos de pagamento, nem os portes grátis, nem as lojas. | Alta (legal/negócio) | ✅ `components/FooterCompact.jsx` |
+| 80 | **Molduras do Google Maps no rodapé de todas as páginas.** Uma por loja com coordenadas, criadas sempre, para um mapa no fim da página a que quase ninguém chega: peso em cada página vista e a Google a saber de cada visita, sem ninguém pedir mapa. | Média (desempenho/privacidade) | ✅ botão "Mostrar o mapa" |
+| 81 | **A página de categoria estava atrás da loja em tudo.** Três critérios de ordenação em vez de oito, sem contagem de resultados, sem vista em lista, e o painel de filtros do telemóvel sem Escape, sem fechar ao tocar fora e sem `role="dialog"` — correcções que a loja recebeu em passagens anteriores e que esta página não acompanhou. Faltava-lhe também o `min-w-0` que foi o achado 68. | Média | ✅ barra partilhada |
+| 82 | **As sugestões ignoravam a colecção e o autor.** No site (`lib/discovery.js`) a semelhança era "mesma categoria ou mesmo autor", sem graus; no servidor (`suggestions.ts`) era só o género. As colecções desta livraria são séries — quem leu o primeiro volume quer o segundo —, e nenhum dos dois lados sabia disso. A ficha do livro também não tinha nenhuma prateleira de livros parecidos: só o histórico da pessoa e o catálogo inteiro. | Média (vendas) | ✅ pontuação por sinais |
+| 83 | **A chave do Google Maps Embed vai na resposta pública `/settings`.** É inevitável (vai no endereço da moldura), mas obriga a restringi-la por *referenciador HTTP* na Google Cloud, senão qualquer pessoa a usa e gasta a quota da conta. Não está escrito em lado nenhum que isso foi feito. | Média | ⏳ dono (Google Cloud) |
+| 84 | Em `SettingsTab`, o padrão de detectar colunas novas (`'coluna' in r`) não protege de facto: o `...form` no início do payload põe sempre a chave, e o spread condicional a seguir só a substitui. Vale para `about_top_image_url`, `unpaid_cancel_days` e `chat_ai_daily_limit`. Nunca mordeu porque as migrações estão aplicadas há muito. | Baixa | ⏳ (o campo novo desta passagem usa `delete`, que funciona) |
+
+### Verificado sem problemas
+
+- **Nada de novo no modelo de segurança.** As 77 funções `security definer` com `search_path`
+  fechado, a RLS, as guardas das rotas da Edge Function, o MFA nos dois lados e o
+  `place_order` continuam como as passagens 9.8 a 9.12 os deixaram; releitura sem achados
+  novos nessas zonas.
+- **CSP**: continua sem `unsafe-inline` em scripts. A entrada nova é
+  `https://www.youtube-nocookie.com` em `frame-src`, e só essa — o `youtube.com` normal fica
+  de fora.
+- **Nenhum segredo versionado** (scanner limpo em 743 ficheiros).
+- **Sem regressões**: 803 testes, lint, build e o scanner passam.
+
+### O que foi feito
+
+**Organizador de produtos** (`lib/productSort.js`, `components/catalog/CatalogToolbar.jsx`).
+Uma só ordenação para a loja, as categorias e as colecções, com oito critérios em vez dos
+cinco da loja e dos três da categoria: Destaques, Novidades, Mais procurados, Maior desconto,
+Preço (nos dois sentidos) e Título (A–Z e Z–A). Três regras valem em todos:
+
+1. o que está esgotado vai para o fim, em qualquer critério — uma loja não abre a lista com o
+   que não pode vender, e o primeiro de "preço do menor" passa a ser o mais barato *que se
+   pode comprar*;
+2. o preço que ordena é o que o cliente paga, não o de tabela (achado 75);
+3. o desempate é sempre o mesmo (título, depois id), para a ordem não mudar entre
+   carregamentos (achado 77).
+
+Juntou-se o **agrupamento por tipo de produto** ("Por tipo"), que separa livros, bíblias,
+material de igreja e vestuário em secções próprias. Só aparece quando a lista tem mais do que
+um tipo: um título "Livros" por cima de uma lista de livros não diz nada a ninguém.
+
+**Links do YouTube** (`lib/youtube.js`, `components/ProductVideo.jsx`, migração
+`video_do_produto`). Campo "Vídeo de apresentação" em Livros → Mídia, com pré-visualização no
+próprio painel, e um separador "Vídeo" na ficha do produto. Três decisões:
+
+- **nada do que está na base de dados vai para o `src`**: o `parseYoutube` extrai um
+  identificador de 11 caracteres e **constrói** o endereço; um valor que não reconheça devolve
+  `null` e o separador desaparece, em vez de abrir uma moldura para um sítio desconhecido;
+- **`youtube-nocookie.com`**, que não escreve cookies de publicidade — o domínio normal
+  escreve-os só por a moldura existir, e isso obrigaria a um aviso de cookies que a loja não
+  tem;
+- **a moldura só é criada ao carregar na miniatura**: um `iframe` do YouTube são mais de
+  500 KB e vários pedidos à Google, e quem abre a ficha de um livro quase nunca vem pelo
+  vídeo. Com ligações a pagar por MB, carregá-la a todos é gastar dinheiro do visitante.
+
+Também um **canal do YouTube** nas Configurações, ao lado do Facebook e do Instagram, para o
+rodapé.
+
+**Sugestões** (`lib/discovery.js`, `suggestions.ts`, migração `sugestoes_com_colecao`). Passa
+a haver pontuação, nos dois lados e com os mesmos pesos:
+
+```
+pontos = Σ  peso_do_sinal × peso_da_semelhança
+```
+
+Sinais: carrinho (5) > lista de desejos (3) > visita recente (2) > visita (1) — quem tem um
+livro no carrinho está a comprar agora; quem abriu uma página pode ter chegado lá por um
+link. Semelhanças: colecção (4) > autor (3) > género (2) > faixa de preço (1). O preço entra
+porque decide a compra: a quem vê livros de 2 000 Kz não se põe à frente uma Bíblia de estudo
+de 25 000. Cada sugestão sabe explicar-se numa frase ("Da mesma colecção").
+
+Na ficha do livro entra a prateleira que faltava — **"Quem leu este, procurou também"**,
+parecidos com *este* livro e não com o histórico —, antes dos vistos recentemente e do
+catálogo a continuar. É a ordem de quem está em frente a uma prateleira: o livro ao lado, o
+que já tinha na mão, a loja toda.
+
+**Rodapé.** O compacto do telemóvel (achado 79) leva o essencial que a barra inferior não
+tem: portes e pagamentos em duas linhas, quatro atalhos (Rastrear, Lojas, WhatsApp,
+Devoluções) e a política de privacidade. O completo continua a ser só do computador — no
+telemóvel são mais de dois ecrãs no fim de uma lista infinita, e foi por isso que o tiraram.
+Os mapas passam a botão (achado 80), as ligações passam pelo `safeLinkUrl` (achado 74) e os
+ícones das redes ganharam nome acessível.
+
+### Ordem de publicação
+
+As duas migrações primeiro (o Actions aplica-as no merge), depois a Edge Function, depois o
+site. O código aguenta a ordem trocada: sem a coluna `video_url`, o campo não é enviado (ver
+`lib/bookSave.js`) e gravar livros continua a funcionar; sem a coluna `youtube`, o campo nem
+aparece no painel; a Edge Function antiga ignora o `collection_id` novo da `suggestable_books`.
+
+### Por fazer (dono)
+
+1. **Restringir a chave do Google Maps Embed por referenciador** na Google Cloud (achado 83),
+   aos domínios `livrariaadventista.com` e `www.livrariaadventista.com`.
+2. Preencher o **canal do YouTube** em Configurações → Contacto, se existir.
+3. Os pontos abertos das passagens anteriores (SMTP, telefones, descrições, DNSSEC, alertas)
+   continuam como estão: nada nesta passagem os altera.

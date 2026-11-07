@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Facebook, Instagram, Mail, MapPin, ExternalLink, Sparkles, CheckCircle2, PackageSearch, Truck, CreditCard, Store, MessageCircle } from 'lucide-react';
+import { Facebook, Instagram, Youtube, Mail, MapPin, ExternalLink, Sparkles, CheckCircle2, PackageSearch, Truck, CreditCard, Store, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,7 @@ import { subscribeNewsletter } from '@/api/EcommerceApi';
 import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
 import { BRAND } from '@/lib/brand';
+import { isInternalLink, safeLinkUrl } from '@/lib/safeLink';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Só caminhos que existem no App.jsx. O separador do perfil vai no URL (/profile?tab=…),
@@ -46,18 +47,69 @@ const DEFAULT_FOOTER_COLUMNS = [
   },
 ];
 
+const ESTILO_LINK = 'block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors';
+
+/**
+ * Uma ligação de uma coluna do rodapé.
+ *
+ * O endereço vem de `site_settings.footer_columns`, JSON escrito no painel, e passa primeiro
+ * pelo `safeLinkUrl` — ver lá porquê (resumo: o React não trava um `href="javascript:…"`, e
+ * o rodapé está em quase todas as páginas). Um endereço que não passe não vira link nenhum:
+ * fica só o texto, para quem escreveu a configuração ver que ali está algo e ir corrigi-lo.
+ *
+ * Se é interno ou externo decide-se pelo próprio endereço, e não pela etiqueta `internal` do
+ * JSON: um `https://…` marcado como interno ia para o `<Link>` do React Router como se fosse
+ * um caminho desta aplicação.
+ */
 function FooterLink({ link }) {
-  if (link.internal) {
+  const url = safeLinkUrl(link?.url);
+  const rotulo = String(link?.label ?? '');
+  if (!url) return <span className="block py-1.5 text-sm text-background/40">{rotulo}</span>;
+
+  if (isInternalLink(url)) {
+    return <Link to={url} className={ESTILO_LINK}>{rotulo}</Link>;
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={ESTILO_LINK}>
+      {rotulo}
+    </a>
+  );
+}
+
+/**
+ * Mapa de uma loja no rodapé, só depois de alguém o pedir.
+ *
+ * O rodapé está em quase todas as páginas, e isto era um `iframe` do Google Maps por loja,
+ * montado sempre: três lojas com coordenadas eram três molduras do Google em cada página
+ * vista, cada uma com os seus pedidos e os seus cookies, para um mapa que fica no fim da
+ * página e quase ninguém desce até ele. Além do peso, punha a Google a saber de cada visita a
+ * cada página da loja, sem a pessoa pedir mapa nenhum.
+ *
+ * Agora há um botão. Quem quiser o mapa carrega, e o endereço da loja e o link para o Google
+ * Maps continuam ali, em texto, para quem só quer saber onde é.
+ */
+function StoreMap({ store, embedKey, open, onOpen }) {
+  if (!open) {
     return (
-      <Link to={link.url} className="block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
-        {link.label}
-      </Link>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-background/20 bg-background/10 px-2.5 py-1.5 text-xs text-background/80 transition-colors hover:bg-background/20"
+      >
+        <MapPin className="h-3 w-3" aria-hidden="true" /> Mostrar o mapa
+      </button>
     );
   }
   return (
-    <a href={link.url} target="_blank" rel="noopener noreferrer" className="block py-1.5 text-sm text-background/70 hover:text-[#22d3ee] transition-colors">
-      {link.label}
-    </a>
+    <div className="mt-2 aspect-video overflow-hidden rounded-lg border border-background/10">
+      <iframe
+        title={`Mapa ${store.name}`}
+        src={`https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(embedKey)}&q=${encodeURIComponent(`${store.latitude},${store.longitude}`)}&zoom=15`}
+        className="h-full w-full border-0"
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
+    </div>
   );
 }
 
@@ -70,6 +122,8 @@ const Footer = () => {
   const [trackEmail, setTrackEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  // Qual dos mapas das lojas está aberto. Um de cada vez (ver StoreMap).
+  const [mapaAberto, setMapaAberto] = useState(null);
   const { toast } = useToast();
   const { settings } = useSiteSettings();
 
@@ -141,14 +195,19 @@ const Footer = () => {
               {tagline}. Literatura cristã, educação e inspiração para toda a família.
             </p>
             <div className="flex gap-4">
-              {settings.facebook && (
-                <a href={settings.facebook} target="_blank" rel="noopener noreferrer" className="text-background/60 hover:text-[#22d3ee] transition-colors">
+              {safeLinkUrl(settings.facebook) && (
+                <a href={safeLinkUrl(settings.facebook)} target="_blank" rel="noopener noreferrer" aria-label="Página de Facebook da livraria" className="text-background/60 hover:text-[#22d3ee] transition-colors">
                   <Facebook className="h-5 w-5" />
                 </a>
               )}
-              {settings.instagram && (
-                <a href={settings.instagram} target="_blank" rel="noopener noreferrer" className="text-background/60 hover:text-[#22d3ee] transition-colors">
+              {safeLinkUrl(settings.instagram) && (
+                <a href={safeLinkUrl(settings.instagram)} target="_blank" rel="noopener noreferrer" aria-label="Instagram da livraria" className="text-background/60 hover:text-[#22d3ee] transition-colors">
                   <Instagram className="h-5 w-5" />
+                </a>
+              )}
+              {safeLinkUrl(settings.youtube) && (
+                <a href={safeLinkUrl(settings.youtube)} target="_blank" rel="noopener noreferrer" aria-label="Canal do YouTube da livraria" className="text-background/60 hover:text-[#22d3ee] transition-colors">
+                  <Youtube className="h-5 w-5" />
                 </a>
               )}
             </div>
@@ -369,9 +428,9 @@ const Footer = () => {
                           <p className="font-medium text-sm">{store.name}</p>
                           <p className="text-xs text-background/60 mt-1">{store.address}</p>
                           {store.hours && <p className="text-xs text-background/70 mt-1">{store.hours}</p>}
-                          {store.maps_url && (
+                          {safeLinkUrl(store.maps_url) && (
                             <a
-                              href={store.maps_url}
+                              href={safeLinkUrl(store.maps_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="-mb-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-[#22d3ee] hover:underline mt-0.5"
@@ -380,15 +439,12 @@ const Footer = () => {
                             </a>
                           )}
                           {settings.google_maps_embed_key && store.latitude && store.longitude && (
-                            <div className="mt-2 rounded-lg overflow-hidden border border-background/10 aspect-video">
-                              <iframe
-                                title={`Mapa ${store.name}`}
-                                src={`https://www.google.com/maps/embed/v1/place?key=${settings.google_maps_embed_key}&q=${store.latitude},${store.longitude}&zoom=15`}
-                                className="w-full h-full border-0"
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                              />
-                            </div>
+                            <StoreMap
+                              store={store}
+                              embedKey={settings.google_maps_embed_key}
+                              open={mapaAberto === store.id}
+                              onOpen={() => setMapaAberto(store.id)}
+                            />
                           )}
                         </div>
                       </div>

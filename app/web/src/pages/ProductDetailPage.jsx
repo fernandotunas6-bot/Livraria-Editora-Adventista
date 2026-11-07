@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
   XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare,
-  Truck, Wallet, Store,
+  Truck, Wallet, Store, Youtube,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,12 +22,15 @@ import { useReviews } from '@/hooks/useReviews';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
+import { isYoutubeUrl } from '@/lib/youtube';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import SampleReaderModal from '@/components/SampleReaderModal';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import DiscoveryFeed from '@/components/DiscoveryFeed.jsx';
+import RelatedProducts from '@/components/RelatedProducts.jsx';
+import ProductVideo from '@/components/ProductVideo.jsx';
 import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
@@ -250,6 +253,9 @@ function ProductDetailPage() {
     );
   }
 
+  // Separador do vídeo só quando há um endereço do YouTube que se consegue mostrar: um
+  // separador vazio é pior do que separador nenhum.
+  const temVideo = isYoutubeUrl(product?.video_url);
   const price = selectedVariant?.sale_price_formatted ?? selectedVariant?.price_formatted;
   const originalPrice = selectedVariant?.price_formatted;
   const availableStock = selectedVariant ? selectedVariant.inventory_quantity : 0;
@@ -610,6 +616,9 @@ function ProductDetailPage() {
               {hasReadingSample(product) && (
                 <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1.5" />Pré-visualização</TabsTrigger>
               )}
+              {temVideo && (
+                <TabsTrigger value="video"><Youtube className="h-4 w-4 mr-1.5" />Vídeo</TabsTrigger>
+              )}
               {(product.author_bio || product.author_photo) && (
                 <TabsTrigger value="author"><User className="h-4 w-4 mr-1.5" />Sobre o Autor</TabsTrigger>
               )}
@@ -645,6 +654,17 @@ function ProductDetailPage() {
                 )}
               </div>
             </TabsContent>
+
+            {temVideo && (
+              <TabsContent value="video">
+                <div className="max-w-3xl">
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    A apresentação deste produto, pela livraria.
+                  </p>
+                  <ProductVideo url={product.video_url} title={product.title} />
+                </div>
+              </TabsContent>
+            )}
 
             {hasReadingSample(product) && (
               <TabsContent value="preview">
@@ -931,6 +951,14 @@ function ProductDetailPage() {
         onClose={() => setSampleReaderOpen(false)}
         pages={product.sample_pages || []}
         title={product.title}
+      />
+
+      {/* Primeiro o que é parecido com **este** livro (mesma colecção, autor, género), depois
+          o que a pessoa já viu, e só no fim o catálogo a continuar. É a ordem de quem está em
+          frente a uma prateleira: o livro ao lado, o que já tinha na mão, a loja toda. */}
+      <RelatedProducts
+        product={product}
+        onCartOpen={() => setIsCartOpen(true)}
       />
 
       <RecentlyViewed currentId={product.id} />

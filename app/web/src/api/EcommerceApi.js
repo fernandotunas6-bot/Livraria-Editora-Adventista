@@ -5,6 +5,7 @@ import { escapeFilterValue } from '@/lib/sanitizeHtml';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
+import { sanitizeYoutubeUrl } from '@/lib/youtube';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -73,6 +74,14 @@ function bookToProduct(book, collectionsMap = {}) {
     collection_id: collectionId || null,
     collection_title: collectionsMap[collectionId] || null,
     order: book.year ? Number(book.year) * 1000 : 0,
+    // Quando o produto entrou no catálogo. O `order` acima é o ano de publicação, que não é
+    // a mesma coisa: um clássico reeditado este mês é novidade da livraria e não de 1950.
+    // A ordenação "Novidades" usa esta data (ver lib/productSort.js).
+    created: book.created || null,
+    updated: book.updated || null,
+    // O autor também em campo próprio: o `subtitle` serve para o mostrar no cartão, mas as
+    // sugestões e os filtros precisam do nome, não da linha de apresentação.
+    author: book.author || '',
     featured: !!book.featured,
     product_type: book.product_type || 'livro',
     book_code: book.book_code || null,
@@ -93,6 +102,10 @@ function bookToProduct(book, collectionsMap = {}) {
     sample_pages: book.sample_pages || [],
     versions: book.versions || [],
     preview_enabled: !!book.preview_enabled,
+    // Vídeo de apresentação (YouTube). Só sai daqui se for um endereço do YouTube que o
+    // `lib/youtube.js` reconhece: o que está na base de dados nunca vai directo para um
+    // `src` de moldura.
+    video_url: sanitizeYoutubeUrl(book.video_url),
     sales_count: Number(book.sales_count) || 0,
     views_count: Number(book.views_count) || 0,
     stock_low: !!book.stock_low,

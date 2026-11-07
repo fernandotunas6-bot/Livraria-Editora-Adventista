@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Layers, ChevronRight, BookOpen, Filter, X } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import FooterCompact from '@/components/FooterCompact.jsx';
 import ShoppingCart from '@/components/ShoppingCart';
 import ProductCard from '@/components/ProductCard';
 import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
@@ -344,10 +345,13 @@ export default function CollectionsPage() {
         onCartOpen={() => setIsCartOpen(true)} 
       />
 
-      {/* Como na loja: no telemóvel a coleção segue sem rodapé. */}
+      {/* Rodapé completo no computador; no telemóvel a versão curta, com o essencial que a
+          barra inferior não tem (privacidade, rastreio, lojas, devoluções). Ver
+          components/FooterCompact.jsx. */}
       <div className="hidden md:block">
         <Footer />
       </div>
+      <FooterCompact />
     </>
   );
 }

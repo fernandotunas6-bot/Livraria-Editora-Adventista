@@ -72,6 +72,8 @@ const empty = {
   whatsapp: '',
   facebook: '',
   instagram: '',
+  youtube: '',
+
   pwa_enabled: true,
   pwa_name: '',
   pwa_short_name: 'LA',
@@ -179,6 +181,10 @@ export default function SettingsTab() {
   // As imagens da página Sobre dependem da migração `imagens_sobre`. Enquanto as colunas não
   // existirem, os campos não aparecem e não são gravados: enviá-los faria o PostgREST
   // recusar o registo inteiro e partir o gravar das Configurações.
+  // A coluna `youtube` nasce numa migração. Enquanto não estiver aplicada, o campo não é
+  // enviado: um pedido com uma coluna que não existe é recusado pelo PostgREST inteiro, e a
+  // equipa ficava sem gravar configuração nenhuma. É o mesmo padrão das colunas abaixo.
+  const [hasYoutube, setHasYoutube] = useState(false);
   const [hasAboutImages, setHasAboutImages] = useState(false);
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
@@ -201,6 +207,7 @@ export default function SettingsTab() {
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
+        setHasYoutube('youtube' in r);
         setHasAboutImages('about_top_image_url' in r);
         setHasAboutTeam('about_team' in r);
         setHasNewRules('unpaid_cancel_days' in r);
@@ -229,6 +236,7 @@ export default function SettingsTab() {
           whatsapp: r.whatsapp ? formatAngolaPhone(r.whatsapp) : '',
           facebook: r.facebook || '',
           instagram: r.instagram || '',
+          youtube: r.youtube || '',
           pwa_enabled: !!r.pwa_enabled,
           pwa_name: r.pwa_name || '',
           pwa_short_name: r.pwa_short_name || 'LA',
@@ -423,6 +431,11 @@ export default function SettingsTab() {
         await removeImageFromRecord('site_settings', id, 'favicon', 'favicon_url');
         data.favicon_url = '';
       }
+
+      // Canal do YouTube: só com a coluna da migração aplicada. O `...form` acima põe sempre
+      // a chave, por isso não basta um spread condicional — tem de ser apagada, como abaixo.
+      if (hasYoutube) data.youtube = (form.youtube || '').trim();
+      else delete data.youtube;
 
       // Páginas sem os botões flutuantes: só com as colunas da migração, e só chaves conhecidas.
       if (hasFloating) {
@@ -670,6 +683,9 @@ export default function SettingsTab() {
           <div className="space-y-2"><Label>WhatsApp</Label><PhoneInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} /></div>
           <div className="space-y-2"><Label>Facebook URL</Label><Input value={form.facebook} onChange={(e) => set('facebook', e.target.value)} /></div>
           <div className="space-y-2"><Label>Instagram URL</Label><Input value={form.instagram} onChange={(e) => set('instagram', e.target.value)} /></div>
+          {hasYoutube && (
+            <div className="space-y-2"><Label>Canal do YouTube</Label><Input value={form.youtube} onChange={(e) => set('youtube', e.target.value)} placeholder="https://www.youtube.com/@..." /></div>
+          )}
         </TabsContent>
 
         <TabsContent value="pwa" className="space-y-4 max-w-xl">
