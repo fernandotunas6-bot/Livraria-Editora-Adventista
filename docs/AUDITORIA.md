@@ -1157,7 +1157,7 @@ Feita no ramo `claude/quirky-hypatia-wnid2g`, fase a fase, como o dono pediu, nu
 
 ### Decisões e riscos
 
-- **Fixar e marcar oficial só pela equipa com MFA** (`private.is_staff()`), mesmo por SQL directo sem sessão. É a mesma regra que já vale para `hidden`.
+- **Fixar e marcar oficial só pela equipa** (`private.is_staff()`: admin ou gestor, com a verificação em dois passos quando a pessoa a activou), mesmo por SQL directo sem sessão. É a mesma regra que já vale para `hidden`.
 - **Os gostos esperam 30 min antes do push**, para não haver um push por gosto. O aviso no site aparece logo.
 - **As funções públicas antigas ficam** até uma migração de limpeza, para o site anterior não partir na janela do deploy.
 - **A Function usa a chave pública** (a mesma do site) e lê só pela RPC pública, que não devolve publicações ocultas, `user_id` nem email.
