@@ -1,5 +1,5 @@
 /**
- * Código do colportor que trouxe o cliente: chega no link (livrariaadventista.com/?c=CPT-0007,
+ * Código do colportor que trouxe o cliente: chega no link (livrariaadventista.ao/?c=CPT-0007,
  * também ?colportor=) e fica guardado 30 dias neste browser, para o checkout o enviar com a
  * encomenda. Quem decide se conta é a base de dados (só colportores activos); aqui só se aceita
  * o formato. Código puro com o armazenamento injectável, testado em colporteurReferral.test.js.
