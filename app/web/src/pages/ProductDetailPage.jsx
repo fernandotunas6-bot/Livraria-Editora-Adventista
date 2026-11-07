@@ -547,7 +547,7 @@ function ProductDetailPage() {
               </li>
               <li className="flex items-start gap-2.5">
                 <Store className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary hover:underline">ver moradas</Link>.</span>
+                <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary underline underline-offset-2 hover:no-underline">ver moradas</Link>.</span>
               </li>
             </ul>
 

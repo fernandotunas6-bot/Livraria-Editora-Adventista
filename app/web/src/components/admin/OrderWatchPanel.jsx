@@ -158,7 +158,7 @@ export default function OrderWatchPanel({ onOpenOrder }) {
         <div className="rounded-xl border border-primary/30 bg-primary/5">
           <div className="flex items-center gap-2 border-b border-primary/20 p-4">
             <Hand className="h-4 w-4 text-primary" aria-hidden />
-            <h3 className="font-semibold">Por assumir ({data.unacknowledged.length})</h3>
+            <h3 className="text-lg font-semibold">Por assumir ({data.unacknowledged.length})</h3>
             <span className="text-xs text-muted-foreground">Quem assume fica responsável; se ninguém assumir a tempo, sobe às urgências.</span>
           </div>
           <ul className="divide-y divide-primary/10">
