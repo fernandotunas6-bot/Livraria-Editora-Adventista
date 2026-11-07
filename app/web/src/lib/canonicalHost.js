@@ -1,19 +1,23 @@
 /**
- * Um só endereço para a loja: https://livrariaadventista.com.
+ * Um só endereço para a loja: https://livrariaadventista.ao (desde 2026-11-07; antes era o .com).
  *
  * O `www` e o endereço de produção do Cloudflare Pages serviam a loja inteira. Como a sessão,
  * o carrinho e os favoritos ficam guardados por domínio, quem entrava pelo `www` tinha uma
  * sessão e um carrinho à parte (auditoria, 9.6). O `_redirects` do Pages não redirecciona por
  * domínio e o CSP não deixa correr scripts inline, por isso faz-se aqui, no primeiro módulo a
- * correr.
+ * correr. O `.com` (com e sem www) passou a endereço antigo: vem para aqui também, para os
+ * links já partilhados continuarem a dar na loja. O Cloudflare faz o mesmo com um 301 no
+ * servidor (regra de redireccionamento da zona); isto cobre o que a regra ainda não apanhar.
  *
  * Só estes endereços exactos: as pré-visualizações (<ramo>.livraria-editora-adventista-ben.pages.dev)
  * e o localhost ficam como estão. O caminho, a pesquisa e o `#` vão junto — é no `#` que a
  * Google devolve a sessão.
  */
-export const CANONICAL_ORIGIN = 'https://livrariaadventista.com';
+export const CANONICAL_ORIGIN = 'https://livrariaadventista.ao';
 
 const REDIRECT_HOSTS = new Set([
+  'www.livrariaadventista.ao',
+  'livrariaadventista.com',
   'www.livrariaadventista.com',
   'livraria-editora-adventista-ben.pages.dev',
 ]);

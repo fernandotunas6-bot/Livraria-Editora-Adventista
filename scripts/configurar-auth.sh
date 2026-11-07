@@ -91,12 +91,12 @@ json.dump({k: cur.get(k) for k in want}, open(sys.argv[2], "w"), ensure_ascii=Fa
 # que considera válido. Um destino autorizado tem de voltar a ele; um estranho, ao site_url.
 verificar() {
   local falhas=0 destino volta
-  for destino in https://livrariaadventista.com/reset-password https://www.livrariaadventista.com/login \
+  for destino in https://livrariaadventista.ao/reset-password https://www.livrariaadventista.ao/login \
                  https://livraria-editora-adventista-ben.pages.dev/login https://evil.example.com/x; do
     volta=$(curl -s -o /dev/null -w "%{redirect_url}" -H "apikey: $KEY" \
       "$AUTH/verify?token=invalido&type=recovery&redirect_to=$destino" | cut -d'#' -f1)
     case "$destino" in
-      https://evil.*) esperado="https://livrariaadventista.com" ;;
+      https://evil.*) esperado="https://livrariaadventista.ao" ;;
       *) esperado="$destino" ;;
     esac
     if [ "${volta%/}" = "${esperado%/}" ]; then echo "  ✓ $destino → $volta"
@@ -104,7 +104,7 @@ verificar() {
   done
   local google
   google=$(curl -s -o /dev/null -w "%{redirect_url}" -H "apikey: $KEY" \
-    "$AUTH/authorize?provider=google&redirect_to=https://livrariaadventista.com/profile")
+    "$AUTH/authorize?provider=google&redirect_to=https://livrariaadventista.ao/profile")
   case "$google" in
     https://accounts.google.com/*redirect_uri=https%3A%2F%2F$REF.supabase.co%2Fauth%2Fv1%2Fcallback*) echo "  ✓ login Google vai para accounts.google.com com o callback do projecto" ;;
     *) echo "  ✘ login Google: $google"; falhas=$((falhas + 1)) ;;
@@ -147,7 +147,7 @@ case "${1:-}" in
     read -r -p "Pôr esta chave no Supabase (Authentication → Providers → Google)? [s/N] " r
     [ "$r" = "s" ] || { echo "Nada mudado."; exit 0; }
     printf '%s' "$body" | curl -sf -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data @- "$API" >/dev/null
-    echo "Feito. Teste: entrar com a Google em https://livrariaadventista.com/login."
+    echo "Feito. Teste: entrar com a Google em https://livrariaadventista.ao/login."
     ;;
   --verificar)
     decidir_emails
