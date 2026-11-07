@@ -2,6 +2,9 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// O primeiro render (Radix no jsdom) pode passar dos 5 s numa máquina carregada.
+vi.setConfig({ testTimeout: 30000 });
+
 const REG = {
   provinces: [{ id: 'hua', name: 'Huambo', sort_order: 1 }, { id: 'bie', name: 'Bié', sort_order: 2 }],
   municipalities: [{ id: 'm-hua', name: 'Huambo', province: 'hua' }, { id: 'm-cui', name: 'Cuito', province: 'bie' }],
@@ -64,10 +67,10 @@ describe('ChurchRegistryTab', () => {
   });
 
   it('migração por aplicar: explica em vez de rebentar', async () => {
-    api.loadRegistry.mockRejectedValue(new Error('O registo da Igreja ainda não está na base de dados (migração 20261106200000_registo_igreja por aplicar).'));
+    api.loadRegistry.mockRejectedValue(new Error('O registo da Igreja ainda não está na base de dados (migração 20261107100000_registo_igreja por aplicar).'));
     const el = await mount(<ChurchRegistryTab />);
     expect(el.textContent).toContain('Não foi possível ler o registo da Igreja');
-    expect(el.textContent).toContain('20261106200000');
+    expect(el.textContent).toContain('20261107100000');
   });
 });
 

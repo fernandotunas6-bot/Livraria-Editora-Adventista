@@ -1,11 +1,11 @@
 /**
  * Colportores — candidatura pública (Edge Function), painel (base de dados com RLS e funções
- * de 20261106201000_colportores.sql) e a área do próprio colportor.
+ * de 20261107101000_colportores.sql) e a área do próprio colportor.
  */
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
 import { registryError } from '@/lib/churchRegistryApi';
 
-const MIGRATION = 'A colportagem ainda não está na base de dados (migração 20261106201000_colportores por aplicar).';
+const MIGRATION = 'A colportagem ainda não está na base de dados (migração 20261107101000_colportores por aplicar).';
 const EDGE = 'O servidor ainda não tem a candidatura de colportores (Edge Function por publicar).';
 
 export function colporteurError(error) {
@@ -144,3 +144,64 @@ export function applicationLink(churchCn, origin = window.location.origin) {
 
 export const colporteurMe = () => rpc('colporteur_me');
 export const claimInvite = (token) => rpc('colporteur_claim_invite', { p_token: token });
+
+// --- Operações: guias, relatórios, conta corrente -------------------------------------------------
+
+/** Produtos para as guias e os relatórios (preço de capa, stock, tipo). */
+export async function loadBooksForColportage() {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('stock_books')
+      .select('id, title, book_code, price, stock, product_type, versions').order('title').range(from, from + 999);
+    if (error) throw new Error(colporteurError(error));
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return out.map((b) => ({ ...b, hasVariants: Array.isArray(b.versions) && b.versions.length > 0 }));
+}
+
+export async function loadOperations() {
+  const [documents, reports, ledger, overview] = await Promise.all([
+    all('colporteur_documents'),
+    all('colporteur_reports', 'week_start'),
+    all('colporteur_ledger', 'id', true),
+    rpc('colporteur_overview', { p_colporteur: null }),
+  ]);
+  return { documents, reports, ledger, overview: overview || [] };
+}
+
+export const issueDocument = ({ colporteurId, kind, lines, notes = '' }) =>
+  rpc('colporteur_issue_document', { p_colporteur: colporteurId, p_kind: kind, p_lines: lines, p_notes: notes });
+export const saveReport = (report, submit = false, colporteurId = null) =>
+  rpc('colporteur_report_save', { p_report: report, p_submit: submit, p_colporteur: colporteurId });
+export const validateReport = (id) => rpc('colporteur_report_validate', { p_id: id });
+export const returnReport = (id, reason) => rpc('colporteur_report_return', { p_id: id, p_reason: reason });
+export const recordPayment = ({ colporteurId, direction, amount, method = '', reference = '', date = null, notes = '' }) =>
+  rpc('colporteur_record_payment', { p_colporteur: colporteurId, p_direction: direction, p_amount: Number(amount), p_method: method, p_reference: reference, p_date: date, p_notes: notes });
+export const ledgerAdjust = ({ colporteurId, amount, description }) =>
+  rpc('colporteur_ledger_adjust', { p_colporteur: colporteurId, p_amount: Number(amount), p_description: description });
+
+/** A área do colportor: resumo, relatórios, conta e guias (o RLS só dá os seus). */
+export async function loadMyOperations() {
+  const [overview, reports, ledger, documents] = await Promise.all([
+    rpc('colporteur_overview', { p_colporteur: null }),
+    all('colporteur_reports', 'week_start'),
+    all('colporteur_ledger', 'id', true),
+    all('colporteur_documents'),
+  ]);
+  return { overview: overview?.[0] || null, reports, ledger, documents };
+}
+
+/**
+ * Liga ao colportor uma encomenda do site em que o cliente se esqueceu do código. Precisa da
+ * permissão "Encomendas" (RLS); a base de dados confirma o código e recusa se a comissão já entrou.
+ */
+export async function assignOrderToColporteur(orderNumber, code) {
+  const number = String(orderNumber || '').trim().toUpperCase();
+  if (!number) throw new Error('Indique o número da encomenda.');
+  const { data, error } = await supabase.from('orders').update({ colporteur_code: code }).eq('order_number', number).select('id, colporteur_id');
+  if (error) throw new Error(colporteurError(error));
+  if (!data?.length) throw new Error('Encomenda não encontrada, ou sem a permissão "Encomendas".');
+  if (!data[0].colporteur_id) throw new Error('A base de dados não aceitou o código (colportor inactivo, ou é a conta do próprio colportor).');
+  return data[0];
+}

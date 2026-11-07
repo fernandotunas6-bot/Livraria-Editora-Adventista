@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { claimInvite, colporteurMe } from '@/lib/colporteurApi';
 import { CATEGORIES, SALE_MODES, STATUSES } from '@/lib/colporteurCommission';
 import { Pill } from '@/components/admin/igreja/registryUi';
+import ColporteurWorkspace from '@/components/colportagem/ColporteurWorkspace';
 
 const EVENT_TEXT = {
   candidatura: () => 'Candidatura enviada',
@@ -25,8 +26,7 @@ const EVENT_TEXT = {
 
 /**
  * Área do colportor (/colportor). Com ?convite=… liga a conta à ficha aprovada; depois mostra
- * o código, a categoria e as percentagens. Os livros, os relatórios semanais e os pagamentos
- * entram aqui nas próximas fases.
+ * o código, a categoria, as percentagens, o relatório semanal, os livros em mão e a conta.
  */
 export default function ColporteurAreaPage() {
   const { ready, isAuthed } = useAuth();
@@ -135,7 +135,7 @@ export default function ColporteurAreaPage() {
             ))}
           </ul>
         </div>
-        <p className="text-sm text-muted-foreground">Em breve: os livros que tem consigo, o relatório semanal e os pagamentos.</p>
+        {me.status === 'activo' && <ColporteurWorkspace me={me} />}
       </div>
     );
   }

@@ -95,7 +95,7 @@ As categorias seguem a Working Policy da Igreja (FP 70):
 | Licenciado | Cumpriu os requisitos do campo |
 | Credenciado | 12 meses ou mais e os requisitos do campo |
 
-A categoria muda-se na ficha, com motivo. A reclassificação anual (fase 3) vai sugerir as mudanças a partir das horas dos relatórios, com os requisitos em **Definições**. A decisão é sempre da equipa.
+A categoria muda-se na ficha, com motivo. O separador **Reclassificação** sugere as mudanças a partir das horas dos relatórios validados, com os requisitos em **Definições** (ver a secção 3). A decisão é sempre da equipa.
 
 ### Percentagens
 
@@ -112,17 +112,106 @@ Em **Percentagens**:
 
 Enquanto não houver percentagens, todos ficam com 0% e o painel avisa.
 
+## 3. Livros, relatórios e contas
+
+### Guias (separador "Guias e stock")
+
+Há três tipos de guia, cada uma numerada (`GUI-000001`) e imprimível, com espaço para as duas assinaturas:
+
+| Guia | O que faz | Na conta do colportor |
+|---|---|---|
+| **Entrega à consignação** | Os livros saem do stock da loja e ficam a cargo do colportor | + preço de capa |
+| **Devolução** | O colportor devolve livros que tinha à consignação; voltam ao stock da loja | − preço de capa |
+| **Compra com desconto** | O colportor compra os livros com o desconto da sua percentagem e fica com eles | + preço com desconto |
+
+- O preço é sempre o **preço de capa** do catálogo, sem as promoções do site, porque é a esse preço que o colportor vende.
+- Produtos com tamanhos ou variantes (t-shirts, uniformes) não entram em guias.
+- **Limite em consignação:** se o saldo do colportor passar o limite (na ficha dele, ou o das Definições), a entrega é recusada. Com 0 não há limite.
+- Cada movimento fica também no histórico de stock da loja, com o número da guia.
+
+### Relatório semanal
+
+O colportor envia-o na sua área (`/colportor`), pelo telemóvel. A equipa pode lançá-lo por quem não tem telemóvel ("Lançar por um colportor"). O relatório tem:
+
+- horas, casas ou famílias visitadas, orações, literatura oferecida, inscrições em estudos bíblicos, interessados e baptismos (as perguntas do relatório de Evangelismo pela Literatura);
+- **vendas à consignação**: só dos livros que tem em mão, e nunca mais do que tem;
+- **vendas de livros que comprou**: contam para as estatísticas, mas não mexem em dinheiro, porque já os pagou;
+- **interessados** (nome, telefone, bairro), para a equipa encaminhar ao pastor do distrito;
+- notas e experiências da semana.
+
+O fluxo é: rascunho → **enviado** → a equipa **valida** ou **devolve** com o que corrigir.
+
+- Só a validação mexe em valores: as vendas à consignação saem do stock em mão e a comissão entra na conta.
+- A percentagem usada é a que vigorava no **último dia da semana** do relatório.
+- O separador mostra quem não enviou relatório nas duas últimas semanas fechadas.
+
+### Contas (separador "Contas")
+
+Cada colportor tem uma conta corrente:
+
+- **saldo positivo** = deve à Livraria (livros à consignação, ou vendidos e por pagar);
+- **saldo negativo** = a Livraria deve-lhe (por exemplo, comissões de vendas no site).
+
+Exemplo: leva 10 livros de 1 000 Kz (+10 000), vende 6 a 30% (−1 800 de comissão), paga 4 200 (−4 200) e devolve 4 (−4 000). O saldo fica em 0.
+
+- **Registar pagamento:** recebido do colportor, ou pago ao colportor, com o método (numerário, Multicaixa Express, transferência) e a referência.
+- **Correcção à mão:** só com explicação, e fica no extracto.
+- **Extracto** para imprimir, com o saldo depois de cada movimento e os livros em mão. O colportor vê o mesmo extracto na sua área.
+
+### Reclassificação
+
+A Working Policy reclassifica os colportores no início de cada ano. O separador sugere, para cada colportor activo:
+
+- Estudante mantém-se;
+- média abaixo das horas de tempo inteiro (com pelo menos 4 relatórios) → **Tempo parcial**;
+- meses e horas de Credenciado → **Credenciado**; de Licenciado → **Licenciado**.
+
+Os requisitos estão em **Definições**. Cada sugestão aplica-se uma a uma, com o motivo no histórico.
+
+## 4. Vendas no site e resumo
+
+### Vendas no site com o código do colportor
+
+- Cada colportor tem um **link de vendas** na sua área: `livrariaadventista.com/?c=CPT-0007`. Pode copiá-lo ou partilhá-lo por WhatsApp.
+- Quem abre o link fica com o código guardado no browser durante 30 dias. No checkout aparece o campo **"Código do colportor (opcional)"** já preenchido. O cliente também o pode escrever à mão.
+- A base de dados confirma o código. Um código errado, de um colportor que não está activo, ou do próprio colportor a comprar com a sua conta, é ignorado: **nunca impede a compra**, só não dá comissão. Para comprar para si, o colportor usa a guia de compra com desconto.
+- **A comissão entra na conta do colportor quando a encomenda está paga e entregue.** Calcula-se com a percentagem do modo "Venda no site", por tipo de produto, em vigor no dia da encomenda, sobre o valor dos produtos (sem portes).
+- Se depois a encomenda for cancelada ou reembolsada, a comissão é anulada com uma correcção no extracto.
+- O colportor vê as suas encomendas do site (número, data, valor, estado e comissão paga, prevista ou anulada), **sem os dados do cliente**.
+- **Encomenda sem o código:** em Contas → colportor → "Encomenda do site sem o código", com o número da encomenda. Precisa da permissão "Encomendas", e só funciona enquanto a comissão não tiver entrado.
+
+### Resumo
+
+O separador **Resumo** tem:
+
+- os números do momento: colportores activos, candidaturas e relatórios por decidir, livros à consignação e quanto há a receber;
+- uma tabela **por colportor, igreja, distrito, província ou campo**, para este ano, os últimos 3 meses, este mês ou desde o início: horas, visitas, estudos bíblicos, baptismos, vendas e comissões;
+- exportação para Excel.
+
+O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
+
 ## Técnico
 
-- Migração `supabase/migrations/20261106200000_registo_igreja.sql`:
+- Migração `supabase/migrations/20261107100000_registo_igreja.sql`:
   - tabelas `church_fields`, `church_districts`, `churches`, `pastors` e `pastor_assignments`, com RLS;
   - funções `church_assign_pastor`, `church_end_assignment`, `church_merge_districts`, `church_merge_pastors` e `church_registry_import`;
   - permissões `manage_church_registry` e `manage_colporteurs` em `users_admin_update`.
 - A importação é preparada no browser (`app/web/src/lib/churchImport.js`, com testes) e gravada numa só transacção pela função da base de dados.
 - Os testes SQL correram em PGlite: RLS por permissão, geografia coerente, transferência, fusões e importação idempotente.
-- Migração `20261106201000_colportores.sql`:
+- Migração `20261107101000_colportores.sql`:
   - tabelas `colporteurs`, `colporteur_events`, `colporteur_invites` (só o hash do token), `colporteur_commission_rules`, `colporteur_commission_overrides` e `colporteur_settings`;
   - código `CPT-` (4 dígitos) no mesmo contador dos outros códigos, e `normalize_person_code` aceita `cpt7`.
   - Estado, categoria, código e conta só mudam pelas funções `colporteur_set_status`, `colporteur_set_category`, `colporteur_claim_invite` e `colporteur_unlink_account`. Um trigger recusa o resto.
 - A candidatura entra por `POST /colportores/candidatura` na Edge Function: limite de 3 por minuto por IP, campo isco e validação de novo em `colporteur_apply` (só service role). A lista pública de igrejas (`church_directory`) não tem contactos.
 - A percentagem decide-se em `private.colporteur_pct`, com uma cópia em `app/web/src/lib/colporteurCommission.js` para o painel. Os casos de `colporteurCommission.cases.json` correm contra as duas, no vitest e no PGlite.
+- Migração `20261107102000_colportagem_movimentos.sql`:
+  - tabelas `colporteur_documents` (guias), `colporteur_reports`, `colporteur_stock_moves` (stock em mão) e `colporteur_ledger` (conta corrente);
+  - funções `colporteur_issue_document`, `colporteur_report_save`/`_validate`/`_return`, `colporteur_record_payment`, `colporteur_ledger_adjust` e `colporteur_overview`;
+  - as tabelas só se lêem pela API (a equipa tudo, o colportor o seu); escreve-se só pelas funções;
+  - motivos novos em `stock_movements`: `consignacao`, `devolucao_consignacao` e `compra_colportor`.
+- `formata_codigo` deixou de cortar números maiores do que a largura (o funcionário 1000 ficaria `FUN-100`).
+- Migração `20261107103000_colportagem_vendas_site.sql`:
+  - `orders.colporteur_code` e `orders.colporteur_id`; o trigger `orders_colportor_codigo` confirma o código e nunca aceita o id vindo de fora;
+  - o trigger `orders_colportor_comissao` mete a comissão (paga e entregue) ou a anulação (cancelada ou reembolsada) na conta corrente, uma vez por encomenda;
+  - `colporteur_overview` passa a trazer as vendas no site.
+- O checkout (`POST /checkout`) aceita `colporteurCode`. Sem a migração, o `place_order` ignora a coluna, e por isso a Edge Function pode ser publicada antes.

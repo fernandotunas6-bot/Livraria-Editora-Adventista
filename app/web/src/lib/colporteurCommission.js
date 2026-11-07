@@ -1,6 +1,6 @@
 /**
  * Percentagem do colportor. A regra que conta está na base de dados
- * (`private.colporteur_pct`, migração 20261106201000_colportores); esta cópia serve a matriz e
+ * (`private.colporteur_pct`, migração 20261107101000_colportores); esta cópia serve a matriz e
  * a simulação do painel. Os casos de `colporteurCommission.cases.json` correm contra as duas.
  *
  * Ordem:

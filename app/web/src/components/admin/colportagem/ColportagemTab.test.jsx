@@ -2,6 +2,9 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// O primeiro render (Radix no jsdom) pode passar dos 5 s numa máquina carregada.
+vi.setConfig({ testTimeout: 30000 });
+
 globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
 
 const REG = {
@@ -32,6 +35,8 @@ const api = vi.hoisted(() => ({
   loadColporteurAdmin: vi.fn(), setColporteurStatus: vi.fn(), createInvite: vi.fn(), setRule: vi.fn(),
   saveColporteur: vi.fn(), deleteCandidate: vi.fn(), setColporteurCategory: vi.fn(), setOverride: vi.fn(), unlinkAccount: vi.fn(),
   pctPreview: vi.fn(), saveColporteurSettings: vi.fn(),
+  loadOperations: vi.fn(async () => ({ documents: [], reports: [], ledger: [], overview: [] })),
+  loadBooksForColportage: vi.fn(async () => []),
 }));
 vi.mock('@/lib/colporteurApi', async (importOriginal) => ({ ...(await importOriginal()), ...api }));
 vi.mock('@/lib/churchRegistryApi', async (importOriginal) => ({ ...(await importOriginal()), loadRegistry: vi.fn(async () => REG) }));

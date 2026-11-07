@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// O primeiro render (Radix no jsdom) pode passar dos 5 s numa máquina carregada.
+vi.setConfig({ testTimeout: 30000 });
+
 const DIR = {
   churches: [
     { id: '11111111-1111-1111-1111-111111111111', cn: '001', name: 'Central Huambo', district_id: 'd1', district: 'Distrito Centro', province_id: 'hua', municipality_id: 'm-hua' },

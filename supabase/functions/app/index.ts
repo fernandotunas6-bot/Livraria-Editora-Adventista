@@ -1910,6 +1910,11 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     order.delivery_gps_lng = gpsLng;
   }
   if (data.notes && rules.notesMax > 0) order.notes = clip(data.notes, rules.notesMax);
+  // Código do colportor que trouxe a venda (link ?c=CPT-0007 ou escrito no checkout). A base de
+  // dados confirma que é de um colportor activo (trigger orders_colportor_codigo); um código
+  // inválido é ignorado e nunca impede a compra. Sem a migração, o place_order ignora a coluna.
+  const colporteurCode = clip(data.colporteurCode, 20).toUpperCase();
+  if (/^CPT[-\s]?\d{1,6}$/.test(colporteurCode)) order.colporteur_code = colporteurCode;
   if (shippingMethod !== "pickup") {
     Object.assign(order, {
       delivery_province_id: clip(data.deliveryProvinceId, 40),

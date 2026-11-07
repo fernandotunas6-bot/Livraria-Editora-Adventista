@@ -14,6 +14,7 @@ import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
+import { captureReferral } from '@/lib/colporteurReferral';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -129,6 +130,13 @@ function AuthRedirectNotice() {
   return null;
 }
 
+/** Guarda o código do colportor que vem no link (?c=CPT-0007) para o checkout. */
+function ColporteurReferralCapture() {
+  const { search } = useLocation();
+  useEffect(() => { captureReferral(search); }, [search]);
+  return null;
+}
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const showAssistant = pathname !== '/login';
@@ -154,6 +162,7 @@ function App() {
         <AuthDialogProvider>
         <ScrollToTop />
         <AuthRedirectNotice />
+        <ColporteurReferralCapture />
         <RouteErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>

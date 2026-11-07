@@ -30,6 +30,7 @@ import { normalizeAngolaPhone, isValidAngolaPhone } from '@/lib/angolaPhone';
 import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
 import { MOTION } from '@/lib/motion';
 import { OPEN_CART_EVENT } from '@/lib/mobileNav';
+import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
 
 const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { toast } = useToast();
@@ -73,6 +74,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     notes: '',
     shippingMethod: 'delivery',
     pickupStore: '',
+    // Vem do link do colportor (?c=CPT-0007), guardado 30 dias; o cliente também o pode escrever.
+    colporteurCode: getReferral(),
   });
   const [deliveryAddress, setDeliveryAddress] = useState({
     provinceId: '',
@@ -111,6 +114,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
   useEffect(() => {
     if (!isCartOpen) return;
+
+    // O carrinho monta antes de o código do link (?c=CPT-…) ser guardado na primeira visita:
+    // lê-se outra vez ao abrir, sem apagar o que o cliente já escreveu.
+    const referral = getReferral();
+    setForm((f) => (f.colporteurCode || !referral ? f : { ...f, colporteurCode: referral }));
 
     getPaymentMethods().then((res) => {
       const methods = res.methods || [];
@@ -302,6 +310,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         pickupStore: form.pickupStore,
         checkoutSignature,
         ...(gps && form.shippingMethod !== 'pickup' ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng } : {}),
+        ...(normalizeColporteurCode(form.colporteurCode) ? { colporteurCode: normalizeColporteurCode(form.colporteurCode) } : {}),
       };
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
       // servidor gravar), a chave repete-se e o servidor devolve essa encomenda em vez de outra.
@@ -648,6 +657,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   <div className="space-y-2">
                     <Label htmlFor="checkout-notas">Notas (opcional)</Label>
                     <Textarea id="checkout-notas" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Instruções de entrega..." />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="checkout-colportor">Código do colportor (opcional)</Label>
+                    <Input id="checkout-colportor" autoComplete="off" value={form.colporteurCode} onChange={(e) => setForm({ ...form, colporteurCode: e.target.value })} placeholder="CPT-0000" maxLength={12} />
+                    {form.colporteurCode && !normalizeColporteurCode(form.colporteurCode) && (
+                      <p className="text-xs text-destructive">O código tem a forma CPT-0000.</p>
+                    )}
                   </div>
 
                   {form.shippingMethod !== 'pickup' && (

@@ -1,13 +1,13 @@
 /**
  * Registo da Igreja (campos, distritos, igrejas, pastores) — leitura e escrita directas na base
- * de dados, com as regras RLS de `20261106200000_registo_igreja.sql`. As operações que mexem em
+ * de dados, com as regras RLS de `20261107100000_registo_igreja.sql`. As operações que mexem em
  * várias tabelas de uma vez (transferir pastor, fundir, importar) são funções da base de dados,
  * numa só transacção.
  */
 import { supabase } from '@/lib/supabaseClient';
 import { csvSafeText } from '@/lib/orderExport';
 
-const MIGRATION_MISSING = 'O registo da Igreja ainda não está na base de dados (migração 20261106200000_registo_igreja por aplicar).';
+const MIGRATION_MISSING = 'O registo da Igreja ainda não está na base de dados (migração 20261107100000_registo_igreja por aplicar).';
 
 /** Mensagem legível para os erros mais comuns do Postgres. */
 export function registryError(error) {
