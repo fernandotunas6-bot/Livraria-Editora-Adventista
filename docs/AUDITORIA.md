@@ -1362,11 +1362,33 @@ Dois dos testes do `SafeLink.test.jsx` não testam o nosso código: testam o Rea
 e documentam a razão de o componente existir. Se um dia as bibliotecas passarem a filtrar
 isto sozinhas, esses testes falham e dizem-no.
 
+### Quarta ronda (mesmo dia): larguras intermédias
+
+A verificação visual desta passagem só tinha olhado para 1280 e 390 px — e o achado 68 da
+passagem anterior foi exactamente um transbordo a 768. Com a varredura alargada a dezasseis
+larguras (320 a 1536), apareceu um.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 95 | **A linha do cabeçalho não cabe entre 1024 e 1118 px.** Medido no navegador: o logótipo 182 px, o menu de computador 603 e os ícones 276 — 1085 no total, para um contentor de 960 a essa largura. É a faixa onde o menu de computador liga (`lg`, 1024) sem que haja ainda espaço para ele. | Média (visual) | ✅ o logótipo encolhe para o emblema entre `lg` e `xl` |
+
+**Porque é que só se via numa página.** O excesso existia em todas, mas só a ficha do produto
+o mostrava, com uma barra de deslocamento horizontal na página inteira. É a única que usa o
+cabeçalho `sticky` (`<Header pinned>`), ou seja em fluxo: aí o conteúdo que não cabe alarga o
+documento. Nas outras o cabeçalho é `fixed`, preso à largura da janela, e o mesmo excesso
+ficava escondido — um computador portátil de 1024 ou 1080 px de largura, que é o mais comum
+em Angola, via a página saltar ao lado.
+
+O logótipo passa a mostrar só o emblema nessa faixa (o modo compacto que já existia para o
+telemóvel), e o lockup volta a partir de `xl`. Poupa os ~138 px que faltavam: a 1024 px a
+linha passa a precisar de 947 para 960 disponíveis. Verificado nas dezasseis larguras, em oito
+páginas: 0 transbordos.
+
 ### Acessibilidade
 
-`axe-core` (WCAG 2 A/AA) nas sete páginas alteradas, a 1280 e a 390 px — início, loja, loja
+`axe-core` (WCAG 2 A/AA) nas sete páginas alteradas, a 1440, 1280, 1024, 768, 390 e 360 px — início, loja, loja
 agrupada, categoria, colecção, ficha do produto e ficha com o separador de vídeo aberto:
-**0 violações nas 14 passagens**. De caminho, o CSP provou-se sozinho: a primeira tentativa de
+**0 violações nas 42 passagens**. De caminho, o CSP provou-se sozinho: a primeira tentativa de
 injectar o axe como script embutido foi recusada pelo navegador ("Executing inline script
 violates… `script-src`"), e teve de ser servido pela própria origem.
 
