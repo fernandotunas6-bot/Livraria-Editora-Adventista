@@ -12,6 +12,8 @@ import ChatRichMessage from '@/components/assistant/ChatRichMessage';
 import ChatHome from '@/components/assistant/ChatHome';
 import HandoffCard from '@/components/assistant/HandoffCard';
 import SupportRating from '@/components/assistant/SupportRating';
+import { TicketWaiting, useNow } from '@/components/assistant/TeamAvailability';
+import { teamAvailability } from '@/lib/teamHours';
 import SupportCenter from '@/components/SupportCenter';
 import { countUnreadSupportReplies, markThreadNotificationsRead } from '@/lib/supportApi';
 
@@ -104,6 +106,7 @@ export default function LivrariaAssistant() {
   const { user, isAuthed, isAdmin, hasPermission } = useAuth();
   const { settings } = useSiteSettings();
   const { fixedStyle } = useChatPosition();
+  const now = useNow();
 
   const canUseStaffInbox = isAdmin || hasPermission('manage_orders');
   const canUseSupport = isAuthed && (canUseStaffInbox || pathname !== '/login');
@@ -373,6 +376,12 @@ export default function LivrariaAssistant() {
   const welcomeText = chatConfig.welcome || DEFAULT_WELCOME;
   const laid = layoutMessages(messages);
   const lastSpoken = [...messages].reverse().find((m) => m.role === 'bot' || m.role === 'staff');
+  const teamHours = chatConfig.team_hours || null;
+  // Num pedido, o ponto do cabeçalho diz se a equipa está a trabalhar agora (o assistente está sempre).
+  const team = teamAvailability(teamHours, now);
+  const headerDotOn = ticket ? ticket.status !== 'closed' && (team ? team.open : true) : true;
+  // O cliente escreveu e espera pela equipa: diz o que acontece a seguir e quando.
+  const waitingForTeam = !!ticket && ticket.status === 'open' && !sending && lastMessage?.role !== 'staff';
 
   return (
     <div style={fixedStyle} className="flex flex-col items-start gap-2 pointer-events-none">
@@ -433,7 +442,7 @@ export default function LivrariaAssistant() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold leading-tight">{ticket && !onSupport ? 'Equipa da Livraria' : title}</p>
                 <p className="flex items-center gap-1.5 truncate text-xs text-primary-foreground/75">
-                  <span className={`h-1.5 w-1.5 rounded-full ${ticket?.status === 'closed' ? 'bg-white/50' : 'bg-emerald-400'}`} aria-hidden />
+                  <span className={`h-1.5 w-1.5 rounded-full ${headerDotOn ? 'bg-emerald-400' : 'bg-white/50'}`} aria-hidden />
                   {subtitle}
                 </p>
               </div>
@@ -514,6 +523,7 @@ export default function LivrariaAssistant() {
                       disabled={sending}
                       onPick={send}
                       onSearch={() => inputRef.current?.focus()}
+                      teamHours={teamHours}
                     />
                   )}
                   <div className="space-y-1.5">
@@ -551,17 +561,26 @@ export default function LivrariaAssistant() {
                     })}
                   </div>
                   {sending && status === 'bot' && <div className="pt-2"><TypingBubble /></div>}
+                  {/* Os cartões ficam na coluna das bolhas do assistente (depois do avatar). */}
                   {showHandoff && (
-                    <HandoffCard
-                      authed={isAuthed}
-                      orders={session.orders}
-                      whatsapp={chatConfig.whatsapp || settings?.whatsapp || ''}
-                      loginHref={loginHref}
-                      busy={handoff.busy}
-                      error={handoff.error}
-                      onConfirm={confirmHandoff}
-                      onDismiss={() => setHandoff({ dismissedFor: offerKey, forced: false, busy: false, error: '' })}
-                    />
+                    <div className="mt-3 pl-9">
+                      <HandoffCard
+                        authed={isAuthed}
+                        orders={session.orders}
+                        whatsapp={chatConfig.whatsapp || settings?.whatsapp || ''}
+                        loginHref={loginHref}
+                        busy={handoff.busy}
+                        error={handoff.error}
+                        onConfirm={confirmHandoff}
+                        onDismiss={() => setHandoff({ dismissedFor: offerKey, forced: false, busy: false, error: '' })}
+                        teamHours={teamHours}
+                      />
+                    </div>
+                  )}
+                  {waitingForTeam && (
+                    <div className="mt-3 pl-9">
+                      <TicketWaiting hours={teamHours} authed={isAuthed} />
+                    </div>
                   )}
                   {newBelow && (
                     <div className="pointer-events-none sticky bottom-1 z-10 flex justify-center">
@@ -576,9 +595,11 @@ export default function LivrariaAssistant() {
                   )}
                   {ticket?.status === 'closed' && (
                     ticket.can_rate && isAuthed ? (
-                      <SupportRating compact threadId={ticket.id} onRated={() => refreshSession({ quiet: true })} />
+                      <div className="mt-3 pl-9">
+                        <SupportRating compact threadId={ticket.id} onRated={() => refreshSession({ quiet: true })} />
+                      </div>
                     ) : (
-                      <p className="text-center text-xs text-muted-foreground">
+                      <p className="mt-3 text-center text-xs text-muted-foreground">
                         Pedido resolvido{ticket.csat_score ? ' e avaliado — obrigado' : ''}. Se escrever, começa uma nova conversa.
                       </p>
                     )

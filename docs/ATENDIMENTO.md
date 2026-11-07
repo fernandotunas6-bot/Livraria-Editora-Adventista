@@ -125,3 +125,11 @@ externas, só livros do catálogo e as regras de passagem à equipa aplicam-se s
 - **"Nova mensagem":** se o cliente estiver a ler mais acima quando chega uma resposta, a
   conversa não salta; aparece um botão para descer. As respostas são anunciadas aos leitores de
   ecrã.
+- **Horário da equipa:** o atalho "Falar com a equipa" e o cartão de passagem dizem se a equipa
+  está disponível agora ou quando volta ("Volta na segunda-feira às 08h"), com o horário de
+  Equipas e alertas. Fora de horas, o cliente sabe que o pedido fica guardado. Num pedido à espera
+  da equipa, uma nota por baixo da última mensagem diz quando respondem e que pode fechar o chat;
+  o ponto do cabeçalho fica cinzento fora de horas. O servidor envia o horário em
+  `/chat/config` e o site calcula "agora" (`lib/teamHours.js`), para a cache não o desactualizar.
+- **Endereços clicáveis:** links e emails escritos pela equipa abrem (os links num separador
+  novo); nas respostas do assistente só os emails, porque as ligações externas são filtradas.

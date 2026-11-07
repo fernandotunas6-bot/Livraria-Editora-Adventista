@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Headset, Loader2, LogIn, MessageCircle } from 'lucide-react';
+import TeamAvailability from '@/components/assistant/TeamAvailability';
 
 /** Número de WhatsApp em formato wa.me (só dígitos, com o indicativo de Angola se faltar). */
 export function whatsappHref(number) {
@@ -16,7 +17,7 @@ export function whatsappHref(number) {
  * WhatsApp. Nada sai sem o cliente confirmar, como nos sistemas de atendimento de referência.
  */
 export default function HandoffCard({
-  authed, orders = [], whatsapp = '', loginHref, onConfirm, onDismiss, busy = false, error = '',
+  authed, orders = [], whatsapp = '', loginHref, onConfirm, onDismiss, busy = false, error = '', teamHours = null,
 }) {
   const [details, setDetails] = useState('');
   const [orderId, setOrderId] = useState('');
@@ -31,6 +32,7 @@ export default function HandoffCard({
         <p className="mt-1 text-muted-foreground">
           Entre na sua conta para a equipa lhe responder aqui. Esta conversa fica guardada e passa consigo.
         </p>
+        <TeamAvailability hours={teamHours} className="mt-2.5" closedNote="" />
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             to={loginHref}
@@ -67,6 +69,7 @@ export default function HandoffCard({
       <p className="text-muted-foreground">
         A equipa recebe esta conversa inteira e responde-lhe aqui. Também recebe um aviso na sua conta.
       </p>
+      <TeamAvailability hours={teamHours} />
       {orders.length > 0 && (
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-foreground">É sobre uma encomenda?</span>

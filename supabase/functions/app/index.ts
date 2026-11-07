@@ -3715,7 +3715,7 @@ function chatProvider(settings: Row | null): { use: "gemini" | "deepseek"; key: 
 }
 
 route("GET", "/chat/config", async () => {
-  const settings = await getSettings();
+  const [settings, hours] = await Promise.all([getSettings(), opsHours()]);
   const ai = chatProvider(settings);
   // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
   return publicJson({
@@ -3723,6 +3723,9 @@ route("GET", "/chat/config", async () => {
     ai: !!ai, provider: ai?.use || "faq", welcome: settings?.chat_welcome || "",
     // O cliente sabe, antes de pedir, se a equipa responde por aqui (precisa de conta).
     handoff: true, whatsapp: settings?.whatsapp || "",
+    // Horário da equipa (Equipas e alertas), em hora de Luanda: o site diz "disponível agora" ou
+    // "volta amanhã às 08h". Vai o horário e não o "aberto agora", que a cache deixaria velho.
+    team_hours: { open_hour: hours.openHour, close_hour: hours.closeHour, open_days: hours.openDays },
   });
 });
 

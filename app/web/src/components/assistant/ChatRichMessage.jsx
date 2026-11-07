@@ -18,6 +18,37 @@ const PATH_LABELS = {
 // Sem lookbehind: o Safari antes do iOS 16.4 recusa-o e o chat inteiro deixava de carregar.
 const TOKEN = /\*\*([^*]+)\*\*|(^|[^\w/])(\/(?:shop|track|contact|faq|shipping-returns|lojas|profile|login))(?![\w/-])/g;
 
+// Endereços escritos no texto ficam clicáveis. Ligações web só nas mensagens da equipa: as do
+// assistente são filtradas no servidor para não levarem o cliente para fora do site, e um
+// endereço que escapasse ao filtro não pode ganhar um link. Emails, em ambas (o de contacto).
+const AUTO_LINK = /\bhttps?:\/\/[^\s<>"']+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gi;
+
+export function linkify(text, { urls = false, keyPrefix = 'l' } = {}) {
+  const s = String(text || '');
+  const out = [];
+  let at = 0;
+  for (const m of s.matchAll(AUTO_LINK)) {
+    const web = /^https?:/i.test(m[0]);
+    if (web && !urls) continue;
+    // A pontuação do fim da frase não faz parte do endereço.
+    const addr = web ? m[0].replace(/[.,;:!?)\]]+$/, '') : m[0];
+    if (m.index > at) out.push(s.slice(at, m.index));
+    out.push(
+      <a
+        key={`${keyPrefix}${m.index}`}
+        href={web ? addr : `mailto:${addr}`}
+        {...(web ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}
+        className="break-all font-medium underline underline-offset-2"
+      >
+        {addr}
+      </a>,
+    );
+    at = m.index + addr.length;
+  }
+  if (at < s.length) out.push(s.slice(at));
+  return out;
+}
+
 export function formatText(text) {
   if (!text) return null;
   const s = String(text);
@@ -26,7 +57,7 @@ export function formatText(text) {
   for (const m of s.matchAll(TOKEN)) {
     const [whole, bold, before, path] = m;
     const start = m.index + (path ? before.length : 0);
-    if (start > at) out.push(s.slice(at, start));
+    if (start > at) out.push(...linkify(s.slice(at, start), { keyPrefix: `t${at}-` }));
     if (bold !== undefined) {
       out.push(<strong key={m.index}>{bold}</strong>);
     } else {
@@ -38,7 +69,7 @@ export function formatText(text) {
     }
     at = m.index + whole.length;
   }
-  if (at < s.length) out.push(s.slice(at));
+  if (at < s.length) out.push(...linkify(s.slice(at), { keyPrefix: `t${at}-` }));
   return out;
 }
 
@@ -102,7 +133,7 @@ export default function ChatRichMessage({
         <div className="min-w-0 max-w-[85%] space-y-0.5">
           {showAvatar && <p className="text-[11px] font-semibold text-emerald-700">{message.author || 'Equipa'} · Equipa</p>}
           <div className="whitespace-pre-line break-words rounded-2xl rounded-tl-md border border-emerald-600/25 bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
-            {message.text}
+            {linkify(message.text, { urls: true })}
           </div>
           <Time time={time} />
         </div>

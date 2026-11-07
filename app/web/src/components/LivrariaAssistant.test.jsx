@@ -74,7 +74,16 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
+  vi.useRealTimers();
 });
+
+// Horário por omissão do servidor (Luanda = UTC+1) e um relógio fixo: só o Date é falso, os
+// temporizadores continuam reais para o act() e o flush().
+const TEAM_HOURS = { open_hour: 8, close_hour: 18, open_days: [1, 2, 3, 4, 5, 6] };
+const clockAt = (iso) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(iso));
+};
 
 describe('LivrariaAssistant', () => {
   it('visitante: boas-vindas e sugestões; ao pedir a equipa, convite para entrar (com regresso ao chat) e WhatsApp', async () => {
@@ -292,5 +301,79 @@ describe('LivrariaAssistant', () => {
     // O balão de texto fica só com a primeira frase: o cartão já mostra o pagamento e o rastreio.
     const bubbles = [...host.querySelectorAll('.whitespace-pre-line')].map((n) => n.textContent);
     expect(bubbles.some((t) => t.includes('Código de rastreio'))).toBe(false);
+  });
+
+  it('horário da equipa: fora de horas, o atalho diz quando volta e o cartão de passagem também', async () => {
+    clockAt('2026-11-07T19:00:00Z'); // sábado, 20h em Luanda
+    api.fetchChatConfig.mockResolvedValue({ ...CONFIG, team_hours: TEAM_HOURS });
+    await mount('/');
+    await openChat();
+    expect(button('Falar com a equipa').textContent).toContain('Volta na segunda-feira às 08h');
+    api.sendChatMessage.mockResolvedValue({
+      conversation: { id: 't1', status: 'bot' },
+      messages: [{ id: 1, role: 'user', text: 'Falar com a equipa' }, bot(2, 'Posso passar esta conversa à equipa.', { offer_handoff: true })],
+    });
+    await act(async () => button('Falar com a equipa').click());
+    await flush();
+    expect(text()).toContain('A equipa volta na segunda-feira às 08h. Segunda a sábado, das 08h às 18h.');
+  });
+
+  it('pedido aberto à espera da equipa: diz quando respondem e que pode fechar o chat', async () => {
+    clockAt('2026-11-06T09:00:00Z'); // sexta, 10h em Luanda
+    Object.assign(auth, { user: { id: 'u1' }, isAuthed: true });
+    api.fetchChatConfig.mockResolvedValue({ ...CONFIG, team_hours: TEAM_HOURS });
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't1', status: 'open', ticket_number: 1004 },
+      messages: [
+        { id: 1, role: 'user', text: 'Paguei e continua pendente' },
+        { id: 2, role: 'system', text: 'Pedido de ajuda #1004 aberto.' },
+      ],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    await openChat();
+    const note = host.querySelector('[role="status"]');
+    expect(note.textContent).toContain('A aguardar resposta da equipa');
+    expect(note.textContent).toContain('A equipa está disponível (até às 18h).');
+    expect(note.textContent).toContain('avisamos na sua conta');
+  });
+
+  it('a equipa já respondeu: sem nota de espera', async () => {
+    Object.assign(auth, { user: { id: 'u1' }, isAuthed: true });
+    api.fetchChatConfig.mockResolvedValue({ ...CONFIG, team_hours: TEAM_HOURS });
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't1', status: 'pending', ticket_number: 1004 },
+      messages: [{ id: 1, role: 'user', text: 'Olá' }, { id: 2, role: 'staff', text: 'Bom dia!', author: 'Ana' }],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    await openChat();
+    expect(text()).not.toContain('A aguardar resposta da equipa');
+  });
+
+  it('endereços clicáveis: links e emails da equipa; do assistente, só o email', async () => {
+    Object.assign(auth, { user: { id: 'u1' }, isAuthed: true });
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't1', status: 'pending', ticket_number: 1004 },
+      messages: [
+        bot(1, 'Escreva para apoio@livraria.ao ou veja https://exemplo.com/x.'),
+        { id: 2, role: 'staff', author: 'Ana', text: 'Pague aqui: https://pagar.ao/ref/123. Dúvidas: ana@livraria.ao.' },
+      ],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    await openChat();
+    const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('https://pagar.ao/ref/123');
+    expect(hrefs).toContain('mailto:ana@livraria.ao');
+    expect(hrefs).toContain('mailto:apoio@livraria.ao');
+    expect(hrefs).not.toContain('https://exemplo.com/x');
+    const pay = host.querySelector('a[href="https://pagar.ao/ref/123"]');
+    expect(pay.getAttribute('target')).toBe('_blank');
+    expect(pay.getAttribute('rel')).toContain('noopener');
+    expect(text()).toContain('https://pagar.ao/ref/123. Dúvidas');
   });
 });
