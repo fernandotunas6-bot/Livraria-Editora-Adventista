@@ -155,6 +155,9 @@ const AdminPage = () => {
         throw new Error('A promoção tem de terminar depois de começar.');
       }
       if (editingBook) {
+        // Vídeo apagado no formulário: o `sanitizeBookPayload` não envia o campo quando está
+        // vazio (ver lá o porquê), por isso é aqui que se diz explicitamente para o limpar.
+        if (editingBook.video_url && !payload.video_url) payload.video_url = '';
         // O formulário leva o stock que leu ao abrir. Uma venda feita entretanto (o checkout
         // desconta-o na base de dados) era apagada ao gravar outra coisa qualquer, como a
         // descrição. Stock não mexido não vai no pedido; stock mexido confere primeiro o actual.

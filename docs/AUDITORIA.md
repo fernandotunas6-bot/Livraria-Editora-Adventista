@@ -1183,3 +1183,363 @@ novo, Firebase autorizado, as três migrações aplicadas, PR #1 integrado no `m
    português (achado 26).
 3. Telefones, coordenadas das lojas, descrições e stock real.
 4. MFA nas contas de admin, DNSSEC, email do domínio e alertas (ver 9.4). Projecto antigo no `pages.dev`.
+
+## 9.14 Análise crítica: segurança, visual, rodapé, navegação e sugestões (2026-11-07)
+
+Passagem pedida sobre o sistema todo, com peso nos pontos nomeados: segurança, visual em
+telemóvel e computador, os contextos em que o rodapé aparece, a navegação dos livros, a
+sugestão inteligente, o organizador de produtos e os links do YouTube.
+
+**Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
+projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
+advisors. O que foi feito: leitura do código, `npm test` (949, eram 753; o main trouxe 81), `npm run lint`,
+`npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
+Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
+chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
+erros de consola, 0 pedidos falhados, 0 scroll horizontal, um `h1` por página.
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 74 | **`footer_columns` podia pôr um `href="javascript:…"` no rodapé de todas as páginas.** As colunas do rodapé são JSON escrito no painel (permissão "Configurações") e iam directas para `<a href>`. Confirmado nesta sessão que o **React 18.3 não bloqueia** um href destes: escreve um aviso na consola e rende o atributo tal e qual. | Média | ✅ `lib/safeLink.js` |
+| 75 | **A ordenação por preço ignorava as promoções.** Ordenava por `price_in_cents` (preço de tabela): um livro de 8 000 Kz em promoção a 1 900 ficava atrás de um de 4 000 em "do menor para o maior", com 1 900 escrito no cartão. | Média (vendas) | ✅ `lib/productSort.js` |
+| 76 | **"Novidades" ordenava ao contrário na página de categoria.** A loja fazia `(b.order) - (a.order)`, a categoria `(a.order) - (b.order)`: o mesmo critério, com o mesmo nome no ecrã, mostrava os livros mais antigos primeiro numa página e os mais recentes na outra. | Média | ✅ ordenação única |
+| 77 | **"Novidades" não era novidade nenhuma.** O `order` é `ano × 1000` — o ano de publicação, não a chegada à livraria. Um clássico reeditado este mês contava como de 1950, e dois livros do mesmo ano ficavam empatados sem desempate (ordem instável entre carregamentos, com livros a repetir-se ou a desaparecer entre páginas). | Média | ✅ passa a usar `created` |
+| 78 | **O `?sort=` era apagado do endereço.** O `useProductFilters` reescreve o endereço a partir dos filtros e não conhecia o `sort`: um link como `/shop?sort=newest` (que o painel lateral do "Mais para si" já usava) funcionava à chegada e perdia o parâmetro logo a seguir. | Baixa | ✅ a ordenação vive no endereço |
+| 79 | **No telemóvel, a política de privacidade era inalcançável a partir das páginas principais.** Início, loja, categorias e colecções escondem o rodapé (`hidden md:block`), e a barra inferior só tem Início, Categorias, Pesquisar, Carrinho e Conta. A única ligação para a política está no rodapé. Com o grosso do tráfego a entrar por telemóvel, a maioria das visitas nunca via a política, nem os métodos de pagamento, nem os portes grátis, nem as lojas. | Alta (legal/negócio) | ✅ `components/FooterCompact.jsx` |
+| 80 | **Molduras do Google Maps no rodapé de todas as páginas.** Uma por loja com coordenadas, criadas sempre, para um mapa no fim da página a que quase ninguém chega: peso em cada página vista e a Google a saber de cada visita, sem ninguém pedir mapa. | Média (desempenho/privacidade) | ✅ botão "Mostrar o mapa" |
+| 81 | **A página de categoria estava atrás da loja em tudo.** Três critérios de ordenação em vez de oito, sem contagem de resultados, sem vista em lista, e o painel de filtros do telemóvel sem Escape, sem fechar ao tocar fora e sem `role="dialog"` — correcções que a loja recebeu em passagens anteriores e que esta página não acompanhou. Faltava-lhe também o `min-w-0` que foi o achado 68. | Média | ✅ barra partilhada |
+| 82 | **As sugestões ignoravam a colecção e o autor.** No site (`lib/discovery.js`) a semelhança era "mesma categoria ou mesmo autor", sem graus; no servidor (`suggestions.ts`) era só o género. As colecções desta livraria são séries — quem leu o primeiro volume quer o segundo —, e nenhum dos dois lados sabia disso. A ficha do livro também não tinha nenhuma prateleira de livros parecidos: só o histórico da pessoa e o catálogo inteiro. | Média (vendas) | ✅ pontuação por sinais |
+| 83 | **A chave do Google Maps Embed vai na resposta pública `/settings`.** É inevitável (vai no endereço da moldura), mas obriga a restringi-la por *referenciador HTTP* na Google Cloud, senão qualquer pessoa a usa e gasta a quota da conta. Não está escrito em lado nenhum que isso foi feito. | Média | ⏳ dono (Google Cloud) |
+| 84 | Em `SettingsTab`, o padrão de detectar colunas novas (`'coluna' in r`) não protege de facto: o `...form` no início do payload põe sempre a chave, e o spread condicional a seguir só a substitui. Vale para `about_top_image_url`, `about_team`, `unpaid_cancel_days` e `chat_ai_daily_limit`. Nunca mordeu porque as migrações estão aplicadas há muito. | Baixa | ✅ `lib/optionalColumns.js` |
+| 85 | **O que se punha no carrinho a partir de uma colecção desaparecia.** A página das colecções tinha a sua própria conversão de livro em produto, e chamava à variante `variant_<id>` em vez de `<id>-default`. O carrinho tira o id do livro do id da variante (`bookIdOf`, `replace(/-(default\|v\d+)$/, '')`): o id fabricado não bate com livro nenhum, a consulta não devolve linha, e a revalidação seguinte tira a linha do carrinho com a mensagem *"já não está disponível"*. | Alta (vendas) | ✅ `getCollectionProducts` |
+| 86 | Na mesma conversão: `inventory_quantity: book.stock \|\| 99` transformava um livro esgotado (stock 0) em **99 unidades** com "Comprar" activo (a recusa só aparecia no fim do checkout); não havia preço promocional (a colecção mostrava o preço de tabela e a loja o de promoção, para o mesmo livro); o preço era formatado à mão, noutro formato; e **sem descrição inventava uma** — "Este livro é uma leitura excelente que edifica a alma" — para os 100 livros do catálogo que ainda não têm texto. É o mesmo problema do achado 44. | Alta | ✅ idem |
+| 87 | A página das colecções não tinha ordenação nenhuma: ficava na ordem fixa do servidor (`-featured,title`). Quem quisesse ver uma colecção pelo preço tinha de ir à loja e filtrar por colecção. | Baixa | ✅ barra partilhada |
+
+### Verificado sem problemas
+
+- **Nada de novo no modelo de segurança.** As 77 funções `security definer` com `search_path`
+  fechado, a RLS, as guardas das rotas da Edge Function, o MFA nos dois lados e o
+  `place_order` continuam como as passagens 9.8 a 9.12 os deixaram; releitura sem achados
+  novos nessas zonas.
+- **CSP**: continua sem `unsafe-inline` em scripts. A entrada nova é
+  `https://www.youtube-nocookie.com` em `frame-src`, e só essa — o `youtube.com` normal fica
+  de fora.
+- **Nenhum segredo versionado** (scanner limpo em 743 ficheiros).
+- **Sem regressões**: 803 testes, lint, build e o scanner passam.
+
+### O que foi feito
+
+**Organizador de produtos** (`lib/productSort.js`, `components/catalog/CatalogToolbar.jsx`).
+Uma só ordenação para a loja, as categorias e as colecções, com oito critérios em vez dos
+cinco da loja e dos três da categoria: Destaques, Novidades, Mais procurados, Maior desconto,
+Preço (nos dois sentidos) e Título (A–Z e Z–A). Três regras valem em todos:
+
+1. o que está esgotado vai para o fim, em qualquer critério — uma loja não abre a lista com o
+   que não pode vender, e o primeiro de "preço do menor" passa a ser o mais barato *que se
+   pode comprar*;
+2. o preço que ordena é o que o cliente paga, não o de tabela (achado 75);
+3. o desempate é sempre o mesmo (título, depois id), para a ordem não mudar entre
+   carregamentos (achado 77).
+
+Juntou-se o **agrupamento por tipo de produto** ("Por tipo"), que separa livros, bíblias,
+material de igreja e vestuário em secções próprias. Só aparece quando a lista tem mais do que
+um tipo: um título "Livros" por cima de uma lista de livros não diz nada a ninguém.
+
+**Links do YouTube** (`lib/youtube.js`, `components/ProductVideo.jsx`, migração
+`video_do_produto`). Campo "Vídeo de apresentação" em Livros → Mídia, com pré-visualização no
+próprio painel, e um separador "Vídeo" na ficha do produto. Três decisões:
+
+- **nada do que está na base de dados vai para o `src`**: o `parseYoutube` extrai um
+  identificador de 11 caracteres e **constrói** o endereço; um valor que não reconheça devolve
+  `null` e o separador desaparece, em vez de abrir uma moldura para um sítio desconhecido;
+- **`youtube-nocookie.com`**, que não escreve cookies de publicidade — o domínio normal
+  escreve-os só por a moldura existir, e isso obrigaria a um aviso de cookies que a loja não
+  tem;
+- **a moldura só é criada ao carregar na miniatura**: um `iframe` do YouTube são mais de
+  500 KB e vários pedidos à Google, e quem abre a ficha de um livro quase nunca vem pelo
+  vídeo. Com ligações a pagar por MB, carregá-la a todos é gastar dinheiro do visitante.
+
+Também um **canal do YouTube** nas Configurações, ao lado do Facebook e do Instagram, para o
+rodapé.
+
+**Sugestões** (`lib/discovery.js`, `suggestions.ts`, migração `sugestoes_com_colecao`). Passa
+a haver pontuação, nos dois lados e com os mesmos pesos:
+
+```
+pontos = Σ  peso_do_sinal × peso_da_semelhança
+```
+
+Sinais: carrinho (5) > lista de desejos (3) > visita recente (2) > visita (1) — quem tem um
+livro no carrinho está a comprar agora; quem abriu uma página pode ter chegado lá por um
+link. Semelhanças: colecção (4) > autor (3) > género (2) > faixa de preço (1). O preço entra
+porque decide a compra: a quem vê livros de 2 000 Kz não se põe à frente uma Bíblia de estudo
+de 25 000. Cada sugestão sabe explicar-se numa frase ("Da mesma colecção").
+
+Na ficha do livro entra a prateleira que faltava — **"Quem leu este, procurou também"**,
+parecidos com *este* livro e não com o histórico —, antes dos vistos recentemente e do
+catálogo a continuar. É a ordem de quem está em frente a uma prateleira: o livro ao lado, o
+que já tinha na mão, a loja toda.
+
+**Rodapé.** O compacto do telemóvel (achado 79) leva o essencial que a barra inferior não
+tem: portes e pagamentos em duas linhas, quatro atalhos (Rastrear, Lojas, WhatsApp,
+Devoluções) e a política de privacidade. O completo continua a ser só do computador — no
+telemóvel são mais de dois ecrãs no fim de uma lista infinita, e foi por isso que o tiraram.
+Os mapas passam a botão (achado 80), as ligações passam pelo `safeLinkUrl` (achado 74) e os
+ícones das redes ganharam nome acessível.
+
+### Ordem de publicação
+
+As duas migrações primeiro (o Actions aplica-as no merge), depois a Edge Function, depois o
+site. O código aguenta a ordem trocada: sem a coluna `video_url`, o campo não é enviado (ver
+`lib/bookSave.js`) e gravar livros continua a funcionar; sem a coluna `youtube`, o campo nem
+aparece no painel; a Edge Function antiga ignora o `collection_id` novo da `suggestable_books`.
+
+### Segunda ronda (mesmo dia): a página das colecções
+
+Os achados 85 a 87 apareceram ao fechar o 84. A página das colecções nunca tinha passado pela
+unificação do catálogo: carregava os livros em bruto e convertia-os em produtos com uma função
+própria, escrita à mão, com 20 linhas. Essa função dizia o contrário da verdadeira em quatro
+pontos, e um deles custava vendas todos os dias.
+
+O **85** é o pior e o menos visível. O carrinho identifica o livro pelo id da variante,
+tirando-lhe o sufixo (`<livro>-default`, `<livro>-v2`). A conversão das colecções inventava
+`variant_<livro>`, que não tem sufixo nenhum para tirar: o `bookIdOf` devolvia a string
+inteira, a consulta `in ('variant_…')` não encontrava nada, e o `refreshCart` concluía que o
+livro tinha sido apagado do catálogo. Resultado: **tudo o que um cliente pusesse no carrinho a
+partir de uma colecção saía de lá sozinho**, com uma mensagem a dizer que o livro já não
+estava disponível. Da loja e da ficha do produto nunca aconteceu, porque essas usam a
+conversão a sério.
+
+A correcção não é remendar a função: é não ter duas. O `EcommerceApi` ganhou o
+`getCollectionProducts`, que usa o `bookToProduct` de sempre, e a página passou a usá-lo. Com
+isso caem os quatro problemas de uma vez, e a colecção recebeu também a barra de ordenação
+(achado 87) e o `min-w-0` da coluna.
+
+O **84** fechou com `lib/optionalColumns.js`: a decisão de enviar ou não uma coluna que nasceu
+numa migração passa a viver num sítio só, com `delete` em vez de um spread que nunca apagava
+nada, e com testes.
+
+### Terceira ronda (mesmo dia): o resto dos sítios com o mesmo padrão
+
+Os achados 85 a 87 vieram de procurar, no resto do código, o padrão que os causou — uma
+conversão ou uma ordenação escrita à mão onde já havia uma partilhada. A varredura encontrou
+mais quatro sítios.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 88 | **As prateleiras da página inicial continuavam a ordenar pelo ano de publicação.** O achado 77 foi corrigido na loja, nas categorias e nas colecções, mas a prateleira "Novidades" da página inicial, os "Destaques da Semana" e a lista curta do "Mais para si" ficaram com `(b.order) - (a.order)`. Pior: o "Ver todos" da prateleira aponta para `/shop?sort=newest`, que depois da correcção ordena por chegada — **a prateleira e a página a que ela leva passaram a mostrar listas diferentes com o mesmo nome**, por causa da própria correcção. | Média | ✅ as três usam `sortProducts` |
+| 89 | **O painel oferecia cinco critérios de ordenação quando a loja já tinha oito**, com nomes diferentes ("Preço ↑" no painel, "Preço: do menor" na loja). Era uma cópia da lista escrita à mão em `SettingsTab`. Quem configurasse a loja não conseguia pô-la a abrir pelas promoções nem pelos mais procurados. | Baixa | ✅ lê de `SORT_OPTIONS` |
+| 90 | **A pesquisa de livros devolvia resultados pela ordem da base de dados, não por relevância.** O `searchProducts` pedia `-featured,title` com o limite aplicado **pela base de dados**: com `limit` 6 — é o que o selector de livros da comunidade usa — os seis que voltavam eram "os mais destacados, por ordem alfabética" de entre os que combinam, e o livro que a pessoa escreveu podia nem estar lá. A pesquisa do cabeçalho já ordenava por relevância; esta não. | Média | ✅ pede um grupo maior e ordena por `getSearchRelevance` |
+| 91 | **O botão da barra do topo e o botão de cada slide tinham o mesmo problema do achado 74.** `settings.header_cta_link` e `slide.cta_link` são escritos no painel e iam directos para `<Link to>`. Verificado com as versões deste projecto que o **React Router 7 passa `javascript:`, `data:` e `//outro-site` intactos para o `href`** — como o React 18.3 faz com o `href` directo. | Média | ✅ `components/SafeLink.jsx` |
+
+| 92 | **O mega-menu do cabeçalho mostrava o preço de tabela.** Usava `variants[0].price_formatted` em vez do par `sale_price_formatted \|\| price_formatted` que o cartão usa: um livro em promoção aparecia no menu a 8 000 Kz e, um clique abaixo, no cartão a 1 900. O par estava escrito em cada sítio que mostra um preço — bastava esquecê-lo num. | Média (confiança) | ✅ `displayPrice` |
+| 93 | A faixa "Disponíveis Agora" da página inicial olhava só para `variants[0]`: um produto com tamanhos cujo primeiro está esgotado mas os outros não ficava de fora, apesar de se poder comprar. | Baixa | ✅ usa o `inStock` partilhado |
+| 94 | **A página inicial descarregava o catálogo inteiro três vezes.** São sete os componentes que chamam `getProducts({})`, e o cabeçalho está em todas as páginas: medido no navegador, a página inicial pedia os 102 livros 3×, a ficha do produto 2× e a loja 2×. A 0,85–1,5 s por pedido a partir de Angola (medição de 9.4), são segundos de espera e de dados pagos pelo visitante para a mesma lista. | Média (desempenho) | ✅ cache curta com junção dos pedidos simultâneos |
+
+**94 — porque é que a cache sozinha não chegava.** Os três componentes da página inicial
+pedem o catálogo no mesmo instante, antes de a primeira resposta chegar: uma cache por tempo
+não apanharia nenhum deles. Por isso são duas coisas — um registo dos pedidos **em curso**,
+que junta os simultâneos numa leitura só, e a cache de 60 s, que cobre quem chega a seguir
+(descer a página, abrir a folha das categorias, ir para outra página do catálogo). Um erro
+não fica guardado. Medido depois no mesmo teste: ficha do produto e loja passam a **1×**, e a
+página inicial a **2×** — a que resta é a consulta dos destaques, que traz no máximo 12
+linhas e não a lista toda.
+
+O painel não passa por aqui (lê `stock_books` directamente), por isso quem grava um livro
+continua a ver o que gravou, sem atraso nenhum.
+
+**91 — um componente em vez de três correcções.** O site tem três sítios onde um endereço
+escrito no painel vira ligação: as colunas do rodapé, o botão da barra do topo e o botão de
+cada slide. Os três estavam expostos, e corrigir cada um à sua maneira voltaria a divergir.
+Ficou um `SafeLink`: o endereço passa pelo `safeLinkUrl`, e é o próprio endereço que decide
+se vai para o `<Link>` do Router ou para um `<a target="_blank">` — nunca uma etiqueta ao
+lado dele. O que for recusado não vira ligação nenhuma: fica o texto, para quem escreveu a
+configuração ver que ali há algo por corrigir.
+
+Dois dos testes do `SafeLink.test.jsx` não testam o nosso código: testam o React e o Router,
+e documentam a razão de o componente existir. Se um dia as bibliotecas passarem a filtrar
+isto sozinhas, esses testes falham e dizem-no.
+
+### Quarta ronda (mesmo dia): larguras intermédias
+
+A verificação visual desta passagem só tinha olhado para 1280 e 390 px — e o achado 68 da
+passagem anterior foi exactamente um transbordo a 768. Com a varredura alargada a dezasseis
+larguras (320 a 1536), apareceu um.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 95 | **A linha do cabeçalho não cabe entre 1024 e 1118 px.** Medido no navegador: o logótipo 182 px, o menu de computador 603 e os ícones 276 — 1085 no total, para um contentor de 960 a essa largura. É a faixa onde o menu de computador liga (`lg`, 1024) sem que haja ainda espaço para ele. | Média (visual) | ✅ o logótipo encolhe para o emblema entre `lg` e `xl` |
+
+**Porque é que só se via numa página.** O excesso existia em todas, mas só a ficha do produto
+o mostrava, com uma barra de deslocamento horizontal na página inteira. É a única que usa o
+cabeçalho `sticky` (`<Header pinned>`), ou seja em fluxo: aí o conteúdo que não cabe alarga o
+documento. Nas outras o cabeçalho é `fixed`, preso à largura da janela, e o mesmo excesso
+ficava escondido — um computador portátil de 1024 ou 1080 px de largura, que é o mais comum
+em Angola, via a página saltar ao lado.
+
+O logótipo passa a mostrar só o emblema nessa faixa (o modo compacto que já existia para o
+telemóvel), e o lockup volta a partir de `xl`. Poupa os ~138 px que faltavam: a 1024 px a
+linha passa a precisar de 947 para 960 disponíveis. Verificado nas dezasseis larguras, em oito
+páginas: 0 transbordos.
+
+### Sexta ronda: o vídeo de fundo não aceitava o YouTube, e não o dizia
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 96 | **Um link do YouTube no fundo em vídeo dava um rectângulo preto, em silêncio.** Os campos "URL do Vídeo (MP4/WebM)" dos slides e "URL do vídeo" do fundo da loja vão directos para um `<video src>`, que não toca endereços de plataforma. O painel não o dizia, o site não recuava para a imagem, e na consola não aparece erro nenhum — a equipa via o fundo preto e não tinha como descobrir porquê. É o engano mais natural que há: quem tem o vídeo da livraria tem-no no YouTube. | Média | ✅ `lib/videoUrl.js` |
+
+O site passa a recuar: um endereço que o `<video>` não toca faz o slide mostrar a imagem e o
+fundo da loja cair no gradiente, como já caía quando não havia vídeo nenhum. E o painel diz o
+que se passa, nomeando a plataforma reconhecida e **encaminhando para onde o YouTube
+funciona** — o campo "Vídeo de apresentação" da ficha do produto, que esta mesma passagem
+criou.
+
+Só se recusa o que de certeza não funciona (YouTube, Vimeo, Dailymotion, Facebook, Instagram,
+TikTok, Google Drive). Um endereço de CDN sem extensão continua a passar: uma lista fechada
+de extensões recusaria endereços que hoje funcionam.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 97 | **O aviso de "adicionado ao carrinho" dizia sempre "Edição Standard".** Lia `variant.name`, um campo que não existe — as variantes que o `bookToProduct` constrói têm `title`. O `variant.name \|\| 'Edição Standard'` caía sempre no texto fixo: juntar uma t-shirt no tamanho M dizia "1x · Edição Standard", com o nome errado e com a palavra errada (o achado 47 já tinha tirado "Edição" dos produtos que não são livros). | Baixa | ✅ usa o `cartVariantLabel` |
+
+É a mesma família do achado 18 — uma leitura de um campo que não existe, que o `||` esconde.
+Ali rebentava o render; aqui limita-se a mentir. O `cartVariantLabel` já existia para isto e
+dá "M · Azul"; na variante única devolve vazio, e então o aviso diz só a quantidade, que é o
+que há para dizer.
+
+O carrinho passou a ter testes do `addToCart` (sete casos): o que o aviso diz nas três
+formas, a recusa de um produto com tamanhos sem tamanho escolhido, o tecto do stock somando o
+que já lá está, a soma na mesma variante e as linhas separadas por tamanho. Com o código
+antigo, três deles falham.
+
+### Sétima ronda: uma guarda para a família inteira, em vez de caçar um a um
+
+Três achados foram o mesmo erro — ler um campo que não existe e deixar um `||` ou um `?.`
+tapar: o **18** (`autoCode`, que rebentava o formulário de livros em produção), o **92** (o
+mega-menu lia só `price_formatted` e anunciava o preço de tabela) e o **97** (`variant.name`,
+que dava sempre "Edição Standard"). O lint não apanha esta família: um acesso a propriedade
+não é uma variável por declarar, e o `no-undef` não o vê.
+
+Procurado sistematicamente — todas as leituras `variant.X` e `selectedVariant.X` do site
+contra os campos que o `EcommerceApi` constrói —, saíram três: o `variant.name` já corrigido,
+e dois falsos positivos em `lib/pricing.js` (`variant.price`, `variant.sale_price`). Os falsos
+positivos é que explicam a família: **a palavra "variante" designava duas formas diferentes**.
+
+| Forma | Campos | Onde nasce |
+|---|---|---|
+| Entrada de `stock_books.versions` | `label`, `format`, `price`, `stock`, `isbn` | escrita no painel |
+| Variante de produto | `id`, `title`, `price_in_cents`, `inventory_quantity`, … | `bookToProduct` / `getProduct` |
+
+O `variantPrices` recebia a primeira e chamava-lhe `variant`; o resto do site usa a mesma
+palavra para a segunda. Com duas formas sob um nome, ler o campo de uma na outra é o erro
+mais fácil de fazer — e foi o que aconteceu ao aviso do carrinho.
+
+O argumento do `variantPrices` passou a chamar-se `versao`, e fica um teste
+(`lib/variantFields.test.js`, no desenho do `queryFields.test.js` que já confere as colunas
+das consultas contra as migrações): a forma de referência é lida do próprio `EcommerceApi`,
+por isso um campo novo numa variante fica legível sem tocar no teste, e um campo imaginado é
+recusado com o nome do ficheiro. Confirmado que o apanha: com `variant.name` reposto no
+`useCart`, falha com `variant.name — lido em hooks/useCart.jsx`.
+
+O teste tem um controlo de si próprio, e foi esse controlo que apanhou um defeito na primeira
+versão: a expressão regular só aceitava minúsculas, por isso `variant.naoExiste` era lido como
+`nao` — e um nome em camelCase cujo prefixo coincidisse com um campo real passaria sem ser
+notado. Os comentários são retirados antes da procura, para um campo citado numa explicação
+não contar como leitura.
+
+### Oitava ronda: a mesma procura para os produtos, e a série na ficha do livro
+
+A procura da sétima ronda, feita agora para `product.X` contra o que o `bookToProduct` põe,
+não encontrou nenhum bug vivo — e um resultado negativo também conta. Encontrou quatro
+leituras sem dono: duas são falsos positivos (uma página de amostra chamada `p`, e o recurso
+`genre` do `lib/discovery.js` para a forma que vem do servidor), e duas são **código morto**:
+
+- `product.additional_info` na ficha do produto: não há coluna nem campo com esse nome em
+  lado nenhum, por isso o bloco nunca aparecia. Saiu — e com ele um `dangerouslySetInnerHTML`
+  que não servia para nada.
+- `product.category` na lista de produtos: só a conversão própria da página das colecções o
+  preenchia, e essa conversão saiu nesta passagem (achado 85). Ficou morto por causa desta
+  mesma passagem, por isso sai com ela.
+
+Não fica guarda permanente para os produtos, ao contrário das variantes: `product` é um nome
+demasiado comum no código (o painel usa-o para registos em bruto), e a lista de excepções
+tornaria o teste mais frágil do que útil.
+
+**A série na ficha do livro.** As colecções desta livraria são séries, e quem está num volume
+procura os outros — mas a ficha não tinha ligação nenhuma para a colecção: o caminho de
+migalhas leva ao género, e o autor à pesquisa por autor. Passa a haver, por baixo do autor,
+"Da colecção <nome>", para `/colecoes/<id>` (a rota aceita o id além do slug). Verificado no
+navegador: o link abre a colecção certa.
+
+### Nona ronda: revisão antes de publicar
+
+Antes de publicar, o `main` tinha avançado (PR #25, colportagem) e foi integrado: sem
+conflitos, as quatro migrações da colportagem (`…100000`–`…103000`) aplicam antes das duas
+desta passagem (`…120000`, `…121000`) e não tocam no que estas mexem. Depois, uma revisão do
+próprio PR à procura de defeitos meus. Encontrou um, e esse levou a um maior e mais antigo.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 98 | **A "Ordenação por defeito" do painel deixou de valer a quem abre a loja directamente** (regressão desta passagem). As Configurações chegam por pedido, depois do primeiro desenho; o `useProductFilters` fixa a ordenação ao montar; e o efeito da loja que a corrigia quando as Configurações chegavam foi retirado aqui, quando a ordenação passou para o endereço. Resultado intermitente: a mesma loja abria pela ordem do painel vindo da página inicial, e por "Destaques" num acesso directo a `/shop`. | Média | ✅ |
+| 99 | **Cada filtro, ordenação ou separador desmontava a página inteira** (anterior a esta passagem). A fronteira de erros do `App.jsx` tinha `key={location.key}`, e o React Router dá uma `location.key` nova a qualquer navegação — também às escritas com `replace` com que as páginas guardam o estado no endereço. Medido no navegador, com uma marca num elemento: um filtro e uma ordenação remontavam a loja; a vista em lista, que não toca no endereço, não. **No telemóvel, o painel de filtros fechava-se sozinho depois de cada toque**: combinar dois filtros obrigava a reabrir o painel e a descer até onde se estava. No painel, cada mudança de separador remontava o painel e voltava a carregar tudo; no perfil, o mesmo com as encomendas. | Alta (telemóvel) | ✅ `hooks/useRouteRemountKey.js` |
+
+**98 levou a 99.** A primeira correcção do 98 (o `useProductFilters` passa a seguir a
+predefinição até alguém escolher outra) passava nos testes unitários e **falhava no
+navegador**: com as Configurações a chegar 1,5 s depois, a loja continuava em "Destaques" e
+escrevia `?sort=featured` no endereço. O teste montava só o hook; a loja real é desmontada
+pela fronteira de erros a cada escrita no endereço, e a montagem nova lia a ordenação antiga.
+Sem o navegador, o 98 teria sido dado como corrigido.
+
+**Porque é que não bastava tirar a `key`.** A remontagem fazia, sem querer, um trabalho
+preciso: o `useProductFilters` só lê os filtros do endereço ao montar, e é ela que faz um link
+do menu de `/shop?category=A` para `/shop?category=B` mudar mesmo os filtros. Tirá-la partia
+esses links. O `useRouteRemountKey` separa os dois casos: remonta numa navegação a sério (um
+link, voltar atrás ou à frente, mudar de página — incluindo um `<Navigate replace>` para outro
+caminho), e não quando a própria página reescreve o seu endereço com `replace`. A página de
+erro continua a limpar-se em qualquer navegação, por um `resetKey` à parte.
+
+Verificado no navegador: o painel de filtros do telemóvel fica aberto depois de marcar um
+filtro; filtros e ordenação já não remontam a loja; com as Configurações a chegar 1,5 s
+depois, a loja abre pela ordem do painel e com o endereço limpo; e, estando na loja com
+"Saúde", o link "Catálogo Geral" da folha de categorias muda a lista (1 → 3 produtos). Seis
+testes do hook, três dos quais falham com a chave antiga.
+
+### Quinta ronda: um teste para o formulário que já esteve partido em produção
+
+O achado 18 (passagem 9.1) foi **criar um livro no painel rebentar em produção**: a variável
+`autoCode` tinha deixado de existir numa limpeza anterior e, como o `||` a avaliava, o render
+estourava. Ninguém deu por isso porque o lint estava com as regras desligadas e **nenhum
+teste montava o componente**. O lint foi corrigido nessa altura; o formulário continuou sem
+teste. E esta passagem mexeu-lhe (o campo de vídeo).
+
+Fica um `BookFormModal.test.jsx` que o abre a sério nos três caminhos do painel — criar,
+editar e duplicar —, percorre os oito separadores confirmando que cada um abre, exercita o
+campo de vídeo (recusa o que não é YouTube, mostra a pré-visualização sem criar a moldura) e
+confere o que sai no `onSave`.
+
+Para confirmar que o teste serve de alguma coisa, o bug histórico foi reintroduzido de
+propósito (`AUTO_CODE` de volta a `autoCode`, sem declaração): os testes passam a falhar com
+`ReferenceError: autoCode is not defined`. Com o código certo, passam os oito.
+
+Duas coisas que o teste ensinou sobre este ecrã, e que ficaram escritas lá: o jsdom não tem
+`ResizeObserver` e o Radix chama-o sem guarda (o código da casa guarda-o); e os separadores
+do Radix mudam no `mousedown`, não no `click` — a primeira versão do teste percorria os
+separadores sem nunca mudar de painel, e passava à mesma.
+
+### Acessibilidade
+
+`axe-core` (WCAG 2 A/AA) nas sete páginas alteradas, a 1440, 1280, 1024, 768, 390 e 360 px — início, loja, loja
+agrupada, categoria, colecção, ficha do produto e ficha com o separador de vídeo aberto:
+**0 violações nas 42 passagens**. De caminho, o CSP provou-se sozinho: a primeira tentativa de
+injectar o axe como script embutido foi recusada pelo navegador ("Executing inline script
+violates… `script-src`"), e teve de ser servido pela própria origem.
+
+### Por fazer (dono)
+
+1. **Restringir a chave do Google Maps Embed por referenciador** na Google Cloud (achado 83),
+   aos domínios `livrariaadventista.com` e `www.livrariaadventista.com`.
+2. Preencher o **canal do YouTube** em Configurações → Contacto, se existir.
+3. Os pontos abertos das passagens anteriores (SMTP, telefones, descrições, DNSSEC, alertas)
+   continuam como estão: nada nesta passagem os altera.

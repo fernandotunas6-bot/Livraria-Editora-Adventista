@@ -1,5 +1,6 @@
 import { sanitizeImageUrlForSave } from '@/lib/imageUrl';
 import { fromLocalInput } from '@/lib/pricing';
+import { sanitizeYoutubeUrl } from '@/lib/youtube';
 
 /** Prepara payload de livro para a API compatível — evita blob: e URLs inválidas. */
 export function sanitizeBookPayload(data) {
@@ -48,6 +49,19 @@ export function sanitizeBookPayload(data) {
   out.sale_starts_at = out.sale_price ? fromLocalInput(out.sale_starts_at) : null;
   out.sale_ends_at = out.sale_price ? fromLocalInput(out.sale_ends_at) : null;
   out.preview_enabled = !!out.preview_enabled;
+  // Vídeo: grava-se a forma canónica do endereço do YouTube, sem os parâmetros de campanha
+  // que vêm no "copiar link". Um endereço que não seja do YouTube fica vazio — mais vale
+  // nenhum vídeo do que um endereço que a ficha não consegue mostrar e ninguém percebe porquê.
+  //
+  // Sem vídeo, o campo **não vai** no pedido, em vez de ir vazio. A coluna `video_url` nasce
+  // numa migração, e o site e a base de dados são publicados em passos separados: se o site
+  // chegar primeiro, um pedido com uma coluna que ainda não existe é recusado pelo PostgREST
+  // inteiro — e a equipa ficava sem conseguir gravar livro nenhum por causa de um campo que
+  // nem usou. Assim, só quem põe um vídeo depende da migração. Para apagar um vídeo já
+  // gravado, quem chama envia `video_url: ''` de propósito (ver `AdminPage`).
+  const video = sanitizeYoutubeUrl(out.video_url);
+  if (video) out.video_url = video;
+  else delete out.video_url;
 
   if (!out.description) out.description = '';
   if (!out.author_bio) out.author_bio = '';

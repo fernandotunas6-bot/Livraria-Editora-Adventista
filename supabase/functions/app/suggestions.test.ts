@@ -46,6 +46,27 @@ describe("rankSuggestions", () => {
     expect(r.recent.map((b) => b.id)).toEqual(["e", "c"]);
   });
 
+  it("a colecção pesa mais do que o autor, e o autor mais do que o género", () => {
+    const livros = [
+      book("lido", "Saúde", "2026-01-01", { collection_id: "serie", author: "Ellen" }),
+      book("mesma-colecao", "Outro", "2026-01-02", { collection_id: "serie", author: "Outro" }),
+      book("mesmo-autor", "Outro", "2026-01-03", { author: "Ellen" }),
+      book("mesmo-genero", "Saúde", "2026-01-04", {}),
+    ];
+    const r = rankSuggestions({ books: livros, viewed: ["lido"], limit: 4 });
+    expect(r.pick.map((b) => b.id)).toEqual(["lido", "mesma-colecao", "mesmo-autor", "mesmo-genero"]);
+  });
+
+  it("um livro da colecção que está a ler ganha a uma novidade de outro género", () => {
+    const livros = [
+      book("comprado", "Saúde", "2026-01-01", { collection_id: "serie" }),
+      book("volume-2", "Saúde", "2026-02-01", { collection_id: "serie" }),
+      book("novidade", "Profecia", "2026-11-01", {}),
+    ];
+    const r = rankSuggestions({ books: livros, owned: ["comprado"], limit: 2 });
+    expect(r.pick[0].id).toBe("volume-2");
+  });
+
   it("prefere livros com capa a sério e deixa os de capa vazia para o fim", () => {
     const books = [
       book("x", "Saúde", "2026-11-04", { cover: "x.jpg", cover_bytes: 3000 }),

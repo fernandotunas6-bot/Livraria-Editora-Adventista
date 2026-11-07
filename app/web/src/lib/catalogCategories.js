@@ -1,3 +1,5 @@
+import { inStock } from '@/lib/productSort';
+
 /**
  * Categorias estratégicas para vitrine — um livro pode aparecer em várias faixas.
  */
@@ -72,7 +74,9 @@ export const SHOWCASE_CATEGORIES = [
     description: 'Prontos para envio imediato',
     accent: '#22c55e',
     minBooks: 3,
-    filter: (p) => p.purchasable && (p.variants?.[0]?.inventory_quantity ?? 0) > 0,
+    // `inStock` olha para todas as variantes: um uniforme com o tamanho S esgotado mas o M
+    // disponível vende-se, e com `variants[0]` ficava de fora dos "Disponíveis Agora".
+    filter: inStock,
   },
   {
     id: 'destaques',
