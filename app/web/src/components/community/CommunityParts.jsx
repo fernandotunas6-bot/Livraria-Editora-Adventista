@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Feather, Flame, LayoutGrid, Search, ShieldCheck, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -75,17 +75,30 @@ export function ClubBanner({ club }) {
   );
 }
 
-/** Temas: lista fixa à esquerda no computador, chips que deslizam no telemóvel. */
+/**
+ * Temas: lista fixa à esquerda no computador, chips que deslizam no telemóvel. No telemóvel a
+ * fila fica colada por baixo do cabeçalho enquanto se desce o feed (`CommunityPage`), encaixa
+ * chip a chip e centra o tema escolhido — como as abas de categorias de uma loja.
+ */
 export function TopicNav({ topics = [], active = '', onChange, counts = {} }) {
+  const activeRef = useRef(null);
+  // O tema escolhido (também quando vem do endereço) fica à vista na fila, sem mexer na página.
+  useEffect(() => {
+    const el = activeRef.current;
+    if (!el || typeof el.scrollIntoView !== 'function' || window.matchMedia?.('(min-width: 1024px)').matches) return;
+    el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [active, topics.length]);
+
   const item = (slug, label, icon) => {
     const on = active === slug;
     return (
       <button
         key={slug || 'todos'}
+        ref={on ? activeRef : undefined}
         type="button"
         onClick={() => onChange(slug)}
         aria-pressed={on}
-        className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors lg:w-full lg:rounded-xl ${on
+        className={`flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors lg:min-h-0 lg:w-full lg:rounded-xl ${on
           ? 'bg-editorial-marinho font-semibold text-white'
           : 'bg-editorial-papel text-editorial-tinta hover:bg-editorial-filete/50 lg:bg-transparent'}`}
       >
@@ -98,7 +111,7 @@ export function TopicNav({ topics = [], active = '', onChange, counts = {} }) {
   return (
     <nav aria-label="Temas da comunidade">
       <p className="mb-2 hidden px-3 text-xs font-semibold uppercase tracking-[0.18em] text-editorial-tinta-suave lg:block">Temas</p>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1.5rem),transparent)] [scrollbar-width:none] lg:mx-0 lg:snap-none lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:[mask-image:none] [&::-webkit-scrollbar]:hidden">
         {item('', 'Todos os temas', <LayoutGrid className="h-4 w-4" aria-hidden="true" />)}
         {topics.map((t) => item(t.slug, t.name, <TopicIcon name={t.icon} />))}
       </div>
@@ -111,7 +124,7 @@ export function FeedToolbar({ filters, onChange }) {
   const [query, setQuery] = useState(filters.query || '');
   useEffect(() => { setQuery(filters.query || ''); }, [filters.query]);
   const submit = (e) => { e.preventDefault(); onChange({ query: query.trim() }); };
-  const chip = (on) => `min-h-9 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-0 ${on
+  const chip = (on) => `min-h-10 shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors sm:min-h-0 ${on
     ? 'border-editorial-petroleo bg-editorial-petroleo text-white'
     : 'border-editorial-filete bg-editorial-papel text-editorial-tinta hover:bg-editorial-tela'}`;
 
@@ -123,7 +136,7 @@ export function FeedToolbar({ filters, onChange }) {
             <button
               key={s.value} type="button" role="tab" aria-selected={filters.sort === s.value}
               onClick={() => onChange({ sort: s.value })}
-              className={`flex min-h-9 items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-sm' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
+              className={`flex min-h-10 items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors sm:min-h-9 ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-sm' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
             >
               {s.value === 'em_alta' && <Flame className="h-3.5 w-3.5" aria-hidden="true" />}
               {s.label}
@@ -133,17 +146,18 @@ export function FeedToolbar({ filters, onChange }) {
         <form onSubmit={submit} role="search" className="relative ml-auto w-full sm:w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-editorial-tinta-suave" aria-hidden="true" />
           <Input
-            aria-label="Pesquisar na comunidade" value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Pesquisar na comunidade" className="h-10 rounded-full bg-editorial-papel pl-9 pr-9"
+            type="search" enterKeyHint="search" aria-label="Pesquisar na comunidade" value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Pesquisar na comunidade" className="h-11 rounded-full bg-editorial-papel pl-9 pr-11 sm:h-10 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
-            <button type="button" aria-label="Limpar a pesquisa" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-editorial-tinta-suave hover:bg-editorial-tela" onClick={() => { setQuery(''); onChange({ query: '' }); }}>
-              <X className="h-3.5 w-3.5" />
+            <button type="button" aria-label="Limpar a pesquisa" className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-editorial-tinta-suave hover:bg-editorial-tela" onClick={() => { setQuery(''); onChange({ query: '' }); }}>
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </form>
       </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de publicação">
+      {/* No telemóvel numa só fila que desliza (eram duas linhas, e o botão do chat tapava uma). */}
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de publicação">
         <button type="button" className={chip(!filters.kind)} aria-pressed={!filters.kind} onClick={() => onChange({ kind: '' })}>Tudo</button>
         {POST_KINDS.map((k) => (
           <button key={k.value} type="button" className={chip(filters.kind === k.value)} aria-pressed={filters.kind === k.value} onClick={() => onChange({ kind: filters.kind === k.value ? '' : k.value })}>

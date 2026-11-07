@@ -45,11 +45,23 @@ export async function listPosts({ topic = '', kind = '', sort = 'recentes', book
 /** Compatível com a primeira versão: o feed por livro. */
 export const loadPosts = ({ bookId = null, before = null, limit = PAGE_SIZE } = {}) => listPosts({ bookId, before, limit });
 
-/** Respostas das publicações indicadas (a oficial primeiro em cada uma). */
-export async function loadReplies(parentIds) {
+/** Quantas respostas o cartão do feed mostra: a oficial e as duas mais recentes (PostCard). */
+export const FEED_REPLIES_PER_POST = 2;
+
+/**
+ * Respostas das publicações indicadas (a oficial primeiro em cada uma). Com `perParent`, só as
+ * oficiais e as N mais recentes de cada (migração 20261107170000): o feed não descarrega
+ * conversas inteiras para mostrar duas respostas. Se a base ainda não tiver o parâmetro
+ * (publicação a meio), pede como antes.
+ */
+export async function loadReplies(parentIds, { perParent = null } = {}) {
   const ids = [...new Set((parentIds || []).filter(Boolean))];
   if (!ids.length) return [];
-  const { data, error } = await supabase.rpc('community_list_replies', { p_parent_ids: ids });
+  const args = perParent ? { p_parent_ids: ids, p_per_parent: perParent } : { p_parent_ids: ids };
+  let { data, error } = await supabase.rpc('community_list_replies', args);
+  if (error && perParent && isMissingTable(error)) {
+    ({ data, error } = await supabase.rpc('community_list_replies', { p_parent_ids: ids }));
+  }
   raise(error);
   return data || [];
 }

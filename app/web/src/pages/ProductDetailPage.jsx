@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { formatCurrency, getProduct, getProductQuantities, trackBookView } from '@/api/EcommerceApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -82,7 +82,19 @@ function ProductDetailPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Separadores controlados: as estrelas do topo e o "Ler a descrição completa" abrem o
   // separador certo e levam o ecrã até lá.
-  const [tab, setTab] = useState('details');
+  // O separador fica no endereço (`?tab=discussion`, ou `?tab=discussao`): a discussão de um
+  // livro, ou as avaliações, partilham-se com um link que já abre lá.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TAB_ALIASES = { discussao: 'discussion', avaliacoes: 'reviews', detalhes: 'details' };
+  const rawTab = searchParams.get('tab') || 'details';
+  const tab = TAB_ALIASES[rawTab] || rawTab;
+  const setTab = (value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === 'details') next.delete('tab'); else next.set('tab', value);
+      return next;
+    }, { replace: true });
+  };
   const tabsRef = useRef(null);
   const openTab = (value) => {
     setTab(value);
@@ -612,7 +624,8 @@ function ProductDetailPage() {
 
         <div ref={tabsRef} className="mt-16 scroll-mt-24 border-t border-border pt-10">
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-8 flex-wrap h-auto gap-1">
+            {/* No telemóvel numa só fila que desliza (partia em três linhas). */}
+            <TabsList className="mb-8 flex h-auto w-full justify-start gap-1 overflow-x-auto [scrollbar-width:none] sm:w-auto sm:flex-wrap [&::-webkit-scrollbar]:hidden">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
               {hasReadingSample(product) && (
                 <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1.5" />Pré-visualização</TabsTrigger>

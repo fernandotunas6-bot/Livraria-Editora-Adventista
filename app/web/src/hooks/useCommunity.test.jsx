@@ -9,6 +9,7 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => auth }));
 
 const api = {
   PAGE_SIZE: 20,
+  FEED_REPLIES_PER_POST: 2,
   isMissingTable: (e) => e?.code === '42P01',
   listPosts: vi.fn(),
   loadReplies: vi.fn(),
@@ -23,7 +24,8 @@ const api = {
 };
 vi.mock('@/lib/communityApi', () => api);
 
-const { groupReplies, nextCursor, useCommunity } = await import('./useCommunity');
+const { countNew, groupReplies, matchesFilters, nextCursor, useCommunity } = await import('./useCommunity');
+const { clearFeeds } = await import('@/lib/communityFeedCache');
 
 let root;
 let host;
@@ -40,6 +42,7 @@ async function render(props = {}) {
 const post = (id, extra = {}) => ({ id, parent_id: null, body: `texto ${id}`, likes_count: 0, created: '2026-11-06T10:00:00Z', ...extra });
 
 beforeEach(() => {
+  clearFeeds();
   host = document.createElement('div');
   root = createRoot(host);
   auth.isAuthed = true;
@@ -163,5 +166,81 @@ describe('useCommunity', () => {
     expect(state.replies.p1).toEqual([]);
     await act(async () => { await state.remove(state.posts[1]); });
     expect(state.posts.map((p) => p.id)).toEqual(['p1']);
+  });
+
+  it('carregar mais com a rede em baixo pára e deixa tentar outra vez', async () => {
+    api.listPosts.mockResolvedValue(Array.from({ length: 20 }, (_, i) => post(`p${i}`, { created: `2026-11-06T10:${String(i).padStart(2, '0')}:00Z` })));
+    await render();
+    expect(state.hasMore).toBe(true);
+    api.listPosts.mockRejectedValueOnce(new Error('Failed to fetch'));
+    await act(async () => { await state.loadMore(); });
+    expect(state.loadMoreFailed).toBe(true);
+    expect(state.loadingMore).toBe(false);
+    expect(state.error).toBe('');
+    api.listPosts.mockResolvedValueOnce([post('mais')]);
+    await act(async () => { await state.loadMore(); });
+    expect(state.loadMoreFailed).toBe(false);
+    expect(state.posts.at(-1).id).toBe('mais');
+  });
+
+  it('ao voltar ao feed com os mesmos filtros, as publicações aparecem logo, sem novo pedido', async () => {
+    await render({ topic: 'biblia' });
+    expect(api.listPosts).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await act(async () => { root.render(<Probe topic="biblia" />); });
+    expect(state.loading).toBe(false);
+    expect(state.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(api.listPosts).toHaveBeenCalledTimes(1);
+  });
+
+  it('mudar de filtro mantém a lista à vista enquanto chega a nova', async () => {
+    await render();
+    let resolve;
+    api.listPosts.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    await act(async () => { root.render(<Probe topic="oracao" />); });
+    expect(state.refreshing).toBe(true);
+    expect(state.loading).toBe(false);
+    expect(state.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
+    await act(async () => { resolve([post('o1', { topic: 'oracao' })]); await new Promise((r) => setTimeout(r, 0)); });
+    expect(state.refreshing).toBe(false);
+    expect(state.posts.map((p) => p.id)).toEqual(['o1']);
+  });
+
+  it('uma publicação de outro tema não aparece no topo do feed filtrado', async () => {
+    await render({ topic: 'oracao' });
+    api.createPost.mockResolvedValue(post('outro', { topic: 'familia' }));
+    await act(async () => { await state.publish({ body: 'sobre família', topic: 'familia' }); });
+    expect(state.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('pede só as respostas que o cartão mostra', async () => {
+    await render();
+    expect(api.loadReplies).toHaveBeenCalledWith(['p1', 'p2'], { perParent: 2 });
+  });
+
+  it('conta as publicações novas do topo', async () => {
+    await render();
+    api.listPosts.mockResolvedValueOnce([post('n1'), post('n2'), post('p1'), post('fixa', { pinned: true })]);
+    let n;
+    await act(async () => { n = await state.checkNew(); });
+    expect(n).toBe(2);
+    expect(state.newCount).toBe(2);
+  });
+});
+
+describe('matchesFilters e countNew', () => {
+  it('só entra no feed o que corresponde aos filtros abertos', () => {
+    expect(matchesFilters({ id: 'a', topic: 't' }, {})).toBe(true);
+    expect(matchesFilters({ id: 'a', topic: 't' }, { topic: 't' })).toBe(true);
+    expect(matchesFilters({ id: 'a', topic: 'x' }, { topic: 't' })).toBe(false);
+    expect(matchesFilters({ id: 'a', kind: 'pergunta' }, { kind: 'citacao' })).toBe(false);
+    expect(matchesFilters({ id: 'a', book_id: 'b2' }, { bookId: 'b1' })).toBe(false);
+    expect(matchesFilters({ id: 'a' }, { query: 'fé' })).toBe(false);
+    expect(matchesFilters({ id: 'r', parent_id: 'a' }, {})).toBe(false);
+  });
+
+  it('não conta as fixadas nem as que já estão à vista', () => {
+    expect(countNew([{ id: 'a' }, { id: 'b', pinned: true }, { id: 'c' }], [{ id: 'c' }])).toBe(1);
   });
 });
