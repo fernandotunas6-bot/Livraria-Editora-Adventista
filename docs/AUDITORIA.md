@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (853, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (857, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1413,6 +1413,41 @@ O carrinho passou a ter testes do `addToCart` (sete casos): o que o aviso diz na
 formas, a recusa de um produto com tamanhos sem tamanho escolhido, o tecto do stock somando o
 que já lá está, a soma na mesma variante e as linhas separadas por tamanho. Com o código
 antigo, três deles falham.
+
+### Sétima ronda: uma guarda para a família inteira, em vez de caçar um a um
+
+Três achados foram o mesmo erro — ler um campo que não existe e deixar um `||` ou um `?.`
+tapar: o **18** (`autoCode`, que rebentava o formulário de livros em produção), o **92** (o
+mega-menu lia só `price_formatted` e anunciava o preço de tabela) e o **97** (`variant.name`,
+que dava sempre "Edição Standard"). O lint não apanha esta família: um acesso a propriedade
+não é uma variável por declarar, e o `no-undef` não o vê.
+
+Procurado sistematicamente — todas as leituras `variant.X` e `selectedVariant.X` do site
+contra os campos que o `EcommerceApi` constrói —, saíram três: o `variant.name` já corrigido,
+e dois falsos positivos em `lib/pricing.js` (`variant.price`, `variant.sale_price`). Os falsos
+positivos é que explicam a família: **a palavra "variante" designava duas formas diferentes**.
+
+| Forma | Campos | Onde nasce |
+|---|---|---|
+| Entrada de `stock_books.versions` | `label`, `format`, `price`, `stock`, `isbn` | escrita no painel |
+| Variante de produto | `id`, `title`, `price_in_cents`, `inventory_quantity`, … | `bookToProduct` / `getProduct` |
+
+O `variantPrices` recebia a primeira e chamava-lhe `variant`; o resto do site usa a mesma
+palavra para a segunda. Com duas formas sob um nome, ler o campo de uma na outra é o erro
+mais fácil de fazer — e foi o que aconteceu ao aviso do carrinho.
+
+O argumento do `variantPrices` passou a chamar-se `versao`, e fica um teste
+(`lib/variantFields.test.js`, no desenho do `queryFields.test.js` que já confere as colunas
+das consultas contra as migrações): a forma de referência é lida do próprio `EcommerceApi`,
+por isso um campo novo numa variante fica legível sem tocar no teste, e um campo imaginado é
+recusado com o nome do ficheiro. Confirmado que o apanha: com `variant.name` reposto no
+`useCart`, falha com `variant.name — lido em hooks/useCart.jsx`.
+
+O teste tem um controlo de si próprio, e foi esse controlo que apanhou um defeito na primeira
+versão: a expressão regular só aceitava minúsculas, por isso `variant.naoExiste` era lido como
+`nao` — e um nome em camelCase cujo prefixo coincidisse com um campo real passaria sem ser
+notado. Os comentários são retirados antes da procura, para um campo citado numa explicação
+não contar como leitura.
 
 ### Quinta ronda: um teste para o formulário que já esteve partido em produção
 
