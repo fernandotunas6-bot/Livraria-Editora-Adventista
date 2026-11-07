@@ -1,6 +1,31 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Política de privacidade (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
+
+- **Pedido do dono:** "actualizar a política de privacidade para cobrir a comunidade". O site não tinha nenhuma (nem página, nem link, nem texto no painel), por isso foi **criada** em `/privacidade` (`/privacy` e `/politica-de-privacidade` redireccionam), com uma secção própria para a comunidade.
+- **Texto:** em `app/web/src/lib/privacyPolicy.js`, com testes. Descreve o que o sistema faz de facto, levantado do código e das migrações: dados da conta, das encomendas (incluindo documento e assinatura de quem recebe e as coordenadas, se partilhadas), do atendimento e do assistente (o que vai para o Gemini ou o DeepSeek), da comunidade (o que é público, o que nunca é, o que é privado, como apagar) e os fornecedores. Os contactos vêm das Configurações (`contact_email`, `contact_phone`, `contact_address`). **Quem mudar o que se recolhe ou para onde vai, muda este ficheiro e a data.**
+- **Links:** no rodapé (fora das colunas configuráveis), no registo, no editor da comunidade ("O que fica visível") e nas regras da comunidade.
+- **Para o dono rever, de preferência com um jurista:**
+  - a denominação legal e o NIF da empresa, que o sistema não tem (o texto usa o nome do site);
+  - a regra para menores de 18 anos;
+  - o compromisso de avisar em caso de falha de segurança;
+  - os prazos de conservação das encomendas, que remetem para "o que a lei fiscal e comercial exige".
+  - A referência legal é a Lei n.º 22/11 (Protecção de Dados Pessoais) e a autoridade de controlo é a APD.
+- **Ainda não há** forma de o cliente apagar a conta ou descarregar os seus dados sozinho: os pedidos chegam pelos contactos e a equipa apaga a conta no painel (Utilizadores). Apagar a conta apaga publicações, respostas e gostos da comunidade.
+
+## Comunidade literária premium (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
+
+- **Pedido do dono:** "tornar premium, com visual organizado e auditado, para ter uma comunidade literária grande". Escolhas: **temas + tipo** de publicação com filtros e ordenação; **clube do livro do mês**, **notificações** (sino e push), **página de cada publicação** e **perfis de leitor**; visual **editorial da marca + rede social**; moderação **publicar logo**, com a equipa a fixar e a marcar respostas oficiais.
+- **Base de dados** (migração `20261107060000_comunidade_premium`, **aplicada no merge**): temas (`community_topics`, 8 iniciais), `topic`/`kind`/`replies_count`/`last_activity_at`/`pinned_at`/`is_official` nas publicações, `profiles.reader_key` (o endereço público do leitor, nunca o `user_id`) e `profiles.community_notify`, `community_book_clubs`, avisos `community` em `customer_notifications` (respostas, resposta oficial, gostos agrupados por 6 h) e funções públicas novas (`community_list`, `community_thread`, `community_list_replies`, `community_reader`, `community_reader_posts`, `community_sidebar`, `community_current_club`). As funções antigas (`community_feed`…) ficam para o site anterior não partir durante o deploy; **retirar numa migração de limpeza** depois.
+- **Site:** `/comunidade` em 3 colunas (temas, feed, coluna lateral) com os filtros no endereço (`?tema=&tipo=&ordem=&q=&livro=`); `/comunidade/p/:id` e `/comunidade/leitor/:key`; sino no cabeçalho e separador **Notificações** no perfil.
+- **Painel:** Clientes → Comunidade com Denúncias, Publicações (fixar, ocultar), Temas, Clube do livro e Sites bloqueados.
+- **Push:** a Edge Function envia os avisos da comunidade só por push (nunca email). Respostas saem logo; gostos esperam 30 min para irem num só push. O agendador `avisos-equipa` passou a acordar a função também para estes.
+- **Partilha:** `functions/comunidade/p/[id].js` (Cloudflare Pages Function, na raiz do repositório) escreve título, texto e capa da publicação para o WhatsApp. A configuração é gerada pelo `scripts/seo-catalogo.mjs` em `scripts/gerado/` (fora do git), com os cabeçalhos de segurança do `_headers`; `_routes.json` limita a Function a `/comunidade/p/*`.
+- **Por confirmar depois do merge:** (1) no registo do deploy do Cloudflare, "Compiled Worker successfully" e a Function carregada; (2) colar o link de uma publicação no WhatsApp e ver a pré-visualização; (3) um push de resposta num telemóvel com push activo.
+- **Política de privacidade:** criada a 2026-11-07 em `/privacidade` (ver a secção seguinte). Pesquisa por `ilike`: chega para milhares de publicações; um índice trigram (`pg_trgm`) fica para quando houver volume.
+- Detalhe e verificação em [AUDITORIA.md](AUDITORIA.md), secção **9.13**.
 
 ## Comunidade de leitores (2026-11-06, ramo `claude/elegant-noether-ebflws`)
 

@@ -143,7 +143,7 @@ export default function OpsTeamsPanel({ canEdit = false }) {
       setHours(d.hours);
     } catch (err) {
       setError(/staff_teams|staff_ops_settings/.test(err.message || '')
-        ? 'As equipas precisam da migração 20261106120000 aplicada no Supabase.'
+        ? 'As equipas precisam da migração 20261107020000 aplicada no Supabase.'
         : err.message);
     }
     try {
@@ -263,7 +263,7 @@ export default function OpsTeamsPanel({ canEdit = false }) {
             <article key={t.id} className={`space-y-3 rounded-xl border bg-card p-4 ${t.active ? '' : 'opacity-60'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-semibold">{t.name}{!t.active && ' (inactiva)'}</h3>
+                  <h3 className="text-lg font-semibold">{t.name}{!t.active && ' (inactiva)'}</h3>
                   <p className="text-xs text-muted-foreground">{t.store_id ? storeName(t.store_id) : 'Central'} · assumir em {t.escalation_minutes} min</p>
                 </div>
                 {canEdit && (
@@ -297,7 +297,7 @@ export default function OpsTeamsPanel({ canEdit = false }) {
 
       {hours && (
         <section className="space-y-3 rounded-xl border bg-card p-4">
-          <h3 className="font-semibold">Horário de funcionamento (hora de Luanda)</h3>
+          <h3 className="text-lg font-semibold">Horário de funcionamento (hora de Luanda)</h3>
           <p className="text-sm text-muted-foreground">
             O tempo para assumir só conta dentro deste horário. Fora dele, só os avisos críticos saem por email, WhatsApp e push; os outros saem à abertura.
             Um pedido em que a equipa respondeu e o cliente não volta a escrever recebe um aviso e fecha sozinho dois dias depois.
@@ -350,7 +350,7 @@ export default function OpsTeamsPanel({ canEdit = false }) {
       )}
 
       <section className="space-y-3">
-        <h3 className="font-semibold">Quem recebe o quê (com a configuração actual)</h3>
+        <h3 className="text-lg font-semibold">Quem recebe o quê (com a configuração actual)</h3>
         {routingError && <p className="text-sm text-muted-foreground">{routingError}</p>}
         {routing && (
           <div className="overflow-x-auto rounded-xl border">

@@ -7,7 +7,7 @@
 --   3. O agendador dos avisos deixa de chamar a Edge Function de 2 em 2 minutos fora do horário
 --      quando só há avisos que esperam pela abertura.
 --
--- Depende de 20261106120000_equipas_alertas_e_prazos.sql.
+-- Depende de 20261107020000_equipas_alertas_e_prazos.sql.
 
 -- ---------------------------------------------------------------------------
 -- 1. Avisos ao cliente enviados por email/push

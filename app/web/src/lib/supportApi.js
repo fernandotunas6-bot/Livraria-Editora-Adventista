@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 
-// Campos da migração 20261106090000 (pedidos numerados, assistente, notas, avaliação). Até ela
+// Campos da migração 20261107010000 (pedidos numerados, assistente, notas, avaliação). Até ela
 // chegar a produção, os pedidos com estes campos dão "column does not exist" e o atendimento usa
 // os campos antigos — o site novo pode ser publicado antes ou depois da base de dados.
 const THREAD_FIELDS = 'id, customer_id, order_id, subject, status, assigned_to, customer_last_read_at, staff_last_read_at, last_sender_id, last_message_at, created_at, updated_at, channel, ticket_number, category, priority, ai_summary, escalated_at, first_response_at, closed_at, csat_score, csat_comment, team_id, first_response_due_at, resolution_due_at';

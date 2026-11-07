@@ -89,7 +89,7 @@ externas, só livros do catálogo e as regras de passagem à equipa aplicam-se s
 
 ## Ficheiros
 
-- Migração: `supabase/migrations/20261106090000_assistente_conversas_e_pedidos.sql`
+- Migração: `supabase/migrations/20261107010000_assistente_conversas_e_pedidos.sql`
 - Servidor: rotas `/chat`, `/chat/session`, `/chat/escalate`, `/chat/new` e `/chat/feedback`
   em `supabase/functions/app/index.ts`; motor em `chatEngine.ts`; conhecimento em
   `chatKnowledge.ts`

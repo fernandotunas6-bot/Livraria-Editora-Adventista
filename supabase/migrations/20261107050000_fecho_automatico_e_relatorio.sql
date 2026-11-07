@@ -5,7 +5,7 @@
 --   * ao fim de (N - 2) dias recebe um aviso: "se não precisar de mais nada, fechamos a dd/mm";
 --   * 2 dias depois do aviso, sem resposta, fecha, com mensagem e convite a avaliar.
 -- N é configurável em Equipas e alertas (0 desliga; 7 por omissão). Qualquer mensagem do
--- cliente ou da equipa cancela o aviso. Depende de 20261106140000.
+-- cliente ou da equipa cancela o aviso. Depende de 20261107030000.
 
 alter table public.staff_ops_settings
   add column if not exists auto_close_days smallint not null default 7;

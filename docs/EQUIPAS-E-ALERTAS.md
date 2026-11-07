@@ -100,7 +100,7 @@ aparecem com **Fora do prazo**. Mudar a prioridade recalcula os prazos.
 
 ## Ficheiros
 
-- Migração: `supabase/migrations/20261106120000_equipas_alertas_e_prazos.sql`
+- Migração: `supabase/migrations/20261107020000_equipas_alertas_e_prazos.sql`
 - Regras puras: `supabase/functions/app/opsRouting.ts` (horário, prazos, canais) e `orderWatch.ts`
 - Envio e vigilância: `runOrderWatch` e `dispatchStaffNotifications` em `supabase/functions/app/index.ts`;
   rotas `/admin/ops/routing` e `/admin/ops/test`

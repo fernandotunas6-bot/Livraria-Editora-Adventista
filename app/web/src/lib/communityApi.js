@@ -1,8 +1,9 @@
 /**
- * Comunidade: leitura pelas funções públicas `community_feed`, `community_replies` e
- * `community_post` (sem email nem id da conta) e escrita nas tabelas, sempre em nome de quem tem
- * sessão (o RLS e os triggers fixam o autor). Migrações: 20261106190000_comunidade,
- * 20261106220000_comunidade_links_seguros e 20261106230000_leituras_publicas_por_funcoes.
+ * Comunidade: leitura pelas funções públicas (`community_list`, `community_list_replies`,
+ * `community_thread`, `community_reader`, `community_sidebar`, `community_current_club`), sem
+ * email nem id da conta, e escrita nas tabelas, sempre em nome de quem tem sessão (o RLS e os
+ * triggers fixam o autor). Migrações: 20261106190000_comunidade, 20261106220000_comunidade_links_seguros
+ * e 20261107060000_comunidade_premium.
  */
 import { supabase } from '@/lib/supabaseClient';
 
@@ -22,27 +23,86 @@ function raise(error) {
   throw e;
 }
 
-/** Publicações (sem as respostas), mais recentes primeiro. `before` é a data da última já mostrada. */
-export async function loadPosts({ bookId = null, before = null, limit = PAGE_SIZE } = {}) {
-  const { data, error } = await supabase.rpc('community_feed', { p_book_id: bookId || null, p_before: before || null, p_limit: limit });
+/**
+ * Publicações (sem as respostas), com filtros e ordenação. Em "recentes" a página seguinte
+ * pede-se com `before` (a data da última mostrada); nas outras ordens, com `offset`.
+ */
+export async function listPosts({ topic = '', kind = '', sort = 'recentes', bookId = null, query = '', before = null, offset = 0, limit = PAGE_SIZE } = {}) {
+  const { data, error } = await supabase.rpc('community_list', {
+    p_topic: topic || null,
+    p_kind: kind || null,
+    p_sort: sort || 'recentes',
+    p_book_id: bookId || null,
+    p_query: query || null,
+    p_before: before || null,
+    p_offset: offset || 0,
+    p_limit: limit,
+  });
   raise(error);
   return data || [];
 }
 
-/** Respostas das publicações indicadas, da mais antiga para a mais recente. */
+/** Compatível com a primeira versão: o feed por livro. */
+export const loadPosts = ({ bookId = null, before = null, limit = PAGE_SIZE } = {}) => listPosts({ bookId, before, limit });
+
+/** Respostas das publicações indicadas (a oficial primeiro em cada uma). */
 export async function loadReplies(parentIds) {
   const ids = [...new Set((parentIds || []).filter(Boolean))];
   if (!ids.length) return [];
-  const { data, error } = await supabase.rpc('community_replies', { p_parent_ids: ids });
+  const { data, error } = await supabase.rpc('community_list_replies', { p_parent_ids: ids });
   raise(error);
   return data || [];
 }
 
-/** Uma publicação (depois de criar, para vir com o nome do autor). */
+/** Uma publicação com todas as respostas: `{ post, replies }`, ou `null` se não existe ou está oculta. */
+export async function loadThread(id) {
+  const { data, error } = await supabase.rpc('community_thread', { p_id: id });
+  raise(error);
+  const rows = data || [];
+  const post = rows.find((r) => !r.parent_id) || null;
+  return post ? { post, replies: rows.filter((r) => r.parent_id) } : null;
+}
+
+/** Uma publicação ou resposta (depois de criar, para vir com o nome do autor). */
 export async function loadPost(id) {
-  const { data, error } = await supabase.rpc('community_post', { p_id: id });
+  const { data, error } = await supabase.rpc('community_thread', { p_id: id });
+  raise(error);
+  return (data || []).find((r) => r.id === id) || null;
+}
+
+/** Perfil público de um leitor, ou `null`. */
+export async function loadReader(key) {
+  const { data, error } = await supabase.rpc('community_reader', { p_key: key });
   raise(error);
   return (data || [])[0] || null;
+}
+
+export async function loadReaderPosts(key, before = null) {
+  const { data, error } = await supabase.rpc('community_reader_posts', { p_key: key, p_before: before || null, p_limit: PAGE_SIZE });
+  raise(error);
+  return data || [];
+}
+
+/** Coluna lateral: números, temas com publicações recentes e livros mais falados. */
+export async function loadSidebar() {
+  const { data, error } = await supabase.rpc('community_sidebar');
+  raise(error);
+  return data || { members: 0, posts_week: 0, posts_total: 0, topics: [], books: [] };
+}
+
+export async function loadCurrentClub() {
+  const { data, error } = await supabase.rpc('community_current_club');
+  raise(error);
+  return (data || [])[0] || null;
+}
+
+/** Temas activos (a equipa lê também os desligados, pelo RLS). */
+export async function loadTopics() {
+  const { data, error } = await supabase.from('community_topics')
+    .select('slug, name, description, icon, sort_order, active')
+    .order('sort_order', { ascending: true }).order('name', { ascending: true });
+  raise(error);
+  return data || [];
 }
 
 /** Ids das publicações de que quem lê gosta (só as suas: o RLS não deixa ver as dos outros). */
@@ -145,4 +205,121 @@ export async function addBlockedDomain(domain, category = 'outro', note = '') {
 export async function removeBlockedDomain(domain) {
   const { error } = await supabase.from('community_blocked_domains').delete().eq('domain', domain);
   raise(error);
+}
+
+// ── Equipa: fixar, resposta oficial, temas e clube ───────────────────────
+
+export async function setPinned(id, pinned) {
+  const { error } = await supabase.from('community_posts').update({ pinned_at: pinned ? new Date().toISOString() : null }).eq('id', id);
+  raise(error);
+}
+
+export async function setOfficial(id, official) {
+  const { error } = await supabase.from('community_posts').update({ is_official: !!official }).eq('id', id);
+  raise(error);
+}
+
+export async function saveTopic(topic, isNew = false) {
+  const row = {
+    name: String(topic.name || '').trim(),
+    description: String(topic.description || '').trim().slice(0, 200),
+    icon: topic.icon || 'book-open',
+    sort_order: Number(topic.sort_order) || 0,
+    active: topic.active !== false,
+  };
+  const q = isNew
+    ? supabase.from('community_topics').insert({ ...row, slug: topic.slug })
+    : supabase.from('community_topics').update(row).eq('slug', topic.slug);
+  const { error } = await q;
+  if (error?.code === '23505') throw new Error('Já existe um tema com esse endereço.');
+  if (error?.code === '23514') throw new Error('Verifique o nome (2 a 60 letras) e o endereço (só letras, números e hífens).');
+  raise(error);
+}
+
+export async function deleteTopic(slug) {
+  const { error } = await supabase.from('community_topics').delete().eq('slug', slug);
+  raise(error);
+}
+
+export async function loadClubs() {
+  const { data, error } = await supabase.from('community_book_clubs')
+    .select('id, book_id, month, title, intro, active, created')
+    .order('month', { ascending: false }).limit(36);
+  raise(error);
+  return data || [];
+}
+
+export async function saveClub(club) {
+  const row = {
+    book_id: club.book_id,
+    month: club.month,
+    title: String(club.title || '').trim().slice(0, 120),
+    intro: String(club.intro || '').trim().slice(0, 1000),
+    active: club.active !== false,
+  };
+  const q = club.id
+    ? supabase.from('community_book_clubs').update(row).eq('id', club.id)
+    : supabase.from('community_book_clubs').insert(row);
+  const { error } = await q;
+  if (error?.code === '23505') throw new Error('Já há um clube para esse mês.');
+  raise(error);
+}
+
+export async function deleteClub(id) {
+  const { error } = await supabase.from('community_book_clubs').delete().eq('id', id);
+  raise(error);
+}
+
+/** Publicações recentes para a equipa (incluindo ocultas), com pesquisa no texto. */
+export async function loadStaffPosts(query = '') {
+  let q = supabase.from('community_posts')
+    .select('id, parent_id, body, topic, kind, hidden, pinned_at, reports_count, likes_count, replies_count, created')
+    .is('parent_id', null)
+    .order('created', { ascending: false }).limit(100);
+  const text = String(query || '').trim();
+  if (text) q = q.ilike('body', `%${text.replace(/[%_\\]/g, (m) => `\\${m}`)}%`);
+  const { data, error } = await q;
+  raise(error);
+  return data || [];
+}
+
+// ── Avisos (sino do cabeçalho) ───────────────────────────────────────────
+
+/** Avisos do próprio (o RLS só devolve os seus), mais recentes primeiro. */
+export async function loadNotifications(limit = 20) {
+  const { data, error } = await supabase.from('customer_notifications')
+    .select('id, kind, title, body, href, read_at, created_at')
+    .order('created_at', { ascending: false }).limit(limit);
+  raise(error);
+  return data || [];
+}
+
+export async function markAllNotificationsRead() {
+  const { error } = await supabase.rpc('customer_mark_all_notifications_read');
+  raise(error);
+}
+
+export async function markNotificationRead(id) {
+  const { error } = await supabase.rpc('customer_mark_notification_read', { p_notification_id: id });
+  raise(error);
+}
+
+export async function loadCommunityNotify(userId) {
+  const { data, error } = await supabase.from('profiles').select('community_notify').eq('id', userId).maybeSingle();
+  raise(error);
+  return data?.community_notify !== false;
+}
+
+export async function setCommunityNotify(userId, on) {
+  const { error } = await supabase.from('profiles').update({ community_notify: !!on }).eq('id', userId);
+  raise(error);
+}
+
+/** Títulos e capas dos livros dos clubes (para a lista do painel). */
+export async function loadBookTitles(ids) {
+  const list = [...new Set((ids || []).filter(Boolean))];
+  if (!list.length) return {};
+  const { data, error } = await supabase.from('stock_books').select('id, title').in('id', list);
+  raise(error);
+  return Object.fromEntries((data || []).map((b) => [b.id, b.title]));
 }

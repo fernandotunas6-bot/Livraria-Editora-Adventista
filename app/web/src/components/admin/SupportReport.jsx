@@ -59,7 +59,7 @@ export default function SupportReport() {
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4" aria-label="Indicadores do atendimento">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 font-semibold"><BarChart3 className="h-4 w-4 text-primary" /> Indicadores</h3>
+        <h3 className="flex items-center gap-2 text-lg font-semibold"><BarChart3 className="h-4 w-4 text-primary" /> Indicadores</h3>
         <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="h-8 rounded-md border bg-background px-2 text-xs" aria-label="Período">
           <option value={7}>Últimos 7 dias</option>
           <option value={30}>Últimos 30 dias</option>

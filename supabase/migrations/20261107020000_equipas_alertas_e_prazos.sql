@@ -15,7 +15,7 @@
 --     Function envia-os (de 2 em 2 minutos, só quando há algum por enviar).
 --
 -- Sem equipas configuradas, tudo continua como antes: os avisos vão para quem gere encomendas.
--- Depende de 20261106090000_assistente_conversas_e_pedidos.sql.
+-- Depende de 20261107010000_assistente_conversas_e_pedidos.sql.
 
 -- ---------------------------------------------------------------------------
 -- 1. Equipas e membros

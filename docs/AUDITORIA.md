@@ -1117,6 +1117,51 @@ dura" a 7 500 Kz + 1 500 de portes = 9 000 Kz, município e rua gravados, stock 
 "não encontrada"; com o certo, a encomenda passa a "a aguardar confirmação"). A página de sucesso
 diz "Encomenda Registada! … Falta o pagamento" a quem ainda tem de pagar.
 
+## 9.13 Comunidade literária premium (2026-11-07)
+
+Feita no ramo `claude/quirky-hypatia-wnid2g`, fase a fase, como o dono pediu, num **Supabase local completo** com a Edge Function em Deno e o site no Vite. A pré-visualização da partilha foi testada com `wrangler pages dev`.
+
+### Verificação
+
+- **Base de dados:** as 79 migrações aplicam do zero (`supabase db reset`). 29 casos SQL numa transacção anulada, todos certos.
+  - Anónimo e cliente não lêem `reader_key` alheio nem `user_id`.
+  - Um cliente não fixa, não marca oficial, não muda o tema de outro e não mexe nos contadores.
+  - As respostas herdam o tema.
+  - Os avisos de resposta e de gosto saem agrupados, e o interruptor desliga-os.
+  - As regras de links continuam.
+  - Advisors de segurança: 0.
+- **Site:** lint, 746 testes (novos para `communityStyle`, `useCommunity`, o push, a partilha e o `slugify` dos temas), build e `deno check`.
+- **Browser (Playwright):**
+  - publicar com tema e tipo, filtrar, ordenar, pesquisar;
+  - página da publicação e perfil do leitor;
+  - equipa a responder e a marcar oficial;
+  - sino com os dois avisos e "marcar tudo como lido";
+  - separador no perfil e ficha do livro;
+  - painel: fixar, criar tema, escolher livro do mês.
+- **Axe (WCAG A/AA):** 0 violações a 1280, 768 e 390 px nas páginas novas e no painel; sem scroll horizontal; sem erros na consola.
+- **Push:** com quatro avisos de teste, a resposta e o gosto com 40 min saíram; o gosto com 5 min ficou à espera; a pessoa com os avisos desligados ficou tratada sem push. O agendador não acorda a função só por um gosto recente.
+- **Partilha:** `curl` com o user-agent do WhatsApp a `/comunidade/p/<id>` devolve o `og:title`, a descrição com a citação e a capa do livro, com CSP e HSTS no cabeçalho. Um id inexistente ou oculto devolve a página genérica, e o resto do site não passa pela Function.
+
+### Achados durante a verificação
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 66 | O botão "Escrever" do topo clicava no primeiro botão do feed, que passou a ser o separador "Recentes" e não o editor. | Média | ✅ procura o editor pelo marcador `data-composer-open` |
+| 67 | Na página da publicação o editor de resposta já vem aberto, e "Responder" fechava-o. | Média | ✅ leva o foco ao editor; sem sessão, mostra "Entre na sua conta para responder" |
+| 68 | No telemóvel e no tablet, a fila de temas que desliza alargava a página (scroll horizontal de 564 a 934 px): faltava `min-w-0` na coluna da grelha. | Média | ✅ |
+| 69 | O rodapé com "vidro" sobre o fundo claro ficava cinzento: o texto media 3,4:1 (o mínimo é 4,5), em todas as páginas. Por baixo do rodapé não há nada para desfocar. | Média | ✅ fundo sólido; horários e direitos a 70 % |
+| 70 | O hover dos botões `outline` e `ghost` usa a cor de destaque da marca com texto branco; o ciano das definições dava 2,96:1. | Média | ✅ a cor de destaque é escurecida até se ler, como a principal (`ensureContrastOnWhite`) |
+| 71 | A condição do agendador `avisos-equipa` só olhava para `kind = 'support'`: sem a correcção, os avisos da comunidade nunca acordariam a função. | Alta | ✅ na migração `comunidade_premium` |
+| 72 | As capas podem vir como caminho do próprio site (`/images/capas/…`); a partilha só aceitava `https` e caía na imagem genérica. | Baixa | ✅ completa com a origem; recusa `javascript:`, `data:` e `//outro-site` |
+| 73 | Plurais: "1 respostas" nas listas da página da publicação e do perfil. | Baixa | ✅ |
+
+### Decisões e riscos
+
+- **Fixar e marcar oficial só pela equipa** (`private.is_staff()`: admin ou gestor, com a verificação em dois passos quando a pessoa a activou), mesmo por SQL directo sem sessão. É a mesma regra que já vale para `hidden`.
+- **Os gostos esperam 30 min antes do push**, para não haver um push por gosto. O aviso no site aparece logo.
+- **As funções públicas antigas ficam** até uma migração de limpeza, para o site anterior não partir na janela do deploy.
+- **A Function usa a chave pública** (a mesma do site) e lê só pela RPC pública, que não devolve publicações ocultas, `user_id` nem email.
+
 ## 10. Não verificado nesta auditoria
 
 - **Checkout real:** não foi feita nenhuma encomenda, para não criar dados nem mexer no stock.
