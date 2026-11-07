@@ -22,9 +22,13 @@
 --      devolvido: fica só com as colunas de seguimento (estado geral, transportadora, código de
 --      seguimento, data prevista, código do colportor).
 --   6. Escrita só por funções, chamadas pela Edge Function (service role), que verifica a
---      permissão, diz quem foi (`x-actor-id`) e avisa o cliente: o cliente indica a referência;
---      a equipa confirma (com o valor recebido), rejeita (com o motivo), regista pagamentos ao
---      balcão e na entrega, anula um pagamento confirmado por engano e regista reembolsos.
+--      permissão, diz quem foi (`x-actor-id`) e avisa o cliente. Um pagamento só fica
+--      confirmado de duas maneiras (regra do dono, 2026-11-07):
+--        * pelo gateway de pagamentos — o webhook assinado (migração gateway_de_pagamentos);
+--        * por um funcionário com "Confirmar pagamentos", que processa o pagamento do cliente:
+--          confirma (com o valor recebido), rejeita (com o motivo), regista pagamentos ao
+--          balcão e na entrega, anula um pagamento confirmado por engano e regista reembolsos.
+--      O cliente nunca confirma: a referência que indica é uma pista para a equipa.
 --      Tudo fica também no registo de segurança.
 --   7. O total da encomenda é sempre a soma dos artigos mais os portes: mudá-lo sozinho não pega.
 --   8. Os avisos na conta do cliente conhecem "pago em parte" e "não confirmado".
@@ -245,7 +249,13 @@ create table if not exists public.order_payments (
   -- Quem recebeu o dinheiro em mão: o estafeta, a pessoa do balcão.
   collected_by text not null default '' check (length(collected_by) <= 120),
   notes text not null default '' check (length(notes) <= 500),
-  source text not null default 'staff' check (source in ('customer', 'staff', 'migration')),
+  -- De onde veio: o gateway (webhook assinado, confirmação automática), a equipa (com a
+  -- permissão "Confirmar pagamentos"), o cliente (só indica; quem confirma é a equipa) ou as
+  -- encomendas que já existiam (migração).
+  source text not null default 'staff' check (source in ('gateway', 'customer', 'staff', 'migration')),
+  -- Gateway: o fornecedor e o id da transacção dele. Um reenvio do webhook não conta duas vezes.
+  provider text not null default '' check (provider ~ '^[a-z0-9_]{0,30}$'),
+  transaction_id text not null default '' check (length(transaction_id) <= 120),
   received_at timestamptz,
   created timestamptz not null default now(),
   created_by uuid,
@@ -264,6 +274,8 @@ create index if not exists order_payments_reference_idx on public.order_payments
 create index if not exists order_payments_reported_idx on public.order_payments (created) where status = 'reported';
 create index if not exists order_payments_received_idx on public.order_payments (received_at) where status = 'confirmed';
 create index if not exists order_payments_created_by_idx on public.order_payments (created_by) where created_by is not null;
+create unique index if not exists order_payments_transacao_unica on public.order_payments (provider, transaction_id)
+  where transaction_id <> '';
 create index if not exists order_payments_decided_by_idx on public.order_payments (decided_by) where decided_by is not null;
 
 alter table public.order_payments enable row level security;
@@ -294,7 +306,8 @@ begin
   if tg_op = 'UPDATE' then
     if new.order_id <> old.order_id or new.kind <> old.kind or new.source <> old.source
        or new.created <> old.created or new.created_by is distinct from old.created_by
-       or new.method_code <> old.method_code or new.reference <> old.reference then
+       or new.method_code <> old.method_code or new.reference <> old.reference
+       or new.provider <> old.provider or new.transaction_id <> old.transaction_id then
       raise exception 'Um pagamento registado não muda de encomenda, tipo, método nem referência.' using errcode = '42501';
     end if;
     if new.status <> old.status and not (
@@ -984,6 +997,7 @@ begin
           'id', p.id, 'kind', p.kind, 'status', p.status, 'amount', p.amount, 'method_code', p.method_code,
           'method_name', p.method_name, 'reference', p.reference, 'account', p.account,
           'collected_by', p.collected_by, 'notes', p.notes, 'source', p.source, 'received_at', p.received_at,
+          'provider', p.provider, 'transaction_id', p.transaction_id,
           'created', p.created, 'decided_at', p.decided_at, 'decision_reason', p.decision_reason,
           'created_by_name', (select coalesce(nullif(pr.name, ''), pr.email) from public.profiles pr where pr.id = p.created_by),
           'decided_by_name', (select coalesce(nullif(pr.name, ''), pr.email) from public.profiles pr where pr.id = p.decided_by),

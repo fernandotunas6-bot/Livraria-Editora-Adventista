@@ -92,7 +92,21 @@ begin
         'payments', coalesce((select sum(amount) from mov where kind = 'payment'), 0),
         'refunds', coalesce((select sum(amount) from mov where kind = 'refund'), 0),
         'net', coalesce((select sum(case when kind = 'payment' then amount else -amount end) from mov), 0),
-        'count', (select count(*) from mov where kind = 'payment')),
+        'count', (select count(*) from mov where kind = 'payment'),
+        -- Confirmado pelo gateway (automático) e pela equipa (à mão): a regra do dono é que tudo
+        -- passe pelo gateway, excepto o que um funcionário com a permissão processa.
+        'automatic', coalesce((select sum(amount) from mov where kind = 'payment' and source = 'gateway'), 0),
+        'manual', coalesce((select sum(amount) from mov where kind = 'payment' and source <> 'gateway'), 0)),
+      -- Chamadas do webhook no período: gravadas, repetidas, sem encomenda, ignoradas, recusadas.
+      'gateway', (select jsonb_build_object(
+                    'recorded', count(*) filter (where e.outcome = 'recorded'),
+                    'duplicate', count(*) filter (where e.outcome = 'duplicate'),
+                    'orphan', count(*) filter (where e.outcome = 'orphan'),
+                    'ignored', count(*) filter (where e.outcome = 'ignored'),
+                    'rejected', count(*) filter (where e.outcome = 'rejected'),
+                    'last_at', max(e.received_at))
+                  from public.payment_gateway_events e
+                  where e.received_at >= v_from and e.received_at < v_to),
       'by_day', coalesce((select jsonb_agg(jsonb_build_object('day', d.day, 'received', d.received, 'refunded', d.refunded) order by d.day)
                           from (select day, sum(amount) filter (where kind = 'payment') as received,
                                        coalesce(sum(amount) filter (where kind = 'refund'), 0) as refunded
@@ -122,9 +136,20 @@ begin
                                          when age_days <= 30 then '8-30' else '30+' end as bucket,
                                     count(*) as n, sum(outstanding) as amount
                              from active where outstanding > 0 group by 1) x on x.bucket = b.bucket)),
-      'to_confirm', (select jsonb_build_object('count', count(*), 'amount', coalesce(sum(p.amount), 0),
-                                               'cash', count(*) filter (where p.source = 'staff'))
-                     from public.order_payments p where p.kind = 'payment' and p.status = 'reported'),
+      -- O que a caixa tem para verificar: indicado pelo cliente (transferência, Multicaixa) ou por
+      -- quem entregou (dinheiro na mão). Os 50 mais antigos, para o painel os decidir ali.
+      'to_confirm', jsonb_build_object(
+        'count', (select count(*) from public.order_payments p where p.kind = 'payment' and p.status = 'reported'),
+        'amount', coalesce((select sum(p.amount) from public.order_payments p where p.kind = 'payment' and p.status = 'reported'), 0),
+        'cash', (select count(*) from public.order_payments p where p.kind = 'payment' and p.status = 'reported' and p.source = 'staff'),
+        'items', coalesce((select jsonb_agg(jsonb_build_object(
+                             'payment_id', x.id, 'order_id', x.order_id, 'order_number', x.order_number, 'customer_name', x.customer_name,
+                             'amount', x.amount, 'reference', x.reference, 'source', x.source, 'collected_by', x.collected_by,
+                             'method_name', x.method_name, 'created', x.created) order by x.created)
+                           from (select p.*, o.order_number, o.customer_name
+                                 from public.order_payments p join public.orders o on o.id = p.order_id
+                                 where p.kind = 'payment' and p.status = 'reported'
+                                 order by p.created limit 50) x), '[]'::jsonb)),
       'delivered_unpaid', jsonb_build_object(
         'count', (select count(*) from active where delivery_status = 'delivered' and outstanding > 0),
         'amount', coalesce((select sum(outstanding) from active where delivery_status = 'delivered' and outstanding > 0), 0),
@@ -133,7 +158,11 @@ begin
                                                                 'payment_status', a.payment_status) order by a.outstanding desc)
                             from (select * from active where delivery_status = 'delivered' and outstanding > 0
                                   order by outstanding desc limit 20) a), '[]'::jsonb)),
-      'refund_due', (select jsonb_build_object('count', count(*), 'amount', coalesce(sum(o.amount_paid - o.amount_refunded), 0))
+      'refund_due', (select jsonb_build_object(
+                       'count', count(*), 'amount', coalesce(sum(o.amount_paid - o.amount_refunded), 0),
+                       'orders', coalesce(jsonb_agg(jsonb_build_object('order_id', o.id, 'order_number', o.order_number,
+                                                                       'due', o.amount_paid - o.amount_refunded, 'method', o.payment_method_name)
+                                                    order by o.updated desc), '[]'::jsonb))
                      from public.orders o
                      where (coalesce(o.status, '') = 'cancelled' or coalesce(o.delivery_status, '') = 'cancelled')
                        and o.amount_paid - o.amount_refunded > 0),
