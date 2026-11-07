@@ -32,3 +32,8 @@ supabase/.branches/
 
 # Configuração da Pages Function da comunidade, gerada no pós-build (scripts/seo-catalogo.mjs)
 scripts/gerado/
+
+# Registo da Igreja: ficheiros de origem com dados pessoais (telefones, avaliações dos pastores).
+# Importam-se pelo painel (Igreja → Registo da Igreja → Importar); não vão para o repositório.
+/churches.json
+/pastores.json

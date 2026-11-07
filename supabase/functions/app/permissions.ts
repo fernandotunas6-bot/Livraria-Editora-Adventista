@@ -29,6 +29,8 @@ export const PERMISSION_KEYS = [
   "manage_users",
   "manage_payments",
   "manage_marketing",
+  "manage_church_registry",
+  "manage_colporteurs",
 ];
 
 /** Faz parte da equipa — distinto de ter uma permissão concreta. */
