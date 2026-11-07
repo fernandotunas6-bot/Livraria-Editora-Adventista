@@ -84,18 +84,22 @@ export default function OrderStatusCard({ card, authed = false }) {
           </div>
         ))}
         {card.tracking && (
-          <div className="flex items-center gap-2 text-xs">
-            <dt className="w-20 shrink-0 text-muted-foreground">Rastreio</dt>
-            <dd className="flex min-w-0 flex-1 items-center gap-1.5">
-              <span className="truncate font-mono">{card.carrier ? `${card.carrier} · ` : ''}{card.tracking}</span>
-              <button
-                type="button"
-                onClick={copy}
-                aria-label={copied ? 'Código copiado' : 'Copiar o código de rastreio'}
-                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
+          <div className="flex gap-2 text-xs">
+            <dt className="w-20 shrink-0 pt-1 text-muted-foreground">Rastreio</dt>
+            {/* O código inteiro e à vista (é o que o cliente copia); a transportadora por baixo. */}
+            <dd className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <span className="break-all font-mono font-semibold text-foreground">{card.tracking}</span>
+                <button
+                  type="button"
+                  onClick={copy}
+                  aria-label={copied ? 'Código copiado' : 'Copiar o código de rastreio'}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+              </span>
+              {card.carrier && <span className="block text-[11px] text-muted-foreground">{card.carrier}</span>}
             </dd>
           </div>
         )}

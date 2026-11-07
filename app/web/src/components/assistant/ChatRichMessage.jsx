@@ -141,7 +141,8 @@ export default function ChatRichMessage({
     );
   }
 
-  const links = message.links || [];
+  // Com o cartão da encomenda, a ligação ao rastreio ou às encomendas já está no rodapé dele.
+  const links = (message.links || []).filter((l) => !(message.order_card && ['/track', '/profile'].includes(l.path)));
   const suggestions = showSuggestions ? message.suggestions || [] : [];
   const text = message.order_card ? cardLead(message.text) : message.text;
 
@@ -156,24 +157,6 @@ export default function ChatRichMessage({
       )}
 
       {message.order_card && <OrderStatusCard card={message.order_card} authed={authed} />}
-
-      {onFeedback && typeof message.id === 'number' && (
-        <div className="flex items-center gap-1 pl-1 text-muted-foreground">
-          {message.feedback ? (
-            <span className="text-[11px]">{message.feedback === 1 ? 'Obrigado pela avaliação.' : 'Obrigado. Vamos melhorar.'}</span>
-          ) : (
-            <>
-              <span className="mr-1 text-[11px]">Ajudou?</span>
-              <button type="button" onClick={() => onFeedback(message, 1)} aria-label="Sim, ajudou" className="rounded-full p-1 hover:bg-muted hover:text-foreground">
-                <ThumbsUp className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" onClick={() => onFeedback(message, -1)} aria-label="Não ajudou" className="rounded-full p-1 hover:bg-muted hover:text-foreground">
-                <ThumbsDown className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
       {message.products?.length > 0 && (
         <ul className="space-y-1.5">
@@ -225,6 +208,25 @@ export default function ChatRichMessage({
               </a>
             );
           })}
+        </div>
+      )}
+
+      {/* Depois dos livros e das ligações: a resposta lê-se inteira antes de se avaliar. */}
+      {onFeedback && typeof message.id === 'number' && (
+        <div className="flex items-center gap-1 pl-1 text-muted-foreground">
+          {message.feedback ? (
+            <span className="text-[11px]">{message.feedback === 1 ? 'Obrigado pela avaliação.' : 'Obrigado. Vamos melhorar.'}</span>
+          ) : (
+            <>
+              <span className="mr-1 text-[11px]">Ajudou?</span>
+              <button type="button" onClick={() => onFeedback(message, 1)} aria-label="Sim, ajudou" className="rounded-full p-1 hover:bg-muted hover:text-foreground">
+                <ThumbsUp className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={() => onFeedback(message, -1)} aria-label="Não ajudou" className="rounded-full p-1 hover:bg-muted hover:text-foreground">
+                <ThumbsDown className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       )}
 

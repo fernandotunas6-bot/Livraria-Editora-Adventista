@@ -275,6 +275,7 @@ describe('LivrariaAssistant', () => {
         { id: 1, role: 'user', text: 'A minha encomenda', created_at: '2026-11-07T10:00:00Z' },
         bot(2, 'A encomenda **ENC-1** (feita a 03/11/2026) está **em trânsito**. Pagamento: confirmado. Código de rastreio: TRK1.', {
           created_at: '2026-11-07T10:00:05Z',
+          links: [{ label: 'Rastrear encomenda', path: '/track' }, { label: 'Ver catálogo', path: '/shop' }],
           order_card: {
             number: 'ENC-1', made: '03/11/2026', stage: 'in_transit', stage_label: 'em trânsito', cancelled: false, pickup: false,
             steps: [
@@ -296,7 +297,12 @@ describe('LivrariaAssistant', () => {
     const card = host.querySelector('section[aria-label^="Encomenda ENC-1"]');
     expect(card).toBeTruthy();
     expect(card.querySelector('[aria-current="step"]').textContent).toContain('Em trânsito');
-    expect(card.textContent).toContain('Correios · TRK1');
+    // O código inteiro à vista, com a transportadora por baixo.
+    expect(card.querySelector('.font-mono.break-all').textContent).toBe('TRK1');
+    expect(card.textContent).toContain('Correios');
+    // A ligação ao rastreio fica só no rodapé do cartão; as outras ligações continuam.
+    expect(host.querySelectorAll('a[href="/track"]').length).toBe(1);
+    expect(host.querySelector('a[href="/shop"]')).toBeTruthy();
     expect(card.textContent).toContain('08/11/2026');
     // O balão de texto fica só com a primeira frase: o cartão já mostra o pagamento e o rastreio.
     const bubbles = [...host.querySelectorAll('.whitespace-pre-line')].map((n) => n.textContent);
