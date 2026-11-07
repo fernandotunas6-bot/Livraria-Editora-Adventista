@@ -131,26 +131,78 @@ async function getCollectionsMap() {
   }
 }
 
+/**
+ * Leituras do catálogo em curso ou acabadas de fazer, para não as repetir.
+ *
+ * Medido no navegador, com cada descarga do catálogo contada: **a página inicial pedia o
+ * catálogo inteiro três vezes** (o cabeçalho, as prateleiras e o "Mais para si"), a ficha do
+ * produto duas e a loja duas. São sete os componentes que chamam `getProducts({})`, e o
+ * cabeçalho está em todas as páginas. A auditoria mediu a API a 0,85–1,5 s por pedido a
+ * partir de Angola: três descargas dos 102 livros são segundos de espera e de dados pagos
+ * pelo visitante, para a mesma lista.
+ *
+ * Duas coisas, e as duas são precisas:
+ *
+ * - **`emCurso`** junta os pedidos simultâneos. É o que resolve o caso real: os três
+ *   componentes da página inicial pedem no mesmo instante, antes de qualquer resposta
+ *   chegar, por isso uma cache por tempo sozinha não apanharia nenhum deles.
+ * - **`cache`** cobre quem chega a seguir (descer a página, abrir a folha das categorias,
+ *   navegar para outra página do catálogo).
+ *
+ * `VALIDADE` é curta de propósito. O catálogo muda quando a equipa grava no painel, e o
+ * painel não passa por aqui (lê `stock_books` directamente), por isso ninguém fica a ver
+ * dados velhos no sítio onde os está a mudar. Para o visitante, meio minuto de atraso num
+ * preço é incomparavelmente melhor do que três segundos de espera em cada página — e o
+ * checkout recalcula tudo no servidor de qualquer maneira.
+ */
+const VALIDADE = 60_000;
+const cache = new Map();
+const emCurso = new Map();
+
+/** Esquece o que está guardado. Para os testes e para quem acabou de gravar. */
+export function clearCatalogCache() {
+  cache.clear();
+  emCurso.clear();
+}
+
 async function fetchBooks(options = {}) {
-  const collectionsMap = await getCollectionsMap();
-  const filter = options.featured ? `featured = true && ${VISIBLE}` : VISIBLE;
   const limit = Number(options.limit);
+  const chave = `${options.featured ? 'destaques' : 'todos'}|${limit > 0 ? limit : 'tudo'}`;
 
-  let items;
-  if (limit > 0) {
-    const records = await pb.collection('stock_books').getList(1, limit, {
-      sort: BOOK_SORT,
-      filter: filter || undefined,
-    });
-    items = records.items;
-  } else {
-    items = await pb.collection('stock_books').getFullList({
-      sort: BOOK_SORT,
-      filter: filter || undefined,
-    });
+  const guardado = cache.get(chave);
+  if (guardado && Date.now() - guardado.at < VALIDADE) return guardado.valor;
+  const aDecorrer = emCurso.get(chave);
+  if (aDecorrer) return aDecorrer;
+
+  const ler = (async () => {
+    const collectionsMap = await getCollectionsMap();
+    const filter = options.featured ? `featured = true && ${VISIBLE}` : VISIBLE;
+
+    let items;
+    if (limit > 0) {
+      const records = await pb.collection('stock_books').getList(1, limit, {
+        sort: BOOK_SORT,
+        filter: filter || undefined,
+      });
+      items = records.items;
+    } else {
+      items = await pb.collection('stock_books').getFullList({
+        sort: BOOK_SORT,
+        filter: filter || undefined,
+      });
+    }
+    return { items, collectionsMap, total: items.length };
+  })();
+
+  emCurso.set(chave, ler);
+  try {
+    const valor = await ler;
+    cache.set(chave, { valor, at: Date.now() });
+    return valor;
+  } finally {
+    // Um erro não fica guardado: o pedido seguinte tenta outra vez.
+    emCurso.delete(chave);
   }
-
-  return { items, collectionsMap, total: items.length };
 }
 
 function mapSlideRecord(s) {

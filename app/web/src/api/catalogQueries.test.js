@@ -26,7 +26,7 @@ vi.mock('@/lib/dataClient', () => ({
 }));
 vi.mock('@/lib/supabaseClient', () => ({ APP_API_URL: '', mediaUrl: (x) => x, supabase: {} }));
 
-const { searchProducts, getCollectionProducts } = await import('./EcommerceApi');
+const { searchProducts, getCollectionProducts, getProducts, getCategories, clearCatalogCache } = await import('./EcommerceApi');
 
 const livro = (id, extra = {}) => ({
   id, title: id, author: '', genre: 'Geral', price: 1000, stock: 3, active: true,
@@ -36,6 +36,7 @@ const livro = (id, extra = {}) => ({
 
 beforeEach(() => {
   livros.length = 0;
+  clearCatalogCache();
   getList.mockReset();
   getFullList.mockReset();
   // As colecções (`book_collections`) são lidas com getFullList; o catálogo com getList.
@@ -114,5 +115,61 @@ describe('getCollectionProducts', () => {
     expect(await getCollectionProducts('')).toEqual([]);
     expect(await getCollectionProducts(null)).toEqual([]);
     expect(getFullList).not.toHaveBeenCalledWith('stock_books', expect.anything());
+  });
+});
+
+describe('cache do catálogo', () => {
+  /** Quantas vezes se foi buscar a lista inteira de livros. */
+  const descargas = () => getFullList.mock.calls.filter(([nome]) => nome === 'stock_books').length;
+
+  it('pedidos simultâneos partilham uma leitura só', async () => {
+    livros.push(livro('a'), livro('b'));
+    // É o caso real: na página inicial, o cabeçalho, as prateleiras e o "Mais para si"
+    // pedem o catálogo no mesmo instante, antes de qualquer resposta chegar.
+    const [um, dois, tres] = await Promise.all([getProducts({}), getProducts({}), getProducts({})]);
+    expect(descargas()).toBe(1);
+    expect(um.products).toHaveLength(2);
+    expect(dois.products).toHaveLength(2);
+    expect(tres.products).toHaveLength(2);
+  });
+
+  it('quem chega logo a seguir aproveita o que já foi lido', async () => {
+    livros.push(livro('a'));
+    await getProducts({});
+    await getProducts({});
+    await getCategories();
+    expect(descargas()).toBe(1);
+  });
+
+  it('consultas diferentes não se confundem umas com as outras', async () => {
+    livros.push(livro('a'), livro('b'), livro('c'));
+    await getProducts({});
+    await getProducts({ limit: 2 });
+    // A lista inteira veio do getFullList; a limitada do getList.
+    expect(descargas()).toBe(1);
+    expect(getList.mock.calls.filter(([nome]) => nome === 'stock_books')).toHaveLength(1);
+  });
+
+  it('um erro não fica guardado: o pedido seguinte tenta outra vez', async () => {
+    // Só a primeira leitura dos livros falha. (As colecções são lidas à parte e têm cache
+    // própria, por isso o mock tem de distinguir a tabela em vez de contar chamadas.)
+    let falhar = true;
+    getFullList.mockImplementation(async (nome) => {
+      if (nome === 'book_collections') return [];
+      if (falhar) { falhar = false; throw new Error('rede'); }
+      return livros;
+    });
+    await expect(getProducts({})).rejects.toThrow('rede');
+    livros.push(livro('a'));
+    const { products } = await getProducts({});
+    expect(products).toHaveLength(1);
+  });
+
+  it('`clearCatalogCache` obriga a ler de novo', async () => {
+    livros.push(livro('a'));
+    await getProducts({});
+    clearCatalogCache();
+    await getProducts({});
+    expect(descargas()).toBe(2);
   });
 });

@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (827, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (832, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1336,6 +1336,19 @@ mais quatro sítios.
 
 | 92 | **O mega-menu do cabeçalho mostrava o preço de tabela.** Usava `variants[0].price_formatted` em vez do par `sale_price_formatted \|\| price_formatted` que o cartão usa: um livro em promoção aparecia no menu a 8 000 Kz e, um clique abaixo, no cartão a 1 900. O par estava escrito em cada sítio que mostra um preço — bastava esquecê-lo num. | Média (confiança) | ✅ `displayPrice` |
 | 93 | A faixa "Disponíveis Agora" da página inicial olhava só para `variants[0]`: um produto com tamanhos cujo primeiro está esgotado mas os outros não ficava de fora, apesar de se poder comprar. | Baixa | ✅ usa o `inStock` partilhado |
+| 94 | **A página inicial descarregava o catálogo inteiro três vezes.** São sete os componentes que chamam `getProducts({})`, e o cabeçalho está em todas as páginas: medido no navegador, a página inicial pedia os 102 livros 3×, a ficha do produto 2× e a loja 2×. A 0,85–1,5 s por pedido a partir de Angola (medição de 9.4), são segundos de espera e de dados pagos pelo visitante para a mesma lista. | Média (desempenho) | ✅ cache curta com junção dos pedidos simultâneos |
+
+**94 — porque é que a cache sozinha não chegava.** Os três componentes da página inicial
+pedem o catálogo no mesmo instante, antes de a primeira resposta chegar: uma cache por tempo
+não apanharia nenhum deles. Por isso são duas coisas — um registo dos pedidos **em curso**,
+que junta os simultâneos numa leitura só, e a cache de 60 s, que cobre quem chega a seguir
+(descer a página, abrir a folha das categorias, ir para outra página do catálogo). Um erro
+não fica guardado. Medido depois no mesmo teste: ficha do produto e loja passam a **1×**, e a
+página inicial a **2×** — a que resta é a consulta dos destaques, que traz no máximo 12
+linhas e não a lista toda.
+
+O painel não passa por aqui (lê `stock_books` directamente), por isso quem grava um livro
+continua a ver o que gravou, sem atraso nenhum.
 
 **91 — um componente em vez de três correcções.** O site tem três sítios onde um endereço
 escrito no painel vira ligação: as colunas do rodapé, o botão da barra do topo e o botão de
