@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (846, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (853, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1399,6 +1399,20 @@ criou.
 Só se recusa o que de certeza não funciona (YouTube, Vimeo, Dailymotion, Facebook, Instagram,
 TikTok, Google Drive). Um endereço de CDN sem extensão continua a passar: uma lista fechada
 de extensões recusaria endereços que hoje funcionam.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 97 | **O aviso de "adicionado ao carrinho" dizia sempre "Edição Standard".** Lia `variant.name`, um campo que não existe — as variantes que o `bookToProduct` constrói têm `title`. O `variant.name \|\| 'Edição Standard'` caía sempre no texto fixo: juntar uma t-shirt no tamanho M dizia "1x · Edição Standard", com o nome errado e com a palavra errada (o achado 47 já tinha tirado "Edição" dos produtos que não são livros). | Baixa | ✅ usa o `cartVariantLabel` |
+
+É a mesma família do achado 18 — uma leitura de um campo que não existe, que o `||` esconde.
+Ali rebentava o render; aqui limita-se a mentir. O `cartVariantLabel` já existia para isto e
+dá "M · Azul"; na variante única devolve vazio, e então o aviso diz só a quantidade, que é o
+que há para dizer.
+
+O carrinho passou a ter testes do `addToCart` (sete casos): o que o aviso diz nas três
+formas, a recusa de um produto com tamanhos sem tamanho escolhido, o tecto do stock somando o
+que já lá está, a soma na mesma variante e as linhas separadas por tamanho. Com o código
+antigo, três deles falham.
 
 ### Quinta ronda: um teste para o formulário que já esteve partido em produção
 
