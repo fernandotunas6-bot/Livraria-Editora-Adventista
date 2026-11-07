@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (857, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (949, eram 753; o main trouxe 81), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1472,6 +1472,39 @@ procura os outros — mas a ficha não tinha ligação nenhuma para a colecção
 migalhas leva ao género, e o autor à pesquisa por autor. Passa a haver, por baixo do autor,
 "Da colecção <nome>", para `/colecoes/<id>` (a rota aceita o id além do slug). Verificado no
 navegador: o link abre a colecção certa.
+
+### Nona ronda: revisão antes de publicar
+
+Antes de publicar, o `main` tinha avançado (PR #25, colportagem) e foi integrado: sem
+conflitos, as quatro migrações da colportagem (`…100000`–`…103000`) aplicam antes das duas
+desta passagem (`…120000`, `…121000`) e não tocam no que estas mexem. Depois, uma revisão do
+próprio PR à procura de defeitos meus. Encontrou um, e esse levou a um maior e mais antigo.
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 98 | **A "Ordenação por defeito" do painel deixou de valer a quem abre a loja directamente** (regressão desta passagem). As Configurações chegam por pedido, depois do primeiro desenho; o `useProductFilters` fixa a ordenação ao montar; e o efeito da loja que a corrigia quando as Configurações chegavam foi retirado aqui, quando a ordenação passou para o endereço. Resultado intermitente: a mesma loja abria pela ordem do painel vindo da página inicial, e por "Destaques" num acesso directo a `/shop`. | Média | ✅ |
+| 99 | **Cada filtro, ordenação ou separador desmontava a página inteira** (anterior a esta passagem). A fronteira de erros do `App.jsx` tinha `key={location.key}`, e o React Router dá uma `location.key` nova a qualquer navegação — também às escritas com `replace` com que as páginas guardam o estado no endereço. Medido no navegador, com uma marca num elemento: um filtro e uma ordenação remontavam a loja; a vista em lista, que não toca no endereço, não. **No telemóvel, o painel de filtros fechava-se sozinho depois de cada toque**: combinar dois filtros obrigava a reabrir o painel e a descer até onde se estava. No painel, cada mudança de separador remontava o painel e voltava a carregar tudo; no perfil, o mesmo com as encomendas. | Alta (telemóvel) | ✅ `hooks/useRouteRemountKey.js` |
+
+**98 levou a 99.** A primeira correcção do 98 (o `useProductFilters` passa a seguir a
+predefinição até alguém escolher outra) passava nos testes unitários e **falhava no
+navegador**: com as Configurações a chegar 1,5 s depois, a loja continuava em "Destaques" e
+escrevia `?sort=featured` no endereço. O teste montava só o hook; a loja real é desmontada
+pela fronteira de erros a cada escrita no endereço, e a montagem nova lia a ordenação antiga.
+Sem o navegador, o 98 teria sido dado como corrigido.
+
+**Porque é que não bastava tirar a `key`.** A remontagem fazia, sem querer, um trabalho
+preciso: o `useProductFilters` só lê os filtros do endereço ao montar, e é ela que faz um link
+do menu de `/shop?category=A` para `/shop?category=B` mudar mesmo os filtros. Tirá-la partia
+esses links. O `useRouteRemountKey` separa os dois casos: remonta numa navegação a sério (um
+link, voltar atrás ou à frente, mudar de página — incluindo um `<Navigate replace>` para outro
+caminho), e não quando a própria página reescreve o seu endereço com `replace`. A página de
+erro continua a limpar-se em qualquer navegação, por um `resetKey` à parte.
+
+Verificado no navegador: o painel de filtros do telemóvel fica aberto depois de marcar um
+filtro; filtros e ordenação já não remontam a loja; com as Configurações a chegar 1,5 s
+depois, a loja abre pela ordem do painel e com o endereço limpo; e, estando na loja com
+"Saúde", o link "Catálogo Geral" da folha de categorias muda a lista (1 → 3 produtos). Seis
+testes do hook, três dos quais falham com a chave antiga.
 
 ### Quinta ronda: um teste para o formulário que já esteve partido em produção
 
