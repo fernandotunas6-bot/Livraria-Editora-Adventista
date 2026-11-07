@@ -64,3 +64,21 @@ jobs:
       - name: deno check
         working-directory: supabase/functions/app
         run: deno check --node-modules-dir=auto index.ts
+
+  # Uma migração com erro só aparecia no merge, ao ser aplicada em produção pelo
+  # deploy-supabase.yml. Aqui todas as migrações são aplicadas do zero num Postgres local,
+  # antes do merge: se uma falhar, o PR fica vermelho e produção não é tocada.
+  migracoes:
+    name: Migrações aplicam do zero
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Postgres local com todas as migrações
+        run: supabase db start

@@ -54,8 +54,8 @@ export default function ForgotPasswordPage() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="seu@email.com" />
+                  <Label htmlFor="recuperar-email">Email</Label>
+                  <Input id="recuperar-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="seu@email.com" />
                 </div>
                 <Button type="submit" className="w-full btn-primary py-6" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

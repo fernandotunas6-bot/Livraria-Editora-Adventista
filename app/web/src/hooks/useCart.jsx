@@ -3,6 +3,7 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
+import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
 
@@ -36,13 +37,20 @@ export const CartProvider = ({ children }) => {
       }
       
       const silent = !!finalOptions.silent;
+      // Produto com tamanhos ou edições: só entra com um escolhido (o servidor recusa sem ele).
+      if (needsVariantChoice(product) && !/-v\d+$/.test(String(variant?.id || ''))) {
+        const errMsg = `Para comprar "${product.title}", ${variantNames(product.product_type).ask} na página do produto.`;
+        if (!silent) toast.error(errMsg);
+        reject(new Error(errMsg));
+        return;
+      }
       const effectiveAvailable = finalAvailable !== undefined ? finalAvailable : (variant.inventory_quantity ?? 99);
 
       if (variant.manage_inventory) {
         const existingItem = cartItems.find((item) => item.variant.id === variant.id);
         const currentCartQuantity = existingItem ? existingItem.quantity : 0;
         if (currentCartQuantity + quantity > effectiveAvailable) {
-          const errMsg = `Stock insuficiente para "${product.title}". Apenas ${effectiveAvailable} unidade${effectiveAvailable !== 1 ? 's' : ''} disponível${effectiveAvailable !== 1 ? 'eis' : ''}.`;
+          const errMsg = `Stock insuficiente para "${product.title}". Apenas ${effectiveAvailable} unidade${effectiveAvailable !== 1 ? 's' : ''} disponíve${effectiveAvailable !== 1 ? 'is' : 'l'}.`;
           if (!silent) {
             toast.error(errMsg);
           }
@@ -105,7 +113,7 @@ export const CartProvider = ({ children }) => {
     if (!ids.length) return [];
     const { data, error } = await supabase
       .from('stock_books')
-      .select('id, title, price, stock, active, sale_price, sale_starts_at, sale_ends_at, versions')
+      .select('id, title, price, stock, active, sale_price, sale_starts_at, sale_ends_at, versions, product_type')
       .in('id', ids);
     if (error) return [];
     const byId = Object.fromEntries((data || []).filter((b) => b.active !== false).map((b) => [b.id, b]));
@@ -119,6 +127,12 @@ export const CartProvider = ({ children }) => {
       const extra = /-v(\d+)$/.exec(item.variant.id);
       const version = extra && Array.isArray(book.versions) ? book.versions[Number(extra[1])] : null;
       if (extra && !version) { changes.push(`A edição escolhida de "${title}" já não existe e saiu do carrinho.`); continue; }
+      // Entrou sem variante (pelo cartão, antes desta regra) num produto que passou a ter: o
+      // servidor recusa-o, por isso sai já, com o aviso do que falta.
+      if (!extra && needsVariantChoice(book)) {
+        changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type).ask} na página do produto.`);
+        continue;
+      }
       // Stock próprio da edição, quando o painel o regista (o servidor recusa acima dele).
       if (version && /^\s*-?\d+(\.\d+)?\s*$/.test(String(version.stock ?? ''))) {
         stock = Math.min(stock, Math.max(0, Math.floor(Number(version.stock))));

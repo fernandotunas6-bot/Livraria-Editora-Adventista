@@ -154,6 +154,7 @@ export default function AdvancedSearchPanel({
               }
             }}
             placeholder="Título, autor, ISBN, código..."
+            aria-label="Pesquisar no catálogo"
             className={inputClass}
             role="combobox"
             aria-expanded={sugestoesAbertas && sugestoes.length > 0}

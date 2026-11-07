@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren, Church, BookHeart } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound, Church, BookHeart } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -38,11 +38,16 @@ const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
 const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
 const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
+const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
+const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
+const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
+const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
+const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
 const ChurchRegistryTab = lazy(() => import('@/components/admin/igreja/ChurchRegistryTab'));
 const ColportagemTab = lazy(() => import('@/components/admin/colportagem/ColportagemTab'));
 
@@ -395,10 +400,12 @@ const AdminPage = () => {
       canManageCatalog && { value: 'books', label: `Produtos (${books.length})`, icon: PackageSearch },
       canManageCatalog && { value: 'collections', label: 'Coleções', icon: Layers },
       canManageCatalog && { value: 'slides', label: `Slider (${slides.length})`, icon: Image },
+      canManageCatalog && { value: 'downloads', label: 'Materiais (PDF)', icon: FileDown },
     ] },
     { label: 'Vendas', tabs: [
       canManageOrders && { value: 'orders', label: `Encomendas (${orders.length})`, icon: ShoppingBag },
       canManageOrders && { value: 'acompanhamento', label: 'Acompanhamento', icon: Siren },
+      (canManageUsers || canManageOrders) && { value: 'equipas', label: 'Equipas e alertas', icon: UsersRound },
       canManagePayments && { value: 'payments', label: 'Pagamentos', icon: CreditCard },
       canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
     ] },
@@ -410,6 +417,7 @@ const AdminPage = () => {
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
       canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
       canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
+      canManageCatalog && { value: 'community', label: 'Comunidade', icon: MessagesSquare },
     ] },
     { label: 'Igreja', tabs: [
       canManageColporteurs && { value: 'colportagem', label: 'Colportagem', icon: BookHeart },
@@ -417,6 +425,7 @@ const AdminPage = () => {
     ] },
     { label: 'Sistema', tabs: [
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
+      (canManageSettings || canManageMarketing) && { value: 'notices', label: 'Faixa de aviso', icon: PanelTop },
       isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
     ] },
   ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
@@ -456,6 +465,18 @@ const AdminPage = () => {
             </div>
           </div>
         </header>
+
+        {/* Encomendas novas e alertas urgentes, com som, para quem está na loja com o painel aberto. */}
+        {canManageOrders && (
+          <Suspense fallback={null}>
+            <StaffAlertBar
+              onOpen={(alert) => {
+                if (alert.thread_id) setActiveTab('support');
+                else setActiveTab('acompanhamento');
+              }}
+            />
+          </Suspense>
+        )}
 
         <main className="container-custom py-10">
           {!canAccessAdmin && (
@@ -550,6 +571,27 @@ const AdminPage = () => {
                 </Suspense>
               </TabsContent>
             )}
+            {(canManageSettings || canManageMarketing) && (
+              <TabsContent value="notices">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <NoticesTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageCatalog && (
+              <TabsContent value="downloads">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <DownloadsTab books={books} />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageCatalog && (
+              <TabsContent value="community">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <CommunityTab />
+                </Suspense>
+              </TabsContent>
+            )}
             {isAdmin && (
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
@@ -568,6 +610,13 @@ const AdminPage = () => {
               <TabsContent value="igreja">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <ChurchRegistryTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {(canManageUsers || canManageOrders) && (
+              <TabsContent value="equipas">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <OpsTeamsPanel canEdit={canManageUsers} />
                 </Suspense>
               </TabsContent>
             )}

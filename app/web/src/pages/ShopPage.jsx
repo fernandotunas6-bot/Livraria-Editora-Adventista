@@ -226,7 +226,7 @@ const ShopPage = () => {
   return (
     <>
       <Helmet>
-        <title>{pageTitle(`${heroTitle} — ${settings.site_name || 'Loja'}`)}</title>
+        <title>{pageTitle(heroTitle)}</title>
         <meta name="description" content={heroSubtitle} />
       </Helmet>
 
@@ -356,7 +356,7 @@ const ShopPage = () => {
                 <div className="flex border rounded-lg overflow-hidden">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')}>
+                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')} aria-label="Visualização em grelha" aria-pressed={viewMode === 'grid'}>
                         <LayoutGrid className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -364,7 +364,7 @@ const ShopPage = () => {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')}>
+                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')} aria-label="Visualização em lista" aria-pressed={viewMode === 'list'}>
                         <List className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -372,7 +372,7 @@ const ShopPage = () => {
                   </Tooltip>
                 </div>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[160px] h-11 sm:h-9"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11 sm:h-9" aria-label="Ordenar por"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SORT_OPTIONS.map((o) => (
                       <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>

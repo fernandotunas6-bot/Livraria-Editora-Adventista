@@ -2,6 +2,47 @@
 
 Estado em 2026-11-02. Complementa [ARQUITETURA.md](ARQUITETURA.md) e [HANDOFF.md](HANDOFF.md).
 
+## 00. Como pôr o email a sair (actualizado a 2026-11-06)
+
+O domínio da loja já existe: **livrariaadventista.com**, com o DNS no Cloudflare (conta
+valentinocanguele@gmail.com). O que faltava em 0.1 deixou de faltar.
+
+**O SMTP não serve para os emails do site.** As Edge Functions do Supabase não abrem ligações de
+saída nas portas 25 e 587 (e a 465 não é garantida), por isso a configuração que quase todos os
+fornecedores indicam (porta 587) nunca entregaria nada. O site envia agora **por API HTTPS**, e o
+painel recusa as portas 25 e 587 com uma explicação.
+
+| Fornecedor | Custo | O que é preciso |
+|---|---|---|
+| **Brevo** (recomendado) | grátis até 300 emails/dia | conta grátis, domínio verificado, chave da API |
+| **Cloudflare Email Sending** | plano Workers Paid (5 USD/mês, 3000 emails incluídos) | activar o envio no domínio, token da API |
+| SendGrid | sem plano gratuito desde 2025 | chave da API |
+
+### Brevo, passo a passo (dono da loja, ~15 minutos)
+
+1. Criar conta em [brevo.com](https://www.brevo.com) com o email da loja.
+2. **Senders, domains & dedicated IPs → Domains → Add a domain** → `livrariaadventista.com`.
+   A Brevo mostra 3–4 registos (código Brevo em TXT, DKIM, DMARC). No Cloudflare → DNS do
+   domínio, criar cada um exactamente como aparece (DNS only, sem proxy). Voltar à Brevo e
+   carregar em **Verify**.
+3. **SMTP & API → API keys → Generate a new API key**. Copiar (só se vê uma vez).
+4. No painel da loja → **Configurações → Comunicações**: fornecedor **Brevo**, colar a chave,
+   remetente `loja@livrariaadventista.com` (ou outro endereço do domínio), nome "Livraria
+   Adventista". Guardar.
+5. **Emails → Enviar teste** para o seu email. Confirmar que chegou à caixa de entrada.
+6. Ligar "Activar email automático de confirmação".
+
+Para receber respostas nesse endereço, active o **Email Routing** do Cloudflare no domínio e
+encaminhe `loja@` para o email que a loja já usa.
+
+### Emails da conta (registo, recuperar palavra-passe)
+
+Esses não saem pela Edge Function: saem pelo **Supabase Auth**, que precisa do seu próprio SMTP
+(ver secção 4). Aí as portas não estão bloqueadas, e a Brevo também serve: Supabase → Authentication
+→ Emails → SMTP Settings → host `smtp-relay.brevo.com`, porta `587`, utilizador e chave SMTP que
+a Brevo mostra em **SMTP & API → SMTP**, remetente `loja@livrariaadventista.com`. Sem isto, quem se
+regista por email não recebe a confirmação.
+
 ## 0. Estado em produção (2026-11-02)
 
 | | |
@@ -248,8 +289,9 @@ Falta ainda, do lado do domínio, **SPF, DKIM e DMARC**: sem eles as mensagens v
 
 ## 3. O que não existe neste sistema
 
-O esquema tem `orders`, `stock_books`, `physical_stores` e `payment_methods`. **Não há**
-produtos digitais, licenças, downloads, vendedores nem comissões — não há modelos de email
+O esquema tem `orders`, `stock_books`, `physical_stores` e `payment_methods`, e PDFs para
+descarregar (`downloads`, sem email próprio: o PDF pago aparece no perfil quando a encomenda
+fica paga). **Não há** licenças, vendedores nem comissões — não há modelos de email
 para isso porque não haveria nada que os chamasse. Se essas áreas forem criadas, os modelos
 seguem o mesmo padrão: uma função em `emailTemplates.ts` e o disparo na rota que muda o estado.
 

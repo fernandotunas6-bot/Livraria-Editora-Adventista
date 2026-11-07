@@ -4,11 +4,12 @@ import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useNavig
 import { CartProvider } from '@/hooks/useCart';
 import { AuthProvider } from '@/hooks/useAuth';
 import { AuthDialogProvider } from '@/hooks/useAuthDialog';
-import { SiteSettingsProvider } from '@/hooks/useSiteSettings';
+import { SiteSettingsProvider, useSiteSettings } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
+import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
@@ -26,6 +27,9 @@ const AboutPage = lazy(() => import('@/pages/AboutPage.jsx'));
 const StoresPage = lazy(() => import('@/pages/StoresPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
+const CommunityPage = lazy(() => import('@/pages/CommunityPage.jsx'));
+const MaterialsPage = lazy(() => import('@/pages/MaterialsPage.jsx'));
 const ShippingReturnsPage = lazy(() => import('@/pages/ShippingReturnsPage.jsx'));
 const SuccessPage = lazy(() => import('@/pages/SuccessPage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
@@ -139,7 +143,9 @@ function ColporteurReferralCapture() {
 
 function GlobalWidgets() {
   const { pathname } = useLocation();
-  const showAssistant = pathname !== '/login';
+  const { settings } = useSiteSettings();
+  // Páginas sem o assistente: escolha do painel (lib/floatingButtons.js).
+  const showAssistant = !isFloatingHidden('chat', pathname, settings);
 
   return (
     <Suspense fallback={null}>
@@ -195,6 +201,8 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/track" element={<TrackOrderPage />} />
               <Route path="/sugestoes" element={<SuggestionsPage />} />
+              <Route path="/comunidade" element={<CommunityPage />} />
+              <Route path="/materiais" element={<MaterialsPage />} />
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />
@@ -218,15 +226,7 @@ function App() {
               <Route path="/painel-vendas-huambo.html" element={<Navigate to="/admin?tab=vendas-huambo" replace />} />
               <Route path="/painel-vendas-huambo" element={<Navigate to="/admin?tab=vendas-huambo" replace />} />
 
-              <Route path="*" element={
-                <div className="min-h-screen flex items-center justify-center bg-background">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-foreground mb-4">404</h1>
-                    <p className="text-xl text-muted-foreground mb-8">Página não encontrada</p>
-                    <a href="/" className="inline-block px-4 py-3 text-primary hover:underline font-medium">Voltar ao Início</a>
-                  </div>
-                </div>
-              } />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </RouteErrorBoundary>

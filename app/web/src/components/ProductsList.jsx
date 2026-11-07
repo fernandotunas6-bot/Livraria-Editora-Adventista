@@ -74,6 +74,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
         )}
         <div
           className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}
+          role="status"
           aria-busy="true"
           aria-label="A carregar livros"
         >

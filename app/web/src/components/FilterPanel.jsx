@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,8 @@ const FilterPanel = ({
   filterCount,
   bookCollections = [],
 }) => {
+  // O painel pode estar duas vezes na página (barra lateral e painel do telemóvel): ids únicos.
+  const uid = useId();
   const handleOptionToggle = (optionName, value) => {
     const currentOptions = activeFilters.options[optionName] || [];
     const updated = currentOptions.includes(value)
@@ -61,19 +63,19 @@ const FilterPanel = ({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Checkbox
-              id="in-stock"
+              id={`${uid}-in-stock`}
               checked={activeFilters.inStockOnly}
               onCheckedChange={(v) => updateFilter('inStockOnly', !!v)}
             />
-            <Label htmlFor="in-stock" className="flex-1 py-1.5 text-sm cursor-pointer">Apenas com stock</Label>
+            <Label htmlFor={`${uid}-in-stock`} className="flex-1 py-1.5 text-sm cursor-pointer">Apenas com stock</Label>
           </div>
           <div className="flex items-center gap-2">
             <Checkbox
-              id="featured-only"
+              id={`${uid}-featured-only`}
               checked={activeFilters.featuredOnly}
               onCheckedChange={(v) => updateFilter('featuredOnly', !!v)}
             />
-            <Label htmlFor="featured-only" className="flex-1 py-1.5 text-sm cursor-pointer">Em destaque</Label>
+            <Label htmlFor={`${uid}-featured-only`} className="flex-1 py-1.5 text-sm cursor-pointer">Em destaque</Label>
           </div>
         </div>
       </div>
@@ -88,7 +90,7 @@ const FilterPanel = ({
             value={activeFilters.collection || '_all'}
             onValueChange={(v) => updateFilter('collection', v === '_all' ? '' : v)}
           >
-            <SelectTrigger className="h-9"><SelectValue placeholder="Todas as coleções" /></SelectTrigger>
+            <SelectTrigger className="h-9" aria-label="Coleção"><SelectValue placeholder="Todas as coleções" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">Todas as coleções</SelectItem>
               {bookCollections.map((c) => (
@@ -110,7 +112,7 @@ const FilterPanel = ({
               const isChecked = (activeFilters.categories || []).some(
                 (c) => c.toLowerCase() === cat.toLowerCase()
               );
-              const id = `cat-${cat}`;
+              const id = `${uid}-cat-${cat}`;
               return (
                 <div key={cat} className="flex items-center">
                   <Checkbox id={id} checked={isChecked} onCheckedChange={() => handleCategoryToggle(cat)} />
@@ -130,7 +132,7 @@ const FilterPanel = ({
             value={activeFilters.productType || '_all'}
             onValueChange={(v) => updateFilter('productType', v === '_all' ? '' : v)}
           >
-            <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectTrigger className="h-9" aria-label="Tipo de produto"><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">Todos</SelectItem>
               {availableFilters.productTypes.map((v) => (
@@ -149,7 +151,7 @@ const FilterPanel = ({
             value={activeFilters.language || '_all'}
             onValueChange={(v) => updateFilter('language', v === '_all' ? '' : v)}
           >
-            <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectTrigger className="h-9" aria-label="Idioma"><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">Todos</SelectItem>
               {BOOK_LANGUAGES.filter((l) => availableFilters.languages.includes(l)).map((l) => (
@@ -181,18 +183,22 @@ const FilterPanel = ({
         />
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1">
-            <Label className="text-xs text-muted-foreground mb-1 block">Mínimo</Label>
+            <Label htmlFor={`${uid}-preco-min`} className="text-xs text-muted-foreground mb-1 block">Mínimo</Label>
             <Input
+              id={`${uid}-preco-min`}
               type="number"
+              inputMode="numeric"
               value={displayMinPrice}
               onChange={(e) => updateFilter('minPrice', parseInt(e.target.value, 10) || 0)}
               className="h-9 text-sm"
             />
           </div>
           <div className="flex-1">
-            <Label className="text-xs text-muted-foreground mb-1 block">Máximo</Label>
+            <Label htmlFor={`${uid}-preco-max`} className="text-xs text-muted-foreground mb-1 block">Máximo</Label>
             <Input
+              id={`${uid}-preco-max`}
               type="number"
+              inputMode="numeric"
               value={displayMaxPrice}
               onChange={(e) => updateFilter('maxPrice', parseInt(e.target.value, 10) || 0)}
               className="h-9 text-sm"
@@ -209,7 +215,7 @@ const FilterPanel = ({
             <div className="space-y-2">
               {values.map((val) => {
                 const isChecked = (activeFilters.options[optionName] || []).includes(val);
-                const id = `opt-${optionName}-${val}`;
+                const id = `${uid}-opt-${optionName}-${val}`;
                 return (
                   <div key={val} className="flex items-center">
                     <Checkbox id={id} checked={isChecked} onCheckedChange={() => handleOptionToggle(optionName, val)} />

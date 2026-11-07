@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, Loader2, Mail, RefreshCw, Siren } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Clock, Hand, Loader2, Mail, RefreshCw, Siren } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { acknowledgeAlert, acknowledgeOrder } from '@/lib/opsApi';
 
 const fmtKz = (v) => `${Number(v || 0).toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kz`;
 const fmtHours = (h) => (h >= 48 ? `${Math.floor(h / 24)} dias` : `${h} h`);
@@ -54,6 +55,32 @@ export default function OrderWatchPanel({ onOpenOrder }) {
     }
   };
 
+  const takeOrder = async (orderId, orderNumber) => {
+    setBusy(`ack-${orderId}`);
+    try {
+      const r = await acknowledgeOrder(orderId);
+      toast({ title: r?.already ? `Já assumida por ${r.by_name || 'outra pessoa'}` : `Assumiu a encomenda ${orderNumber}` });
+      load();
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: err.message });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const takeAlert = async (alert) => {
+    setBusy(`alert-${alert.order_id}-${alert.kind}`);
+    try {
+      await acknowledgeAlert(alert.order_id, alert.kind);
+      toast({ title: 'Fica consigo', description: 'O alerta deixa de subir de nível. Resolva-o no passo da encomenda.' });
+      load();
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Erro', description: err.message });
+    } finally {
+      setBusy('');
+    }
+  };
+
   const resolve = async (alert) => {
     const note = window.prompt(`Como foi resolvido o problema da encomenda ${alert.order_number}?`, '');
     if (note === null) return;
@@ -79,7 +106,7 @@ export default function OrderWatchPanel({ onOpenOrder }) {
         <div>
           <h2 className="text-2xl font-bold">Acompanhamento das encomendas</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cada passo, as encomendas paradas e os problemas dos clientes. Verificado de hora a hora; resumo por email às 07:29.
+            Encomendas por assumir, cada passo, os atrasos e os problemas dos clientes. Verificado de 10 em 10 minutos; resumo por email às 07:29.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -127,10 +154,40 @@ export default function OrderWatchPanel({ onOpenOrder }) {
         </>
       )}
 
+      {(data?.unacknowledged || []).length > 0 && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-2 border-b border-primary/20 p-4">
+            <Hand className="h-4 w-4 text-primary" aria-hidden />
+            <h3 className="text-lg font-semibold">Por assumir ({data.unacknowledged.length})</h3>
+            <span className="text-xs text-muted-foreground">Quem assume fica responsável; se ninguém assumir a tempo, sobe às urgências.</span>
+          </div>
+          <ul className="divide-y divide-primary/10">
+            {data.unacknowledged.map((o) => (
+              <li key={o.order_id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 text-sm">
+                  <span className="font-mono text-xs text-primary">{o.order_number}</span>
+                  <span className="ml-2 font-medium">{o.customer_name || 'Cliente'}</span>
+                  <span className="ml-2 text-muted-foreground">
+                    {o.shipping_method === 'pickup' ? `Levantamento: ${o.pickup_store || 'loja'}` : o.shipping_method === 'express' ? 'Entrega expressa' : 'Entrega ao domicílio'}
+                    {' · '}{fmtKz(o.total)} · {new Date(o.created).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}
+                  </span>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  {onOpenOrder && <Button size="sm" variant="outline" onClick={() => onOpenOrder(o.order_number)}>Ver</Button>}
+                  <Button size="sm" className="btn-primary" onClick={() => takeOrder(o.order_id, o.order_number)} disabled={busy === `ack-${o.order_id}`}>
+                    {busy === `ack-${o.order_id}` ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />} Assumir
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 border-b p-4">
           <Siren className="h-4 w-4 text-primary" aria-hidden />
-          <h3 className="font-semibold">A precisar de atenção</h3>
+          <h3 className="text-lg font-semibold">A precisar de atenção</h3>
         </div>
         {alerts.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Nenhuma encomenda parada nem problema por resolver.</div>
@@ -150,9 +207,20 @@ export default function OrderWatchPanel({ onOpenOrder }) {
                     <Clock className="h-3 w-3" aria-hidden /> {fmtHours(a.hours)} neste passo{a.limit ? ` (limite ${fmtHours(a.limit)})` : ''}{a.customer_name ? ` · ${a.customer_name}` : ''}
                   </p>
                   {a.detail && <p className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-800"><AlertTriangle className="mr-1 inline h-3 w-3" />{a.detail}</p>}
+                  {(a.acknowledged_by_name || a.acknowledged_at) && (
+                    <p className="mt-1 text-xs font-medium text-emerald-700">Com {a.acknowledged_by_name || 'alguém da equipa'} a tratar</p>
+                  )}
+                  {a.escalated_at && !a.acknowledged_at && (
+                    <p className="mt-1 text-xs font-medium text-red-700">Subiu às urgências: ninguém assumiu a tempo</p>
+                  )}
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
                   {onOpenOrder && <Button size="sm" variant="outline" onClick={() => onOpenOrder(a.order_number)}>Ver encomenda</Button>}
+                  {a.kind === 'new_unacknowledged' ? (
+                    <Button size="sm" onClick={() => takeOrder(a.order_id, a.order_number)} disabled={!!busy}>Assumir encomenda</Button>
+                  ) : !a.acknowledged_at && (
+                    <Button size="sm" variant="secondary" onClick={() => takeAlert(a)} disabled={busy === `alert-${a.order_id}-${a.kind}`}>Estou a tratar</Button>
+                  )}
                   {a.kind === 'customer_problem' && <Button size="sm" onClick={() => resolve(a)}>Marcar resolvido</Button>}
                 </div>
               </li>
@@ -166,6 +234,8 @@ export default function OrderWatchPanel({ onOpenOrder }) {
 
 function stageOfAlert(kind) {
   return {
+    new_unacknowledged: 'awaiting_payment',
+    delivery_overdue: 'in_transit',
     payment_pending: 'awaiting_payment',
     not_prepared: 'paid',
     preparing_too_long: 'preparing',

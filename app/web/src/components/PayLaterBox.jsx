@@ -53,7 +53,7 @@ export default function PayLaterBox({
 
   return (
     <section className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:p-5 text-left space-y-3" aria-labelledby="como-pagar">
-      <h2 id="como-pagar" className="flex items-center gap-2 font-semibold text-foreground">
+      <h2 id="como-pagar" className="flex items-center gap-2 text-lg font-semibold text-foreground">
         <CreditCard className="h-4 w-4 text-primary" aria-hidden="true" /> Como pagar{methodName ? ` — ${methodName}` : ''}
       </h2>
       <ol className="list-decimal pl-5 space-y-1.5 text-sm text-muted-foreground">

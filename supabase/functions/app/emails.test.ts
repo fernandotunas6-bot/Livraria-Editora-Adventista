@@ -201,6 +201,9 @@ describe("emailDocument", () => {
 });
 
 describe("orderCreatedLetter", () => {
+  // Com endereço do site, para os botões que levam ao rastreio existirem.
+  const brandLoja = brandFromSettings({ site_name: "Livraria Adventista" }, "https://loja.exemplo.ao");
+
   it("pede o pagamento quando ainda falta", () => {
     const l = orderCreatedLetter(brand, ORDER, "https://pagamento.exemplo.ao/abc");
     expect(l.subject).toBe("Encomenda LA-2026-0042 recebida");
@@ -208,6 +211,29 @@ describe("orderCreatedLetter", () => {
     expect(l.doc.cta?.url).toBe("https://pagamento.exemplo.ao/abc");
     // O segundo botão leva ao rastreio, para quem já pagou por outro meio.
     expect(l.doc.secondaryCta?.url).toContain("/track");
+  });
+
+  it("transferência sem link: pede o pagamento com o número e leva a indicar a referência", () => {
+    const l = orderCreatedLetter(brandLoja, ORDER, "", { payLater: true });
+    expect(l.doc.subtitle).toBe("Falta só o pagamento para a prepararmos.");
+    expect(l.doc.cta?.label).toBe("Indicar o pagamento");
+    expect(l.doc.cta?.url).toContain("/track");
+    expect(l.doc.notes?.[0]).toContain("LA-2026-0042");
+    expect(l.doc.notes?.[0]).toContain("Rastrear encomenda");
+  });
+
+  it("transferência com a referência já indicada: diz que a recebeu", () => {
+    const l = orderCreatedLetter(brandLoja, { ...ORDER, payment_reference: "REF-998" }, "", { payLater: true });
+    expect(l.doc.notes?.[0]).toBe("Recebemos a referência REF-998. Confirmamos o pagamento e avisamo-lo.");
+  });
+
+  it("pagamento na entrega ou no balcão: não pede pagamento antes de preparar", () => {
+    const entrega = orderCreatedLetter(brandLoja, ORDER, "", { payLater: false });
+    expect(entrega.doc.subtitle).toBe("Vamos prepará-la. Paga na entrega.");
+    expect(entrega.doc.cta?.label).toBe("Acompanhar a encomenda");
+    expect(entrega.doc.notes?.some((n) => n.includes("referência"))).toBe(false);
+    const balcao = orderCreatedLetter(brandLoja, { ...ORDER, shipping_method: "pickup" }, "", { payLater: false });
+    expect(balcao.doc.subtitle).toBe("Vamos prepará-la. Paga no levantamento, na loja.");
   });
 
   it("confirma quando a encomenda já está paga", () => {

@@ -26,8 +26,9 @@ app/pocketbase/
 # Cópias da configuração do Auth antes de cada alteração (scripts/configurar-auth.sh)
 supabase/auth/.antes-*.json
 
-# CLI do Supabase
+# CLI do Supabase (`.branches` aparece com `supabase db start` / `supabase start` locais)
 supabase/.temp/
+supabase/.branches/
 
 # Registo da Igreja: ficheiros de origem com dados pessoais (telefones, avaliações dos pastores).
 # Importam-se pelo painel (Igreja → Registo da Igreja → Importar); não vão para o repositório.

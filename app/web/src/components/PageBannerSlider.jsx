@@ -45,7 +45,9 @@ export default function PageBannerSlider({
       role="region"
       aria-roledescription="carrossel"
       aria-label={ariaLabel}
-      className="relative isolate flex min-h-[240px] items-center overflow-hidden bg-[#0c4a6e] text-white md:min-h-[290px]"
+      // pt-14 no telemóvel: a barra fina do cabeçalho (56px, com o logótipo) fica por cima do
+      // topo da página; sem isto o texto centrado subia para debaixo do logótipo.
+      className="relative isolate flex min-h-[240px] items-center overflow-hidden bg-[#0c4a6e] pt-14 text-white md:min-h-[290px] md:pt-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

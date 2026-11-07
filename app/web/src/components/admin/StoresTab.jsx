@@ -360,7 +360,7 @@ export default function StoresTab() {
                 </div>
                 <div className="p-4 flex-1 flex flex-col gap-2">
                   <div className="flex justify-between items-start gap-2">
-                    <h4 className="font-semibold leading-snug">{s.name}</h4>
+                    <h4 className="text-base font-semibold leading-snug">{s.name}</h4>
                     <div className="flex shrink-0">
                       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setToDelete(s)} aria-label="Eliminar"><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -397,7 +397,7 @@ export default function StoresTab() {
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar loja' : 'Nova loja física'}</DialogTitle>
-            <DialogDescription>Os dados aparecem na página de lojas, no rodapé e no checkout.</DialogDescription>
+            <DialogDescription>Os dados aparecem na página de lojas, no rodapé e na finalização da compra.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
             <FormSection title="Identificação">
