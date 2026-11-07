@@ -77,6 +77,23 @@ export function payablePriceInCents(product) {
   return Number(product?.price_in_cents) || 0;
 }
 
+/**
+ * O que escrever no cartão: o preço a pagar e, quando há promoção, o de tabela para riscar.
+ *
+ * O par `sale_price_formatted || price_formatted` estava escrito em cada sítio que mostra um
+ * preço, e bastava esquecê-lo num para esse sítio passar a anunciar o preço de tabela de um
+ * livro em promoção — foi o que aconteceu no mega-menu do cabeçalho, que mostrava 8 000 Kz
+ * ao lado de um cartão a dizer 1 900.
+ */
+export function displayPrice(product) {
+  const v = product?.variants?.[0];
+  const promocional = v?.sale_price_formatted || null;
+  return {
+    price: promocional || v?.price_formatted || '',
+    originalPrice: promocional ? (v?.price_formatted || null) : null,
+  };
+}
+
 /** Desconto em vigor, de 0 a 100. Sem promoção, 0. */
 export function discountPercentOf(product) {
   const v = product?.variants?.[0];

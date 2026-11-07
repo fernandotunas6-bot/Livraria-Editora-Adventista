@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (826, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (827, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1333,6 +1333,9 @@ mais quatro sítios.
 | 89 | **O painel oferecia cinco critérios de ordenação quando a loja já tinha oito**, com nomes diferentes ("Preço ↑" no painel, "Preço: do menor" na loja). Era uma cópia da lista escrita à mão em `SettingsTab`. Quem configurasse a loja não conseguia pô-la a abrir pelas promoções nem pelos mais procurados. | Baixa | ✅ lê de `SORT_OPTIONS` |
 | 90 | **A pesquisa de livros devolvia resultados pela ordem da base de dados, não por relevância.** O `searchProducts` pedia `-featured,title` com o limite aplicado **pela base de dados**: com `limit` 6 — é o que o selector de livros da comunidade usa — os seis que voltavam eram "os mais destacados, por ordem alfabética" de entre os que combinam, e o livro que a pessoa escreveu podia nem estar lá. A pesquisa do cabeçalho já ordenava por relevância; esta não. | Média | ✅ pede um grupo maior e ordena por `getSearchRelevance` |
 | 91 | **O botão da barra do topo e o botão de cada slide tinham o mesmo problema do achado 74.** `settings.header_cta_link` e `slide.cta_link` são escritos no painel e iam directos para `<Link to>`. Verificado com as versões deste projecto que o **React Router 7 passa `javascript:`, `data:` e `//outro-site` intactos para o `href`** — como o React 18.3 faz com o `href` directo. | Média | ✅ `components/SafeLink.jsx` |
+
+| 92 | **O mega-menu do cabeçalho mostrava o preço de tabela.** Usava `variants[0].price_formatted` em vez do par `sale_price_formatted \|\| price_formatted` que o cartão usa: um livro em promoção aparecia no menu a 8 000 Kz e, um clique abaixo, no cartão a 1 900. O par estava escrito em cada sítio que mostra um preço — bastava esquecê-lo num. | Média (confiança) | ✅ `displayPrice` |
+| 93 | A faixa "Disponíveis Agora" da página inicial olhava só para `variants[0]`: um produto com tamanhos cujo primeiro está esgotado mas os outros não ficava de fora, apesar de se poder comprar. | Baixa | ✅ usa o `inStock` partilhado |
 
 **91 — um componente em vez de três correcções.** O site tem três sítios onde um endereço
 escrito no painel vira ligação: as colunas do rodapé, o botão da barra do topo e o botão de

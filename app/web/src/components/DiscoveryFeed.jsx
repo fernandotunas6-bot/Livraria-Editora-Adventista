@@ -9,7 +9,7 @@ import { useInfiniteList } from '@/hooks/useInfiniteList';
 import { useScrollMemory } from '@/hooks/useScrollMemory';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { discoveryOrder, hasInterest, interestFromRecent } from '@/lib/discovery';
-import { inStock, sortProducts } from '@/lib/productSort';
+import { displayPrice, inStock, sortProducts } from '@/lib/productSort';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 // A ordem vive em lib/discovery.js; reexportada para os testes.
@@ -24,8 +24,7 @@ const MINI_COUNT = 5;
 
 /** Livro em ponto pequeno para a coluna lateral: capa, título e preço numa linha. */
 function MiniBook({ product }) {
-  const v = product.variants?.[0];
-  const price = v?.sale_price_formatted || v?.price_formatted;
+  const { price } = displayPrice(product);
   return (
     <Link to={`/product/${product.id}`} className="group flex items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted">
       <img src={product.image} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />

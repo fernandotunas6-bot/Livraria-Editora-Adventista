@@ -5,6 +5,7 @@ import {
   arrivedAt,
   canGroupByType,
   discountPercentOf,
+  displayPrice,
   groupByType,
   inStock,
   normalizeSort,
@@ -54,6 +55,22 @@ describe('leituras do produto', () => {
     expect(discountPercentOf(produto('b', { preco: 8000 }))).toBe(0);
     // Promocional maior do que o normal não é desconto nenhum.
     expect(discountPercentOf(produto('c', { preco: 2000, promo: 3000 }))).toBe(0);
+  });
+
+  it('o preço mostrado é o que se paga, com o de tabela para riscar', () => {
+    // O par `sale_price_formatted || price_formatted` estava escrito em cada sítio que mostra
+    // um preço, e o mega-menu do cabeçalho tinha-se esquecido do promocional: anunciava
+    // 8 000 Kz ao lado de um cartão a dizer 1 900.
+    const comPromo = {
+      variants: [{ price_formatted: 'Kz 8 000,00', sale_price_formatted: 'Kz 1 900,00' }],
+    };
+    expect(displayPrice(comPromo)).toEqual({ price: 'Kz 1 900,00', originalPrice: 'Kz 8 000,00' });
+
+    const semPromo = { variants: [{ price_formatted: 'Kz 3 500,00', sale_price_formatted: null }] };
+    expect(displayPrice(semPromo)).toEqual({ price: 'Kz 3 500,00', originalPrice: null });
+
+    expect(displayPrice({})).toEqual({ price: '', originalPrice: null });
+    expect(displayPrice(null)).toEqual({ price: '', originalPrice: null });
   });
 
   it('disponibilidade: fora de venda conta como esgotado', () => {
