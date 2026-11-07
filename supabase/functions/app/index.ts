@@ -3873,6 +3873,7 @@ async function presentMessages(rows: Row[]) {
     products: (Array.isArray(r.meta?.product_ids) ? r.meta.product_ids : []).map((pid: unknown) => byBook.get(String(pid))).filter(Boolean),
     offer_handoff: r.meta?.offer_handoff === true,
     handoff_reason: typeof r.meta?.handoff_reason === "string" ? r.meta.handoff_reason : undefined,
+    order_card: r.meta?.order_card && typeof r.meta.order_card === "object" ? r.meta.order_card : undefined,
     feedback: r.feedback ?? null,
     author: r.author_kind === "staff" ? (byStaff.get(r.sender_id) || "Equipa") : undefined,
   }));
@@ -4057,6 +4058,7 @@ route("POST", "/chat", async ({ body, ip, auth }) => {
   };
   if (reply.handoff_reason) meta.handoff_reason = reply.handoff_reason;
   if (reply.order_id) meta.order_id = reply.order_id;
+  if (reply.order_card) meta.order_card = reply.order_card;
   if (provider) meta.ai = provider;
   const { data: botRow, error: botError } = await db.from("support_messages").insert({
     thread_id: thread.id, sender_id: null, author_kind: "assistant", body: reply.reply.slice(0, 4000), meta,

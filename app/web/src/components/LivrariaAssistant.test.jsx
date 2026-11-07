@@ -48,15 +48,15 @@ async function openChat() {
 const text = () => host.textContent;
 const button = (label) => [...host.querySelectorAll('button')].find((b) => b.textContent.trim() === label || b.getAttribute('aria-label') === label);
 async function type(value) {
-  const input = host.querySelector('input[aria-label^="Mensagem"]');
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const input = host.querySelector('textarea[aria-label^="Mensagem"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
   await act(async () => {
     setter.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 async function submit() {
-  await act(async () => host.querySelector('form:last-of-type').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  await act(async () => host.querySelector('textarea[aria-label^="Mensagem"]').form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   await flush();
 }
 
@@ -141,7 +141,7 @@ describe('LivrariaAssistant', () => {
     expect(api.escalateChat).toHaveBeenCalledWith({ details: 'Comprovativo enviado ontem', orderId: 'o1', reason: 'sensitive' });
     expect(text()).toContain('Pedido #1004');
     expect(text()).toContain('Pedido de ajuda #1004 aberto.');
-    expect(host.querySelector('input[aria-label="Mensagem para a equipa"]').getAttribute('placeholder')).toBe('Escreva à equipa…');
+    expect(host.querySelector('textarea[aria-label="Mensagem para a equipa"]').getAttribute('placeholder')).toBe('Escreva à equipa…');
     expect(text()).not.toContain('Continuar com o assistente');
   });
 
@@ -188,7 +188,7 @@ describe('LivrariaAssistant', () => {
     await openChat();
     await type('Tem o livro Nisto Cremos?');
     await submit();
-    expect(host.querySelector('input[aria-label^="Mensagem"]').value).toBe('Tem o livro Nisto Cremos?');
+    expect(host.querySelector('textarea[aria-label^="Mensagem"]').value).toBe('Tem o livro Nisto Cremos?');
     expect(host.querySelector('[role="alert"]').textContent).toContain('Sem ligação.');
     expect(host.querySelector('[role="alert"]').textContent).toContain('923 000 000');
   });
@@ -233,5 +233,64 @@ describe('LivrariaAssistant', () => {
     await openChat();
     expect(api.loadChatSession).toHaveBeenCalled();
     expect(text()).toContain('Olá de ontem');
+  });
+
+  it('ecrã de início: saudação com o nome e atalhos que enviam a pergunta', async () => {
+    Object.assign(auth, { user: { id: 'u1', name: 'Maria João' }, isAuthed: true });
+    api.sendChatMessage.mockResolvedValue({ conversation: { id: 't1', status: 'bot' }, messages: [] });
+    await mount('/');
+    await openChat();
+    expect(text()).toContain('Olá, Maria! Como podemos ajudar?');
+    await act(async () => button('Envios e prazos').click());
+    await flush();
+    expect(api.sendChatMessage).toHaveBeenCalledWith(expect.objectContaining({ message: 'Quanto custa a entrega?' }));
+  });
+
+  it('Enter envia; Shift+Enter não', async () => {
+    api.sendChatMessage.mockResolvedValue({ conversation: { id: 't1', status: 'bot' }, messages: [] });
+    await mount('/');
+    await openChat();
+    await type('Olá');
+    const box = host.querySelector('textarea[aria-label^="Mensagem"]');
+    await act(async () => box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })));
+    expect(api.sendChatMessage).not.toHaveBeenCalled();
+    await act(async () => box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await flush();
+    expect(api.sendChatMessage).toHaveBeenCalledWith(expect.objectContaining({ message: 'Olá' }));
+  });
+
+  it('cartão da encomenda: passos, rastreio e o texto sem repetir o que o cartão mostra', async () => {
+    api.loadChatSession.mockResolvedValue({
+      conversation: { id: 't1', status: 'bot', ticket_number: null },
+      messages: [
+        { id: 1, role: 'user', text: 'A minha encomenda', created_at: '2026-11-07T10:00:00Z' },
+        bot(2, 'A encomenda **ENC-1** (feita a 03/11/2026) está **em trânsito**. Pagamento: confirmado. Código de rastreio: TRK1.', {
+          created_at: '2026-11-07T10:00:05Z',
+          order_card: {
+            number: 'ENC-1', made: '03/11/2026', stage: 'in_transit', stage_label: 'em trânsito', cancelled: false, pickup: false,
+            steps: [
+              { key: 'awaiting_payment', label: 'Recebida', done: true, current: false },
+              { key: 'paid', label: 'Paga', done: true, current: false },
+              { key: 'preparing', label: 'Em preparação', done: true, current: false },
+              { key: 'shipped', label: 'Em trânsito', done: false, current: true },
+              { key: 'delivered', label: 'Entregue', done: false, current: false },
+            ],
+            payment: 'confirmado', payment_method: '', tracking: 'TRK1', carrier: 'Correios', eta: '08/11/2026', pickup_store: '', items: 'Nisto Cremos', total: '23 500 Kz',
+          },
+        }),
+      ],
+      orders: [],
+      open_tickets: [],
+    });
+    await mount('/');
+    await openChat();
+    const card = host.querySelector('section[aria-label^="Encomenda ENC-1"]');
+    expect(card).toBeTruthy();
+    expect(card.querySelector('[aria-current="step"]').textContent).toContain('Em trânsito');
+    expect(card.textContent).toContain('Correios · TRK1');
+    expect(card.textContent).toContain('08/11/2026');
+    // O balão de texto fica só com a primeira frase: o cartão já mostra o pagamento e o rastreio.
+    const bubbles = [...host.querySelectorAll('.whitespace-pre-line')].map((n) => n.textContent);
+    expect(bubbles.some((t) => t.includes('Código de rastreio'))).toBe(false);
   });
 });

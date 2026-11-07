@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Sparkles, Bell, RotateCcw, Headset, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { MessageCircle, X, Send, Sparkles, Bell, RotateCcw, Headset, Loader2, ArrowDown } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPosition } from '@/hooks/useChatPosition';
@@ -10,6 +9,7 @@ import {
   escalateChat, fetchChatConfig, loadChatSession, sendChatFeedback, sendChatMessage, startNewChat,
 } from '@/lib/assistantApi';
 import ChatRichMessage from '@/components/assistant/ChatRichMessage';
+import ChatHome from '@/components/assistant/ChatHome';
 import HandoffCard from '@/components/assistant/HandoffCard';
 import SupportRating from '@/components/assistant/SupportRating';
 import SupportCenter from '@/components/SupportCenter';
@@ -17,8 +17,7 @@ import { countUnreadSupportReplies, markThreadNotificationsRead } from '@/lib/su
 
 const DEFAULT_WELCOME = 'Olá! Sou o assistente da livraria. Posso ver as suas encomendas, responder sobre envios, pagamentos e devoluções, e encontrar livros. Se precisar, passo a conversa à nossa equipa.';
 
-// As sugestões iniciais vivem na mensagem de boas-vindas; depois, cada resposta traz as suas.
-const STARTERS = ['A minha encomenda', 'Envio grátis?', 'Formas de pagamento', 'Falar com a equipa'];
+// Os atalhos iniciais estão no ecrã de início (ChatHome); depois, cada resposta traz sugestões.
 
 const TICKET_STATUS = {
   open: 'A aguardar a equipa',
@@ -37,10 +36,56 @@ function toApiHistory(messages) {
 
 const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches;
 
+const MAX_LENGTH = 800;
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+const asDate = (iso) => {
+  const d = new Date(iso || '');
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const sameDay = (a, b) => a && b && a.toDateString() === b.toDateString();
+
+export function dayLabel(date, now = new Date()) {
+  if (!date) return '';
+  if (sameDay(date, now)) return 'Hoje';
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(date, yesterday)) return 'Ontem';
+  return date.toLocaleDateString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+/**
+ * Arruma as mensagens em blocos, como os mensageiros: separador de dia, avatar no início de
+ * cada bloco do mesmo autor e a hora só no fim do bloco (ou depois de uma pausa de 5 minutos).
+ */
+export function layoutMessages(messages, now = new Date()) {
+  const authorKey = (m) => `${m.role}:${m.author || ''}`;
+  return messages.map((msg, i) => {
+    const prev = messages[i - 1];
+    const next = messages[i + 1];
+    const at = asDate(msg.created_at);
+    const prevAt = asDate(prev?.created_at);
+    const nextAt = asDate(next?.created_at);
+    const newDay = !!at && (!prevAt || !sameDay(at, prevAt));
+    const startsGroup = !prev || newDay || authorKey(prev) !== authorKey(msg) || (at && prevAt && at - prevAt > GROUP_GAP_MS);
+    const endsGroup = !next || authorKey(next) !== authorKey(msg) || (nextAt && !sameDay(nextAt, at))
+      || (at && nextAt && nextAt - at > GROUP_GAP_MS);
+    return {
+      msg,
+      day: newDay ? dayLabel(at, now) : '',
+      showAvatar: !!startsGroup,
+      time: endsGroup && at ? at.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' }) : '',
+    };
+  });
+}
+
 function TypingBubble() {
   return (
-    <div className="flex" aria-live="polite" aria-label="O assistente está a escrever">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-border/70 bg-card px-4 py-3 shadow-sm">
+    <div className="flex items-start gap-2" aria-label="O assistente está a escrever">
+      <span aria-hidden className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm">
+        <img src="/logo-icon-light.svg" alt="" className="h-4 w-4 object-contain" />
+      </span>
+      <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/70 bg-card px-4 py-3 shadow-sm">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -77,6 +122,11 @@ export default function LivrariaAssistant() {
   const lastRef = useRef(null);
   const inputRef = useRef(null);
   const tempId = useRef(0);
+  // Mensagens já mostradas: só as novas entram com animação (o histórico aparece de uma vez).
+  const shownIds = useRef(new Set());
+  // O cliente está a ler mais acima? Então uma mensagem nova não o arrasta: aparece um botão.
+  const atBottom = useRef(true);
+  const [newBelow, setNewBelow] = useState(false);
   // Respostas da equipa por ler: o ponto no botão, para o cliente saber sem abrir o chat.
   const [unread, setUnread] = useState(0);
   const watchReplies = isAuthed && !canUseStaffInbox;
@@ -108,6 +158,7 @@ export default function LivrariaAssistant() {
       orders: data.orders || [],
       openTickets: data.open_tickets || [],
     });
+    for (const m of data.messages || []) shownIds.current.add(m.id);
     setMessages(data.messages || []);
   }, []);
 
@@ -173,12 +224,44 @@ export default function LivrariaAssistant() {
     const box = scrollRef.current;
     if (!box) return;
     const last = messages[messages.length - 1];
+    // A ler mais acima e chegou uma mensagem que não é dele: não o arrastar, avisar.
+    if (!atBottom.current && last && last.role !== 'user') {
+      setNewBelow(true);
+      return;
+    }
     if (!sending && last && last.role !== 'user' && messages.length > 1 && lastRef.current) {
       box.scrollTop = Math.max(0, lastRef.current.offsetTop - 12);
     } else {
       box.scrollTop = box.scrollHeight;
     }
+    setNewBelow(false);
   }, [messages, open, sending, activePanel, handoff.forced]);
+
+  // Registadas depois de mostradas: só uma mensagem que aparece pela primeira vez anima.
+  useEffect(() => {
+    for (const m of messages) shownIds.current.add(m.id);
+  }, [messages]);
+
+  const onScroll = useCallback(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    atBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    if (atBottom.current) setNewBelow(false);
+  }, []);
+  const toBottom = () => {
+    const box = scrollRef.current;
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+    atBottom.current = true;
+    setNewBelow(false);
+  };
+
+  // A caixa de escrita cresce com o texto (até ~5 linhas) e volta ao tamanho de uma linha.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [input, open]);
 
   // Esc fecha; no telemóvel o chat ocupa o ecrã todo, por isso a página por trás não rola.
   useEffect(() => {
@@ -199,7 +282,8 @@ export default function LivrariaAssistant() {
   const send = useCallback(async (text) => {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
-    const temp = { id: `tmp-${(tempId.current += 1)}`, role: 'user', text: trimmed, pending: true };
+    const temp = { id: `tmp-${(tempId.current += 1)}`, role: 'user', text: trimmed, pending: true, created_at: new Date().toISOString() };
+    atBottom.current = true;
     setMessages((m) => [...m, temp]);
     setInput('');
     setNotice('');
@@ -216,6 +300,7 @@ export default function LivrariaAssistant() {
         setMessages((m) => [...m.map((x) => (x.id === temp.id ? { ...x, pending: false } : x)), {
           id: `tmp-${(tempId.current += 1)}`,
           role: 'bot',
+          created_at: new Date().toISOString(),
           text: data.reply || 'Desculpe, não consegui responder agora.',
           suggestions: data.suggestions,
           links: data.links,
@@ -285,8 +370,9 @@ export default function LivrariaAssistant() {
   const showHandoff = !legacy && chatConfig.handoff !== false && status === 'bot' && !sending
     && ((lastBot?.offer_handoff && lastMessage === lastBot && handoff.dismissedFor !== offerKey) || handoff.forced);
   const loginHref = `/login?redirect=${encodeURIComponent(`${pathname}?ajuda=1`)}`;
-  const welcome = { role: 'bot', text: chatConfig.welcome || DEFAULT_WELCOME, suggestions: STARTERS };
-  const shown = [welcome, ...messages];
+  const welcomeText = chatConfig.welcome || DEFAULT_WELCOME;
+  const laid = layoutMessages(messages);
+  const lastSpoken = [...messages].reverse().find((m) => m.role === 'bot' || m.role === 'staff');
 
   return (
     <div style={fixedStyle} className="flex flex-col items-start gap-2 pointer-events-none">
@@ -411,30 +497,60 @@ export default function LivrariaAssistant() {
                 )}
                 <div
                   ref={scrollRef}
-                  className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-muted/30 px-3 py-4 sm:min-h-[280px]"
+                  onScroll={onScroll}
+                  className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/30 px-3 py-4 sm:min-h-[300px]"
                 >
+                  {/* O que o assistente ou a equipa acabou de dizer, lido pelos leitores de ecrã. */}
+                  <p className="sr-only" aria-live="polite">{lastSpoken?.text || ''}</p>
                   {session.loading && !session.loaded && (
                     <p className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" /> A carregar a conversa…
                     </p>
                   )}
-                  {shown.map((msg, i) => {
-                    const isLast = i === shown.length - 1;
-                    const isWelcome = i === 0;
-                    return (
-                      <div key={msg.id ?? `w-${i}`} ref={isLast ? lastRef : undefined}>
-                        <ChatRichMessage
-                          message={msg}
-                          onSuggestionClick={send}
-                          // Sugestões só na última resposta, e não quando a equipa já está na conversa.
-                          showSuggestions={isLast && !sending && !withTeam && !showHandoff && (msg.role === 'bot')}
-                          disabled={sending}
-                          onFeedback={!legacy && !isWelcome && msg === lastBot && status === 'bot' ? giveFeedback : undefined}
-                        />
-                      </div>
-                    );
-                  })}
-                  {sending && status === 'bot' && <TypingBubble />}
+                  {messages.length === 0 && !(session.loading && !session.loaded) && (
+                    <ChatHome
+                      name={user?.name}
+                      welcome={welcomeText}
+                      disabled={sending}
+                      onPick={send}
+                      onSearch={() => inputRef.current?.focus()}
+                    />
+                  )}
+                  <div className="space-y-1.5">
+                    {laid.map(({ msg, day, showAvatar, time }, i) => {
+                      const isLast = i === laid.length - 1;
+                      const fresh = !shownIds.current.has(msg.id);
+                      return (
+                        <React.Fragment key={msg.id ?? `m-${i}`}>
+                          {day && (
+                            <div className="flex items-center gap-2 py-2 text-[11px] font-medium text-muted-foreground" role="separator">
+                              <span className="h-px flex-1 bg-border" /> {day} <span className="h-px flex-1 bg-border" />
+                            </div>
+                          )}
+                          <motion.div
+                            ref={isLast ? lastRef : undefined}
+                            initial={fresh ? { opacity: 0, y: 8 } : false}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.18, ease: 'easeOut' }}
+                            className={showAvatar && i > 0 ? 'pt-2' : ''}
+                          >
+                            <ChatRichMessage
+                              message={msg}
+                              onSuggestionClick={send}
+                              // Sugestões só na última resposta, e não quando a equipa já está na conversa.
+                              showSuggestions={isLast && !sending && !withTeam && !showHandoff && (msg.role === 'bot')}
+                              disabled={sending}
+                              onFeedback={!legacy && msg === lastBot && status === 'bot' ? giveFeedback : undefined}
+                              showAvatar={showAvatar}
+                              time={time}
+                              authed={isAuthed}
+                            />
+                          </motion.div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                  {sending && status === 'bot' && <div className="pt-2"><TypingBubble /></div>}
                   {showHandoff && (
                     <HandoffCard
                       authed={isAuthed}
@@ -446,6 +562,17 @@ export default function LivrariaAssistant() {
                       onConfirm={confirmHandoff}
                       onDismiss={() => setHandoff({ dismissedFor: offerKey, forced: false, busy: false, error: '' })}
                     />
+                  )}
+                  {newBelow && (
+                    <div className="pointer-events-none sticky bottom-1 z-10 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={toBottom}
+                        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lg"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" /> Nova mensagem
+                      </button>
+                    </div>
                   )}
                   {ticket?.status === 'closed' && (
                     ticket.can_rate && isAuthed ? (
@@ -475,21 +602,37 @@ export default function LivrariaAssistant() {
                   </p>
                 )}
                 <form
-                  className={`flex shrink-0 items-center gap-2 bg-background px-3 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-3 ${withTeam ? 'border-t border-border pt-3' : ''}`}
+                  className={`flex shrink-0 items-end gap-2 bg-background px-3 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-3 ${withTeam ? 'border-t border-border pt-3' : ''}`}
                   onSubmit={(e) => { e.preventDefault(); send(input); }}
                 >
-                  <Input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={withTeam && status !== 'closed' ? 'Escreva à equipa…' : 'Escreva a sua pergunta…'}
-                    aria-label={withTeam ? 'Mensagem para a equipa' : 'Mensagem para o assistente'}
-                    // 16 px no telemóvel: abaixo disso o Safari do iPhone amplia a página ao tocar.
-                    className="h-11 rounded-full bg-muted/40 px-4 text-base sm:h-10 sm:text-sm"
-                    disabled={sending}
-                    maxLength={800}
-                    enterKeyHint="send"
-                  />
+                  <div className="relative min-w-0 flex-1">
+                    <textarea
+                      ref={inputRef}
+                      rows={1}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      // Enter envia; Shift+Enter muda de linha. Durante a composição de acentos
+                      // (teclados com teclas mortas, IME) o Enter não envia.
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                          e.preventDefault();
+                          send(input);
+                        }
+                      }}
+                      placeholder={withTeam && status !== 'closed' ? 'Escreva à equipa…' : 'Escreva a sua pergunta…'}
+                      aria-label={withTeam ? 'Mensagem para a equipa' : 'Mensagem para o assistente'}
+                      // 16 px no telemóvel: abaixo disso o Safari do iPhone amplia a página ao tocar.
+                      className="block max-h-32 min-h-[44px] w-full resize-none rounded-2xl border border-input bg-muted/40 px-4 py-2.5 text-base leading-snug placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:min-h-[40px] sm:py-2 sm:text-sm"
+                      disabled={sending}
+                      maxLength={MAX_LENGTH}
+                      enterKeyHint="send"
+                    />
+                    {input.length > MAX_LENGTH - 150 && (
+                      <span className="pointer-events-none absolute bottom-1 right-3 text-[10px] text-muted-foreground" aria-live="polite">
+                        {input.length}/{MAX_LENGTH}
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="submit"
                     aria-label="Enviar"
