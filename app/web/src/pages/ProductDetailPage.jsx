@@ -422,6 +422,19 @@ function ProductDetailPage() {
                 </Link>
               </p>
             )}
+            {/* A colecção a que o livro pertence. As colecções desta livraria são séries
+                (Conflito dos Séculos, lições, devocionais de um ano), e quem está num volume
+                procura os outros — mas a ficha não tinha ligação nenhuma para a série: o
+                caminho de migalhas leva ao género, e o autor à pesquisa por autor. A rota
+                `/colecoes/:slug` aceita também o id da colecção. */}
+            {product.collection_id && product.collection_title && (
+              <p className="mb-2 text-sm text-muted-foreground">
+                Da colecção{' '}
+                <Link to={`/colecoes/${encodeURIComponent(product.collection_id)}`} className="font-medium text-primary hover:underline">
+                  {product.collection_title}
+                </Link>
+              </p>
+            )}
             <button
               type="button"
               onClick={() => openTab('reviews')}
@@ -594,18 +607,6 @@ function ProductDetailPage() {
               </p>
             )}
 
-            {product.additional_info?.length > 0 && (
-              <div className="mt-8 space-y-6">
-                {product.additional_info
-                  .sort((a, b) => a.order - b.order)
-                  .map((info) => (
-                    <div key={info.id} className="border-l-2 border-primary/30 pl-4">
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">{info.title}</h3>
-                      <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(info.description) }} />
-                    </div>
-                  ))}
-              </div>
-            )}
           </motion.div>
         </div>
 

@@ -24,11 +24,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
   const categories = useMemo(() => {
     const list = new Set();
     products.forEach((p) => {
-      if (p.type?.value) {
-        list.add(p.type.value);
-      } else if (p.category) {
-        list.add(p.category);
-      }
+      if (p.type?.value) list.add(p.type.value);
     });
     return ['all', ...Array.from(list)];
   }, [products]);
@@ -36,10 +32,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
   // Filter products based on search and category
   const filteredList = useMemo(() => {
     return products.filter((p) => {
-      const categoryMatch =
-        selectedCategory === 'all' ||
-        p.type?.value === selectedCategory ||
-        p.category === selectedCategory;
+      const categoryMatch = selectedCategory === 'all' || p.type?.value === selectedCategory;
 
       const title = p.title?.toLowerCase() || '';
       const subtitle = p.subtitle?.toLowerCase() || '';

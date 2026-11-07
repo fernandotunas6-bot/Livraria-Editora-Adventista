@@ -1449,6 +1449,30 @@ versão: a expressão regular só aceitava minúsculas, por isso `variant.naoExi
 notado. Os comentários são retirados antes da procura, para um campo citado numa explicação
 não contar como leitura.
 
+### Oitava ronda: a mesma procura para os produtos, e a série na ficha do livro
+
+A procura da sétima ronda, feita agora para `product.X` contra o que o `bookToProduct` põe,
+não encontrou nenhum bug vivo — e um resultado negativo também conta. Encontrou quatro
+leituras sem dono: duas são falsos positivos (uma página de amostra chamada `p`, e o recurso
+`genre` do `lib/discovery.js` para a forma que vem do servidor), e duas são **código morto**:
+
+- `product.additional_info` na ficha do produto: não há coluna nem campo com esse nome em
+  lado nenhum, por isso o bloco nunca aparecia. Saiu — e com ele um `dangerouslySetInnerHTML`
+  que não servia para nada.
+- `product.category` na lista de produtos: só a conversão própria da página das colecções o
+  preenchia, e essa conversão saiu nesta passagem (achado 85). Ficou morto por causa desta
+  mesma passagem, por isso sai com ela.
+
+Não fica guarda permanente para os produtos, ao contrário das variantes: `product` é um nome
+demasiado comum no código (o painel usa-o para registos em bruto), e a lista de excepções
+tornaria o teste mais frágil do que útil.
+
+**A série na ficha do livro.** As colecções desta livraria são séries, e quem está num volume
+procura os outros — mas a ficha não tinha ligação nenhuma para a colecção: o caminho de
+migalhas leva ao género, e o autor à pesquisa por autor. Passa a haver, por baixo do autor,
+"Da colecção <nome>", para `/colecoes/<id>` (a rota aceita o id além do slug). Verificado no
+navegador: o link abre a colecção certa.
+
 ### Quinta ronda: um teste para o formulário que já esteve partido em produção
 
 O achado 18 (passagem 9.1) foi **criar um livro no painel rebentar em produção**: a variável
