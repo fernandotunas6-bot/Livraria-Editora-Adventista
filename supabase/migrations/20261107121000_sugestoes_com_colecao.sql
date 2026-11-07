@@ -10,10 +10,20 @@
 -- igual à de `20261105065500_capas_certas_do_catalogo`. A Edge Function antiga ignora a
 -- coluna nova, por isso a ordem de publicação não importa aqui.
 --
--- Reverter: voltar a criar a função com a lista de colunas da migração
--- `20261105065500_capas_certas_do_catalogo.sql`.
+-- **O `drop` antes do `create` não é opcional.** Acrescentar uma coluna ao `returns table`
+-- muda o tipo de retorno da função, e o `create or replace` não o deixa mudar:
+-- `cannot change return type of existing function (42P13)`, que recusa a migração inteira.
+-- Só o `drop` o permite. Nada em SQL depende desta função (quem a chama é a Edge Function,
+-- pela API), por isso o `drop` não arrasta mais nada; as permissões são repostas no fim,
+-- como têm de ser, porque um `drop` leva as concessões com ele.
+--
+-- Reverter: `drop function public.suggestable_books();` e voltar a criá-la com a lista de
+-- colunas da migração `20261105065500_capas_certas_do_catalogo.sql`, repondo depois o
+-- `revoke`/`grant` do fim deste ficheiro.
 
-create or replace function public.suggestable_books()
+drop function if exists public.suggestable_books();
+
+create function public.suggestable_books()
 returns table (
   id text, title text, author text, genre text, collection_id text,
   price double precision, sale_price double precision,
