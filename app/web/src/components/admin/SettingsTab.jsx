@@ -3,6 +3,7 @@ import { Loader2, Save, Palette, Smartphone, Truck, MessageSquare, LayoutTemplat
 import pb from '@/lib/dataClient';
 import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
 import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
+import { embedOnlyVideoPlatform } from '@/lib/videoUrl';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
@@ -1064,8 +1065,26 @@ export default function SettingsTab() {
                 />
                 {form.shop_bg_mode === 'video' && (
                   <div className="space-y-2">
-                    <Label>URL do vídeo</Label>
-                    <Input value={form.shop_bg_video_url} onChange={(e) => set('shop_bg_video_url', e.target.value)} placeholder="https://...mp4" />
+                    <Label htmlFor="fundo-video">URL do vídeo</Label>
+                    <Input
+                      id="fundo-video"
+                      value={form.shop_bg_video_url}
+                      onChange={(e) => set('shop_bg_video_url', e.target.value)}
+                      placeholder="https://...mp4"
+                      aria-invalid={embedOnlyVideoPlatform(form.shop_bg_video_url) ? 'true' : undefined}
+                    />
+                    {embedOnlyVideoPlatform(form.shop_bg_video_url) ? (
+                      <p className="text-sm text-destructive">
+                        Isto é um link do {embedOnlyVideoPlatform(form.shop_bg_video_url)}. O
+                        fundo em vídeo precisa de um ficheiro (MP4 ou WebM) que o navegador
+                        saiba tocar; com um link de plataforma o fundo cai no gradiente. Um
+                        vídeo do YouTube mostra-se na ficha do produto, em Livros → Mídia.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Um ficheiro que toque sozinho, sem som e em ciclo.
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="space-y-2">

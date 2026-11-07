@@ -1,3 +1,4 @@
+import { playableVideoUrl } from '@/lib/videoUrl';
 export function hexToRgb(hex) {
   const h = (hex || '#1b365d').replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
@@ -134,7 +135,9 @@ export function applyShopTheme(settings = {}) {
 export function resolveShopBgMode(settings = {}) {
   const mode = settings.shop_bg_mode || 'gradient';
   if (mode === 'image' && !settings.shop_bg_image_url) return 'gradient';
-  if (mode === 'video' && !settings.shop_bg_video_url) return 'gradient';
+  // Sem vídeo, ou com um endereço que o `<video>` não toca (um link do YouTube, por
+  // exemplo): o fundo cai no gradiente em vez de ficar um rectângulo preto.
+  if (mode === 'video' && !playableVideoUrl(settings.shop_bg_video_url)) return 'gradient';
   if (!['gradient', 'image', 'video', 'slides'].includes(mode)) return 'gradient';
   return mode;
 }

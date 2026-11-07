@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import SafeLink from '@/components/SafeLink.jsx';
+import { playableVideoUrl } from '@/lib/videoUrl';
 import { safeLinkUrl } from '@/lib/safeLink';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
@@ -47,11 +48,13 @@ const FALLBACK_SLIDES = [
 ];
 
 function SlideMedia({ slide, eager }) {
-  const isVideo = slide.media_type === 'video' && slide.video_url;
-  if (isVideo) {
+  // Só um ficheiro que a etiqueta `<video>` saiba tocar. Um link do YouTube colado no painel
+  // dava um rectângulo preto, sem erro nem aviso (ver lib/videoUrl.js); agora cai na imagem.
+  const videoSrc = slide.media_type === 'video' ? playableVideoUrl(slide.video_url) : '';
+  if (videoSrc) {
     return (
       <video
-        src={slide.video_url}
+        src={videoSrc}
         className="w-full h-full object-cover"
         autoPlay
         muted

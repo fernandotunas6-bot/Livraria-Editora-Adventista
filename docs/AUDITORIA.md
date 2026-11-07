@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (840, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (846, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1383,6 +1383,22 @@ O logótipo passa a mostrar só o emblema nessa faixa (o modo compacto que já e
 telemóvel), e o lockup volta a partir de `xl`. Poupa os ~138 px que faltavam: a 1024 px a
 linha passa a precisar de 947 para 960 disponíveis. Verificado nas dezasseis larguras, em oito
 páginas: 0 transbordos.
+
+### Sexta ronda: o vídeo de fundo não aceitava o YouTube, e não o dizia
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 96 | **Um link do YouTube no fundo em vídeo dava um rectângulo preto, em silêncio.** Os campos "URL do Vídeo (MP4/WebM)" dos slides e "URL do vídeo" do fundo da loja vão directos para um `<video src>`, que não toca endereços de plataforma. O painel não o dizia, o site não recuava para a imagem, e na consola não aparece erro nenhum — a equipa via o fundo preto e não tinha como descobrir porquê. É o engano mais natural que há: quem tem o vídeo da livraria tem-no no YouTube. | Média | ✅ `lib/videoUrl.js` |
+
+O site passa a recuar: um endereço que o `<video>` não toca faz o slide mostrar a imagem e o
+fundo da loja cair no gradiente, como já caía quando não havia vídeo nenhum. E o painel diz o
+que se passa, nomeando a plataforma reconhecida e **encaminhando para onde o YouTube
+funciona** — o campo "Vídeo de apresentação" da ficha do produto, que esta mesma passagem
+criou.
+
+Só se recusa o que de certeza não funciona (YouTube, Vimeo, Dailymotion, Facebook, Instagram,
+TikTok, Google Drive). Um endereço de CDN sem extensão continua a passar: uma lista fechada
+de extensões recusaria endereços que hoje funcionam.
 
 ### Quinta ronda: um teste para o formulário que já esteve partido em produção
 

@@ -5,11 +5,14 @@ import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransiti
 import { resolveShopBgMode } from '@/lib/shopTheme';
 import ShopHeroMotion from '@/components/ShopHeroMotion';
 import PageBannerSlider, { SHOP_BANNER_IMAGES } from '@/components/PageBannerSlider';
+import { playableVideoUrl } from '@/lib/videoUrl';
 
 function ShopSlideMedia({ slide }) {
-  if (slide.media_type === 'video' && slide.video_url) {
+  // Ver lib/videoUrl.js: um endereço de plataforma (YouTube e afins) não toca num `<video>`.
+  const videoSrc = slide.media_type === 'video' ? playableVideoUrl(slide.video_url) : '';
+  if (videoSrc) {
     return (
-      <video src={slide.video_url} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline poster={slide.image} />
+      <video src={videoSrc} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline poster={slide.image} />
     );
   }
   if (slide.image) {
@@ -101,9 +104,9 @@ export default function ShopHeroBackground({ settings, children }) {
         </>
       )}
 
-      {mode === 'video' && settings.shop_bg_video_url && (
+      {mode === 'video' && playableVideoUrl(settings.shop_bg_video_url) && (
         <>
-          <video src={settings.shop_bg_video_url} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline poster={settings.shop_bg_image_url || undefined} />
+          <video src={playableVideoUrl(settings.shop_bg_video_url)} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline poster={settings.shop_bg_image_url || undefined} />
           <div className="absolute inset-0" style={{ background: `rgba(12, 74, 110, ${overlay})` }} />
         </>
       )}
