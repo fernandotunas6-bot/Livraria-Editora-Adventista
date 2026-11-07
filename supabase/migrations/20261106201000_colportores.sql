@@ -25,6 +25,8 @@
 -- formata_codigo / normalize_person_code de 20261106033302.
 
 -- 1. Códigos -------------------------------------------------------------------------------
+-- Também corrige um erro antigo: o lpad cortava os números maiores do que a largura, e o
+-- funcionário 1000 ficaria FUN-100 (igual ao 100). Agora a largura é um mínimo.
 insert into private.product_code_counters (prefix, last_value) values ('CPT-', 0)
 on conflict (prefix) do nothing;
 
@@ -34,7 +36,8 @@ language sql
 immutable
 set search_path = ''
 as $$
-  select p_prefix || lpad(p_numero::text, case p_prefix when 'CLI-' then 6 when 'CPT-' then 4 else 3 end, '0');
+  -- greatest(): o lpad corta o que passa da largura (FUN-1000 saía FUN-100).
+  select p_prefix || lpad(p_numero::text, greatest(length(p_numero::text), case p_prefix when 'CLI-' then 6 when 'CPT-' then 4 when 'GUI-' then 6 else 3 end), '0');
 $$;
 revoke all on function private.formata_codigo(text, integer) from public, anon, authenticated;
 
@@ -47,7 +50,7 @@ set search_path = ''
 as $$
   select case
     when m is null or upper(m[1]) not in ('CLI', 'FUN', 'CPT') then upper(btrim(coalesce(p, '')))
-    else upper(m[1]) || '-' || lpad(m[2], case upper(m[1]) when 'CLI' then 6 when 'CPT' then 4 else 3 end, '0')
+    else upper(m[1]) || '-' || lpad(m[2], greatest(length(m[2]), case upper(m[1]) when 'CLI' then 6 when 'CPT' then 4 else 3 end), '0')
   end
   from (select regexp_match(coalesce(p, ''), '^\s*([a-zA-Z]{3})[-\s]?0*([0-9]+)\s*$') as m) x;
 $$;
