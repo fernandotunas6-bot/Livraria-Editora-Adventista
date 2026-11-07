@@ -1192,7 +1192,7 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (832, eram 753), `npm run lint`,
+advisors. O que foi feito: leitura do código, `npm test` (840, eram 753), `npm run lint`,
 `npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
 Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
@@ -1383,6 +1383,28 @@ O logótipo passa a mostrar só o emblema nessa faixa (o modo compacto que já e
 telemóvel), e o lockup volta a partir de `xl`. Poupa os ~138 px que faltavam: a 1024 px a
 linha passa a precisar de 947 para 960 disponíveis. Verificado nas dezasseis larguras, em oito
 páginas: 0 transbordos.
+
+### Quinta ronda: um teste para o formulário que já esteve partido em produção
+
+O achado 18 (passagem 9.1) foi **criar um livro no painel rebentar em produção**: a variável
+`autoCode` tinha deixado de existir numa limpeza anterior e, como o `||` a avaliava, o render
+estourava. Ninguém deu por isso porque o lint estava com as regras desligadas e **nenhum
+teste montava o componente**. O lint foi corrigido nessa altura; o formulário continuou sem
+teste. E esta passagem mexeu-lhe (o campo de vídeo).
+
+Fica um `BookFormModal.test.jsx` que o abre a sério nos três caminhos do painel — criar,
+editar e duplicar —, percorre os oito separadores confirmando que cada um abre, exercita o
+campo de vídeo (recusa o que não é YouTube, mostra a pré-visualização sem criar a moldura) e
+confere o que sai no `onSave`.
+
+Para confirmar que o teste serve de alguma coisa, o bug histórico foi reintroduzido de
+propósito (`AUTO_CODE` de volta a `autoCode`, sem declaração): os testes passam a falhar com
+`ReferenceError: autoCode is not defined`. Com o código certo, passam os oito.
+
+Duas coisas que o teste ensinou sobre este ecrã, e que ficaram escritas lá: o jsdom não tem
+`ResizeObserver` e o Radix chama-o sem guarda (o código da casa guarda-o); e os separadores
+do Radix mudam no `mousedown`, não no `click` — a primeira versão do teste percorria os
+separadores sem nunca mudar de painel, e passava à mesma.
 
 ### Acessibilidade
 
