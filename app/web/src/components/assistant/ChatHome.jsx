@@ -19,6 +19,8 @@ const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || '';
  */
 export default function ChatHome({ name, welcome, onPick, disabled = false, onSearch }) {
   const first = firstName(name);
+  // O título já cumprimenta: um "Olá!" no início do texto de boas-vindas ficava repetido.
+  const intro = String(welcome || '').replace(/^\s*ol[aá]\s*[!,.]?\s*/i, '');
   return (
     <div className="space-y-4 pb-1">
       <div className="flex items-start gap-3">
@@ -29,7 +31,7 @@ export default function ChatHome({ name, welcome, onPick, disabled = false, onSe
           <p className="text-lg font-semibold leading-tight text-foreground">
             Olá{first ? `, ${first}` : ''}! Como podemos ajudar?
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{welcome}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{intro}</p>
         </div>
       </div>
 
