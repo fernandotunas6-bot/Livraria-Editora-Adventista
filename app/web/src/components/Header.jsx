@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import SafeLink from '@/components/SafeLink.jsx';
 import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3, Bell, FileDown, ShieldCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -248,9 +249,10 @@ const Header = ({ onCartOpen, pinned = false }) => {
             {(settings.header_cta_text || settings.header_cta_link) && (
               <>
                 {' · '}
-                <Link to={settings.header_cta_link || '/shop'} className="underline underline-offset-2 hover:text-white">
+                {/* `SafeLink`: o endereço vem do painel e nem o React nem o Router o filtram. */}
+                <SafeLink to={settings.header_cta_link || '/shop'} className="underline underline-offset-2 hover:text-white">
                   {settings.header_cta_text || 'Explorar novidades'}
-                </Link>
+                </SafeLink>
               </>
             )}
           </span>

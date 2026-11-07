@@ -3,9 +3,21 @@ import { useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories, getBookCollections } from '@/api/EcommerceApi';
 import { BOOK_GENRES } from '@/lib/bookConstants';
 import { PRODUCT_TYPES } from '@/lib/productTypes';
-import { matchesTokenizedSearch, buildProductSearchHaystack } from '@/lib/searchUtils';
+import { matchesTokenizedSearch, buildProductSearchHaystack, getSearchRelevance } from '@/lib/searchUtils';
+import { DEFAULT_SORT, normalizeSort, sortProducts } from '@/lib/productSort';
 
-export function buildCatalogSearchParams(activeFilters, availableMaxPrice) {
+/**
+ * O estado do catálogo em parâmetros de endereço.
+ *
+ * A ordenação vai aqui, e não só no estado da página, por duas razões. A primeira é que um
+ * link tem de poder dizer o que mostra: `/shop?sort=price-low` é "os mais baratos", e já
+ * existiam links desses no site (o painel lateral do "Mais para si" aponta para
+ * `/shop?sort=newest`). A segunda é que este ficheiro reescreve o endereço a partir dos
+ * filtros: tudo o que ele não conheça é apagado do endereço no primeiro render — era o que
+ * acontecia ao `sort`, que funcionava à chegada e desaparecia a seguir, deixando o endereço
+ * a dizer uma coisa e a lista a mostrar outra.
+ */
+export function buildCatalogSearchParams(activeFilters, availableMaxPrice, sortBy = '') {
   const params = new URLSearchParams();
 
   if (activeFilters.categories.length > 0) params.set('category', activeFilters.categories.join(','));
@@ -24,6 +36,9 @@ export function buildCatalogSearchParams(activeFilters, availableMaxPrice) {
   if (activeFilters.maxPrice !== Infinity && activeFilters.maxPrice < availableMaxPrice) {
     params.set('maxPrice', activeFilters.maxPrice);
   }
+
+  // Só quando não é a de omissão: o endereço limpo é o mais comum e não precisa de ruído.
+  if (sortBy && sortBy !== DEFAULT_SORT) params.set('sort', sortBy);
 
   Object.entries(activeFilters.options || {}).forEach(([key, values]) => {
     values.forEach((val) => params.append(key, val));
@@ -54,7 +69,7 @@ export function usableOptionFilters(activeOptions, availableOptions) {
   return usable;
 }
 
-export function useProductFilters(initialCategory = null) {
+export function useProductFilters(initialCategory = null, { defaultSort = DEFAULT_SORT } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [allProducts, setAllProducts] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -146,7 +161,7 @@ export function useProductFilters(initialCategory = null) {
 
   const [activeFilters, setActiveFilters] = useState(() => {
     const initialOptions = {};
-    const knownParams = ['category', 'collection', 'minPrice', 'maxPrice', 'search', 'rating', 'author', 'isbn', 'publisher', 'language', 'yearFrom', 'yearTo', 'featuredOnly', 'inStockOnly', 'tipo'];
+    const knownParams = ['category', 'collection', 'minPrice', 'maxPrice', 'search', 'rating', 'author', 'isbn', 'publisher', 'language', 'yearFrom', 'yearTo', 'featuredOnly', 'inStockOnly', 'tipo', 'sort'];
 
     for (const [key, value] of searchParams.entries()) {
       if (!knownParams.includes(key)) {
@@ -180,19 +195,25 @@ export function useProductFilters(initialCategory = null) {
     };
   });
 
+  // A ordenação começa no endereço (um link partilhado manda) e só depois na predefinição de
+  // quem chama (as Configurações da loja). Um valor estranho no endereço cai na de omissão em
+  // vez de deixar a lista por ordenar.
+  const [sortBy, setSortByState] = useState(() => normalizeSort(searchParams.get('sort'), defaultSort));
+  const setSortBy = useCallback((value) => setSortByState(normalizeSort(value, defaultSort)), [defaultSort]);
+
   const urlSearch = searchParams.get('search') || '';
   useEffect(() => {
     setActiveFilters((prev) => (prev.search !== urlSearch ? { ...prev, search: urlSearch } : prev));
   }, [urlSearch]);
 
   useEffect(() => {
-    const nextParams = buildCatalogSearchParams(activeFilters, availableFilters.maxPrice);
+    const nextParams = buildCatalogSearchParams(activeFilters, availableFilters.maxPrice, sortBy);
     const nextQuery = nextParams.toString();
 
     if (searchParams.toString() !== nextQuery) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [activeFilters, availableFilters.maxPrice, searchParams, setSearchParams]);
+  }, [activeFilters, availableFilters.maxPrice, sortBy, searchParams, setSearchParams]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((product) => {
@@ -249,6 +270,20 @@ export function useProductFilters(initialCategory = null) {
       return true;
     });
   }, [allProducts, activeFilters, categoriesMap, availableFilters.options]);
+
+  /**
+   * Os produtos filtrados **e organizados**, pelo critério escolhido.
+   *
+   * A ordem vive aqui e não em cada página: eram duas implementações, e a página de categoria
+   * chamava "Novidades" à ordem inversa da loja (ver `lib/productSort.js`). Com pesquisa
+   * activa, a relevância do termo ganha ao critério "Destaques" — quem escreveu um título
+   * quer esse livro primeiro.
+   */
+  const sortedProducts = useMemo(() => {
+    const termo = activeFilters.search;
+    const relevance = termo ? (p) => getSearchRelevance(p, termo) : null;
+    return sortProducts(filteredProducts, sortBy, { relevance });
+  }, [filteredProducts, sortBy, activeFilters.search]);
 
   const updateFilter = useCallback((key, value) => {
     setActiveFilters((prev) => ({ ...prev, [key]: value }));
@@ -324,6 +359,9 @@ export function useProductFilters(initialCategory = null) {
     bookCollections,
     availableFilters,
     filteredProducts,
+    sortedProducts,
+    sortBy,
+    setSortBy,
     activeFilters,
     updateFilter,
     updateOptionFilter,

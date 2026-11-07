@@ -36,10 +36,20 @@ export function isSaleActive(book, now = Date.now()) {
  * É a mesma regra de `public.effective_price` e do `place_order`, que é quem cobra:
  * mexer aqui sem mexer na migração volta a pôr o carrinho a mostrar um preço e o servidor
  * a cobrar outro.
+ *
+ * O segundo argumento é uma entrada de `stock_books.versions` — o que a equipa escreve no
+ * painel: `{ label, format, price, stock, isbn }`. **Não** é uma variante de produto
+ * (`product.variants[i]`), que é outra forma, com `title`, `price_in_cents` e
+ * `inventory_quantity`, construída pelo `bookToProduct`.
+ *
+ * As duas chamavam-se "variant" no código, e a confusão já custou: o aviso do carrinho lia
+ * `variant.name` — um campo que nenhuma das duas tem — e dizia sempre "Edição Standard"
+ * (achado 97). Aqui o argumento chama-se `versao`, e o `lib/variantFields.test.js` passa a
+ * recusar leituras de campos que uma variante de produto não tem.
  */
-export function variantPrices(book, variant, now = Date.now()) {
-  const price = Number(variant?.price ?? book?.price) || 0;
-  const sale = Number(variant?.sale_price) || 0;
+export function variantPrices(book, versao, now = Date.now()) {
+  const price = Number(versao?.price ?? book?.price) || 0;
+  const sale = Number(versao?.sale_price) || 0;
   const onSale = sale > 0 && sale < price && saleWindowOpen(book, now);
   return { price, sale: onSale ? sale : null, onSale };
 }

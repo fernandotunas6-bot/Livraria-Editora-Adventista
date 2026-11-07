@@ -9,6 +9,7 @@ import { useInfiniteList } from '@/hooks/useInfiniteList';
 import { useScrollMemory } from '@/hooks/useScrollMemory';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { discoveryOrder, hasInterest, interestFromRecent } from '@/lib/discovery';
+import { displayPrice, inStock, sortProducts } from '@/lib/productSort';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
 
 // A ordem vive em lib/discovery.js; reexportada para os testes.
@@ -19,12 +20,11 @@ export const BATCH_MOBILE = 12;
 export const BATCH_DESKTOP = 16;
 const MINI_COUNT = 5;
 
-const inStock = (p) => p.purchasable !== false && (p.variants?.[0]?.inventory_quantity ?? 0) > 0;
+
 
 /** Livro em ponto pequeno para a coluna lateral: capa, título e preço numa linha. */
 function MiniBook({ product }) {
-  const v = product.variants?.[0];
-  const price = v?.sale_price_formatted || v?.price_formatted;
+  const { price } = displayPrice(product);
   return (
     <Link to={`/product/${product.id}`} className="group flex items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted">
       <img src={product.image} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />
@@ -54,10 +54,10 @@ function DiscoveryAside({ products, excludeId }) {
   }, [products]);
 
   const mini = useMemo(() => {
+    // `sortProducts` com "Destaques": em destaque primeiro, depois promoções e chegadas
+    // recentes — a mesma ordem da loja, e pela data de chegada e não pelo ano de publicação.
     const disponiveis = products.filter((p) => inStock(p) && String(p.id) !== String(excludeId));
-    const destaques = disponiveis.filter((p) => p.featured);
-    const resto = disponiveis.filter((p) => !p.featured).sort((a, b) => (b.order || 0) - (a.order || 0));
-    return [...destaques, ...resto].slice(0, MINI_COUNT);
+    return sortProducts(disponiveis, 'featured').slice(0, MINI_COUNT);
   }, [products, excludeId]);
 
   const link = 'flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted hover:text-primary';

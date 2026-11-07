@@ -1279,6 +1279,7 @@ route("GET", "/settings", async () => {
     whatsapp: rec.whatsapp || "",
     facebook: rec.facebook || "",
     instagram: rec.instagram || "",
+    youtube: rec.youtube || "",
     pwa_enabled: !!rec.pwa_enabled,
     pwa_name: rec.pwa_name || rec.site_name,
     pwa_short_name: rec.pwa_short_name || "LA",

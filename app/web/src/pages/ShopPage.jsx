@@ -2,19 +2,16 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet';
 import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  SlidersHorizontal, X, LayoutGrid, List, Sparkles,
-  ChevronRight, ChevronLeft,
-} from 'lucide-react';
+import { X, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
+import CatalogToolbar from '@/components/catalog/CatalogToolbar.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
 import FilterPanel from '@/components/FilterPanel.jsx';
 import AdvancedSearchPanel from '@/components/AdvancedSearchPanel.jsx';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
+import FooterCompact from '@/components/FooterCompact.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import ShopHeroBackground from '@/components/ShopHeroBackground';
 import QuickViewModal from '@/components/QuickViewModal';
@@ -22,39 +19,13 @@ import { getProduct } from '@/api/EcommerceApi';
 import { pageTitle } from '@/lib/brand';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { applyShopTheme, shopDefaults } from '@/lib/shopTheme';
-import { getSearchRelevance } from '@/lib/searchUtils';
 import { MOTION } from '@/lib/motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useInfiniteList } from '@/hooks/useInfiniteList';
 import { readPlace, useScrollMemory } from '@/hooks/useScrollMemory';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import { shopDensityClass } from '@/lib/productGrid';
-
-const SORT_OPTIONS = [
-  { value: 'featured', label: 'Destaques' },
-  { value: 'title', label: 'A – Z' },
-  { value: 'price-low', label: 'Preço: Menor ao Maior' },
-  { value: 'price-high', label: 'Preço: Maior ao Menor' },
-  { value: 'newest', label: 'Novidades' },
-];
-
-function sortProducts(products, sortBy, search = '') {
-  return [...products].sort((a, b) => {
-    if (sortBy === 'price-low') return a.price_in_cents - b.price_in_cents;
-    if (sortBy === 'price-high') return b.price_in_cents - a.price_in_cents;
-    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-    if (sortBy === 'newest') return (b.order || 0) - (a.order || 0);
-    if (sortBy === 'featured') {
-      const relevance = search
-        ? getSearchRelevance(b, search) - getSearchRelevance(a, search)
-        : 0;
-      return relevance
-        || (b.featured ? 1 : 0) - (a.featured ? 1 : 0)
-        || (b.order || 0) - (a.order || 0);
-    }
-    return (b.order || 0) - (a.order || 0);
-  });
-}
+import { DEFAULT_SORT, canGroupByType, groupByType, normalizeSort } from '@/lib/productSort';
 
 const ShopPage = () => {
   const { settings } = useSiteSettings();
@@ -79,13 +50,13 @@ const ShopPage = () => {
   const navType = useNavigationType();
   const [initialPlace] = useState(() => (navType === 'POP' ? readPlace(`${location.pathname}${location.search}`) : null));
 
-  // `?sort=` no endereço (ex.: "Ver todos" das Novidades na página inicial) escolhe a ordem.
-  const [urlSort] = useState(() => {
-    const v = new URLSearchParams(location.search).get('sort');
-    return SORT_OPTIONS.some((o) => o.value === v) ? v : null;
-  });
-  const [sortBy, setSortBy] = useState(initialPlace?.sortBy || urlSort || shop.shop_default_sort || 'featured');
+  // `?sort=` no endereço (ex.: "Ver todos" das Novidades na página inicial) escolhe a ordem;
+  // hoje a ordenação vive no endereço, dentro do `useProductFilters`, por isso um link
+  // partilhado mostra mesmo o que diz.
+  const [urlSort] = useState(() => new URLSearchParams(location.search).get('sort') || null);
   const [viewMode, setViewMode] = useState(initialPlace?.viewMode === 'list' ? 'list' : 'grid');
+  // Agrupar por tipo de produto. Só aparece quando o catálogo tem mais do que um tipo.
+  const [grouped, setGrouped] = useState(false);
   // Densidade da grelha no desktop largo: a das Configurações da loja.
   const gridCols = shop.shop_grid_columns || 4;
   const [quickView, setQuickView] = useState(null);
@@ -105,12 +76,7 @@ const ShopPage = () => {
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [isMobileFilterOpen]);
 
-  useEffect(() => {
-    // A ordem reposta ao voltar atrás ganha sempre à de omissão das configurações, mesmo
-    // que estas cheguem depois do primeiro desenho.
-    if (initialPlace?.sortBy || urlSort) return;
-    setSortBy(shop.shop_default_sort || 'featured');
-  }, [shop.shop_default_sort, initialPlace?.sortBy, urlSort]);
+
 
   useEffect(() => {
     if (!quickView) {
@@ -131,6 +97,9 @@ const ShopPage = () => {
     bookCollections,
     availableFilters,
     filteredProducts,
+    sortedProducts,
+    sortBy,
+    setSortBy,
     activeFilters,
     updateFilter,
     updateOptionFilter,
@@ -138,12 +107,16 @@ const ShopPage = () => {
     filterCount,
     catalogStats,
     isLoading,
-  } = useProductFilters();
+  } = useProductFilters(null, { defaultSort: normalizeSort(shop.shop_default_sort, DEFAULT_SORT) });
 
-  const sortedProducts = useMemo(
-    () => sortProducts(filteredProducts, sortBy, activeFilters.search),
-    [filteredProducts, sortBy, activeFilters.search]
-  );
+  // A ordem reposta ao voltar atrás ganha à de omissão das Configurações, mas não ao que
+  // está escrito no endereço (um link partilhado manda em tudo).
+  const reposicaoFeita = useRef(false);
+  useEffect(() => {
+    if (reposicaoFeita.current || urlSort || !initialPlace?.sortBy) return;
+    reposicaoFeita.current = true;
+    setSortBy(initialPlace.sortBy);
+  }, [initialPlace?.sortBy, urlSort, setSortBy]);
 
   const perPage = shop.shop_per_page;
   const pageCount = Math.max(1, Math.ceil(sortedProducts.length / perPage));
@@ -200,6 +173,16 @@ const ShopPage = () => {
 
   // Densidade no desktop largo (ver lib/productGrid.js): a grelha é a mesma do resto do site.
   const gridClass = shopDensityClass(gridCols);
+
+  // Agrupar por tipo só se houver mais do que um tipo — num catálogo só de livros, um título
+  // "Livros" por cima de uma lista de livros não diz nada a ninguém.
+  const podeAgrupar = useMemo(() => canGroupByType(sortedProducts), [sortedProducts]);
+  // Os grupos são dos produtos **que estão nesta página**: agrupar a lista inteira e depois
+  // cortar daria grupos com buracos, e a paginação deixava de corresponder ao que se vê.
+  const grupos = useMemo(
+    () => (grouped && podeAgrupar ? groupByType(displayProducts, sortBy) : []),
+    [grouped, podeAgrupar, displayProducts, sortBy],
+  );
 
 
   const heroTitle = shop.shop_hero_title || shopDefaults.shop_hero_title;
@@ -333,54 +316,24 @@ const ShopPage = () => {
           </aside>
 
           <div className="flex-1 min-w-0">
-            {/* Barra de ferramentas */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-card border border-border p-4 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Sem botão "Pesquisar" aqui: o campo de pesquisa completo está logo acima. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setIsMobileFilterOpen(true)}>
-                      <SlidersHorizontal className="h-4 w-4 mr-1" />
-                      Filtros {filterCount > 0 && `(${filterCount})`}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Filtrar catálogo</TooltipContent>
-                </Tooltip>
-                <p className="text-sm text-muted-foreground" aria-live="polite">
-                  <strong className="text-foreground">{sortedProducts.length}</strong>
-                  {sortedProducts.length === 1 ? ' livro' : ' livros'}
-                  {sortedProducts.length > displayProducts.length && ` · a mostrar ${firstShown}–${lastShown}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
-                <div className="flex border rounded-lg overflow-hidden">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('grid')} aria-label="Visualização em grelha" aria-pressed={viewMode === 'grid'}>
-                        <LayoutGrid className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Visualização em Grelha</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-11 w-11 sm:h-9 sm:w-9 rounded-none" onClick={() => setViewMode('list')} aria-label="Visualização em lista" aria-pressed={viewMode === 'list'}>
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Visualização em Lista</TooltipContent>
-                  </Tooltip>
-                </div>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[160px] h-11 sm:h-9" aria-label="Ordenar por"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SORT_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <CatalogToolbar
+              className="mb-6"
+              total={sortedProducts.length}
+              shownFrom={firstShown}
+              shownTo={lastShown}
+              shownCount={displayProducts.length}
+              noun="produto"
+              nounPlural="produtos"
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              grouped={grouped}
+              onGroupedChange={setGrouped}
+              canGroup={podeAgrupar}
+              filterCount={filterCount}
+              onOpenFilters={() => setIsMobileFilterOpen(true)}
+            />
 
             {/* Chips de filtros activos */}
             {activeFilterChips.length > 0 && (
@@ -403,22 +356,50 @@ const ShopPage = () => {
                 montagem; a seguir, o React reconcilia pelos `key={product.id}` de cada
                 cartão e reaproveita os que não mudaram. Quem muda um filtro já tem a
                 contagem de resultados a dizer-lhe que mudou. */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: MOTION.base, ease: MOTION.ease }}
-              className={viewMode === 'grid' ? gridClass : ''}
-            >
-              <ProductsList
-                embedded
-                products={displayProducts}
-                isLoading={isLoading}
-                skeletonCount={perPage}
-                onCartOpen={handleCartOpen}
-                viewMode={viewMode}
-                onQuickView={setQuickView}
-              />
-            </motion.div>
+            {grupos.length > 0 ? (
+              /* Agrupado por tipo: cada grupo com o seu título e a sua grelha. Serve para
+                 quando o catálogo deixa de ser só livros — um uniforme escolar entre dois
+                 devocionais não ajuda quem procura leitura. */
+              <div className="space-y-10">
+                {grupos.map((grupo) => (
+                  <section key={grupo.value} aria-labelledby={`grupo-${grupo.value}`}>
+                    <div className="mb-4 flex items-baseline gap-2 border-b border-border pb-2">
+                      <h2 id={`grupo-${grupo.value}`} className="text-lg font-semibold">{grupo.label}</h2>
+                      <span className="text-sm text-muted-foreground tabular-nums">
+                        {grupo.products.length}
+                      </span>
+                    </div>
+                    <div className={viewMode === 'grid' ? gridClass : ''}>
+                      <ProductsList
+                        embedded
+                        products={grupo.products}
+                        isLoading={false}
+                        onCartOpen={handleCartOpen}
+                        viewMode={viewMode}
+                        onQuickView={setQuickView}
+                      />
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: MOTION.base, ease: MOTION.ease }}
+                className={viewMode === 'grid' ? gridClass : ''}
+              >
+                <ProductsList
+                  embedded
+                  products={displayProducts}
+                  isLoading={isLoading}
+                  skeletonCount={perPage}
+                  onCartOpen={handleCartOpen}
+                  viewMode={viewMode}
+                  onQuickView={setQuickView}
+                />
+              </motion.div>
+            )}
 
             {/* Enquanto carrega, fica aqui um espaço com a altura da navegação de páginas.
                 Sem ele, a navegação aparecia de repente no fim da lista e empurrava o rodapé
@@ -528,11 +509,13 @@ const ShopPage = () => {
         )}
       </main>
 
-      {/* No telemóvel o catálogo segue sem rodapé (a barra inferior e o menu do cabeçalho
-          levam às mesmas páginas); no desktop fica o de sempre. */}
+      {/* Rodapé completo no computador; no telemóvel a versão curta, com o essencial que a
+          barra inferior não tem (privacidade, rastreio, lojas, devoluções). Ver
+          components/FooterCompact.jsx. */}
       <div className="hidden md:block">
         <Footer />
       </div>
+      <FooterCompact />
     </>
   );
 };
