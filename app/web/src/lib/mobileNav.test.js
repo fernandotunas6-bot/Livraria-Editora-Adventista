@@ -27,6 +27,9 @@ describe('activeTab', () => {
     expect(activeTab('/shop')).toBe('categorias');
     expect(activeTab('/colecoes/biblias')).toBe('categorias');
     expect(activeTab('/profile')).toBe('conta');
+    expect(activeTab('/comunidade')).toBe('comunidade');
+    expect(activeTab('/comunidade/p/abc123')).toBe('comunidade');
+    expect(activeTab('/comunidades')).toBeNull();
     expect(activeTab('/about')).toBeNull();
   });
 });

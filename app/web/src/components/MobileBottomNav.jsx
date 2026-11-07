@@ -1,10 +1,10 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, LayoutGrid, Search, ShoppingCart, User } from 'lucide-react';
+import { Home, LayoutGrid, MessagesSquare, ShoppingCart, User } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useHideOnScroll } from '@/hooks/useHideOnScroll';
-import { activeTab, bottomNavVisible, requestCartOpen, requestHeaderSearch } from '@/lib/mobileNav';
+import { activeTab, bottomNavVisible, requestCartOpen } from '@/lib/mobileNav';
 import { cn } from '@/lib/utils';
 
 const MobileCategoriesSheet = lazy(() => import('@/components/MobileCategoriesSheet'));
@@ -15,7 +15,8 @@ const MobileCategoriesSheet = lazy(() => import('@/components/MobileCategoriesSh
 const ALTURA = 56;
 
 /**
- * Navegação inferior do telemóvel: Início, Categorias, Pesquisar, Carrinho, Conta.
+ * Navegação inferior do telemóvel: Início, Categorias, Comunidade, Carrinho, Conta. A pesquisa
+ * está na lupa do cabeçalho (e no catálogo); a Comunidade entrou no lugar dela (2026-11-07).
  * Só abaixo de 768 px, e fora da ficha do livro (que tem a sua barra de compra) e dos ecrãs
  * de tarefa. Não substitui nada: o cabeçalho continua igual; isto é um atalho ao alcance do
  * polegar enquanto se percorre o catálogo.
@@ -74,10 +75,10 @@ export default function MobileBottomNav() {
             <LayoutGrid className="h-5 w-5" aria-hidden="true" />
             Categorias
           </button>
-          <button type="button" className={cn(item, cor(false))} onClick={requestHeaderSearch}>
-            <Search className="h-5 w-5" aria-hidden="true" />
-            Pesquisar
-          </button>
+          <Link to="/comunidade" className={cn(item, cor(tab === 'comunidade'))} aria-current={tab === 'comunidade' ? 'page' : undefined}>
+            <MessagesSquare className="h-5 w-5" aria-hidden="true" />
+            Comunidade
+          </Link>
           <button
             type="button"
             className={cn(item, cor(false))}

@@ -20,19 +20,19 @@ export function GoldRule({ className = '' }) {
 /** Topo editorial: marinho, Fraunces, filete dourado e os números da comunidade. */
 export function CommunityHero({ stats, onWrite }) {
   return (
-    <section className="relative overflow-hidden bg-editorial-marinho pb-10 pt-24 text-white sm:pt-28">
+    <section className="relative overflow-hidden bg-editorial-marinho pb-6 pt-20 text-white sm:pb-10 sm:pt-28">
       <div className="pointer-events-none absolute inset-0 opacity-[0.07]" aria-hidden="true"
         style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #b8892f 0, transparent 40%), radial-gradient(circle at 80% 0%, #5fd0ea 0, transparent 35%)' }} />
       <div className="container-custom relative">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e2c27d]">Livraria Adventista</p>
-        <h1 className="mt-2 text-4xl font-semibold text-white md:text-5xl">Comunidade de Leitores</h1>
-        <p className="mt-3 max-w-2xl text-base text-white/80 md:text-lg">
+        <h1 className="mt-2 text-3xl font-semibold text-white sm:text-4xl md:text-5xl">Comunidade de Leitores</h1>
+        <p className="mt-2 max-w-2xl text-sm text-white/80 sm:mt-3 sm:text-base md:text-lg">
           Converse sobre livros, a Bíblia e a vida. Cite uma passagem, faça uma pergunta, recomende uma leitura.
         </p>
-        <GoldRule className="my-6 max-w-md" />
+        <GoldRule className="my-4 max-w-md sm:my-6" />
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
           {stats && (
-            <dl className="flex gap-8 text-sm">
+            <dl className="flex gap-6 text-sm sm:gap-8">
               <div><dt className="text-white/70">Leitores</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.members || 0}</dd></div>
               <div><dt className="text-white/70">Publicações</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.posts_total || 0}</dd></div>
               <div><dt className="text-white/70">Esta semana</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.posts_week || 0}</dd></div>
@@ -53,13 +53,13 @@ export function ClubBanner({ club }) {
   const month = new Date(`${club.month}T12:00:00`).toLocaleDateString('pt-PT', { month: 'long' });
   return (
     <section aria-labelledby="clube-do-livro" className="overflow-hidden rounded-2xl border border-editorial-ouro/40 bg-gradient-to-br from-editorial-papel to-editorial-tela shadow-sm">
-      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-        {club.book_cover && <img src={club.book_cover} alt={`Capa de ${club.book_title}`} className="h-36 w-24 shrink-0 self-center rounded-md object-cover shadow-md sm:self-auto" />}
+      <div className="flex items-start gap-4 p-4 sm:items-center sm:p-5">
+        {club.book_cover && <img src={club.book_cover} alt={`Capa de ${club.book_title}`} className="h-28 w-[4.5rem] shrink-0 rounded-md object-cover shadow-md sm:h-36 sm:w-24" />}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-ouro-texto">Clube do livro · {month}</p>
-          <h2 id="clube-do-livro" className="mt-1 text-2xl font-semibold text-editorial-tinta">{club.title || club.book_title}</h2>
+          <h2 id="clube-do-livro" className="mt-1 text-xl font-semibold text-editorial-tinta sm:text-2xl">{club.title || club.book_title}</h2>
           <p className="text-sm text-editorial-tinta-suave">{club.book_title}{club.book_author ? ` · ${club.book_author}` : ''}</p>
-          {club.intro && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-editorial-tinta">{club.intro}</p>}
+          {club.intro && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-editorial-tinta sm:line-clamp-3">{club.intro}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button asChild size="sm" className="bg-editorial-petroleo hover:bg-editorial-petroleo/90">
               <Link to={`/comunidade?livro=${encodeURIComponent(club.book_id)}`}>Entrar na discussão</Link>
@@ -111,7 +111,7 @@ export function FeedToolbar({ filters, onChange }) {
   const [query, setQuery] = useState(filters.query || '');
   useEffect(() => { setQuery(filters.query || ''); }, [filters.query]);
   const submit = (e) => { e.preventDefault(); onChange({ query: query.trim() }); };
-  const chip = (on) => `rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${on
+  const chip = (on) => `min-h-9 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-0 ${on
     ? 'border-editorial-petroleo bg-editorial-petroleo text-white'
     : 'border-editorial-filete bg-editorial-papel text-editorial-tinta hover:bg-editorial-tela'}`;
 
@@ -123,7 +123,7 @@ export function FeedToolbar({ filters, onChange }) {
             <button
               key={s.value} type="button" role="tab" aria-selected={filters.sort === s.value}
               onClick={() => onChange({ sort: s.value })}
-              className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-sm' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
+              className={`flex min-h-9 items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-sm' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
             >
               {s.value === 'em_alta' && <Flame className="h-3.5 w-3.5" aria-hidden="true" />}
               {s.label}
@@ -160,7 +160,7 @@ export function CommunitySidebar({ sidebar }) {
   const books = sidebar?.books || [];
   const trending = (sidebar?.topics || []).filter((t) => t.posts > 0).sort((a, b) => b.posts - a.posts).slice(0, 5);
   return (
-    <aside className="space-y-4" aria-label="Destaques da comunidade">
+    <aside className="hidden space-y-4 lg:block" aria-label="Destaques da comunidade">
       {books.length > 0 && (
         <section className="rounded-2xl border border-editorial-filete bg-editorial-papel p-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-editorial-tinta"><BookOpen className="h-4 w-4 text-editorial-ouro" aria-hidden="true" /> Livros em discussão</h2>
@@ -209,5 +209,53 @@ export function CommunitySidebar({ sidebar }) {
         <Link to="/privacidade#comunidade" className="mt-1.5 inline-block text-xs font-semibold text-editorial-petroleo underline underline-offset-2">O que fica público e como apagar</Link>
       </section>
     </aside>
+  );
+}
+
+/**
+ * Telemóvel: o que no computador está na coluna lateral, antes do feed. Lá em baixo ficava
+ * inalcançável, porque o feed carrega mais publicações ao chegar ao fim.
+ */
+export function MobileHighlights({ sidebar }) {
+  const books = sidebar?.books || [];
+  return (
+    <div className="space-y-3 lg:hidden">
+      {books.length > 0 && (
+        <section aria-labelledby="livros-em-discussao-m">
+          <h2 id="livros-em-discussao-m" className="mb-2 flex items-center gap-2 text-sm font-semibold text-editorial-tinta">
+            <BookOpen className="h-4 w-4 text-editorial-ouro" aria-hidden="true" /> Livros em discussão
+          </h2>
+          <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+            {books.map((b) => (
+              <li key={b.id} className="shrink-0">
+                <Link to={`/comunidade?livro=${encodeURIComponent(b.id)}`} className="flex w-56 items-center gap-3 rounded-xl border border-editorial-filete bg-editorial-papel p-2">
+                  {b.cover ? <img src={b.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover shadow-sm" /> : <span className="h-14 w-10 shrink-0 rounded bg-editorial-tela" aria-hidden="true" />}
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-editorial-tinta">{b.title}</span>
+                    <span className="block text-xs text-editorial-tinta-suave">{plural(b.posts, 'publicação', 'publicações')}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <details className="group rounded-2xl border border-editorial-filete bg-editorial-papel">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-sm font-semibold text-editorial-tinta [&::-webkit-details-marker]:hidden">
+          <ShieldCheck className="h-4 w-4 text-editorial-ouro" aria-hidden="true" /> Regras da casa
+          <span className="ml-auto text-xs font-normal text-editorial-tinta-suave group-open:hidden">Ver</span>
+          <span className="ml-auto hidden text-xs font-normal text-editorial-tinta-suave group-open:inline">Fechar</span>
+        </summary>
+        <div className="px-4 pb-4">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-editorial-tinta">
+            <li>Respeito, sempre. Discorde das ideias, não das pessoas.</li>
+            <li>Nas citações, indique o livro e a página.</li>
+            <li>Sem links para conteúdo adulto, encurtadores ou sites perigosos.</li>
+            <li>Três denúncias ocultam uma publicação até a equipa a rever.</li>
+          </ul>
+          <Link to="/privacidade#comunidade" className="mt-2 inline-block text-xs font-semibold text-editorial-petroleo underline underline-offset-2">O que fica público e como apagar</Link>
+        </div>
+      </details>
+    </div>
   );
 }

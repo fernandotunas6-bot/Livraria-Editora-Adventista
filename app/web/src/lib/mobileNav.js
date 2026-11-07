@@ -34,10 +34,11 @@ export function bottomNavVisible(pathname = '/') {
   return !HIDDEN.some((re) => re.test(pathname));
 }
 
-/** Separador activo: 'inicio' | 'categorias' | 'conta' | null. Pesquisa e carrinho são acções. */
+/** Separador activo: 'inicio' | 'categorias' | 'comunidade' | 'conta' | null. O carrinho é uma acção. */
 export function activeTab(pathname = '/') {
   if (pathname === '/') return 'inicio';
   if (pathname.startsWith('/shop') || pathname.startsWith('/colecoes')) return 'categorias';
+  if (pathname === '/comunidade' || pathname.startsWith('/comunidade/')) return 'comunidade';
   if (pathname.startsWith('/profile')) return 'conta';
   return null;
 }
