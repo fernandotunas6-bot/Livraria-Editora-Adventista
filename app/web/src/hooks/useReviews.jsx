@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase, mediaUrl } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
+import { hasPurchasedBook } from '@/lib/purchase';
 
 function toReview(row) {
   return {
@@ -89,16 +90,12 @@ export const useReviews = (bookId) => {
     loadOrders();
   }, [user?.email, isAuthed, fetchUserOrders]);
 
-  // 3. Check if user has purchased this book (by comparing title or bookId)
-  const hasPurchased = useMemo(() => {
-    if (!isAuthed || userOrders.length === 0 || !bookId) return false;
-    return userOrders.some(order => {
-      const items = order.items || [];
-      return items.some(item => {
-        return item.book_id === bookId || item.product_id === bookId;
-      });
-    });
-  }, [userOrders, bookId, isAuthed]);
+  // 3. O utilizador comprou este livro? Só contam encomendas pagas, entregues ou confirmadas, e
+  // nunca as canceladas: a mesma regra da "compra verificada" na base de dados (lib/purchase.js).
+  const hasPurchased = useMemo(
+    () => isAuthed && hasPurchasedBook(userOrders, bookId),
+    [userOrders, bookId, isAuthed],
+  );
 
   // 4. Calculate stats (Average Rating, etc)
   const stats = useMemo(() => {

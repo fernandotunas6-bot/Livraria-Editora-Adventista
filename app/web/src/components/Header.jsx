@@ -17,12 +17,16 @@ import { UserMenu, GuestAuthButton } from '@/components/UserMenu';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { getProducts } from '@/api/EcommerceApi';
 import { buildSearchSuggestions } from '@/lib/searchUtils';
+import SiteNoticeBar from '@/components/SiteNoticeBar';
+import { useSiteNotice } from '@/hooks/useSiteNotice';
 
 // Menu do telemóvel: as mesmas secções do mega menu, em lista.
 const NAV_LINKS = [
   { to: '/', label: 'Início' },
   { to: '/shop', label: 'Livros' },
   { to: '/colecoes', label: 'Coleções' },
+  { to: '/comunidade', label: 'Comunidade' },
+  { to: '/materiais', label: 'Materiais' },
   { to: '/lojas', label: 'Lojas' },
   { to: '/about', label: 'Sobre' },
   { to: '/faq', label: 'Ajuda' },
@@ -42,6 +46,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
   const { user, isAuthed, isAdmin, canAccessAdmin, logout } = useAuth();
   const { openAuth } = useAuthDialog();
   const { settings } = useSiteSettings();
+  const { notice, dismiss: dismissNotice } = useSiteNotice();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -159,6 +164,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
 
   return (
     <>
+      {/* Faixa de aviso (painel → Sistema → Faixa de aviso), no fluxo da página: empurra o
+          conteúdo em vez de o tapar e sobe com ele ao descer. */}
+      <SiteNoticeBar notice={notice} onDismiss={dismissNotice} />
       {/* Barra fina por cima do herói.
           O cabeçalho completo sai de cena no topo da página para a imagem de entrada se ver
           inteira (ver `useHeaderReveal`) — mas isso deixava quem acaba de chegar sem
@@ -167,8 +175,17 @@ const Header = ({ onCartOpen, pinned = false }) => {
           mantém legível por cima de qualquer imagem, e sai de cena quando o cabeçalho
           verdadeiro entra. Monta e desmonta em vez de ficar escondida, para não deixar
           botões invisíveis no caminho de quem navega pelo teclado. */}
+      {/* Com faixa de aviso, a barra fica logo abaixo dela (`--notice-offset`, medido pela faixa)
+          e acompanha a página em vez de ficar presa ao ecrã: só existe nos primeiros píxeis de
+          deslocamento, antes de o cabeçalho completo entrar. */}
       {!pinned && !revealed && (
-        <div className="safe-top fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base">
+        <div
+          className={cn(
+            'inset-x-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base',
+            notice ? 'absolute' : 'safe-top fixed top-0',
+          )}
+          style={notice ? { top: 'var(--notice-offset, 0px)' } : undefined}
+        >
           <div className="container-custom flex h-14 items-center justify-between gap-3">
             <BrandLogo variant="light" collapseToIcon />
             <div className="flex items-center gap-1">
@@ -325,7 +342,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
           onSubmit={handleSearch}
           role="search"
           aria-label="Pesquisa de livros"
-          aria-hidden={!searchOpen}
+          // Fechada, sai do caminho do teclado e dos leitores de ecrã (antes só aria-hidden,
+          // e o campo continuava a receber o foco sem se ver).
+          {...(searchOpen ? {} : { inert: '' })}
           className={`relative grid transition-[grid-template-rows,opacity] duration-base ${
             searchOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
           }`}

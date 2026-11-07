@@ -18,6 +18,8 @@ import { isUploadPending } from '@/lib/mediaUpload';
 import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { clearSecret, loadSecretStatus, secretsForSave, withoutSecrets } from '@/lib/siteSecrets';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FLOATING_PAGES, hiddenPages } from '@/lib/floatingButtons';
 
 /**
  * Campo de palavra-passe ou chave. Com a migração `segredos_fora_da_api` o valor guardado
@@ -181,6 +183,8 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
   const [hasNewRules, setHasNewRules] = useState(false);
+  // Colunas da migração 20261106180000 (páginas sem os botões flutuantes).
+  const [hasFloating, setHasFloating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // Que segredos estão guardados (sem os valores). `null` = base de dados sem a migração.
@@ -200,6 +204,7 @@ export default function SettingsTab() {
         setHasAboutImages('about_top_image_url' in r);
         setHasAboutTeam('about_team' in r);
         setHasNewRules('unpaid_cancel_days' in r);
+        setHasFloating('chat_hidden_on' in r);
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
         setLogoRemoved(false);
@@ -289,6 +294,8 @@ export default function SettingsTab() {
           deepseek_api_key: r.deepseek_api_key || '',
           chat_model: r.chat_model || '',
           chat_welcome: r.chat_welcome || '',
+          chat_hidden_on: hiddenPages(r, 'chat'),
+          scroll_top_hidden_on: hiddenPages(r, 'top'),
         });
       }
     } catch {
@@ -417,6 +424,15 @@ export default function SettingsTab() {
         data.favicon_url = '';
       }
 
+      // Páginas sem os botões flutuantes: só com as colunas da migração, e só chaves conhecidas.
+      if (hasFloating) {
+        data.chat_hidden_on = hiddenPages(form, 'chat');
+        data.scroll_top_hidden_on = hiddenPages(form, 'top');
+      } else {
+        delete data.chat_hidden_on;
+        delete data.scroll_top_hidden_on;
+      }
+
       // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
       const payload = { ...withoutSecrets(data), ...secretsForSave(form, secretStatus) };
       if (id) {
@@ -501,7 +517,7 @@ export default function SettingsTab() {
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.maintenance_mode} onCheckedChange={(v) => set('maintenance_mode', v)} />
-            <Label>Modo manutenção (bloqueia checkout)</Label>
+            <Label>Modo manutenção (bloqueia as compras)</Label>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.google_oauth_enabled} onCheckedChange={(v) => set('google_oauth_enabled', v)} />
@@ -520,7 +536,7 @@ export default function SettingsTab() {
             onFileChange={(f) => { setLogoFile(f); if (f) setLogoRemoved(false); }}
             onClear={() => setLogoRemoved(true)}
             aspect="quadrado ou horizontal"
-            hint="Logotipo: PNG/SVG com fundo transparente · 200×200px mínimo · Aparece em todo o site (header, login, admin, rodapé)"
+            hint="Logotipo: PNG ou WebP com fundo transparente · 200×200px mínimo · Aparece em todo o site (header, login, admin, rodapé)"
             previewClassName="h-20 w-40"
             driveConfig={driveImageConfig}
           />
@@ -674,7 +690,7 @@ export default function SettingsTab() {
 
         <TabsContent value="messaging" className="space-y-6 max-w-xl">
           <div>
-            <h3 className="font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /> Email de confirmação de encomenda</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Confirmações de encomenda, avisos de cada passo, respostas da equipa aos clientes e alertas à equipa.
               O servidor envia por API: Brevo (grátis, 300 por dia) ou Cloudflare (o domínio da loja já lá está; plano pago).
@@ -761,7 +777,7 @@ export default function SettingsTab() {
           </div>
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>
             <p className="text-xs text-muted-foreground mt-1">Gere chaves VAPID em <a href="https://vapidkeys.com" target="_blank" rel="noreferrer" className="text-primary underline">vapidkeys.com</a></p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
@@ -775,7 +791,7 @@ export default function SettingsTab() {
           <SecretField {...secretProps('vapid_private_key', 'Chave privada VAPID')} className="font-mono text-xs" />
 
           <div className="border-t pt-6">
-            <h3 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Assistente IA (chat)</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Widget de ajuda fixo no site com sugestões, catálogo e links. Recomendado: <strong>Gemini Flash Lite</strong> (mais barato). Fallback automático para FAQ sem chave.
             </p>
@@ -816,6 +832,50 @@ export default function SettingsTab() {
             <Label>Mensagem de boas-vindas</Label>
             <Textarea rows={2} value={form.chat_welcome} onChange={(e) => set('chat_welcome', e.target.value)} placeholder="Olá! Sou o assistente da livraria…" />
           </div>
+
+          {hasFloating && (
+            <div className="border-t pt-6 space-y-3">
+              <div>
+                <h3 className="text-lg font-semibold">Botões flutuantes</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Em que páginas aparecem o botão do assistente e o de voltar ao topo. Tire-os onde taparem botões ou formulários, sobretudo no telemóvel.
+                </p>
+              </div>
+              <div className="rounded-lg border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th scope="col" className="text-left font-medium px-3 py-2">Página</th>
+                      <th scope="col" className="font-medium px-3 py-2 w-28">Assistente</th>
+                      <th scope="col" className="font-medium px-3 py-2 w-28">Voltar ao topo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FLOATING_PAGES.map((page) => (
+                      <tr key={page.key} className="border-t">
+                        <th scope="row" className="text-left font-normal px-3 py-2">{page.label}</th>
+                        {[['chat_hidden_on', 'Assistente'], ['scroll_top_hidden_on', 'Voltar ao topo']].map(([field, name]) => {
+                          const hidden = (form[field] || []).includes(page.key);
+                          return (
+                            <td key={field} className="px-3 py-2 text-center">
+                              <Checkbox
+                                checked={!hidden}
+                                aria-label={`${name} em ${page.label}`}
+                                onCheckedChange={(v) => set(field, v
+                                  ? (form[field] || []).filter((k) => k !== page.key)
+                                  : [...(form[field] || []), page.key])}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">Marcado = aparece. O assistente também se desliga por completo em "Mostrar assistente no site".</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="shipping" className="space-y-4 max-w-xl">
@@ -963,7 +1023,7 @@ export default function SettingsTab() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="gradient">Gradiente (cores da marca)</SelectItem>
-                <SelectItem value="image">Imagem (JPG, PNG, SVG)</SelectItem>
+                <SelectItem value="image">Imagem (JPG, PNG, WebP)</SelectItem>
                 <SelectItem value="video">Vídeo (MP4/WebM)</SelectItem>
                 <SelectItem value="slides">Slider da loja (slides com localização «shop»)</SelectItem>
               </SelectContent>
@@ -978,7 +1038,7 @@ export default function SettingsTab() {
                   aspect="16:9"
                   previewClassName="h-24 w-40"
                   driveConfig={driveImageConfig}
-                  hint="JPG, PNG, WebP ou SVG · 1920×1080 recomendado"
+                  hint="JPG, PNG ou WebP · 1920×1080 recomendado"
                   uploadFolder="site_settings"
                 />
                 {form.shop_bg_mode === 'video' && (

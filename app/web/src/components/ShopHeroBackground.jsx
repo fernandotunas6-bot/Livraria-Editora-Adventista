@@ -90,7 +90,7 @@ export default function ShopHeroBackground({ settings, children }) {
 
   return (
     <section
-      className="text-white py-14 md:py-20 relative overflow-hidden"
+      className="text-white pt-20 pb-14 md:py-20 relative overflow-hidden"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >

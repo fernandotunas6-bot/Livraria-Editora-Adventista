@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, Siren, UsersRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -38,6 +38,9 @@ const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
 const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
 const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
+const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
+const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
+const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
@@ -332,6 +335,10 @@ const AdminPage = () => {
           title: 'Pagamento actualizado, cliente não avisado',
           description: `${label}. ${EDGE_FUNCTION_DESACTUALIZADA}`,
         });
+      } else if (res?.notice) {
+        // Gravado, mas falta a equipa fazer alguma coisa — por exemplo, reembolsar uma
+        // encomenda cancelada cujo pagamento chegou depois (o cliente não foi avisado).
+        toast({ title: 'Pagamento actualizado — atenção', description: `${label}. ${res.notice}`, duration: 12000 });
       } else {
         toast({
           title: 'Pagamento actualizado',
@@ -388,6 +395,7 @@ const AdminPage = () => {
       canManageCatalog && { value: 'books', label: `Produtos (${books.length})`, icon: PackageSearch },
       canManageCatalog && { value: 'collections', label: 'Coleções', icon: Layers },
       canManageCatalog && { value: 'slides', label: `Slider (${slides.length})`, icon: Image },
+      canManageCatalog && { value: 'downloads', label: 'Materiais (PDF)', icon: FileDown },
     ] },
     { label: 'Vendas', tabs: [
       canManageOrders && { value: 'orders', label: `Encomendas (${orders.length})`, icon: ShoppingBag },
@@ -397,21 +405,27 @@ const AdminPage = () => {
       canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
     ] },
     { label: 'Relatórios', tabs: [
-      canAccessAdmin && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
+      // Facturação: com a permissão de encomendas, como na base (migração vendas_so_com_encomendas).
+      canManageOrders && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
     ] },
     { label: 'Clientes', tabs: [
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
       canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
       canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
+      canManageCatalog && { value: 'community', label: 'Comunidade', icon: MessagesSquare },
     ] },
     { label: 'Sistema', tabs: [
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
+      (canManageSettings || canManageMarketing) && { value: 'notices', label: 'Faixa de aviso', icon: PanelTop },
       isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
     ] },
   ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
   const allowedTabs = tabGroups.flatMap((g) => g.tabs.map((t) => t.value));
   const requestedTab = searchParams.get('tab');
-  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : defaultTab;
+  // O separador por omissão pode não estar entre os permitidos (um gestor só com Marketing caía
+  // em Pagamentos): nesse caso abre o primeiro a que a pessoa tem acesso.
+  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab
+    : allowedTabs.includes(defaultTab) ? defaultTab : (allowedTabs[0] || defaultTab);
   const setActiveTab = (value) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     next.set('tab', value);
@@ -545,6 +559,27 @@ const AdminPage = () => {
               <TabsContent value="support">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <SupportCenter />
+                </Suspense>
+              </TabsContent>
+            )}
+            {(canManageSettings || canManageMarketing) && (
+              <TabsContent value="notices">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <NoticesTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageCatalog && (
+              <TabsContent value="downloads">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <DownloadsTab books={books} />
+                </Suspense>
+              </TabsContent>
+            )}
+            {canManageCatalog && (
+              <TabsContent value="community">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <CommunityTab />
                 </Suspense>
               </TabsContent>
             )}

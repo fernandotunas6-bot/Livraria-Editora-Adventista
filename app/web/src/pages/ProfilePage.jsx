@@ -5,12 +5,14 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { motion } from 'framer-motion';
 import {
   User, Mail, Shield, ShoppingBag, Settings, LogOut, Loader2,
-  Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell
+  Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell, FileDown
 } from 'lucide-react';
+import MyDownloads from '@/components/downloads/MyDownloads';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import { pageTitle } from '@/lib/brand';
+import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
 import { sessionDecision } from '@/lib/authSession';
@@ -31,6 +33,8 @@ import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { Switch } from '@/components/ui/switch';
+import { getPaymentMethods } from '@/api/PlatformApi';
+import { isPaidUpfront } from '@/lib/paymentMethods';
 import { isPushSupported, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
 
 
@@ -43,11 +47,19 @@ const ProfilePage = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { settings } = useSiteSettings();
+  // Métodos pagos antes do envio (transferência, Multicaixa): as encomendas por pagar com eles
+  // mostram "Indicar pagamento", que abre o rastreio com a caixa "Como pagar".
+  const [upfrontCodes, setUpfrontCodes] = useState(() => new Set());
+  useEffect(() => {
+    getPaymentMethods()
+      .then((res) => setUpfrontCodes(new Set((res.methods || []).filter((m) => isPaidUpfront(m.type)).map((m) => m.code))))
+      .catch(() => {});
+  }, []);
   const [isCartOpen, setIsCartOpen] = useState(false);
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
   const [searchParams, setSearchParams] = useSearchParams();
-  const PROFILE_TABS = ['orders', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
+  const PROFILE_TABS = ['orders', 'pdfs', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
@@ -212,8 +224,12 @@ const ProfilePage = () => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'Imagem demasiado grande', description: 'Escolha uma foto com até 2 MB.' });
+    // Tipo e tamanho (lib/imageTypes.js). O tipo é verificado aqui porque o `accept` do
+    // input é só uma sugestão da janela de ficheiros: sem isto passava um SVG, que é um
+    // documento capaz de levar `<script>`, para um bucket público.
+    const problem = imageFileError(file, 2);
+    if (problem) {
+      toast({ variant: 'destructive', title: 'Foto não aceite', description: problem });
       return;
     }
     setAvatarUploading(true);
@@ -321,6 +337,7 @@ const ProfilePage = () => {
             <Tabs value={activeTab} onValueChange={changeTab} className="w-full">
               <TabsList className="mb-6 flex flex-wrap gap-2">
                 <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
+                <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
                 <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Definições</TabsTrigger>
                 <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" />Segurança</TabsTrigger>
                 <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" />Lista de Desejos</TabsTrigger>
@@ -350,6 +367,13 @@ const ProfilePage = () => {
                                   <Button variant="ghost" size="sm" className="h-7 text-xs text-primary px-2" asChild>
                                     <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
                                       <Truck className="h-3 w-3 mr-1" /> Rastrear
+                                    </Link>
+                                  </Button>
+                                )}
+                                {o.order_number && o.payment_status === 'pending' && o.status !== 'cancelled' && upfrontCodes.has(o.payment_method_code) && (
+                                  <Button variant="outline" size="sm" className="h-7 text-xs px-2 border-marca/40 text-primary" asChild>
+                                    <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
+                                      Indicar pagamento
                                     </Link>
                                   </Button>
                                 )}
@@ -433,10 +457,10 @@ const ProfilePage = () => {
                       <UserAvatar user={user} size="lg" className="h-20 w-20" />
                       <div>
                         <p className="text-sm text-muted-foreground mb-2">
-                          {user?.avatar ? 'Foto do Google ou upload personalizado' : 'Adicione a sua foto (PNG/JPG, máx. 2MB)'}
+                          {user?.avatar ? 'Foto do Google ou upload personalizado' : `Adicione a sua foto (${ALLOWED_IMAGE_LABEL}, máx. 2 MB)`}
                         </p>
                         <label className="cursor-pointer">
-                          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
+                          <input type="file" accept={ALLOWED_IMAGE_ACCEPT} className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
                           <Button type="button" variant="outline" size="sm" asChild>
                             <span>{avatarUploading ? 'A carregar...' : 'Alterar foto'}</span>
                           </Button>
@@ -528,6 +552,10 @@ const ProfilePage = () => {
                     Terminar sessão em todos os aparelhos
                   </Button>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="pdfs">
+                {activeTab === 'pdfs' && <MyDownloads userId={user?.id} />}
               </TabsContent>
 
               <TabsContent value="wishlist">

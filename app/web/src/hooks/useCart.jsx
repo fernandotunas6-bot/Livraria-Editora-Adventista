@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { supabase } from '@/lib/supabaseClient';
-import { effectivePrice, isSaleActive } from '@/lib/pricing';
+import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
+import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
 
@@ -36,13 +37,20 @@ export const CartProvider = ({ children }) => {
       }
       
       const silent = !!finalOptions.silent;
+      // Produto com tamanhos ou edições: só entra com um escolhido (o servidor recusa sem ele).
+      if (needsVariantChoice(product) && !/-v\d+$/.test(String(variant?.id || ''))) {
+        const errMsg = `Para comprar "${product.title}", ${variantNames(product.product_type).ask} na página do produto.`;
+        if (!silent) toast.error(errMsg);
+        reject(new Error(errMsg));
+        return;
+      }
       const effectiveAvailable = finalAvailable !== undefined ? finalAvailable : (variant.inventory_quantity ?? 99);
 
       if (variant.manage_inventory) {
         const existingItem = cartItems.find((item) => item.variant.id === variant.id);
         const currentCartQuantity = existingItem ? existingItem.quantity : 0;
         if (currentCartQuantity + quantity > effectiveAvailable) {
-          const errMsg = `Stock insuficiente para "${product.title}". Apenas ${effectiveAvailable} unidade${effectiveAvailable !== 1 ? 's' : ''} disponível${effectiveAvailable !== 1 ? 'eis' : ''}.`;
+          const errMsg = `Stock insuficiente para "${product.title}". Apenas ${effectiveAvailable} unidade${effectiveAvailable !== 1 ? 's' : ''} disponíve${effectiveAvailable !== 1 ? 'is' : 'l'}.`;
           if (!silent) {
             toast.error(errMsg);
           }
@@ -96,15 +104,16 @@ export const CartProvider = ({ children }) => {
   /**
    * Confirma o carrinho com a base de dados: livros ocultos, apagados ou esgotados saem;
    * preço, promoção e stock são actualizados; a quantidade não passa do stock.
-   * Devolve a lista de mudanças (para avisar o cliente). Só a edição standard tem preço na tabela;
-   * as edições extra mantêm o preço próprio mas respeitam o stock e a visibilidade do livro.
+   * Devolve a lista de mudanças (para avisar o cliente). As edições extra (`<id>-v<n>`, tamanhos e
+   * edições em `versions`) também: antes guardavam o preço de quando entraram no carrinho, e o
+   * cliente via um preço e pagava outro (o `place_order` cobra o actual, com `variantPrices`).
    */
   const refreshCart = useCallback(async () => {
     const ids = [...new Set(cartItems.map((i) => bookIdOf(i.variant.id)).filter(Boolean))];
     if (!ids.length) return [];
     const { data, error } = await supabase
       .from('stock_books')
-      .select('id, title, price, stock, active, sale_price, sale_starts_at, sale_ends_at')
+      .select('id, title, price, stock, active, sale_price, sale_starts_at, sale_ends_at, versions, product_type')
       .in('id', ids);
     if (error) return [];
     const byId = Object.fromEntries((data || []).filter((b) => b.active !== false).map((b) => [b.id, b]));
@@ -114,9 +123,34 @@ export const CartProvider = ({ children }) => {
       const book = byId[bookIdOf(item.variant.id)];
       const title = item.product.title;
       if (!book) { changes.push(`"${title}" já não está disponível e saiu do carrinho.`); continue; }
-      const stock = Math.max(0, Number(book.stock) || 0);
+      let stock = Math.max(0, Number(book.stock) || 0);
+      const extra = /-v(\d+)$/.exec(item.variant.id);
+      const version = extra && Array.isArray(book.versions) ? book.versions[Number(extra[1])] : null;
+      if (extra && !version) { changes.push(`A edição escolhida de "${title}" já não existe e saiu do carrinho.`); continue; }
+      // Entrou sem variante (pelo cartão, antes desta regra) num produto que passou a ter: o
+      // servidor recusa-o, por isso sai já, com o aviso do que falta.
+      if (!extra && needsVariantChoice(book)) {
+        changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type).ask} na página do produto.`);
+        continue;
+      }
+      // Stock próprio da edição, quando o painel o regista (o servidor recusa acima dele).
+      if (version && /^\s*-?\d+(\.\d+)?\s*$/.test(String(version.stock ?? ''))) {
+        stock = Math.min(stock, Math.max(0, Math.floor(Number(version.stock))));
+      }
       if (stock === 0) { changes.push(`"${title}" esgotou e saiu do carrinho.`); continue; }
       const variant = { ...item.variant, inventory_quantity: stock };
+      if (version) {
+        const { price, sale } = variantPrices(book, version);
+        const priceInCents = Math.round(price * 100);
+        const saleInCents = sale != null ? Math.round(sale * 100) : null;
+        const before = item.variant.sale_price_in_cents ?? item.variant.price_in_cents;
+        const after = saleInCents ?? priceInCents;
+        variant.price_in_cents = priceInCents;
+        variant.price_formatted = formatCurrency(priceInCents);
+        variant.sale_price_in_cents = saleInCents;
+        variant.sale_price_formatted = saleInCents != null ? formatCurrency(saleInCents) : null;
+        if (before !== after) changes.push(`O preço de "${title}" mudou para ${formatCurrency(after)}.`);
+      }
       if (item.variant.id.endsWith('-default')) {
         const priceInCents = Math.round((Number(book.price) || 0) * 100);
         const saleInCents = isSaleActive(book) ? Math.round(effectivePrice(book) * 100) : null;

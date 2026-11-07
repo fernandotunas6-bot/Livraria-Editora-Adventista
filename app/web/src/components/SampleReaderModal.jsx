@@ -88,7 +88,7 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
       <div className="bg-background rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b gap-3">
           <div>
-            <h3 className="font-bold">Pré-visualização — {title}</h3>
+            <h3 className="text-lg font-bold">Pré-visualização — {title}</h3>
             <p className="text-xs text-muted-foreground">{urls.length} página(s) de amostra</p>
           </div>
           <div className="flex items-center gap-2">

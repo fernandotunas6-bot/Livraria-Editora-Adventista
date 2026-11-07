@@ -473,7 +473,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                 <ChevronLeft className="mr-1 h-4 w-4" /> Conversas
               </Button>
             )}
-            <h3 className="font-semibold leading-snug">{threadTitle(selectedThread)}</h3>
+            <h3 className="text-base font-semibold leading-snug">{threadTitle(selectedThread)}</h3>
             {staff && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedThread.customer?.name || selectedThread.customer?.email || (selectedThread.customer_id ? 'Cliente' : 'Visitante sem conta')}
@@ -788,7 +788,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   const newThreadForm = (
     <form onSubmit={submitNewThread} className="space-y-3 rounded-xl border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">Falar com a equipa</h3>
+        <h3 className="text-lg font-semibold">Falar com a equipa</h3>
         <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewThread(false)}>Cancelar</Button>
       </div>
       <Input value={newSubject} onChange={(event) => setNewSubject(event.target.value)} maxLength={160} placeholder="Assunto" required />

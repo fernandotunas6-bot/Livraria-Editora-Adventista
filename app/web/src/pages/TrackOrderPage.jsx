@@ -120,8 +120,12 @@ export default function TrackOrderPage() {
 
             <form onSubmit={handleTrack} className="bg-card border rounded-2xl p-6 mb-8 space-y-4">
               <div className="space-y-2">
-                <Label>Número da Encomenda</Label>
+                <Label htmlFor="rastreio-numero">Número da Encomenda</Label>
                 <Input
+                  id="rastreio-numero"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
                   placeholder={`${settings?.order_number_prefix || 'ENC-'}XXXXXXXXX`}
@@ -130,8 +134,8 @@ export default function TrackOrderPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email usado na compra</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Label htmlFor="rastreio-email">Email usado na compra</Label>
+                <Input id="rastreio-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <Button type="submit" className="w-full btn-primary py-6" disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
@@ -233,7 +237,7 @@ export default function TrackOrderPage() {
                 </div>
 
                 <div className="bg-card border rounded-2xl p-6">
-                  <h3 className="font-semibold mb-6 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <Package className="h-5 w-5 text-primary" /> {isPickup ? 'Estado do levantamento' : 'Estado da entrega'}
                   </h3>
                   {isPickup && order.pickup_store && (
@@ -270,7 +274,7 @@ export default function TrackOrderPage() {
 
                 {timeline.length > 0 && (
                   <div className="bg-card border rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4">Histórico</h3>
+                    <h3 className="text-lg font-semibold mb-4">Histórico</h3>
                     <div className="space-y-4">
                       {[...timeline].reverse().map((ev, i) => (
                         <div key={i} className="flex gap-3 text-sm">

@@ -37,8 +37,32 @@ export function columnsFromMigrations(files) {
     for (const m of sql.matchAll(/alter table (?:if exists )?(?:public\.)?(\w+)\s+drop column (?:if exists )?(\w+)/gi)) {
       set(m[1]).delete(m[2]);
     }
+    // Vistas: as colunas são o nome depois de `as`, ou a coluna simples (`c.id` → id).
+    for (const m of sql.matchAll(/create (?:or replace )?view (?:public\.)?"?(\w+)"?(?:\s+with\s*\([^)]*\))?\s+as\s+select\s+([\s\S]*?)\sfrom\s/gi)) {
+      const t = new Set();
+      cols.set(m[1], t);
+      for (const item of splitTopLevel(m[2])) {
+        const alias = item.match(/\bas\s+"?([a-z_][a-z0-9_]*)"?\s*$/i);
+        const plain = item.trim().match(/^(?:\w+\.)?"?([a-z_][a-z0-9_]*)"?$/i);
+        if (alias) t.add(alias[1]); else if (plain) t.add(plain[1]);
+      }
+    }
   }
   return cols;
+}
+
+/** Separa a lista do `select` pelas vírgulas de fora dos parênteses. */
+function splitTopLevel(list) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of list) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur);
+  return out;
 }
 
 /** Pares [tabela, campos] das consultas com campos explícitos num ficheiro. */
@@ -102,6 +126,13 @@ describe('analisador', () => {
       'alter table public.t drop column if exists c;',
     ]).get('t');
     expect([...c].sort()).toEqual(['a2', 'b', 'id']);
+  });
+
+  it('lê as colunas de uma vista (alias e coluna simples)', () => {
+    const c = columnsFromMigrations([
+      "create or replace view public.v as\nselect c.id, c.body, left(coalesce(p.name, 'x'), 100) as author_name,\n  (c.user_id = auth.uid()) as mine\nfrom public.t c;",
+    ]).get('v');
+    expect([...c].sort()).toEqual(['author_name', 'body', 'id', 'mine']);
   });
 
   it('ignora relações embutidas e aliases', () => {

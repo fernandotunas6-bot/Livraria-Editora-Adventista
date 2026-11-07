@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
 import QuickViewModal from '@/components/QuickViewModal';
 import { MOTION } from '@/lib/motion';
+import { useNavigate } from 'react-router-dom';
+import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -19,6 +21,7 @@ export default function DestaquesSemana({ onCartOpen }) {
   const timerRef = useRef(null);
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     getFeaturedProducts(12)
@@ -69,16 +72,19 @@ export default function DestaquesSemana({ onCartOpen }) {
     setCurrentIndex((prev) => (prev - 1 + books.length) % books.length);
   };
 
-  const handleAddToCart = (e) => {
+  // Como nos cartões: o aviso tem "Ver" e o carrinho não abre sozinho. Antes o aviso de
+  // "adicionado" saía mesmo quando o stock não chegava (o erro do addToCart ficava por tratar).
+  const handleAddToCart = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (currentBook.variants && currentBook.variants[0]) {
-      addToCart(currentBook, currentBook.variants[0], 1, { silent: true });
-      toast({
-        title: 'Adicionado ao carrinho!',
-        description: `${currentBook.title} foi adicionado com sucesso.`,
-      });
-      if (onCartOpen) onCartOpen();
+    const variant = currentBook.variants?.[0];
+    if (!variant) return;
+    if (needsVariantChoice(currentBook)) { navigate(`/product/${currentBook.id}`); return; }
+    try {
+      await addToCart(currentBook, variant, 1, variant.inventory_quantity, { silent: true });
+      toast({ variant: 'cart-success', product: currentBook, onCartOpen });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Não foi possível adicionar', description: err.message });
     }
   };
 
@@ -182,7 +188,8 @@ export default function DestaquesSemana({ onCartOpen }) {
                 {/* Purchase Button */}
                 <div className="flex flex-wrap items-center gap-4 pt-2">
                   <div className="text-2xl md:text-3xl font-black text-white">
-                    {formatCurrency(currentBook.price_in_cents)}
+                    {/* O preço em vigor (com a promoção), o mesmo dos cartões e do carrinho. */}
+                    {currentBook.variants?.[0]?.sale_price_formatted || currentBook.variants?.[0]?.price_formatted || formatCurrency(currentBook.price_in_cents)}
                   </div>
 
                   <div className="flex gap-3 w-full sm:w-auto">
@@ -190,9 +197,9 @@ export default function DestaquesSemana({ onCartOpen }) {
                       <BookOpen className="h-4 w-4 mr-2" /> Detalhes
                     </Button>
                     {currentBook.purchasable ? (
-                      <Button onClick={handleAddToCart} className="flex-1 sm:flex-initial bg-primary hover:bg-[#0c90b0] text-white">
+                      <Button onClick={handleAddToCart} className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-white">
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Comprar Agora
+                        {needsVariantChoice(currentBook) ? variantNames(currentBook.product_type).pick : 'Comprar Agora'}
                       </Button>
                     ) : (
                       <Button disabled className="bg-slate-800 text-slate-500">

@@ -39,6 +39,12 @@ export const isStaff = (auth: Auth) => !!auth && (auth.role === "admin" || auth.
  *
  * A comparação é `=== true` de propósito: em `profiles.permissions` os valores vêm de JSON,
  * e `"false"`, `0` ou `null` não podem passar por engano.
+ *
+ * A base de dados exige o mesmo desde a migração `permissoes_so_booleanos`: usava
+ * `permissions ->> chave = 'true'`, e o `->>` devolve o texto `'true'` tanto para o booleano
+ * `true` como para a *string* `"true"` — ou seja, aceitava um valor que esta função recusa.
+ * O desacordo estava no lado que manda, o RLS, e abria em vez de fechar. Agora são
+ * `permissions -> chave = 'true'::jsonb` lá e `=== true` aqui.
  */
 export const can = (auth: Auth, key: string) =>
   !!auth && (auth.role === "admin" || (auth.role === "manager" && auth.permissions?.[key] === true));

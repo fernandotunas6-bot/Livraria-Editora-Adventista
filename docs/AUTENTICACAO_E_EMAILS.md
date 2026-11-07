@@ -289,8 +289,9 @@ Falta ainda, do lado do domínio, **SPF, DKIM e DMARC**: sem eles as mensagens v
 
 ## 3. O que não existe neste sistema
 
-O esquema tem `orders`, `stock_books`, `physical_stores` e `payment_methods`. **Não há**
-produtos digitais, licenças, downloads, vendedores nem comissões — não há modelos de email
+O esquema tem `orders`, `stock_books`, `physical_stores` e `payment_methods`, e PDFs para
+descarregar (`downloads`, sem email próprio: o PDF pago aparece no perfil quando a encomenda
+fica paga). **Não há** licenças, vendedores nem comissões — não há modelos de email
 para isso porque não haveria nada que os chamasse. Se essas áreas forem criadas, os modelos
 seguem o mesmo padrão: uma função em `emailTemplates.ts` e o disparo na rota que muda o estado.
 

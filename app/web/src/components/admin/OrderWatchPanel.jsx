@@ -187,7 +187,7 @@ export default function OrderWatchPanel({ onOpenOrder }) {
       <div className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 border-b p-4">
           <Siren className="h-4 w-4 text-primary" aria-hidden />
-          <h3 className="font-semibold">A precisar de atenção</h3>
+          <h3 className="text-lg font-semibold">A precisar de atenção</h3>
         </div>
         {alerts.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Nenhuma encomenda parada nem problema por resolver.</div>

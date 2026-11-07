@@ -359,13 +359,27 @@ export function accountClosedLetter(brand: Brand, name: string): Letter {
 // B. Encomendas
 // ---------------------------------------------------------------------------
 
-export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = ""): Letter {
+/**
+ * Confirmação de encomenda. `payLater`: o método é pago antes do envio (transferência, Multicaixa),
+ * e o cliente paga depois de encomendar, com o número da encomenda, indicando a referência em
+ * Rastrear encomenda. Sem a informação, conta como tal quando há link de pagamento (como antes).
+ * Pagamento na entrega ou no balcão: a loja prepara primeiro, por isso não se pede pagamento.
+ */
+export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = "", opts: { payLater?: boolean } = {}): Letter {
   const paid = String(order.payment_status) === "paid";
+  const payLater = !paid && (opts.payLater ?? !!paymentLink);
+  const pickup = order.shipping_method === "pickup";
+  const track = trackUrl(brand.siteUrl);
   // O endereço de rastreio já vai num botão; aqui basta dizer o que é preciso para o usar.
   const notes = ["Pode acompanhar a encomenda a qualquer momento com o número acima e o email desta compra."];
-  if (paymentLink && !paid) {
-    notes.unshift("Se já pagou, ignore o botão de pagamento: confirmamos o pagamento pela referência indicada.");
+  if (payLater) {
+    const reference = String(order.payment_reference || "").trim();
+    notes.unshift(reference
+      ? `Recebemos a referência ${reference}. Confirmamos o pagamento e avisamo-lo.`
+      : `Pague com o número ${orderRef(order)} no descritivo e indique a referência do pagamento em Rastrear encomenda. Preparamos a encomenda quando o pagamento for confirmado.`);
   }
+  const indicar = track ? { label: "Indicar o pagamento", url: track } : undefined;
+  const acompanhar = track ? { label: "Acompanhar a encomenda", url: track } : undefined;
   return {
     key: paid ? "order_paid" : "order_unpaid",
     vars: orderVars(brand, order),
@@ -376,7 +390,11 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = ""): 
       title: paid ? "Encomenda confirmada!" : "Recebemos a sua encomenda",
       subtitle: paid
         ? "O pagamento está confirmado e vamos preparar a sua encomenda."
-        : "Falta só o pagamento para a prepararmos.",
+        : payLater
+          ? "Falta só o pagamento para a prepararmos."
+          : pickup
+            ? "Vamos prepará-la. Paga no levantamento, na loja."
+            : "Vamos prepará-la. Paga na entrega.",
       lead: [
         `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}! Obrigado pela sua compra na ${brand.siteName}.`,
       ],
@@ -386,12 +404,10 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = ""): 
       totals: orderTotals(order),
       stepsTitle: "Estado da encomenda",
       steps: orderSteps(order, paid ? "confirmed" : "received"),
-      cta: paymentLink && !paid
+      cta: payLater && paymentLink
         ? { label: `Pagar com ${paymentLabel(order) || "o método escolhido"}`, url: paymentLink }
-        : (trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined),
-      secondaryCta: paymentLink && !paid && trackUrl(brand.siteUrl)
-        ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) }
-        : undefined,
+        : payLater ? (indicar || acompanhar) : acompanhar,
+      secondaryCta: payLater && paymentLink ? indicar : undefined,
       notes,
       reason: REASON_ORDER,
     },
