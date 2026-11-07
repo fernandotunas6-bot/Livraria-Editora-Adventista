@@ -439,7 +439,7 @@ function ProductDetailPage() {
             transition={{ duration: MOTION.base, delay: 0.2 }}
             className="flex flex-col min-w-0"
           >
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 text-foreground">{product.title}</h1>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 text-foreground text-balance">{product.title}</h1>
             {product.marketing_hook && (
               <p className="text-lg text-primary font-medium mb-2">{product.marketing_hook}</p>
             )}
@@ -870,7 +870,7 @@ function ProductDetailPage() {
                             <span>Vimos que comprou este livro! O seu comentário terá o selo <strong>Compra Verificada</strong>.</span>
                           </div>
                         ) : (
-                          <div className="bg-amber-50/50 text-amber-800/80 text-[11px] p-2.5 rounded-lg border border-amber-100 leading-relaxed">
+                          <div className="bg-amber-50/50 text-amber-800/80 text-xs p-2.5 rounded-lg border border-amber-100 leading-relaxed">
                             Apenas compradores verificados deste livro recebem o selo especial de verificação, mas todos os membros podem avaliar!
                           </div>
                         )}
@@ -950,7 +950,7 @@ function ProductDetailPage() {
                               </div>
                               <div>
                                 <h5 className="font-bold text-sm leading-tight">{r.userName}</h5>
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   {new Date(r.createdAt || Date.now()).toLocaleDateString('pt-AO', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </p>
                               </div>

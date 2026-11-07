@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet';
 import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { X, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Sparkles, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import CatalogToolbar from '@/components/catalog/CatalogToolbar.jsx';
 import ProductsList from '@/components/ProductsList.jsx';
 import FilterPanel from '@/components/FilterPanel.jsx';
+import MobileFilterDrawer from '@/components/catalog/MobileFilterDrawer.jsx';
 import AdvancedSearchPanel from '@/components/AdvancedSearchPanel.jsx';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
@@ -30,6 +31,7 @@ const ShopPage = () => {
   const { settings } = useSiteSettings();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const closeMobileFilters = useCallback(() => setIsMobileFilterOpen(false), []);
   // Páginas a sério em vez do "carregar mais", que empilhava 24 → 48 → 72 → 102 na mesma
   // página: num telemóvel isso é uma lista interminável onde se perde o lugar.
   const [page, setPage] = useState(1);
@@ -66,14 +68,6 @@ const ShopPage = () => {
     applyShopTheme(settings);
   }, [settings]);
 
-  // Escape fecha o painel de filtros, como fecha o carrinho. Sem isto, quem navega pelo
-  // teclado só saía dele depois de percorrer todos os filtros lá dentro.
-  useEffect(() => {
-    if (!isMobileFilterOpen) return undefined;
-    const aoTeclar = (e) => { if (e.key === 'Escape') setIsMobileFilterOpen(false); };
-    window.addEventListener('keydown', aoTeclar);
-    return () => window.removeEventListener('keydown', aoTeclar);
-  }, [isMobileFilterOpen]);
 
 
 
@@ -471,41 +465,25 @@ const ShopPage = () => {
           </div>
         </div>
 
-        {isMobileFilterOpen && (
-          <div
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm lg:hidden"
-            onClick={() => setIsMobileFilterOpen(false)}
-          >
-            {/* Tocar na zona escurecida fecha — num telemóvel é o gesto que se tenta primeiro,
-                e aqui não fazia nada: só o X no canto fechava o painel. */}
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r p-6 overflow-y-auto shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="titulo-filtros"
-            >
-              <div className="flex justify-between mb-6 pb-4 border-b">
-                <h2 id="titulo-filtros" className="text-xl font-semibold">Filtros</h2>
-                <Button variant="ghost" size="icon" onClick={() => setIsMobileFilterOpen(false)}><X /></Button>
-              </div>
-              <FilterPanel
-                availableFilters={availableFilters}
-                activeFilters={activeFilters}
-                updateFilter={updateFilter}
-                updateOptionFilter={updateOptionFilter}
-                clearFilters={clearFilters}
-                filterCount={filterCount}
-                bookCollections={bookCollections}
-              />
-              <Button className="w-full btn-primary mt-6" onClick={() => setIsMobileFilterOpen(false)}>
-                Ver {sortedProducts.length} livros
-              </Button>
-            </motion.div>
-          </div>
-        )}
+        {/* Filtros do telemóvel: "Ver N livros" preso ao fundo (components/catalog/MobileFilterDrawer). */}
+        <MobileFilterDrawer
+          open={isMobileFilterOpen}
+          onClose={closeMobileFilters}
+          titleId="titulo-filtros"
+          count={sortedProducts.length}
+          filterCount={filterCount}
+          onClear={clearFilters}
+        >
+          <FilterPanel
+            availableFilters={availableFilters}
+            activeFilters={activeFilters}
+            updateFilter={updateFilter}
+            updateOptionFilter={updateOptionFilter}
+            clearFilters={clearFilters}
+            filterCount={filterCount}
+            bookCollections={bookCollections}
+          />
+        </MobileFilterDrawer>
       </main>
 
       {/* No telemóvel o rodapé curto, no computador o completo (ver components/Footer.jsx). */}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MOTION } from '@/lib/motion';
+import { useSwipe } from '@/hooks/useSwipe';
 
 export const SHOP_BANNER_IMAGES = [
   '/images/site/loja-banner.webp',
@@ -39,15 +40,18 @@ export default function PageBannerSlider({
   const navigate = (direction) => {
     setCurrent((index) => (index + direction + slides.length) % slides.length);
   };
+  const swipe = useSwipe({ onNext: () => navigate(1), onPrev: () => navigate(-1) });
 
   return (
     <section
       role="region"
       aria-roledescription="carrossel"
       aria-label={ariaLabel}
-      // pt-14 no telemóvel: a barra fina do cabeçalho (56px, com o logótipo) fica por cima do
-      // topo da página; sem isto o texto centrado subia para debaixo do logótipo.
-      className="relative isolate flex min-h-[240px] items-center overflow-hidden bg-[#0c4a6e] pt-14 text-white md:min-h-[290px] md:pt-0"
+      // No telemóvel, espaço para a barra fina do cabeçalho (56px, com o logótipo) e para a
+      // área segura do topo (ver .pt-below-thin-bar): sem isto o texto centrado subia para
+      // debaixo do logótipo.
+      className="pt-below-thin-bar relative isolate flex min-h-[240px] items-center overflow-hidden bg-[#0c4a6e] text-white md:min-h-[290px]"
+      {...(slides.length > 1 ? swipe : {})}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -104,7 +108,7 @@ export default function PageBannerSlider({
           {/* O ponto mede 8px: quem cresce é o botão à volta dele, até aos 24 que a WCAG
               2.5.8 pede em AA. O intervalo sai do contentor porque o preenchimento de cada
               botão já afasta os pontos — somados, davam uma fila larga de mais. */}
-          <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2">
+          <div className="absolute bottom-0 left-1/2 z-20 flex -translate-x-1/2 sm:bottom-3">
             {slides.map((image, index) => (
               <button
                 key={image}
@@ -112,7 +116,7 @@ export default function PageBannerSlider({
                 onClick={() => setCurrent(index)}
                 aria-label={`Mostrar banner ${index + 1}`}
                 aria-pressed={activeIndex === index}
-                className="group grid h-6 place-items-center px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                className="group grid h-11 place-items-center px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:h-6"
               >
                 <span
                   className={`block h-2 rounded-full transition-all ${

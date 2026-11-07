@@ -286,7 +286,7 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
             placeholder="Ex.: junto ao mercado, escola, poste, casa cor..."
             disabled={disabled}
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Obrigatório para entregas ao domicílio — facilita a localização do estafeta em todo o território nacional.
           </p>
         </div>
@@ -302,7 +302,7 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
             onChange={(phone) => set({ phone })}
             disabled={disabled}
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Número para o estafeta ligar no momento da entrega.
           </p>
         </div>
@@ -330,7 +330,7 @@ export default function AngolaAddressSelector({ value, onChange, disabled = fals
               placeholder="+244 9XX XXX XXX"
             />
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Útil caso não esteja disponível no local — alguém que possa receber ou indicar a morada.
           </p>
         </div>

@@ -159,8 +159,10 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
+  /* No telemóvel 40 px em vez de 64: com cinco ou seis secções por página, eram ecrãs inteiros
+     de espaço vazio entre elas. */
   .section-spacing {
-    @apply py-16 md:py-20 lg:py-24;
+    @apply py-10 md:py-20 lg:py-24;
   }
 
   /* Sem `transition` própria: a animação destas três vem das regras de `control-press`,
@@ -392,6 +394,25 @@
    preciso separar por aparelho. */
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Herói da página inicial: 85% do ecrã *pequeno* (svh), o que se vê com as barras do
+   navegador à mostra. Com `vh`, no iPhone o herói media mais do que o ecrã visível e a secção
+   seguinte não espreitava — e é ela que diz que a página continua. */
+.hero-height {
+  height: 85vh;
+  height: 85svh;
+}
+
+/* Banners do topo das páginas (PageBannerSlider): no telemóvel a barra fina do cabeçalho
+   (56 px, mais a área segura do iPhone) fica por cima deles. */
+.pt-below-thin-bar {
+  padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+@media (min-width: 768px) {
+  .pt-below-thin-bar {
+    padding-top: 0;
+  }
 }
 
 .safe-bottom {

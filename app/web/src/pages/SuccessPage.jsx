@@ -147,7 +147,7 @@ const SuccessPage = () => {
               </span>
             )}
 
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">{title}</h1>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-balance">{title}</h1>
             <p className="text-muted-foreground text-lg mb-8">{subtitle}</p>
 
             {hasOrder && (
@@ -217,7 +217,7 @@ const SuccessPage = () => {
                   >
                     <MessageCircle className="h-6 w-6" />
                     <span className="font-semibold">Receber por WhatsApp</span>
-                    <span className="text-xs font-normal opacity-80">Envia o recibo para o seu chat</span>
+                    <span className="text-xs font-normal">Envia o recibo para o seu chat</span>
                   </Button>
                   <Button
                     variant={receiptChoice === 'download' ? 'default' : 'outline'}
@@ -226,7 +226,7 @@ const SuccessPage = () => {
                   >
                     <Download className="h-6 w-6" />
                     <span className="font-semibold">Descarregar Recibo</span>
-                    <span className="text-xs font-normal opacity-80">Ficheiro HTML para imprimir ou guardar</span>
+                    <span className="text-xs font-normal">Ficheiro HTML para imprimir ou guardar</span>
                   </Button>
                 </div>
                 {receiptChoice && (
