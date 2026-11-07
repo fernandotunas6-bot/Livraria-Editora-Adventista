@@ -3,7 +3,7 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
-import { needsVariantChoice, variantNames } from '@/lib/productTypes';
+import { cartVariantLabel, needsVariantChoice, variantNames } from '@/lib/productTypes';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
 
@@ -72,8 +72,14 @@ export const CartProvider = ({ children }) => {
       });
       
       if (!silent) {
+        // `variant.name` não existe: as variantes têm `title` (ver `bookToProduct`). O `||`
+        // caía sempre no texto fixo, por isso juntar uma t-shirt em M dizia "1x · Edição
+        // Standard" — nome errado e palavra errada, que o achado 47 já tinha corrigido
+        // noutros sítios. O `cartVariantLabel` dá "M · Azul" e devolve vazio na variante
+        // única, que não tem nome nenhum para dizer.
+        const etiqueta = cartVariantLabel(variant);
         toast.success(`"${product.title}" adicionado ao carrinho!`, {
-          description: `${quantity}x · ${variant.name || 'Edição Standard'}`,
+          description: etiqueta ? `${quantity}× · ${etiqueta}` : `${quantity}×`,
         });
       }
       resolve();

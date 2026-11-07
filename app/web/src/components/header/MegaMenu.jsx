@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { displayPrice } from '@/lib/productSort';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronDown, BookOpen, Star, PackageCheck, Layers, Truck, Search, Info, Mail, HelpCircle,
@@ -185,7 +186,7 @@ export default function MegaMenu() {
             <div className="grid grid-cols-4 gap-4">
               {(data.books.length ? data.books : Array.from({ length: 4 }, () => null)).slice(0, 4).map((p, i) => (
                 p ? (
-                  <ImageCard key={p.id} to={`/product/${p.id}`} image={p.image} title={p.title} subtitle={p.variants?.[0]?.price_formatted} onNavigate={close} tall />
+                  <ImageCard key={p.id} to={`/product/${p.id}`} image={p.image} title={p.title} subtitle={displayPrice(p).price} onNavigate={close} tall />
                 ) : (
                   <div key={i} className="aspect-[3/4] rounded-xl bg-muted animate-pulse" />
                 )

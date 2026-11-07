@@ -19,6 +19,7 @@ import ImageField from '@/components/admin/ImageField';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { pbErrorMessage, sanitizeUrlField } from '@/lib/mediaSave';
 import { isUploadPending } from '@/lib/mediaUpload';
+import { embedOnlyVideoPlatform } from '@/lib/videoUrl';
 import { effectivePrice, isBookVisible, isSaleActive, toLocalInput, fromLocalInput } from '@/lib/pricing';
 
 const emptySlide = {
@@ -559,12 +560,39 @@ export default function SlidesTab({ onChange }) {
                       />
                     </div>
                   </div>
-                  {form.media_type === 'video' && (
-                    <div className="space-y-2">
-                      <Label>URL do Vídeo (MP4/WebM)</Label>
-                      <Input value={form.video_url} onChange={(e) => set('video_url', e.target.value)} placeholder="https://...mp4" />
-                    </div>
-                  )}
+                  {form.media_type === 'video' && (() => {
+                    const plataforma = embedOnlyVideoPlatform(form.video_url);
+                    return (
+                      <div className="space-y-2">
+                        <Label htmlFor="slide-video">URL do Vídeo (MP4/WebM)</Label>
+                        <Input
+                          id="slide-video"
+                          value={form.video_url}
+                          onChange={(e) => set('video_url', e.target.value)}
+                          placeholder="https://...mp4"
+                          aria-describedby="slide-video-ajuda"
+                          aria-invalid={plataforma ? 'true' : undefined}
+                        />
+                        <div id="slide-video-ajuda">
+                          {plataforma ? (
+                            <p className="text-sm text-destructive">
+                              Isto é um link do {plataforma}. O fundo em vídeo precisa de um
+                              ficheiro (MP4 ou WebM) que o navegador saiba tocar — um link de
+                              plataforma dá um rectângulo preto, sem aviso nenhum. Para
+                              mostrar um vídeo do YouTube, use o campo «Vídeo de apresentação»
+                              na ficha do produto (Livros → Mídia). Aqui, carregue o ficheiro
+                              ou cole o endereço directo dele.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Um ficheiro que toque sozinho, sem som e em ciclo. Sem um que
+                              sirva, o slide mostra a imagem.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <ImageField
                     label={form.media_type === 'video' ? 'Imagem poster do vídeo' : 'Imagem de fundo do slide'}
                     gallery="slide"

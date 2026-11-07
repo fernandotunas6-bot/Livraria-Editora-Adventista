@@ -2,9 +2,11 @@ import pb from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { getSearchRelevance } from '@/lib/searchUtils';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
+import { sanitizeYoutubeUrl } from '@/lib/youtube';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -73,6 +75,14 @@ function bookToProduct(book, collectionsMap = {}) {
     collection_id: collectionId || null,
     collection_title: collectionsMap[collectionId] || null,
     order: book.year ? Number(book.year) * 1000 : 0,
+    // Quando o produto entrou no catálogo. O `order` acima é o ano de publicação, que não é
+    // a mesma coisa: um clássico reeditado este mês é novidade da livraria e não de 1950.
+    // A ordenação "Novidades" usa esta data (ver lib/productSort.js).
+    created: book.created || null,
+    updated: book.updated || null,
+    // O autor também em campo próprio: o `subtitle` serve para o mostrar no cartão, mas as
+    // sugestões e os filtros precisam do nome, não da linha de apresentação.
+    author: book.author || '',
     featured: !!book.featured,
     product_type: book.product_type || 'livro',
     book_code: book.book_code || null,
@@ -93,6 +103,10 @@ function bookToProduct(book, collectionsMap = {}) {
     sample_pages: book.sample_pages || [],
     versions: book.versions || [],
     preview_enabled: !!book.preview_enabled,
+    // Vídeo de apresentação (YouTube). Só sai daqui se for um endereço do YouTube que o
+    // `lib/youtube.js` reconhece: o que está na base de dados nunca vai directo para um
+    // `src` de moldura.
+    video_url: sanitizeYoutubeUrl(book.video_url),
     sales_count: Number(book.sales_count) || 0,
     views_count: Number(book.views_count) || 0,
     stock_low: !!book.stock_low,
@@ -117,26 +131,78 @@ async function getCollectionsMap() {
   }
 }
 
+/**
+ * Leituras do catálogo em curso ou acabadas de fazer, para não as repetir.
+ *
+ * Medido no navegador, com cada descarga do catálogo contada: **a página inicial pedia o
+ * catálogo inteiro três vezes** (o cabeçalho, as prateleiras e o "Mais para si"), a ficha do
+ * produto duas e a loja duas. São sete os componentes que chamam `getProducts({})`, e o
+ * cabeçalho está em todas as páginas. A auditoria mediu a API a 0,85–1,5 s por pedido a
+ * partir de Angola: três descargas dos 102 livros são segundos de espera e de dados pagos
+ * pelo visitante, para a mesma lista.
+ *
+ * Duas coisas, e as duas são precisas:
+ *
+ * - **`emCurso`** junta os pedidos simultâneos. É o que resolve o caso real: os três
+ *   componentes da página inicial pedem no mesmo instante, antes de qualquer resposta
+ *   chegar, por isso uma cache por tempo sozinha não apanharia nenhum deles.
+ * - **`cache`** cobre quem chega a seguir (descer a página, abrir a folha das categorias,
+ *   navegar para outra página do catálogo).
+ *
+ * `VALIDADE` é curta de propósito. O catálogo muda quando a equipa grava no painel, e o
+ * painel não passa por aqui (lê `stock_books` directamente), por isso ninguém fica a ver
+ * dados velhos no sítio onde os está a mudar. Para o visitante, meio minuto de atraso num
+ * preço é incomparavelmente melhor do que três segundos de espera em cada página — e o
+ * checkout recalcula tudo no servidor de qualquer maneira.
+ */
+const VALIDADE = 60_000;
+const cache = new Map();
+const emCurso = new Map();
+
+/** Esquece o que está guardado. Para os testes e para quem acabou de gravar. */
+export function clearCatalogCache() {
+  cache.clear();
+  emCurso.clear();
+}
+
 async function fetchBooks(options = {}) {
-  const collectionsMap = await getCollectionsMap();
-  const filter = options.featured ? `featured = true && ${VISIBLE}` : VISIBLE;
   const limit = Number(options.limit);
+  const chave = `${options.featured ? 'destaques' : 'todos'}|${limit > 0 ? limit : 'tudo'}`;
 
-  let items;
-  if (limit > 0) {
-    const records = await pb.collection('stock_books').getList(1, limit, {
-      sort: BOOK_SORT,
-      filter: filter || undefined,
-    });
-    items = records.items;
-  } else {
-    items = await pb.collection('stock_books').getFullList({
-      sort: BOOK_SORT,
-      filter: filter || undefined,
-    });
+  const guardado = cache.get(chave);
+  if (guardado && Date.now() - guardado.at < VALIDADE) return guardado.valor;
+  const aDecorrer = emCurso.get(chave);
+  if (aDecorrer) return aDecorrer;
+
+  const ler = (async () => {
+    const collectionsMap = await getCollectionsMap();
+    const filter = options.featured ? `featured = true && ${VISIBLE}` : VISIBLE;
+
+    let items;
+    if (limit > 0) {
+      const records = await pb.collection('stock_books').getList(1, limit, {
+        sort: BOOK_SORT,
+        filter: filter || undefined,
+      });
+      items = records.items;
+    } else {
+      items = await pb.collection('stock_books').getFullList({
+        sort: BOOK_SORT,
+        filter: filter || undefined,
+      });
+    }
+    return { items, collectionsMap, total: items.length };
+  })();
+
+  emCurso.set(chave, ler);
+  try {
+    const valor = await ler;
+    cache.set(chave, { valor, at: Date.now() });
+    return valor;
+  } finally {
+    // Um erro não fica guardado: o pedido seguinte tenta outra vez.
+    emCurso.delete(chave);
   }
-
-  return { items, collectionsMap, total: items.length };
 }
 
 function mapSlideRecord(s) {
@@ -253,6 +319,33 @@ export async function getProduct(id) {
     });
   }
   return product;
+}
+
+/**
+ * Os produtos de uma colecção, pela conversão de sempre (`bookToProduct`).
+ *
+ * A página das colecções tinha a sua própria conversão, escrita à mão, e isso saía caro:
+ *
+ * - a variante chamava-se `variant_<id>` em vez de `<id>-default`, e o carrinho tira o id do
+ *   livro do id da variante (`bookIdOf`, em `hooks/useCart.jsx`). O id fabricado não batia com
+ *   livro nenhum, por isso **tudo o que fosse posto no carrinho a partir de uma colecção
+ *   desaparecia na revalidação seguinte**, com a mensagem "já não está disponível";
+ * - `inventory_quantity: book.stock || 99` transformava um livro esgotado (stock 0) em 99
+ *   unidades, com o botão "Comprar" activo — e a recusa só aparecia no fim do checkout;
+ * - não havia preço promocional: um livro em promoção aparecia aqui pelo preço de tabela e na
+ *   loja pelo de promoção;
+ * - sem descrição, inventava uma ("Este livro é uma leitura excelente que edifica a alma"),
+ *   para os 100 livros do catálogo que ainda não têm texto. É o mesmo problema do achado 44.
+ */
+export async function getCollectionProducts(collectionId) {
+  const id = String(collectionId || '').trim();
+  if (!id) return [];
+  const collectionsMap = await getCollectionsMap();
+  const items = await pb.collection('stock_books').getFullList({
+    filter: `collection_id = "${escapeFilterValue(id)}" && ${VISIBLE}`,
+    sort: BOOK_SORT,
+  });
+  return items.map((b) => bookToProduct(b, collectionsMap));
 }
 
 export async function getCategories() {
@@ -453,7 +546,21 @@ export async function searchProducts(query, limit = 50) {
   }
   const v = escapeFilterValue(q);
   const filter = `(title ~ "${v}" || author ~ "${v}" || genre ~ "${v}" || book_code ~ "${v}" || isbn ~ "${v}") && ${VISIBLE}`;
-  const records = await pb.collection('stock_books').getList(1, limit, { filter, sort: BOOK_SORT });
+  // Pede-se um grupo maior do que o pedido e ordena-se por relevância antes de cortar.
+  //
+  // A base de dados ordena por `-featured,title` e só depois aplica o limite: com `limit` 6
+  // (é o que o selector de livros da comunidade usa), os 6 que voltavam eram "os mais
+  // destacados, por ordem alfabética" de entre os que combinam — e o livro que a pessoa
+  // escreveu podia nem estar lá. A relevância é a mesma da pesquisa do cabeçalho
+  // (`getSearchRelevance`): o título ganha ao autor, que ganha ao género.
+  const pool = Math.min(Math.max(limit * 5, 30), 200);
+  const records = await pb.collection('stock_books').getList(1, pool, { filter, sort: BOOK_SORT });
   const collectionsMap = await getCollectionsMap();
-  return { products: records.items.map((b) => bookToProduct(b, collectionsMap)) };
+  const products = records.items
+    .map((b) => bookToProduct(b, collectionsMap))
+    .map((p) => ({ p, r: getSearchRelevance(p, q) }))
+    .sort((a, b) => b.r - a.r || String(a.p.title || '').localeCompare(String(b.p.title || ''), 'pt'))
+    .slice(0, limit)
+    .map(({ p }) => p);
+  return { products };
 }

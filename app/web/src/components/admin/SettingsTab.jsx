@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Save, Palette, Smartphone, Truck, MessageSquare, LayoutTemplate, Store, Mail, Bell, Sparkles, RotateCcw, Image as ImageIcon, Phone, Brush, ShieldCheck } from 'lucide-react';
 import pb from '@/lib/dataClient';
+import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
+import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
+import { embedOnlyVideoPlatform } from '@/lib/videoUrl';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
@@ -72,6 +75,8 @@ const empty = {
   whatsapp: '',
   facebook: '',
   instagram: '',
+  youtube: '',
+
   pwa_enabled: true,
   pwa_name: '',
   pwa_short_name: 'LA',
@@ -179,6 +184,10 @@ export default function SettingsTab() {
   // As imagens da página Sobre dependem da migração `imagens_sobre`. Enquanto as colunas não
   // existirem, os campos não aparecem e não são gravados: enviá-los faria o PostgREST
   // recusar o registo inteiro e partir o gravar das Configurações.
+  // A coluna `youtube` nasce numa migração. Enquanto não estiver aplicada, o campo não é
+  // enviado: um pedido com uma coluna que não existe é recusado pelo PostgREST inteiro, e a
+  // equipa ficava sem gravar configuração nenhuma. É o mesmo padrão das colunas abaixo.
+  const [hasYoutube, setHasYoutube] = useState(false);
   const [hasAboutImages, setHasAboutImages] = useState(false);
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
@@ -201,10 +210,11 @@ export default function SettingsTab() {
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
-        setHasAboutImages('about_top_image_url' in r);
-        setHasAboutTeam('about_team' in r);
-        setHasNewRules('unpaid_cancel_days' in r);
-        setHasFloating('chat_hidden_on' in r);
+        setHasYoutube(hasColumn(r, 'youtube'));
+        setHasAboutImages(hasColumn(r, 'about_top_image_url'));
+        setHasAboutTeam(hasColumn(r, 'about_team'));
+        setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
+        setHasFloating(hasColumn(r, 'chat_hidden_on'));
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
         setLogoRemoved(false);
@@ -229,6 +239,7 @@ export default function SettingsTab() {
           whatsapp: r.whatsapp ? formatAngolaPhone(r.whatsapp) : '',
           facebook: r.facebook || '',
           instagram: r.instagram || '',
+          youtube: r.youtube || '',
           pwa_enabled: !!r.pwa_enabled,
           pwa_name: r.pwa_name || '',
           pwa_short_name: r.pwa_short_name || 'LA',
@@ -369,24 +380,6 @@ export default function SettingsTab() {
         logo_url: form.logo_url?.startsWith('blob:') ? '' : sanitizeImageUrlForSave(form.logo_url),
         favicon_url: form.favicon_url?.startsWith('blob:') ? '' : sanitizeImageUrlForSave(form.favicon_url),
         login_bg_url: sanitizeImageUrlForSave(form.login_bg_url),
-        ...(hasAboutImages ? {
-          about_top_image_url: sanitizeImageUrlForSave(form.about_top_image_url),
-          about_side_image_url: sanitizeImageUrlForSave(form.about_side_image_url),
-        } : {}),
-        ...(hasNewRules ? {
-          unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
-          chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
-        } : {}),
-        ...(hasAboutTeam ? {
-          // Sem nome não é ninguém: essas linhas não são gravadas.
-          about_team: (form.about_team || [])
-            .map((m) => ({
-              name: (m.name || '').trim().slice(0, 120),
-              role: (m.role || '').trim().slice(0, 120),
-              photo_url: sanitizeImageUrlForSave(m.photo_url || ''),
-            }))
-            .filter((m) => m.name),
-        } : {}),
         shop_bg_image_url: sanitizeImageUrlForSave(form.shop_bg_image_url),
         shipping_free_threshold: Number(form.shipping_free_threshold),
         shipping_cost: Number(form.shipping_cost),
@@ -424,14 +417,34 @@ export default function SettingsTab() {
         data.favicon_url = '';
       }
 
-      // Páginas sem os botões flutuantes: só com as colunas da migração, e só chaves conhecidas.
-      if (hasFloating) {
-        data.chat_hidden_on = hiddenPages(form, 'chat');
-        data.scroll_top_hidden_on = hiddenPages(form, 'top');
-      } else {
-        delete data.chat_hidden_on;
-        delete data.scroll_top_hidden_on;
-      }
+      // Colunas que nasceram em migrações: só vão no pedido quando existem mesmo na base de
+      // dados. Ver `lib/optionalColumns.js` — e lá está também porque é que o padrão antigo
+      // (um spread condicional depois do `...form`) não chegava a apagar nada.
+      applyOptionalColumns(data, [
+        [hasAboutImages, {
+          about_top_image_url: sanitizeImageUrlForSave(form.about_top_image_url),
+          about_side_image_url: sanitizeImageUrlForSave(form.about_side_image_url),
+        }],
+        [hasNewRules, {
+          unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
+          chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
+        }],
+        [hasAboutTeam, {
+          // Sem nome não é ninguém: essas linhas não são gravadas.
+          about_team: (form.about_team || [])
+            .map((m) => ({
+              name: (m.name || '').trim().slice(0, 120),
+              role: (m.role || '').trim().slice(0, 120),
+              photo_url: sanitizeImageUrlForSave(m.photo_url || ''),
+            }))
+            .filter((m) => m.name),
+        }],
+        [hasYoutube, { youtube: (form.youtube || '').trim() }],
+        [hasFloating, {
+          chat_hidden_on: hiddenPages(form, 'chat'),
+          scroll_top_hidden_on: hiddenPages(form, 'top'),
+        }],
+      ]);
 
       // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
       const payload = { ...withoutSecrets(data), ...secretsForSave(form, secretStatus) };
@@ -670,6 +683,9 @@ export default function SettingsTab() {
           <div className="space-y-2"><Label>WhatsApp</Label><PhoneInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} /></div>
           <div className="space-y-2"><Label>Facebook URL</Label><Input value={form.facebook} onChange={(e) => set('facebook', e.target.value)} /></div>
           <div className="space-y-2"><Label>Instagram URL</Label><Input value={form.instagram} onChange={(e) => set('instagram', e.target.value)} /></div>
+          {hasYoutube && (
+            <div className="space-y-2"><Label>Canal do YouTube</Label><Input value={form.youtube} onChange={(e) => set('youtube', e.target.value)} placeholder="https://www.youtube.com/@..." /></div>
+          )}
         </TabsContent>
 
         <TabsContent value="pwa" className="space-y-4 max-w-xl">
@@ -986,16 +1002,22 @@ export default function SettingsTab() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Ordenação por defeito</Label>
-              <Select value={form.shop_default_sort} onValueChange={(v) => set('shop_default_sort', v)}>
+              {/* Da lista partilhada (lib/productSort.js), e não escrita aqui à mão: esta
+                  cópia tinha cinco critérios quando a loja passou a ter oito, com nomes
+                  diferentes ("Preço ↑" aqui, "Preço: do menor" na loja). Quem escolhesse aqui
+                  não conseguia pôr a loja a abrir pelas promoções ou pelos mais procurados. */}
+              <Select value={normalizeSort(form.shop_default_sort)} onValueChange={(v) => set('shop_default_sort', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="featured">Destaques</SelectItem>
-                  <SelectItem value="title">A – Z</SelectItem>
-                  <SelectItem value="price-low">Preço ↑</SelectItem>
-                  <SelectItem value="price-high">Preço ↓</SelectItem>
-                  <SelectItem value="newest">Mais recentes</SelectItem>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Por que ordem a loja abre. Quem lá estiver pode mudá-la, e o que estiver no
+                endereço (<code>?sort=</code>) manda sempre.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Livros por página</Label>
@@ -1043,8 +1065,26 @@ export default function SettingsTab() {
                 />
                 {form.shop_bg_mode === 'video' && (
                   <div className="space-y-2">
-                    <Label>URL do vídeo</Label>
-                    <Input value={form.shop_bg_video_url} onChange={(e) => set('shop_bg_video_url', e.target.value)} placeholder="https://...mp4" />
+                    <Label htmlFor="fundo-video">URL do vídeo</Label>
+                    <Input
+                      id="fundo-video"
+                      value={form.shop_bg_video_url}
+                      onChange={(e) => set('shop_bg_video_url', e.target.value)}
+                      placeholder="https://...mp4"
+                      aria-invalid={embedOnlyVideoPlatform(form.shop_bg_video_url) ? 'true' : undefined}
+                    />
+                    {embedOnlyVideoPlatform(form.shop_bg_video_url) ? (
+                      <p className="text-sm text-destructive">
+                        Isto é um link do {embedOnlyVideoPlatform(form.shop_bg_video_url)}. O
+                        fundo em vídeo precisa de um ficheiro (MP4 ou WebM) que o navegador
+                        saiba tocar; com um link de plataforma o fundo cai no gradiente. Um
+                        vídeo do YouTube mostra-se na ficha do produto, em Livros → Mídia.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Um ficheiro que toque sozinho, sem som e em ciclo.
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="space-y-2">

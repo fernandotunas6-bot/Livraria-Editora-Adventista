@@ -15,6 +15,7 @@ import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
+import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
 import { captureReferral } from '@/lib/colporteurReferral';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
@@ -89,6 +90,15 @@ class RouteErrorBoundaryView extends React.Component {
     return { hasError: true };
   }
 
+  // Uma página que rebentou volta a tentar em **qualquer** navegação, mesmo nas que já não
+  // remontam a página (ver `useRouteRemountKey`): é o `resetKey`, que é sempre a
+  // `location.key`, que o garante.
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false });
+    }
+  }
+
   componentDidCatch(error, errorInfo) {
     console.error('RouteErrorBoundary caught an error:', error, errorInfo);
   }
@@ -117,9 +127,20 @@ class RouteErrorBoundaryView extends React.Component {
   }
 }
 
+/**
+ * Fronteira de erros das rotas. A chave já não é a `location.key`: essa muda também quando a
+ * própria página reescreve o endereço (filtros, ordenação, separadores), e cada escrita
+ * desmontava a página inteira — na loja, no telemóvel, o painel de filtros fechava-se a cada
+ * toque. Ver `hooks/useRouteRemountKey.js`.
+ */
 function RouteErrorBoundary({ children }) {
   const location = useLocation();
-  return <RouteErrorBoundaryView key={location.key}>{children}</RouteErrorBoundaryView>;
+  const remountKey = useRouteRemountKey();
+  return (
+    <RouteErrorBoundaryView key={remountKey} resetKey={location.key}>
+      {children}
+    </RouteErrorBoundaryView>
+  );
 }
 
 /**

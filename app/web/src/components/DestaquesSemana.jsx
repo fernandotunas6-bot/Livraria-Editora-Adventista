@@ -9,6 +9,7 @@ import QuickViewModal from '@/components/QuickViewModal';
 import { MOTION } from '@/lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { needsVariantChoice, variantNames } from '@/lib/productTypes';
+import { inStock, sortProducts } from '@/lib/productSort';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -26,15 +27,11 @@ export default function DestaquesSemana({ onCartOpen }) {
   useEffect(() => {
     getFeaturedProducts(12)
       .then((res) => {
-        const inStock = (b) => b.purchasable && (b.variants?.[0]?.inventory_quantity ?? 0) > 0;
-        const sorted = (res.products || [])
-          .filter((b) => b.book_code || inStock(b))
-          .sort((a, b) =>
-            (b.featured ? 1 : 0) - (a.featured ? 1 : 0)
-            || (inStock(b) ? 1 : 0) - (inStock(a) ? 1 : 0)
-            || (b.order || 0) - (a.order || 0),
-          );
-        setBooks(sorted.slice(0, 5));
+        // O critério "Destaques" da loja (lib/productSort.js): em destaque primeiro, depois
+        // as promoções a valer, depois quem chegou há menos tempo — e sempre com os
+        // esgotados no fim. Antes o desempate era o `order`, que é o ano de publicação.
+        const lista = (res.products || []).filter((b) => b.book_code || inStock(b));
+        setBooks(sortProducts(lista, 'featured').slice(0, 5));
       })
       .catch(console.error)
       .finally(() => setLoading(false));

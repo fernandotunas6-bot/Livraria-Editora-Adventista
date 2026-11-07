@@ -48,6 +48,13 @@ export function BrandLogo({ className, linkTo = '/', variant = 'default', showTe
   // 343px da barra: o logótipo ficava encostado aos ícones. Aí fica só o emblema, e a
   // assinatura volta a partir de `sm`. Só com o logótipo da casa — de um carregado pelo
   // administrador não há emblema separado.
+  //
+  // E volta a encolher entre `lg` e `xl` (1024–1279px), pela mesma razão: é aí que o menu de
+  // computador liga, e a linha do cabeçalho passa a precisar de 1085px quando o contentor só
+  // tem 960. Medido no navegador: o logótipo 182px, o menu 603 e os ícones 276. Sem isto a
+  // linha transborda 94px — e na ficha do produto, onde o cabeçalho é `sticky` (em fluxo) em
+  // vez de `fixed`, esse excesso vira uma barra de deslocamento horizontal na página toda.
+  // O emblema poupa os ~138px que faltam, e o lockup volta no `xl`.
   const collapses = collapseToIcon && !hasCustomLogo;
 
   const content = (
@@ -56,7 +63,7 @@ export function BrandLogo({ className, linkTo = '/', variant = 'default', showTe
         <img
           src={isLight ? '/logo-icon-light.svg' : '/logo-icon.svg'}
           alt={siteName}
-          className="h-11 w-11 object-contain shrink-0 sm:hidden"
+          className="h-11 w-11 object-contain shrink-0 sm:hidden lg:block xl:hidden"
         />
       )}
       {isHorizontalLogo ? (
@@ -66,7 +73,7 @@ export function BrandLogo({ className, linkTo = '/', variant = 'default', showTe
           alt={siteName}
           className={cn(
             'h-9 sm:h-10 w-auto max-w-[190px] sm:max-w-[220px] object-contain shrink-0',
-            collapses && 'hidden sm:block',
+            collapses && 'hidden sm:block lg:hidden xl:block',
             isLight && hasCustomLogo && 'brightness-110 drop-shadow-[0_1px_2px_rgba(255,255,255,0.2)]'
           )}
         />

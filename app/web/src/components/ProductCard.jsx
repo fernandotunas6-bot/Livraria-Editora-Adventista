@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { displayPrice } from '@/lib/productSort';
 import { ShoppingCart, Loader2, Eye, MessageCircle, Heart, Star, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -39,8 +40,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   const qty = variant?.inventory_quantity ?? 0;
   // A marca vem da base de dados, com o limite definido em Configurações → Regras da loja.
   const isLowStock = inStock && !!product.stock_low;
-  const price = variant?.sale_price_formatted || variant?.price_formatted;
-  const originalPrice = variant?.sale_price_formatted ? variant?.price_formatted : null;
+  const { price, originalPrice } = displayPrice(product);
   const waPhone = settings.whatsapp || settings.contact_phone;
 
   const handleAddToCart = async (e) => {
