@@ -48,10 +48,35 @@ export function isSaleActive(book, now = Date.now()) {
  * recusar leituras de campos que uma variante de produto não tem.
  */
 export function variantPrices(book, versao, now = Date.now()) {
-  const price = Number(versao?.price ?? book?.price) || 0;
+  // Sem preço próprio (vazio, 0 ou ausente), a variante é o produto: preço e promoção do produto.
+  // O painel gravava `price: ''` num tamanho sem preço, e `Number('')` dava 0: a loja mostrava
+  // 0 Kz e o servidor cobrava o preço do produto (migração tamanhos_e_comissoes).
+  const own = Number(versao?.price);
+  const hasOwn = String(versao?.price ?? '').trim() !== '' && Number.isFinite(own) && own > 0;
+  const price = hasOwn ? own : (Number(book?.price) || 0);
   const sale = Number(versao?.sale_price) || 0;
-  const onSale = sale > 0 && sale < price && saleWindowOpen(book, now);
-  return { price, sale: onSale ? sale : null, onSale };
+  if (sale > 0 && sale < price && saleWindowOpen(book, now)) return { price, sale, onSale: true };
+  if (!hasOwn && isSaleActive(book, now)) return { price, sale: Number(book.sale_price), onSale: true };
+  return { price, sale: null, onSale: false };
+}
+
+/**
+ * Variantes como se gravam: preço e stock em número, ou null quando ficam por preencher (a
+ * variante usa então os do produto). O formulário guarda o texto dos campos, e um `''` gravado
+ * era lido como 0 Kz no site.
+ */
+export function normalizeVersions(list) {
+  const toNumber = (v) => {
+    if (v === null || v === undefined || String(v).trim() === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  return (Array.isArray(list) ? list : []).map((v) => {
+    const out = { ...v, price: toNumber(v?.price), stock: toNumber(v?.stock) };
+    if (out.stock !== null) out.stock = Math.floor(out.stock);
+    if ('sale_price' in (v || {})) out.sale_price = toNumber(v.sale_price);
+    return out;
+  });
 }
 
 export function effectivePrice(book, now = Date.now()) {

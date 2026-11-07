@@ -74,6 +74,7 @@ import {
   type PaymentAction, type PaymentResult, customerNoticeFor, deliveryNeedsPayment, kz as kwanza, outstanding, parseAmount,
   staffNoteFor, trackPaymentSummary, unpaidLimitReached,
 } from "./payments.ts";
+import { parseGatewayEvent, providerCode, verifyWebhookSignature } from "./paymentWebhook.ts";
 import { floatingPagesFrom } from "./floatingPages.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -108,7 +109,9 @@ const bad = (msg: string) => new HttpError(400, msg);
 const tooMany = (msg: string) => new HttpError(429, msg, { "Retry-After": "60" });
 
 type Row = Record<string, any>;
-type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
+// `raw`: o corpo exacto, como chegou. O webhook do gateway de pagamentos verifica a assinatura
+// sobre ele (o JSON analisado pode reordenar ou reescrever números).
+type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string; raw: string };
 
 // Por omissão nada se guarda: estas respostas têm dados pessoais (rastreio, painel, contas)
 // e não levavam Cache-Control nenhum. As rotas iguais para todos usam `publicJson`.
@@ -1476,6 +1479,8 @@ route("GET", "/payment-methods", async () => {
       id: r.id, name: r.name, code: r.code, type: r.type || "offline", instructions: r.instructions || "",
       account_info: r.account_info || "", qr_url: r.qr_url || fileUrl("payment_methods", r, "qr_code"), icon: r.icon || "",
       payment_link: r.payment_link || "",
+      // Confirmado pelo gateway de pagamentos (webhook): o cliente não indica referência.
+      automatic: !!String(r.gateway_provider || "").trim(),
       // Envios em que o método aparece; null = todos (ver checkoutRules.paymentAllowedForShipping).
       shipping_methods: Array.isArray(r.shipping_methods) && r.shipping_methods.length ? r.shipping_methods : null,
     })),
@@ -1500,7 +1505,7 @@ route("POST", "/track", async ({ body, ip }) => {
   // Como pagar, para quem paga depois de encomendar (transferência, Multicaixa): são os dados
   // públicos que o checkout já mostra. A página usa-os para pedir a referência do pagamento.
   const { data: method } = await db.from("payment_methods")
-    .select("name, type, instructions, account_info, payment_link").eq("code", order.payment_method_code || "").maybeSingle();
+    .select("name, type, instructions, account_info, payment_link, gateway_provider").eq("code", order.payment_method_code || "").maybeSingle();
   const payLater = isPaidUpfront(method?.type) && !["paid", "refunded"].includes(order.payment_status) && order.status !== "cancelled";
   // O que o cliente precisa de saber do pagamento: quanto falta, o que indicou e, se a equipa não
   // o encontrou, porquê (pagamentos registados, migração pagamentos_registados).
@@ -1510,6 +1515,8 @@ route("POST", "/track", async ({ body, ip }) => {
     payment_method_name: order.payment_method_name || method?.name || "",
     payment_upfront: isPaidUpfront(method?.type),
     payment_reference_present: !!order.payment_reference,
+    // Confirmado pelo gateway: a página não pede a referência, diz que a confirmação é automática.
+    payment_automatic: !!String(method?.gateway_provider || "").trim(),
     ...trackPaymentSummary(order, payRows || []),
     ...(payLater ? {
       payment_instructions: method?.instructions || "",
@@ -1567,8 +1574,13 @@ route("POST", "/order/payment-reference", async ({ body, ip }) => {
   if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o contacto.");
   if (order.status === "cancelled" || order.delivery_status === "cancelled") throw bad("Esta encomenda foi cancelada.");
   if (["paid", "refunded"].includes(order.payment_status)) throw bad("O pagamento desta encomenda já foi confirmado.");
-  const { data: method } = await db.from("payment_methods").select("name, type").eq("code", order.payment_method_code || "").maybeSingle();
+  const { data: method } = await db.from("payment_methods").select("name, type, gateway_provider").eq("code", order.payment_method_code || "").maybeSingle();
   if (!isPaidUpfront(method?.type)) throw bad("Esta encomenda paga-se na entrega ou no balcão: não precisa de referência.");
+  // Com gateway, quem confirma é o gateway (webhook): uma referência escrita pelo cliente não
+  // serve para nada e daria à equipa uma confirmação a fazer à mão.
+  if (String(method?.gateway_provider || "").trim()) {
+    throw bad(`O pagamento por ${method?.name || "este método"} é confirmado automaticamente: não precisa de indicar a referência.`);
+  }
 
   // Fica registado como "indicado" (order_payments): a encomenda passa a "a aguardar
   // confirmação". A mesma referência outra vez não cria outra; uma nova substitui a anterior,
@@ -1858,6 +1870,81 @@ const isoOrNull = (v: unknown) => {
   const t = Date.parse(String(v || ""));
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 };
+
+// ---------------------------------------------------------------------------
+// Gateway de pagamentos (migração 20261107201500_gateway_de_pagamentos, docs/PAGAMENTOS.md)
+// ---------------------------------------------------------------------------
+// Regra do dono: um pagamento só fica confirmado pelo gateway, ou por um funcionário com
+// "Confirmar pagamentos". O gateway chama esta rota com o JSON assinado (paymentWebhook.ts).
+// Segredos da Edge Function: PAYMENT_WEBHOOK_SECRET (o segredo partilhado com o gateway) e
+// PAYMENT_GATEWAY_PROVIDER (o nome do fornecedor, "generico" por omissão). Sem o segredo, a
+// rota não existe: ninguém consegue marcar pagamentos por aqui.
+const gatewayProvider = () => providerCode(Deno.env.get("PAYMENT_GATEWAY_PROVIDER") || "generico");
+
+/** Uma chamada recusada (assinatura, dados) também fica no registo do gateway. */
+async function logGatewayRejection(provider: string, detail: string, body: Row, ip: string) {
+  const payload = JSON.stringify(body || {}).length > 20000 ? { cortado: true } : (body || {});
+  const { error } = await db.from("payment_gateway_events").insert({
+    provider, outcome: "rejected", detail: clipText(detail, 500), payload, ip: clipText(ip, 80),
+    transaction_id: clipText((body as Row)?.transaction_id ?? (body as Row)?.id ?? "", 120),
+    order_ref: clipText((body as Row)?.order_number ?? "", 80),
+  });
+  if (error) console.log("Registo do gateway:", error.message);
+}
+
+route("POST", "/webhooks/pagamentos", async ({ req, raw, body, ip }) => {
+  const secret = Deno.env.get("PAYMENT_WEBHOOK_SECRET") || "";
+  if (!secret) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("payment-webhook", ip, 300)) throw tooMany("Demasiados pedidos.");
+  const provider = gatewayProvider();
+  const signature = req.headers.get("x-signature") || req.headers.get("x-webhook-signature") || "";
+  if (!(await verifyWebhookSignature(raw, signature, secret))) {
+    await logGatewayRejection(provider, "Assinatura inválida.", body, ip);
+    throw new HttpError(401, "Assinatura inválida.");
+  }
+  const event = parseGatewayEvent(body);
+  if ("error" in event) {
+    await logGatewayRejection(provider, event.error, body, ip);
+    throw bad(event.error);
+  }
+  const result = await paymentRpc("order_payment_gateway", {
+    p_provider: provider, p_transaction_id: event.transactionId, p_order_ref: event.orderRef, p_amount: event.amount,
+    p_paid_at: event.paidAt, p_reference: event.reference, p_status: event.status, p_payload: body, p_ip: ip,
+  }, null);
+
+  if (result.outcome === "recorded") {
+    // O cliente é avisado como num pagamento confirmado pela equipa (email, WhatsApp, push), já
+    // depois da resposta: o gateway espera pouco e repete se não receber 200.
+    runAfterResponse("Pagamento confirmado pelo gateway", async () => { await afterPaymentAction("record", result, null); });
+    const note = staffNoteFor(result);
+    if (note) {
+      await notifyDuty({
+        duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: String(result.order_id || "") || null,
+        title: `Pagamento do gateway na encomenda ${result.order_number || event.orderRef}`, body: note,
+      });
+      runAfterResponse("Avisos à equipa (gateway)", () => dispatchStaffNotifications());
+    }
+  } else if (result.outcome === "orphan") {
+    await notifyDuty({
+      duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: null,
+      title: `Pagamento do gateway sem encomenda (${event.orderRef})`,
+      body: `${kwanza(event.amount)} · transacção ${event.transactionId}. Veja em Relatórios → Pagamentos e caixa e concilie à mão.`,
+    });
+    runAfterResponse("Avisos à equipa (gateway sem encomenda)", () => dispatchStaffNotifications());
+  }
+  return json({ ok: true, outcome: result.outcome });
+});
+
+/** O que o painel mostra do gateway: se está ligado, o endereço a dar ao fornecedor. */
+route("GET", "/admin/payments/gateway", async ({ auth }) => {
+  if (!can(auth, "manage_payments") && !can(auth, "confirm_payments")) throw new HttpError(403, "Sem permissão.");
+  return json({
+    configured: !!(Deno.env.get("PAYMENT_WEBHOOK_SECRET") || ""),
+    provider: gatewayProvider(),
+    webhook_url: `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/app/webhooks/pagamentos`,
+    signature_header: "X-Signature",
+  });
+});
 
 /**
  * Mudava o estado do pagamento com um clique, sem valor nem data. O estado passou a resultar dos
@@ -2247,8 +2334,9 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     throw error;
   }
 
-  // A referência trazida no checkout (transferência, Multicaixa) fica indicada, por verificar.
-  if (paidUpfront && paymentReference) {
+  // A referência trazida no checkout (transferência sem gateway) fica indicada, por verificar.
+  // Num método com gateway, quem confirma é o webhook: a referência escrita não entra.
+  if (paidUpfront && paymentReference && !String(paymentMethodRow?.gateway_provider || "").trim()) {
     try {
       const r = await paymentRpc("order_payment_report", { p_order_id: saved.id, p_reference: paymentReference }, null);
       saved.payment_status = r.payment_status || saved.payment_status;
@@ -4668,6 +4756,7 @@ Deno.serve(async (req) => {
   let auth: Auth = null;
   try {
     let body: Row = {};
+    let rawBody = "";
     if (req.method === "POST") {
       // O maior pedido legítimo é a confirmação de entrega (assinatura até 600 KB). Sem tecto,
       // um corpo de dezenas de MB era lido e analisado inteiro antes de qualquer validação.
@@ -4675,6 +4764,7 @@ Deno.serve(async (req) => {
       if (declared > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
       const raw = await req.text();
       if (raw.length > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      rawBody = raw;
       try {
         const parsed = raw ? JSON.parse(raw) : {};
         body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
@@ -4687,7 +4777,7 @@ Deno.serve(async (req) => {
     // por isso o primeiro valor é fiável para os limites de pedidos.
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "anon";
     auth = await getAuth(req);
-    const res = await handler({ req, url, body, auth, ip });
+    const res = await handler({ req, url, body, auth, ip, raw: rawBody });
     res.headers.set("X-Request-Id", requestId);
     return res;
   } catch (err) {

@@ -57,17 +57,23 @@ const LUANDA_OFFSET_MS = 3600 * 1000;
 /**
  * Vendas registadas no sistema (encomendas) de uma loja, por mês, em Kz sem portes.
  * Conta para a loja: levantamentos nessa loja e entregas ao domicílio na província da loja.
- * Exclui encomendas canceladas; com paidOnly, só as que têm o pagamento confirmado.
+ * Exclui encomendas canceladas.
+ *
+ * Com `paidOnly` (o normal), conta o dinheiro que entrou, pelo mês em que entrou: encomendas com
+ * `paid_at` nesse ano (pagamentos registados, migração pagamentos_registados), pelo pago menos o
+ * reembolsado, sem os portes. Antes contava pelo mês da encomenda e pelo total: uma encomenda de
+ * 31 de Janeiro paga a 3 de Fevereiro entrava em Janeiro, e um reembolso não descontava nada.
  */
 async function fetchSystemSales(store, ano, { paidOnly = true } = {}) {
   const from = new Date(Date.UTC(ano, 0, 1) - LUANDA_OFFSET_MS).toISOString();
   const to = new Date(Date.UTC(ano + 1, 0, 1) - LUANDA_OFFSET_MS).toISOString();
+  const dateField = paidOnly ? 'paid_at' : 'created';
   const rows = [];
   for (let page = 0; ; page++) {
     const { data, error } = await supabase.from('orders')
-      .select('created, total, shipping_cost, status, delivery_status, payment_status, shipping_method, pickup_store, delivery_province')
-      .gte('created', from).lt('created', to)
-      .order('created')
+      .select('created, paid_at, total, shipping_cost, amount_paid, amount_refunded, status, delivery_status, payment_status, shipping_method, pickup_store, delivery_province')
+      .gte(dateField, from).lt(dateField, to)
+      .order(dateField)
       .range(page * 1000, page * 1000 + 999);
     if (error) throw error;
     rows.push(...(data || []));
@@ -77,12 +83,16 @@ async function fetchSystemSales(store, ano, { paidOnly = true } = {}) {
   const counts = Array(12).fill(0);
   for (const o of rows) {
     if (o.status === 'cancelled' || o.delivery_status === 'cancelled') continue;
-    if (paidOnly && o.payment_status !== 'paid') continue;
     const pickup = o.shipping_method === 'pickup' || !!o.pickup_store;
     const mine = pickup ? norm(o.pickup_store) === norm(store.name) : norm(o.delivery_province) === norm(store.province);
     if (!mine) continue;
-    const m = new Date(new Date(o.created).getTime() + LUANDA_OFFSET_MS).getUTCMonth();
-    months[m] += Math.max(0, cents(o.total) - cents(o.shipping_cost));
+    // Pago: o que ficou (pago − reembolsado), até ao total, sem os portes. Vendido: o total.
+    const value = paidOnly
+      ? Math.min(cents(o.amount_paid) - cents(o.amount_refunded), cents(o.total)) - cents(o.shipping_cost)
+      : cents(o.total) - cents(o.shipping_cost);
+    if (paidOnly && value <= 0) continue;
+    const m = new Date(new Date(o[dateField]).getTime() + LUANDA_OFFSET_MS).getUTCMonth();
+    months[m] += Math.max(0, value);
     counts[m] += 1;
   }
   return { months: months.map((c) => c / 100), counts, orders: rows.length };

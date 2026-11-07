@@ -1,5 +1,4 @@
 import pb from '@/lib/dataClient';
-import { isMissingRoute } from '@/lib/apiCompat';
 import { resolveShopBgMode } from '@/lib/shopTheme';
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
 
@@ -193,48 +192,57 @@ export async function addDeliveryEvent(orderId, event, token) {
   return data;
 }
 
-/**
- * Muda o estado do pagamento de uma encomenda.
- *
- * Passa pela API e não pela tabela porque é aí que o aviso ao cliente é enviado: a gravação
- * directa em `orders` mudava o estado sem que ninguém soubesse que o pagamento foi aceite.
- *
- * Enquanto a Edge Function publicada não tiver esta rota, grava na tabela como antes e
- * devolve `via: 'fallback'`, para o painel poder dizer que o estado mudou mas o cliente não
- * foi avisado. Sem isto, o site novo com a função antiga deixava de conseguir sequer
- * confirmar um pagamento — uma funcionalidade a menos em vez de um aviso a mais.
- */
-export async function setOrderPaymentStatus(orderId, status) {
-  try {
-    const res = await pb.send('/admin/orders/payment-status', {
-      method: 'POST',
-      body: { orderId, status },
-    });
-    return { ...res, via: 'api' };
-  } catch (err) {
-    if (!isMissingRoute(err)) throw err;
-    await pb.collection('orders').update(orderId, { payment_status: status });
-    return { payment_status: status, email_sent: false, via: 'fallback' };
-  }
+// ---------------------------------------------------------------------------------------------
+// Pagamentos registados (migração 20261107200000_pagamentos_registados, docs/PAGAMENTOS.md)
+// ---------------------------------------------------------------------------------------------
+// Cada pagamento e reembolso é uma linha de `order_payments`; o estado do pagamento da encomenda
+// resulta delas e ninguém o escreve à mão. As acções passam pela Edge Function, que verifica a
+// permissão "Confirmar pagamentos", diz à base quem foi (registo de segurança) e avisa o cliente.
+// Não há caminho de recurso para a tabela: a base de dados recusa-o.
+
+const paymentAction = (path, body) => pb.send(path, { method: 'POST', body });
+
+/** Pagamento já verificado: balcão, dinheiro da entrega, transferência vista no extracto. */
+export const recordOrderPayment = ({ orderId, amount, methodCode, reference, receivedAt, account, collectedBy, notes, sharedReferenceOk }) =>
+  paymentAction('/admin/orders/payments/record', { orderId, amount, methodCode, reference, receivedAt, account, collectedBy, notes, sharedReferenceOk });
+
+/** Confirma um pagamento indicado, com o valor que de facto entrou. */
+export const confirmOrderPayment = ({ paymentId, amount, receivedAt, account, notes, sharedReferenceOk }) =>
+  paymentAction('/admin/orders/payments/confirm', { paymentId, amount, receivedAt, account, notes, sharedReferenceOk });
+
+/** Rejeita um pagamento indicado que não se encontrou; o motivo vai para o cliente. */
+export const rejectOrderPayment = (paymentId, reason) => paymentAction('/admin/orders/payments/reject', { paymentId, reason });
+
+/** Anula um pagamento ou reembolso confirmado por engano (avisa os administradores). */
+export const voidOrderPayment = (paymentId, reason) => paymentAction('/admin/orders/payments/void', { paymentId, reason });
+
+/** Reembolso: dinheiro devolvido ao cliente, no máximo o que ficou pago. */
+export const recordOrderRefund = ({ orderId, amount, methodCode, reference, refundedAt, account, reason }) =>
+  paymentAction('/admin/orders/refunds/record', { orderId, amount, methodCode, reference, refundedAt, account, reason });
+
+/** A encomenda, os pagamentos e as referências repetidas noutras encomendas. */
+export async function getOrderPayments(orderId) {
+  const { data, error } = await supabase.rpc('order_payments_overview', { p_order_id: orderId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** Relatório de pagamentos e caixa (datas AAAA-MM-DD, em Luanda). */
+export async function getPaymentsReport(from, to) {
+  const { data, error } = await supabase.rpc('payments_report', { p_from: from, p_to: to });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 /**
- * Muda o estado da entrega de uma encomenda.
- *
- * Pela API, como o pagamento: é lá que o cliente recebe o email "enviada", "saiu para
- * entrega", "entregue". O painel gravava directamente na tabela, e a rota que envia esses
- * emails existia mas ninguém a chamava — o cliente nunca era avisado. Sem a rota (função
- * antiga), grava na tabela e devolve `via: 'fallback'`.
+ * Muda o estado da entrega de uma encomenda, pela API: é lá que o cliente recebe o email
+ * "enviada", "saiu para entrega", "entregue". Marcar "Entregue" com dinheiro por receber leva
+ * `extra.payment` ({ amount, collectedBy, methodCode, reference }) ou `extra.unpaidReason`; sem
+ * nenhum, a API responde 409 com o valor em falta.
  */
-export async function setOrderDeliveryStatus(orderId, status) {
-  try {
-    const res = await pb.send('/delivery-event', { method: 'POST', body: { orderId, status } });
-    return { ...res, via: 'api' };
-  } catch (err) {
-    if (!isMissingRoute(err)) throw err;
-    await pb.collection('orders').update(orderId, { delivery_status: status });
-    return { email_sent: false, via: 'fallback' };
-  }
+export async function setOrderDeliveryStatus(orderId, status, extra = {}) {
+  const res = await pb.send('/delivery-event', { method: 'POST', body: { orderId, status, ...extra } });
+  return { ...res, via: 'api' };
 }
 
 export function getSettingsFileUrl(record, field) {
