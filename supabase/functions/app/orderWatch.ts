@@ -7,11 +7,13 @@
  */
 
 import { type OpsHours, DEFAULT_HOURS, deliveryDeadline, openMinutesBetween } from "./opsRouting.ts";
+import { deliveryNeedsPayment, kz, outstanding, overpaid, refundDue } from "./payments.ts";
 
 type Row = Record<string, any>;
 
 export type AlertKind =
   | "payment_pending"
+  | "payment_to_confirm"
   | "not_prepared"
   | "preparing_too_long"
   | "pickup_waiting"
@@ -19,9 +21,13 @@ export type AlertKind =
   | "out_for_delivery_too_long"
   | "customer_problem"
   | "new_unacknowledged"
-  | "delivery_overdue";
+  | "delivery_overdue"
+  | "delivered_unpaid"
+  | "refund_due"
+  | "overpaid";
 
-type StageAlertKind = Exclude<AlertKind, "customer_problem" | "new_unacknowledged" | "delivery_overdue">;
+type StageAlertKind = Exclude<AlertKind,
+  "customer_problem" | "new_unacknowledged" | "delivery_overdue" | "delivered_unpaid" | "refund_due" | "overpaid">;
 
 export type OrderAlert = {
   order_id: string;
@@ -40,6 +46,8 @@ export type OrderAlert = {
 /** Limites por passo, em horas. Passar o dobro do limite torna o alerta crítico. */
 export const WATCH_RULES: Record<StageAlertKind, { hours: number; label: string }> = {
   payment_pending: { hours: 48, label: "Pagamento por confirmar" },
+  // O cliente diz que pagou: quem espera agora é a loja, por isso o prazo é mais curto.
+  payment_to_confirm: { hours: 12, label: "Pagamento indicado por verificar" },
   // Paga, ou a pagar no fim (na entrega ou no balcão): em ambos os casos falta preparar.
   not_prepared: { hours: 24, label: "Ainda não preparada" },
   preparing_too_long: { hours: 48, label: "Em preparação há demasiado tempo" },
@@ -54,6 +62,9 @@ const OTHER_LABELS: Record<Exclude<AlertKind, StageAlertKind>, string> = {
   customer_problem: "Cliente reportou um problema",
   new_unacknowledged: "Encomenda nova por assumir",
   delivery_overdue: "Entrega fora do prazo prometido",
+  delivered_unpaid: "Entregue sem pagamento registado",
+  refund_due: "Paga e cancelada: falta reembolsar",
+  overpaid: "Pago a mais: falta devolver a diferença",
 };
 export const alertLabel = (kind: AlertKind) =>
   (kind in WATCH_RULES ? WATCH_RULES[kind as StageAlertKind].label : OTHER_LABELS[kind as Exclude<AlertKind, StageAlertKind>]);
@@ -133,6 +144,23 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
     out.push(alert(o, "customer_problem", (now - time(fb.at)) / HOUR, 0, String(fb.message || "")));
   }
   const stage = orderStage(o, opts.payLater?.(o) ?? false);
+
+  // Dinheiro (migração pagamentos_registados). Alertam logo, também nas encomendas entregues e
+  // canceladas, que já não têm passos: é o caso da encomenda de 245 000 Kz entregue com o
+  // pagamento pendente, que nada assinalava.
+  if (stage === "delivered" && deliveryNeedsPayment(o)) {
+    const h = (now - stageSince(o)) / HOUR;
+    const who = o.payment_status === "awaiting_confirmation" ? "indicado por quem entregou, por confirmar na caixa" : "sem pagamento registado";
+    out.push(alert(o, "delivered_unpaid", h, 0, `${who} · faltam ${kz(outstanding(o))}`, h >= 48));
+  }
+  if (stage === "cancelled" && refundDue(o) > 0) {
+    const h = (now - (time(o.updated) || time(o.created))) / HOUR;
+    out.push(alert(o, "refund_due", h, 0, `por devolver: ${kz(refundDue(o))}`, h >= 72));
+  }
+  if (stage !== "cancelled" && overpaid(o) > 0) {
+    const h = (now - (time(o.updated) || time(o.created))) / HOUR;
+    out.push(alert(o, "overpaid", h, 0, `a mais: ${kz(overpaid(o))}`, false));
+  }
   if (stage === "cancelled" || stage === "delivered") return out;
 
   // Encomenda nova que ninguém assumiu, contada só em horário de funcionamento: é crítica
@@ -158,7 +186,7 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
     if (hours >= WATCH_RULES[kind].hours) out.push(alert(o, kind, hours, WATCH_RULES[kind].hours));
   };
   switch (stage) {
-    case "awaiting_payment": rule("payment_pending"); break;
+    case "awaiting_payment": rule(o.payment_status === "awaiting_confirmation" ? "payment_to_confirm" : "payment_pending"); break;
     case "paid": rule("not_prepared"); break;
     case "preparing": rule("preparing_too_long"); break;
     case "shipped":

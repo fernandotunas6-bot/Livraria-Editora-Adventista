@@ -28,6 +28,9 @@ export const PERMISSION_KEYS = [
   "manage_settings",
   "manage_users",
   "manage_payments",
+  // Confirmar, rejeitar e anular pagamentos e registar reembolsos (migração pagamentos_registados).
+  // Separada de "Pagamentos" (métodos, IBAN, links): quem confirma dinheiro não muda para onde ele vai.
+  "confirm_payments",
   "manage_marketing",
   "manage_church_registry",
   "manage_colporteurs",
