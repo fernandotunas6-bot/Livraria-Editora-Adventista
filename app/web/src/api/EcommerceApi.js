@@ -268,6 +268,33 @@ export async function getProduct(id) {
   return product;
 }
 
+/**
+ * Os produtos de uma colecção, pela conversão de sempre (`bookToProduct`).
+ *
+ * A página das colecções tinha a sua própria conversão, escrita à mão, e isso saía caro:
+ *
+ * - a variante chamava-se `variant_<id>` em vez de `<id>-default`, e o carrinho tira o id do
+ *   livro do id da variante (`bookIdOf`, em `hooks/useCart.jsx`). O id fabricado não batia com
+ *   livro nenhum, por isso **tudo o que fosse posto no carrinho a partir de uma colecção
+ *   desaparecia na revalidação seguinte**, com a mensagem "já não está disponível";
+ * - `inventory_quantity: book.stock || 99` transformava um livro esgotado (stock 0) em 99
+ *   unidades, com o botão "Comprar" activo — e a recusa só aparecia no fim do checkout;
+ * - não havia preço promocional: um livro em promoção aparecia aqui pelo preço de tabela e na
+ *   loja pelo de promoção;
+ * - sem descrição, inventava uma ("Este livro é uma leitura excelente que edifica a alma"),
+ *   para os 100 livros do catálogo que ainda não têm texto. É o mesmo problema do achado 44.
+ */
+export async function getCollectionProducts(collectionId) {
+  const id = String(collectionId || '').trim();
+  if (!id) return [];
+  const collectionsMap = await getCollectionsMap();
+  const items = await pb.collection('stock_books').getFullList({
+    filter: `collection_id = "${escapeFilterValue(id)}" && ${VISIBLE}`,
+    sort: BOOK_SORT,
+  });
+  return items.map((b) => bookToProduct(b, collectionsMap));
+}
+
 export async function getCategories() {
   const { items } = await fetchBooks({});
   const seen = new Map();

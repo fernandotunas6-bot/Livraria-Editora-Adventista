@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Save, Palette, Smartphone, Truck, MessageSquare, LayoutTemplate, Store, Mail, Bell, Sparkles, RotateCcw, Image as ImageIcon, Phone, Brush, ShieldCheck } from 'lucide-react';
 import pb from '@/lib/dataClient';
+import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
@@ -207,11 +208,11 @@ export default function SettingsTab() {
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
-        setHasYoutube('youtube' in r);
-        setHasAboutImages('about_top_image_url' in r);
-        setHasAboutTeam('about_team' in r);
-        setHasNewRules('unpaid_cancel_days' in r);
-        setHasFloating('chat_hidden_on' in r);
+        setHasYoutube(hasColumn(r, 'youtube'));
+        setHasAboutImages(hasColumn(r, 'about_top_image_url'));
+        setHasAboutTeam(hasColumn(r, 'about_team'));
+        setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
+        setHasFloating(hasColumn(r, 'chat_hidden_on'));
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
         setLogoRemoved(false);
@@ -377,24 +378,6 @@ export default function SettingsTab() {
         logo_url: form.logo_url?.startsWith('blob:') ? '' : sanitizeImageUrlForSave(form.logo_url),
         favicon_url: form.favicon_url?.startsWith('blob:') ? '' : sanitizeImageUrlForSave(form.favicon_url),
         login_bg_url: sanitizeImageUrlForSave(form.login_bg_url),
-        ...(hasAboutImages ? {
-          about_top_image_url: sanitizeImageUrlForSave(form.about_top_image_url),
-          about_side_image_url: sanitizeImageUrlForSave(form.about_side_image_url),
-        } : {}),
-        ...(hasNewRules ? {
-          unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
-          chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
-        } : {}),
-        ...(hasAboutTeam ? {
-          // Sem nome não é ninguém: essas linhas não são gravadas.
-          about_team: (form.about_team || [])
-            .map((m) => ({
-              name: (m.name || '').trim().slice(0, 120),
-              role: (m.role || '').trim().slice(0, 120),
-              photo_url: sanitizeImageUrlForSave(m.photo_url || ''),
-            }))
-            .filter((m) => m.name),
-        } : {}),
         shop_bg_image_url: sanitizeImageUrlForSave(form.shop_bg_image_url),
         shipping_free_threshold: Number(form.shipping_free_threshold),
         shipping_cost: Number(form.shipping_cost),
@@ -432,19 +415,34 @@ export default function SettingsTab() {
         data.favicon_url = '';
       }
 
-      // Canal do YouTube: só com a coluna da migração aplicada. O `...form` acima põe sempre
-      // a chave, por isso não basta um spread condicional — tem de ser apagada, como abaixo.
-      if (hasYoutube) data.youtube = (form.youtube || '').trim();
-      else delete data.youtube;
-
-      // Páginas sem os botões flutuantes: só com as colunas da migração, e só chaves conhecidas.
-      if (hasFloating) {
-        data.chat_hidden_on = hiddenPages(form, 'chat');
-        data.scroll_top_hidden_on = hiddenPages(form, 'top');
-      } else {
-        delete data.chat_hidden_on;
-        delete data.scroll_top_hidden_on;
-      }
+      // Colunas que nasceram em migrações: só vão no pedido quando existem mesmo na base de
+      // dados. Ver `lib/optionalColumns.js` — e lá está também porque é que o padrão antigo
+      // (um spread condicional depois do `...form`) não chegava a apagar nada.
+      applyOptionalColumns(data, [
+        [hasAboutImages, {
+          about_top_image_url: sanitizeImageUrlForSave(form.about_top_image_url),
+          about_side_image_url: sanitizeImageUrlForSave(form.about_side_image_url),
+        }],
+        [hasNewRules, {
+          unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
+          chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
+        }],
+        [hasAboutTeam, {
+          // Sem nome não é ninguém: essas linhas não são gravadas.
+          about_team: (form.about_team || [])
+            .map((m) => ({
+              name: (m.name || '').trim().slice(0, 120),
+              role: (m.role || '').trim().slice(0, 120),
+              photo_url: sanitizeImageUrlForSave(m.photo_url || ''),
+            }))
+            .filter((m) => m.name),
+        }],
+        [hasYoutube, { youtube: (form.youtube || '').trim() }],
+        [hasFloating, {
+          chat_hidden_on: hiddenPages(form, 'chat'),
+          scroll_top_hidden_on: hiddenPages(form, 'top'),
+        }],
+      ]);
 
       // Segredos: só seguem os que foram escritos agora (ver lib/siteSecrets.js).
       const payload = { ...withoutSecrets(data), ...secretsForSave(form, secretStatus) };

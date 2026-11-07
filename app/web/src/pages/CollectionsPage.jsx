@@ -14,8 +14,9 @@ import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import QuickViewModal from '@/components/QuickViewModal';
 import { pageTitle } from '@/lib/brand';
 import { getCollections } from '@/api/PlatformApi';
-import pb from '@/lib/dataClient';
-import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { getCollectionProducts } from '@/api/EcommerceApi';
+import CatalogToolbar from '@/components/catalog/CatalogToolbar.jsx';
+import { DEFAULT_SORT, canGroupByType, groupByType, normalizeSort, sortProducts } from '@/lib/productSort';
 import { Button } from '@/components/ui/button';
 import PageBannerSlider from '@/components/PageBannerSlider';
 
@@ -31,27 +32,6 @@ const CATEGORY_MAPPINGS = {
   children: ['infantil', 'criancas', 'infanto-juvenil']
 };
 
-function bookToProduct(book) {
-  return {
-    id: book.id,
-    title: book.title,
-    subtitle: book.author,
-    price_in_cents: Math.round(Number(book.price) * 100),
-    image: book.cover,
-    category: book.genre,
-    marketing_hook: book.marketing_hook,
-    urgency_text: book.urgency_text,
-    purchasable: true,
-    variants: [
-      {
-        id: `variant_${book.id}`,
-        price_formatted: `${Number(book.price).toLocaleString('pt-AO')} Kz`,
-        inventory_quantity: book.stock || 99,
-      }
-    ],
-    description: book.description || 'Este livro é uma leitura excelente que edifica a alma.',
-  };
-}
 
 export default function CollectionsPage() {
   const { slug } = useParams();
@@ -78,11 +58,10 @@ export default function CollectionsPage() {
         if (slug) {
           const col = cols.find((c) => c.slug === slug || c.id === slug);
           if (col) {
-            const list = await pb.collection('stock_books').getFullList({
-              filter: `collection_id = "${escapeFilterValue(col.id)}" && active = true`,
-              sort: '-featured,title',
-            });
-            setBooks(list);
+            // A mesma conversão da loja e da ficha do produto (ver `getCollectionProducts`):
+            // a conversão própria que aqui estava partia o carrinho e mostrava preços e
+            // disponibilidade diferentes dos do resto do site.
+            setBooks(await getCollectionProducts(col.id));
             // Reset filters on collection change
             setSelectedCategory('all');
           }
@@ -103,7 +82,8 @@ export default function CollectionsPage() {
     let children = 0;
 
     books.forEach((book) => {
-      const g = getNormalizedGenre(book.genre);
+      // Num produto o género está em `type.value` — a conversão de sempre põe-no lá.
+      const g = getNormalizedGenre(book.type?.value);
       if (CATEGORY_MAPPINGS.educational.includes(g)) educational++;
       if (CATEGORY_MAPPINGS.inspirational.includes(g)) inspirational++;
       if (CATEGORY_MAPPINGS.children.includes(g)) children++;
@@ -117,17 +97,32 @@ export default function CollectionsPage() {
     if (selectedCategory === 'all') return books;
     const allowed = CATEGORY_MAPPINGS[selectedCategory] || [];
     return books.filter((book) => {
-      const g = getNormalizedGenre(book.genre);
+      const g = getNormalizedGenre(book.type?.value);
       return allowed.includes(g);
     });
   }, [books, selectedCategory]);
 
+  // Ordenação, a mesma da loja e das categorias (lib/productSort.js). Esta página não tinha
+  // nenhuma: ficava na ordem fixa que o servidor devolve, e quem quisesse ver a colecção pelo
+  // preço tinha de ir à loja e filtrar por colecção.
+  const [sortBy, setSortByState] = useState(DEFAULT_SORT);
+  const setSortBy = (v) => setSortByState(normalizeSort(v));
+  const [grouped, setGrouped] = useState(false);
+
+  const sortedBooks = useMemo(() => sortProducts(filteredBooks, sortBy), [filteredBooks, sortBy]);
+  const podeAgrupar = useMemo(() => canGroupByType(sortedBooks), [sortedBooks]);
+
   // Telemóvel: a coleção cresce ao deslizar, como a loja; desktop: inteira, como sempre.
   const catalog = useCatalogWindow({
-    items: filteredBooks,
+    items: sortedBooks,
     ready: !loading,
-    resetKey: `${slug || ''}|${selectedCategory}`,
+    resetKey: `${slug || ''}|${selectedCategory}|${sortBy}`,
   });
+
+  const grupos = useMemo(
+    () => (grouped && podeAgrupar ? groupByType(catalog.visible, sortBy) : []),
+    [grouped, podeAgrupar, catalog.visible, sortBy],
+  );
 
   return (
     <>
@@ -296,27 +291,63 @@ export default function CollectionsPage() {
                 )}
               </aside>
 
-              {/* Books Grid */}
-              <div className="flex-1">
-                {filteredBooks.length > 0 ? (
+              {/* Books Grid. `min-w-0` para a coluna poder encolher: sem isso, qualquer fila
+                  que deslize na horizontal alarga a página no telemóvel (achado 68). */}
+              <div className="flex-1 min-w-0">
+                {sortedBooks.length > 0 ? (
                   <>
-                    <div className={PRODUCT_GRID_CLASS}>
-                      {catalog.visible.map((book) => (
-                        <ProductCard
-                          key={book.id}
-                          product={bookToProduct(book)}
-                          onQuickView={setQuickView}
-                          onCartOpen={() => setIsCartOpen(true)}
-                        />
-                      ))}
-                    </div>
+                    <CatalogToolbar
+                      className="mb-6"
+                      total={sortedBooks.length}
+                      shownFrom={1}
+                      shownTo={catalog.visible.length}
+                      shownCount={catalog.visible.length}
+                      sortBy={sortBy}
+                      onSortChange={setSortBy}
+                      grouped={grouped}
+                      onGroupedChange={setGrouped}
+                      canGroup={podeAgrupar}
+                    />
+                    {grupos.length > 0 ? (
+                      <div className="space-y-10">
+                        {grupos.map((grupo) => (
+                          <section key={grupo.value} aria-labelledby={`grupo-col-${grupo.value}`}>
+                            <div className="mb-4 flex items-baseline gap-2 border-b border-border pb-2">
+                              <h2 id={`grupo-col-${grupo.value}`} className="text-lg font-semibold">{grupo.label}</h2>
+                              <span className="text-sm text-muted-foreground tabular-nums">{grupo.products.length}</span>
+                            </div>
+                            <div className={PRODUCT_GRID_CLASS}>
+                              {grupo.products.map((book) => (
+                                <ProductCard
+                                  key={book.id}
+                                  product={book}
+                                  onQuickView={setQuickView}
+                                  onCartOpen={() => setIsCartOpen(true)}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={PRODUCT_GRID_CLASS}>
+                        {catalog.visible.map((book) => (
+                          <ProductCard
+                            key={book.id}
+                            product={book}
+                            onQuickView={setQuickView}
+                            onCartOpen={() => setIsCartOpen(true)}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {catalog.isMobile && (
                       <CatalogInfiniteTail
                         sentinelRef={catalog.infinite.sentinelRef}
                         hasMore={catalog.infinite.hasMore}
                         loadMore={catalog.infinite.loadMore}
                         shown={catalog.visible.length}
-                        total={filteredBooks.length}
+                        total={sortedBooks.length}
                         onClearFilters={selectedCategory !== 'all' ? () => setSelectedCategory('all') : undefined}
                       />
                     )}

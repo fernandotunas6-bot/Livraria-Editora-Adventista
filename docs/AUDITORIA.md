@@ -1192,9 +1192,9 @@ sugestão inteligente, o organizador de produtos e os links do YouTube.
 
 **Como foi verificado.** A rede desta sessão não chega a `livrariaadventista.com` nem ao
 projecto Supabase (`connect_rejected` nos dois), por isso não houve leitura de produção nem
-advisors. O que foi feito: leitura do código, `npm test` (803, eram 753), `npm run lint`,
-`npm run build`, `scripts/verificar-segredos.mjs`, e **Chromium com a API do Supabase
-simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
+advisors. O que foi feito: leitura do código, `npm test` (809, eram 753), `npm run lint`,
+`npm run build`, `scripts/verificar-segredos.mjs`, **axe-core** e **Chromium com a API do
+Supabase simulada** — o build servido localmente com os cabeçalhos do `_headers` (CSP incluído) e as
 chamadas ao Supabase respondidas com um catálogo de teste. 13 ecrãs a 1280 e a 390 px: 0
 erros de consola, 0 pedidos falhados, 0 scroll horizontal, um `h1` por página.
 
@@ -1212,7 +1212,10 @@ erros de consola, 0 pedidos falhados, 0 scroll horizontal, um `h1` por página.
 | 81 | **A página de categoria estava atrás da loja em tudo.** Três critérios de ordenação em vez de oito, sem contagem de resultados, sem vista em lista, e o painel de filtros do telemóvel sem Escape, sem fechar ao tocar fora e sem `role="dialog"` — correcções que a loja recebeu em passagens anteriores e que esta página não acompanhou. Faltava-lhe também o `min-w-0` que foi o achado 68. | Média | ✅ barra partilhada |
 | 82 | **As sugestões ignoravam a colecção e o autor.** No site (`lib/discovery.js`) a semelhança era "mesma categoria ou mesmo autor", sem graus; no servidor (`suggestions.ts`) era só o género. As colecções desta livraria são séries — quem leu o primeiro volume quer o segundo —, e nenhum dos dois lados sabia disso. A ficha do livro também não tinha nenhuma prateleira de livros parecidos: só o histórico da pessoa e o catálogo inteiro. | Média (vendas) | ✅ pontuação por sinais |
 | 83 | **A chave do Google Maps Embed vai na resposta pública `/settings`.** É inevitável (vai no endereço da moldura), mas obriga a restringi-la por *referenciador HTTP* na Google Cloud, senão qualquer pessoa a usa e gasta a quota da conta. Não está escrito em lado nenhum que isso foi feito. | Média | ⏳ dono (Google Cloud) |
-| 84 | Em `SettingsTab`, o padrão de detectar colunas novas (`'coluna' in r`) não protege de facto: o `...form` no início do payload põe sempre a chave, e o spread condicional a seguir só a substitui. Vale para `about_top_image_url`, `unpaid_cancel_days` e `chat_ai_daily_limit`. Nunca mordeu porque as migrações estão aplicadas há muito. | Baixa | ⏳ (o campo novo desta passagem usa `delete`, que funciona) |
+| 84 | Em `SettingsTab`, o padrão de detectar colunas novas (`'coluna' in r`) não protege de facto: o `...form` no início do payload põe sempre a chave, e o spread condicional a seguir só a substitui. Vale para `about_top_image_url`, `about_team`, `unpaid_cancel_days` e `chat_ai_daily_limit`. Nunca mordeu porque as migrações estão aplicadas há muito. | Baixa | ✅ `lib/optionalColumns.js` |
+| 85 | **O que se punha no carrinho a partir de uma colecção desaparecia.** A página das colecções tinha a sua própria conversão de livro em produto, e chamava à variante `variant_<id>` em vez de `<id>-default`. O carrinho tira o id do livro do id da variante (`bookIdOf`, `replace(/-(default\|v\d+)$/, '')`): o id fabricado não bate com livro nenhum, a consulta não devolve linha, e a revalidação seguinte tira a linha do carrinho com a mensagem *"já não está disponível"*. | Alta (vendas) | ✅ `getCollectionProducts` |
+| 86 | Na mesma conversão: `inventory_quantity: book.stock \|\| 99` transformava um livro esgotado (stock 0) em **99 unidades** com "Comprar" activo (a recusa só aparecia no fim do checkout); não havia preço promocional (a colecção mostrava o preço de tabela e a loja o de promoção, para o mesmo livro); o preço era formatado à mão, noutro formato; e **sem descrição inventava uma** — "Este livro é uma leitura excelente que edifica a alma" — para os 100 livros do catálogo que ainda não têm texto. É o mesmo problema do achado 44. | Alta | ✅ idem |
+| 87 | A página das colecções não tinha ordenação nenhuma: ficava na ordem fixa do servidor (`-featured,title`). Quem quisesse ver uma colecção pelo preço tinha de ir à loja e filtrar por colecção. | Baixa | ✅ barra partilhada |
 
 ### Verificado sem problemas
 
@@ -1292,6 +1295,39 @@ As duas migrações primeiro (o Actions aplica-as no merge), depois a Edge Funct
 site. O código aguenta a ordem trocada: sem a coluna `video_url`, o campo não é enviado (ver
 `lib/bookSave.js`) e gravar livros continua a funcionar; sem a coluna `youtube`, o campo nem
 aparece no painel; a Edge Function antiga ignora o `collection_id` novo da `suggestable_books`.
+
+### Segunda ronda (mesmo dia): a página das colecções
+
+Os achados 85 a 87 apareceram ao fechar o 84. A página das colecções nunca tinha passado pela
+unificação do catálogo: carregava os livros em bruto e convertia-os em produtos com uma função
+própria, escrita à mão, com 20 linhas. Essa função dizia o contrário da verdadeira em quatro
+pontos, e um deles custava vendas todos os dias.
+
+O **85** é o pior e o menos visível. O carrinho identifica o livro pelo id da variante,
+tirando-lhe o sufixo (`<livro>-default`, `<livro>-v2`). A conversão das colecções inventava
+`variant_<livro>`, que não tem sufixo nenhum para tirar: o `bookIdOf` devolvia a string
+inteira, a consulta `in ('variant_…')` não encontrava nada, e o `refreshCart` concluía que o
+livro tinha sido apagado do catálogo. Resultado: **tudo o que um cliente pusesse no carrinho a
+partir de uma colecção saía de lá sozinho**, com uma mensagem a dizer que o livro já não
+estava disponível. Da loja e da ficha do produto nunca aconteceu, porque essas usam a
+conversão a sério.
+
+A correcção não é remendar a função: é não ter duas. O `EcommerceApi` ganhou o
+`getCollectionProducts`, que usa o `bookToProduct` de sempre, e a página passou a usá-lo. Com
+isso caem os quatro problemas de uma vez, e a colecção recebeu também a barra de ordenação
+(achado 87) e o `min-w-0` da coluna.
+
+O **84** fechou com `lib/optionalColumns.js`: a decisão de enviar ou não uma coluna que nasceu
+numa migração passa a viver num sítio só, com `delete` em vez de um spread que nunca apagava
+nada, e com testes.
+
+### Acessibilidade
+
+`axe-core` (WCAG 2 A/AA) nas sete páginas alteradas, a 1280 e a 390 px — início, loja, loja
+agrupada, categoria, colecção, ficha do produto e ficha com o separador de vídeo aberto:
+**0 violações nas 14 passagens**. De caminho, o CSP provou-se sozinho: a primeira tentativa de
+injectar o axe como script embutido foi recusada pelo navegador ("Executing inline script
+violates… `script-src`"), e teve de ser servido pela própria origem.
 
 ### Por fazer (dono)
 
