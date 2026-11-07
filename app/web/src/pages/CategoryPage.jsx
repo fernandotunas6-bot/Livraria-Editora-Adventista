@@ -13,7 +13,6 @@ import FilterPanel from '@/components/FilterPanel.jsx';
 import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
 import Footer from '@/components/Footer.jsx';
-import FooterCompact from '@/components/FooterCompact.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import PageBannerSlider from '@/components/PageBannerSlider';
 
@@ -195,13 +194,8 @@ const CategoryPage = () => {
         )}
       </main>
 
-      {/* Rodapé completo no computador; no telemóvel a versão curta, com o essencial que a
-          barra inferior não tem (privacidade, rastreio, lojas, devoluções). Ver
-          components/FooterCompact.jsx. */}
-      <div className="hidden md:block">
-        <Footer />
-      </div>
-      <FooterCompact />
+      {/* No telemóvel o rodapé curto, no computador o completo (ver components/Footer.jsx). */}
+      <Footer />
     </>
   );
 };

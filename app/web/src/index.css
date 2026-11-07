@@ -210,8 +210,14 @@
                 visibility 0.35s;
   }
 
+  /* Aberto, o menu desloca-se por dentro e acaba acima da barra de baixo: com sessão (e mais
+     ainda para a equipa) a lista passa da altura do ecrã, e com `overflow: hidden` e 90vh o
+     fim — "Terminar sessão", "Rastrear encomenda" — ficava cortado ou por baixo da barra. */
   .mobile-menu-container.open {
-    max-height: 90vh;
+    max-height: calc(100vh - 4rem - env(safe-area-inset-top, 0px) - var(--barra-navegacao-total, 0px));
+    max-height: calc(100dvh - 4rem - env(safe-area-inset-top, 0px) - var(--barra-navegacao-total, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     opacity: 1;
     visibility: visible;
     padding-bottom: 1.5rem;
@@ -399,6 +405,18 @@
    leva vírgulas, e o que saía dali não chegava a gerar regra nenhuma. */
 .float-above-bar {
   bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px) + var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px));
+  /* Acompanha a barra de baixo quando ela se esconde (300 ms, como ela). Só o `bottom` e as
+     cores: a escala e a opacidade são do framer-motion, e uma transição CSS por cima delas
+     atrasava cada fotograma da animação. */
+  transition-property: bottom, box-shadow, background-color, border-color;
+  transition-duration: 300ms;
+  transition-timing-function: ease-out;
+}
+
+/* O mesmo afastamento ao canto que o assistente do outro lado (16 px + a área segura do
+   telemóvel deitado), em vez de 24 px de um lado e 16 do outro. */
+.float-right-edge {
+  right: calc(1rem + env(safe-area-inset-right, 0px));
 }
 
 /* Para quem está preso ao fundo com `bottom`: afasta-se do indicador de gestos
@@ -414,9 +432,13 @@
 body {
   padding-bottom: var(--barra-navegacao-total, 0px);
 }
-@media (max-width: 600px) {
+/* Os avisos (sonner) sobem acima da barra de baixo e da barra de compra da ficha do livro:
+   o "Adicionado ao carrinho" aparecia por cima do botão de comprar. Até aos 768 px, o mesmo
+   corte do resto do telemóvel (o sonner muda de desenho aos 600, e entre um e outro os
+   avisos ficavam por cima da barra). Sem barra, ao menos a área segura do sistema. */
+@media (max-width: 767px) {
   [data-sonner-toaster][data-y-position=bottom] {
-    bottom: calc(var(--mobile-offset-bottom, 16px) + var(--barra-navegacao-total, 0px)) !important;
+    bottom: calc(var(--mobile-offset-bottom, 16px) + max(var(--barra-navegacao-total, 0px), env(safe-area-inset-bottom, 0px)) + var(--barra-compra, 0px)) !important;
   }
 }
 

@@ -19,6 +19,7 @@ import { UserMenu, GuestAuthButton } from '@/components/UserMenu';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { getProducts } from '@/api/EcommerceApi';
 import { buildSearchSuggestions } from '@/lib/searchUtils';
+import { addRecentSearch, clearRecentSearches, getRecentSearches } from '@/lib/recentSearches';
 import SiteNoticeBar from '@/components/SiteNoticeBar';
 import { useSiteNotice } from '@/hooks/useSiteNotice';
 
@@ -56,6 +57,8 @@ const Header = ({ onCartOpen, pinned = false }) => {
   const [searchCatalog, setSearchCatalog] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  // O que se procurou antes, neste aparelho: aparece com o campo vazio (lib/recentSearches.js).
+  const [recentSearches, setRecentSearches] = useState(() => getRecentSearches());
   const searchInputRef = useRef(null);
   const headerRef = useRef(null);
 
@@ -85,6 +88,24 @@ const Header = ({ onCartOpen, pinned = false }) => {
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus();
   }, [searchOpen]);
+
+  // O menu fecha ao mudar de página (também pela barra de baixo, que não passa por aqui) e com
+  // a tecla Escape.
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false); };
+    document.addEventListener('keydown', onKey);
+    // Com o menu aberto, a página de trás fica quieta (o menu desloca-se por dentro). Isto
+    // também tira de cena o "Voltar ao topo" (ver usePageScrollLocked).
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      body.style.overflow = prevOverflow;
+    };
+  }, [mobileOpen]);
 
   // As barras que colam por baixo (as letras do catálogo, os filtros da loja) precisam de
   // saber onde o cabeçalho acaba, senão colam ao topo e ficam escondidas por trás dele.
@@ -137,6 +158,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
     e.preventDefault();
     const query = search.trim();
     if (!query) return;
+    setRecentSearches(addRecentSearch(query));
     navigate(`/shop?search=${encodeURIComponent(query)}`);
     setMobileOpen(false);
     setSearchOpen(false);
@@ -146,6 +168,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
 
   const chooseSearchSuggestion = (suggestion) => {
     setSearch(suggestion.texto);
+    setRecentSearches(addRecentSearch(suggestion.texto));
     setSearchSuggestionsOpen(false);
     setActiveSuggestion(-1);
     if (suggestion.tipo === 'livro' && suggestion.id) {
@@ -154,6 +177,14 @@ const Header = ({ onCartOpen, pinned = false }) => {
       navigate(`/shop?search=${encodeURIComponent(suggestion.texto)}`);
     }
     setSearchOpen(false);
+  };
+
+  const searchRecent = (term) => {
+    setSearch(term);
+    setRecentSearches(addRecentSearch(term));
+    navigate(`/shop?search=${encodeURIComponent(term)}`);
+    setSearchOpen(false);
+    setSearchSuggestionsOpen(false);
   };
 
   const closeMobile = () => setMobileOpen(false);
@@ -191,6 +222,16 @@ const Header = ({ onCartOpen, pinned = false }) => {
           <div className="container-custom flex h-14 items-center justify-between gap-3">
             <BrandLogo variant="light" collapseToIcon />
             <div className="flex items-center gap-1">
+              {/* A pesquisa saiu da barra de baixo: no topo da página tem de estar à mão. */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full text-white hover:bg-white/15"
+                onClick={openHeaderSearch}
+                aria-label="Abrir pesquisa"
+              >
+                <Search className="h-5 w-5" aria-hidden="true" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -219,6 +260,15 @@ const Header = ({ onCartOpen, pinned = false }) => {
           </div>
         </div>
       )}
+      {/* Por trás do menu aberto, um véu: tocar fora fecha-o (em vez de mexer na página por
+          baixo sem se ver), e o deslizar não passa para a página. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-[48] touch-none bg-black/40 animate-in fade-in duration-base lg:hidden"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
     <header
       ref={headerRef}
       onFocusCapture={() => setHasFocus(true)}
@@ -226,7 +276,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
       }}
       className={cn(
-        'safe-top top-0 z-40 border-b border-border shadow-sm glass-topbar text-white',
+        'safe-top top-0 border-b border-border shadow-sm glass-topbar text-white',
+        // Com o menu aberto, acima do véu e dos botões flutuantes (o chat está em z-45).
+        mobileOpen ? 'z-[49]' : 'z-40',
         // Onde a página abre com imagem de largura inteira, o cabeçalho sai do fluxo para
         // a poder descobrir: em `sticky` continuava a ocupar lugar, e escondê-lo deixava
         // uma faixa vazia por cima dela — exactamente o que se queria tirar.
@@ -360,6 +412,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
               <Input
                 ref={searchInputRef}
                 type="search"
+                enterKeyHint="search"
                 placeholder="Pesquisar livros, autores..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setSearchSuggestionsOpen(true); }}
@@ -394,6 +447,28 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 Pesquisar
               </Button>
             </div>
+            {searchOpen && !search.trim() && recentSearches.length > 0 && (
+              <div className="-mt-1 flex flex-wrap items-center gap-2 pb-4" aria-label="Pesquisas recentes" role="group">
+                <span className="text-xs text-white/60">Recentes:</span>
+                {recentSearches.map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => searchRecent(term)}
+                    className="inline-flex min-h-9 max-w-[12rem] items-center truncate rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white/90 hover:bg-white/15"
+                  >
+                    {term}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { clearRecentSearches(); setRecentSearches([]); searchInputRef.current?.focus(); }}
+                  className="inline-flex min-h-9 items-center px-2 text-xs font-medium text-white/60 underline-offset-2 hover:text-white hover:underline"
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
           </div>
           {searchOpen && searchSuggestionsOpen && searchSuggestions.length > 0 && (
             <ul
@@ -457,7 +532,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 key={to}
                 to={to}
                 onClick={closeMobile}
-                className={`px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                className={`flex min-h-11 items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   location.pathname === to
                     ? 'bg-[#22d3ee]/15 text-[#22d3ee]'
                     : 'text-white/80 hover:bg-white/5 hover:text-white'
@@ -474,7 +549,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 <Link
                   to="/profile"
                   onClick={closeMobile}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
                   <User className="h-4 w-4 text-[#22d3ee]" /> Minha Conta
@@ -483,7 +558,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   to="/profile"
                   state={{ tab: 'orders' }}
                   onClick={closeMobile}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
                   <ShoppingBag className="h-4 w-4 text-[#22d3ee]" /> Encomendas
@@ -491,7 +566,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 <Link
                   to="/profile?tab=notifications"
                   onClick={closeMobile}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
                   <Bell className="h-4 w-4 text-[#22d3ee]" /> Notificações
@@ -499,7 +574,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 <Link
                   to="/profile?tab=pdfs"
                   onClick={closeMobile}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                  className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
                   <FileDown className="h-4 w-4 text-[#22d3ee]" /> Os meus PDFs
@@ -508,7 +583,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <Link
                     to="/admin"
                     onClick={closeMobile}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
                     <LayoutDashboard className="h-4 w-4 text-[#22d3ee]" /> Painel Admin
@@ -518,7 +593,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <Link
                     to="/admin?tab=vendas-huambo"
                     onClick={closeMobile}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
                     <BarChart3 className="h-4 w-4 text-[#22d3ee]" /> Painel de Vendas
@@ -527,7 +602,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg hover:bg-destructive/10 text-destructive w-full text-left"
+                  className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg hover:bg-destructive/10 text-destructive w-full text-left"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
                   <LogOut className="h-4 w-4" /> Terminar Sessão
@@ -537,7 +612,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
             <Link
               to="/track"
               onClick={() => setMobileOpen(false)}
-              className="px-3 py-2.5 text-sm font-semibold rounded-lg hover:bg-white/5 text-[#22d3ee]"
+              className="flex min-h-11 items-center px-3 py-2.5 text-sm font-semibold rounded-lg hover:bg-white/5 text-[#22d3ee]"
               tabIndex={mobileOpen ? 0 : -1}
             >
               Rastrear Encomenda
@@ -545,7 +620,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
             <Link
               to="/privacidade"
               onClick={closeMobile}
-              className="flex items-center gap-2 px-3 py-2.5 text-xs font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
+              className="flex min-h-11 items-center gap-2 px-3 py-2.5 text-xs font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
               tabIndex={mobileOpen ? 0 : -1}
             >
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Política de privacidade
