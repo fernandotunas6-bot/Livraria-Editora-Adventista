@@ -80,6 +80,17 @@ export function privacySections(settings = {}) {
       ],
     },
     {
+      id: 'colportagem',
+      title: 'Colportagem',
+      blocks: [
+        { p: '**Candidatura a colportor.** Quem se candidata em [Ser colportor](/colportor/candidatura) dá-nos o nome, o telefone, o email (opcional), a província, o município, a igreja, o pastor ou ancião que o recomenda, como quer trabalhar, as horas por semana, a escola (se for estudante) e, se quiser, a motivação. Usamo-los para avaliar a candidatura e partilhamo-los com o pastor do distrito para confirmar a recomendação. A equipa pode apagar uma candidatura que não foi aprovada, e pode pedir-nos que a apaguemos.' },
+        { p: '**Colportores aprovados.** Guardamos o código de colportor, a ligação à conta, os livros entregues e devolvidos, os relatórios semanais (horas, visitas, vendas), a conta corrente e os pagamentos, para gerir a consignação e pagar as percentagens. Só a equipa com a permissão de Colportagem vê estes dados; cada colportor vê os seus na [área do colportor](/colportor).' },
+        { p: '**Interessados.** No relatório semanal, o colportor pode registar o nome, o telefone e o bairro de quem lhe pediu estudos bíblicos, uma visita ou oração, com o acordo dessa pessoa, para a equipa o encaminhar ao pastor do distrito. Estes contactos só a equipa os vê.' },
+        { p: '**Compras com o código de um colportor.** Se comprar pelo link de um colportor ou escrever o código dele no checkout, a encomenda fica ligada a ele para lhe pagarmos a percentagem. O colportor vê apenas o número, a data, o valor e o estado da encomenda; nunca o seu nome, email, telefone ou morada. O código fica guardado no seu navegador durante 30 dias.' },
+        { p: '**Igrejas e pastores.** O registo das igrejas, dos distritos e dos pastores (nome, cargo, distrito e telefone) é usado pela equipa para organizar a colportagem. No formulário de candidatura aparecem só os nomes das igrejas e dos pastores de cada distrito, sem contactos.' },
+      ],
+    },
+    {
       id: 'partilha',
       title: 'Com quem partilhamos',
       blocks: [
@@ -107,6 +118,7 @@ export function privacySections(settings = {}) {
           'Encomendas e comprovativos de entrega: durante o tempo que a lei fiscal e comercial exige.',
           'Publicações da comunidade: até as apagar ou a sua conta ser apagada.',
           'Conversas do assistente sem conta e sem pedido de ajuda: 90 dias.',
+          'Candidaturas a colportor: enquanto estiverem em análise, ou até pedir que as apaguemos; fichas, relatórios e contas dos colportores: enquanto colaborar connosco e, depois, durante o tempo que a lei fiscal e comercial exige.',
           'Newsletter e campanhas: até deixar de as querer receber.',
           'Endereços IP para segurança: pouco tempo, apagados automaticamente.',
         ] },

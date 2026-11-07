@@ -15,6 +15,7 @@ import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
+import { captureReferral } from '@/lib/colporteurReferral';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -44,6 +45,8 @@ const CollectionsPage = lazy(() => import('@/pages/CollectionsPage.jsx'));
 const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
 const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
 const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
+const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx'));
+const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
@@ -134,6 +137,13 @@ function AuthRedirectNotice() {
   return null;
 }
 
+/** Guarda o código do colportor que vem no link (?c=CPT-0007) para o checkout. */
+function ColporteurReferralCapture() {
+  const { search } = useLocation();
+  useEffect(() => { captureReferral(search); }, [search]);
+  return null;
+}
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
@@ -161,6 +171,7 @@ function App() {
         <AuthDialogProvider>
         <ScrollToTop />
         <AuthRedirectNotice />
+        <ColporteurReferralCapture />
         <RouteErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -207,6 +218,12 @@ function App() {
               <Route path="/rastreio" element={<Navigate to="/track" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/perfil" element={<Navigate to="/profile" replace />} />
+
+              {/* Colportagem: o link de candidatura é próprio, para quem se quer tornar colportor. */}
+              <Route path="/colportor" element={<ColporteurAreaPage />} />
+              <Route path="/colportor/candidatura" element={<ColporteurApplyPage />} />
+              <Route path="/ser-colportor" element={<Navigate to="/colportor/candidatura" replace />} />
+              <Route path="/colportores" element={<Navigate to="/colportor/candidatura" replace />} />
 
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin.html" element={<Navigate to="/admin" replace />} />
