@@ -112,12 +112,32 @@ create trigger security_audit_log_no_truncate
   for each statement execute function private.security_audit_log_no_truncate();
 
 -- O aviso novo.
-alter table public.staff_notifications drop constraint if exists staff_notifications_kind_check;
-alter table public.staff_notifications add constraint staff_notifications_kind_check
-  check (kind = any (array[
-    'new_order', 'support', 'order_stuck', 'order_problem', 'order_confirmed', 'payment_reported',
-    'order_overdue', 'order_unacknowledged', 'ticket_sla', 'escalation', 'ops_test', 'security'
-  ]));
+-- O tipo novo de aviso ('security') junta-se aos que a regra já tiver, em vez de reescrever a
+-- lista: outros PRs acrescentam tipos à mesma regra (a colportagem, por exemplo), e uma lista
+-- fixa aqui apagava os deles conforme a ordem de publicação.
+do $$
+declare
+  v_def text;
+  v_kinds text[];
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conrelid = 'public.staff_notifications'::regclass and c.conname = 'staff_notifications_kind_check';
+  -- Os valores aparecem como ARRAY['a'::text, …] ou como '{a,b}'::text[]: lêem-se os dois.
+  select coalesce(array_agg(distinct coalesce(m[1], m[2])), array[]::text[]) into v_kinds
+  from regexp_matches(coalesce(v_def, ''), '''([a-z_]+)''|[{,]([a-z_]+)(?=[,}])', 'g') as m;
+  if v_def is not null and cardinality(v_kinds) = 0 then
+    raise exception 'staff_notifications_kind_check com um formato inesperado: %', v_def;
+  end if;
+  if not ('security' = any (v_kinds)) then
+    v_kinds := v_kinds || 'security'::text;
+  end if;
+  alter table public.staff_notifications drop constraint if exists staff_notifications_kind_check;
+  -- Escrita como ARRAY['a', 'b'], o mesmo formato das outras migrações.
+  execute format('alter table public.staff_notifications add constraint staff_notifications_kind_check check (kind = any (array[%s]))',
+    (select string_agg(quote_literal(k), ', ' order by k) from unnest(v_kinds) as k));
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 2. Ajudantes
@@ -251,15 +271,21 @@ begin
       when 'login' then 'o sistema de login'
       when 'agendador' then 'uma tarefa automática'
       else 'o servidor' end);
-    insert into public.staff_notifications (staff_id, kind, severity, title, body)
-    select p.id, 'security', 'critical',
-      left('Segurança: ' || v_summary, 120),
-      left(v_summary || ' — por ' || v_who || ', '
-        || to_char(now() at time zone 'Africa/Luanda', 'DD/MM/YYYY "às" HH24:MI') || '. '
-        || 'Se não foi alguém da equipa, mude já a palavra-passe dessa conta e veja o Registo de segurança no painel (Utilizadores).',
-        500)
-    from public.profiles p
-    where p.role = 'admin';
+    -- Bloco à parte: se o aviso falhar (por exemplo, outra migração tirou o tipo 'security' da
+    -- regra), a linha do registo já gravada fica; só o aviso se perde, com WARNING.
+    begin
+      insert into public.staff_notifications (staff_id, kind, severity, title, body)
+      select p.id, 'security', 'critical',
+        left('Segurança: ' || v_summary, 120),
+        left(v_summary || ' — por ' || v_who || ', '
+          || to_char(now() at time zone 'Africa/Luanda', 'DD/MM/YYYY "às" HH24:MI') || '. '
+          || 'Se não foi alguém da equipa, mude já a palavra-passe dessa conta e veja o Registo de segurança no painel (Utilizadores).',
+          500)
+      from public.profiles p
+      where p.role = 'admin';
+    exception when others then
+      raise warning 'Registo de segurança: o aviso aos administradores falhou para "%" (%).', v_summary, sqlerrm;
+    end;
   end if;
 exception when others then
   raise warning 'Registo de segurança: não foi possível registar "%" (%).', v_summary, sqlerrm;
