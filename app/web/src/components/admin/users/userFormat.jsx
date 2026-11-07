@@ -1,7 +1,7 @@
 // Formatação e etiquetas partilhadas pelo módulo de utilizadores.
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { mediaUrl } from '@/lib/supabaseClient';
+import { avatarSrc } from '@/lib/avatar';
 import { ROLES } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
@@ -63,7 +63,7 @@ export function CodeChip({ code }) {
 
 export function PersonAvatar({ person, className }) {
   const avatar = person?.avatar || '';
-  const src = !avatar ? '' : /^https?:\/\//.test(avatar) ? avatar : person?.id ? mediaUrl('users', person.id, avatar) : '';
+  const src = avatarSrc(person?.id, avatar);
   const label = (person?.name || person?.email || '?').trim();
   const initials = label.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
   return (

@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { pageTitle } from '@/lib/brand';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
+import { ordersWithBookQuery } from '@/lib/bookOrders';
 import { setOrderPaymentStatus, setOrderDeliveryStatus } from '@/api/PlatformApi';
 import { EDGE_FUNCTION_DESACTUALIZADA } from '@/lib/apiCompat';
 import { useAuth } from '@/hooks/useAuth';
@@ -198,13 +199,12 @@ const AdminPage = () => {
 
   const handleDeleteBook = async (b) => {
     // As encomendas guardam uma cópia dos itens; eliminar o livro não as apaga, mas convém avisar.
-    const { count } = await supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .contains('items', [{ book_id: b.id }]);
+    const { count, error: countError } = await ordersWithBookQuery(supabase, b.id);
     const warning = count
       ? `\n\nEste livro aparece em ${count} encomenda(s). As encomendas mantêm o título, mas o livro desaparece da loja, das listas de desejos e das avaliações. Para o tirar só de venda, ponha o stock a 0.`
-      : '';
+      : countError
+        ? '\n\nNão foi possível confirmar se este livro aparece em encomendas. Para o tirar só de venda, ponha o stock a 0.'
+        : '';
     if (!confirm(`Eliminar "${b.title}"? Esta acção não pode ser desfeita.${warning}`)) return;
     try {
       await pb.collection('stock_books').delete(b.id);

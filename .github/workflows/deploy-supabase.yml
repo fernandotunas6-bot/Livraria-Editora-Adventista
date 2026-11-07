@@ -42,8 +42,11 @@ jobs:
       - name: Ligar ao projecto
         run: supabase link --project-ref "$PROJECT_REF"
 
+      # `--include-all`: há PRs em paralelo com migrações do mesmo dia. Sem isto, quando um PR
+      # com migrações mais antigas entra depois de outro com mais recentes, o `db push` recusa-as
+      # ("inserted before the last migration on remote") e a publicação pára aqui.
       - name: Aplicar migrações
-        run: supabase db push
+        run: supabase db push --include-all
 
       - name: Publicar Edge Function "app"
         run: supabase functions deploy app --project-ref "$PROJECT_REF" --no-verify-jwt

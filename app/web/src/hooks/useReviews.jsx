@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { supabase, mediaUrl } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
+import { avatarSrc } from '@/lib/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { hasPurchasedBook } from '@/lib/purchase';
 
@@ -9,7 +10,7 @@ function toReview(row) {
     id: row.id,
     userId: row.user_id,
     userName: row.user_name || 'Leitor',
-    userAvatar: row.user_avatar ? mediaUrl('users', row.user_id, row.user_avatar) : null,
+    userAvatar: avatarSrc(row.user_id, row.user_avatar) || null,
     bookId: row.book_id,
     rating: row.rating,
     comment: row.comment,

@@ -97,9 +97,14 @@ class RouteErrorBoundaryView extends React.Component {
           <div className="max-w-md text-center">
             <h1 className="text-4xl font-bold text-foreground mb-4">Algo correu mal</h1>
             <p className="text-muted-foreground mb-6">A página não pôde ser carregada. Tente recarregar ou voltar à loja.</p>
-            <a href="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
-              Voltar ao Início
-            </a>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+                Recarregar a página
+              </button>
+              <a href="/" className="inline-flex items-center justify-center rounded-md border border-input px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                Voltar ao Início
+              </a>
+            </div>
           </div>
         </div>
       );
