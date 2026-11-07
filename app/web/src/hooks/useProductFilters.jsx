@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories, getBookCollections } from '@/api/EcommerceApi';
 import { BOOK_GENRES } from '@/lib/bookConstants';
@@ -17,7 +17,7 @@ import { DEFAULT_SORT, normalizeSort, sortProducts } from '@/lib/productSort';
  * acontecia ao `sort`, que funcionava à chegada e desaparecia a seguir, deixando o endereço
  * a dizer uma coisa e a lista a mostrar outra.
  */
-export function buildCatalogSearchParams(activeFilters, availableMaxPrice, sortBy = '') {
+export function buildCatalogSearchParams(activeFilters, availableMaxPrice, sortBy = '', defaultSort = DEFAULT_SORT) {
   const params = new URLSearchParams();
 
   if (activeFilters.categories.length > 0) params.set('category', activeFilters.categories.join(','));
@@ -37,8 +37,10 @@ export function buildCatalogSearchParams(activeFilters, availableMaxPrice, sortB
     params.set('maxPrice', activeFilters.maxPrice);
   }
 
-  // Só quando não é a de omissão: o endereço limpo é o mais comum e não precisa de ruído.
-  if (sortBy && sortBy !== DEFAULT_SORT) params.set('sort', sortBy);
+  // Só quando não é a de omissão **em vigor** (a das Configurações, se houver): o endereço
+  // limpo é o mais comum e não precisa de ruído — e escrever lá a predefinição prendia-a ao
+  // link, mesmo depois de a equipa a mudar no painel.
+  if (sortBy && sortBy !== normalizeSort(defaultSort)) params.set('sort', sortBy);
 
   Object.entries(activeFilters.options || {}).forEach(([key, values]) => {
     values.forEach((val) => params.append(key, val));
@@ -199,7 +201,23 @@ export function useProductFilters(initialCategory = null, { defaultSort = DEFAUL
   // quem chama (as Configurações da loja). Um valor estranho no endereço cai na de omissão em
   // vez de deixar a lista por ordenar.
   const [sortBy, setSortByState] = useState(() => normalizeSort(searchParams.get('sort'), defaultSort));
-  const setSortBy = useCallback((value) => setSortByState(normalizeSort(value, defaultSort)), [defaultSort]);
+
+  // A ordenação segue a predefinição das Configurações **até alguém escolher outra** — pelo
+  // endereço, pelo menu, ou ao voltar atrás para a lista onde estava.
+  //
+  // As Configurações chegam por pedido, depois do primeiro desenho; até lá o site usa os
+  // valores por omissão. Quem abre `/shop` directamente monta a loja antes de elas chegarem,
+  // e o `useState` acima já fixou "Destaques". Sem este seguimento, a "Ordenação por defeito"
+  // do painel só valia a quem chegasse à loja vindo de outra página — e ninguém percebia
+  // porque é que a mesma loja abria de duas maneiras.
+  const escolhida = useRef(searchParams.has('sort'));
+  const setSortBy = useCallback((value) => {
+    escolhida.current = true;
+    setSortByState(normalizeSort(value, defaultSort));
+  }, [defaultSort]);
+  useEffect(() => {
+    if (!escolhida.current) setSortByState(normalizeSort(defaultSort));
+  }, [defaultSort]);
 
   const urlSearch = searchParams.get('search') || '';
   useEffect(() => {
@@ -207,13 +225,13 @@ export function useProductFilters(initialCategory = null, { defaultSort = DEFAUL
   }, [urlSearch]);
 
   useEffect(() => {
-    const nextParams = buildCatalogSearchParams(activeFilters, availableFilters.maxPrice, sortBy);
+    const nextParams = buildCatalogSearchParams(activeFilters, availableFilters.maxPrice, sortBy, defaultSort);
     const nextQuery = nextParams.toString();
 
     if (searchParams.toString() !== nextQuery) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [activeFilters, availableFilters.maxPrice, sortBy, searchParams, setSearchParams]);
+  }, [activeFilters, availableFilters.maxPrice, sortBy, defaultSort, searchParams, setSearchParams]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((product) => {
