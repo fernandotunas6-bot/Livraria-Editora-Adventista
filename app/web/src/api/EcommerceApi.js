@@ -314,6 +314,7 @@ export async function initializeCheckout({
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
   deliveryGpsLat, deliveryGpsLng,
   idempotencyKey,
+  colporteurCode,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -345,6 +346,8 @@ export async function initializeCheckout({
       // A mesma em cada repetição da mesma compra: o servidor devolve a encomenda já criada
       // em vez de fazer outra (ver lib/checkoutIdempotency.js).
       ...(idempotencyKey ? { idempotencyKey } : {}),
+      // Código do colportor que trouxe a venda (o servidor confirma se é válido).
+      ...(colporteurCode ? { colporteurCode } : {}),
     }),
   });
 

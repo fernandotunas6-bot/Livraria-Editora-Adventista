@@ -42,19 +42,22 @@ export function Pill({ className, children }) {
   );
 }
 
-/** Código de cliente (CLI-) ou de funcionário (FUN-). Pequeno, monoespaçado, sem quebras de linha. */
+/** Código de cliente (CLI-), funcionário (FUN-) ou colportor (CPT-). Pequeno, monoespaçado, sem quebras de linha. */
+const CODE_KINDS = {
+  'FUN-': { title: 'Código de funcionário', cls: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  'CPT-': { title: 'Código de colportor', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300' },
+  'CLI-': { title: 'Código de cliente', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+};
 export function CodeChip({ code }) {
   if (!code) return null;
-  const staff = code.startsWith('FUN-');
+  const kind = CODE_KINDS[code.slice(0, 4)] || CODE_KINDS['CLI-'];
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-md border px-1.5 py-px font-mono text-[11px] leading-4 tabular-nums whitespace-nowrap',
-        staff
-          ? 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'
-          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        kind.cls,
       )}
-      title={staff ? 'Código de funcionário' : 'Código de cliente'}
+      title={kind.title}
     >
       {code}
     </span>

@@ -1,0 +1,93 @@
+import React, { useMemo, useState } from 'react';
+import { Download, Link2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CodeChip } from '@/components/admin/users/userFormat';
+import { displayAngolaPhone } from '@/lib/angolaPhone';
+import { downloadCsv, matchesQuery } from '@/lib/churchRegistryApi';
+import { CATEGORIES, STATUSES } from '@/lib/colporteurCommission';
+import { DataTable, NativeSelect, Pill, SearchBox, Toolbar } from '@/components/admin/igreja/registryUi';
+import ColporteurSheet from './ColporteurSheet';
+
+const OPEN = ['candidatura', 'em_analise'];
+
+/** Lista de candidaturas (mode="candidaturas") ou de colportores (mode="colportores"). */
+export default function ColporteursPanel({ mode, data, reg, idx, run }) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState(mode === 'candidaturas' ? 'open' : 'activo');
+  const [category, setCategory] = useState('');
+  const [district, setDistrict] = useState('');
+  const [openId, setOpenId] = useState(null);
+
+  const churchOf = (c) => idx.churchesById.get(c.church_id);
+  const districtOf = (c) => churchOf(c)?.district_id || '';
+  const rows = useMemo(() => data.colporteurs
+    .filter((c) => (mode === 'candidaturas' ? [...OPEN, 'recusado'].includes(c.status) : !OPEN.includes(c.status) && c.status !== 'recusado'))
+    .filter((c) => (status === 'all' ? true : status === 'open' ? OPEN.includes(c.status) : c.status === status))
+    .filter((c) => !category || c.category === category)
+    .filter((c) => !district || districtOf(c) === district)
+    .filter((c) => !query || matchesQuery(`${c.code || ''} ${c.full_name} ${c.phone} ${churchOf(c)?.name || c.church_other} ${idx.districtName(districtOf(c))}`, query))
+    .sort((a, b) => (mode === 'candidaturas' ? String(b.created).localeCompare(String(a.created)) : a.full_name.localeCompare(b.full_name))),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [data.colporteurs, mode, status, category, district, query, idx]);
+
+  const statusOptions = mode === 'candidaturas'
+    ? [['open', 'Por decidir'], ['candidatura', 'Novas'], ['em_analise', 'Em análise'], ['recusado', 'Recusadas'], ['all', 'Todas']]
+    : [['activo', 'Activos'], ['suspenso', 'Suspensos'], ['inactivo', 'Inactivos'], ['all', 'Todos']];
+
+  const exportCsv = () => downloadCsv(mode, ['Código', 'Nome', 'Telefone', 'Email', 'Igreja', 'Distrito', 'Município', 'Província', 'Categoria', 'Estado', 'Conta ligada', 'Desde', 'Candidatura'],
+    rows.map((c) => [c.code || '', c.full_name, c.phone, c.email, churchOf(c)?.name || c.church_other, idx.districtName(districtOf(c)),
+      idx.municipalityName(c.municipality_id), idx.provinceName(c.province_id), CATEGORIES[c.category]?.label, STATUSES[c.status]?.label,
+      c.profile_id ? 'sim' : 'não', c.start_date || '', String(c.created || '').slice(0, 10)]));
+
+  const current = data.colporteurs.find((c) => c.id === openId);
+  return (
+    <div>
+      <Toolbar>
+        <SearchBox value={query} onChange={setQuery} placeholder="Código, nome, telefone, igreja…" />
+        <NativeSelect value={status} onChange={setStatus} className="w-auto">
+          {statusOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </NativeSelect>
+        {mode === 'colportores' && (
+          <NativeSelect value={category} onChange={setCategory} className="w-auto">
+            <option value="">Todas as categorias</option>
+            {Object.entries(CATEGORIES).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
+          </NativeSelect>
+        )}
+        <NativeSelect value={district} onChange={setDistrict} className="w-auto max-w-[14rem]">
+          <option value="">Todos os distritos</option>
+          {[...reg.districts].sort((a, b) => a.name.localeCompare(b.name)).map((d) => <option key={d.id} value={d.id}>{d.name} · {idx.provinceName(d.province_id)}</option>)}
+        </NativeSelect>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={exportCsv}><Download className="mr-1.5 h-4 w-4" />Excel</Button>
+      </Toolbar>
+
+      <DataTable count={rows.length}
+        head={mode === 'candidaturas' ? ['Data', 'Nome', 'Telefone', 'Igreja · Distrito', 'Pede', 'Recomendação', 'Estado'] : ['Código', 'Nome', 'Telefone', 'Igreja · Distrito', 'Categoria', 'Estado', 'Conta']}
+        empty={mode === 'candidaturas' ? 'Sem candidaturas. Partilhe o link de candidatura (separador "Links").' : 'Ainda não há colportores aprovados.'}>
+        {rows.map((c) => {
+          const church = churchOf(c);
+          const st = STATUSES[c.status] || {};
+          return (
+            <tr key={c.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setOpenId(c.id)}>
+              <td className="px-3 py-2">{mode === 'candidaturas' ? new Date(c.created).toLocaleDateString('pt-AO') : <CodeChip code={c.code} />}</td>
+              <td className="px-3 py-2 font-medium">{c.full_name}</td>
+              <td className="px-3 py-2 whitespace-nowrap">{displayAngolaPhone(c.phone)}</td>
+              <td className="px-3 py-2">{church?.name || c.church_other || '—'}{church?.district_id ? <span className="text-muted-foreground"> · {idx.districtName(church.district_id)}</span> : ''}</td>
+              {mode === 'candidaturas' ? (
+                <>
+                  <td className="px-3 py-2">{CATEGORIES[c.requested_category]?.label}</td>
+                  <td className="px-3 py-2">{c.recommendation_ok ? <Pill tone="green">confirmada</Pill> : (c.recommended_by_pastor_id ? idx.pastorLabel(c.recommended_by_pastor_id) : (c.recommended_by_name || <Pill tone="amber">nenhuma</Pill>))}</td>
+                </>
+              ) : (
+                <td className="px-3 py-2">{CATEGORIES[c.category]?.label}</td>
+              )}
+              <td className="px-3 py-2"><Pill tone={st.tone}>{st.label}</Pill></td>
+              {mode === 'colportores' && <td className="px-3 py-2">{c.profile_id ? <Pill tone="green">ligada</Pill> : <span title="Envie o convite na ficha"><Link2 className="h-4 w-4 text-muted-foreground" /></span>}</td>}
+            </tr>
+          );
+        })}
+      </DataTable>
+
+      {current && <ColporteurSheet colporteur={current} data={data} reg={reg} idx={idx} run={run} onClose={() => setOpenId(null)} />}
+    </div>
+  );
+}

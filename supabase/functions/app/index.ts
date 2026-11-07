@@ -1995,6 +1995,11 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     order.delivery_gps_lng = gpsLng;
   }
   if (data.notes && rules.notesMax > 0) order.notes = clip(data.notes, rules.notesMax);
+  // Código do colportor que trouxe a venda (link ?c=CPT-0007 ou escrito no checkout). A base de
+  // dados confirma que é de um colportor activo (trigger orders_colportor_codigo); um código
+  // inválido é ignorado e nunca impede a compra. Sem a migração, o place_order ignora a coluna.
+  const colporteurCode = clip(data.colporteurCode, 20).toUpperCase();
+  if (/^CPT[-\s]?\d{1,6}$/.test(colporteurCode)) order.colporteur_code = colporteurCode;
   if (shippingMethod !== "pickup") {
     Object.assign(order, {
       delivery_province_id: clip(data.deliveryProvinceId, 40),
@@ -2489,6 +2494,44 @@ route("POST", "/contact-message", async ({ body, ip }) => {
   if (!isDeliverableEmail(email)) throw bad("Email inválido.");
   await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId());
   return json({ message: "Mensagem recebida! Entraremos em contacto em breve." });
+});
+
+// Candidatura a colportor (link público /colportor/candidatura). Não precisa de conta: o
+// registo por email ainda não entrega a confirmação. A validação a sério está na função da
+// base de dados (`colporteur_apply`, só service role); aqui ficam o limite por IP, o campo
+// isco para robôs e os tamanhos.
+route("POST", "/colportores/candidatura", async ({ body, ip }) => {
+  if (!await checkRateLimit("colportor", ip, 3)) throw tooMany("Demasiadas candidaturas seguidas. Aguarde um minuto.");
+  // Campo escondido no formulário: uma pessoa não o preenche.
+  if (String(body.website || "").trim()) return json({ message: "Candidatura recebida." });
+  const text = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+  const uuidOrEmpty = (v: unknown) => (/^[0-9a-f-]{36}$/i.test(String(v || "")) ? String(v) : "");
+  const payload = {
+    full_name: text(body.full_name, 120),
+    phone: text(body.phone, 30),
+    email: normalizeEmail(text(body.email, 160)),
+    church_id: uuidOrEmpty(body.church_id),
+    church_other: text(body.church_other, 120),
+    province_id: text(body.province_id, 40),
+    municipality_id: text(body.municipality_id, 40),
+    requested_category: text(body.requested_category, 20),
+    weekly_hours: Number.isFinite(Number(body.weekly_hours)) ? Math.round(Number(body.weekly_hours)) : null,
+    is_student: body.is_student === true,
+    school: text(body.school, 120),
+    pastor_id: uuidOrEmpty(body.pastor_id),
+    pastor_name: text(body.pastor_name, 120),
+    motivation: text(body.motivation, 1000),
+    consent: body.consent === true,
+  };
+  if (payload.email && !isDeliverableEmail(payload.email)) throw bad("Email inválido.");
+  const { data, error } = await db.rpc("colporteur_apply", { p: payload });
+  if (error) {
+    // As mensagens da função são para o candidato (telefone, igreja, consentimento, repetida).
+    const known = /Telefone|nome completo|igreja|Igreja|tratamento dos dados|Já existe|fechadas/.test(error.message || "");
+    if (!known) console.error("colporteur_apply", error.code, error.message);
+    throw bad(known ? error.message : "Não foi possível registar a candidatura. Tente mais tarde.");
+  }
+  return json({ message: "Candidatura recebida. A equipa da Livraria vai contactá-lo pelo telefone indicado.", id: (data as Row)?.id || null });
 });
 
 route("POST", "/contacts/sync-batch", async ({ auth, body }) => {
