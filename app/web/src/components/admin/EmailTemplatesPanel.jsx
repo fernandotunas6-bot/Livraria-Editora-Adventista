@@ -164,7 +164,8 @@ export default function EmailTemplatesPanel() {
   const blockers = [];
   if (ready && !ready.enabled) blockers.push('o envio de emails está desligado em Configurações');
   if (ready && !ready.configured) {
-    blockers.push(ready.provider === 'sendgrid' ? 'falta a chave do SendGrid' : 'falta o servidor SMTP');
+    // O servidor diz o que falta (fornecedor por API, porta SMTP bloqueada…); versões antigas não diziam.
+    blockers.push(ready.missing ? `falta: ${ready.missing}` : (ready.provider === 'sendgrid' ? 'falta a chave do SendGrid' : 'falta o servidor SMTP'));
   }
   if (ready && !ready.site_url) blockers.push('falta o endereço do site (os botões ficam sem destino)');
 

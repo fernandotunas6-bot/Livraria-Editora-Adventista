@@ -333,7 +333,10 @@ const authStore = {
   },
   clear() {
     setAuth('', null);
-    supabase.auth.signOut().catch(() => {});
+    // Só este aparelho. `signOut()` sem argumento é `scope: 'global'` no supabase-js (auth-js
+    // 2.118.0): carregar em "Sair" no telemóvel terminava a sessão em todos os aparelhos da conta.
+    // Terminar em todo o lado é o `logoutEverywhere` (Perfil → Segurança). Ideia do PR #3.
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
   },
   /** `true` quando o arranque já determinou se existe sessão (com ou sem utilizador). */
   get isReady() { return authGate.ready; },

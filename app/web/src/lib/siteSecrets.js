@@ -7,7 +7,7 @@
 // valores vêm nas colunas e gravam-se tal como estão.
 import { supabase } from '@/lib/supabaseClient';
 
-export const SECRET_KEYS = ['smtp_password', 'sendgrid_api_key', 'vapid_private_key', 'gemini_api_key', 'deepseek_api_key'];
+export const SECRET_KEYS = ['smtp_password', 'sendgrid_api_key', 'vapid_private_key', 'gemini_api_key', 'deepseek_api_key', 'brevo_api_key', 'cloudflare_email_token'];
 
 /** { chave: { set, updatedAt } }, ou `null` se a base de dados ainda não tem a migração. */
 export async function loadSecretStatus() {
