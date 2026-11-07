@@ -29,3 +29,6 @@ supabase/auth/.antes-*.json
 # CLI do Supabase (`.branches` aparece com `supabase db start` / `supabase start` locais)
 supabase/.temp/
 supabase/.branches/
+
+# Configuração da Pages Function da comunidade, gerada no pós-build (scripts/seo-catalogo.mjs)
+scripts/gerado/

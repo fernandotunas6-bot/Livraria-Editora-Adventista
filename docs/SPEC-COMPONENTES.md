@@ -100,13 +100,45 @@ O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A r
 
 ### Comunidade
 
-`/comunidade` (feed geral) e o separador **Discussão** da ficha (o mesmo feed filtrado pelo livro) usam `components/community/` (`CommunityFeed`, `PostCard`, `PostComposer`) e `hooks/useCommunity.jsx`.
+**Páginas e ficheiros:**
+- `/comunidade` (`pages/CommunityPage.jsx`): topo editorial, clube do livro do mês, temas à esquerda, feed ao centro e coluna lateral. No telemóvel é uma coluna, com os temas em chips que deslizam.
+- `/comunidade/p/:id` (`CommunityPostPage.jsx`): a publicação com todas as respostas.
+- `/comunidade/leitor/:key` (`ReaderProfilePage.jsx`): o perfil público do leitor.
+- O separador **Discussão** da ficha usa o mesmo `CommunityFeed`, já filtrado pelo livro.
+- Componentes em `components/community/`. Lógica em `hooks/useCommunity.jsx` (feed) e `hooks/useCommunityThread.jsx` (uma publicação). Funções puras em `lib/communityStyle.js`.
 
-- **Publicação:** texto (até 2000), livro opcional (pesquisa do catálogo), citação com página (escrita por quem publica: o sistema não tem o texto dos livros) e até 5 links. Respostas num só nível.
-- **Links de utilizadores:** só http(s) (`lib/communityLinks.js`), sempre com `rel="nofollow ugc noopener noreferrer"` e `target="_blank"`, mostrados pelo domínio com "link externo". Nunca `dangerouslySetInnerHTML`: o texto passa por `linkifySegments`.
-- **Autor:** nome do perfil e iniciais; nunca email nem foto (o endereço da foto teria o id da conta).
-- **Moderação:** "Denunciar" com motivo; à 3.ª denúncia fica oculta. A equipa decide no painel → Clientes → Comunidade.
-- Sem a migração `comunidade` aplicada, mostra "A comunidade abre em breve".
+**Visual:**
+- Paleta editorial dos emails, com os tokens `editorial-*` do Tailwind: `papel`, `tela`, `filete`, `ouro`, `ouro-texto`, `tinta`, `tinta-suave`, `marinho`, `petroleo`.
+- Títulos em Fraunces e filete dourado (`GoldRule`).
+- Contraste verificado: o dourado só aparece em texto como `ouro-texto`.
+
+**Filtros:** ficam no endereço (`?tema=&tipo=&ordem=&q=&livro=`), por isso um filtro partilha-se com o link. As ordenações são Recentes (as fixadas primeiro), Em alta e Sem resposta.
+
+**Cartão (`PostCard`):**
+- monograma com cor por leitor, e nome que leva ao perfil;
+- selo "Equipa da Livraria" e fita "Fixada pela equipa";
+- chips de tipo e tema, e "Respondida" nas perguntas com resposta oficial;
+- "Ler mais" depois de 6 linhas;
+- citação em destaque e cartão do livro com capa;
+- barra de acções: gostar, responder e partilhar (WhatsApp ou copiar). O menu ⋯ tem denunciar e apagar; a equipa tem também fixar, resposta oficial e ocultar.
+- No feed mostra a resposta oficial e as últimas; na página da publicação mostra todas, com o editor aberto.
+
+**Editor (`PostComposer`):** fechado, é uma barra com o monograma. O botão "Escrever" do topo procura-o pelo marcador `data-composer-open`. Aberto, tem o tipo (cartões), o tema, o livro (pesquisa com capas), a citação com página (obrigatória numa Citação) e até 5 links.
+
+**Links de utilizadores:**
+- só http(s) (`lib/communityLinks.js`), sempre com `rel="nofollow ugc noopener noreferrer"` e `target="_blank"`;
+- nunca `dangerouslySetInnerHTML`;
+- a base de dados recusa sites adultos, maliciosos e encurtadores.
+
+**Autor:** nome do perfil e monograma; nunca email nem foto. O endereço do perfil usa o `reader_key`, não o id da conta.
+
+**Avisos:** o sino (`components/NotificationBell.jsx`) junta os da comunidade e os do atendimento e recarrega a cada minuto enquanto a página está à vista. O perfil tem o separador **Notificações**, com o interruptor dos da comunidade. O push sai pela Edge Function.
+
+**Moderação:** "Denunciar" com motivo; à 3.ª denúncia a publicação fica oculta. O painel → Clientes → Comunidade tem os separadores Denúncias, Publicações, Temas, Clube do livro e Sites bloqueados.
+
+**Partilha:** a Pages Function `functions/comunidade/p/[id].js` escreve o título, o texto e a capa nas etiquetas `og:`.
+
+Sem as migrações aplicadas, o site mostra "A comunidade abre em breve".
 
 ## 9. Carrinho e checkout
 

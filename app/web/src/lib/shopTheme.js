@@ -107,7 +107,8 @@ export function applyShopTheme(settings = {}) {
   root.style.setProperty('--brand-primary-rgb', `${r}, ${g}, ${b}`);
   // A cor viva da marca fica para decoração: barras, bordas, fundos de áreas grandes.
   root.style.setProperty('--brand-primary-hsl', hexToHsl(primary));
-  root.style.setProperty('--brand-accent-hsl', hexToHsl(settings.accent_color || primary));
+  // A cor de destaque é o fundo do hover dos botões, com texto branco: também tem de se ler.
+  root.style.setProperty('--brand-accent-hsl', hexToHsl(ensureContrastOnWhite(settings.accent_color || primary)));
   root.style.setProperty('--brand-dark', dark);
 
   // `--brand-ink` é a variante legível, e é o `index.css` que decide onde ela entra: no tema

@@ -1,6 +1,18 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-03. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Comunidade literária premium (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
+
+- **Pedido do dono:** "tornar premium, com visual organizado e auditado, para ter uma comunidade literária grande". Escolhas: **temas + tipo** de publicação com filtros e ordenação; **clube do livro do mês**, **notificações** (sino e push), **página de cada publicação** e **perfis de leitor**; visual **editorial da marca + rede social**; moderação **publicar logo**, com a equipa a fixar e a marcar respostas oficiais.
+- **Base de dados** (migração `20261107060000_comunidade_premium`, **aplicada no merge**): temas (`community_topics`, 8 iniciais), `topic`/`kind`/`replies_count`/`last_activity_at`/`pinned_at`/`is_official` nas publicações, `profiles.reader_key` (o endereço público do leitor, nunca o `user_id`) e `profiles.community_notify`, `community_book_clubs`, avisos `community` em `customer_notifications` (respostas, resposta oficial, gostos agrupados por 6 h) e funções públicas novas (`community_list`, `community_thread`, `community_list_replies`, `community_reader`, `community_reader_posts`, `community_sidebar`, `community_current_club`). As funções antigas (`community_feed`…) ficam para o site anterior não partir durante o deploy; **retirar numa migração de limpeza** depois.
+- **Site:** `/comunidade` em 3 colunas (temas, feed, coluna lateral) com os filtros no endereço (`?tema=&tipo=&ordem=&q=&livro=`); `/comunidade/p/:id` e `/comunidade/leitor/:key`; sino no cabeçalho e separador **Notificações** no perfil.
+- **Painel:** Clientes → Comunidade com Denúncias, Publicações (fixar, ocultar), Temas, Clube do livro e Sites bloqueados.
+- **Push:** a Edge Function envia os avisos da comunidade só por push (nunca email). Respostas saem logo; gostos esperam 30 min para irem num só push. O agendador `avisos-equipa` passou a acordar a função também para estes.
+- **Partilha:** `functions/comunidade/p/[id].js` (Cloudflare Pages Function, na raiz do repositório) escreve título, texto e capa da publicação para o WhatsApp. A configuração é gerada pelo `scripts/seo-catalogo.mjs` em `scripts/gerado/` (fora do git), com os cabeçalhos de segurança do `_headers`; `_routes.json` limita a Function a `/comunidade/p/*`.
+- **Por confirmar depois do merge:** (1) no registo do deploy do Cloudflare, "Compiled Worker successfully" e a Function carregada; (2) colar o link de uma publicação no WhatsApp e ver a pré-visualização; (3) um push de resposta num telemóvel com push activo.
+- **Com o dono:** a política de privacidade deve passar a cobrir a comunidade (nome público, actividade e data de entrada no perfil de leitor). Pesquisa por `ilike`: chega para milhares de publicações; um índice trigram (`pg_trgm`) fica para quando houver volume.
+- Detalhe e verificação em [AUDITORIA.md](AUDITORIA.md), secção **9.13**.
 
 ## Comunidade de leitores (2026-11-06, ramo `claude/elegant-noether-ebflws`)
 

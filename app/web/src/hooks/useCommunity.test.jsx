@@ -10,17 +10,20 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => auth }));
 const api = {
   PAGE_SIZE: 20,
   isMissingTable: (e) => e?.code === '42P01',
-  loadPosts: vi.fn(),
+  listPosts: vi.fn(),
   loadReplies: vi.fn(),
   loadMyLikes: vi.fn(),
   createPost: vi.fn(),
   setLike: vi.fn(),
   reportPost: vi.fn(),
   deletePost: vi.fn(),
+  setPinned: vi.fn(),
+  setOfficial: vi.fn(),
+  setHidden: vi.fn(),
 };
 vi.mock('@/lib/communityApi', () => api);
 
-const { groupReplies, useCommunity } = await import('./useCommunity');
+const { groupReplies, nextCursor, useCommunity } = await import('./useCommunity');
 
 let root;
 let host;
@@ -41,7 +44,7 @@ beforeEach(() => {
   root = createRoot(host);
   auth.isAuthed = true;
   Object.values(api).forEach((f) => typeof f === 'function' && f.mockReset?.());
-  api.loadPosts.mockResolvedValue([post('p1'), post('p2')]);
+  api.listPosts.mockResolvedValue([post('p1'), post('p2')]);
   api.loadReplies.mockResolvedValue([post('r1', { parent_id: 'p1' })]);
   api.loadMyLikes.mockResolvedValue(['p2']);
 });
@@ -54,10 +57,46 @@ describe('groupReplies', () => {
   });
 });
 
+describe('nextCursor', () => {
+  it('usa a publicação mais antiga que não está fixada', () => {
+    expect(nextCursor([
+      { created: '2026-11-01', pinned: true }, { created: '2026-11-05' }, { created: '2026-11-03' },
+    ])).toBe('2026-11-03');
+    expect(nextCursor([{ created: '2026-11-02', pinned: true }])).toBe('2026-11-02');
+    expect(nextCursor([])).toBeNull();
+  });
+});
+
 describe('useCommunity', () => {
+  it('passa os filtros e pagina por posição fora de "recentes"', async () => {
+    api.listPosts.mockResolvedValue(Array.from({ length: 20 }, (_, i) => post(`x${i}`)));
+    await render({ topic: 'familia', kind: 'pergunta', sort: 'em_alta', query: 'lar' });
+    expect(api.listPosts).toHaveBeenLastCalledWith({ bookId: null, topic: 'familia', kind: 'pergunta', sort: 'em_alta', query: 'lar', before: null, offset: 0 });
+    expect(state.hasMore).toBe(true);
+    api.listPosts.mockResolvedValue([post('y1')]);
+    await act(async () => { await state.loadMore(); });
+    expect(api.listPosts).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'em_alta', offset: 20, before: null }));
+    expect(state.posts).toHaveLength(21);
+    expect(state.hasMore).toBe(false);
+  });
+
+  it('a equipa fixa, marca a resposta oficial (que passa para cima) e oculta', async () => {
+    api.loadReplies.mockResolvedValue([post('r1', { parent_id: 'p1' }), post('r2', { parent_id: 'p1', created: '2026-11-06T11:00:00Z' })]);
+    await render();
+    await act(async () => { await state.pin(state.posts[1]); });
+    expect(api.setPinned).toHaveBeenCalledWith('p2', true);
+    expect(state.posts[1].pinned).toBe(true);
+    await act(async () => { await state.markOfficial(state.replies.p1[1]); });
+    expect(api.setOfficial).toHaveBeenCalledWith('r2', true);
+    expect(state.replies.p1.map((r) => r.id)).toEqual(['r2', 'r1']);
+    await act(async () => { await state.hide(state.posts[0]); });
+    expect(api.setHidden).toHaveBeenCalledWith('p1', true);
+    expect(state.posts.map((p) => p.id)).toEqual(['p2']);
+  });
+
   it('carrega publicações, respostas e os gostos próprios', async () => {
     await render({ bookId: 'b1' });
-    expect(api.loadPosts).toHaveBeenCalledWith({ bookId: 'b1', before: null });
+    expect(api.listPosts).toHaveBeenCalledWith({ bookId: 'b1', topic: '', kind: '', sort: 'recentes', query: '', before: null, offset: 0 });
     expect(state.posts.map((p) => p.id)).toEqual(['p1', 'p2']);
     expect(state.replies.p1.map((r) => r.id)).toEqual(['r1']);
     expect(state.liked.has('p2')).toBe(true);
@@ -65,7 +104,7 @@ describe('useCommunity', () => {
   });
 
   it('sem a tabela (migração por aplicar) fica indisponível, sem erro', async () => {
-    api.loadPosts.mockRejectedValue(Object.assign(new Error('x'), { code: '42P01' }));
+    api.listPosts.mockRejectedValue(Object.assign(new Error('x'), { code: '42P01' }));
     await render();
     expect(state.unavailable).toBe(true);
     expect(state.error).toBe('');
@@ -81,7 +120,7 @@ describe('useCommunity', () => {
     api.createPost.mockResolvedValue(post('novo'));
     await act(async () => { err = await state.publish({ body: 'Olá https://a.ao' }); });
     expect(err).toBe('');
-    expect(api.createPost).toHaveBeenCalledWith('u1', expect.objectContaining({ body: 'Olá https://a.ao', links: ['https://a.ao/'] }));
+    expect(api.createPost).toHaveBeenCalledWith('u1', expect.objectContaining({ body: 'Olá https://a.ao', links: ['https://a.ao/'], kind: 'discussao', topic: null }));
     expect(state.posts[0].id).toBe('novo');
   });
 

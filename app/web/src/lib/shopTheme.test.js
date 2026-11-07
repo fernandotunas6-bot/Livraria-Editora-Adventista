@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, ensureContrastOnWhite, hexToRgb, relativeLuminance, resolveShopBgMode } from '@/lib/shopTheme';
+import { applyShopTheme, contrastRatio, ensureContrastOnWhite, hexToRgb, relativeLuminance, resolveShopBgMode } from '@/lib/shopTheme';
 
 const BRANCO = { r: 255, g: 255, b: 255 };
 const PRETO = { r: 0, g: 0, b: 0 };
@@ -125,5 +125,19 @@ describe('resolveShopBgMode', () => {
     expect(resolveShopBgMode({})).toBe('gradient');
     expect(resolveShopBgMode({ shop_bg_mode: '' })).toBe('gradient');
     expect(resolveShopBgMode({ shop_bg_mode: null })).toBe('gradient');
+  });
+});
+
+describe('applyShopTheme: cor de destaque', () => {
+  it('escurece a cor de destaque até o texto branco do hover se ler', () => {
+    applyShopTheme({ primary_color: '#1b365d', accent_color: '#0ea3c8' });
+    const hsl = document.documentElement.style.getPropertyValue('--brand-accent-hsl');
+    // A cor original (#0ea3c8) dá 2,96:1 com branco; a aplicada já não é essa.
+    expect(hsl).not.toBe('');
+    const [h, s, l] = hsl.split(' ').map((v) => parseFloat(v));
+    expect(h).toBeGreaterThan(180);
+    expect(h).toBeLessThan(200);
+    expect(s).toBeGreaterThan(50);
+    expect(l).toBeLessThan(35);
   });
 });
