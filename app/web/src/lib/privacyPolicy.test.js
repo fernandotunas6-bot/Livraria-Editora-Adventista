@@ -27,6 +27,14 @@ describe('privacySections', () => {
     expect(text).toMatch(/\[Falar connosco\]\(\/contact\)/);
   });
 
+  it('a colportagem diz o que o colportor nunca vê e para que serve a candidatura', () => {
+    const colp = privacySections().find((s) => s.id === 'colportagem');
+    const text = colp.blocks.flatMap((b) => b.list || [b.p]).join('\n');
+    expect(text).toMatch(/nunca o seu nome, email, telefone ou morada/);
+    expect(text).toMatch(/pastor do distrito para confirmar a recomendação/);
+    expect(text).toMatch(/\/colportor\/candidatura/);
+  });
+
   it('ids únicos para os links da página', () => {
     const ids = privacySections().map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);

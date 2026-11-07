@@ -222,7 +222,7 @@ export default function ColporteurApplyPage() {
 
               <label className="flex items-start gap-3 text-sm">
                 <Checkbox checked={form.consent} onCheckedChange={(v) => set({ consent: v === true })} className="mt-0.5" />
-                <span>Aceito que a Livraria Adventista use estes dados para tratar a candidatura e me contactar, e que os partilhe com o pastor do meu distrito.</span>
+                <span>Aceito que a Livraria Adventista use estes dados para tratar a candidatura e me contactar, e que os partilhe com o pastor do meu distrito (<Link to="/privacidade#colportagem" className="text-primary underline-offset-4 hover:underline">política de privacidade</Link>).</span>
               </label>
 
               {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
