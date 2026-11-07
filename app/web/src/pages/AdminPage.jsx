@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound, ShieldCheck } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -37,6 +37,7 @@ const SettingsTab = lazy(() => import('@/components/admin/SettingsTab'));
 const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
 const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
 const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
+const SecurityLogTab = lazy(() => import('@/components/admin/SecurityLogTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
 const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
@@ -418,6 +419,7 @@ const AdminPage = () => {
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
       (canManageSettings || canManageMarketing) && { value: 'notices', label: 'Faixa de aviso', icon: PanelTop },
       isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
+      isAdmin && { value: 'seguranca', label: 'Registo de segurança', icon: ShieldCheck },
     ] },
   ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
   const allowedTabs = tabGroups.flatMap((g) => g.tabs.map((t) => t.value));
@@ -587,6 +589,13 @@ const AdminPage = () => {
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {isAdmin && (
+              <TabsContent value="seguranca">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <SecurityLogTab />
                 </Suspense>
               </TabsContent>
             )}

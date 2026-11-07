@@ -23,10 +23,12 @@ begin
   update public.profiles set role = 'member', permissions = null where id in (a, b);
   insert into public.orders (customer_id, customer_email, order_number, items, total, status)
     values (b, email_b, 'TESTE-ISOLAMENTO', '[]'::jsonb, 1, 'pending') returning id into enc_b;
+  -- 'order': um dos tipos que a regra `customer_notifications_kind_check` aceita (o 'teste' de
+  -- antes passou a ser recusado com a migração 20261107030000 e o ficheiro deixou de correr).
   insert into public.customer_notifications (customer_id, kind, title, body)
-    values (b, 'teste', 'Teste', 'Notificação de B');
+    values (b, 'order', 'Teste', 'Notificação de B');
   insert into public.support_threads (customer_id, subject) values (b, 'Conversa de B') returning id into conversa_b;
-  insert into public.support_messages (thread_id, sender_id, body) values (conversa_b, b, 'Mensagem de B');
+  insert into public.support_messages (thread_id, sender_id, body, author_kind) values (conversa_b, b, 'Mensagem de B', 'customer');
   insert into public.secure_support_threads (customer_id, mls_group_id) values (b, 'teste-isolamento') returning id into segura_b;
 
   -- Como o cliente A, com sessão (aal1).
@@ -65,9 +67,16 @@ begin
     r := r || '14 B reabre a conversa: PERMITIDO | ';
   exception when others then r := r || '14 B reabre a conversa: negado ' || sqlstate || ' | '; end;
 
-  -- MFA: B passa a admin com um factor verificado.
+  -- MFA: B passa a admin com um factor verificado. A promoção corre SEM sessão: com a sessão de
+  -- B ainda definida, o gatilho `protect_profile_privileges` repunha o papel antigo (B não é
+  -- admin) e os casos 15, 16 e 18 mediam um cliente em vez de um admin.
   execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
   update public.profiles set role = 'admin' where id = b;
+  if not exists (select 1 from public.profiles where id = b and role = 'admin') then
+    raise exception 'RESULTADO PREPARAÇÃO FALHOU: B não ficou admin';
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated', 'aal', 'aal1')::text, true);
   begin
     insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at, secret)
       values (gen_random_uuid(), b, 'teste-isolamento', 'totp', 'verified', now(), now(), 'teste');

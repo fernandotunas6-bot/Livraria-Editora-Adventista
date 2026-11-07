@@ -86,6 +86,7 @@ const NOTIFICATION_KINDS = {
   ticket_sla: 'Prazo de pedido de ajuda',
   escalation: 'Escalada: ninguém assumiu',
   ops_test: 'Teste de avisos',
+  security: 'Segurança',
 };
 
 // Avisos da vigilância: levam ao Acompanhamento, onde se assume e trata.
@@ -264,6 +265,9 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       await refresh();
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
+      } else if (staff && notification.kind === 'security') {
+        // Aviso do registo de segurança (alteração a pagamentos, permissões, contactos…).
+        navigate('/admin?tab=seguranca');
       } else if (notification.href?.startsWith('/')) {
         navigate(notification.href);
       }

@@ -1755,7 +1755,10 @@ route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
       ? { delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []),
         timelineEvent("paid", "Pagamento confirmado", "", "")] }
       : {};
-    const { data, error } = await db.from("orders").update({ payment_status: status, ...timeline }).eq("id", id).select().single();
+    // `x-actor-id`: o registo de segurança fica a saber quem marcou o pagamento (com a service
+    // role, `auth.uid()` é nulo na base de dados). Migração 20261107130000_registo_de_seguranca.
+    const { data, error } = await db.from("orders").update({ payment_status: status, ...timeline }).eq("id", id)
+      .setHeader("x-actor-id", auth!.id).select().single();
     if (error) throw error;
     saved = data;
   }
@@ -3045,7 +3048,10 @@ async function dispatchStaffNotifications(limit = 100) {
     const { data: claimed } = await db.from("staff_notifications").update({ dispatched_at: nowISO() })
       .eq("id", n.id).is("dispatched_at", null).select("id");
     if (!claimed?.length) continue;
-    const path = n.thread_id ? "/admin?tab=support" : n.order_id ? "/admin?tab=acompanhamento" : "/admin";
+    const path = n.thread_id ? "/admin?tab=support"
+      : n.order_id ? "/admin?tab=acompanhamento"
+      : n.kind === "security" ? "/admin?tab=seguranca"
+      : "/admin";
     const result: Row = {};
     for (const channel of plan.channels) {
       try {
@@ -3337,6 +3343,31 @@ function safeOrigin(origin: unknown) {
   }
 }
 
+/**
+ * Registo de segurança (migração 20261107130000_registo_de_seguranca): acções sobre contas que
+ * não passam por uma tabela com gatilho — suspender, apagar, terminar sessões, gerar um link
+ * de acesso, mudar o email de outra pessoa. `x-actor-id` diz à base quem foi (só vale com a
+ * service role). Uma falha aqui não desfaz a acção já feita: fica nos registos da função.
+ */
+async function recordSecurity(
+  auth: Auth,
+  entry: { rowId: string; summary: string; changes?: Row; alert?: boolean; action?: "insert" | "update" | "delete"; table?: string },
+) {
+  try {
+    const { error } = await db.rpc("security_audit_record", {
+      p_table: entry.table || "profiles",
+      p_row_id: entry.rowId,
+      p_action: entry.action || "update",
+      p_summary: entry.summary,
+      p_changes: entry.changes || {},
+      p_alert: !!entry.alert,
+    }).setHeader("x-actor-id", auth?.id || "");
+    if (error) console.log("Registo de segurança:", error.message);
+  } catch (err) {
+    console.log("Registo de segurança:", err);
+  }
+}
+
 async function loadTarget(auth: Auth, id: unknown) {
   // A permissão é verificada antes de ir à base de dados: a ordem inversa respondia 404 para
   // um id inexistente e 403 para um existente, o que dizia a qualquer pessoa quais os ids de
@@ -3557,7 +3588,7 @@ route("POST", "/admin/users/create", async ({ auth, body }) => {
     phone: cleanText(body.phone, 40),
     role,
     permissions: role === "manager" ? cleanPermissions(body.permissions) : null,
-  }).eq("id", id);
+  }).eq("id", id).setHeader("x-actor-id", auth!.id);
   if (profileError) throw bad(profileError.message);
 
   let access = { link: "", emailSent: false };
@@ -3602,11 +3633,19 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
       patch.email = email;
       // Para o endereço antigo: se a mudança não foi pedida pelo cliente, é por lá que ele sabe.
       await notifyAccount(target.email, target.name, (b) => emailChangedLetter(b, target.name, email, true));
+      // Mudar o email de outra pessoa é o primeiro passo para entrar na conta dela: avisa os
+      // administradores. O gatilho da base não o distingue de o dono mudar o próprio email.
+      await recordSecurity(auth, {
+        rowId: target.id,
+        summary: `Email de uma conta mudado por ${auth!.email}: ${target.email || "—"} → ${email}`,
+        changes: { email: { de: target.email || null, para: email } },
+        alert: true,
+      });
     }
   }
 
   if (Object.keys(patch).length) {
-    const { error } = await db.from("profiles").update(patch).eq("id", target.id);
+    const { error } = await db.from("profiles").update(patch).eq("id", target.id).setHeader("x-actor-id", auth!.id);
     if (error) throw bad(error.message);
   }
   return json({ ok: true });
@@ -3629,6 +3668,11 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
     // (migração por aplicar) não pode fazer parecer que a suspensão falhou.
     await endSessions(target.id).catch((err) => console.log("Terminar sessões:", err?.message || err));
   }
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `${suspend ? "Conta suspensa" : "Conta reactivada"}: ${target.email || target.id}`,
+    alert: target.role !== "member",
+  });
   const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountStatusLetter(b, target.name, suspend));
   return json({ ok: true, suspended: suspend, email_sent: emailSent });
 });
@@ -3645,6 +3689,12 @@ route("POST", "/admin/users/access-link", async ({ auth, body }) => {
   // tem de o mandar por WhatsApp) e só a um administrador. O gestor fica a saber se o email
   // seguiu; se não seguiu, pede a um administrador.
   const canSeeLink = !access.emailSent && auth!.role === "admin";
+  // Com o link à vista, quem o pediu pode entrar na conta: isso avisa os administradores.
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `Link de acesso gerado para ${target.email}${canSeeLink ? " (mostrado no painel, o email não saiu)" : " (enviado por email ao dono)"}`,
+    alert: canSeeLink || target.role !== "member",
+  });
   return json({ emailSent: access.emailSent, link: canSeeLink ? access.link : "", link_withheld: !access.emailSent && !canSeeLink });
 });
 
@@ -3658,6 +3708,8 @@ route("POST", "/admin/users/delete", async ({ auth, body }) => {
   // As encomendas ficam (estão ligadas ao email, não à conta).
   const { error } = await db.auth.admin.deleteUser(target.id);
   if (error) throw bad(error.message);
+  // Para a equipa, o gatilho dos perfis já avisou (sem saber quem foi); isto diz quem.
+  await recordSecurity(auth, { rowId: target.id, action: "delete", summary: `Conta apagada: ${target.email || target.id}` });
   // Depois de apagada, e não antes: um aviso de encerramento de uma conta que afinal ficou
   // seria pior do que nenhum. O email e o nome já tinham sido lidos em `loadTarget`.
   const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountClosedLetter(b, target.name));
@@ -3682,6 +3734,10 @@ route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   const ended = await endSessions(target.id);
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `Sessões terminadas em todos os aparelhos: ${target.email || target.id} (${ended})`,
+  });
   let emailSent = false;
   if (body.suspicious === true) {
     const detail = cleanText(body.detail, 500);

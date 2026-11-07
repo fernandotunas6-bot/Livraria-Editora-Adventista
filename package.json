@@ -13,5 +13,8 @@
   },
   "workspaces": [
     "app/web"
-  ]
+  ],
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
+  }
 }
