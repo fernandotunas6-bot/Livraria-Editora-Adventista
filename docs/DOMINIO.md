@@ -43,6 +43,34 @@ duplicada da outra conta.
   O token do repositório não tem permissão para os endereços de destino.
 - Falta ainda: remover a zona `.ao` duplicada da outra conta (`randy`/`riya`).
 
+### Verificação de 2026-11-07 (06:40 UTC)
+
+Nada mudou: a troca de nameservers na AngoWeb ainda **não** apareceu na delegação do `.ao`.
+
+| Consulta | Resposta |
+|----------|----------|
+| `NS livrariaadventista.ao` | `randy.ns.cloudflare.com`, `riya.ns.cloudflare.com` (TTL 21600) — ainda a zona duplicada da outra conta |
+| `SOA livrariaadventista.ao` | `randy.ns.cloudflare.com. dns.cloudflare.com. 2419394032 ...` |
+| `A livrariaadventista.ao` | sem resposta (zona vazia) |
+| `A`/`CNAME www.livrariaadventista.ao` | NXDOMAIN |
+| `MX`/`TXT livrariaadventista.ao` | sem resposta — nem MX do Google, nem Email Routing |
+| `https://livrariaadventista.ao/` | não serve (não há endereço para onde ir) |
+| `NS livrariaadventista.com` | `cody.ns.cloudflare.com`, `hadlee.ns.cloudflare.com` — a conta certa |
+| `https://livrariaadventista.com/`, `www` e `...pages.dev` | **HTTP 200**, a loja continua de pé |
+
+Ou seja: o bloqueio é o mesmo do dia 6 e continua **só do lado do registador**. Enquanto o `.ao`
+delegar em `randy`/`riya`, a zona desta conta fica *pending*, o Pages não emite certificado e o
+Email Routing do `.ao` não pode ser activado. Nada a fazer no código nem no Cloudflare desta conta.
+
+Por fazer, pela ordem:
+
+1. AngoWeb: confirmar que os nameservers do domínio estão em `cody.ns.cloudflare.com` e
+   `hadlee.ns.cloudflare.com` — o painel dos `.ao` costuma mostrar os campos vazios depois de
+   gravar, por isso vale a pena abrir ticket a pedir confirmação do que está publicado.
+2. Apagar a zona `livrariaadventista.ao` duplicada na outra conta Cloudflare (a de `randy`/`riya`):
+   enquanto existir, pode voltar a prender a delegação.
+3. Só depois: zona *Active*, certificado do Pages, Email Routing e o passo 2 desta página (código).
+
 ## 1. Bloqueio: nameservers do `.ao` (só o dono, no painel da AngoWeb)
 
 No painel do registador do `.ao` (AngoWeb), trocar os nameservers do domínio para:
