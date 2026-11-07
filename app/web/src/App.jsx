@@ -28,6 +28,7 @@ const ContactPage = lazy(() => import('@/pages/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 const CommunityPage = lazy(() => import('@/pages/CommunityPage.jsx'));
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage.jsx'));
 const CommunityPostPage = lazy(() => import('@/pages/CommunityPostPage.jsx'));
 const ReaderProfilePage = lazy(() => import('@/pages/ReaderProfilePage.jsx'));
 const MaterialsPage = lazy(() => import('@/pages/MaterialsPage.jsx'));
@@ -193,6 +194,9 @@ function App() {
               <Route path="/track" element={<TrackOrderPage />} />
               <Route path="/sugestoes" element={<SuggestionsPage />} />
               <Route path="/comunidade" element={<CommunityPage />} />
+              <Route path="/privacidade" element={<PrivacyPage />} />
+              <Route path="/privacy" element={<Navigate to="/privacidade" replace />} />
+              <Route path="/politica-de-privacidade" element={<Navigate to="/privacidade" replace />} />
               <Route path="/comunidade/p/:id" element={<CommunityPostPage />} />
               <Route path="/comunidade/leitor/:key" element={<ReaderProfilePage />} />
               <Route path="/materiais" element={<MaterialsPage />} />

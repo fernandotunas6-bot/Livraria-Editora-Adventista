@@ -268,7 +268,12 @@ export default function PostComposer({
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {!compact && <p className="mr-auto text-xs text-editorial-tinta-suave">Fica público, com o nome do seu perfil.</p>}
+        {!compact && (
+          <p className="mr-auto text-xs text-editorial-tinta-suave">
+            Fica público, com o nome do seu perfil.{' '}
+            <a href="/privacidade#comunidade" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-editorial-tinta">O que fica visível</a>
+          </p>
+        )}
         {(onCancel || (collapsible && open)) && (
           <Button type="button" variant="ghost" size="sm" onClick={onCancel || (() => { setOpen(false); setError(''); })}>Cancelar</Button>
         )}

@@ -225,6 +225,12 @@ export default function AuthForm({
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="mr-2 h-4 w-4" aria-hidden="true" />}
           {mode === 'login' ? 'Entrar' : 'Criar conta'}
         </Button>
+        {mode === 'signup' && (
+          <p className="text-center text-xs text-muted-foreground">
+            Ao criar conta, os seus dados são tratados como explicado na{' '}
+            <a href="/privacidade" target="_blank" rel="noopener" className="font-medium text-primary underline underline-offset-2">política de privacidade</a>.
+          </p>
+        )}
       </form>
 
       <p className="text-center text-sm text-muted-foreground mt-5">

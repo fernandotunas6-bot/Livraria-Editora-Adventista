@@ -206,6 +206,7 @@ export function CommunitySidebar({ sidebar }) {
           <li>Três denúncias ocultam uma publicação até a equipa a rever.</li>
         </ul>
         <p className="mt-3 flex items-center gap-1.5 text-xs text-editorial-tinta-suave"><Users className="h-3.5 w-3.5" aria-hidden="true" /> Publica com o nome do seu perfil.</p>
+        <Link to="/privacidade#comunidade" className="mt-1.5 inline-block text-xs font-semibold text-editorial-petroleo underline underline-offset-2">O que fica público e como apagar</Link>
       </section>
     </aside>
   );

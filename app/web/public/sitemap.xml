@@ -12,4 +12,5 @@
   <url><loc>https://livraria-adventista.pages.dev/materiais</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://livraria-adventista.pages.dev/comunidade</loc><changefreq>daily</changefreq><priority>0.5</priority></url>
   <url><loc>https://livraria-adventista.pages.dev/shipping-returns</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://livraria-adventista.pages.dev/privacidade</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>
