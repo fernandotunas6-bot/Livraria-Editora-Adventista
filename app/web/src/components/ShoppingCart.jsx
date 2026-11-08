@@ -826,7 +826,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     <SignaturePad
                       ref={signatureRef}
                       label="Assinatura do comprador"
-                      hint="Desenhe a sua assinatura com o dedo ou rato, se quiser."
+                      hint="Desenhe a assinatura do seu Bilhete de Identidade, com o dedo ou o rato, se quiser."
                     />
                   </div>
                   )}
