@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import SafeLink from '@/components/SafeLink.jsx';
-import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, FileDown, ShieldCheck, BadgeCheck } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, Library, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useHeaderReveal } from '@/hooks/useHeaderReveal';
@@ -576,12 +576,12 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <Bell className="h-4 w-4 text-[#22d3ee]" /> Notificações
                 </Link>
                 <Link
-                  to="/profile?tab=pdfs"
+                  to="/profile?tab=biblioteca"
                   onClick={closeMobile}
                   className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
-                  <FileDown className="h-4 w-4 text-[#22d3ee]" /> Os meus PDFs
+                  <Library className="h-4 w-4 text-[#22d3ee]" /> A minha biblioteca
                 </Link>
                 {colporteur && (
                   <Link
