@@ -11,7 +11,7 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   - nos pagamentos, os pagamentos a fornecedores e à gráfica, e melhorar os dos clientes.
 
   Guia completo em [PRODUCAO.md](PRODUCAO.md).
-- **Junto ao main depois do #44, do #45 e do #47:** o ramo tinha um tempo real próprio (tópicos
+- **Junto ao main depois do #44, do #45, do #47 e do #41:** o ramo tinha um tempo real próprio (tópicos
   `painel:<área>`), que se perdeu de propósito: ficou o do main (`private.realtime_signal`, canal
   `painel`, `useSignal`). As migrações mudaram de número porque `20261108150000` já existia em
   produção (`versoes_da_app`) e seria saltada sem aviso; e o `170000` é do #41.

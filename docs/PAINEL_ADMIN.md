@@ -217,14 +217,15 @@ Só o que **pede acção**, nunca totais:
 | | Cargos (`cargos`) | administrador |
 | Contactos e campanhas | Contactos, Grupos, Campanhas, Histórico (`contacts`, `groups`, `campaigns`, `history`) | quem vê a secção |
 | Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados, Níveis dos leitores (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`, `niveis`) | quem vê a secção |
-| Colportagem | Resumo, Candidaturas, Colportores, Relatórios, Guias e stock, Contas, Reclassificação, Percentagens, Links, Definições (`resumo`, `candidaturas`, `colportores`, `relatorios`, `guias`, `contas`, `reclassificacao`, `percentagens`, `links`, `definicoes`) | quem vê a secção |
+| Colportagem | Resumo, Candidaturas, Colportores, Relatórios, Entregas, Guias e stock, Contas, Reclassificação, Percentagens, Links, Definições (`resumo`, `candidaturas`, `colportores`, `relatorios`, `entregas`, `guias`, `contas`, `reclassificacao`, `percentagens`, `links`, `definicoes`) | quem vê a secção |
 | Registo da Igreja | Resumo, Distritos, Igrejas, Pastores, Campos (`resumo`, `distritos`, `igrejas`, `pastores`, `campos`) | quem vê a secção |
 | | Importar (`importar`) | `manage_church_registry` (quem só gere colportores vê o registo só de leitura) |
 | Configurações | Identidade: Marca, Imagens, Tema visual · Loja: Catálogo e loja, Envio, Regras da loja · Comunicação: Contacto, Email push e chat, Barra superior, Rodapé · Aplicação: PWA (`brand`, `images`, `theme`, `shop`, `shipping`, `rules`, `contact`, `messaging`, `header`, `footer`, `pwa`) | quem vê a secção |
 | Integrações | Serviços, Modelos de email, Registo de envios (`apps`, `templates`, `logs`) | administrador |
 
 Os avisos de colportagem para a equipa abrem a vista certa: candidatura nova → `candidaturas`,
-relatório enviado → `relatorios`.
+relatório enviado → `relatorios`, entrega por preparar ou que ficou com a equipa → `entregas` (quem
+não vê a Colportagem vai às Encomendas).
 
 ### 3.3 Ecrã das permissões — `components/admin/users/PermissionAreas.jsx`
 A permissão **Ver relatórios** (`view_reports`, migração `20261108130000_cargos_e_ver_relatorios`)

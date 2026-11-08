@@ -143,7 +143,7 @@ describe('vistas (sub-secções)', () => {
 
   it('mantém os identificadores que as ligações e os separadores de antes já usam', () => {
     expect(ADMIN_SECTIONS.colportagem.views.map((v) => v.id)).toEqual(
-      ['resumo', 'candidaturas', 'colportores', 'relatorios', 'guias', 'contas', 'reclassificacao', 'percentagens', 'links', 'definicoes'],
+      ['resumo', 'candidaturas', 'colportores', 'relatorios', 'entregas', 'guias', 'contas', 'reclassificacao', 'percentagens', 'links', 'definicoes'],
     );
     expect(ADMIN_SECTIONS.settings.views.map((v) => v.id)).toEqual(
       ['brand', 'images', 'theme', 'shop', 'shipping', 'rules', 'contact', 'messaging', 'header', 'footer', 'pwa'],

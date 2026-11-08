@@ -292,6 +292,12 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
         navigate('/admin?tab=seguranca');
         return;
       }
+      // Preparar os livros, ou entrega que ficou com a equipa: o quadro das entregas mostra as duas.
+      // Quem não vê a Colportagem abre a encomenda na lista, como os outros avisos.
+      if (staff && notification.kind === 'colporteur_delivery' && (isAdmin || hasPermission('manage_colporteurs'))) {
+        navigate(adminHref('colportagem', 'entregas'));
+        return;
+      }
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
       } else if (staff && String(notification.kind).startsWith('colporteur_')) {
