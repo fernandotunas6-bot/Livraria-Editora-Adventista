@@ -22,6 +22,7 @@ import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, 
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
 
 const PER_PAGE = 20;
 
@@ -93,11 +94,21 @@ export default function UsersModule() {
   const { user: me, isAdmin } = useAuth();
   const { toast } = useToast();
 
-  const [scope, setScope] = useState('customers');
+  // Clientes ou equipa: as duas vistas da secção (lib/adminSections.js), com a aberta no
+  // endereço (/admin?tab=users&vista=team).
+  const sv = useSectionView('users');
+  const scope = sv.view === 'team' ? 'team' : 'customers';
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  // Ao mudar de vista, o filtro de estado e a página voltam ao princípio (os estados são outros).
+  const [prevScope, setPrevScope] = useState(scope);
+  if (prevScope !== scope) {
+    setPrevScope(scope);
+    setStatus('all');
+    setPage(1);
+  }
   const [data, setData] = useState({ items: [], total: 0, summary: {} });
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -147,8 +158,6 @@ export default function UsersModule() {
       setExporting(false);
     }
   };
-
-  const changeScope = (value) => { setScope(value); setStatus('all'); setPage(1); };
 
   /** Gestores só mexem em clientes; ninguém se suspende nem se apaga a si próprio. */
   const permissionsFor = useCallback((u) => {
@@ -338,21 +347,8 @@ export default function UsersModule() {
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        {/* Clientes ou equipa: um interruptor de duas posições sobre a mesma tabela (antes eram
-            separadores sem painel, e os leitores de ecrã anunciavam um painel que não existia). */}
-        <div role="group" aria-label="Mostrar" className="inline-flex h-9 w-fit shrink-0 items-center rounded-lg bg-muted p-1 text-muted-foreground">
-          {[['customers', 'Clientes'], ['team', 'Equipa']].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={scope === value}
-              onClick={() => changeScope(value)}
-              className={`inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${scope === value ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Clientes ou equipa: as vistas da secção (na barra lateral, quando está aberta). */}
+        <AdminViewNav state={sv} className="mb-0 shrink-0" />
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome, email, telefone ou código (CLI-, FUN-)…" className="pl-9" aria-label="Pesquisar utilizadores" />

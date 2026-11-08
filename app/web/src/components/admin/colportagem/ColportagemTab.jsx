@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, ClipboardList, Inbox, Link2, Percent, RefreshCw, Scale, Settings2, TrendingUp, Truck, Users } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminViewNav, useReportViewBadges, useSectionView } from '@/components/admin/shell/AdminViewNav';
 import { useToast } from '@/hooks/use-toast';
 import { indexRegistry, loadRegistry } from '@/lib/churchRegistryApi';
 import { loadBooksForColportage, loadColporteurAdmin, loadOperations } from '@/lib/colporteurApi';
@@ -26,8 +26,10 @@ export default function ColportagemTab() {
   const [ops, setOps] = useState(null);
   const [opsError, setOpsError] = useState('');
   const [books, setBooks] = useState([]);
-  // Sem escolha: abre nas candidaturas quando há alguma por decidir, senão no resumo.
-  const [tab, setTab] = useState(null);
+  // As vistas (Resumo, Candidaturas, Contas…) vêm do registo do painel e a aberta do endereço
+  // (/admin?tab=colportagem&vista=contas). Sem escolha: abre nas candidaturas quando há alguma
+  // por decidir, senão no resumo.
+  const sv = useSectionView('colportagem');
 
   const reload = useCallback(async () => {
     try {
@@ -60,6 +62,20 @@ export default function ColportagemTab() {
   }, [toast, reload]);
 
   const idx = useMemo(() => indexRegistry(reg), [reg]);
+  const pending = (data?.colporteurs || []).filter((c) => c.status === 'candidatura' || c.status === 'em_analise').length;
+  const active = (data?.colporteurs || []).filter((c) => c.status === 'activo').length;
+  const toValidate = ops ? ops.reports.filter((r) => r.status === 'enviado').length : 0;
+  const { explicit, view: currentView, setView } = sv;
+  useEffect(() => {
+    if (data && !explicit && pending > 0 && currentView === 'resumo') setView('candidaturas', { replace: true });
+  }, [data, explicit, pending, currentView, setView]);
+  // Os números das vistas: o que pede acção (também na barra lateral) e os colportores activos.
+  const viewBadges = {
+    candidaturas: { count: pending, tone: 'warning' },
+    relatorios: { count: toValidate, tone: 'warning' },
+    colportores: { count: active, tone: 'count' },
+  };
+  useReportViewBadges(sv, viewBadges);
   if (error) {
     return (
       <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm">
@@ -71,14 +87,12 @@ export default function ColportagemTab() {
   }
   if (!data) return <Spinner />;
 
-  const pending = data.colporteurs.filter((c) => c.status === 'candidatura' || c.status === 'em_analise').length;
-  const active = data.colporteurs.filter((c) => c.status === 'activo').length;
   const props = { data, reg, idx, run };
   const opsProps = { data, ops, books, run };
   const needsOps = (node) => (ops ? node : (
     <p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">{opsError || 'A carregar…'}</p>
   ));
-  const toValidate = ops ? ops.reports.filter((r) => r.status === 'enviado').length : 0;
+  const view = !explicit && pending > 0 && currentView === 'resumo' ? 'candidaturas' : currentView;
   return (
     <div>
       {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui os números e as acções. */}
@@ -86,30 +100,17 @@ export default function ColportagemTab() {
         <p className="text-sm text-muted-foreground"><strong className="font-semibold text-foreground">{active}</strong> colportores activos · <strong className="font-semibold text-foreground">{pending}</strong> candidaturas por decidir</p>
         <Button variant="ghost" size="sm" onClick={reload}><RefreshCw className="mr-1.5 h-4 w-4" />Actualizar</Button>
       </div>
-      <Tabs value={tab ?? (pending > 0 ? 'candidaturas' : 'resumo')} onValueChange={setTab}>
-        <TabsList className="mb-4 h-auto flex-wrap">
-          <TabsTrigger value="resumo"><BarChart3 className="mr-1.5 h-4 w-4" />Resumo</TabsTrigger>
-          <TabsTrigger value="candidaturas"><Inbox className="mr-1.5 h-4 w-4" />Candidaturas{pending > 0 && <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{pending}</span>}</TabsTrigger>
-          <TabsTrigger value="colportores"><Users className="mr-1.5 h-4 w-4" />Colportores ({active})</TabsTrigger>
-          <TabsTrigger value="relatorios"><ClipboardList className="mr-1.5 h-4 w-4" />Relatórios{toValidate > 0 && <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{toValidate}</span>}</TabsTrigger>
-          <TabsTrigger value="guias"><Truck className="mr-1.5 h-4 w-4" />Guias e stock</TabsTrigger>
-          <TabsTrigger value="contas"><Scale className="mr-1.5 h-4 w-4" />Contas</TabsTrigger>
-          <TabsTrigger value="reclassificacao"><TrendingUp className="mr-1.5 h-4 w-4" />Reclassificação</TabsTrigger>
-          <TabsTrigger value="percentagens"><Percent className="mr-1.5 h-4 w-4" />Percentagens</TabsTrigger>
-          <TabsTrigger value="links"><Link2 className="mr-1.5 h-4 w-4" />Links</TabsTrigger>
-          <TabsTrigger value="definicoes"><Settings2 className="mr-1.5 h-4 w-4" />Definições</TabsTrigger>
-        </TabsList>
-        <TabsContent value="resumo">{needsOps(<SummaryPanel {...opsProps} reg={reg} idx={idx} />)}</TabsContent>
-        <TabsContent value="candidaturas"><ColporteursPanel mode="candidaturas" {...props} /></TabsContent>
-        <TabsContent value="colportores"><ColporteursPanel mode="colportores" {...props} /></TabsContent>
-        <TabsContent value="relatorios">{needsOps(<ReportsPanel {...opsProps} />)}</TabsContent>
-        <TabsContent value="guias">{needsOps(<GuidesPanel {...opsProps} />)}</TabsContent>
-        <TabsContent value="contas">{needsOps(<AccountsPanel {...opsProps} />)}</TabsContent>
-        <TabsContent value="reclassificacao">{needsOps(<ReclassPanel {...opsProps} />)}</TabsContent>
-        <TabsContent value="percentagens"><CommissionPanel data={data} run={run} /></TabsContent>
-        <TabsContent value="links"><LinksPanel reg={reg} idx={idx} /></TabsContent>
-        <TabsContent value="definicoes"><SettingsPanel data={data} run={run} /></TabsContent>
-      </Tabs>
+      <AdminViewNav state={sv} badges={viewBadges} />
+      {view === 'resumo' && needsOps(<SummaryPanel {...opsProps} reg={reg} idx={idx} />)}
+      {view === 'candidaturas' && <ColporteursPanel mode="candidaturas" {...props} />}
+      {view === 'colportores' && <ColporteursPanel mode="colportores" {...props} />}
+      {view === 'relatorios' && needsOps(<ReportsPanel {...opsProps} />)}
+      {view === 'guias' && needsOps(<GuidesPanel {...opsProps} />)}
+      {view === 'contas' && needsOps(<AccountsPanel {...opsProps} />)}
+      {view === 'reclassificacao' && needsOps(<ReclassPanel {...opsProps} />)}
+      {view === 'percentagens' && <CommissionPanel data={data} run={run} />}
+      {view === 'links' && <LinksPanel reg={reg} idx={idx} />}
+      {view === 'definicoes' && <SettingsPanel data={data} run={run} />}
     </div>
   );
 }
