@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  BookOpen, Check, CreditCard, Loader2, Package, ReceiptText, RotateCcw, ShoppingBag, Store, Truck, XCircle,
+  BookOpen, Check, CreditCard, Library, Loader2, Package, ReceiptText, RotateCcw, ShoppingBag, Store, Truck, XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
@@ -76,7 +76,7 @@ function Progress({ order, stage }) {
   if (stage.step < 0) return null;
   return (
     <div className="mt-3">
-      <ol className="grid grid-cols-4 gap-1.5" aria-label="Progresso da encomenda">
+      <ol className={cn('grid gap-1.5', steps.length === 3 ? 'grid-cols-3' : 'grid-cols-4')} aria-label="Progresso da encomenda">
         {steps.map((label, i) => {
           const done = i <= stage.step;
           return (
@@ -101,6 +101,7 @@ function OrderCard({ order, covers, user, settings, upfront, onCancel, onReorder
   const stage = customerOrderStage(order, { upfront });
   const units = orderUnits(order);
   const pickup = order.shipping_method === 'pickup';
+  const digital = order.shipping_method === 'digital';
   const where = pickup ? orderPickupStore(order) : orderLocality(order, ', ');
   const finished = isOrderFinished(order);
   const trackState = { orderNumber: order.order_number, email: user?.email };
@@ -132,8 +133,8 @@ function OrderCard({ order, covers, user, settings, upfront, onCancel, onReorder
           </ul>
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              {pickup ? <Store className="h-3.5 w-3.5" aria-hidden="true" /> : <Truck className="h-3.5 w-3.5" aria-hidden="true" />}
-              {pickup ? `Levantamento${where ? ` · ${where}` : ''}` : `Entrega${where ? ` · ${where}` : ''}`}
+              {digital ? <Library className="h-3.5 w-3.5" aria-hidden="true" /> : pickup ? <Store className="h-3.5 w-3.5" aria-hidden="true" /> : <Truck className="h-3.5 w-3.5" aria-hidden="true" />}
+              {digital ? 'Edição digital · sem envio' : pickup ? `Levantamento${where ? ` · ${where}` : ''}` : `Entrega${where ? ` · ${where}` : ''}`}
             </span>
             {orderPaymentLabel(order) && (
               <span className="inline-flex items-center gap-1"><CreditCard className="h-3.5 w-3.5" aria-hidden="true" />{orderPaymentLabel(order)}</span>

@@ -162,6 +162,12 @@ export function authDialogCopy(reason = '', mode = 'signup') {
         description: 'A entrega ao domicílio precisa de conta, para acompanhar a encomenda e confirmar a recepção. O seu carrinho fica como está.',
         dismiss: 'Voltar ao carrinho',
       };
+    case 'digital':
+      return {
+        title: signup ? 'Crie conta para a edição digital' : 'Entre para comprar a edição digital',
+        description: 'O livro digital fica na biblioteca da sua conta: é lá que o abre e descarrega, em qualquer aparelho. O seu carrinho fica como está.',
+        dismiss: 'Voltar ao carrinho',
+      };
     case 'review':
       return {
         title: signup ? 'Crie conta para avaliar' : 'Entre para avaliar este livro',

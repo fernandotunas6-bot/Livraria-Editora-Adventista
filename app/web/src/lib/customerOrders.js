@@ -65,6 +65,8 @@ export function customerOrderStage(order, { upfront = false } = {}) {
   const delivery = String(order?.delivery_status || 'received');
   const payment = String(order?.payment_status || 'pending');
   const pickup = order?.shipping_method === 'pickup';
+  // Edição digital (migração edicoes_digitais): sem envio; paga, está na biblioteca.
+  const digital = order?.shipping_method === 'digital';
   const make = (key, label, hint, tone, step) => ({ key, label, hint, tone, className: TONE[tone], step });
 
   if (status === 'cancelled' || delivery === 'cancelled') {
@@ -72,19 +74,27 @@ export function customerOrderStage(order, { upfront = false } = {}) {
     return make('cancelled', 'Cancelada',
       paid > 0 ? 'Tem um reembolso por receber: a equipa trata dele.' : 'Não há nada a pagar.', 'cancelled', -1);
   }
+  if (digital && (status === 'delivered' || delivery === 'delivered')) {
+    return payment === 'refunded'
+      ? make('delivered', 'Reembolsada', 'O pagamento foi devolvido e o acesso ao livro fechou.', 'done', 2)
+      : make('delivered', 'Na biblioteca', 'Abra ou descarregue em Perfil → Biblioteca, em qualquer aparelho.', 'done', 2);
+  }
   if (status === 'delivered' || delivery === 'delivered') {
     return make('delivered', pickup ? 'Levantada' : 'Entregue',
       order?.delivery_confirmed_at ? 'Recepção confirmada. Obrigado pela sua compra!' : 'Obrigado pela sua compra!', 'done', 3);
   }
   if (payment === 'awaiting_confirmation') {
-    return make('verifying', 'Pagamento em verificação', 'Recebemos a sua referência: a equipa confirma e avisa-o.', 'waiting', 0);
+    return make('verifying', 'Pagamento em verificação', digital
+      ? 'Recebemos a sua referência: quando a equipa a confirmar, o livro abre na sua biblioteca.'
+      : 'Recebemos a sua referência: a equipa confirma e avisa-o.', 'waiting', digital ? 1 : 0);
   }
   if (payment === 'failed') {
     return make('payment_failed', 'Pagamento não encontrado', 'Veja o motivo no rastreio e indique outra referência.', 'action', 0);
   }
-  if (upfront && ['pending', 'partially_paid'].includes(payment)) {
-    return make('to_pay', payment === 'partially_paid' ? 'Falta pagar o resto' : 'Falta pagar',
-      'Pague e indique a referência: preparamos a encomenda logo a seguir.', 'action', 0);
+  if ((upfront || digital) && ['pending', 'partially_paid'].includes(payment)) {
+    return make('to_pay', payment === 'partially_paid' ? 'Falta pagar o resto' : 'Falta pagar', digital
+      ? 'Pague e indique a referência: o livro abre na sua biblioteca quando o pagamento for confirmado.'
+      : 'Pague e indique a referência: preparamos a encomenda logo a seguir.', 'action', digital && payment === 'partially_paid' ? 1 : 0);
   }
   if (delivery === 'out_for_delivery') return make('out', 'Saiu para entrega', 'Deve chegar hoje. Tenha o telefone por perto.', 'progress', 2);
   if (['shipped', 'in_transit'].includes(delivery)) {
@@ -99,9 +109,11 @@ export function customerOrderStage(order, { upfront = false } = {}) {
 
 /** Os passos da barra de progresso, pela ordem. */
 export const STAGE_STEPS = ['Registada', 'A preparar', 'A caminho', 'Entregue'];
-export const stageSteps = (order) => (order?.shipping_method === 'pickup'
-  ? ['Registada', 'A preparar', 'Pronta', 'Levantada']
-  : STAGE_STEPS);
+export const stageSteps = (order) => (order?.shipping_method === 'digital'
+  ? ['Registada', 'Pagamento', 'Na biblioteca']
+  : order?.shipping_method === 'pickup'
+    ? ['Registada', 'A preparar', 'Pronta', 'Levantada']
+    : STAGE_STEPS);
 
 /**
  * O que juntar ao carrinho para "Comprar de novo": um pedido por linha, com o id da variante

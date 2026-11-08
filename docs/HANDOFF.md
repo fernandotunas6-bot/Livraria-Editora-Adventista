@@ -2,6 +2,43 @@
 
 Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Trajeto da encomenda com GPS dos dois lados (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** "refinar também o trajeto da encomenda, GPS refinado dos dois lados, de quem
+  recebe e de quem envia". Guia em [TRAJETO_GPS.md](TRAJETO_GPS.md); achados 157–160 em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.20**.
+- **Quem recebe:** no checkout, a localização espera pela leitura mais precisa (até 15 s), diz a
+  precisão e afina-se no mapa. No rastreio, "Trajeto da entrega": o ponto de entrega e, a caminho,
+  quem a leva (primeiro nome), o caminho, a distância e o tempo estimado, de 15 em 15 s; "Afinar o
+  ponto" até ser entregue (o colportor é avisado).
+- **Quem entrega:** o colportor (Entregas) e a equipa (Encomendas, nas entregas que não foram para
+  um colportor) vêem o ponto do cliente, navegam (Google Maps, Waze) e partilham a posição depois de
+  "Saiu para entrega" — de 10 em 10 s quando anda, com o ecrã ligado. A página tem de ficar aberta
+  (um site não partilha em segundo plano).
+- **Privacidade:** a posição só aparece a caminho e com notícias da última hora; apaga-se 7 dias
+  depois (cron `trajetos-limpeza`).
+- **Base de dados:** migração `20261108211000_trajeto_gps`, **por aplicar** (vai no merge, com a
+  Edge Function: `/track/live`, `/track/destination`, a precisão no `/checkout`). Mapa: Leaflet
+  1.9.4 (dependência nova, carregada só com o mapa) e mosaicos do OpenStreetMap. Cenários:
+  `scripts/pglite/trajeto.mjs` (39).
+
+## Edições digitais à venda sem envio (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** a fase seguinte dos livros digitais, "como os outros sistemas fazem": vender a
+  edição digital sem pedir entrega nem levantamento, concluída ao pagar. Guia actualizado em
+  [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md); achados 151–156 em [AUDITORIA.md](AUDITORIA.md),
+  secção **9.19**.
+- **No painel:** «Edição digital» em cada edição (Versões) ou «Produto digital (PDF)» num produto sem
+  edições: sem stock nem envio. O PDF tem de estar publicado em Materiais (PDF), ligado ao produto
+  ou à edição. Em Pagamentos, "Disponível para" ganha "Edição digital".
+- **Na loja:** uma por conta, com conta obrigatória; "Já é seu" na ficha de quem a tem. Só digitais:
+  envio "Edição digital (sem envio)", sem portes, morada nem loja; só os pagamentos antecipados ou do
+  gateway. Paga → "Na biblioteca" (entregue sozinha); pagamento anulado → volta a esperar. Com
+  impressos, os portes contam só os impressos.
+- **Base de dados:** migração `20261108210000_edicoes_digitais`, **por aplicar** (vai no merge, com
+  a Edge Function: checkout, emails, vigilância e assistente). Cenários:
+  `scripts/pglite/edicoes.mjs` (50).
+
 ## Refinar: a Editora e as finanças no Início, e «Pagamentos e caixa» em tempo real (2026-11-08, ramo `claude/gracious-hamilton-kfrbg8`, depois do #48)
 
 - **Pedido do dono:** "continua a refinar", depois do deploy do #48 e da resolução dos PRs
@@ -117,12 +154,10 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Equipa:** Catálogo → Materiais (PDF) → **Acessos e pagamentos**: quem comprou, o pagamento e o
   acesso, com filtros e procura; "Confirmar o pagamento" abre a encomenda; bloquear (com motivo) e
   desbloquear, no registo de segurança; cada download fica registado.
-- **Base de dados:** migração `20261108160000_livros_digitais`, **por aplicar** (vai no merge, com a
-  Edge Function). Cenários: `scripts/pglite/digitais.mjs` (59).
-- **Fase seguinte (por decidir com o dono):** vender a edição digital sem pedir entrega nem
-  levantamento no checkout, concluída ao pagar. Mexe em mais de 20 sítios do circuito da encomenda
-  (checkout, `place_order`, avisos à equipa, vigilância, recibo, rastreio): ficou fora desta passagem
-  de propósito. Também por decidir: limite de downloads e marca d'água com o nome do comprador.
+- **Base de dados:** migração `20261108160000_livros_digitais`, aplicada em produção com o PR #47.
+  Cenários: `scripts/pglite/digitais.mjs` (59).
+- **Fase seguinte:** feita a seguir (edições digitais sem envio, acima). Por decidir: limite de
+  downloads e marca d'água com o nome do comprador.
 
 ## Telemóvel: entrar ao abrir a app, conta identificada e versões (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 
@@ -756,7 +791,6 @@ Ainda não publicada; vai no deploy depois do merge.
   - o cancelamento repõe o stock e desconta `sales_count`;
   - `customer_email` fica sempre em minúsculas.
 - O site usa só as marcas `stock_low` e `stock_alert` da base de dados (antes misturava "< 5" e "<= 5"). O botão "Marcar resolvido", que não resolvia nada, passou a "Repor stock" e abre o livro.
-
 
 ## Livros, imagens e encomendas — correcções (2026-11-01, sessão local)
 

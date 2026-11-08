@@ -11,6 +11,7 @@ import SignaturePad from '@/components/SignaturePad';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import { kz } from '@/lib/colporteurCommission';
 import { accountTopic } from '@/lib/realtimeSignals';
+import CourierShare from '@/components/delivery/CourierShare';
 import {
   DELIVERY_OFFER_STATUS, deliveryStep, loadMyDeliveries, respondDelivery, setAcceptsDeliveries, setMyLocation,
 } from '@/lib/colporteurApi';
@@ -200,12 +201,14 @@ export default function ColporteurDeliveries({ onChanged }) {
                   {c.reference && <p className="text-muted-foreground">Referência: {c.reference}</p>}
                   {c.relative_name && <p className="text-muted-foreground">Contacto próximo: {c.relative_name} {c.relative_phone}</p>}
                   {c.notes && <p className="text-muted-foreground italic">Nota: {c.notes}</p>}
-                  {c.gps && (
+                  {c.gps && !d.order_id && (
                     <a className="text-primary inline-flex items-center gap-1" href={`https://www.google.com/maps?q=${c.gps.lat},${c.gps.lng}`} target="_blank" rel="noreferrer">
                       <MapPin className="h-3.5 w-3.5" />Abrir a localização do cliente no mapa
                     </a>
                   )}
                 </div>
+                {/* O mapa até ao cliente e a partilha da posição (migração trajeto_gps). */}
+                {d.order_id && <CourierShare orderId={d.order_id} deliveryStatus={d.delivery_status} />}
                 <Items items={d.items} />
                 <p className="text-xs text-muted-foreground">
                   {d.source === 'stock' ? 'Entrega com os livros que tem consigo: saem da sua conta à consignação quando marcar "Entregue".'

@@ -20,6 +20,7 @@ import StockHistory from '@/components/admin/StockHistory';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { isYoutubeUrl } from '@/lib/youtube';
 import { normalizeVersions } from '@/lib/pricing';
+import { versionIsDigital } from '@/lib/digitalEditions';
 import ProductVideo from '@/components/ProductVideo';
 import { isUploadPending } from '@/lib/mediaUpload';
 
@@ -91,6 +92,12 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
       sample_pages: samplePages.filter(Boolean),
       // Preço e stock das variantes em número (ou null = os do produto): lib/pricing.js.
       versions: normalizeVersions(form.versions),
+      // Produto digital, só sem variantes (com elas, marca-se a edição). Vai quando está ligado
+      // ou quando o produto já tem a coluna: antes da migração edicoes_digitais, gravar um
+      // produto com uma coluna que não existe falhava.
+      ...(form.digital || (editing && 'digital' in editing)
+        ? { digital: !!form.digital && !(form.versions || []).length }
+        : {}),
       preview_enabled: !!form.preview_enabled,
       video_url: (form.video_url || '').trim(),
     });
@@ -257,8 +264,8 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                       <Input type="number" min="0" step="0.01" value={form.price} onChange={(e) => set('price', e.target.value)} required />
                     </div>
                     <div className="space-y-2">
-                      <Label>Stock *</Label>
-                      <Input type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} required />
+                      <Label>Stock {form.digital && !(form.versions || []).length ? <span className="font-normal text-muted-foreground">(sem stock: digital)</span> : '*'}</Label>
+                      <Input type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} required={!(form.digital && !(form.versions || []).length)} disabled={!!form.digital && !(form.versions || []).length} />
                     </div>
                     <div className="space-y-2">
                       <Label>Ano</Label>
@@ -275,6 +282,19 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                     <Label>Descrição</Label>
                     <RichTextEditor value={form.description} onChange={(v) => set('description', v)} placeholder={isBook ? 'Sinopse do livro...' : 'Descrição, materiais, medidas, cuidados...'} />
                   </div>
+                  {!(form.versions || []).length && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5" data-produto-digital>
+                      <Switch id="produto-digital" checked={!!form.digital} onCheckedChange={(v) => set('digital', v)} />
+                      <div>
+                        <Label htmlFor="produto-digital" className="cursor-pointer">Produto digital (PDF): sem stock nem envio</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Vende-se uma vez por conta, sem portes nem morada, e abre na biblioteca do cliente quando o pagamento é confirmado.
+                          Carregue o PDF em Catálogo → Materiais (PDF), «Para quem comprou», ligado a este produto. Com uma edição impressa
+                          e outra digital, marque a digital em {type.sized ? 'Tamanhos' : 'Versões'}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-marca/5 border border-marca/20">
                     <Switch checked={form.featured} onCheckedChange={(v) => set('featured', v)} />
                     <Label className="cursor-pointer">Destacar na homepage</Label>
@@ -440,6 +460,12 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                       ? 'Um tamanho por linha (ex.: S, M, L, XL, ou 6 anos, 8 anos), cada um com o seu stock e, se mudar, o seu preço. Em "Formato" pode pôr a cor.'
                       : isBook ? 'Defina edições alternativas (capa dura, pocket, ebook, etc.)' : 'Defina variantes (cor, modelo, tamanho), cada uma com o seu stock.'}
                   </p>
+                  {!type.sized && (
+                    <p className="text-xs text-muted-foreground">
+                      Edição digital: ligue «Edição digital» nessa edição (fica sem stock nem envio) e carregue o PDF em Catálogo → Materiais (PDF),
+                      «Para quem comprou», ligado a este produto e a essa edição. Sem o PDF publicado, a loja não a deixa comprar.
+                    </p>
+                  )}
                   {(form.versions || []).map((v, i) => (
                     <div key={i} className="p-3 rounded-xl border space-y-2 bg-muted/20">
                       <div className="grid sm:grid-cols-2 gap-2">
@@ -460,7 +486,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                           versions[i] = { ...versions[i], price: e.target.value };
                           set('versions', versions);
                         }} />
-                        <Input type="number" placeholder="Stock" value={v.stock ?? ''} onChange={(e) => {
+                        <Input type="number" placeholder={versionIsDigital(v) ? 'Sem stock (digital)' : 'Stock'} value={versionIsDigital(v) ? '' : v.stock ?? ''} disabled={versionIsDigital(v)} onChange={(e) => {
                           const versions = [...(form.versions || [])];
                           versions[i] = { ...versions[i], stock: e.target.value };
                           set('versions', versions);
@@ -471,6 +497,20 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                           set('versions', versions);
                         }} className="font-mono text-sm" />
                       </div>
+                      {!type.sized && (
+                        <label className="flex items-center gap-2 text-xs cursor-pointer" data-edicao-digital={versionIsDigital(v) ? 'sim' : 'nao'}>
+                          <Switch
+                            checked={versionIsDigital(v)}
+                            aria-label="Edição digital"
+                            onCheckedChange={(on) => {
+                              const versions = [...(form.versions || [])];
+                              versions[i] = { ...versions[i], digital: on, ...(on ? { stock: '' } : {}) };
+                              set('versions', versions);
+                            }}
+                          />
+                          Edição digital (PDF): sem stock nem envio, abre na biblioteca de quem a compra
+                        </label>
+                      )}
                       <Button type="button" variant="ghost" size="sm" className="text-destructive h-7" onClick={() => {
                         set('versions', (form.versions || []).filter((_, j) => j !== i));
                       }}>Remover edição</Button>

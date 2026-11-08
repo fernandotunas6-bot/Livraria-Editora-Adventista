@@ -15,6 +15,7 @@ import { ordersWithBookQuery } from '@/lib/bookOrders';
 import { setOrderDeliveryStatus } from '@/api/PlatformApi';
 import OrderPaymentsPanel from '@/components/admin/OrderPaymentsPanel';
 import OrderColporteurDelivery from '@/components/admin/OrderColporteurDelivery';
+import CourierShare from '@/components/delivery/CourierShare';
 import DeliveredPaymentDialog from '@/components/admin/DeliveredPaymentDialog';
 import { deliveryNeedsPayment, moneySummary } from '@/lib/payments';
 import { useAuth } from '@/hooks/useAuth';
@@ -1168,7 +1169,7 @@ const AdminPage = () => {
                             <p className="text-xs text-muted-foreground">
                               {new Date(o.created).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               {' · '}{unitsLabel(orderUnits(o))}
-                              {' · '}{o.shipping_method === 'pickup' ? `Levantamento${orderPickupStore(o) ? ` · ${orderPickupStore(o)}` : ''}` : `Entrega${orderLocality(o, ', ') ? ` · ${orderLocality(o, ', ')}` : ''}`}
+                              {' · '}{o.shipping_method === 'digital' ? 'Edição digital (sem envio)' : o.shipping_method === 'pickup' ? `Levantamento${orderPickupStore(o) ? ` · ${orderPickupStore(o)}` : ''}` : `Entrega${orderLocality(o, ', ') ? ` · ${orderLocality(o, ', ')}` : ''}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1239,7 +1240,7 @@ const AdminPage = () => {
                               )}
                               {o.shipping_method && (
                                 <p className="text-muted-foreground">
-                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${orderPickupStore(o) || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio'}
+                                  Envio: {o.shipping_method === 'pickup' ? `Levantamento — ${orderPickupStore(o) || 'Loja'}` : o.shipping_method === 'express' ? 'Expressa' : o.shipping_method === 'digital' ? 'Edição digital (sem envio): conclui-se sozinha quando o pagamento é confirmado' : 'Domicílio'}
                                 </p>
                               )}
                             </div>
@@ -1282,7 +1283,27 @@ const AdminPage = () => {
                             {['delivery', 'express'].includes(o.shipping_method) && (
                               <OrderColporteurDelivery order={o} onChanged={loadAll} />
                             )}
+                            {/* A equipa também entrega: o mapa até ao cliente e a partilha da posição (migração trajeto_gps). */}
+                            {['delivery', 'express'].includes(o.shipping_method) && o.status !== 'cancelled' && o.delivery_status !== 'delivered' && o.delivery_route !== 'colportor' && (
+                              <CourierShare orderId={o.id} deliveryStatus={o.delivery_status} />
+                            )}
 
+                            {o.shipping_method === 'digital' ? (
+                              // Edição digital (migração edicoes_digitais): sem passos de envio. Fica
+                              // concluída quando o pagamento é confirmado; aqui só se cancela.
+                              <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3" data-encomenda-digital>
+                                <p className="text-xs text-muted-foreground">
+                                  <strong className="text-foreground">Edição digital, sem envio.</strong> Não se prepara nem se entrega: fica concluída
+                                  sozinha quando o pagamento é confirmado, e o livro abre na biblioteca do cliente.
+                                </p>
+                                {o.status !== 'cancelled' && o.status !== 'delivered' && (
+                                  <Button size="sm" variant="outline" onClick={() => handleOrderStatus(o, 'cancelled')}>
+                                    {getOrderStatusLabel('cancelled')}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                            <>
                             <div className="space-y-2">
                               <p className="text-xs font-medium text-muted-foreground">Estado da encomenda</p>
                               <div className="flex flex-wrap gap-2">
@@ -1320,6 +1341,8 @@ const AdminPage = () => {
                                 onBlur={(e) => updateTracking(o, o.tracking_number, o.carrier, e.target.value)}
                               />
                             </div>
+                            </>
+                            )}
                           </div>
                         )}
                       </div>

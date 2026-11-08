@@ -101,6 +101,13 @@ describe('tamanho sem preço próprio', () => {
   });
 });
 
+describe('normalizeVersions — edição digital', () => {
+  it('a edição digital fica marcada e sem stock', () => {
+    expect(normalizeVersions([{ label: 'Edição digital', format: 'PDF', price: '3000', stock: '5', digital: true }, { label: 'Impresso', stock: '4', digital: false }]))
+      .toEqual([{ label: 'Edição digital', format: 'PDF', price: 3000, stock: null, digital: true }, { label: 'Impresso', price: null, stock: 4 }]);
+  });
+});
+
 describe('normalizeVersions', () => {
   it('grava números, ou null quando fica por preencher', () => {
     expect(normalizeVersions([{ label: 'M', format: '', price: '', stock: '', isbn: '' }, { label: 'G', price: '5200', stock: '7.9' }]))
