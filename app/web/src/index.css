@@ -409,6 +409,15 @@
     line-height: 1.625;
   }
 
+  /* O `max-w-prose` limita a caixa do parágrafo a 65 caracteres, mas deixa-a encostada à
+     esquerda: num bloco centrado (estados vazios, avisos, cabeçalhos) o texto ficava centrado
+     dentro dessa caixa e a caixa à esquerda — "Ainda não tem encomendas." aparecia desviado do
+     ícone e do botão por cima e por baixo. Dentro de um `.text-center`, a caixa também centra.
+     Está na camada base: qualquer `mx-*`/`ml-*` explícito continua a mandar. */
+  .text-center > p {
+    margin-inline: auto;
+  }
+
   .text-balance {
     text-wrap: balance;
   }

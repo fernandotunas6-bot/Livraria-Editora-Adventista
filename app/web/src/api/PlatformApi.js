@@ -138,6 +138,47 @@ export async function reportPaymentReference({ orderNumber, email = '', phone = 
   return data;
 }
 
+/** O cabeçalho da sessão, quando há (a Edge Function identifica a conta por ele). */
+async function sessionHeaders() {
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
+/**
+ * O cliente cancela uma encomenda sua, enquanto não está paga nem saiu da fila de preparação
+ * (regras em lib/customerOrders.js). Com sessão basta o número; sem sessão, número e email.
+ */
+export async function cancelOrder({ orderNumber, email = '', reason = '' }) {
+  const res = await fetch(`${APP_API_URL}/order/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await sessionHeaders()) },
+    body: JSON.stringify({ orderNumber, email, reason }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível cancelar a encomenda.');
+  return data;
+}
+
+/** Os dados da conta, para o próprio descarregar (direito de acesso). */
+export async function exportMyData() {
+  const res = await fetch(`${APP_API_URL}/account/export`, { headers: await sessionHeaders() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível juntar os seus dados.');
+  return data;
+}
+
+/** Apaga a conta da sessão. `confirmEmail`: o email da conta, escrito à mão. */
+export async function deleteMyAccount(confirmEmail) {
+  const res = await fetch(`${APP_API_URL}/account/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await sessionHeaders()) },
+    body: JSON.stringify({ confirmEmail }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Não foi possível apagar a conta.');
+  return data;
+}
+
 export async function getGeoProvinces() {
   const res = await fetch(`${APP_API_URL}/geo/provinces`);
   if (!res.ok) return [];

@@ -77,6 +77,7 @@ import {
 } from "./payments.ts";
 import { parseGatewayEvent, providerCode, verifyWebhookSignature } from "./paymentWebhook.ts";
 import { floatingPagesFrom } from "./floatingPages.ts";
+import { cleanCancelReason, customerCancelBlock } from "./customerCancel.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1562,6 +1563,8 @@ route("POST", "/track", async ({ body, ip }) => {
     estimated_delivery: order.estimated_delivery || "", payment_status: order.payment_status || "pending",
     timeline: order.delivery_timeline || [], created: order.created,
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
+    // O cliente ainda a pode cancelar sozinho (rota /order/cancel; regras em customerCancel.ts).
+    can_cancel: customerCancelBlock(order) === null,
   });
 });
 
@@ -4087,6 +4090,193 @@ route("POST", "/account/password-changed-notice", async ({ auth }) => {
     customer_name: profile?.name || "",
   });
   return json({ ok: true, notified: sent });
+});
+
+/** A encomenda é da conta da sessão: a mesma regra do RLS das encomendas (conta ou email da conta). */
+const sessionOwnsOrder = (auth: Auth, order: Row | null) =>
+  !!auth?.id && !!order && (order.customer_id === auth.id ||
+    (!!auth.email && normalizeEmail(order.customer_email || "") === normalizeEmail(auth.email)));
+
+/**
+ * O cliente cancela uma encomenda sua enquanto não está paga nem saiu da fila de preparação.
+ *
+ * Antes não podia: a mensagem do checkout ("Já tem 3 encomendas por pagar. Pague ou cancele
+ * uma…") mandava-o cancelar sem lhe dar maneira, e o contacto da loja era o único caminho.
+ * Com sessão, a encomenda tem de ser da conta; sem sessão, identifica-se como no rastreio
+ * (número e email). Quem decide é public.order_cancel_by_customer, com a linha bloqueada: o
+ * stock volta pelo gatilho da base (como num cancelamento no painel), a equipa é avisada para
+ * não a preparar e o cliente recebe o aviso do costume.
+ */
+route("POST", "/order/cancel", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("order-cancel", auth?.id || ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const orderNumber = String(body.orderNumber || "").trim().slice(0, 60);
+  const email = normalizeEmail(body.email || "");
+  if (!orderNumber) throw bad("Indique o número da encomenda.");
+
+  let order: Row | null = null;
+  if (auth?.id) {
+    const { data } = await db.from("orders").select("*")
+      .or(`order_number.eq.${JSON.stringify(orderNumber)},id.eq.${JSON.stringify(orderNumber)}`).limit(1);
+    if (sessionOwnsOrder(auth, data?.[0] || null)) order = data![0];
+  }
+  if (!order && email) order = await findOrderByNumberAndEmail(orderNumber, email);
+  // A mesma resposta para número inexistente e encomenda de outra pessoa.
+  if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
+  const block = customerCancelBlock(order);
+  if (block) throw bad(block);
+
+  const reason = cleanCancelReason(body.reason);
+  const { data: result, error } = await db.rpc("order_cancel_by_customer", { p_order_id: order.id, p_reason: reason });
+  if (error) throw bad(error.message);
+  const ref = String(result?.order_number || order.order_number || order.id);
+
+  // A equipa que recebe as encomendas novas (por loja, no levantamento) deixa de a preparar.
+  const storeId = await orderStoreId(order);
+  await notifyDuty({
+    duty: "new_order", storeId, kind: "order_cancelled", severity: "normal", orderId: order.id,
+    title: `Cancelada pelo cliente — ${ref}`,
+    body: `${order.customer_name || "O cliente"} cancelou a encomenda (${kwanza(order.total)}).`
+      + `${reason ? ` Motivo: ${reason}.` : ""} O stock voltou ao catálogo: não é para preparar.`,
+  });
+  runAfterResponse("Avisos à equipa (cancelada pelo cliente)", () => dispatchStaffNotifications());
+  const { data: saved } = await db.from("orders").select("*").eq("id", order.id).maybeSingle();
+  if (saved) {
+    try {
+      await notifyOrderStep(saved, "cancelled", {
+        description: `Cancelou a encomenda${reason ? ` (${reason})` : ""}. Não há nada a pagar. Se mudar de ideias, é só voltar a encomendar.`,
+      });
+    } catch (err) {
+      console.log("Aviso de cancelamento pelo cliente:", err);
+    }
+  }
+  return json({ ok: true, order_number: ref, message: "Encomenda cancelada. Não há nada a pagar." });
+});
+
+/**
+ * A loja da encomenda para escolher a equipa: a do levantamento (pelo id ou pelo nome, as
+ * activas primeiro), ou nenhuma na entrega. A mesma regra de private.order_store_id.
+ */
+async function orderStoreId(order: Row): Promise<string | null> {
+  const pickup = String(order.pickup_store || "").trim();
+  if (order.shipping_method !== "pickup" || !pickup) return null;
+  const { data } = await db.from("physical_stores").select("id, name, active").limit(200);
+  const match = (data || [])
+    .filter((st: Row) => String(st.id) === pickup || String(st.name || "").trim().toLowerCase() === pickup.toLowerCase())
+    .sort((a: Row, b: Row) => Number(b.active !== false) - Number(a.active !== false))[0];
+  return match ? String(match.id) : null;
+}
+
+/**
+ * Os dados da conta, para o próprio cliente descarregar (direito de acesso, Lei n.º 22/11).
+ * Lê com a chave de serviço o que é da conta — perfil, encomendas, pagamentos, lista de
+ * desejos, avaliações, comunidade, avisos, conversas de apoio, aparelhos e subscrições — sem o
+ * que é da equipa: notas internas das conversas, quem tratou cada encomenda e as imagens das
+ * assinaturas (só se diz se existem).
+ */
+route("GET", "/account/export", async ({ auth }) => {
+  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("account-export", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const email = normalizeEmail(auth.email || "");
+  const listOr = <T>(p: PromiseLike<{ data: T[] | null; error: unknown }>) => Promise.resolve(p).then((r) => r.data || []).catch(() => []);
+  const ORDER_EXPORT_COLUMNS = "id, order_number, created, updated, status, payment_status, delivery_status, items, total, shipping_cost, "
+    + "amount_paid, amount_refunded, paid_at, payment_method_name, payment_reference, shipping_method, pickup_store, "
+    + "customer_name, customer_email, phone, address, city, delivery_province, delivery_municipality, delivery_locality, "
+    + "delivery_street, delivery_reference, delivery_address_full, delivery_relative_name, delivery_relative_phone, "
+    + "notes, tracking_number, carrier, estimated_delivery, delivery_confirmed_at, delivery_recipient_name, "
+    + "checkout_signature_at, customer_feedback, customer_confirmed_at, delivery_timeline, customer_code, "
+    + "delivery_signature_data, checkout_signature_data";
+  // As encomendas da conta e as do email da conta (a regra do RLS), em duas leituras: o email num
+  // `or(...)` passaria por outro analisador, e o escape do `_` do LIKE podia perder-se pelo
+  // caminho — um email com `_` apanharia encomendas de outro parecido.
+  const [{ data: userData }, { data: profile }, byAccount, byEmail] = await Promise.all([
+    db.auth.admin.getUserById(auth.id),
+    db.from("profiles").select("name, email, phone, avatar, customer_code, staff_code, role, reader_key, community_notify, created, updated").eq("id", auth.id).maybeSingle(),
+    listOr(db.from("orders").select(ORDER_EXPORT_COLUMNS).eq("customer_id", auth.id).limit(1000)),
+    email ? listOr(db.from("orders").select(ORDER_EXPORT_COLUMNS).ilike("customer_email", likeExact(email)).limit(1000)) : [],
+  ]);
+  const orders = [...new Map([...byAccount, ...byEmail].map((o: Row) => [o.id, o])).values()]
+    .sort((a: Row, b: Row) => String(b.created).localeCompare(String(a.created)));
+  const orderIds = orders.map((o: Row) => o.id);
+  const [payments, wishlist, reviews, posts, likes, notices, threads, devices, newsletter, contacts, pushes] = await Promise.all([
+    orderIds.length
+      ? listOr(db.from("order_payments").select("order_id, kind, status, amount, method_name, reference, created, decided_at, decision_reason").in("order_id", orderIds).limit(2000))
+      : [],
+    listOr(db.from("wishlists").select("created, book_id, stock_books (title, book_code)").eq("user_id", auth.id).limit(1000)),
+    listOr(db.from("book_reviews").select("book_id, rating, comment, user_name, is_verified, created, updated").eq("user_id", auth.id).limit(1000)),
+    listOr(db.from("community_posts").select("id, parent_id, book_id, topic, kind, body, quote, quote_page, links, hidden, created, updated").eq("user_id", auth.id).limit(2000)),
+    listOr(db.from("community_likes").select("post_id, created").eq("user_id", auth.id).limit(5000)),
+    listOr(db.from("customer_notifications").select("kind, title, body, href, created_at, read_at").eq("customer_id", auth.id).order("created_at", { ascending: false }).limit(1000)),
+    listOr(db.from("support_threads").select("id, ticket_number, subject, status, channel, category, created_at, closed_at, csat_score, csat_comment").eq("customer_id", auth.id).limit(500)),
+    listOr(db.from("account_devices").select("description, first_seen, last_seen").eq("user_id", auth.id).limit(200)),
+    email ? listOr(db.from("newsletter").select("email, created").ilike("email", likeExact(email)).limit(5)) : [],
+    email ? listOr(db.from("contacts").select("name, email, phone, source, tags, created, marketing_opt_out_at").ilike("email", likeExact(email)).limit(20)) : [],
+    listOr(db.from("push_subscriptions").select("user_agent, created").eq("user", auth.id).limit(50)),
+  ]);
+  const threadIds = threads.map((t: Row) => t.id);
+  // As notas internas da equipa ("note") não são do cliente: ficam de fora, como no site.
+  const messages = threadIds.length
+    ? await listOr(db.from("support_messages").select("thread_id, author_kind, body, created_at").in("thread_id", threadIds).neq("author_kind", "note").order("created_at").limit(5000))
+    : [];
+  const user = (userData?.user || {}) as Row;
+  const ordersOut = orders.map((o: Row) => {
+    const { delivery_signature_data, checkout_signature_data, ...rest } = o;
+    return {
+      ...rest,
+      checkout_signature_present: !!checkout_signature_data,
+      delivery_signature_present: !!delivery_signature_data,
+      payments: payments.filter((p: Row) => p.order_id === o.id).map(({ order_id: _o, ...p }: Row) => p),
+    };
+  });
+  return json({
+    gerado_em: nowISO(),
+    explicacao: "Os dados da sua conta na Livraria Adventista. As imagens das assinaturas não vão neste ficheiro (só se diz se existem); pode pedi-las à loja. A política de privacidade está em /privacidade.",
+    conta: {
+      email: user.email || auth.email, criada_em: user.created_at || null, ultima_entrada: user.last_sign_in_at || null,
+      email_confirmado_em: user.email_confirmed_at || null, entrada_com: user.app_metadata?.providers || [],
+      verificacao_em_dois_passos: Array.isArray(user.factors) && user.factors.some((f: Row) => f.status === "verified"),
+    },
+    perfil: profile || null,
+    encomendas: ordersOut,
+    lista_de_desejos: wishlist,
+    avaliacoes: reviews,
+    comunidade: { publicacoes: posts, gostos: likes },
+    avisos: notices,
+    atendimento: threads.map((t: Row) => ({ ...t, mensagens: messages.filter((m: Row) => m.thread_id === t.id).map(({ thread_id: _t, ...m }: Row) => m) })),
+    aparelhos: devices,
+    notificacoes_push: pushes,
+    newsletter,
+    contactos_de_marketing: contacts,
+  });
+});
+
+/**
+ * O cliente apaga a sua conta (direito ao apagamento, Lei n.º 22/11). Pede o email da conta
+ * escrito à mão, como confirmação. Vale o mesmo que apagar no painel: saem o perfil, a lista
+ * de desejos, as publicações e gostos da comunidade e os avisos; as encomendas ficam (estão
+ * ligadas ao email e a lei fiscal obriga a guardá-las) e continuam a poder ser rastreadas.
+ * As contas da equipa e dos colportores apagam-se pela administração, que trata do que está
+ * pendurado nelas (permissões, guias, comissões).
+ */
+route("POST", "/account/delete", async ({ auth, body }) => {
+  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("account-delete", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const { data: profile } = await db.from("profiles").select("name, role").eq("id", auth.id).maybeSingle();
+  if (profile?.role === "admin" || profile?.role === "manager" || isStaff(auth)) {
+    throw bad("As contas da equipa são apagadas por um administrador, no painel (Utilizadores).");
+  }
+  const { data: colporteur } = await db.from("colporteurs").select("code").eq("profile_id", auth.id).limit(1);
+  if (colporteur?.length) {
+    throw bad(`A sua conta está ligada à colportagem${colporteur[0].code ? ` (${colporteur[0].code})` : ""}: para a apagar, fale com a coordenação.`);
+  }
+  if (normalizeEmail(String(body.confirmEmail || "")) !== normalizeEmail(auth.email || "")) {
+    throw bad("Escreva o email da sua conta para confirmar.");
+  }
+  const { error } = await db.auth.admin.deleteUser(auth.id);
+  if (error) throw bad(`Não foi possível apagar a conta: ${error.message}`);
+  await recordSecurity(auth, { rowId: auth.id, action: "delete", summary: `Conta apagada pelo próprio cliente: ${auth.email || auth.id}` });
+  // Depois de apagada, como no painel: um aviso de encerramento de uma conta que ficou seria pior.
+  const emailSent = await notifyAccount(auth.email || "", profile?.name || "", (b) => accountClosedLetter(b, profile?.name || ""));
+  return json({ ok: true, email_sent: emailSent });
 });
 
 /** Envia um aviso de conta sem deixar que uma falha de email desfaça a operação já feita. */

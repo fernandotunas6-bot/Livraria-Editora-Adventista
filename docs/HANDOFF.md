@@ -1,6 +1,35 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Análise por perfil: visitante, cliente, funcionário e gestor (2026-11-08, ramo `claude/nifty-archimedes-44rw4k`)
+
+- **Pedido do dono:** "análise crítica e de estética em todo o sistema e adicionar o que falta na
+  óptica do utilizador e gestor e cliente funcionário". Detalhe e verificação em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.16** (achados 118–135).
+- **Cliente:** cancela sozinho uma encomenda por pagar que ainda não está em preparação (na conta e
+  no rastreio, sem conta) — a mensagem do checkout mandava cancelar e não havia como; a conta mostra
+  o estado em palavras simples, com o passo seguinte, barra de progresso e capas, "Comprar de novo",
+  o código `CLI-`; descarrega os seus dados e apaga a conta (Lei 22/11; a política de privacidade
+  diz agora onde); lista de desejos com "Juntar ao carrinho" e a data certa; "palavra-passe" em vez
+  de "Password". Regras em `lib/customerOrders.js`, `supabase/functions/app/customerCancel.ts` e
+  `public.order_cancel_by_customer` (as três têm de dizer o mesmo; há teste).
+- **Funcionário:** os avisos "Nova encomenda — assumir" fecham-se quando a encomenda fica assumida por
+  qualquer caminho (antes, só o botão; encomendas enviadas, entregues e canceladas continuavam a
+  pedir "assumir"); barra de avisos compacta (no telemóvel tapava o ecrã); "Encomendas" abre na
+  lista, com os relatórios dobrados no fim; cartões com pagamento e forma de entrega; aviso
+  "Cancelada pelo cliente".
+- **Gestor:** o Início diz como corre o mês, comparado com os mesmos dias do mês anterior, e o que se
+  vende mais; relatórios sem "Kz 14 316,667", "Novembro De 2026", "1 pedidos" nem títulos
+  sobrepostos no gráfico. Dinheiro sempre "Kz 14 500,00" (`lib/money.js`).
+- **Base de dados:** migração `20261108120000_conta_do_cliente`, **por aplicar** (vai no merge, com a
+  Edge Function). Cenários: `scripts/pglite/conta.mjs` (35; ver `docs/PAGAMENTOS.md`, "Testes").
+- **Como se testou:** réplica local com Postgres 16 real, as migrações todas, um emulador do
+  PostgREST, Auth simulado e a Edge Function verdadeira em Deno — a pilha inteira, sem Docker e sem
+  tocar em produção (a rede da sessão não chega lá). Os scripts ficaram fora do repositório; a
+  descrição está na AUDITORIA 9.16 para quem quiser repetir.
+- **Por decidir (dono):** confirmação por email antes de apagar a conta (hoje: escrever o email da
+  conta com a sessão aberta); os pontos de email, WhatsApp e telefones das passagens anteriores.
 
 ## Pagamentos registados e gateway (2026-11-07, ramo `claude/pagamentos-premium`)
 
@@ -35,7 +64,7 @@ Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegu
   - o compromisso de avisar em caso de falha de segurança;
   - os prazos de conservação das encomendas, que remetem para "o que a lei fiscal e comercial exige".
   - A referência legal é a Lei n.º 22/11 (Protecção de Dados Pessoais) e a autoridade de controlo é a APD.
-- **Ainda não há** forma de o cliente apagar a conta ou descarregar os seus dados sozinho: os pedidos chegam pelos contactos e a equipa apaga a conta no painel (Utilizadores). Apagar a conta apaga publicações, respostas e gostos da comunidade.
+- ~~**Ainda não há** forma de o cliente apagar a conta ou descarregar os seus dados sozinho~~: desde 2026-11-08, em Perfil → Segurança e privacidade (secção acima). Apagar a conta apaga publicações, respostas e gostos da comunidade; as encomendas ficam.
 
 ## Comunidade literária premium (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
 
@@ -95,7 +124,7 @@ Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Teste de ponta a ponta** (transacção revertida): compra sem conta → `CLI-000002`; ao criar conta, o mesmo código; ao passar a gestor, mantém `CLI-` e recebe `FUN-004`; a pesquisa encontra a conta pelo código.
 - **Produtos:** revistos, sem alterações. Os 9 tipos têm prefixo e contador, e `normalize_product_code` (SQL) e `normalizeProductCode` (JS) usam a mesma expressão.
 - **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
-- **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
+- **Por fazer (decisão tua):** ~~mostrar ao próprio cliente o seu `CLI-` no perfil da loja~~ (feito a 2026-11-08); e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
 
 ## Análise crítica e correcções do checkout (2026-11-06)
 

@@ -1,7 +1,8 @@
 /**
  * Política de privacidade. O texto descreve o que o sistema faz de facto (levantado do código
- * e das migrações em 2026-11-07); quem mudar o que se recolhe ou para onde vai, muda aqui
- * também. Os contactos vêm das Configurações, para não ficarem desactualizados.
+ * e das migrações em 2026-11-07; os direitos na própria conta — descarregar e apagar — em
+ * 2026-11-08); quem mudar o que se recolhe ou para onde vai, muda aqui também. Os contactos vêm
+ * das Configurações, para não ficarem desactualizados.
  *
  * Blocos: { p: 'texto' } ou { list: ['…'] }. No texto, `[rótulo](/caminho)` vira link interno.
  */
@@ -131,10 +132,12 @@ export function privacySections(settings = {}) {
       blocks: [
         { p: 'Tem direito a saber que dados temos sobre si, a corrigi-los, a pedir que sejam apagados, a opor-se ao envio de comunicações de marketing e a retirar um consentimento que nos tenha dado.' },
         { list: [
-          'Corrigir o nome, o telefone e a fotografia: em [Perfil → Definições](/profile?tab=settings).',
+          'Corrigir o nome, o telefone e a fotografia: em [Perfil → Dados pessoais](/profile?tab=settings).',
           'Desligar avisos e notificações: em [Perfil → Notificações](/profile?tab=notifications).',
           'Apagar publicações da comunidade: no menu "⋯" de cada uma.',
-          `Pedir uma cópia dos seus dados ou apagar a conta: contacte-nos ${contactLine}. Podemos pedir-lhe que confirme a identidade antes de responder.`,
+          'Descarregar uma cópia dos seus dados (perfil, encomendas, pagamentos, lista de desejos, avaliações, comunidade, avisos e conversas de apoio): em [Perfil → Segurança e privacidade](/profile?tab=security), num ficheiro JSON.',
+          'Apagar a conta: no mesmo sítio. Saem o perfil, a lista de desejos, as publicações e os gostos da comunidade e os avisos; as encomendas ficam, porque a lei obriga a guardá-las, e continuam a poder ser rastreadas com o número e o email. As contas da equipa e dos colportores apagam-se pela administração.',
+          `Sem conta, ou se preferir: contacte-nos ${contactLine}. Podemos pedir-lhe que confirme a identidade antes de responder.`,
         ] },
         { p: 'Se achar que não tratámos bem os seus dados, pode apresentar queixa à Agência de Protecção de Dados (APD).' },
       ],
