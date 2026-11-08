@@ -2,46 +2,76 @@
 
 Estado em 2026-11-02. Complementa [ARQUITETURA.md](ARQUITETURA.md) e [HANDOFF.md](HANDOFF.md).
 
-## 00. Como pôr o email a sair (actualizado a 2026-11-06)
+## 00. Como pôr o email a sair (actualizado a 2026-11-07, domínio `.ao`)
 
-O domínio da loja já existe: **livrariaadventista.com**, com o DNS no Cloudflare (conta
-valentinocanguele@gmail.com). O que faltava em 0.1 deixou de faltar.
+**Estado em produção (2026-11-07): nenhum email saiu até hoje.** Em `notification_logs` só há
+registos `skipped` ("Servidor SMTP não configurado"): `order_email_enabled` está desligado, o
+fornecedor é `smtp` sem servidor e não há chave da Brevo, do Cloudflare nem do SendGrid. Os
+emails da conta (Supabase Auth) também não chegam aos clientes — ver mais abaixo.
+
+O domínio oficial é **livrariaadventista.ao**, com o DNS no Cloudflare (zona `cody`/`hadlee`,
+conta valentinocanguele@gmail.com). O `.com` só redirecciona: não se usa para email.
 
 **O SMTP não serve para os emails do site.** As Edge Functions do Supabase não abrem ligações de
 saída nas portas 25 e 587 (e a 465 não é garantida), por isso a configuração que quase todos os
-fornecedores indicam (porta 587) nunca entregaria nada. O site envia agora **por API HTTPS**, e o
+fornecedores indicam (porta 587) nunca entregaria nada. O site envia **por API HTTPS**, e o
 painel recusa as portas 25 e 587 com uma explicação.
 
 | Fornecedor | Custo | O que é preciso |
 |---|---|---|
 | **Brevo** (recomendado) | grátis até 300 emails/dia | conta grátis, domínio verificado, chave da API |
-| **Cloudflare Email Sending** | plano Workers Paid (5 USD/mês, 3000 emails incluídos) | activar o envio no domínio, token da API |
+| **Cloudflare Email Sending** | plano Workers Paid (5 USD/mês, 3000 emails incluídos) | activar o envio no domínio, token da API. **Só transaccionais**: as campanhas não podem sair por aqui (regras do Cloudflare) |
 | SendGrid | sem plano gratuito desde 2025 | chave da API |
 
-### Brevo, passo a passo (dono da loja, ~15 minutos)
+### 1. Receber: `contacto@livrariaadventista.ao` (Cloudflare Email Routing)
+
+É o endereço publicado no site, no rodapé dos emails, na política de privacidade e no contacto
+das notificações push, e é para lá que vão as respostas dos clientes (o "Responder para" das
+mensagens). **Enquanto o Email Routing não estiver activo, esse endereço não recebe nada**: a zona
+ainda tem os MX e o SPF da Google, e o domínio não tem conta Google.
+
+Cloudflare → zona `livrariaadventista.ao` → **Email → Email Routing** → regra `contacto` →
+destino `valentinocanguele@gmail.com` (verificar o Gmail) → **"Adicionar registos e activar"**,
+aceitando apagar os MX e o SPF da Google. Repetir para `loja@` se for esse o remetente.
+
+### 2. Enviar: Brevo, passo a passo (dono da loja, ~15 minutos)
 
 1. Criar conta em [brevo.com](https://www.brevo.com) com o email da loja.
-2. **Senders, domains & dedicated IPs → Domains → Add a domain** → `livrariaadventista.com`.
-   A Brevo mostra 3–4 registos (código Brevo em TXT, DKIM, DMARC). No Cloudflare → DNS do
-   domínio, criar cada um exactamente como aparece (DNS only, sem proxy). Voltar à Brevo e
+2. **Senders, domains & dedicated IPs → Domains → Add a domain** → `livrariaadventista.ao`.
+   A Brevo mostra os registos (código Brevo em TXT, DKIM, DMARC). No Cloudflare → DNS da zona
+   `.ao`, criar cada um exactamente como aparece (**DNS only**, sem proxy). Voltar à Brevo e
    carregar em **Verify**.
 3. **SMTP & API → API keys → Generate a new API key**. Copiar (só se vê uma vez).
 4. No painel da loja → **Configurações → Comunicações**: fornecedor **Brevo**, colar a chave,
-   remetente `loja@livrariaadventista.com` (ou outro endereço do domínio), nome "Livraria
-   Adventista". Guardar.
-5. **Emails → Enviar teste** para o seu email. Confirmar que chegou à caixa de entrada.
+   remetente `loja@livrariaadventista.ao` (ou `contacto@`), nome "Livraria Adventista". Guardar.
+5. **Emails → Enviar teste** para um Gmail e um Outlook. Confirmar que chegou à caixa de
+   entrada e, em "Mostrar original", `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`.
 6. Ligar "Activar email automático de confirmação".
 
-Para receber respostas nesse endereço, active o **Email Routing** do Cloudflare no domínio e
-encaminhe `loja@` para o email que a loja já usa.
+### 3. Registos DNS da zona `.ao` (cuidados)
 
-### Emails da conta (registo, recuperar palavra-passe)
+| Registo | Valor | Notas |
+|---|---|---|
+| MX `@` | os três do Email Routing (`route1/2/3.mx.cloudflare.net`) | criados pelo passo 1; tirar os da Google |
+| TXT `@` (SPF) | `v=spf1 include:_spf.mx.cloudflare.net ~all` | **um só registo SPF por nome.** Se a Brevo pedir `include:spf.brevo.com`, junta-se ao mesmo: `v=spf1 include:_spf.mx.cloudflare.net include:spf.brevo.com ~all`. Dois registos `v=spf1` dão *permerror* e o SPF falha nos dois |
+| TXT `brevo-code` / CNAME `brevo1._domainkey`, `brevo2._domainkey` | os que a Brevo mostrar | DKIM: é o que faz o DMARC passar |
+| TXT `_dmarc` | `v=DMARC1; p=none; rua=mailto:contacto@livrariaadventista.ao` | um só. Começar em `p=none`; depois de 2–4 semanas de relatórios limpos, `p=quarantine` |
 
-Esses não saem pela Edge Function: saem pelo **Supabase Auth**, que precisa do seu próprio SMTP
-(ver secção 4). Aí as portas não estão bloqueadas, e a Brevo também serve: Supabase → Authentication
-→ Emails → SMTP Settings → host `smtp-relay.brevo.com`, porta `587`, utilizador e chave SMTP que
-a Brevo mostra em **SMTP & API → SMTP**, remetente `loja@livrariaadventista.com`. Sem isto, quem se
-regista por email não recebe a confirmação.
+O Cloudflare Email Sending, se for usado, junta os seus registos no subdomínio `cf-bounce` e um
+DMARC em `_dmarc`: se já existir um, fica o que existe.
+
+### 4. Emails da conta (registo, recuperar palavra-passe)
+
+Esses não saem pela Edge Function: saem pelo **Supabase Auth**, que precisa do seu próprio SMTP.
+Sem ele, o correio do Supabase só entrega a membros da equipa do projecto (2 por hora) e em
+inglês: **quem se regista por email nunca recebe a confirmação**. Aqui as portas não estão
+bloqueadas, e a Brevo também serve: Supabase → **Authentication → Emails → SMTP Settings** → host
+`smtp-relay.brevo.com`, porta `587`, utilizador e chave SMTP que a Brevo mostra em **SMTP & API →
+SMTP**, remetente `loja@livrariaadventista.ao`, nome "Livraria Adventista".
+
+Depois, `bash scripts/configurar-auth.sh` põe os modelos em português (`supabase/auth/templates`)
+e o **Site URL** em `https://livrariaadventista.ao` (ainda por aplicar no painel: Authentication →
+URL Configuration). Sem SMTP próprio o Supabase recusa mudar os modelos no plano gratuito.
 
 ## 0. Estado em produção (2026-11-02)
 
@@ -387,8 +417,14 @@ cancelar o que não se pode cancelar, e ensinaria o cliente a ignorá-lo onde el
 - `notifyContact()` verifica `marketing_opt_out_at` **no envio**, e não só em quem escolhe
   os destinatários: uma lista montada antes do cancelamento voltaria a apanhá-lo.
 - As campanhas levam `List-Unsubscribe` e `List-Unsubscribe-Post: One-Click`, que os clientes
-  de email usam para mostrar o botão próprio de cancelamento, e que o Gmail exige a quem
-  envia em volume.
+  de email usam para mostrar o botão próprio de cancelamento, e que o Gmail e o Yahoo exigem a
+  quem envia em volume. **O cabeçalho aponta para a API** (`<função>/unsubscribe?t=<token>`), e
+  não para a página: o botão do Gmail faz um POST com o corpo `List-Unsubscribe=One-Click`
+  (RFC 8058), sem correr JavaScript, e a página do site é estática — até 2026-11-07 o POST não
+  chegava a código nenhum e o cliente continuava inscrito. A rota `POST /unsubscribe` aceita o
+  token no corpo (página) ou no endereço (um clique), com um limite à parte para os servidores
+  do correio; `GET /unsubscribe?t=…` só redirecciona para a página de confirmação. Ver
+  `listUnsubscribeHeaders()` em `emailTemplates.ts`, com testes.
 
 ## 7. Fila de recuperação
 

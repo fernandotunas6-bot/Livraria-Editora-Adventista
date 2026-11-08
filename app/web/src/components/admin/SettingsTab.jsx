@@ -774,6 +774,10 @@ export default function SettingsTab() {
                 <li>Em <strong>Compute &amp; AI → Email Service → Email Sending → Onboard Domain</strong>, escolha <strong>livrariaadventista.ao</strong> e aceite os registos DNS.</li>
                 <li>Crie um <strong>API token</strong> com permissão de envio de email e cole-o aqui, com o ID da conta.</li>
               </ol>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                O Cloudflare só aceita mensagens transaccionais (encomendas, conta, avisos). Campanhas e novidades
+                não podem sair por aqui: para essas, use a Brevo.
+              </p>
               <div className="space-y-2">
                 <Label>ID da conta Cloudflare</Label>
                 <Input value={form.cloudflare_account_id} onChange={(e) => set('cloudflare_account_id', e.target.value)} placeholder="701800d01d428c5141fa1fdb60ee01ae" className="font-mono text-xs" />
@@ -784,13 +788,18 @@ export default function SettingsTab() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Email remetente</Label>
-              <Input type="email" value={form.smtp_from_email} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="noreply@livraria.ao" />
+              <Input type="email" value={form.smtp_from_email} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="loja@livrariaadventista.ao" />
             </div>
             <div className="space-y-2">
               <Label>Nome remetente</Label>
               <Input value={form.smtp_from_name} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="Livraria Adventista" />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground -mt-3">
+            Tem de ser um endereço do domínio verificado no fornecedor (<em>…@livrariaadventista.ao</em>). Vazio, usa o email de contacto.
+            As respostas dos clientes vão para o email de contacto ({form.contact_email || 'por preencher'}), que tem de receber correio
+            (Cloudflare → Email Routing).
+          </p>
 
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold flex items-center gap-2"><Bell className="h-4 w-4 text-primary" /> Notificações Push (PWA)</h3>

@@ -15,6 +15,8 @@ export type EmailMessage = {
   to: string;
   fromEmail: string;
   fromName: string;
+  /** Para onde vão as respostas do cliente, quando não é o próprio remetente (ver `senderFor`). */
+  replyTo?: string;
   subject: string;
   html: string;
   text: string;
@@ -36,6 +38,31 @@ export function smtpPortProblem(port: number): string {
 
 const clip = (s: string, max: number) => String(s || "").slice(0, max);
 
+/** A mesma forma de endereço que `isEmail` (emails.ts) aceita nas rotas públicas. */
+const EMAIL_SHAPE = /^[^\s@]{1,64}@[^\s@.]+(\.[^\s@.]+)+$/;
+const asEmail = (value: unknown) => {
+  const v = String(value ?? "").trim();
+  return v.length <= 254 && EMAIL_SHAPE.test(v) ? v : "";
+};
+
+/**
+ * Remetente e endereço de resposta das mensagens da loja.
+ *
+ * - **Remetente**: o "Email remetente" do painel, senão o email de contacto. Sem nenhum dos
+ *   dois não há remetente: antes caía em `noreply@livraria.ao`, um domínio que não é o da
+ *   loja — nenhum fornecedor o aceitaria, e se aceitasse a mensagem falhava o SPF/DMARC.
+ * - **Responder para**: o email de contacto, quando o remetente é outro (um `loja@` ou
+ *   `noreply@` que ninguém lê). É o caminho das respostas dos clientes; sem ele, quem
+ *   respondesse a uma confirmação escrevia para uma caixa que não existe.
+ */
+export function senderFor(settings: Row | null): { fromEmail: string; fromName: string; replyTo: string } {
+  const fromEmail = asEmail(settings?.smtp_from_email) || asEmail(settings?.contact_email);
+  const contact = asEmail(settings?.contact_email);
+  const replyTo = contact && contact.toLowerCase() !== fromEmail.toLowerCase() ? contact : "";
+  const fromName = clip(String(settings?.smtp_from_name || settings?.site_name || "Livraria Adventista").trim(), 70);
+  return { fromEmail, fromName, replyTo };
+}
+
 export function brevoRequest(apiKey: string, m: EmailMessage) {
   return {
     url: "https://api.brevo.com/v3/smtp/email",
@@ -48,6 +75,7 @@ export function brevoRequest(apiKey: string, m: EmailMessage) {
         subject: clip(m.subject, 998),
         htmlContent: m.html,
         ...(m.text ? { textContent: m.text } : {}),
+        ...(m.replyTo ? { replyTo: { email: m.replyTo } } : {}),
         ...(Object.keys(m.headers).length ? { headers: m.headers } : {}),
       }),
     },
@@ -79,6 +107,9 @@ export function cloudflareRequest(accountId: string, token: string, m: EmailMess
         subject: clip(m.subject, 998),
         html: m.html,
         ...(m.text ? { text: m.text } : {}),
+        // Na API REST é `reply_to` (no binding dos Workers, `replyTo`); um `Reply-To` em
+        // `headers` é recusado com E_HEADER_USE_API_FIELD e a mensagem não sai.
+        ...(m.replyTo ? { reply_to: m.replyTo } : {}),
         ...(Object.keys(m.headers).length ? { headers: m.headers } : {}),
       }),
     },
@@ -114,8 +145,7 @@ export function interpretCloudflare(status: number, body: Row | null, to: string
 /** O fornecedor escolhido tem o que precisa para enviar? (sem dizer os valores). */
 export function emailProviderReady(settings: Row | null, secrets: { brevo?: string; cloudflareToken?: string; sendgrid?: string }): { ready: boolean; missing: string } {
   const provider = String(settings?.email_provider || "smtp");
-  const from = String(settings?.smtp_from_email || settings?.contact_email || "");
-  if (!from.includes("@")) return { ready: false, missing: "email remetente" };
+  if (!senderFor(settings).fromEmail) return { ready: false, missing: "email remetente" };
   if (provider === "brevo") return secrets.brevo ? { ready: true, missing: "" } : { ready: false, missing: "chave da API da Brevo" };
   if (provider === "cloudflare") {
     if (!String(settings?.cloudflare_account_id || "").trim()) return { ready: false, missing: "ID da conta Cloudflare" };

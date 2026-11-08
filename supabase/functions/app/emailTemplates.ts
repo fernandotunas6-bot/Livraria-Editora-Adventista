@@ -772,6 +772,35 @@ export function unsubscribeUrlFor(brand: Brand, token: string) {
   return `${brand.siteUrl.replace(/\/$/, "")}/unsubscribe?t=${encodeURIComponent(token)}`;
 }
 
+/**
+ * Cabeçalhos `List-Unsubscribe` de uma campanha, a partir do link do rodapé.
+ *
+ * O botão "cancelar subscrição" do Gmail, do Yahoo e do Apple Mail não abre a página: faz um
+ * POST ao endereço do cabeçalho, com o corpo `List-Unsubscribe=One-Click` (RFC 8058), e não
+ * corre JavaScript nenhum. Por isso o cabeçalho aponta para a API (`<api>/unsubscribe?t=…`),
+ * que cancela num POST, e não para a página do site — que é estática: um POST não chega a
+ * nenhum código, e o cliente continuava inscrito depois de carregar no botão.
+ *
+ * O link do rodapé continua a ser a página, que pede confirmação: alguns servidores de correio
+ * abrem os links das mensagens para os analisar, e um GET nunca pode cancelar.
+ */
+export function listUnsubscribeHeaders(pageUrl: string, apiBase: string): Record<string, string> {
+  let token = "";
+  try {
+    token = new URL(String(pageUrl || "")).searchParams.get("t") || "";
+  } catch {
+    return {};
+  }
+  if (!/^[a-f0-9]{64}$/.test(token)) return {};
+  const api = String(apiBase || "").replace(/\/+$/, "");
+  // Sem API em https (desenvolvimento local), fica só o link da página, sem "um clique".
+  if (!/^https:\/\/[^/]+/i.test(api)) return { "List-Unsubscribe": `<${pageUrl}>` };
+  return {
+    "List-Unsubscribe": `<${api}/unsubscribe?t=${token}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
 export function testLetter(brand: Brand): Letter {
   return {
     subject: `Teste de email — ${brand.siteName}`,
