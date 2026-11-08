@@ -17,7 +17,7 @@ const orderHref = (number) => `/admin?tab=orders&encomenda=${encodeURIComponent(
 export function deliveryStage(d) {
   if (d.status === 'offered') return { key: 'waiting', tone: 'amber', label: 'À espera de resposta', detail: d.expires_at ? `até ${when(d.expires_at)}` : '' };
   if (d.source === 'loja' && !d.picked_up_at) return { key: 'prepare', tone: 'red', label: 'Preparar na loja', detail: 'levanta os livros na loja' };
-  if (d.source === 'stock') return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: 'com os livros dele' };
+  if (d.source === 'stock') return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: 'com livros à consignação' };
   return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: `livros entregues a ${when(d.picked_up_at)}` };
 }
 
@@ -117,7 +117,7 @@ export default function DeliveriesPanel() {
                   <p className="text-xs text-muted-foreground">
                     <CodeChip code={d.colporteur.code} /> {d.colporteur.name}
                     {d.colporteur.phone && <> · <a href={`tel:${d.colporteur.phone}`} className="hover:underline">{d.colporteur.phone}</a></>}
-                    {Number(d.fee) > 0 && <> · para ele: {kz(d.fee)}</>}
+                    {Number(d.fee) > 0 && <> · ganha {kz(d.fee)}</>}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +175,7 @@ export default function DeliveriesPanel() {
           ))}
         </DataTable>
         <p className="text-xs text-muted-foreground">
-          {DELIVERY_OFFER_STATUS.expired.label}: o prazo para aceitar acabou. Devolvidas: o colportor desistiu, a equipa retirou-lha, ou a encomenda foi dada como entregue sem os livros estarem com ele.
+          {DELIVERY_OFFER_STATUS.expired.label}: o prazo para aceitar acabou. Devolvidas: o colportor desistiu, a equipa retirou-lha, ou a encomenda foi dada como entregue antes de ter os livros.
           Os ganhos entram na conta corrente de cada um como «Portes de entrega».
         </p>
       </section>

@@ -45,7 +45,7 @@ describe('em que ponto está cada entrega', () => {
     expect(deliveryStage({ status: 'offered' }).key).toBe('waiting');
     expect(deliveryStage({ status: 'accepted', source: 'loja', picked_up_at: null }).key).toBe('prepare');
     expect(deliveryStage({ status: 'accepted', source: 'loja', picked_up_at: '2026-11-08T10:00:00Z' }).key).toBe('out');
-    expect(deliveryStage({ status: 'accepted', source: 'stock' }).detail).toBe('com os livros dele');
+    expect(deliveryStage({ status: 'accepted', source: 'stock' }).detail).toBe('com livros à consignação');
   });
 });
 
