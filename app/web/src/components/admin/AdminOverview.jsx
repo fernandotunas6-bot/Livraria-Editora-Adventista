@@ -254,16 +254,19 @@ export default function AdminOverview({
             value={loading ? '…' : toShip.length} hint="Confirmadas, ainda na loja"
             onClick={() => onOpenOrders({ status: 'confirmed' })}
           />
-          <StatCard
-            icon={CheckCircle2} label="Encomendado (30 dias)" tone="success"
-            value={loading ? '…' : kz(monthTotal)}
-            hint={`${month.length} encomenda${month.length === 1 ? '' : 's'} · ${kz(monthReceived)} recebido${monthReceived === 0 ? '' : 's'}`}
-            onClick={() => onNavigate('vendas-huambo')}
-          />
+          {/* A facturação só para quem tem «Ver relatórios» (o atendimento trata encomendas sem a ver). */}
+          {perms.reports && (
+            <StatCard
+              icon={CheckCircle2} label="Encomendado (30 dias)" tone="success"
+              value={loading ? '…' : kz(monthTotal)}
+              hint={`${month.length} encomenda${month.length === 1 ? '' : 's'} · ${kz(monthReceived)} recebido${monthReceived === 0 ? '' : 's'}`}
+              onClick={() => onNavigate('vendas-huambo')}
+            />
+          )}
         </div>
       )}
 
-      {perms.orders && !loading && <MonthPanel orders={orders} onNavigate={onNavigate} />}
+      {perms.orders && perms.reports && !loading && <MonthPanel orders={orders} onNavigate={onNavigate} />}
 
       <div className="grid gap-6 xl:grid-cols-3">
         {perms.orders && (

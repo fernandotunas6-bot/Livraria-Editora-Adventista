@@ -627,7 +627,7 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
-            {(canManageOrders || canConfirmPayments) && (
+            {(perms.reports || canConfirmPayments) && (
               <AdminSection active={activeTab} value="pagamentos-caixa">
                 <Suspense fallback={spinner}>
                   <PaymentsReportTab canConfirm={canConfirmPayments} currentUserName={user?.name || user?.email || ''} />
@@ -1226,7 +1226,8 @@ const AdminPage = () => {
                       </div>
                     ))}
                   </div>
-                  <OrdersReportSection orders={orders} />
+                  {/* Totais e produtos mais vendidos: facturação, só com «Ver relatórios». */}
+                  {perms.reports && <OrdersReportSection orders={orders} />}
                 </AdminSection>
                 )}
               </>
