@@ -17,8 +17,7 @@ import {
 import { buildKnowledge, knowledgeText, kz } from "./chatKnowledge.ts";
 import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
 import {
-  OTP_MINUTES, type SmsResult, isAngolaMobile, isVerifyService, maskedNumber, smsE164, smsErrorText, smsNotice, smsNumber, smsSender,
-  twilioRequest, verifyCheck, verifyOutcome, verifySend,
+  OTP_MINUTES, type SmsResult, isAngolaMobile, maskedNumber, otpCode, otpHash, otpMessage, pro2smsRequest, smsErrorText, smsNotice, smsNumber,
 } from "./sms.ts";
 import { communityPushPlan, communityPushUrl, type CommunityNotice } from "./communityPush.ts";
 import {
@@ -989,30 +988,24 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
 }
 
 // ---------------------------------------------------------------------------
-// SMS (Twilio). Guia em docs/SMS.md.
+// SMS (PRO2SMS). Guia em docs/SMS.md.
 // ---------------------------------------------------------------------------
-/** As credenciais, dos segredos da função: não ficam na base de dados nem chegam ao browser. */
-function twilioCredentials() {
-  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
-  const token = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-  return sid && token ? { sid, token } : null;
-}
+/** A chave, de um segredo da função: não fica na base de dados nem chega ao browser. */
+const pro2smsKey = () => Deno.env.get("PRO2SMS_API_KEY") || "";
 
-/** As opções da integração (Integrações → Twilio), ou null se estiver desligada ou sem credenciais. */
+/** As opções da integração (Integrações → PRO2SMS), ou null se estiver desligada ou sem chave. */
 async function getSmsConfig(fresh = false): Promise<Row | null> {
-  const rec = await getIntegration("twilio", fresh);
-  if (!rec?.enabled || !twilioCredentials()) return null;
+  const rec = await getIntegration("pro2sms", fresh);
+  if (!rec?.enabled || !pro2smsKey()) return null;
   const cfg = rec.config || {};
   return {
-    // Angola aceita um nome como remetente, sem registo prévio. Até 11 caracteres.
-    sender: clipText(cfg.sender, 40) || "LivrariaAdv",
-    // Os códigos vão pela Twilio Verify: sem o serviço (VA…), não há códigos.
-    verify_service: isVerifyService(cfg.verify_service) ? String(cfg.verify_service) : "",
-    otp: cfg.otp !== false && isVerifyService(cfg.verify_service),
+    // Só um remetente aprovado na conta. Vazio: o da chave, ou INFO.
+    sender: clipText(cfg.sender, 11),
+    otp: cfg.otp !== false,
     orders: !!cfg.orders,
     colporteurs: !!cfg.colporteurs,
     staff: !!cfg.staff,
-    daily_limit: clampInt(cfg.daily_limit, 1, 5000, 50),
+    daily_limit: clampInt(cfg.daily_limit, 1, 5000, 200),
   };
 }
 
@@ -1031,7 +1024,7 @@ async function smsBudgetLeft(config: Row) {
 async function sendSms(phone: unknown, text: string, config: Row, meta: NotifyMeta & { subject?: string } = {}): Promise<SmsResult> {
   const number = smsNumber(phone);
   const base = {
-    type: "sms", context: meta.context || "order", recipient: number || String(phone || ""), provider: "twilio",
+    type: "sms", context: meta.context || "order", recipient: number || String(phone || ""), provider: "pro2sms",
     customer_name: meta.customer_name || "", order_number: meta.order_number || "", subject: meta.subject || "", content: text,
     ...(meta.dedupe ? { dedupe_key: meta.dedupe } : {}),
   };
@@ -1042,18 +1035,16 @@ async function sendSms(phone: unknown, text: string, config: Row, meta: NotifyMe
   if (!number) return refuse("invalid_phone", "Número inválido para SMS.");
   if (meta.dedupe && await alreadySent(meta.dedupe)) return { ok: false, code: "already_sent", error: "Já enviada." };
   if (!await smsBudgetLeft(config)) {
-    return refuse("daily_limit", `Teto diário de ${config.daily_limit} SMS atingido (Integrações → Twilio).`);
+    return refuse("daily_limit", `Teto diário de ${config.daily_limit} SMS atingido (Integrações → PRO2SMS).`);
   }
-  const credentials = twilioCredentials();
-  if (!credentials) return refuse("missing_credentials", "Faltam os segredos da Twilio.");
-  const res = await twilioRequest(credentials, "/Messages.json", { To: smsE164(number), Body: text, ...smsSender(String(config.sender)) });
+  const res = await pro2smsRequest(pro2smsKey(), "/send", {
+    body: { to: number, message: text, ...(config.sender ? { sender: config.sender } : {}) },
+  });
   await logNotification({
     ...base,
     status: res.ok ? "sent" : "failed",
-    // "Aceite": a Twilio ainda vai tentar entregar. Se a operadora recusar depois, não se fica a saber aqui.
-    detail: res.ok
-      ? `Aceite pela Twilio (${res.status || "em fila"})${res.parts ? ` · ${res.parts} parte(s)` : ""}${res.id ? ` · ${res.id}` : ""}`
-      : `${res.code}: ${smsErrorText(res.code, res.error)}`,
+    // "Aceite": a PRO2SMS ainda vai tentar entregar. Se a operadora recusar depois, não se fica a saber aqui.
+    detail: res.ok ? `Aceite pela PRO2SMS (${res.status || "em fila"})${res.id ? ` · ${res.id}` : ""}` : `${res.code}: ${smsErrorText(res.code, res.error)}`,
   });
   return res;
 }
@@ -2751,25 +2742,21 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
   return json({ message: `Mensagem de teste enviada para ${phone}.` });
 });
 
-/** O estado da Twilio para o painel: se há credenciais, se está ligada, o saldo e o tipo de conta. */
+/** O estado da PRO2SMS para o painel: se há chave, se está ligada e o saldo. */
 route("GET", "/admin/sms/estado", async ({ auth }) => {
   requirePermission(auth, "manage_settings");
-  const rec = await getIntegration("twilio", true);
-  const credentials = twilioCredentials();
-  if (!credentials) return json({ configured: false, enabled: !!rec?.enabled });
-  const [balance, account] = await Promise.all([
-    twilioRequest(credentials, "/Balance.json"),
-    twilioRequest(credentials, ".json"),
-  ]);
+  const rec = await getIntegration("pro2sms", true);
+  if (!pro2smsKey()) return json({ configured: false, enabled: !!rec?.enabled });
+  const res = await pro2smsRequest(pro2smsKey(), "/balance");
   return json({
     configured: true,
     enabled: !!rec?.enabled,
-    ok: account.ok,
-    error: account.ok ? "" : smsErrorText(account.code, account.error),
-    account_type: account.body?.type ?? "",
-    account_status: account.body?.status ?? "",
-    balance: balance.ok ? balance.body?.balance ?? null : null,
-    currency: balance.ok ? balance.body?.currency ?? "" : "",
+    ok: res.ok,
+    error: res.ok ? "" : smsErrorText(res.code, res.error),
+    balance: res.body?.balance ?? null,
+    balance_formatted: res.body?.balance_formatted ?? "",
+    sms_estimated: res.body?.sms_estimated ?? null,
+    price_per_sms: res.body?.national_price_per_sms ?? null,
   });
 });
 
@@ -2777,23 +2764,24 @@ route("POST", "/admin/sms/teste", async ({ auth, body, ip }) => {
   requirePermission(auth, "manage_settings");
   if (!await checkRateLimit("sms-teste", ip, 5)) throw tooMany("Demasiados testes seguidos. Aguarde um minuto.");
   const config = await getSmsConfig(true);
-  if (!config) throw bad("A Twilio não está ligada, ou faltam os segredos TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN.");
+  if (!config) throw bad("A PRO2SMS não está ligada, ou falta o segredo PRO2SMS_API_KEY.");
   if (!smsNumber(body.phone)) throw bad("Indique um número válido.");
   const res = await sendSms(body.phone, "Teste - Livraria Adventista. A integracao de SMS esta a funcionar.", config, { context: "test", subject: "Teste" });
   if (!res.ok) throw bad(smsErrorText(res.code, res.error));
-  return json({ message: `SMS de teste aceite pela Twilio para ${maskedNumber(smsNumber(body.phone))}.` });
+  return json({ message: `SMS de teste aceite pela PRO2SMS para ${maskedNumber(smsNumber(body.phone))}.` });
 });
 
 /**
- * Confirmar o telefone da conta por código, pela Twilio Verify, que gera o código, o guarda e conta
- * as tentativas. O número fica preso à conta na base de dados (phone_verifications), e a verificação
- * usa sempre esse número, nunca um que venha do browser.
+ * Confirmar o telefone da conta por código. A chave da PRO2SMS não tem a permissão `otp`, por isso o
+ * código é gerado aqui e guarda-se só como resumo. O número fica preso à conta na base de dados
+ * (phone_verifications), e a verificação usa sempre esse número, nunca um que venha do browser.
  *
  * Só telemóveis de Angola: um formulário destes aberto a qualquer país é o alvo clássico da fraude
  * com SMS internacionais pagas. Limites por IP, conta e número, além do teto diário; sem os conseguir
  * confirmar na base de dados, não se envia.
  */
 const OTP_PER_DAY = { conta: 5, numero: 5, ip: 20 };
+const otpPepper = () => Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 async function otpAllowedToday(userId: string, number: string, ip: string) {
   const buckets: [string, string, number][] = [
@@ -2810,13 +2798,15 @@ route("POST", "/conta/telefone/enviar", async ({ auth, body, ip }) => {
   if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
   if (!await checkRateLimit("otp-envio", ip, 5)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const config = await getSmsConfig();
-  const credentials = twilioCredentials();
-  if (!config?.otp || !credentials) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
+  if (!config?.otp) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
   const number = smsNumber(body.phone);
   if (!isAngolaMobile(number)) throw bad("Indique um telemóvel de Angola: +244 9XX XXX XXX.");
 
+  const code = otpCode();
   // Primeiro a espera de 60 segundos: carregar outra vez no botão não gasta o limite do dia.
-  const { data: wait, error } = await db.rpc("phone_verification_start", { p_user: auth.id, p_phone: number, p_minutes: OTP_MINUTES });
+  const { data: wait, error } = await db.rpc("phone_verification_start", {
+    p_user: auth.id, p_phone: number, p_code_hash: await otpHash(auth.id, number, code, otpPepper()), p_minutes: OTP_MINUTES,
+  });
   if (error) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
   if (Number(wait) > 0) throw new HttpError(429, `Já enviámos um código. Pode pedir outro daqui a ${wait} segundos.`, { "Retry-After": String(wait) });
 
@@ -2825,22 +2815,14 @@ route("POST", "/conta/telefone/enviar", async ({ auth, body, ip }) => {
     await cancel();
     throw tooMany("Já pediu muitos códigos hoje. Tente amanhã, ou fale connosco.");
   }
-  const logged = { type: "sms", context: "otp", recipient: number, provider: "twilio-verify", subject: "Código de confirmação" };
-  if (!await smsBudgetLeft(config)) {
-    await cancel();
-    await logNotification({ ...logged, status: "skipped", detail: `Teto diário de ${config.daily_limit} SMS atingido (Integrações → Twilio).` });
-    throw new HttpError(503, "Não foi possível enviar a SMS agora. Tente mais tarde.");
-  }
-  const res = await verifySend(credentials, config.verify_service, smsE164(number));
-  await logNotification({
-    ...logged,
-    status: res.ok ? "sent" : "failed",
-    detail: res.ok ? `Aceite pela Twilio Verify (${res.status || "em fila"})${res.id ? ` · ${res.id}` : ""}` : `${res.code}: ${smsErrorText(res.code, res.error)}`,
+  const settings = await getSettings();
+  // O teto diário e o registo ficam em sendSms; o conteúdo com o código não se grava.
+  const res = await sendSms(number, otpMessage(String(settings?.site_name || "Livraria Adventista"), code), config, {
+    context: "otp", subject: "Código de confirmação",
   });
   if (!res.ok) {
     await cancel();
     console.log("SMS do código:", res.code, res.error);
-    if (res.code === "60203" || res.code === "60212") throw tooMany(smsErrorText(res.code));
     throw new HttpError(503, "Não foi possível enviar a SMS agora. Tente daqui a pouco.");
   }
   return json({ message: `Enviámos um código para ${maskedNumber(number)}.`, expires_minutes: OTP_MINUTES, retry_after: 60 });
@@ -2850,28 +2832,23 @@ route("POST", "/conta/telefone/confirmar", async ({ auth, body, ip }) => {
   if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
   if (!await checkRateLimit("otp-confirma", ip, 20)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const code = String(body.code || "").trim();
-  if (!/^\d{4,10}$/.test(code)) throw bad("Escreva o código que recebeu por SMS.");
-  const config = await getSmsConfig();
-  const credentials = twilioCredentials();
-  if (!config?.otp || !credentials) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
+  if (!/^\d{6}$/.test(code)) throw bad("O código tem 6 dígitos.");
   const { data: number } = await db.rpc("phone_verification_pending", { p_user: auth.id });
   if (!number) throw bad("Peça um código novo.");
 
-  const outcome = verifyOutcome(await verifyCheck(credentials, config.verify_service, smsE164(String(number)), code));
-  if (outcome === "unavailable") throw new HttpError(503, "Não foi possível confirmar agora. Tente daqui a pouco.");
-  if (outcome === "approved") {
+  const { data: right, error: checkError } = await db.rpc("phone_verification_code_ok", {
+    p_user: auth.id, p_code_hash: await otpHash(auth.id, String(number), code, otpPepper()),
+  });
+  if (checkError) throw new HttpError(503, "Não foi possível confirmar agora. Tente daqui a pouco.");
+  if (right === true) {
     const { data, error } = await db.rpc("phone_verification_confirm", { p_user: auth.id });
     const r = data as Row;
     if (error || !r?.ok) throw new HttpError(503, "Não foi possível confirmar agora. Peça um código novo.");
     return json({ message: "Telefone confirmado.", phone: r.phone });
   }
-  if (outcome === "wrong") {
-    const { data: left } = await db.rpc("phone_verification_failed", { p_user: auth.id });
-    if (Number(left) > 0) throw bad(`Código errado. ${Number(left) === 1 ? "Resta 1 tentativa." : `Restam ${left} tentativas.`}`);
-    throw bad("Demasiadas tentativas. Peça um código novo.");
-  }
-  await db.rpc("phone_verification_cancel", { p_user: auth.id });
-  throw bad(outcome === "attempts" ? "Demasiadas tentativas. Peça um código novo." : "O código expirou. Peça um novo.");
+  const { data: left } = await db.rpc("phone_verification_failed", { p_user: auth.id });
+  if (Number(left) > 0) throw bad(`Código errado. ${Number(left) === 1 ? "Resta 1 tentativa." : `Restam ${left} tentativas.`}`);
+  throw bad("Demasiadas tentativas. Peça um código novo.");
 });
 
 /** Lista dos modelos que o painel pode pré-visualizar. */
@@ -3439,7 +3416,7 @@ async function dispatchColporteurNotifications(limit = 50) {
         if (sms?.colporteurs) {
           const res = await sendSms(c.phone, smsNotice({
             title: String(n.title || "Colportagem"), detail: String(n.body || ""), link: site ? `${site}${n.href || "/colportor?tab=entregas"}` : "",
-          }), sms, { context: "colportagem", customer_name: c.full_name || "", dedupe: `sms:colportor:${n.id}`, subject: String(n.title || "") });
+          }, 2), sms, { context: "colportagem", customer_name: c.full_name || "", dedupe: `sms:colportor:${n.id}`, subject: String(n.title || "") });
           ok = !!res.ok;
         }
       }
@@ -4098,7 +4075,7 @@ async function dispatchStaffNotifications(limit = 100) {
         if (channel === "whatsapp" && !result.whatsapp && p!.phone && ["high", "critical"].includes(String(n.severity))) {
           const sms = await getSmsConfig();
           if (sms?.staff) {
-            const res = await sendSms(p!.phone, smsNotice({ title: n.title, detail: n.body, link: site ? `${site}${path}` : "" }), sms, {
+            const res = await sendSms(p!.phone, smsNotice({ title: n.title, detail: n.body, link: site ? `${site}${path}` : "" }, 2), sms, {
               context: "staff_alert", customer_name: p!.name || "", dedupe: `staff:${n.id}:sms`, subject: n.title,
             });
             result.sms = !!res.ok;
