@@ -197,7 +197,8 @@ As encomendas pagas ou reembolsadas ganham um pagamento confirmado pelo total, n
   npm i --prefix /tmp/pglite @electric-sql/pglite@0.2.17
   PGLITE_MODULE=/tmp/pglite/node_modules/@electric-sql/pglite/dist/index.js node scripts/pglite/pagamentos.mjs supabase/migrations
   ```
-  Com o mesmo módulo: `scripts/pglite/entregas.mjs` (44, entregas por colportor), `scripts/pglite/conta.mjs` (35, cancelamento pelo cliente e avisos "assumir"), `scripts/pglite/versoes.mjs` (39, versões da app e o aviso por push a todos os aparelhos), `scripts/pglite/digitais.mjs` (59, livros digitais: só abrem com a encomenda paga — [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md)) e `scripts/pglite/producao.mjs` (produção, funcionários, salários e pagamentos a fornecedores — ver [PRODUCAO.md](PRODUCAO.md)).
+  Com o mesmo módulo: `scripts/pglite/entregas.mjs` (111, entregas por colportor), `scripts/pglite/conta.mjs` (35, cancelamento pelo cliente e avisos "assumir"), `scripts/pglite/versoes.mjs` (39, versões da app e o aviso por push a todos os aparelhos), `scripts/pglite/digitais.mjs` (59, livros digitais: só abrem com a encomenda paga — [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md)) e `scripts/pglite/producao.mjs` (produção, funcionários, salários e pagamentos a fornecedores — ver [PRODUCAO.md](PRODUCAO.md)).
+  Todos os `scripts/pglite/*.mjs` correm em cada PR, no job «Cenários da base de dados» do `ci.yml`. `scripts/pglite/seguranca.mjs` verifica a base de dados inteira: gatilhos que falham para quem usa o site, funções abertas sem verificação, tabelas sem RLS e chaves estrangeiras sem índice.
 - **vitest:**
   - `payments.test.ts`, `paymentWebhook.test.ts`, `orderWatch.test.ts`, `checkoutRules.test.ts` e `emails.test.ts` (Edge Function);
   - `payments.test.js`, `pricing.test.js` e `receipt.test.js` (site).
