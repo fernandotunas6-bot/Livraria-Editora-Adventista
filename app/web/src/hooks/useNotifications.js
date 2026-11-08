@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { accountTopic, subscribeSignal } from '@/lib/realtimeSignals';
 
 // Os avisos do cliente (comunidade e atendimento), partilhados por todos os que os mostram: os
 // sinos do cabeçalho (no topo da página inicial há dois, o da barra fina e o do cabeçalho), o
@@ -21,6 +22,8 @@ const listeners = new Set();
 const subscribers = new Map();
 let timer = 0;
 let seq = 0;
+// O canal da conta em tempo real: um aviso novo chega na hora, sem esperar pela consulta.
+let signal = { owner: '', off: null };
 let inflight = null;
 
 function set(patch) {
@@ -56,6 +59,10 @@ function sync() {
     clearInterval(timer);
     timer = 0;
     document.removeEventListener('visibilitychange', onVisible);
+  }
+  if (signal.owner !== owner) {
+    signal.off?.();
+    signal = { owner, off: owner ? subscribeSignal(accountTopic(owner), 'avisos', () => refreshNotifications()) : null };
   }
 }
 

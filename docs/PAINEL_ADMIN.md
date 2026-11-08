@@ -96,12 +96,25 @@ Igual em todas as secções: **grupo** (12 px, maiúsculas), **título** (`h1`, 
 Os textos vêm do registo (§3). Os separadores internos não repetem o título; mostram só o seu
 estado e os seus botões (ex.: "3 no ar agora", "Actualizar", "Nova loja").
 
-### 1.7 Sincronização dos dados — `hooks/useAutoRefresh.js`
-Encomendas, produtos e stock actualizam-se sozinhos, sem recarregar a página: **de minuto a minuto
-com o painel à vista**, **ao voltar ao separador** (se passaram mais de 15 s) e **quando a rede
-volta**. Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera: as
-seguintes (incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da
-navegação, o Início e o título do separador do navegador acompanham.
+### 1.7 Sincronização dos dados — tempo real e `hooks/useAutoRefresh.js`
+Encomendas, produtos e stock actualizam-se sozinhos, sem recarregar a página:
+
+- **Na hora**, pelos sinais em tempo real (`lib/realtimeSignals.js`, `hooks/useSignal.js`, migração
+  `20261108132000_sinais_em_tempo_real`). Quando muda uma encomenda ou o catálogo, a base de dados
+  manda um sinal pequeno pelo canal privado `painel` (só a equipa o ouve) e o painel pede **só isso**:
+  as encomendas que mudaram desde a última vez (`updated >= …`, `lib/ordersSync.js`) ou o catálogo.
+  O sinal não leva dados pessoais.
+- **Por consulta completa**, de reserva: de 5 em 5 minutos com o canal ligado (de minuto a minuto
+  sem ele), **ao voltar ao separador** (se passaram mais de 15 s) e **quando a rede volta**.
+
+Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera: as seguintes
+(incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da navegação,
+o Início e o título do separador do navegador acompanham.
+
+O mesmo canal acorda os **alertas da equipa** (antes de 20 em 20 s; agora na hora, e de reserva de
+2 em 2 min) e o **atendimento** (antes de 30 em 30 s). Fora do painel, cada conta ouve o seu canal
+`conta:<id>`: as encomendas e o nível no perfil, os avisos do sino e as respostas no chat chegam na
+hora. A comunidade tem um canal público (`comunidade`) que só diz «há publicações novas».
 
 O **título do separador do navegador** diz a secção e, para quem gere encomendas, quantas pedem
 acção: `(7) Encomendas · Painel`.
@@ -160,8 +173,8 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | | Equipas e alertas (`equipas`) | `manage_users` ou `manage_orders` |
 | | Métodos de pagamento (`payments`) | `manage_payments` |
 | | Lojas (`stores`) | `manage_settings` |
-| Relatórios | Vendas por loja (`vendas-huambo`) | `manage_orders` |
-| | Pagamentos e caixa (`pagamentos-caixa`) | `manage_orders` ou `confirm_payments` |
+| Relatórios | Vendas por loja (`vendas-huambo`) | `view_reports` (Ver relatórios) |
+| | Pagamentos e caixa (`pagamentos-caixa`) | `view_reports` ou `confirm_payments` |
 | Clientes | Utilizadores (`users`) | `manage_users` |
 | | Contactos e campanhas (`contacts`) | `manage_marketing` |
 | | Atendimento (`support`) | `manage_orders` |
@@ -186,8 +199,9 @@ Só o que **pede acção**, nunca totais:
 | Secção | Vistas (`vista`) | Quem vê |
 |---|---|---|
 | Utilizadores | Clientes (`customers`), Equipa (`team`) | quem vê a secção (alterar a equipa é só do administrador) |
+| | Cargos (`cargos`) | administrador |
 | Contactos e campanhas | Contactos, Grupos, Campanhas, Histórico (`contacts`, `groups`, `campaigns`, `history`) | quem vê a secção |
-| Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`) | quem vê a secção |
+| Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados, Níveis dos leitores (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`, `niveis`) | quem vê a secção |
 | Colportagem | Resumo, Candidaturas, Colportores, Relatórios, Guias e stock, Contas, Reclassificação, Percentagens, Links, Definições (`resumo`, `candidaturas`, `colportores`, `relatorios`, `guias`, `contas`, `reclassificacao`, `percentagens`, `links`, `definicoes`) | quem vê a secção |
 | Registo da Igreja | Resumo, Distritos, Igrejas, Pastores, Campos (`resumo`, `distritos`, `igrejas`, `pastores`, `campos`) | quem vê a secção |
 | | Importar (`importar`) | `manage_church_registry` (quem só gere colportores vê o registo só de leitura) |
@@ -198,6 +212,13 @@ Os avisos de colportagem para a equipa abrem a vista certa: candidatura nova →
 relatório enviado → `relatorios`.
 
 ### 3.3 Ecrã das permissões — `components/admin/users/PermissionAreas.jsx`
+A permissão **Ver relatórios** (`view_reports`, migração `20261108130000_cargos_e_ver_relatorios`)
+separa a facturação das encomendas: Vendas por loja, o relatório de vendas dentro das Encomendas e
+os números do mês no Início. Quem trata encomendas sem ela vê as encomendas, não a facturação.
+Os gestores que já geriam encomendas receberam-na na migração. As chaves das permissões estão em
+três sítios (`lib/permissions.js`, `supabase/functions/app/permissions.ts` e
+`private.permission_keys()`), e um teste (`lib/permissions.test.js`) obriga-os a bater certo.
+
 Ao editar um gestor, as permissões aparecem **por área** (Catálogo, Vendas, Clientes, Igreja,
 Sistema — o campo `area` em `lib/permissions.js`), cada uma com **"Abre: …"**, as secções que dá,
 e por baixo **o menu desta pessoa no painel**, que muda à medida que se ligam e desligam. A ficha
@@ -302,3 +323,29 @@ Encomendas), o título da página e só o que a pessoa pode abrir.
   de Vendas também para quem não lhes tinha acesso, que caía no Início.
 - Saber se a pessoa é colportor é uma pergunta à base de dados por visita, partilhada por todos
   os menus (`hooks/useColporteurMe.js`), feita só quando o menu abre.
+
+## 10. Cargos — Utilizadores › Cargos (`components/admin/users/StaffRolesPanel.jsx`)
+
+Um **cargo** é um conjunto de permissões com nome (migração `20261108130000_cargos_e_ver_relatorios`):
+
+| Cargo de partida | Permissões |
+|---|---|
+| Gerente de loja | Catálogo, Encomendas, Pagamentos, Confirmar pagamentos, Ver relatórios, Utilizadores, Marketing |
+| Caixa | Encomendas, Confirmar pagamentos |
+| Atendimento | Encomendas (sem a facturação) |
+| Catálogo e stock | Catálogo |
+| Marketing | Marketing |
+| Contabilidade | Ver relatórios, Confirmar pagamentos |
+| Colportagem | Colportagem |
+| Registo da Igreja | Registo da Igreja |
+
+- Só o **administrador** cria, edita e apaga cargos, e atribui-os no formulário de cada gestor
+  («Cargo»). Com cargo, as permissões da pessoa são as do cargo (os interruptores ficam bloqueados);
+  «Sem cargo» deixa escolher uma a uma («personalizado»).
+- **Mudar as permissões de um cargo muda logo as de toda a gente que o tem** (gatilho
+  `staff_roles_propagate`); o registo de segurança regista cada mudança.
+- Apagar um cargo deixa as pessoas com as mesmas permissões, sem cargo.
+- Na base de dados, o cargo só muda pela função `staff_role_assign`: uma escrita directa em
+  `profiles.staff_role_id`, mesmo de um administrador, é ignorada. `private.has_permission` continua
+  a ler `profiles.permissions`, por isso nenhuma regra RLS mudou.
+- A lista da Equipa e a ficha de cada pessoa mostram o cargo («Personalizado» sem cargo).

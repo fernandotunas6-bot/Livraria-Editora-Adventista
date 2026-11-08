@@ -23,6 +23,8 @@ import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
 import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import { listStaffRoles, loadTeamRoles } from '@/lib/staffRolesApi';
+import StaffRolesPanel from './StaffRolesPanel';
 
 const PER_PAGE = 20;
 
@@ -98,6 +100,8 @@ export default function UsersModule() {
   // endereço (/admin?tab=users&vista=team).
   const sv = useSectionView('users');
   const scope = sv.view === 'team' ? 'team' : 'customers';
+  // O cargo de cada pessoa da equipa (Caixa, Atendimento…), para a lista da Equipa.
+  const [cargoOf, setCargoOf] = useState({});
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -314,6 +318,29 @@ export default function UsersModule() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail, permissionsFor]);
 
+  useEffect(() => {
+    if (scope !== 'team') return undefined;
+    let alive = true;
+    Promise.all([listStaffRoles(), loadTeamRoles()])
+      .then(([{ roles }, team]) => {
+        if (!alive) return;
+        const names = Object.fromEntries(roles.map((r) => [r.id, r.name]));
+        setCargoOf(Object.fromEntries(Object.entries(team).map(([id, roleId]) => [id, names[roleId]]).filter(([, n]) => n)));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [scope, data.items]);
+
+  // Cargos: a vista própria (só administradores), sem a lista nem os filtros das contas.
+  if (sv.view === 'cargos') {
+    return (
+      <div className="space-y-5">
+        <AdminViewNav state={sv} className="mb-0" />
+        <StaffRolesPanel />
+      </div>
+    );
+  }
+
   const s = data.summary || {};
   const from = data.total ? (page - 1) * PER_PAGE + 1 : 0;
   const to = Math.min(page * PER_PAGE, data.total);
@@ -404,7 +431,12 @@ export default function UsersModule() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Pill className={role.className}>{role.label}</Pill></TableCell>
+                  <TableCell>
+                    <Pill className={role.className}>{role.label}</Pill>
+                    {u.role === 'manager' && scope === 'team' && (
+                      <span className="mt-1 block text-xs text-muted-foreground">{cargoOf[u.id] || 'Personalizado'}</span>
+                    )}
+                  </TableCell>
                   <TableCell><Pill className={state.className}>{state.label}</Pill></TableCell>
                   <TableCell className="text-right tabular-nums">{u.orders_count || 0}</TableCell>
                   <TableCell className="text-right tabular-nums whitespace-nowrap">{formatKz(u.orders_total)}</TableCell>

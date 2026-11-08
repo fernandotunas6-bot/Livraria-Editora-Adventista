@@ -13,6 +13,10 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ColporteurProfileLink from '@/components/colportagem/ColporteurProfileLink';
 import AreaBreadcrumb from '@/components/AreaBreadcrumb';
+import ReaderLevelCard from '@/components/account/ReaderLevelCard';
+import { useReaderStatus } from '@/hooks/useReader';
+import { useSignal } from '@/hooks/useSignal';
+import { accountTopic } from '@/lib/realtimeSignals';
 import { useColporteurMe } from '@/hooks/useColporteurMe';
 import { adminPermissions, buildAdminNav, navAreas } from '@/lib/adminSections';
 import { DEFAULT_ACCOUNT_VIEW, accountViews, colporteurHref, resolveAccountView } from '@/lib/siteAreas';
@@ -139,6 +143,10 @@ const ProfilePage = () => {
   // As outras áreas da pessoa: a de colportor (se tem ficha) e o painel (se tem permissões).
   const colporteur = useColporteurMe(user?.id, { enabled: isAuthed });
   const staffAreas = canAccessAdmin ? navAreas(buildAdminNav(adminPermissions({ isAdmin, hasPermission }))) : [];
+  // O nível de leitor (Conta nova → Leitor → assíduo → de honra) e o que falta para o seguinte.
+  // Volta a pedir quando chega um sinal da conta (pagamento confirmado, aviso de nível novo).
+  const [readerTick, setReaderTick] = useState(0);
+  const reader = useReaderStatus({ refreshKey: readerTick });
 
   const tabsRef = useRef(null);
   const tabClicked = useRef(false);
@@ -254,6 +262,12 @@ const ProfilePage = () => {
   }, [user?.email, fetchUserOrders]);
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
+  // Tempo real: uma encomenda que muda (pagamento confirmado, enviada, entregue) ou um aviso novo
+  // aparecem na hora — e com eles o nível de leitor, que sobe com o pagamento do livro.
+  useSignal(accountTopic(user?.id), ['orders', 'avisos'], (event) => {
+    if (event === 'orders') loadOrders();
+    setReaderTick((n) => n + 1);
+  }, { enabled: !!user?.id, debounceMs: 500 });
 
   const summary = useMemo(() => {
     const active = orders.filter((o) => !isOrderFinished(o));
@@ -431,6 +445,7 @@ const ProfilePage = () => {
               <SummaryTile icon={Heart} value={wishlist.length} label="na lista de desejos" hint="Livros guardados para depois" onClick={() => openTab('wishlist')} />
               <SummaryTile icon={Truck} label="Rastrear encomenda" hint="Com o número e o email" to="/track" />
             </div>
+            <ReaderLevelCard status={reader} className="mb-6 md:mb-8" />
             <div className="mb-6 empty:hidden md:mb-8 [&>a]:max-w-md"><ColporteurProfileLink /></div>
 
             {/* Tabs principais */}

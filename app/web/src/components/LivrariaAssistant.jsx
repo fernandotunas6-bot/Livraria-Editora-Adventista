@@ -16,6 +16,8 @@ import { TicketWaiting, useNow } from '@/components/assistant/TeamAvailability';
 import { teamAvailability } from '@/lib/teamHours';
 import SupportCenter from '@/components/SupportCenter';
 import { countUnreadSupportReplies, markThreadNotificationsRead } from '@/lib/supportApi';
+import { accountTopic } from '@/lib/realtimeSignals';
+import { useSignal } from '@/hooks/useSignal';
 
 const DEFAULT_WELCOME = 'Olá! Sou o assistente da livraria. Posso ver as suas encomendas, responder sobre envios, pagamentos e devoluções, e encontrar livros. Se precisar, passo a conversa à nossa equipa.';
 
@@ -137,12 +139,19 @@ export default function LivrariaAssistant() {
     if (!watchReplies) { setUnread(0); return; }
     setUnread(await countUnreadSupportReplies().catch(() => 0));
   }, [watchReplies]);
+  // Tempo real: a resposta da equipa chega na hora pelo canal da conta (lib/realtimeSignals.js);
+  // as consultas ficam de reserva, mais espaçadas com o canal ligado.
+  const quietRefreshRef = useRef(null);
+  const live = useSignal(accountTopic(user?.id), 'atendimento', () => {
+    refreshUnread();
+    quietRefreshRef.current?.();
+  }, { enabled: watchReplies });
   useEffect(() => {
     refreshUnread();
     if (!watchReplies) return undefined;
-    const timer = window.setInterval(() => { if (!document.hidden) refreshUnread(); }, 60000);
+    const timer = window.setInterval(() => { if (!document.hidden) refreshUnread(); }, live ? 300_000 : 60_000);
     return () => window.clearInterval(timer);
-  }, [watchReplies, refreshUnread]);
+  }, [watchReplies, refreshUnread, live]);
 
   useEffect(() => {
     fetchChatConfig().then((cfg) => {
@@ -208,10 +217,13 @@ export default function LivrariaAssistant() {
   const status = session.conversation?.status || 'bot';
   const withTeam = !!session.conversation && status !== 'bot';
   useEffect(() => {
-    if (!open || legacy || !withTeam || status === 'closed') return undefined;
-    const timer = window.setInterval(() => refreshSession({ quiet: true }), POLL_MS);
-    return () => window.clearInterval(timer);
+    quietRefreshRef.current = open && !legacy && withTeam && status !== 'closed' ? () => refreshSession({ quiet: true }) : null;
   }, [open, legacy, withTeam, status, refreshSession]);
+  useEffect(() => {
+    if (!open || legacy || !withTeam || status === 'closed') return undefined;
+    const timer = window.setInterval(() => refreshSession({ quiet: true }), live ? 60_000 : POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [open, legacy, withTeam, status, refreshSession, live]);
 
   // Aberto numa conversa com a equipa: as respostas dessa conversa ficam lidas.
   const openTicketId = open && session.conversation?.ticket_number ? session.conversation.id : '';

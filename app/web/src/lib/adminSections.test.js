@@ -149,7 +149,7 @@ describe('vistas (sub-secções)', () => {
       ['brand', 'images', 'theme', 'shop', 'shipping', 'rules', 'contact', 'messaging', 'header', 'footer', 'pwa'],
     );
     expect(ADMIN_SECTIONS.apps.views.map((v) => v.id)).toEqual(['apps', 'templates', 'logs']);
-    expect(ADMIN_SECTIONS.users.views.map((v) => v.id)).toEqual(['customers', 'team']);
+    expect(ADMIN_SECTIONS.users.views.map((v) => v.id)).toEqual(['customers', 'team', 'cargos']);
   });
 
   it('as vistas de um grupo (Configurações) ficam seguidas', () => {
@@ -241,6 +241,9 @@ describe('permissões arrumadas pelas áreas do painel', () => {
     expect(gestor.users).toBe(false);
     expect(permissionsOfAccount({ role: 'admin' }).isAdmin).toBe(true);
     expect(Object.values(permissionsOfAccount({ role: 'member', permissions: { manage_orders: true } })).some(Boolean)).toBe(false);
-    expect(navAreas(buildAdminNav(gestor))).toEqual(['Vendas', 'Relatórios', 'Clientes']);
+    // Os relatórios de dinheiro já não vêm com as encomendas (precisam de «Ver relatórios»).
+    expect(navAreas(buildAdminNav(gestor))).toEqual(['Vendas', 'Clientes']);
+    const comRelatorios = permissionsOfAccount({ role: 'manager', permissions: { manage_orders: true, view_reports: true } });
+    expect(navAreas(buildAdminNav(comRelatorios))).toEqual(['Vendas', 'Relatórios', 'Clientes']);
   });
 });
