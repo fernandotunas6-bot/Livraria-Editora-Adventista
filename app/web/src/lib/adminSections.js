@@ -12,8 +12,9 @@
 // avisos, nos emails e noutras páginas do site.
 
 import {
-  Activity, Award, Ban, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
-  FileUp, Flag, Hash, Image, Inbox, KeyRound, LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
+  Activity, ArrowLeftRight, Award, Ban, Banknote, BarChart3, Bell, Bike, BookHeart, BookOpen, Brush, Building2, CalendarClock,
+  Church, ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, KeyRound,
+  LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
   UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
@@ -25,9 +26,11 @@ export const DEFAULT_SECTION = 'inicio';
 export const ADMIN_GROUPS = [
   { id: 'inicio', label: '', sections: ['inicio'] },
   { id: 'catalogo', label: 'Catálogo', sections: ['books', 'collections', 'slides', 'downloads'] },
+  { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
-  { id: 'relatorios', label: 'Relatórios', sections: ['vendas-huambo', 'pagamentos-caixa'] },
+  { id: 'relatorios', label: 'Relatórios', sections: ['vendas-huambo', 'pagamentos-caixa', 'financas'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
+  { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
   { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'apps', 'seguranca'] },
 ];
@@ -79,6 +82,18 @@ export const ADMIN_SECTIONS = {
       { id: 'acessos', label: 'Acessos e pagamentos', icon: KeyRound, keywords: 'compradores biblioteca bloquear desbloquear confirmar pagamento abrir', description: 'Quem comprou cada livro digital, o pagamento e o acesso: abre com o pagamento confirmado; bloquear e desbloquear.' },
     ],
   },
+  producao: {
+    label: 'Produção', title: 'Produção da Editora', icon: Factory,
+    keywords: 'editora grafica impressao tiragem reimpressao revisao paginacao capa ordens etapas fornecedores custos',
+    description: 'Cada título em produção: as etapas, quem é responsável e os prazos, os custos e os fornecedores. Ao concluir, a tiragem entra no stock.',
+    allowed: (p) => p.production || p.finance,
+    views: [
+      { id: 'ordens', label: 'Ordens', icon: ClipboardList, keywords: 'tiragens titulos novos reimpressoes concluir cancelar', description: 'As ordens de produção: planeadas, em curso, concluídas e canceladas.' },
+      { id: 'etapas', label: 'Etapas e prazos', icon: CalendarClock, keywords: 'responsaveis atrasadas prazos tarefas', description: 'O que falta fazer em todas as ordens, por responsável e prazo, com as atrasadas primeiro.' },
+      { id: 'fornecedores', label: 'Fornecedores', icon: Building2, keywords: 'graficas papel design transporte nif iban contactos', description: 'Gráficas, papel, design, revisão e transporte: contactos, NIF e IBAN.' },
+      { id: 'contas', label: 'Contas e pagamentos', icon: HandCoins, keywords: 'dividas saldos pagar fornecedores anular', description: 'O que se deve a cada fornecedor e os pagamentos feitos. Só as finanças registam pagamentos.' },
+    ],
+  },
   orders: {
     label: 'Encomendas', title: 'Encomendas', icon: ShoppingBag,
     keywords: 'pedidos vendas compras encomenda entregas recibos',
@@ -120,6 +135,12 @@ export const ADMIN_SECTIONS = {
     keywords: 'caixa recebimentos reembolsos dinheiro fecho',
     description: 'Pagamentos recebidos e por confirmar, reembolsos e o fecho de caixa.',
     allowed: (p) => p.reports || p.confirmPayments,
+  },
+  financas: {
+    label: 'Entradas e saídas', title: 'Entradas e saídas', icon: ArrowLeftRight,
+    keywords: 'caixa fluxo saldo despesas receitas financas dinheiro',
+    description: 'O dinheiro que entra (clientes) e o que sai (fornecedores e salários), por período, e o que está por pagar.',
+    allowed: (p) => p.finance,
   },
   users: {
     label: 'Utilizadores', title: 'Utilizadores e clientes', icon: Users,
@@ -164,6 +185,17 @@ export const ADMIN_SECTIONS = {
       { id: 'niveis', label: 'Níveis dos leitores', icon: Award, keywords: 'leitor assiduo honra distintivos fidelizacao comunidade de leitores', description: 'Conta nova → Leitor (1.º livro, ou participação) → Leitor assíduo → Leitor de honra: as regras e quantos há em cada nível.' },
     ],
   },
+  funcionarios: {
+    label: 'Funcionários', title: 'Funcionários', icon: IdCard,
+    keywords: 'rh recursos humanos fichas pessoal vendedores estafetas salarios ordenados',
+    description: 'A ficha de cada pessoa que trabalha na livraria e na Editora, com ou sem conta no painel, e os salários de cada mês.',
+    allowed: (p) => p.staff || p.finance,
+    readOnly: (p) => !p.staff,
+    views: [
+      { id: 'fichas', label: 'Fichas', icon: IdCard, keywords: 'cargo loja contactos admissao estado', description: 'Nome, cargo, departamento, loja, contactos, admissão e estado. A ficha não tem dinheiro.' },
+      { id: 'salarios', label: 'Salários', icon: Banknote, keywords: 'ordenados mes folha pagar descontos inss irt', description: 'Os salários de cada mês: gerar, descontos, pagar e anular. Só as finanças.', allowed: (p) => p.finance },
+    ],
+  },
   colportagem: {
     label: 'Colportagem', title: 'Colportagem', icon: BookHeart,
     keywords: 'colportores candidaturas comissoes relatorios',
@@ -174,6 +206,7 @@ export const ADMIN_SECTIONS = {
       { id: 'candidaturas', label: 'Candidaturas', icon: Inbox, keywords: 'pedidos novos aprovar recusar', description: 'Quem se candidatou: aprovar, recusar ou pedir mais dados.' },
       { id: 'colportores', label: 'Colportores', icon: Users, keywords: 'fichas codigo cpt', description: 'As fichas dos colportores: código, categoria, igreja, zona e estado.' },
       { id: 'relatorios', label: 'Relatórios', icon: ClipboardList, keywords: 'semanais validar devolver', description: 'Relatórios semanais: validar ou devolver, ver quem falta e lançar por um colportor.' },
+      { id: 'entregas', label: 'Entregas', icon: Bike, keywords: 'domicilio ofertas preparar levantar loja', description: 'As entregas ao domicílio com colportores: o que preparar na loja, as ofertas à espera e quanto cada um fez e ganhou.' },
       { id: 'guias', label: 'Guias e stock', icon: Truck, keywords: 'consignacao entrega devolucao compra', description: 'Guias de entrega, devolução e compra, com o stock da loja e o do colportor.' },
       { id: 'contas', label: 'Contas', icon: Scale, keywords: 'conta corrente saldo extracto acertos pagamentos', description: 'O saldo de cada colportor, o extracto, os pagamentos e as correcções.' },
       { id: 'reclassificacao', label: 'Reclassificação', icon: TrendingUp, keywords: 'categoria anual subir', description: 'A sugestão anual de categoria de cada colportor; a equipa aplica uma a uma.' },
@@ -265,6 +298,9 @@ export function adminPermissions({ isAdmin = false, hasPermission = () => false 
     churchRegistry: has('manage_church_registry') || has('manage_colporteurs'),
     churchRegistryEdit: has('manage_church_registry'),
     colporteurs: has('manage_colporteurs'),
+    production: has('manage_production'),
+    staff: has('manage_staff'),
+    finance: has('manage_finance'),
   };
 }
 

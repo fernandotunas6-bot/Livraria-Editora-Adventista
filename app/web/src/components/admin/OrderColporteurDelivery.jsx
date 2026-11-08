@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Handshake, Loader2, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useSignal } from '@/hooks/useSignal';
 import { useToast } from '@/hooks/use-toast';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import { DELIVERY_OFFER_STATUS, handoverDelivery, loadOrderDeliveries, takeBackDelivery } from '@/lib/colporteurApi';
@@ -25,6 +26,8 @@ export default function OrderColporteurDelivery({ order, onChanged }) {
     try { setData(await loadOrderDeliveries(order.id)); } catch { setData({ route: '', deliveries: [] }); }
   }, [order.id]);
   useEffect(() => { load(); }, [load, order.delivery_status, order.payment_status]);
+  // O colportor aceitou, recusou ou avançou: aparece aqui sem recarregar.
+  useSignal('painel', ['entregas'], () => { load(); });
 
   const run = async (key, fn, ok) => {
     setBusy(key);
@@ -62,7 +65,7 @@ export default function OrderColporteurDelivery({ order, onChanged }) {
           {active.source === 'stock' ? 'Entrega com os livros que tem à consignação.'
             : active.picked_up_at ? `Livros entregues ao colportor a ${when(active.picked_up_at)}.`
               : 'Levanta os livros na loja: prepare-os e marque quando lhos entregar.'}
-          {' '}Telefone: {active.colporteur.phone}.{Number(active.fee) > 0 ? ` Portes para ele: ${kz(active.fee)}.` : ''}
+          {' '}Telefone: {active.colporteur.phone}.{Number(active.fee) > 0 ? ` Ganha ${kz(active.fee)}.` : ''}
         </p>
       )}
 

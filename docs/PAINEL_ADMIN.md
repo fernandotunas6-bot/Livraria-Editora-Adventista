@@ -57,8 +57,9 @@ Separadores no topo                         Barra lateral
      painel**, O meu perfil, Ver a loja, Terminar sessão, e os atalhos de teclado.
 
 ### 1.2 Navegação — separadores — `AdminTabsNav.jsx`
-- **Grupos** (sublinhado na cor da marca no activo, 44 px de altura): Início, Catálogo, Vendas,
-  Relatórios, Clientes, Igreja, Sistema. Cada grupo mostra a **soma** dos números das suas secções.
+- **Grupos** (sublinhado na cor da marca no activo, 44 px de altura): Início, Catálogo, Editora,
+  Vendas, Relatórios, Clientes, Pessoal, Igreja, Sistema (Editora e Pessoal desde 2026-11-08,
+  [PRODUCAO.md](PRODUCAO.md)). Cada grupo mostra a **soma** dos números das suas secções.
 - Carregar num grupo abre **a secção onde se estava nesse grupo da última vez** (ou a primeira).
 - **Secções do grupo**: pílulas de 36 px com ícone, nome e número; a activa a cheio.
 - No telemóvel só aparece a linha das secções do grupo (desliza na horizontal, colada por baixo da
@@ -111,8 +112,21 @@ Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera
 (incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da navegação,
 o Início e o título do separador do navegador acompanham.
 
+A barra do topo mostra o ícone de actualizar com **Em tempo real** (a verde) quando o canal está
+ligado; sem ele, "Actualizado há 2 min". O ícone roda enquanto actualiza — também quando a
+actualização vem de um sinal (pelo menos 0,7 s, para se ver) — e carregar actualiza já, nos dois
+casos. O canal liga-se para toda a equipa.
+
+Uma rajada de sinais dá uma só leitura, mas com todos os sinais da rajada (`useSignal` passa a lista
+em terceiro argumento): uma encomenda nova manda «catalogo» (o stock desceu) e «orders» quase juntos,
+e o painel lê os dois. Antes ficava só o último, e o stock vendido só aparecia na consulta de 5 em
+5 minutos; o mesmo no perfil do cliente («orders» e «avisos») e no atendimento (mensagens de duas
+conversas).
+
 O mesmo canal acorda os **alertas da equipa** (antes de 20 em 20 s; agora na hora, e de reserva de
-2 em 2 min) e o **atendimento** (antes de 30 em 30 s). Fora do painel, cada conta ouve o seu canal
+2 em 2 min), o **atendimento** (antes de 30 em 30 s) e a **Produção**, os **Funcionários** e as
+**Entradas e saídas** (sinais `producao`, `funcionarios` e `financas`, [PRODUCAO.md](PRODUCAO.md)).
+As visitas aos livros não contam como mudança do catálogo (migração `20261108193000_sinais_afinados`). Fora do painel, cada conta ouve o seu canal
 `conta:<id>`: as encomendas e o nível no perfil, os avisos do sino e as respostas no chat chegam na
 hora. A comunidade tem um canal público (`comunidade`) que só diz «há publicações novas».
 
@@ -203,14 +217,15 @@ Só o que **pede acção**, nunca totais:
 | | Cargos (`cargos`) | administrador |
 | Contactos e campanhas | Contactos, Grupos, Campanhas, Histórico (`contacts`, `groups`, `campaigns`, `history`) | quem vê a secção |
 | Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados, Níveis dos leitores (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`, `niveis`) | quem vê a secção |
-| Colportagem | Resumo, Candidaturas, Colportores, Relatórios, Guias e stock, Contas, Reclassificação, Percentagens, Links, Definições (`resumo`, `candidaturas`, `colportores`, `relatorios`, `guias`, `contas`, `reclassificacao`, `percentagens`, `links`, `definicoes`) | quem vê a secção |
+| Colportagem | Resumo, Candidaturas, Colportores, Relatórios, Entregas, Guias e stock, Contas, Reclassificação, Percentagens, Links, Definições (`resumo`, `candidaturas`, `colportores`, `relatorios`, `entregas`, `guias`, `contas`, `reclassificacao`, `percentagens`, `links`, `definicoes`) | quem vê a secção |
 | Registo da Igreja | Resumo, Distritos, Igrejas, Pastores, Campos (`resumo`, `distritos`, `igrejas`, `pastores`, `campos`) | quem vê a secção |
 | | Importar (`importar`) | `manage_church_registry` (quem só gere colportores vê o registo só de leitura) |
 | Configurações | Identidade: Marca, Imagens, Tema visual · Loja: Catálogo e loja, Envio, Regras da loja · Comunicação: Contacto, Email push e chat, Barra superior, Rodapé · Aplicação: PWA (`brand`, `images`, `theme`, `shop`, `shipping`, `rules`, `contact`, `messaging`, `header`, `footer`, `pwa`) | quem vê a secção |
 | Integrações | Serviços, Modelos de email, Registo de envios (`apps`, `templates`, `logs`) | administrador |
 
 Os avisos de colportagem para a equipa abrem a vista certa: candidatura nova → `candidaturas`,
-relatório enviado → `relatorios`.
+relatório enviado → `relatorios`, entrega por preparar ou que ficou com a equipa → `entregas` (quem
+não vê a Colportagem vai às Encomendas).
 
 ### 3.3 Ecrã das permissões — `components/admin/users/PermissionAreas.jsx`
 A permissão **Ver relatórios** (`view_reports`, migração `20261108130000_cargos_e_ver_relatorios`)

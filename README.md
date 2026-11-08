@@ -90,6 +90,8 @@ flowchart LR
 - Painel `/admin` com permissões por função
 - Gestão de livros, slides, lojas e pagamentos
 - Relatórios de vendas e alertas de stock
+- **Produção da Editora**: ordens de produção com etapas, responsáveis, prazos e custos; a tiragem entra no stock ao concluir
+- **Funcionários e finanças**: fichas (com ou sem conta), salários do mês, pagamentos a fornecedores e o relatório de entradas e saídas
 - Integrações (Google Drive, OAuth)
 - Definições de marca e PWA
 
@@ -234,7 +236,7 @@ Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), implementada sobre o Supabase em `app/web/src/lib/dataClient.js`.
 
 > Contactos e campanhas: [docs/CONTACTOS-E-CAMPANHAS.md](docs/CONTACTOS-E-CAMPANHAS.md)  
-> Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · Passagem de trabalho: [docs/HANDOFF.md](docs/HANDOFF.md) · Migração do repositório: [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md)  
+> Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · Passagem de trabalho: [docs/HANDOFF.md](docs/HANDOFF.md) · Produção, funcionários e finanças: [docs/PRODUCAO.md](docs/PRODUCAO.md) · Migração do repositório: [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md)  
 > O login (email e Google) é do Supabase Auth. O Firebase fica só para as ferramentas do Google Workspace no painel.
 
 ---

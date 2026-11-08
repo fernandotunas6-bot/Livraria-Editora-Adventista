@@ -65,7 +65,8 @@ export function useReportViewBadges(state, badges) {
 }
 
 function ViewBadge({ badge, active }) {
-  if (!badge) return null;
+  // Zero não pede acção nem é um total que valha a pena: sem número (como na barra lateral).
+  if (!badge || !(Number(badge.count) > 0)) return null;
   if (badge.tone === 'count') {
     return (
       <span className={cn('tabular-nums', active ? 'text-muted-foreground' : 'text-muted-foreground/80')}>
