@@ -5,17 +5,41 @@
 -- administradores e gestores com a permissão "Colportagem". O envio por outros canais é o de
 -- sempre (a Edge Function envia os avisos por enviar, em horário de funcionamento).
 --
--- Os tipos novos juntam-se aos de 20261107020000_equipas_alertas_e_prazos (a lista fica igual).
+-- Os dois tipos novos JUNTAM-SE à regra que existir, não a reescrevem. Esta migração nasceu como
+-- 20261107110000, com uma lista fixa; entretanto entrou em produção o registo de segurança
+-- (20261107130000), que acrescenta o tipo `security` — e há avisos desse tipo gravados. A lista
+-- fixa apagava-o da regra, e o `add constraint` falhava sobre essas linhas: o `db push` parava e
+-- a Edge Function não chegava a ser publicada. Mudou de data (20261108041000) porque o deploy
+-- usa `--include-all`: com a data antiga corria depois das mais recentes em produção, mas antes
+-- delas no CI, e o CI não via o problema.
+-- Lê os dois formatos em que o Postgres guarda a regra; correr duas vezes não muda nada.
 -- Reverter: drop dos triggers colporteurs_aviso_candidatura e colporteur_reports_aviso_enviado e
--- da função private.notify_colporteur_staff; repor a lista de tipos de 20261107020000.
+-- da função private.notify_colporteur_staff; tirar os dois tipos da regra.
 
-alter table public.staff_notifications drop constraint if exists staff_notifications_kind_check;
-alter table public.staff_notifications add constraint staff_notifications_kind_check
-  check (kind = any (array[
-    'new_order', 'support', 'order_stuck', 'order_problem', 'order_confirmed', 'payment_reported',
-    'order_overdue', 'order_unacknowledged', 'ticket_sla', 'escalation', 'ops_test',
-    'colporteur_application', 'colporteur_report'
-  ]));
+do $$
+declare
+  v_def text;
+  v_kinds text[];
+begin
+  select pg_get_constraintdef(c.oid) into v_def
+  from pg_constraint c
+  where c.conrelid = 'public.staff_notifications'::regclass and c.conname = 'staff_notifications_kind_check';
+  select coalesce(array_agg(distinct coalesce(m[1], m[2])), array[]::text[]) into v_kinds
+  from regexp_matches(coalesce(v_def, ''), '''([a-z_]+)''|[{,]([a-z_]+)(?=[,}])', 'g') as m;
+  if v_def is not null and cardinality(v_kinds) = 0 then
+    raise exception 'staff_notifications_kind_check com um formato inesperado: %', v_def;
+  end if;
+  if not ('colporteur_application' = any (v_kinds)) then
+    v_kinds := v_kinds || 'colporteur_application'::text;
+  end if;
+  if not ('colporteur_report' = any (v_kinds)) then
+    v_kinds := v_kinds || 'colporteur_report'::text;
+  end if;
+  alter table public.staff_notifications drop constraint if exists staff_notifications_kind_check;
+  execute format('alter table public.staff_notifications add constraint staff_notifications_kind_check check (kind = any (array[%s]))',
+    (select string_agg(quote_literal(k), ', ' order by k) from unnest(v_kinds) as k));
+end
+$$;
 
 -- Um aviso a cada pessoa que gere colportores (administradores e gestores com a permissão).
 create or replace function private.notify_colporteur_staff(p_kind text, p_title text, p_body text)
