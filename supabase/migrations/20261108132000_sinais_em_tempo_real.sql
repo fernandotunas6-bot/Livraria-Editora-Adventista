@@ -167,7 +167,8 @@ revoke all on function private.community_realtime_signal() from public, anon, au
 -- Quem ouve os canais privados: a equipa ouve o painel; cada conta ouve só o seu canal.
 do $$
 begin
-  if to_regclass('realtime.messages') is not null then
+  -- Só com o serviço de tempo real (em produção); o Postgres do CI e o PGlite não o têm.
+  if to_regclass('realtime.messages') is not null and to_regprocedure('realtime.topic()') is not null then
     execute 'drop policy if exists "livraria: sinais do painel e da conta" on realtime.messages';
     execute $p$
       create policy "livraria: sinais do painel e da conta" on realtime.messages
