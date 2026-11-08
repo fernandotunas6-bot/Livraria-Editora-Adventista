@@ -224,7 +224,7 @@ describe('permissões arrumadas pelas áreas do painel', () => {
     const labels = (key) => sectionsOpenedBy(key).map((s) => s.id);
     expect(labels('manage_catalog')).toEqual(['books', 'collections', 'slides', 'downloads', 'community']);
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
-    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices']);
+    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes']);
     expect(labels('manage_settings')).not.toContain('apps');
     const colp = sectionsOpenedBy('manage_colporteurs');
     expect(colp.map((s) => s.id)).toEqual(['colportagem', 'igreja']);

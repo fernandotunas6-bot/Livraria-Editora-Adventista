@@ -61,7 +61,7 @@ export const colporteurHref = (view) => (!view || view === DEFAULT_COLPORTEUR_VI
 const SHORTCUT_ORDER = [
   'orders', 'books', 'support', 'colportagem', 'acompanhamento', 'pagamentos-caixa', 'contacts', 'igreja',
   'collections', 'slides', 'community', 'downloads', 'vendas-huambo', 'users', 'equipas', 'payments', 'stores',
-  'settings', 'notices', 'apps', 'seguranca',
+  'settings', 'notices', 'versoes', 'apps', 'seguranca',
 ];
 
 /**

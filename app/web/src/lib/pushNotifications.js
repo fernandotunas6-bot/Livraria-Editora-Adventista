@@ -1,5 +1,19 @@
 import pb from '@/lib/dataClient';
-import { APP_API_URL } from '@/lib/supabaseClient';
+
+/**
+ * "Novidades da app" neste aparelho (perfil → Notificações no aparelho). Por omissão, sim: as
+ * novidades só chegam quando a equipa as anuncia (painel → Versões da app). Desligar não mexe
+ * nos avisos das encomendas nem da comunidade.
+ */
+export const APP_UPDATES_KEY = 'livraria:push-novidades';
+
+export function appUpdatesWanted() {
+  try {
+    return localStorage.getItem(APP_UPDATES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -21,7 +35,7 @@ export async function requestPushPermission() {
   return Notification.requestPermission();
 }
 
-export async function subscribeToPush(vapidPublicKey) {
+export async function subscribeToPush(vapidPublicKey, { appUpdates } = {}) {
   if (!vapidPublicKey || !isPushSupported()) return null;
   const permission = await requestPushPermission();
   if (permission !== 'granted') return null;
@@ -41,18 +55,28 @@ export async function subscribeToPush(vapidPublicKey) {
     keys: json.keys,
     user_agent: navigator.userAgent,
     user: pb.authStore.model?.id || '',
+    app_updates: typeof appUpdates === 'boolean' ? appUpdates : appUpdatesWanted(),
   };
 
-  await fetch(`${APP_API_URL}/push/subscribe`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
+  // `pb.send` leva o token da sessão já renovado (o guardado pode ter expirado com a app em
+  // segundo plano) e diz se o servidor recusou, em vez de dar a subscrição por feita.
+  await pb.send('/push/subscribe', { method: 'POST', body });
 
   return sub;
+}
+
+/** Liga ou desliga as novidades da app neste aparelho (só se já tiver notificações). */
+export async function setAppUpdatesPush(vapidPublicKey, enabled) {
+  try {
+    localStorage.setItem(APP_UPDATES_KEY, enabled ? '1' : '0');
+  } catch {
+    // sem armazenamento: o servidor fica a saber na mesma
+  }
+  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+  const reg = await navigator.serviceWorker.ready;
+  if (!await reg.pushManager.getSubscription()) return false;
+  await subscribeToPush(vapidPublicKey, { appUpdates: !!enabled });
+  return true;
 }
 
 export async function showLocalNotification({ title, body, url = '/' }) {
