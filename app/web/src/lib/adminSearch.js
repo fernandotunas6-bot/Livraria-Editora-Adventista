@@ -2,7 +2,8 @@
 // um email, um telefone ou texto solto. Conforme o que for, a procura põe à frente a acção certa
 // ("Abrir produto LIV-063", "Encomendas de ana@…") em vez de só procurar secções pelo nome.
 //
-// E as secções abertas há pouco, por pessoa, para a procura vazia começar por elas.
+// E as secções abertas há pouco, por pessoa, para a procura vazia começar por elas — com a vista
+// onde se estava ("colportagem:contas"), uma entrada por secção.
 
 import { looksLikeProductCode, normalizeProductCode } from '@/lib/productTypes';
 
@@ -31,10 +32,17 @@ export function readRecentSections(userId) {
   }
 }
 
-/** Junta a secção ao topo das recentes (sem repetir) e devolve a lista nova. */
+/** "colportagem:contas" → { section: 'colportagem', view: 'contas' }; "orders" → sem vista. */
+export function parseRecent(entry) {
+  const [section, view = null] = String(entry || '').split(':');
+  return { section, view: view || null };
+}
+
+/** Junta a secção (e a vista) ao topo das recentes — uma entrada por secção — e devolve a lista nova. */
 export function pushRecentSection(userId, id) {
   if (!id) return readRecentSections(userId);
-  const list = [id, ...readRecentSections(userId).filter((x) => x !== id)].slice(0, MAX_RECENTS);
+  const { section } = parseRecent(id);
+  const list = [id, ...readRecentSections(userId).filter((x) => parseRecent(x).section !== section)].slice(0, MAX_RECENTS);
   try {
     globalThis.localStorage?.setItem(recentsKey(userId), JSON.stringify(list));
   } catch {

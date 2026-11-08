@@ -137,8 +137,8 @@ const ProfilePage = () => {
   const views = accountViews({ canAccessAdmin, canManageContacts });
   const PROFILE_TABS = views.map((v) => v.id);
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
-  const [activeTabState, setActiveTab] = useState(tabFromUrl || location.state?.tab || DEFAULT_ACCOUNT_VIEW);
-  const activeTab = resolveAccountView(activeTabState, { canAccessAdmin, canManageContacts });
+  // O separador vem sempre do endereço: o «voltar» do navegador regressa ao anterior.
+  const activeTab = resolveAccountView(tabFromUrl || location.state?.tab || DEFAULT_ACCOUNT_VIEW, { canAccessAdmin, canManageContacts });
   const activeView = views.find((v) => v.id === activeTab);
   // As outras áreas da pessoa: a de colportor (se tem ficha) e o painel (se tem permissões).
   const colporteur = useColporteurMe(user?.id, { enabled: isAuthed });
@@ -151,12 +151,13 @@ const ProfilePage = () => {
   const tabsRef = useRef(null);
   const tabClicked = useRef(false);
   const changeTab = (tab) => {
+    if (tab === activeTab) return;
     tabClicked.current = true;
-    setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     if (tab === 'orders') next.delete('tab');
     else next.set('tab', tab);
-    setSearchParams(next, { replace: true });
+    // Uma entrada no histórico por separador: o «voltar» regressa ao anterior.
+    setSearchParams(next);
   };
   const openTab = (tab) => {
     changeTab(tab);
@@ -238,8 +239,6 @@ const ProfilePage = () => {
   }, [access, navigate]);
 
   useEffect(() => {
-    if (tabFromUrl) setActiveTab(tabFromUrl);
-    else if (location.state?.tab) setActiveTab(location.state.tab);
     // Chegou por um link para um separador (menu, sino, rodapé): no telemóvel o cartão do
     // perfil ocupa o ecrã todo e o separador ficava escondido lá em baixo; desce até ele.
     // Um clique nos próprios separadores não mexe no scroll.

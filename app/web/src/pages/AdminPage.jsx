@@ -31,6 +31,7 @@ import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView 
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useSignal } from '@/hooks/useSignal';
 import { mergeOrders, newestUpdated } from '@/lib/ordersSync';
+import { loadStaffRoleName } from '@/lib/staffRolesApi';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getPaymentStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
@@ -119,14 +120,17 @@ const AdminPage = () => {
   // recarregar, voltar atrás ou mandar a ligação a um colega abre a lista como estava. Valores
   // desconhecidos no endereço valem "todos". Uma só escrita por acção (o `setSearchParams` não
   // junta chamadas seguidas: a segunda apagava a primeira).
-  const updateParams = useCallback((patch) => setSearchParams((prev) => {
+  // Filtros substituem a entrada do histórico (escrever na procura não enche o «voltar»); mudar de
+  // secção ou de vista acrescenta uma, para o «voltar» do navegador (e do telemóvel) regressar ao
+  // contexto anterior em vez de sair do painel.
+  const updateParams = useCallback((patch, { replace = true } = {}) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     for (const [key, value] of Object.entries(patch)) {
       if (value == null || value === '' || value === 'all') next.delete(key);
       else next.set(key, String(value));
     }
     return next;
-  }, { replace: true }), [setSearchParams]);
+  }, { replace }), [setSearchParams]);
   const param = (key, allowed) => {
     const v = searchParams.get(key) || '';
     return !allowed || allowed.includes(v) ? v : '';
@@ -174,6 +178,14 @@ const AdminPage = () => {
   const canManageColporteurs = perms.colporteurs;
   // Separadores no topo ou barra lateral: escolha de cada pessoa, neste aparelho.
   const { layout, setLayout, sidebarOpen, setSidebarOpen } = useAdminLayout(user?.id);
+  // O cargo de quem está no painel (Caixa, Atendimento…), no menu da conta.
+  const [myCargo, setMyCargo] = useState(null);
+  useEffect(() => {
+    if (!user?.id || isAdmin) { setMyCargo(null); return undefined; }
+    let alive = true;
+    loadStaffRoleName(user.id).then((name) => { if (alive) setMyCargo(name); }).catch(() => {});
+    return () => { alive = false; };
+  }, [user?.id, isAdmin]);
 
   // Só a primeira carga mostra a espera; as seguintes (depois de gravar, ou a actualização
   // automática) trocam os dados por baixo, sem a lista piscar nem perder o lugar.
@@ -493,17 +505,18 @@ const AdminPage = () => {
   const attentionCount = canManageOrders ? pendingCount + awaitingPaymentCount : 0;
   // Abrir as encomendas já filtradas (do Início e da procura).
   const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search });
+    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search }, { replace: activeTab === 'orders' });
   };
   const openProducts = ({ filter = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search });
+    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search }, { replace: activeTab === 'books' });
   };
   // Ir para uma secção (e vista). Sem vista pedida, a última aberta nessa secção; a vista é
   // própria de cada secção, por isso a de outra não fica no endereço.
   const goToSection = (id, opts = {}) => {
     if (id === 'books' && opts.filter) { openProducts({ filter: opts.filter }); return; }
     const view = opts.view !== undefined ? opts.view : (lastViews.current[id] ?? null);
-    updateParams({ tab: id, vista: view });
+    if (id === activeTab && (view || null) === (requestedView || null)) return;
+    updateParams({ tab: id, vista: view }, { replace: !!opts.replace });
   };
   const setActiveTab = (id) => goToSection(id);
   const addProduct = (type = 'livro') => {
@@ -553,7 +566,7 @@ const AdminPage = () => {
         sidebarOpen={sidebarOpen}
         onSidebarOpenChange={setSidebarOpen}
         user={user}
-        roleLabel={isAdmin ? 'Administrador' : 'Equipa'}
+        roleLabel={isAdmin ? 'Administrador' : myCargo ? `Gestor · ${myCargo}` : 'Gestor'}
         onProfile={() => navigate('/profile')}
         onLogout={() => { logout(); navigate('/'); }}
         actions={sectionActions}

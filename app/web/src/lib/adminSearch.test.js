@@ -43,3 +43,18 @@ describe('secções recentes', () => {
     expect(readRecentSections('u1')).toEqual(['orders']);
   });
 });
+
+describe('recentes com a vista onde se estava', () => {
+  it('uma entrada por secção, com a última vista', async () => {
+    const { parseRecent, pushRecentSection, readRecentSections } = await import('@/lib/adminSearch');
+    localStorage.clear();
+    pushRecentSection('u9', 'orders');
+    pushRecentSection('u9', 'colportagem:contas');
+    pushRecentSection('u9', 'colportagem:relatorios');
+    expect(readRecentSections('u9')).toEqual(['colportagem:relatorios', 'orders']);
+    expect(parseRecent('colportagem:relatorios')).toEqual({ section: 'colportagem', view: 'relatorios' });
+    expect(parseRecent('orders')).toEqual({ section: 'orders', view: null });
+    pushRecentSection('u9', 'orders');
+    expect(readRecentSections('u9')).toEqual(['orders', 'colportagem:relatorios']);
+  });
+});

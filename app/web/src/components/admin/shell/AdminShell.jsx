@@ -7,7 +7,7 @@ import AdminSectionHeader from '@/components/admin/shell/AdminSectionHeader';
 import AdminCommandPalette from '@/components/admin/shell/AdminCommandPalette';
 import { AdminViewContext } from '@/components/admin/shell/AdminViewNav';
 import { findSection, findView, withViewBadges } from '@/lib/adminSections';
-import { pushRecentSection, readRecentSections } from '@/lib/adminSearch';
+import { parseRecent, pushRecentSection, readRecentSections } from '@/lib/adminSearch';
 
 /**
  * A estrutura do painel, nas duas disposições (ver docs/PAINEL_ADMIN.md):
@@ -87,9 +87,10 @@ function ShellBody({
   // As secções abertas há pouco (por pessoa), para a procura vazia começar por elas. A que está
   // aberta não conta: já se está lá.
   const [recents, setRecents] = useState(() => readRecentSections(user?.id));
+  const currentViewId = currentView?.id || null;
   useEffect(() => {
-    if (active && active !== 'inicio') setRecents(pushRecentSection(user?.id, active));
-  }, [active, user?.id]);
+    if (active && active !== 'inicio') setRecents(pushRecentSection(user?.id, currentViewId ? `${active}:${currentViewId}` : active));
+  }, [active, currentViewId, user?.id]);
 
   const sidebarLayout = layout === 'sidebar';
   const showSidebar = sidebarLayout || isMobile;
@@ -154,7 +155,7 @@ function ShellBody({
         open={searchOpen} onOpenChange={setSearchOpen}
         nav={nav} onNavigate={go}
         onSearchOrders={onSearchOrders} onSearchProducts={onSearchProducts}
-        recents={recents.filter((id) => id !== active)}
+        recents={recents.filter((id) => parseRecent(id).section !== active)}
         findProduct={findProduct} onEditProduct={onEditProduct}
       />
     </>
