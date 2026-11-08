@@ -108,3 +108,21 @@ describe('rewriteSiteUrl', () => {
     expect(INDEX).toContain(SOURCE_URL);
   });
 });
+
+describe('domínio oficial nos ficheiros do repositório', () => {
+  // Um build publicado sem o pós-build (outro caminho de deploy, um passo saltado) sai com o
+  // que estiver escrito aqui: tem de ser o domínio oficial, e não um projecto antigo.
+  it('index.html, sitemap.xml e robots.txt só falam do livrariaadventista.ao', () => {
+    for (const name of ['index.html', 'public/sitemap.xml', 'public/robots.txt']) {
+      const text = readFileSync(path.resolve(__dirname, '../app/web', name), 'utf8');
+      expect(text, name).toContain(SOURCE_URL);
+      expect(text, name).not.toMatch(/pages\.dev|livrariaadventista\.com/);
+    }
+    expect(SOURCE_URL).toBe('https://livrariaadventista.ao');
+  });
+
+  it('uma pré-visualização continua a receber o seu próprio endereço', () => {
+    expect(rewriteSiteUrl(`<loc>${SOURCE_URL}/shop</loc>`, 'https://abc.livraria-editora-adventista-ben.pages.dev'))
+      .toBe('<loc>https://abc.livraria-editora-adventista-ben.pages.dev/shop</loc>');
+  });
+});

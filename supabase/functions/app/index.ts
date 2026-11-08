@@ -52,6 +52,7 @@ import {
   welcomeLetter,
   PREVIEW_TEMPLATES,
   unsubscribeUrlFor,
+  listUnsubscribeHeaders,
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
@@ -63,7 +64,7 @@ import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.
 import { createRateLimit } from "./rateLimit.ts";
 import { buildOpsReport } from "./opsReport.ts";
 import {
-  brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, smtpPortProblem,
+  brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, senderFor, smtpPortProblem,
   type EmailMessage, type ProviderResult,
 } from "./emailProviders.ts";
 import {
@@ -332,11 +333,14 @@ async function deliverByApi(provider: string, request: { url: string; init: Requ
 
 /** Entrega uma mensagem ao fornecedor. Só envia: não regista nem decide repetições. */
 async function deliverEmail(settings: Row, to: string, subject: string, html: string, text: string, headers: Record<string, string>): Promise<SendOutcome> {
-  const siteName = settings.site_name || "Livraria Adventista";
   const provider = settings.email_provider || "smtp";
-  const fromEmail = settings.smtp_from_email || settings.contact_email || "noreply@livraria.ao";
-  const fromName = settings.smtp_from_name || siteName;
-  const message: EmailMessage = { to, fromEmail, fromName, subject, html, text, headers };
+  // Sem remetente não se envia: o recuo antigo era `noreply@livraria.ao`, que não é o domínio da
+  // loja. Falta de configuração, não falha de envio — fica "skipped" e não entra na fila.
+  const { fromEmail, fromName, replyTo } = senderFor(settings);
+  if (!fromEmail) {
+    return { ok: false, detail: "Email remetente em falta: preencha-o em Configurações → Comunicações (ex.: loja@livrariaadventista.ao).", provider };
+  }
+  const message: EmailMessage = { to, fromEmail, fromName, replyTo, subject, html, text, headers };
 
   if (provider === "brevo") {
     if (!brevoKey(settings)) return { ok: false, detail: "Chave da API da Brevo em falta.", provider };
@@ -365,9 +369,12 @@ async function deliverEmail(settings: Row, to: string, subject: string, html: st
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${sendgridKey(settings)}`, "Content-Type": "application/json" },
+        // Sem tecto, um fornecedor parado prendia o pedido até ao limite da própria função.
+        signal: AbortSignal.timeout(20_000),
         body: JSON.stringify({
           personalizations: [{ to: [{ email: to }] }],
           from: { email: fromEmail, name: fromName },
+          ...(replyTo ? { reply_to: { email: replyTo } } : {}),
           subject,
           content,
           ...(Object.keys(headers).length ? { headers } : {}),
@@ -394,9 +401,15 @@ async function deliverEmail(settings: Row, to: string, subject: string, html: st
       port,
       secure: port === 465,
       auth: settings.smtp_user ? { user: settings.smtp_user, pass: smtpPassword(settings) } : undefined,
+      // Os valores por omissão do nodemailer vão até 10 minutos por ligação: muito para lá do
+      // tempo que a Edge Function tem para responder ao checkout.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     const info = await transport.sendMail({
       from: { name: fromName, address: fromEmail },
+      ...(replyTo ? { replyTo } : {}),
       to, subject, html, ...(text ? { text } : {}),
       ...(Object.keys(headers).length ? { headers } : {}),
     });
@@ -704,11 +717,11 @@ async function sendLetter(settings: Row | null, to: string, letter: Letter, meta
   await decorateLetter(brand, letter, meta.context || "order", to);
   const { html, text } = emailDocument(brand, letter.doc);
   // `List-Unsubscribe` é o que os clientes de email usam para mostrar o botão próprio de
-  // cancelamento, e o Gmail exige-o a quem envia em volume. O `One-Click` diz que basta um
-  // pedido ao endereço, sem o utilizador ter de confirmar noutra página.
-  const unsubscribe = letter.doc.unsubscribeUrl || "";
-  const headers: Record<string, string> = unsubscribe
-    ? { "List-Unsubscribe": `<${unsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
+  // cancelamento, e o Gmail e o Yahoo exigem-no a quem envia em volume. Com o `One-Click`, o
+  // botão faz um POST ao endereço do cabeçalho — por isso aponta para esta API (POST
+  // /unsubscribe?t=…) e não para a página do site, que é estática (ver listUnsubscribeHeaders).
+  const headers = letter.doc.unsubscribeUrl
+    ? listUnsubscribeHeaders(letter.doc.unsubscribeUrl, `${SUPABASE_URL}/functions/v1/app`)
     : {};
   return sendTransactionalEmail(settings, to, letter.subject, html, meta, text, headers);
 }
@@ -853,11 +866,20 @@ const waNumber = (phone: string) => {
 };
 
 async function metaSend(config: Row, payload: Row) {
-  const res = await fetch(`https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${config.access_token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`https://graph.facebook.com/v21.0/${config.phone_number_id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      // A confirmação da encomenda espera por isto: a Meta parada não pode prender o checkout.
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    const why = (err as Error)?.message || String(err);
+    console.log(`WhatsApp API sem resposta: ${why}`);
+    return { ok: false, status: 0, error: `Sem resposta da Meta: ${why}` };
+  }
   if (res.ok) return { ok: true };
   const raw = await res.text();
   console.log(`WhatsApp API error ${res.status}: ${raw}`);
@@ -1165,11 +1187,10 @@ async function getNewBooksDigest(settings: Row | null) {
   if (!books?.length) return "";
   const lines = ["📚 *Novidades na Livraria Adventista*", ""];
   for (const b of books) {
-    const price = b.price ? `${effectivePrice(b).toLocaleString("pt-AO")} Kz` : "";
+    const price = b.price ? fmtMoneyKz(effectivePrice(b)) : "";
     lines.push(`• ${b.title || "Livro"}${price ? " — " + price : ""}`);
   }
-  // O `.ao` ainda não resolve: um endereço fixo aqui mandava os clientes para uma página que
-  // não abre. Vem das configurações, como os links dos emails.
+  // Vem das configurações (`site_url`), como os links dos emails; o domínio principal é o recuo.
   const site = (emailBrand(settings).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   lines.push("", `Visite: ${site}/shop`);
   return lines.join("\n");
@@ -2461,9 +2482,18 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
  * Responde sempre o mesmo com um token inválido: dizer "não existe" transformaria esta rota
  * num meio de confirmar se um token é de alguém.
  */
-route("POST", "/unsubscribe", async ({ body, ip }) => {
-  if (!await checkRateLimit("unsubscribe", ip, 20)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
-  const token = String(body.token || "").trim();
+route("POST", "/unsubscribe", async ({ body, url, ip }) => {
+  // Dois caminhos: a página do site manda `{ token }` em JSON; o botão "cancelar subscrição" do
+  // cliente de email (RFC 8058) faz POST ao endereço do cabeçalho, com o token no endereço e o
+  // corpo `List-Unsubscribe=One-Click` (formulário, não JSON — chega aqui como corpo vazio).
+  // Esses pedidos vêm dos servidores do Gmail e do Yahoo, poucos IPs para muita gente: um
+  // limite à parte, mais largo. O token tem 256 bits; o limite protege a base, não o segredo.
+  const fromHeader = String(url.searchParams.get("t") || "").trim();
+  const oneClick = !body.token && !!fromHeader;
+  if (!await checkRateLimit(oneClick ? "unsubscribe-one-click" : "unsubscribe", ip, oneClick ? 300 : 20)) {
+    throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  }
+  const token = String(body.token || fromHeader).trim();
   const done = { message: "Deixou de receber campanhas e novidades desta loja." };
   if (!/^[a-f0-9]{64}$/.test(token)) return json(done);
   const { data: contact } = await db.from("contacts")
@@ -2480,6 +2510,18 @@ route("POST", "/unsubscribe", async ({ body, ip }) => {
     }).eq("id", contact.id);
   }
   return json(done);
+});
+
+/**
+ * Quem abre o endereço do cabeçalho `List-Unsubscribe` num navegador (cliente de email sem "um
+ * clique", ou o link copiado) vai para a página de confirmação do site. Um GET nunca cancela:
+ * os servidores de correio abrem os endereços das mensagens para os analisar.
+ */
+route("GET", "/unsubscribe", async ({ url }) => {
+  const token = String(url.searchParams.get("t") || "").trim();
+  const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  const target = /^[a-f0-9]{64}$/.test(token) ? `${site}/unsubscribe?t=${token}` : `${site}/unsubscribe`;
+  return new Response(null, { status: 302, headers: { ...CORS, Location: target, "Cache-Control": "no-store" } });
 });
 
 /** Categorias opcionais de email, para o painel ligar e desligar. */

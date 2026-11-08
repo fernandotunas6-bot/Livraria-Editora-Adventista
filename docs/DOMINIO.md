@@ -26,8 +26,18 @@ Objectivo: **https://livrariaadventista.ao** (sem `www`) passa a ser o endereço
 2. Supabase → Authentication → URL Configuration: **Site URL** = `https://livrariaadventista.ao`.
    Os Redirect URLs já incluem o `.ao` e mantêm o `.com`.
 3. Search Console: *Alteração de endereço* do `.com` para o `.ao` e enviar `https://livrariaadventista.ao/sitemap.xml`.
-4. Email Routing do `contacto@livrariaadventista.ao` (ver as notas de 2026-11-06 abaixo).
+4. Email Routing do `contacto@livrariaadventista.ao` (ver as notas de 2026-11-06 abaixo). **Até lá,
+   o endereço publicado no site e nos emails não recebe correio.**
 5. Manter o `.com` registado e a redireccionar pelo menos um ano.
+6. Envio de email pelo `.ao`: domínio na Brevo, DKIM, **um só** SPF e DMARC na zona `.ao`, e SMTP
+   do Supabase Auth. Passo a passo e registos em
+   [AUTENTICACAO_E_EMAILS.md § 00](AUTENTICACAO_E_EMAILS.md#00-como-pôr-o-email-a-sair-actualizado-a-2026-11-07-domínio-ao).
+7. Se um dia se puser uma chave do Google Maps (hoje não há: os mapas são do OpenStreetMap),
+   restringi-la por referenciador a `livrariaadventista.ao/*` e `www.livrariaadventista.ao/*`.
+
+**Desde 2026-11-07** o `index.html`, o `sitemap.xml` e o `robots.txt` do repositório já têm o `.ao`
+(antes tinham o projecto antigo `livraria-adventista.pages.dev`, trocado só no pós-build). Um
+teste (`scripts/seo-paginas.test.mjs`) impede que voltem a ter outro domínio.
 
 ## Histórico (2026-11-05 e 06)
 

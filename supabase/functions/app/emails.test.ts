@@ -19,6 +19,7 @@ import {
   welcomeLetter,
   PREVIEW_TEMPLATES,
   unsubscribeUrlFor,
+  listUnsubscribeHeaders,
 } from "./emailTemplates.ts";
 
 const SETTINGS = {
@@ -772,6 +773,43 @@ describe("agradecimento e linhas com variante", () => {
     const { html, text } = emailDocument(brandSite, orderCreatedLetter(brandSite, order).doc);
     expect(html).toContain("M · Azul · UNI-004");
     expect(text).toContain("1x Uniforme — camisa (M · Azul · UNI-004)");
+  });
+});
+
+describe("cancelar com um clique (List-Unsubscribe)", () => {
+  const token = "a".repeat(32) + "0123456789abcdef0123456789abcdef";
+  const page = `https://livrariaadventista.ao/unsubscribe?t=${token}`;
+  const api = "https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app";
+
+  it("o cabeçalho aponta para a API (que cancela num POST), não para a página estática do site", () => {
+    const h = listUnsubscribeHeaders(page, api);
+    expect(h["List-Unsubscribe"]).toBe(`<${api}/unsubscribe?t=${token}>`);
+    expect(h["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    // Um só endereço https no cabeçalho (RFC 8058): é a ele que o cliente de email faz o POST.
+    expect(h["List-Unsubscribe"].match(/https:/g)).toHaveLength(1);
+    expect(h["List-Unsubscribe"]).not.toContain("livrariaadventista.ao");
+  });
+
+  it("tolera a barra no fim da API", () => {
+    expect(listUnsubscribeHeaders(page, `${api}/`)["List-Unsubscribe"]).toBe(`<${api}/unsubscribe?t=${token}>`);
+  });
+
+  it("sem API em https fica só o link da página, sem 'um clique'", () => {
+    const h = listUnsubscribeHeaders(page, "http://kong:8000/functions/v1/app");
+    expect(h).toEqual({ "List-Unsubscribe": `<${page}>` });
+  });
+
+  it("token com outra forma, ou link inválido: sem cabeçalhos (não cancelariam nada)", () => {
+    expect(listUnsubscribeHeaders("https://livrariaadventista.ao/unsubscribe?t=x", api)).toEqual({});
+    expect(listUnsubscribeHeaders("https://livrariaadventista.ao/unsubscribe", api)).toEqual({});
+    expect(listUnsubscribeHeaders("não é um endereço", api)).toEqual({});
+    expect(listUnsubscribeHeaders("", api)).toEqual({});
+  });
+
+  it("encaixa no link que as campanhas já levam no rodapé", () => {
+    const brand = brandFromSettings({ site_url: "https://livrariaadventista.ao" });
+    const h = listUnsubscribeHeaders(unsubscribeUrlFor(brand, token), api);
+    expect(h["List-Unsubscribe"]).toBe(`<${api}/unsubscribe?t=${token}>`);
   });
 });
 

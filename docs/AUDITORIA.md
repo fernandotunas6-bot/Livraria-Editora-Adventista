@@ -1539,7 +1539,118 @@ violates… `script-src`"), e teve de ser servido pela própria origem.
 ### Por fazer (dono)
 
 1. **Restringir a chave do Google Maps Embed por referenciador** na Google Cloud (achado 83),
-   aos domínios `livrariaadventista.com` e `www.livrariaadventista.com`.
+   aos domínios `livrariaadventista.ao` e `www.livrariaadventista.ao` (o `.com` passou a
+   redireccionar em 2026-11-07). Em produção não há chave hoje: os mapas são do OpenStreetMap.
 2. Preencher o **canal do YouTube** em Configurações → Contacto, se existir.
 3. Os pontos abertos das passagens anteriores (SMTP, telefones, descrições, DNSSEC, alertas)
    continuam como estão: nada nesta passagem os altera.
+
+## 9.15 Análise crítica do sistema todo, com o domínio `.ao`, até aos emails (2026-11-07)
+
+Pedido: análise crítica de todo o sistema sabendo que o domínio é **livrariaadventista.ao**,
+revendo tudo até aos emails, e publicar no fim.
+
+**Como foi verificado.** Esta sessão lê a base de dados de produção e os registos (Supabase, só
+leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
+`livrariaadventista.ao` e os resolvedores DNS sobre HTTPS). Por isso:
+
+- **código**: Edge Function (as 78 rotas, com foco no envio de email, WhatsApp e cancelamento de
+  subscrição), moldura e modelos dos emails, modelos do Supabase Auth, SEO e partilha, CSP,
+  PWA, scripts e workflows;
+- **produção**: migrações (89 no repositório e 89 aplicadas; 95 e 95 depois do PR #29), advisors de segurança e de
+  desempenho, `site_settings` (sem ler segredos), `notification_logs`, `app_integrations` (sem
+  ler tokens), registos da função das últimas 24 h, contagens de contas e encomendas;
+- **GitHub**: o último deploy (o registo confirma `→ endereços públicos:
+  https://livrariaadventista.ao`, 102 livros e 4 colecções) e os PRs abertos (migrações e
+  conflitos com o `main`);
+- **gates**: `npm test`, `npm run lint`, `npm run build`, `deno check`, `npm audit`.
+
+### Produção em números (2026-11-07, ~21 h UTC)
+
+- 102 livros activos, 4 colecções, 3 lojas (**nenhuma com telefone**), 4 métodos de pagamento
+  (entrega, balcão, transferência, Multicaixa).
+- 4 contas (2 com a Google), nenhuma por confirmar; 5 encomendas.
+- **Nenhum email enviado desde o início**: 14 registos, todos `skipped` ("Servidor SMTP não
+  configurado").
+- 1 envio de WhatsApp, `failed`: a Meta recusa o token (`OAuthException`, código 190).
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|--------|-----------|--------|
+| 100 | **"Cancelar subscrição" do Gmail, Yahoo e Apple Mail não cancelava.** O `List-Unsubscribe` das campanhas apontava para a página do site com `List-Unsubscribe-Post: One-Click`. Com o "um clique", o cliente de email faz um **POST** a esse endereço (corpo `List-Unsubscribe=One-Click`, RFC 8058) e não corre JavaScript — e a página é estática no Cloudflare Pages: o POST não chegava a código nenhum. A rota `POST /unsubscribe` também só lia o token de um corpo JSON. Quem carregava no botão continuava inscrito, que é exactamente o que o Gmail e o Yahoo penalizam (queixas de spam e a reputação do domínio). | Alta (entregabilidade) | ✅ cabeçalho para a API; a rota aceita o token no endereço; `GET` redirecciona para a página |
+| 101 | **Remetente por omissão `noreply@livraria.ao`.** Sem "Email remetente" nem email de contacto, as mensagens saíam em nome de um domínio que não é o da loja: nenhum fornecedor o aceitaria e, se aceitasse, falhava o SPF/DMARC. O painel sugeria o mesmo endereço como exemplo. | Média | ✅ `senderFor()`: sem remetente, não envia e diz porquê |
+| 102 | **Sem "Responder para".** Com um remetente `loja@` ou `noreply@` (o que o próprio painel sugere), a resposta de um cliente a uma confirmação ia para uma caixa que ninguém lê. | Média | ✅ `reply_to`/`replyTo` = email de contacto, nos quatro fornecedores |
+| 103 | **Pedidos externos sem tempo-limite.** SendGrid e a Meta (WhatsApp) sem `AbortSignal`, e o SMTP com os valores do nodemailer (até 10 minutos por ligação). O checkout espera pela confirmação: um fornecedor parado prendia a resposta até ao limite da Edge Function. Um erro de rede na Meta saía como excepção, não como resultado. | Média | ✅ 15–20 s; falha de rede da Meta devolvida como falha |
+| 104 | **O repositório tinha o projecto antigo como endereço do site.** `index.html` (canonical, `og:url`, `og:image`), `sitemap.xml` e `robots.txt` diziam `livraria-adventista.pages.dev`; só o pós-build de SEO os trocava. Qualquer publicação sem esse passo dizia à Google e ao WhatsApp que a loja era noutro sítio. | Média (SEO) | ✅ `.ao` nos ficheiros e em `SOURCE_URL`, com teste |
+| 105 | **Nenhum email chega aos clientes.** `order_email_enabled` desligado, fornecedor `smtp` sem servidor, sem chave da Brevo, do Cloudflare nem do SendGrid: não há confirmação de encomenda, avisos de entrega, boas-vindas nem respostas do atendimento por email. | Alta (negócio) | ⏳ dono: Brevo + DNS ([AUTENTICACAO_E_EMAILS.md § 00](AUTENTICACAO_E_EMAILS.md)) |
+| 106 | **Emails da conta (Supabase Auth) sem SMTP próprio**: a confirmação de registo e a recuperação de palavra-passe só chegam a membros da equipa do projecto, em inglês, 2 por hora. Os modelos em português (`supabase/auth/templates`) não se podem aplicar no plano gratuito sem SMTP. Segundo o DOMINIO.md, o **Site URL** do Auth ainda é o `.com` (não se pode ler daqui; os links funcionam pelo redireccionamento do site, com um salto a mais). | Alta | ⏳ dono: SMTP no Auth, depois `scripts/configurar-auth.sh` |
+| 107 | **`contacto@livrariaadventista.ao` não recebe correio** enquanto o Email Routing não estiver activo (a zona ainda tem os MX da Google, sem conta Google). É o endereço do rodapé do site, dos emails, da política de privacidade e do contacto VAPID das notificações — e, com o achado 102, o das respostas dos clientes. | Alta | ⏳ dono: Cloudflare → Email Routing (DOMINIO.md, passo 4) |
+| 108 | **WhatsApp Business ligado com um token que não é da Meta** (19 caracteres; os tokens da Meta começam por `EAA` e têm centenas). Com `auto_send` ligado, cada encomenda tenta enviar e falha (`OAuthException` 190, "Expected 1 '.' in the input between the postcard and the payload"). | Média | ⏳ dono: token permanente de *System User*, ou desligar a integração |
+| 109 | **A loja não tem telefone nem WhatsApp configurados** (`contact_phone` e `whatsapp` vazios, e as 3 lojas sem telefone). O rodapé dos emails e o site não dão um número; as mensagens de erro mandam o cliente "falar connosco pelo WhatsApp". | Média (negócio) | ⏳ dono: Configurações → Contacto e Lojas |
+| 110 | **Três PRs abertos partem o deploy do Supabase se forem integrados como estão.** #23 (`20261107130000`–`160000`), #26 (`20261107110000`) e #27 (`…130000`–`170000`) têm migrações datadas **antes** da última aplicada em produção (`20261107180000_dominio_ao`). O `supabase db push` recusa-as ("Found local migration files to be inserted before the last migration on remote database"): o workflow fica vermelho antes de publicar a função, enquanto o Cloudflare publica o site novo — site novo com base de dados e função antigas. O #21 tem ainda conflitos com o `main`. | Alta (deploy) | ✅ no `main` pelo PR #29 (integrado durante esta passagem): `supabase db push --include-all`, e as do #23 já estão aplicadas. Fica um cuidado: com `--include-all` uma migração de data antiga corre **depois** das mais recentes já aplicadas, por isso tem de ser independente delas (o #26 e o #27 continuam abertos) |
+| 111 | O painel apresentava o **Cloudflare Email Sending** como opção para tudo; o Cloudflare só aceita mensagens transaccionais, e campanhas por lá arriscam a suspensão da conta de envio. | Baixa | ✅ aviso no painel e na documentação |
+| 112 | **Estado geral das encomendas desencontrado da entrega e do pagamento**: em produção, uma encomenda entregue e paga continua `pending`, e outra entregue no balcão tem o pagamento por confirmar. Os relatórios e o painel lêem o estado geral. | Média | ✅ a primeira: `estado_geral_acompanha_a_entrega` (do #23, integrada pelo #29) acertou as duas encomendas. Fica uma entregue no balcão com o pagamento por confirmar: processo (marcar pago ao entregar) |
+| 113 | Edge Function com `Access-Control-Allow-Origin: *`. Sem efeito em CSRF (a sessão vai num cabeçalho, não em cookies), mas qualquer site pode chamar as rotas públicas a partir do navegador de um visitante; os limites por IP continuam a valer. | Baixa | 📝 opcional: lista de origens (`.ao`, pré-visualizações, localhost) |
+| 114 | **Protecção contra palavras-passe vazadas desligada** no Auth (advisor). Só existe no plano Pro. | Baixa | ⏳ quando houver plano pago |
+| 115 | **Plano Free, sem PITR, e o backup semanal cifrado ainda não correu** (0 execuções; o primeiro agendado é domingo 2026-11-08, 03:30 UTC). É a única cópia da base: falta confirmar que os segredos (`BACKUP_PASSPHRASE`…) existem. A base está em Estocolmo (`eu-north-1`): ~1 s por pedido a partir de Angola, que a cache das rotas públicas atenua. | Média | ⏳ dono: Actions → Backup → *Run workflow* uma vez |
+| 117 | **Quem tinha o site aberto no `.com` antes da publicação do `.ao` continua no `.com` até recarregar** (registos do Auth de 2026-11-08, 03:43 UTC: pedidos com `referer: https://livrariaadventista.com` e a sessão a renovar-se). O redireccionamento corre ao carregar a página, e o service worker vai sempre à rede buscar o HTML, por isso um recarregamento chega. A sessão e o carrinho ficam no `.com` (o armazenamento é por domínio): no `.ao` é preciso entrar outra vez. Uma app (PWA) instalada a partir do `.com` passa a abrir o `.ao` fora da janela da app: reinstalar a partir do `.ao`. | Baixa (migração) | 📝 avisar a equipa e os clientes habituais |
+| 116 | Manutenção do CI: o deploy instala o `wrangler` 3.90 (a action usa a 3 por omissão) e as actions correm em Node 20, descontinuado (aviso em cada execução). | Baixa | 📝 por fazer |
+
+### Verificado sem problemas
+
+- **Domínio no código e nos dados**: `CANONICAL_ORIGIN`, `DEFAULT_SITE_URL`, `site_settings.site_url`,
+  as capas, `supabase/auth/config.json` e o `SITE_URL` do deploy estão no `.ao`. Os restos de
+  `.com` que ficam no código são intencionais (o redireccionamento do `.com` e os testes dele).
+- **Advisors de segurança**: as 14 funções `security definer` que o `anon` pode chamar são as
+  leituras públicas (comunidade, materiais, o directório das igrejas — nomes de igrejas e de
+  pastores, sem contactos — e o `start_download`, que verifica o acesso a cada material). As 57
+  que o `authenticated` pode chamar têm guarda; verificado nas mais sensíveis (`users_admin_*`,
+  `colporteur_ledger_adjust`, `colporteur_record_payment`, `site_secret_*`,
+  `church_registry_import`, `e2ee_admin_key_packages`). As 9 tabelas com RLS e sem políticas
+  são de propósito (só service role).
+- **Segredos**: nenhuma chave gravada em `site_settings` (estão nos segredos da função, ou ainda
+  não existem); `app_integrations` só é lida por administradores. Scanner de segredos limpo.
+- **RLS** de encomendas, perfis, contactos, definições, registos de envio e fila.
+- **Números de encomenda** aleatórios (`ENC-` e 9 caracteres): o rastreio pede ainda o email.
+- **Emails**: moldura (tabelas, CSS em linha, texto simples gerado do mesmo conteúdo), categorias,
+  idempotência e fila — sem achados novos além dos de cima.
+- **Dependências de produção**: só os 4 "high" do gRPC do Firebase, que não entram no bundle.
+- **Peso da página inicial**: ~235 KB de JavaScript comprimido e 25 KB de CSS.
+
+### O que foi feito
+
+- `emailProviders.ts`: `senderFor()` (remetente, nome e "Responder para", sem recuo para outro
+  domínio); `reply_to` no Cloudflare (no campo da API — um `Reply-To` em `headers` é recusado
+  com `E_HEADER_USE_API_FIELD`) e `replyTo` na Brevo.
+- `index.ts`: envio sem remetente fica `skipped` com o motivo; `reply_to` no SendGrid e
+  `replyTo` no SMTP; tempos-limite no SendGrid, na Meta e no SMTP; `List-Unsubscribe` para a API;
+  `POST /unsubscribe` com o token no endereço (um clique) e limite próprio; `GET /unsubscribe`
+  redirecciona para a página de confirmação; preço do resumo de novidades no formato de
+  `formatKz` (o `toLocaleString` mudava com o runtime).
+- `emailTemplates.ts`: `listUnsubscribeHeaders()`.
+- SEO: o `.ao` no `index.html`, `sitemap.xml`, `robots.txt` e em `SOURCE_URL`.
+- Painel: exemplo de remetente no `.ao`, nota sobre o domínio verificado e para onde vão as
+  respostas, aviso "só transaccionais" no Cloudflare.
+- Documentação: `AUTENTICACAO_E_EMAILS.md § 00` reescrita para o `.ao` (receber, enviar, DNS com
+  um só SPF, DMARC, SMTP do Auth); `DOMINIO.md` com os passos de email e o teste do SEO.
+- Testes novos: remetente e "Responder para" (4), cancelamento com um clique (5), domínio nos
+  ficheiros do repositório e pré-visualizações (2).
+
+### Por fazer (dono), por ordem
+
+1. **Email Routing** do `contacto@livrariaadventista.ao` (achado 107).
+2. **Brevo** com o domínio `.ao` e os registos DNS; **SMTP no Supabase Auth**; depois
+   `bash scripts/configurar-auth.sh` (Site URL `.ao` e modelos em português); ligar
+   "Activar email automático" e enviar um teste a um Gmail (achados 105 e 106).
+3. **WhatsApp**: token permanente da Meta ou desligar a integração (108). Telefone e WhatsApp da
+   loja e das lojas (109).
+4. Cloudflare, zona `.com`: o 301 para o `.ao` (DOMINIO.md, passo 1). Search Console: mudança de
+   endereço e o sitemap do `.ao`.
+5. Antes de integrar o #26 e o #27: confirmar que as migrações deles não dependem das que já
+   correram depois da data delas (110).
+6. Correr o **backup** à mão uma vez e guardar a frase-passe fora do GitHub (115).
+7. Do `security_spec.md` (outra passagem, confirmado aqui): verificação em dois passos nas
+   contas da equipa; **apagar o projecto antigo `livraria-adventista.pages.dev`**, que continua
+   ligado à base de produção com um build antigo; e fechar o email do `.com` (`MX 0 .`,
+   `v=spf1 -all`, DMARC `p=reject`), que não envia nada e pode ser usado para falsificar a loja.

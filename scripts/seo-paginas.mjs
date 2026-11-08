@@ -1,8 +1,16 @@
 // Funções puras do pós-build de SEO (ver seo-catalogo.mjs): sem rede nem disco, para serem
 // testadas no `npm test` (seo-paginas.test.mjs).
 
-/** Endereço em que o build é feito; o pós-build troca-o pelo endereço de destino. */
-export const SOURCE_URL = 'https://livraria-adventista.pages.dev';
+/**
+ * Endereço escrito no `index.html`, no `sitemap.xml` e no `robots.txt` do repositório; o
+ * pós-build troca-o pelo endereço de destino quando este é outro (uma pré-visualização).
+ *
+ * É o domínio oficial, e não um endereço de trabalho: um build publicado sem o pós-build
+ * (outro caminho de deploy, um passo saltado) sai na mesma com o canonical, o og:url e o
+ * sitemap certos. Antes era o `livraria-adventista.pages.dev`, um projecto antigo, e um deploy
+ * assim dizia à Google que a loja era lá.
+ */
+export const SOURCE_URL = 'https://livrariaadventista.ao';
 export const SITE_NAME = 'Livraria Adventista';
 
 const ENTITIES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };

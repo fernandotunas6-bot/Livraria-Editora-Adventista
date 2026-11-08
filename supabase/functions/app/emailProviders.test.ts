@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, smtpPortProblem,
+  brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, senderFor, smtpPortProblem,
 } from "./emailProviders.ts";
 
 const MSG = {
-  to: "cliente@exemplo.ao", fromEmail: "loja@livrariaadventista.com", fromName: "Livraria Adventista",
+  to: "cliente@exemplo.ao", fromEmail: "loja@livrariaadventista.ao", fromName: "Livraria Adventista",
   subject: "Teste", html: "<p>Olá</p>", text: "Olá",
-  headers: { "List-Unsubscribe": "<https://livrariaadventista.com/unsubscribe?t=x>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+  headers: { "List-Unsubscribe": "<https://livrariaadventista.ao/unsubscribe?t=x>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
 };
 
 describe("Brevo", () => {
@@ -16,7 +16,7 @@ describe("Brevo", () => {
     expect(init.headers["api-key"]).toBe("xkeysib-123");
     const body = JSON.parse(init.body);
     expect(body).toMatchObject({
-      sender: { email: "loja@livrariaadventista.com", name: "Livraria Adventista" },
+      sender: { email: "loja@livrariaadventista.ao", name: "Livraria Adventista" },
       to: [{ email: "cliente@exemplo.ao" }], subject: "Teste", htmlContent: "<p>Olá</p>", textContent: "Olá",
     });
     expect(body.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
@@ -36,7 +36,7 @@ describe("Cloudflare Email Sending", () => {
     expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/701800d0/email/sending/send");
     expect(init.headers.Authorization).toBe("Bearer tok");
     const body = JSON.parse(init.body);
-    expect(body.from).toEqual({ address: "loja@livrariaadventista.com", name: "Livraria Adventista" });
+    expect(body.from).toEqual({ address: "loja@livrariaadventista.ao", name: "Livraria Adventista" });
     expect(body).toMatchObject({ to: "cliente@exemplo.ao", subject: "Teste", html: "<p>Olá</p>", text: "Olá" });
   });
 
@@ -67,11 +67,50 @@ describe("configuração", () => {
   });
 
   it("diz o que falta em cada fornecedor", () => {
-    const base = { smtp_from_email: "loja@livrariaadventista.com" };
+    const base = { smtp_from_email: "loja@livrariaadventista.ao" };
     expect(emailProviderReady({ ...base, email_provider: "brevo" }, {})).toEqual({ ready: false, missing: "chave da API da Brevo" });
     expect(emailProviderReady({ ...base, email_provider: "brevo" }, { brevo: "k" })).toEqual({ ready: true, missing: "" });
     expect(emailProviderReady({ ...base, email_provider: "cloudflare" }, { cloudflareToken: "t" }).missing).toBe("ID da conta Cloudflare");
     expect(emailProviderReady({ ...base, email_provider: "cloudflare", cloudflare_account_id: "701800d0" }, { cloudflareToken: "t" }).ready).toBe(true);
     expect(emailProviderReady({ email_provider: "brevo" }, { brevo: "k" }).missing).toBe("email remetente");
+  });
+});
+
+describe("remetente e resposta", () => {
+  it("remetente: o do painel, senão o email de contacto; nunca um domínio que não é o da loja", () => {
+    expect(senderFor({ smtp_from_email: "loja@livrariaadventista.ao", contact_email: "contacto@livrariaadventista.ao" }).fromEmail)
+      .toBe("loja@livrariaadventista.ao");
+    expect(senderFor({ smtp_from_email: "", contact_email: "contacto@livrariaadventista.ao" }).fromEmail)
+      .toBe("contacto@livrariaadventista.ao");
+    // Antes caía em noreply@livraria.ao: sem nenhum dos dois, não há remetente.
+    expect(senderFor({ smtp_from_email: "", contact_email: "" }).fromEmail).toBe("");
+    expect(senderFor(null).fromEmail).toBe("");
+    expect(senderFor({ smtp_from_email: "sem arroba", contact_email: "" }).fromEmail).toBe("");
+    expect(emailProviderReady({ email_provider: "brevo", smtp_from_email: "sem arroba" }, { brevo: "k" }).missing).toBe("email remetente");
+  });
+
+  it("responder para: o contacto, só quando o remetente é outro endereço", () => {
+    const loja = senderFor({ smtp_from_email: "loja@livrariaadventista.ao", contact_email: "contacto@livrariaadventista.ao" });
+    expect(loja.replyTo).toBe("contacto@livrariaadventista.ao");
+    expect(senderFor({ smtp_from_email: "Contacto@LivrariaAdventista.ao", contact_email: "contacto@livrariaadventista.ao" }).replyTo).toBe("");
+    expect(senderFor({ smtp_from_email: "", contact_email: "contacto@livrariaadventista.ao" }).replyTo).toBe("");
+    expect(senderFor({ smtp_from_email: "loja@livrariaadventista.ao", contact_email: "inválido" }).replyTo).toBe("");
+  });
+
+  it("nome: o do painel, senão o da loja, com o limite das APIs", () => {
+    expect(senderFor({ smtp_from_name: "Livraria Adventista · Luanda" }).fromName).toBe("Livraria Adventista · Luanda");
+    expect(senderFor({ site_name: "Livraria" }).fromName).toBe("Livraria");
+    expect(senderFor({}).fromName).toBe("Livraria Adventista");
+    expect(senderFor({ smtp_from_name: "x".repeat(90) }).fromName).toHaveLength(70);
+  });
+
+  it("o responder-para vai no campo de cada API (Cloudflare recusa Reply-To em headers)", () => {
+    const withReply = { ...MSG, replyTo: "contacto@livrariaadventista.ao" };
+    expect(JSON.parse(brevoRequest("k", withReply).init.body).replyTo).toEqual({ email: "contacto@livrariaadventista.ao" });
+    const cf = JSON.parse(cloudflareRequest("acc", "tok", withReply).init.body);
+    expect(cf.reply_to).toBe("contacto@livrariaadventista.ao");
+    expect(cf.headers["Reply-To"]).toBeUndefined();
+    expect(JSON.parse(brevoRequest("k", MSG).init.body).replyTo).toBeUndefined();
+    expect(JSON.parse(cloudflareRequest("acc", "tok", MSG).init.body).reply_to).toBeUndefined();
   });
 });
