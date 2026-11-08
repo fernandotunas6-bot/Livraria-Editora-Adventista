@@ -1,24 +1,27 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { orderItemTitle } from '@/lib/productTypes';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  User, Mail, Shield, ShoppingBag, Settings, LogOut, Loader2,
-  Package, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck, Phone, Heart, Trash2, Users, Bell, FileDown
+  User, Mail, Shield, ShoppingBag, Settings, LogOut, Loader2, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck,
+  Heart, Trash2, Users, Bell, FileDown, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,
 } from 'lucide-react';
+import { toast as notify } from 'sonner';
 import MyDownloads from '@/components/downloads/MyDownloads';
 import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ColporteurProfileLink from '@/components/colportagem/ColporteurProfileLink';
 import ShoppingCart from '@/components/ShoppingCart';
+import CustomerOrders from '@/components/account/CustomerOrders';
+import AccountPrivacy from '@/components/account/AccountPrivacy';
 import { pageTitle } from '@/lib/brand';
 import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
 import { sessionDecision } from '@/lib/authSession';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,31 +29,94 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserAvatar from '@/components/UserAvatar';
 import { getUserDisplayName } from '@/lib/userUtils';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderLocality } from '@/lib/orderUtils';
-import { displayAngolaPhone, formatAngolaPhone } from '@/lib/angolaPhone';
+import { formatAngolaPhone } from '@/lib/angolaPhone';
 import PhoneInput from '@/components/PhoneInput';
 import MfaSettings from '@/components/MfaSettings';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
 import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { Switch } from '@/components/ui/switch';
 import { getPaymentMethods } from '@/api/PlatformApi';
+import { getProduct } from '@/api/EcommerceApi';
 import { isPaidUpfront } from '@/lib/paymentMethods';
 import { isPushSupported, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
+import { ROLES } from '@/lib/permissions';
+import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
+import { kwanza } from '@/lib/money';
+import { cn } from '@/lib/utils';
 
+const PROFILE_TABS = ['orders', 'pdfs', 'notifications', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
+
+const dateOnly = (value) => {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-AO');
+};
+
+/** Código (CLI-… ou FUN-…) com botão de copiar: é o que se dita ao telefone à loja. */
+function CodeChip({ label, code, icon: Icon }) {
+  const [copied, setCopied] = useState(false);
+  if (!code) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      notify(code);
+    }
+  };
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-2.5 pr-1 text-xs font-medium text-muted-foreground">
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      {label} <span className="font-mono text-foreground">{code}</span>
+      <button
+        type="button" onClick={copy}
+        className="ml-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`Copiar ${code}`} title="Copiar"
+      >
+        {copied ? <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
+      </button>
+    </span>
+  );
+}
+
+function SummaryTile({ icon: Icon, value, label, hint, tone = 'default', onClick, to }) {
+  const body = (
+    <>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10',
+        tone === 'action' ? 'bg-amber-500/15 text-amber-700' : 'bg-marca/10 text-primary')}
+      >
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium leading-snug text-foreground sm:text-base">
+          {value !== undefined && <span className="mr-1 tabular-nums">{value}</span>}{label}
+        </span>
+        <span className="hidden truncate text-xs text-muted-foreground sm:block">{hint}</span>
+      </span>
+      <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" aria-hidden="true" />
+    </>
+  );
+  const cls = cn('group flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-marca/40 sm:p-4',
+    tone === 'action' && 'border-amber-300/70');
+  return to
+    ? <Link to={to} className={cls}>{body}</Link>
+    : <button type="button" onClick={onClick} className={cls}>{body}</button>;
+}
 
 const ProfilePage = () => {
   const { user, ready, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout, logoutEverywhere, updateProfile, changePassword, fetchUserOrders, updateAvatar } = useAuth();
   // As mesmas permissões que o servidor exige em /contacts/*.
   const canManageContacts = isAdmin || hasPermission('manage_marketing') || hasPermission('manage_users');
   const { wishlist, loading: loadingWishlist, removeFromWishlist } = useWishlist();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const { settings } = useSiteSettings();
+  const isStaff = user?.role === 'admin' || user?.role === 'manager';
   // Métodos pagos antes do envio (transferência, Multicaixa): as encomendas por pagar com eles
-  // mostram "Indicar pagamento", que abre o rastreio com a caixa "Como pagar".
+  // mostram "Pagar e indicar a referência", que abre o rastreio com a caixa "Como pagar".
   const [upfrontCodes, setUpfrontCodes] = useState(() => new Set());
   useEffect(() => {
     getPaymentMethods()
@@ -61,7 +127,6 @@ const ProfilePage = () => {
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
   const [searchParams, setSearchParams] = useSearchParams();
-  const PROFILE_TABS = ['orders', 'pdfs', 'notifications', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
@@ -74,6 +139,10 @@ const ProfilePage = () => {
     if (tab === 'orders') next.delete('tab');
     else next.set('tab', tab);
     setSearchParams(next, { replace: true });
+  };
+  const openTab = (tab) => {
+    changeTab(tab);
+    setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
   const [orders, setOrders] = useState([]);
@@ -91,6 +160,7 @@ const ProfilePage = () => {
   const [pushEnabled, setPushEnabled] = useState(
     () => typeof Notification !== 'undefined' && Notification.permission === 'granted'
   );
+  const [movingToCart, setMovingToCart] = useState('');
 
   const handlePushToggle = async (enabled) => {
     if (!isPushSupported()) {
@@ -175,6 +245,12 @@ const ProfilePage = () => {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
+  const summary = useMemo(() => {
+    const active = orders.filter((o) => !isOrderFinished(o));
+    const toPay = active.filter((o) => ['to_pay', 'payment_failed'].includes(customerOrderStage(o, { upfront: upfrontCodes.has(o.payment_method_code) }).key));
+    return { active: active.length, toPay: toPay.length };
+  }, [orders, upfrontCodes]);
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -258,8 +334,35 @@ const ProfilePage = () => {
     }
   };
 
+  // Da lista de desejos para o carrinho, com o preço e o stock de agora.
+  const moveToCart = async (bookId) => {
+    setMovingToCart(bookId);
+    try {
+      const product = await getProduct(bookId);
+      const variant = product.variants?.[0];
+      const available = Number(variant?.inventory_quantity ?? 0);
+      if (!variant || available <= 0) {
+        notify.error('Este livro está esgotado de momento.');
+        return;
+      }
+      if ((product.variants || []).length > 1 || /-v\d+$/.test(String(variant.id))) {
+        navigate(`/product/${bookId}`);
+        return;
+      }
+      await addToCart(product, variant, 1, available, { silent: true });
+      notify.success(`"${product.title}" está no carrinho`);
+      setIsCartOpen(true);
+    } catch (err) {
+      notify.error(err.message || 'Não foi possível juntar ao carrinho.');
+    } finally {
+      setMovingToCart('');
+    }
+  };
+
   if (access === 'wait') return <SessionGate />;
   if (access !== 'allow') return null;
+
+  const roleLabel = ROLES[user?.role]?.label;
 
   return (
     <>
@@ -268,202 +371,80 @@ const ProfilePage = () => {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main className="min-h-screen bg-muted/20">
-        <div className="container-custom py-10">
+        <div className="container-custom py-6 md:py-10">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Cabeçalho do perfil */}
-            <div className="bg-linear-to-br from-marca/10 via-background to-background border rounded-2xl p-6 md:p-8 mb-8">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                <UserAvatar user={user} size="lg" className="h-20 w-20 text-2xl ring-4 ring-marca/20" />
-                <div className="flex-1">
-                  <h1 className="text-2xl md:text-3xl font-bold">{getUserDisplayName(user)}</h1>
-                  <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                    <Mail className="h-4 w-4" /> {user?.email}
+            {/* Cabeçalho do perfil: compacto no telemóvel, para as encomendas aparecerem cedo. */}
+            <div className="mb-5 rounded-2xl border bg-linear-to-br from-marca/10 via-background to-background p-4 sm:p-6 md:mb-6 md:p-8">
+              <div className="flex flex-wrap items-center gap-4 sm:gap-5">
+                <UserAvatar user={user} size="lg" className="h-14 w-14 text-lg ring-4 ring-marca/20 sm:h-20 sm:w-20 sm:text-2xl" />
+                <div className="min-w-0 flex-1">
+                  <h1 className="truncate text-xl font-bold sm:text-2xl md:text-3xl">{getUserDisplayName(user)}</h1>
+                  <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">{user?.email}</span>
                   </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {isAdmin && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-marca/15 text-primary">
-                        <Shield className="h-3 w-3" /> Administrador
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                      <User className="h-3 w-3" /> Membro desde {new Date(user?.created).toLocaleDateString('pt-AO')}
-                    </span>
-                  </div>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  {isAdmin && (
-                    <Button asChild variant="outline" className="flex-1 sm:flex-none">
-                      <Link to="/admin"><LayoutDashboard className="h-4 w-4 mr-2" /> Admin</Link>
+                <div className={cn('flex gap-2', canAccessAdmin ? 'w-full sm:w-auto' : 'ml-auto')}>
+                  {canAccessAdmin && (
+                    <Button asChild size="sm" className="btn-primary flex-1 sm:flex-none">
+                      <Link to="/admin"><LayoutDashboard className="mr-2 h-4 w-4" aria-hidden="true" /> Painel</Link>
                     </Button>
                   )}
-                  <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => { logout(); navigate('/'); }}>
-                    <LogOut className="h-4 w-4 mr-2" /> Sair
+                  <Button variant="outline" size="sm" className={cn(canAccessAdmin && 'flex-1 sm:flex-none')} onClick={() => { logout(); navigate('/'); }}>
+                    <LogOut className="mr-2 h-4 w-4" aria-hidden="true" /> Sair
                   </Button>
                 </div>
               </div>
-            </div>
-
-            {/* Atalhos rápidos */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Link to="/shop" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
-                <div className="h-10 w-10 rounded-lg bg-marca/10 flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">Explorar Loja</p>
-                  <p className="text-xs text-muted-foreground">Ver catálogo completo</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-              </Link>
-              <Link to="/track" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
-                <div className="h-10 w-10 rounded-lg bg-marca/10 flex items-center justify-center">
-                  <Truck className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">Rastrear Encomenda</p>
-                  <p className="text-xs text-muted-foreground">Estado de entrega em tempo real</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-              </Link>
-              <ColporteurProfileLink />
-              <div className="bg-card border rounded-xl p-4 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <ShoppingBag className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-medium">{orders.length} Encomenda{orders.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-muted-foreground">Histórico de compras</p>
-                </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isStaff && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-marca/15 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    <Shield className="h-3 w-3" aria-hidden="true" /> Equipa · {roleLabel}
+                  </span>
+                )}
+                {isStaff && <CodeChip label="Funcionário" code={user?.staff_code} icon={BadgeCheck} />}
+                <CodeChip label="Cliente" code={user?.customer_code} icon={User} />
+                {dateOnly(user?.created) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    Desde {dateOnly(user?.created)}
+                  </span>
+                )}
               </div>
-              {isAdmin && (
-                <Link to="/admin" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">
-                  <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Package className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Gestão de Livros</p>
-                    <p className="text-xs text-muted-foreground">Admin · catálogo e slides</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                </Link>
+              {user?.customer_code && (
+                <p className="mt-2 text-xs text-muted-foreground">Diga o código de cliente quando falar com a loja: encontram as suas encomendas mais depressa.</p>
               )}
             </div>
 
+            {/* Resumo: o que precisa de si primeiro. */}
+            <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 md:mb-8">
+              <SummaryTile icon={ShoppingBag} value={summary.active} label="em curso" hint={`${orders.length} ${orders.length === 1 ? 'encomenda' : 'encomendas'} no total`} onClick={() => openTab('orders')} />
+              <SummaryTile icon={Wallet} value={summary.toPay} label="por pagar" hint={summary.toPay ? 'Pague e indique a referência' : 'Nada pendente'} tone={summary.toPay ? 'action' : 'default'} onClick={() => openTab('orders')} />
+              <SummaryTile icon={Heart} value={wishlist.length} label="na lista de desejos" hint="Livros guardados para depois" onClick={() => openTab('wishlist')} />
+              <SummaryTile icon={Truck} label="Rastrear encomenda" hint="Com o número e o email" to="/track" />
+            </div>
+            <div className="mb-6 empty:hidden md:mb-8 [&>a]:max-w-md"><ColporteurProfileLink /></div>
+
             {/* Tabs principais */}
             <Tabs ref={tabsRef} value={activeTab} onValueChange={changeTab} className="w-full scroll-mt-20">
-              <TabsList className="mb-6 flex h-auto flex-wrap gap-2 [&>button]:min-h-10">
-                <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
-                <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
-                <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" />Notificações</TabsTrigger>
-                <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Definições</TabsTrigger>
-                <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" />Segurança</TabsTrigger>
-                <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" />Lista de Desejos</TabsTrigger>
-                {canAccessAdmin && <TabsTrigger value="workspace"><LayoutDashboard className="h-4 w-4 mr-2" />Google Workspace</TabsTrigger>}
-                {canManageContacts && <TabsTrigger value="crm"><Users className="h-4 w-4 mr-2" />CRM Contactos</TabsTrigger>}
+              <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-2 [&>button]:min-h-10">
+                <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" aria-hidden="true" />Encomendas</TabsTrigger>
+                <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" aria-hidden="true" />Lista de desejos</TabsTrigger>
+                <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" aria-hidden="true" />PDFs</TabsTrigger>
+                <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" aria-hidden="true" />Notificações</TabsTrigger>
+                <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" aria-hidden="true" />Dados pessoais</TabsTrigger>
+                <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" aria-hidden="true" />Segurança e privacidade</TabsTrigger>
+                {canAccessAdmin && <TabsTrigger value="workspace"><LayoutDashboard className="h-4 w-4 mr-2" aria-hidden="true" />Google Workspace</TabsTrigger>}
+                {canManageContacts && <TabsTrigger value="crm"><Users className="h-4 w-4 mr-2" aria-hidden="true" />CRM Contactos</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="orders">
-                <div className="bg-card border rounded-xl">
-                  {loadingOrders ? (
-                    <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                  ) : orders.length === 0 ? (
-                    <div className="text-center py-16 px-4">
-                      <ShoppingBag className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-4">Ainda não tem encomendas.</p>
-                      <Button asChild className="btn-primary"><Link to="/shop">Ir à Loja</Link></Button>
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {orders.map((o) => (
-                        <div key={o.id} className="p-5 hover:bg-muted/20">
-                          <div className="flex flex-wrap justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-medium">{formatOrderNumber(o)}</p>
-                                {o.order_number && (
-                                  <Button variant="ghost" size="sm" className="h-7 text-xs text-primary px-2" asChild>
-                                    <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
-                                      <Truck className="h-3 w-3 mr-1" /> Rastrear
-                                    </Link>
-                                  </Button>
-                                )}
-                                {o.order_number && o.payment_status === 'pending' && o.status !== 'cancelled' && upfrontCodes.has(o.payment_method_code) && (
-                                  <Button variant="outline" size="sm" className="h-7 text-xs px-2 border-marca/40 text-primary" asChild>
-                                    <Link to="/track" state={{ orderNumber: o.order_number, email: user?.email }}>
-                                      Indicar pagamento
-                                    </Link>
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs text-primary px-2"
-                                  onClick={() => downloadReceipt(receiptFromOrder(o), receiptBrand(settings))}
-                                >
-                                  Recibo
-                                </Button>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {new Date(o.created).toLocaleDateString('pt-AO', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                {' · '}{(o.items || []).length} item{(o.items || []).length !== 1 ? 's' : ''}
-                              </p>
-                              {o.phone && (
-                                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                  <Phone className="h-3 w-3" /> {displayAngolaPhone(o.phone)}
-                                </p>
-                              )}
-                              {orderPaymentLabel(o) && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {orderPaymentLabel(o)}
-                                  {o.payment_status && (
-                                    <> · {getPaymentStatusLabel(o.payment_status)}</>
-                                  )}
-                                </p>
-                              )}
-                              {orderLocality(o) && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {orderLocality(o, ', ')}
-                                </p>
-                              )}
-                              {o.tracking_number && (
-                                <p className="text-xs text-primary mt-1 font-mono">
-                                  Tracking: {o.tracking_number}{o.carrier ? ` (${o.carrier})` : ''}
-                                </p>
-                              )}
-                              <div className="mt-2 space-y-1">
-                                {(o.items || []).map((item, i) => (
-                                  <p key={i} className="text-xs text-muted-foreground">
-                                    {item.quantity}× {orderItemTitle(item)}
-                                    {item.book_code && <span className="ml-1 font-mono text-[10px]">{item.book_code}</span>}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="font-bold text-primary">
-                                Kz {(() => {
-                                  const totalVal = typeof o.total === 'number' ? o.total : parseFloat(o.total) || 0;
-                                  return totalVal.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                })()}
-                              </p>
-                              <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(o.status)}`}>
-                                {getOrderStatusLabel(o.status)}
-                              </span>
-                              {o.delivery_status && (
-                                <span className={`inline-block mt-1.5 px-3 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(o.delivery_status)}`}>
-                                  {getDeliveryStatusLabel(o.delivery_status)}
-                                </span>
-                              )}
-                              {o.delivery_confirmed_at && (
-                                <p className="text-[10px] text-green-600 mt-1.5">Recepção confirmada</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <CustomerOrders
+                  orders={orders}
+                  loading={loadingOrders}
+                  user={user}
+                  settings={settings}
+                  upfrontCodes={upfrontCodes}
+                  onChanged={loadOrders}
+                  onCartOpen={() => setIsCartOpen(true)}
+                />
               </TabsContent>
 
               <TabsContent value="notifications">
@@ -471,67 +452,70 @@ const ProfilePage = () => {
               </TabsContent>
 
               <TabsContent value="settings">
-                <div className="bg-card border rounded-xl p-6 max-w-lg space-y-6">
-                  <div>
-                    <h3 className="font-bold text-lg mb-4">Foto de Perfil</h3>
-                    <div className="flex items-center gap-4">
-                      <UserAvatar user={user} size="lg" className="h-20 w-20" />
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {user?.avatar ? 'Foto do Google ou upload personalizado' : `Adicione a sua foto (${ALLOWED_IMAGE_LABEL}, máx. 2 MB)`}
-                        </p>
-                        <label className="cursor-pointer">
-                          <input type="file" accept={ALLOWED_IMAGE_ACCEPT} className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
-                          <Button type="button" variant="outline" size="sm" asChild>
-                            <span>{avatarUploading ? 'A carregar...' : 'Alterar foto'}</span>
-                          </Button>
-                        </label>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-6 rounded-xl border bg-card p-6">
+                    <div>
+                      <h3 className="mb-4 text-lg font-bold">Foto de perfil</h3>
+                      <div className="flex items-center gap-4">
+                        <UserAvatar user={user} size="lg" className="h-20 w-20" />
+                        <div>
+                          <p className="mb-2 text-sm text-muted-foreground">
+                            {user?.avatar ? 'Foto do Google ou carregada por si' : `Adicione a sua foto (${ALLOWED_IMAGE_LABEL}, máx. 2 MB)`}
+                          </p>
+                          <label className="cursor-pointer">
+                            <input type="file" accept={ALLOWED_IMAGE_ACCEPT} className="hidden" onChange={handleAvatarChange} disabled={avatarUploading} />
+                            <Button type="button" variant="outline" size="sm" asChild>
+                              <span>{avatarUploading ? 'A carregar…' : 'Alterar foto'}</span>
+                            </Button>
+                          </label>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg mb-4">Dados Pessoais</h3>
-                    <form onSubmit={handleSaveProfile} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Nome</Label>
-                      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="O seu nome" />
+                    <div>
+                      <h3 className="mb-4 text-lg font-bold">Dados pessoais</h3>
+                      <form onSubmit={handleSaveProfile} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-name">Nome</Label>
+                          <Input id="profile-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="O seu nome" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-email">Email</Label>
+                          <Input id="profile-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Telefone</Label>
+                          <PhoneInput value={phone} onChange={setPhone} />
+                          <p className="text-[11px] text-muted-foreground">Usado para pré-preencher a compra e para o contacto na entrega.</p>
+                        </div>
+                        <Button type="submit" className="btn-primary" disabled={saving}>
+                          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                          Guardar alterações
+                        </Button>
+                      </form>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Telefone</Label>
-                      <PhoneInput value={phone} onChange={setPhone} />
-                      <p className="text-[11px] text-muted-foreground">Usado para pré-preencher o checkout e contacto de entrega.</p>
-                    </div>
-                    <Button type="submit" className="btn-primary" disabled={saving}>
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Guardar Alterações
-                    </Button>
-                  </form>
                   </div>
 
                   {isPushSupported() && (
-                    <div className="border-t pt-6">
-                      <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                        <Bell className="h-5 w-5 text-primary" />
-                        Notificações Push
+                    <div className="h-fit rounded-xl border bg-card p-6">
+                      <h3 className="mb-2 flex items-center gap-2 text-lg font-bold">
+                        <Bell className="h-5 w-5 text-primary" aria-hidden="true" />
+                        Notificações no aparelho
                       </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Receba alertas de encomendas e promoções directamente no seu dispositivo.
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        Receba neste aparelho os avisos de cada passo das encomendas e as respostas da comunidade.
                       </p>
-                      <div className="flex items-center justify-between gap-4 p-3 rounded-lg border">
+                      <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
                         <div>
-                          <p className="font-medium text-sm">Activar notificações</p>
+                          <p className="text-sm font-medium">Activar notificações</p>
                           {!settings?.push_enabled && (
-                            <p className="text-xs text-muted-foreground">Ainda não configurado pelo administrador.</p>
+                            <p className="text-xs text-muted-foreground">A loja ainda não as ligou.</p>
                           )}
                         </div>
                         <Switch
                           checked={pushEnabled}
                           disabled={pushLoading || !settings?.push_enabled}
                           onCheckedChange={handlePushToggle}
+                          aria-label="Activar notificações neste aparelho"
                         />
                       </div>
                     </div>
@@ -540,38 +524,52 @@ const ProfilePage = () => {
               </TabsContent>
 
               <TabsContent value="security">
-                <div className="bg-card border rounded-xl p-6 max-w-lg">
-                  <h3 className="font-bold text-lg mb-4">Alterar Password</h3>
-                  <form onSubmit={handleChangePassword} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Password Actual</Label>
-                      <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="rounded-xl border bg-card p-6">
+                      <h3 className="mb-4 text-lg font-bold">Alterar a palavra-passe</h3>
+                      <form onSubmit={handleChangePassword} className="space-y-4">
+                        {/* O utilizador escondido ajuda os gestores de palavras-passe a saber de que conta é. */}
+                        <input type="email" autoComplete="username" value={user?.email || ''} readOnly hidden />
+                        <div className="space-y-2">
+                          <Label htmlFor="pw-current">Palavra-passe actual</Label>
+                          <Input id="pw-current" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="pw-new">Nova palavra-passe</Label>
+                          <Input id="pw-new" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+                          <p className="text-[11px] text-muted-foreground">Pelo menos 8 caracteres.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="pw-confirm">Repita a nova palavra-passe</Label>
+                          <Input id="pw-confirm" type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                        </div>
+                        <Button type="submit" variant="outline" disabled={saving}>
+                          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                          Alterar a palavra-passe
+                        </Button>
+                      </form>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Nova Password</Label>
-                      <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+                    <MfaSettings isStaff={canAccessAdmin} />
+                    <div className="rounded-xl border bg-card p-6">
+                      <h3 className="mb-1 text-lg font-bold">Sessões abertas</h3>
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        Perdeu um telemóvel ou entrou num computador que não é seu? Termine a sessão em todos os aparelhos.
+                        Nos outros, a sessão fecha no máximo dentro de uma hora.
+                      </p>
+                      <Button type="button" variant="outline" onClick={handleLogoutEverywhere} disabled={endingSessions}>
+                        {endingSessions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />}
+                        Terminar sessão em todos os aparelhos
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Confirmar Nova Password</Label>
-                      <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                    </div>
-                    <Button type="submit" variant="outline" disabled={saving}>
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Alterar Password
-                    </Button>
-                  </form>
-                </div>
-                <MfaSettings isStaff={canAccessAdmin} />
-                <div className="bg-card border rounded-xl p-6 max-w-lg mt-6">
-                  <h3 className="font-bold text-lg mb-1">Sessões abertas</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Perdeu um telemóvel ou entrou num computador que não é seu? Termine a sessão em todos os aparelhos.
-                    Nos outros, a sessão fecha no máximo dentro de uma hora.
-                  </p>
-                  <Button type="button" variant="outline" onClick={handleLogoutEverywhere} disabled={endingSessions}>
-                    {endingSessions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-                    Terminar sessão em todos os aparelhos
-                  </Button>
+                  </div>
+                  <div>
+                    <AccountPrivacy
+                      user={user}
+                      isStaff={isStaff}
+                      onDeleted={() => { logout(); navigate('/'); }}
+                    />
+                  </div>
                 </div>
               </TabsContent>
 
@@ -580,57 +578,60 @@ const ProfilePage = () => {
               </TabsContent>
 
               <TabsContent value="wishlist">
-                <div className="bg-card border rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                    <Heart className="h-5 w-5 text-red-500 fill-red-500" />
-                    Lista de Desejos ({wishlist.length})
+                <div className="rounded-xl border bg-card p-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-lg font-bold">
+                    <Heart className="h-5 w-5 fill-red-500 text-red-500" aria-hidden="true" />
+                    Lista de desejos ({wishlist.length})
                   </h3>
-                  
+
                   {loadingWishlist ? (
                     <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="A carregar" />
                     </div>
                   ) : wishlist.length === 0 ? (
-                    <div className="text-center py-12 border border-dashed rounded-xl">
-                      <Heart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                      <p className="text-muted-foreground mb-4">A sua lista de desejos está vazia.</p>
+                    <div className="flex flex-col items-center rounded-xl border border-dashed py-12 text-center">
+                      <Heart className="mb-3 h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
+                      <p className="mb-4 text-muted-foreground">A sua lista de desejos está vazia.</p>
                       <Button asChild className="btn-primary">
-                        <Link to="/shop">Ir à Loja</Link>
+                        <Link to="/shop">Ir à loja</Link>
                       </Button>
                     </div>
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                       {wishlist.map((item) => (
-                        <div key={item.id} className="border rounded-xl overflow-hidden bg-background hover:border-marca/30 transition-all flex flex-col justify-between">
-                          <div className="p-4 flex gap-3">
-                            <div className="h-20 w-16 bg-muted rounded-lg overflow-hidden shrink-0 border flex items-center justify-center">
+                        <div key={item.id} className="flex flex-col justify-between overflow-hidden rounded-xl border bg-background transition-all hover:border-marca/30">
+                          <Link to={`/product/${item.bookId}`} className="flex gap-3 p-4">
+                            <div className="flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
                               {item.bookCover ? (
-                                <img src={item.bookCover} alt={item.bookTitle} className="h-full w-full object-cover" />
+                                <img src={item.bookCover} alt="" className="h-full w-full object-cover" loading="lazy" />
                               ) : (
-                                <BookOpen className="h-6 w-6 text-muted-foreground/40" />
+                                <BookOpen className="h-6 w-6 text-muted-foreground/40" aria-hidden="true" />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h4 className="font-bold text-sm truncate">{item.bookTitle}</h4>
-                              <p className="text-xs text-primary font-semibold mt-1">
-                                {item.bookPrice > 0 ? `${item.bookPrice.toLocaleString('pt-AO')} Kz` : 'Grátis'}
+                              <h4 className="line-clamp-2 text-sm font-bold">{item.bookTitle}</h4>
+                              <p className="mt-1 text-xs font-semibold text-primary">
+                                {item.bookPrice > 0 ? kwanza(item.bookPrice) : 'Grátis'}
                               </p>
-                              <p className="text-[10px] text-muted-foreground mt-2">
-                                Adicionado em: {item.addedAt?.seconds ? new Date(item.addedAt.seconds * 1000).toLocaleDateString('pt-AO') : new Date().toLocaleDateString('pt-AO')}
-                              </p>
+                              {dateOnly(item.addedAt) && (
+                                <p className="mt-2 text-[10px] text-muted-foreground">Guardado a {dateOnly(item.addedAt)}</p>
+                              )}
                             </div>
-                          </div>
-                          <div className="p-3 bg-muted/10 border-t flex gap-2">
-                            <Button asChild size="sm" variant="outline" className="flex-1 text-xs">
-                              <Link to={`/product/${item.bookId}`}>Ver Livro</Link>
+                          </Link>
+                          <div className="flex gap-2 border-t bg-muted/10 p-3">
+                            <Button size="sm" className="btn-primary flex-1 text-xs" onClick={() => moveToCart(item.bookId)} disabled={movingToCart === item.bookId}>
+                              {movingToCart === item.bookId ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CartIcon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
+                              Juntar ao carrinho
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => removeFromWishlist(item.bookId)}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
+                              className="px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={`Tirar ${item.bookTitle} da lista`}
+                              title="Tirar da lista"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
                             </Button>
                           </div>
                         </div>
