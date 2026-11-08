@@ -11,7 +11,7 @@
 // avisos e na política de privacidade).
 
 import {
-  Bell, BookOpen, ClipboardList, FileDown, Globe, Heart, LayoutDashboard, Lock, Scale, Send, Settings,
+  Bell, BookOpen, ClipboardList, Globe, Heart, LayoutDashboard, Library, Lock, Scale, Send, Settings,
   ShoppingBag, Truck, Users,
 } from 'lucide-react';
 import { adminHref, buildAdminNav, flattenNav } from '@/lib/adminSections';
@@ -20,7 +20,7 @@ import { adminHref, buildAdminNav, flattenNav } from '@/lib/adminSections';
 export const ACCOUNT_VIEWS = [
   { id: 'orders', label: 'Encomendas', icon: ShoppingBag, description: 'As suas encomendas, o estado de cada uma, pagar, cancelar e os recibos.' },
   { id: 'wishlist', label: 'Lista de desejos', icon: Heart, description: 'Os livros que guardou para mais tarde.' },
-  { id: 'pdfs', label: 'PDFs', icon: FileDown, description: 'Os materiais que pode descarregar.' },
+  { id: 'biblioteca', label: 'Biblioteca', icon: Library, description: 'Os seus livros digitais: abrem quando o pagamento estiver confirmado.' },
   { id: 'notifications', label: 'Notificações', icon: Bell, description: 'Os avisos da loja e da comunidade, e o que quer receber.' },
   { id: 'settings', label: 'Dados pessoais', icon: Settings, description: 'O nome, o telefone e a fotografia.' },
   { id: 'security', label: 'Segurança e privacidade', icon: Lock, description: 'A palavra-passe, a verificação em dois passos, as sessões e os seus dados.' },
@@ -33,9 +33,13 @@ export const DEFAULT_ACCOUNT_VIEW = 'orders';
 /** As vistas da conta que esta pessoa pode abrir. */
 export const accountViews = (ctx = {}) => ACCOUNT_VIEWS.filter((v) => !v.allowed || v.allowed(ctx));
 
+/** Endereços antigos que continuam a abrir a vista certa (há ligações em emails e avisos). */
+export const ACCOUNT_VIEW_ALIASES = { pdfs: 'biblioteca' };
+
 /** A vista pedida, se existir e a pessoa a puder abrir; senão as encomendas. */
 export function resolveAccountView(requested, ctx = {}) {
-  return accountViews(ctx).some((v) => v.id === requested) ? requested : DEFAULT_ACCOUNT_VIEW;
+  const id = ACCOUNT_VIEW_ALIASES[requested] || requested;
+  return accountViews(ctx).some((v) => v.id === id) ? id : DEFAULT_ACCOUNT_VIEW;
 }
 
 export const accountHref = (view) => (!view || view === DEFAULT_ACCOUNT_VIEW ? '/profile?tab=orders' : `/profile?tab=${view}`);
