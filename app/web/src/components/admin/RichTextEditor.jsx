@@ -63,7 +63,7 @@ export default function RichTextEditor({ value = '', onChange, placeholder, clas
         ref={ref}
         contentEditable
         suppressContentEditableWarning
-        className="min-h-[120px] max-h-[280px] overflow-y-auto p-4 text-sm prose prose-sm max-w-none focus:outline-none"
+        className="min-h-[120px] max-h-[280px] overflow-y-auto p-4 text-sm prose prose-sm max-w-none focus:outline-hidden"
         data-placeholder={placeholder}
         onInput={() => onChange?.(ref.current?.innerHTML || '')}
         onBlur={() => onChange?.(ref.current?.innerHTML || '')}

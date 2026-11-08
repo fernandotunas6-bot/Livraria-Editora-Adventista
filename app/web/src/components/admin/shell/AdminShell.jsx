@@ -88,7 +88,7 @@ function ShellBody({
         <div className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-16 pt-4 sm:px-6 lg:px-8">
           <div className="pt-2">
             <AdminSectionHeader ref={headingRef} section={current} actions={actions} />
-            <div id="conteudo-painel" tabIndex={-1} className="focus:outline-none">
+            <div id="conteudo-painel" tabIndex={-1} className="focus:outline-hidden">
               {children}
             </div>
           </div>

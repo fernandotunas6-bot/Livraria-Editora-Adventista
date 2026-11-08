@@ -260,7 +260,7 @@ export default function DownloadsTab({ books = [] }) {
                 value={form.cover}
                 onChange={(v) => set('cover', v)}
                 aspect="3:4"
-                previewClassName="h-24 w-[4.5rem]"
+                previewClassName="h-24 w-18"
                 showDrive={false}
                 hint="Imagem da capa · 3:4"
                 uploadFolder="stock_books"

@@ -105,7 +105,7 @@ export default function TrackOrderPage() {
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 mb-4">
           <Truck className="h-7 w-7" />
         </div>
-        <h1 className="mb-2 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Rastrear Encomenda</h1>
+        <h1 className="mb-2 text-2xl font-bold leading-tight sm:text-3xl/9 md:text-4xl/10">Rastrear Encomenda</h1>
         <p className="text-sm text-white/85 sm:text-base">Acompanhe a entrega ao domicílio em tempo real</p>
       </PageBannerSlider>
 

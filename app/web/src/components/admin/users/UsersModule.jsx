@@ -347,7 +347,7 @@ export default function UsersModule() {
               type="button"
               aria-pressed={scope === value}
               onClick={() => changeScope(value)}
-              className={`inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${scope === value ? 'bg-background text-foreground shadow' : 'hover:text-foreground'}`}
+              className={`inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${scope === value ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'}`}
             >
               {label}
             </button>

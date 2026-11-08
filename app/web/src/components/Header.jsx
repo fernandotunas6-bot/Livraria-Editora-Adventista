@@ -214,7 +214,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
       {!pinned && !revealed && (
         <div
           className={cn(
-            'inset-x-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base',
+            'inset-x-0 z-30 bg-linear-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base',
             notice ? 'absolute' : 'safe-top fixed top-0',
           )}
           style={notice ? { top: 'var(--notice-offset, 0px)' } : undefined}
@@ -264,7 +264,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
           baixo sem se ver), e o deslizar não passa para a página. */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-[48] touch-none bg-black/40 animate-in fade-in duration-base lg:hidden"
+          className="fixed inset-0 z-48 touch-none bg-black/40 animate-in fade-in duration-base lg:hidden"
           onClick={closeMobile}
           aria-hidden="true"
         />
@@ -276,9 +276,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
       }}
       className={cn(
-        'safe-top top-0 border-b border-border shadow-sm glass-topbar text-white',
+        'safe-top top-0 border-b border-border shadow-xs glass-topbar text-white',
         // Com o menu aberto, acima do véu e dos botões flutuantes (o chat está em z-45).
-        mobileOpen ? 'z-[49]' : 'z-40',
+        mobileOpen ? 'z-49' : 'z-40',
         // Onde a página abre com imagem de largura inteira, o cabeçalho sai do fluxo para
         // a poder descobrir: em `sticky` continuava a ocupar lugar, e escondê-lo deixava
         // uma faixa vazia por cima dela — exactamente o que se queria tirar.
@@ -455,7 +455,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                     key={term}
                     type="button"
                     onClick={() => searchRecent(term)}
-                    className="inline-flex min-h-9 max-w-[12rem] items-center truncate rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white/90 hover:bg-white/15"
+                    className="inline-flex min-h-9 max-w-48 items-center truncate rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white/90 hover:bg-white/15"
                   >
                     {term}
                   </button>

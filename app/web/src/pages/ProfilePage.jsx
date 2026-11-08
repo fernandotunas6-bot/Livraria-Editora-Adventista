@@ -271,7 +271,7 @@ const ProfilePage = () => {
         <div className="container-custom py-10">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
             {/* Cabeçalho do perfil */}
-            <div className="bg-gradient-to-br from-marca/10 via-background to-background border rounded-2xl p-6 md:p-8 mb-8">
+            <div className="bg-linear-to-br from-marca/10 via-background to-background border rounded-2xl p-6 md:p-8 mb-8">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                 <UserAvatar user={user} size="lg" className="h-20 w-20 text-2xl ring-4 ring-marca/20" />
                 <div className="flex-1">

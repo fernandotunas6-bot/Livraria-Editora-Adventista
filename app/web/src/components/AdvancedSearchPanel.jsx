@@ -111,7 +111,7 @@ export default function AdvancedSearchPanel({
 
   const isHero = variant === 'hero';
   const inputClass = isHero
-    ? 'pl-10 rounded-full bg-white/15 border-white/25 text-white placeholder:text-white/60 focus-visible:ring-white/40 backdrop-blur-sm'
+    ? 'pl-10 rounded-full bg-white/15 border-white/25 text-white placeholder:text-white/60 focus-visible:ring-white/40 backdrop-blur-xs'
     : 'pl-9 rounded-full bg-muted/40 border-border/60 glass-surface';
 
   const advancedCount = [
@@ -193,20 +193,20 @@ export default function AdvancedSearchPanel({
             </ul>
           )}
         </div>
-        <Button onClick={apply} className={`rounded-full px-5 shrink-0 ${isHero ? 'bg-white text-[var(--brand-dark)] hover:bg-white/90' : 'btn-primary'}`}>
+        <Button onClick={apply} className={`rounded-full px-5 shrink-0 ${isHero ? 'bg-white text-(--brand-dark) hover:bg-white/90' : 'btn-primary'}`}>
           Pesquisar
         </Button>
         <Button
           variant="outline"
           size="icon"
-          className={`rounded-full shrink-0 relative ${expanded ? 'border-[var(--brand-primary)] bg-[rgb(var(--brand-primary-rgb)/0.1)]' : ''} ${isHero ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
+          className={`rounded-full shrink-0 relative ${expanded ? 'border-(--brand-primary) bg-[rgb(var(--brand-primary-rgb)/0.1)]' : ''} ${isHero ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
           onClick={() => setExpanded(!expanded)}
           title="Filtros avançados"
           type="button"
         >
           <SlidersHorizontal className="h-4 w-4" />
           {(advancedCount > 0 || filterCount > 0) && (
-            <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-[var(--brand-primary)] text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-(--brand-primary) text-white text-[10px] font-bold flex items-center justify-center">
               {advancedCount || filterCount}
             </span>
           )}
@@ -242,7 +242,7 @@ export default function AdvancedSearchPanel({
         <div className={`mt-4 p-5 rounded-2xl border space-y-4 animate-in slide-in-from-top-2 ${isHero ? 'bg-black/30 border-white/20 backdrop-blur-md text-white' : 'bg-card glass-surface'}`}>
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold flex items-center gap-2">
-              <Sparkles className={`h-4 w-4 ${isHero ? 'text-white' : 'text-[var(--brand-primary)]'}`} />
+              <Sparkles className={`h-4 w-4 ${isHero ? 'text-white' : 'text-(--brand-primary)'}`} />
               Pesquisa Avançada
             </p>
             {(hasAdvanced || local.search) && (
@@ -318,7 +318,7 @@ export default function AdvancedSearchPanel({
             </div>
           </div>
 
-          <Button onClick={apply} className={`w-full ${isHero ? 'bg-white text-[var(--brand-dark)] hover:bg-white/90' : 'btn-primary'}`}>
+          <Button onClick={apply} className={`w-full ${isHero ? 'bg-white text-(--brand-dark) hover:bg-white/90' : 'btn-primary'}`}>
             <Filter className="h-4 w-4 mr-2" /> Aplicar Filtros
           </Button>
         </div>

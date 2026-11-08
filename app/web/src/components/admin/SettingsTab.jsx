@@ -635,7 +635,7 @@ export default function SettingsTab() {
               ) : (
                 <div className="space-y-4">
                   {(form.about_team || []).map((member, i) => (
-                    <div key={i} className="grid gap-3 sm:grid-cols-[auto,1fr] items-start border-t pt-4 first:border-t-0 first:pt-0">
+                    <div key={i} className="grid gap-3 sm:grid-cols-[auto_1fr] items-start border-t pt-4 first:border-t-0 first:pt-0">
                       <div className="w-32">
                         <ImageField
                           label="Fotografia"
@@ -1234,7 +1234,7 @@ export default function SettingsTab() {
         </div>
       </Tabs>
 
-      <div className={`sticky bottom-4 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur transition-colors ${dirty ? 'border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/80' : 'border-border bg-background/95'}`}>
+      <div className={`sticky bottom-4 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm transition-colors ${dirty ? 'border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/80' : 'border-border bg-background/95'}`}>
         <p className={`text-sm ${dirty ? 'text-amber-900 dark:text-amber-200 font-medium' : 'text-muted-foreground'}`}>
           {dirty ? 'Há alterações por gravar.' : 'Tudo gravado.'}
         </p>

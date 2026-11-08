@@ -732,7 +732,7 @@ const AdminPage = () => {
                           onClick={() => setBookFilter(filter)}
                           aria-pressed={active}
                           title={`Mostrar: ${label.toLowerCase()}`}
-                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
+                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
                         >
                           {body}
                         </button>

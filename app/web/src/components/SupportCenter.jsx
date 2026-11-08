@@ -626,7 +626,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                 <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-amber-800">
                   <Lock className="h-3 w-3" /> Nota interna · {staffName(message.sender_id)} · só a equipa vê
                 </p>
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                <p className="whitespace-pre-wrap wrap-break-word">{message.body}</p>
                 <time className="mt-1 block text-[10px] text-amber-800/70" dateTime={message.created_at}>{when}</time>
               </div>
             );
@@ -647,7 +647,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                 <p className={`mb-0.5 flex items-center gap-1 text-[10px] font-semibold ${mine ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                   {author === 'assistant' && <Sparkles className="h-3 w-3" />} {label}
                 </p>
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                <p className="whitespace-pre-wrap wrap-break-word">{message.body}</p>
                 <time className={`mt-1 block text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} dateTime={message.created_at}>
                   {when}
                 </time>

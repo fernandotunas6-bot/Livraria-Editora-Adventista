@@ -26,7 +26,7 @@ export default function NotFoundPage() {
         <div className="w-full max-w-md text-center">
           <p className="text-6xl font-bold text-foreground mb-3" aria-hidden="true">404</p>
           <h1 className="text-2xl font-bold text-foreground mb-2">Página não encontrada</h1>
-          <p className="text-muted-foreground mb-8 break-words">
+          <p className="text-muted-foreground mb-8 wrap-break-word">
             O endereço <code className="text-sm">{pathname}</code> não existe ou mudou de sítio.
           </p>
           <ul className="grid gap-2 text-left">

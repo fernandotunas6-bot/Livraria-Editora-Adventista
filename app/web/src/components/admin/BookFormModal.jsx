@@ -104,7 +104,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -113,7 +113,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
         aria-modal="true"
         aria-labelledby="formulario-produto-titulo"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-marca/10 to-transparent">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-linear-to-r from-marca/10 to-transparent">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-marca/15 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -131,7 +131,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
             {/* Preview lateral */}
             <div className="lg:col-span-2 bg-muted/30 p-6 border-b lg:border-b-0 lg:border-r border-border">
               <div className="sticky top-0 space-y-4">
-                <div className="aspect-[3/4] rounded-xl overflow-hidden bg-muted border shadow-inner">
+                <div className="aspect-3/4 rounded-xl overflow-hidden bg-muted border shadow-inner">
                   <img
                     src={form.cover || PLACEHOLDER_COVER}
                     alt="Preview"
@@ -417,7 +417,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                           value={url}
                           onChange={(v) => setSamplePage(i, v)}
                           aspect="3:4"
-                          previewClassName="h-24 w-[4.5rem]"
+                          previewClassName="h-24 w-18"
                           driveConfig={driveImageConfig}
                           uploadFolder="stock_books"
                         />
@@ -530,7 +530,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                 </TabsContent>
 
                 <TabsContent value="stats" className="space-y-4 mt-0">
-                  <div className="rounded-xl bg-gradient-to-r from-marca/10 to-marca/5 border border-marca/20 p-4 text-sm text-foreground">
+                  <div className="rounded-xl bg-linear-to-r from-marca/10 to-marca/5 border border-marca/20 p-4 text-sm text-foreground">
                     <h4 className="text-base font-semibold text-primary mb-1">Métricas reais</h4>
                     <p className="text-muted-foreground">Contadas automaticamente: vendas quando uma encomenda é registada e visualizações quando alguém abre a página do livro.</p>
                   </div>
@@ -556,7 +556,7 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
             </div>
           </div>
 
-          <div className="sticky bottom-0 flex gap-3 px-6 py-4 border-t bg-background/95 backdrop-blur">
+          <div className="sticky bottom-0 flex gap-3 px-6 py-4 border-t bg-background/95 backdrop-blur-sm">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
             <Button type="submit" className="flex-1 btn-primary py-6 text-base" disabled={saving || uploadPending}>
               {(saving || uploadPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

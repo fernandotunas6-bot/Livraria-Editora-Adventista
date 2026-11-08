@@ -94,7 +94,7 @@ export default function ReaderProfilePage() {
 
           {status === 'ready' && reader && (
             <>
-              <section className="overflow-hidden rounded-2xl border border-editorial-filete bg-editorial-papel shadow-sm">
+              <section className="overflow-hidden rounded-2xl border border-editorial-filete bg-editorial-papel shadow-xs">
                 <div className="h-20 bg-editorial-marinho" aria-hidden="true" />
                 <div className="-mt-10 px-5 pb-5">
                   <Monogram name={reader.author_name} authorKey={reader.author_key} size="lg" staff={reader.is_staff} />
@@ -125,7 +125,7 @@ export default function ReaderProfilePage() {
                     {posts.map((p) => (
                       <li key={p.id}>
                         <Link to={postPath(p.id)} className="flex gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
-                          {p.book_cover && <img src={p.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />}
+                          {p.book_cover && <img src={p.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />}
                           <span className="min-w-0">
                             <span className="block text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(p.kind).label}{p.book_title ? ` · ${p.book_title}` : ''}</span>
                             <span className="mt-1 line-clamp-3 block text-[15px] text-editorial-tinta">{p.body}</span>

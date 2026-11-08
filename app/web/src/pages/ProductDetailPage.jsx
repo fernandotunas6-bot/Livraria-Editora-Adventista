@@ -227,7 +227,7 @@ function ProductDetailPage() {
           <p className="sr-only" role="status">A carregar o livro…</p>
           <Skeleton className="mb-6 h-4 w-44" />
           <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-            <Skeleton className="mx-auto aspect-[3/4] w-full max-w-md rounded-2xl" />
+            <Skeleton className="mx-auto aspect-3/4 w-full max-w-md rounded-2xl" />
             <div className="space-y-4">
               <Skeleton className="h-9 w-11/12" />
               <Skeleton className="h-9 w-2/3" />
@@ -374,7 +374,7 @@ function ProductDetailPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-[3/4] max-h-[78vh] mx-auto w-full mb-4">
+            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-3/4 max-h-[78vh] mx-auto w-full mb-4">
               <img
                 src={!currentImage?.url ? placeholderImage : currentImage.url}
                 alt={product.title}
@@ -401,7 +401,7 @@ function ProductDetailPage() {
               )}
 
               {discount > 0 && product.purchasable && (
-                <span className="absolute left-4 top-4 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-bold text-white shadow tabular-nums">
+                <span className="absolute left-4 top-4 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-bold text-white shadow-sm tabular-nums">
                   −{discount}%
                 </span>
               )}
@@ -418,7 +418,7 @@ function ProductDetailPage() {
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                    className={`shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
                       index === currentImageIndex ? 'border-primary' : 'border-border hover:border-primary/50'
                     }`}
                   >
@@ -663,7 +663,7 @@ function ProductDetailPage() {
         <div ref={tabsRef} className="mt-16 scroll-mt-24 border-t border-border pt-10">
           <Tabs value={tab} onValueChange={setTab}>
             {/* No telemóvel numa só fila que desliza (partia em três linhas). */}
-            <TabsList className="mb-8 flex h-auto w-full justify-start gap-1 overflow-x-auto [scrollbar-width:none] sm:w-auto sm:flex-wrap [&::-webkit-scrollbar]:hidden">
+            <TabsList className="mb-8 flex h-auto w-full justify-start gap-1 overflow-x-auto scrollbar-none sm:w-auto sm:flex-wrap [&::-webkit-scrollbar]:hidden">
               <TabsTrigger value="details"><BookOpen className="h-4 w-4 mr-1.5" />Detalhes</TabsTrigger>
               {hasReadingSample(product) && (
                 <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1.5" />Pré-visualização</TabsTrigger>
@@ -698,7 +698,7 @@ function ProductDetailPage() {
                       {specs.map(([label, value]) => (
                         <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
                           <dt className="shrink-0 text-muted-foreground">{label}</dt>
-                          <dd className="min-w-0 break-words text-right font-medium text-foreground">{value}</dd>
+                          <dd className="min-w-0 wrap-break-word text-right font-medium text-foreground">{value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -730,7 +730,7 @@ function ProductDetailPage() {
                   {product.sample_pages.map((page, i) => {
                     const url = typeof page === 'string' ? page : page.url;
                     return (
-                      <div key={i} className="rounded-xl overflow-hidden border shadow-sm bg-muted/30">
+                      <div key={i} className="rounded-xl overflow-hidden border shadow-xs bg-muted/30">
                         <img src={url} alt={`Página ${i + 1}`} className="w-full h-auto object-contain" />
                         <p className="text-xs text-center py-2 text-muted-foreground">Página {i + 1}</p>
                       </div>
@@ -766,7 +766,7 @@ function ProductDetailPage() {
                       type="button"
                       key={v.id}
                       aria-pressed={selectedVariant?.id === v.id}
-                      className={`text-left p-4 rounded-xl border cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedVariant?.id === v.id ? 'ring-2 ring-marca border-marca/40' : 'hover:border-marca/30'}`}
+                      className={`text-left p-4 rounded-xl border cursor-pointer transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${selectedVariant?.id === v.id ? 'ring-2 ring-marca border-marca/40' : 'hover:border-marca/30'}`}
                       onClick={() => handleVariantSelect(v)}
                     >
                       <p className="font-semibold">{v.title}</p>
@@ -823,7 +823,7 @@ function ProductDetailPage() {
                   </div>
 
                   {/* Submission form or existing user review indicator */}
-                  <div className="bg-card border p-6 rounded-2xl shadow-sm">
+                  <div className="bg-card border p-6 rounded-2xl shadow-xs">
                     {userReview && !editingReview ? (
                       <div className="space-y-4">
                         <h4 className="font-bold text-base text-foreground flex items-center gap-2">
@@ -851,7 +851,7 @@ function ProductDetailPage() {
                               </Button>
                             </div>
                           </div>
-                          <p className="text-sm text-foreground break-words italic">"{userReview.comment}"</p>
+                          <p className="text-sm text-foreground wrap-break-word italic">"{userReview.comment}"</p>
                           {userReview.isVerified && (
                             <span className="inline-flex items-center gap-1 mt-3 text-[10px] bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded border border-green-100">
                               ★ Compra Verificada
@@ -889,7 +889,7 @@ function ProductDetailPage() {
                             placeholder="Partilhe a sua opinião sobre este livro..."
                             rows={4}
                             maxLength={1000}
-                            className="w-full text-sm p-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-marca bg-background"
+                            className="w-full text-sm p-3 rounded-xl border border-input focus:outline-hidden focus:ring-2 focus:ring-marca bg-background"
                             required
                           />
                         </div>
@@ -938,7 +938,7 @@ function ProductDetailPage() {
                   ) : (
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
                       {reviews.map((r) => (
-                        <div key={r.id} className="p-4 border rounded-xl bg-card hover:shadow-sm transition-all">
+                        <div key={r.id} className="p-4 border rounded-xl bg-card hover:shadow-xs transition-all">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div className="h-9 w-9 rounded-full bg-marca/10 text-primary font-bold flex items-center justify-center text-sm shrink-0 border border-marca/25">

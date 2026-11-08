@@ -40,7 +40,7 @@ export function NotificationList({ items, loading, onOpen, className }) {
             {!n.read_at && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-editorial-petroleo" aria-label="Por ler" />}
           </>
         );
-        const cls = 'flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none';
+        const cls = 'flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-hidden';
         return (
           <li key={n.id}>
             {href

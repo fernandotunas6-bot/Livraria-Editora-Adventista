@@ -16,7 +16,7 @@ const AdminSectionHeader = forwardRef(function AdminSectionHeader({ section, act
         {section.groupLabel && (
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.groupLabel}</p>
         )}
-        <h1 ref={ref} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-foreground focus:outline-none md:text-[1.75rem]">
+        <h1 ref={ref} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-foreground focus:outline-hidden md:text-[1.75rem]">
           {section.title}
         </h1>
         {section.description && <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{section.description}</p>}

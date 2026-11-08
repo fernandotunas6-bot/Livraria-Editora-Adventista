@@ -40,7 +40,7 @@ export default function ShopHeroMotion() {
       {LINES.map((line, i) => (
         <motion.div
           key={`line-${i}`}
-          className="absolute h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+          className="absolute h-px bg-linear-to-r from-transparent via-white/25 to-transparent"
           style={{ top: line.top, width: line.width, left: '-20%' }}
           animate={{ x: ['0%', '15%', '0%'] }}
           transition={{

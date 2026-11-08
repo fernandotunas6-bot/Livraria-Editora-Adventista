@@ -67,7 +67,7 @@ export default function StoresPage() {
 
       <PageBannerSlider contentClassName="text-left">
         <p className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/80"><Store className="h-4 w-4" /> Lojas físicas</p>
-        <h1 className="mb-3 font-serif text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Visite-nos</h1>
+        <h1 className="mb-3 font-serif text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Visite-nos</h1>
         <p className="max-w-xl text-sm text-white/85 sm:text-base">
           Encontre a loja mais perto de si, veja o horário e combine o levantamento das suas encomendas.
         </p>
@@ -168,7 +168,7 @@ export default function StoresPage() {
                                   </span>
                                 )}
                               </div>
-                              <h2 className="text-base md:text-lg font-semibold leading-snug">{s.name}</h2>
+                              <h2 className="text-base md:text-lg/7 font-semibold leading-snug">{s.name}</h2>
                               <p className="text-sm text-muted-foreground flex items-start gap-1 mt-1"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{s.address}</p>
                               {s.hours && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Clock className="h-3.5 w-3.5 shrink-0" />{s.hours}</p>}
                             </div>
@@ -212,12 +212,12 @@ export default function StoresPage() {
                       key={selected.id}
                       title={`Mapa — ${selected.name}`}
                       src={embed}
-                      className="w-full aspect-[4/3] lg:aspect-auto lg:h-[560px] border-0"
+                      className="w-full aspect-4/3 lg:aspect-auto lg:h-[560px] border-0"
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
                     />
                   ) : (
-                    <div className="aspect-[4/3] flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
+                    <div className="aspect-4/3 flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
                       <MapPin className="h-10 w-10 text-primary/50" />
                       <p className="text-sm max-w-xs">{selected ? 'Esta loja ainda não tem coordenadas GPS. Use «Como chegar» para abrir a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
                     </div>

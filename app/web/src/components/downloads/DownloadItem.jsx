@@ -39,9 +39,9 @@ export default function DownloadItem({ item, product = null, compact = false }) 
     <li className={`flex gap-3 rounded-xl border bg-card ${compact ? 'p-3' : 'p-4'}`}>
       {!compact && (
         item.cover ? (
-          <img src={item.cover} alt="" loading="lazy" className="h-24 w-[4.5rem] shrink-0 rounded-md border object-cover" />
+          <img src={item.cover} alt="" loading="lazy" className="h-24 w-18 shrink-0 rounded-md border object-cover" />
         ) : (
-          <div className="flex h-24 w-[4.5rem] shrink-0 items-center justify-center rounded-md border bg-muted/40" aria-hidden="true">
+          <div className="flex h-24 w-18 shrink-0 items-center justify-center rounded-md border bg-muted/40" aria-hidden="true">
             <FileText className="h-8 w-8 text-muted-foreground" />
           </div>
         )

@@ -40,7 +40,7 @@ export default function ProductRail({ id, title, description, accent, products, 
   if (!products?.length) return null;
   const items = products.slice(0, RAIL_MAX_ITEMS);
 
-  const arrow = 'hidden h-9 w-9 items-center justify-center rounded-full border border-border bg-card shadow-sm transition-colors hover:bg-muted disabled:opacity-40 disabled:pointer-events-none md:inline-flex';
+  const arrow = 'hidden h-9 w-9 items-center justify-center rounded-full border border-border bg-card shadow-xs transition-colors hover:bg-muted disabled:opacity-40 disabled:pointer-events-none md:inline-flex';
 
   return (
     <section id={id ? `cat-${id}` : undefined} className="scroll-mt-28 py-7 md:py-9" aria-labelledby={id ? `rail-${id}` : undefined}>
@@ -71,7 +71,7 @@ export default function ProductRail({ id, title, description, accent, products, 
         <div
           ref={trackRef}
           onScroll={updateEdges}
-          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 scrollbar-none sm:gap-4 [&::-webkit-scrollbar]:hidden"
         >
           {items.map((product, i) => (
             <div

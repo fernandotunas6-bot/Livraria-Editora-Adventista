@@ -146,7 +146,7 @@ export default function CollectionsPage() {
             </>
           )}
         </div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight sm:gap-3 sm:text-3xl md:text-4xl">
+        <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight sm:gap-3 sm:text-3xl/9 md:text-4xl/10">
           <Layers className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
           {activeCollection ? activeCollection.title : 'Coleções de Livros'}
         </h1>
@@ -178,7 +178,7 @@ export default function CollectionsPage() {
                       {col.cover ? (
                         <img src={col.cover} alt={col.title} className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-base" />
                       ) : (
-                        <div className="w-full h-44 bg-gradient-to-br from-primary/20 to-[#0c4a6e]/20 flex items-center justify-center">
+                        <div className="w-full h-44 bg-linear-to-br from-primary/20 to-[#0c4a6e]/20 flex items-center justify-center">
                           <BookOpen className="h-12 w-12 text-primary/50" />
                         </div>
                       )}
@@ -206,7 +206,7 @@ export default function CollectionsPage() {
               {/* Category Filtering Sidebar */}
               <aside className="w-full lg:w-64 shrink-0">
                 {/* Desktop Sidebar Panel */}
-                <div className="hidden lg:block bg-card border rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="hidden lg:block bg-card border rounded-2xl p-5 shadow-xs space-y-4">
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Filtrar Categoria</h3>
                   <div className="space-y-1">
                     {[
@@ -234,7 +234,7 @@ export default function CollectionsPage() {
                 </div>
 
                 {/* Mobile Filter Action Area */}
-                <div className="lg:hidden flex items-center justify-between bg-card border rounded-xl p-4 shadow-sm">
+                <div className="lg:hidden flex items-center justify-between bg-card border rounded-xl p-4 shadow-xs">
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-bold text-foreground">Filtro Ativo</span>

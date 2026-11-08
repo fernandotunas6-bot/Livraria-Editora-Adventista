@@ -41,13 +41,13 @@ function StatCard({ icon: Icon, label, value, hint, tone = 'default', onClick })
       {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </>
   );
-  const cls = 'rounded-xl border border-border bg-card p-4 text-left shadow-sm';
+  const cls = 'rounded-xl border border-border bg-card p-4 text-left shadow-xs';
   if (!onClick) return <div className={cls}>{body}</div>;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(cls, 'transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
+      className={cn(cls, 'transition-colors hover:border-primary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring')}
     >
       {body}
     </button>
@@ -75,7 +75,7 @@ function AttentionList({ items, onAct, loading }) {
     );
   }
   return (
-    <section aria-labelledby="painel-atencao" className="rounded-xl border border-border bg-card shadow-sm">
+    <section aria-labelledby="painel-atencao" className="rounded-xl border border-border bg-card shadow-xs">
       <h2 id="painel-atencao" className="border-b border-border px-4 py-3 font-sans text-sm font-semibold tracking-normal text-foreground">
         Precisa de atenção <span className="font-normal text-muted-foreground">({items.length})</span>
       </h2>
@@ -104,7 +104,7 @@ function AttentionList({ items, onAct, loading }) {
 
 function Panel({ title, action, children }) {
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm" aria-label={title}>
+    <section className="rounded-xl border border-border bg-card shadow-xs" aria-label={title}>
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="font-sans text-sm font-semibold tracking-normal text-foreground">{title}</h2>
         {action}
@@ -197,7 +197,7 @@ export default function AdminOverview({
                       <button
                         type="button"
                         onClick={() => onOpenOrders({ search: formatOrderNumber(o) })}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-hidden"
                       >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-foreground">
@@ -263,7 +263,7 @@ export default function AdminOverview({
               {(perms.settings || perms.marketing) && <Shortcut icon={PanelTop} label="Faixa de aviso" onClick={() => onNavigate('notices')} />}
               <a
                 href="/" target="_blank" rel="noopener noreferrer"
-                className="flex h-10 items-center gap-2.5 rounded-md px-2.5 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 items-center gap-2.5 rounded-md px-2.5 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> Ver a loja
               </a>
@@ -280,7 +280,7 @@ function Shortcut({ icon: Icon, label, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-10 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex h-10 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> {label}
     </button>

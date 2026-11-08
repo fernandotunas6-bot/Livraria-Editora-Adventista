@@ -271,7 +271,7 @@ const GoogleWorkspaceHub = () => {
 
   if (loadingAuth) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 bg-background border rounded-2xl p-8 text-center shadow-sm">
+      <div className="flex flex-col items-center justify-center py-20 bg-background border rounded-2xl p-8 text-center shadow-xs">
         <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground font-medium">A validar estado dos serviços Google...</p>
       </div>
@@ -281,7 +281,7 @@ const GoogleWorkspaceHub = () => {
   // Google Connection Prompt
   if (!googleUser) {
     return (
-      <div className="bg-background border border-muted/60 rounded-2xl p-6 md:p-8 shadow-sm">
+      <div className="bg-background border border-muted/60 rounded-2xl p-6 md:p-8 shadow-xs">
         <div className="max-w-2xl mx-auto text-center space-y-6 py-4">
           <div className="h-16 w-16 rounded-2xl bg-marca/10 flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 className="h-10 w-10 text-primary" />
@@ -299,7 +299,7 @@ const GoogleWorkspaceHub = () => {
             <button
               onClick={handleConnect}
               disabled={actionLoading}
-              className="gsi-material-button w-full sm:w-auto px-6 py-2.5 flex items-center justify-center gap-3 border shadow-sm rounded-lg hover:bg-muted/10 transition-all duration-base"
+              className="gsi-material-button w-full sm:w-auto px-6 py-2.5 flex items-center justify-center gap-3 border shadow-xs rounded-lg hover:bg-muted/10 transition-all duration-base"
             >
               <div className="gsi-material-button-icon">
                 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: 'block', width: '22px', height: '22px' }}>
@@ -323,12 +323,12 @@ const GoogleWorkspaceHub = () => {
   }
 
   return (
-    <div className="bg-background border rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-background border rounded-2xl overflow-hidden shadow-xs">
       {/* Account Header */}
       <div className="p-5 md:p-6 bg-muted/20 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {googleUser.photoURL ? (
-            <img src={googleUser.photoURL} alt="Google Avatar" className="h-10 w-10 rounded-full border border-primary/20 shadow-sm" />
+            <img src={googleUser.photoURL} alt="Google Avatar" className="h-10 w-10 rounded-full border border-primary/20 shadow-xs" />
           ) : (
             <div className="h-10 w-10 rounded-full bg-marca/10 flex items-center justify-center text-primary border">
               <User className="h-5 w-5" />
@@ -459,7 +459,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
                       {filteredDriveFiles.map((file) => (
-                        <div key={file.id} className="border rounded-xl p-4 flex items-start justify-between bg-card hover:border-marca/30 transition-all shadow-sm">
+                        <div key={file.id} className="border rounded-xl p-4 flex items-start justify-between bg-card hover:border-marca/30 transition-all shadow-xs">
                           <div className="flex items-start gap-3 min-w-0">
                             <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
                               <File className="h-5 w-5" />
@@ -569,7 +569,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="space-y-3">
                       {filteredEvents.map((ev) => (
-                        <div key={ev.id} className="border rounded-xl p-4 flex items-center justify-between bg-card hover:border-marca/30 transition-all shadow-sm">
+                        <div key={ev.id} className="border rounded-xl p-4 flex items-center justify-between bg-card hover:border-marca/30 transition-all shadow-xs">
                           <div className="min-w-0 pr-2">
                             <p className="text-sm font-bold truncate text-foreground">{ev.summary || '(Sem Título)'}</p>
                             {ev.description && (
@@ -661,7 +661,7 @@ const GoogleWorkspaceHub = () => {
                   ) : (
                     <div className="space-y-3">
                       {filteredGmail.map((msg) => (
-                        <div key={msg.id} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-sm space-y-2">
+                        <div key={msg.id} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-xs space-y-2">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-foreground truncate">{msg.from}</p>
@@ -704,7 +704,7 @@ const GoogleWorkspaceHub = () => {
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                     {filteredContacts.map((c, i) => (
-                      <div key={i} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-sm flex items-center gap-3">
+                      <div key={i} className="border rounded-xl p-4 bg-card hover:border-marca/30 transition-all shadow-xs flex items-center gap-3">
                         {c.photo ? (
                           <img src={c.photo} alt={c.name} className="h-10 w-10 rounded-full object-cover border" />
                         ) : (
