@@ -16,8 +16,18 @@ const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(n
  * onde se está (grupo › secção), procurar (Ctrl+K), ver a loja e a conta.
  */
 /**
- * Estado da sincronização: "Actualizado há 2 min" (carregar actualiza já), a rodar enquanto
- * actualiza, e "Sem ligação" quando a rede cai — aí o que se gravar pode não chegar.
+ * O que dizer do tempo real (`sync.realtime`): 'live' com o canal «painel» ligado
+ * (lib/realtimeSignals.js); senão os dados actualizam-se de minuto a minuto.
+ */
+export function realtimeLabel(realtime) {
+  if (realtime === 'live') return { text: 'Em tempo real', title: 'Em tempo real: o que muda aparece sozinho, no momento. Carregar actualiza já.' };
+  return { text: '', title: 'Actualizar agora (os dados actualizam-se sozinhos de minuto a minuto)' };
+}
+
+/**
+ * Estado da sincronização: "Em tempo real" (ponto verde) com o canal ligado; senão "Actualizado
+ * há 2 min" (carregar actualiza já), a rodar enquanto actualiza, e "Sem ligação" quando a rede
+ * cai — aí o que se gravar pode não chegar.
  */
 function SyncStatus({ sync }) {
   const [now, setNow] = useState(() => Date.now());
@@ -33,16 +43,24 @@ function SyncStatus({ sync }) {
       </span>
     );
   }
-  const label = sync.syncing ? 'A actualizar…' : sync.lastSync ? `Actualizado ${sinceLabel(sync.lastSync, now)}` : 'Actualizar';
+  const live = sync.realtime === 'live';
+  const rt = realtimeLabel(sync.realtime);
+  const label = live ? rt.text : sync.syncing ? 'A actualizar…' : sync.lastSync ? `Actualizado ${sinceLabel(sync.lastSync, now)}` : 'Actualizar';
   return (
     <Button
       type="button" variant="ghost" onClick={sync.refreshNow} disabled={sync.syncing}
       className="h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground"
-      title="Actualizar agora (os dados actualizam-se sozinhos de minuto a minuto)"
+      title={rt.title}
       aria-label={`${label}. Actualizar agora`}
     >
-      <RefreshCw className={cn('h-4 w-4', sync.syncing && 'animate-spin')} aria-hidden="true" />
-      <span className="hidden xl:inline">{label}</span>
+      {/* Um ponto fixo, sem pulsar: o painel fica aberto o dia inteiro e uma animação contínua
+          distrai (e gasta bateria no portátil da loja). */}
+      {live ? (
+        <span className="mx-[3px] inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" aria-hidden="true" />
+      ) : (
+        <RefreshCw className={cn('h-4 w-4', sync.syncing && 'animate-spin')} aria-hidden="true" />
+      )}
+      <span className={cn('hidden xl:inline', live && 'text-emerald-700 dark:text-emerald-400')}>{label}</span>
     </Button>
   );
 }

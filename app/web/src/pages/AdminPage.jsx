@@ -66,6 +66,9 @@ const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
 const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
 const ChurchRegistryTab = lazy(() => import('@/components/admin/igreja/ChurchRegistryTab'));
 const ColportagemTab = lazy(() => import('@/components/admin/colportagem/ColportagemTab'));
+const ProducaoTab = lazy(() => import('@/components/admin/producao/ProducaoTab'));
+const FuncionariosTab = lazy(() => import('@/components/admin/funcionarios/FuncionariosTab'));
+const FinanceTab = lazy(() => import('@/components/admin/FinanceTab'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -223,7 +226,7 @@ const AdminPage = () => {
   const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
     const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
     run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
-  }, { enabled: access === 'allow' && (canManageOrders || canManageCatalog) });
+  }, { enabled: access === 'allow' });
 
   // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
   // tempo real; e por consulta completa de 5 em 5 minutos com o canal ligado (de minuto a minuto
@@ -232,6 +235,8 @@ const AdminPage = () => {
   const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
   syncRef.current = sync;
   const { markSynced } = sync;
+  // A barra do topo diz «Em tempo real» com o canal do painel ligado.
+  const syncState = { ...sync, realtime: live ? 'live' : 'off' };
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
   const handleSaveBook = async (data) => {
@@ -542,7 +547,7 @@ const AdminPage = () => {
           aberto noutro separador, vê-se de relance. */}
       <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${activeView ? `${findView(currentSection, activeView)?.label} · ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
-        sync={sync}
+        sync={syncState}
         nav={nav}
         active={activeTab}
         view={activeView}
@@ -690,6 +695,29 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="igreja">
                 <Suspense fallback={spinner}>
                   <ChurchRegistryTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {/* Produção da Editora, funcionários e saídas de dinheiro (migrações funcionarios, producao
+                e saidas): as mesmas regras de lib/adminSections.js. */}
+            {(perms.production || perms.finance) && (
+              <AdminSection active={activeTab} value="producao">
+                <Suspense fallback={spinner}>
+                  <ProducaoTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {(perms.staff || perms.finance) && (
+              <AdminSection active={activeTab} value="funcionarios">
+                <Suspense fallback={spinner}>
+                  <FuncionariosTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {perms.finance && (
+              <AdminSection active={activeTab} value="financas">
+                <Suspense fallback={spinner}>
+                  <FinanceTab />
                 </Suspense>
               </AdminSection>
             )}

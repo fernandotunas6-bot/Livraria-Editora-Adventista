@@ -109,7 +109,7 @@ describe('searchSections', () => {
     expect(searchSections(nav, 'colecoes').map((i) => i.id)).toEqual(['collections']);
     expect(searchSections(nav, 'PERMISSOES').map((i) => i.id)).toEqual(expect.arrayContaining(['users', 'seguranca']));
     // o grupo "Relatórios" e a colportagem, que fala de relatórios na descrição
-    expect(searchSections(nav, 'relatorios').map((i) => i.id)).toEqual(['vendas-huambo', 'pagamentos-caixa', 'colportagem']);
+    expect(searchSections(nav, 'relatorios').map((i) => i.id)).toEqual(['vendas-huambo', 'pagamentos-caixa', 'financas', 'colportagem']);
   });
 
   it('entende as palavras que as pessoas usam para a mesma coisa', () => {
@@ -226,6 +226,11 @@ describe('permissões arrumadas pelas áreas do painel', () => {
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
     expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes']);
     expect(labels('manage_settings')).not.toContain('apps');
+    // Produção, funcionários e finanças (migrações funcionarios, producao e saidas).
+    expect(labels('manage_production')).toEqual(['producao']);
+    expect(labels('manage_staff')).toEqual(['funcionarios']);
+    expect(labels('manage_finance')).toEqual(['producao', 'financas', 'funcionarios']);
+    expect(sectionsOpenedBy('manage_finance').find((s) => s.id === 'funcionarios').readOnly).toBe(true);
     const colp = sectionsOpenedBy('manage_colporteurs');
     expect(colp.map((s) => s.id)).toEqual(['colportagem', 'igreja']);
     expect(colp.find((s) => s.id === 'igreja').readOnly).toBe(true);
