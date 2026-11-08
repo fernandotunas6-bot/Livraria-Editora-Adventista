@@ -82,6 +82,7 @@ import {
   RELEASE_PUSH_BATCH, RELEASE_PUSH_CONCURRENCY, mapLimit, nextReleaseBatch, pushFailure, releasePushAlive, releasePushPayload,
 } from "./releasePush.ts";
 import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.ts";
+import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1669,7 +1670,49 @@ route("POST", "/track", async ({ body, ip }) => {
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
     // O cliente ainda a pode cancelar sozinho (rota /order/cancel; regras em customerCancel.ts).
     can_cancel: customerCancelBlock(order) === null,
+    // O ponto de entrega (migração trajeto_gps): o cliente afina-o em /track/destination.
+    delivery_gps: destinationOf(order),
+    can_set_destination: canSetDestination(order),
   });
+});
+
+// ---------------------------------------------------------------------------
+// Trajeto com GPS (migração trajeto_gps)
+// ---------------------------------------------------------------------------
+// Quem recebe vê quem entrega enquanto a encomenda vai a caminho, e afina o ponto de entrega.
+// Identifica-se como no rastreio: o número da encomenda e o email. A página pergunta de 15 em 15
+// segundos enquanto a encomenda vai a caminho; o limite por minuto dá para dois separadores.
+
+route("POST", "/track/live", async ({ body, ip }) => {
+  if (!await checkRateLimit("track_live", ip, 40)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const orderNumber = String(body.orderNumber || "").trim();
+  const email = normalizeEmail(body.email || "");
+  if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
+  const order = await findOrderByNumberAndEmail(orderNumber, email);
+  if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
+  // Sem a migração a tabela não existe: a leitura falha e o mapa mostra só o ponto de entrega.
+  const { data: position } = await db.from("delivery_positions").select("*").eq("order_id", order.id).maybeSingle();
+  return json(liveTrackingView(order, position || null));
+});
+
+route("POST", "/track/destination", async ({ body, ip }) => {
+  if (!await checkRateLimit("track_destination", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const orderNumber = String(body.orderNumber || "").trim();
+  const email = normalizeEmail(body.email || "");
+  if (!orderNumber || !email) throw bad("Número da encomenda e email são obrigatórios.");
+  const point = parseDestination(body);
+  if (typeof point === "string") throw bad(point);
+  const order = await findOrderByNumberAndEmail(orderNumber, email);
+  if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
+  const { data, error } = await db.rpc("order_set_destination", {
+    p_order_id: order.id, p_lat: point.lat, p_lng: point.lng, p_accuracy: point.accuracy,
+  });
+  // Só as mensagens escritas para o cliente (raise exception, P0001) saem como estão.
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    throw error;
+  }
+  return json(data);
 });
 
 /** Últimos 9 dígitos do telefone (sem o 244 nem o 0 inicial), para comparar números escritos de formas diferentes. */
@@ -2413,6 +2456,13 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
       && Math.abs(gpsLat) <= 90 && Math.abs(gpsLng) <= 180 && (gpsLat !== 0 || gpsLng !== 0)) {
     order.delivery_gps_lat = gpsLat;
     order.delivery_gps_lng = gpsLng;
+    // A precisão que o telemóvel deu (migração trajeto_gps): quem entrega sabe quanto confiar no
+    // ponto. Sem a migração, o place_order deixa cair as colunas que não existem.
+    const gpsAccuracy = Number(data.deliveryGpsAccuracy);
+    if (inAngola(gpsLat, gpsLng)) {
+      order.delivery_gps_updated_at = nowISO();
+      if (Number.isFinite(gpsAccuracy) && gpsAccuracy >= 0 && gpsAccuracy <= 20000) order.delivery_gps_accuracy = Math.round(gpsAccuracy * 10) / 10;
+    }
   }
   if (data.notes && rules.notesMax > 0) order.notes = clip(data.notes, rules.notesMax);
   // Código do colportor que trouxe a venda (link ?c=CPT-0007 ou escrito no checkout). A base de

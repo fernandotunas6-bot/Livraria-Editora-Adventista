@@ -15,6 +15,7 @@ import { ordersWithBookQuery } from '@/lib/bookOrders';
 import { setOrderDeliveryStatus } from '@/api/PlatformApi';
 import OrderPaymentsPanel from '@/components/admin/OrderPaymentsPanel';
 import OrderColporteurDelivery from '@/components/admin/OrderColporteurDelivery';
+import CourierShare from '@/components/delivery/CourierShare';
 import DeliveredPaymentDialog from '@/components/admin/DeliveredPaymentDialog';
 import { deliveryNeedsPayment, moneySummary } from '@/lib/payments';
 import { useAuth } from '@/hooks/useAuth';
@@ -1220,6 +1221,10 @@ const AdminPage = () => {
                             {/* Entrega ao domicílio: o colportor mais próximo (migração entregas_por_colportor). */}
                             {['delivery', 'express'].includes(o.shipping_method) && (
                               <OrderColporteurDelivery order={o} onChanged={loadAll} />
+                            )}
+                            {/* A equipa também entrega: o mapa até ao cliente e a partilha da posição (migração trajeto_gps). */}
+                            {['delivery', 'express'].includes(o.shipping_method) && o.status !== 'cancelled' && o.delivery_status !== 'delivered' && o.delivery_route !== 'colportor' && (
+                              <CourierShare orderId={o.id} deliveryStatus={o.delivery_status} />
                             )}
 
                             {o.shipping_method === 'digital' ? (

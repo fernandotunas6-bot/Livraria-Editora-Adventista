@@ -24,6 +24,7 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
 import { calcShippingCents, DIGITAL_SHIPPING, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
 import { isDigitalCartItem, titleList } from '@/lib/digitalEditions';
+import { accuracyLabel, betterFix } from '@/lib/deliveryTracking';
 import { cartItemTitle, cartVariantLabel } from '@/lib/productTypes';
 import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
@@ -36,6 +37,9 @@ import { MOTION } from '@/lib/motion';
 import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
 import { checkoutMemoryKey, checkoutMemoryOff, readCheckoutMemory, saveCheckoutMemory, setCheckoutMemoryEnabled } from '@/lib/checkoutMemory';
+
+// O mapa do ponto de entrega só se carrega quando se abre (migração trajeto_gps).
+const DeliveryMap = React.lazy(() => import('@/components/maps/DeliveryMap'));
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Ordem em que se procura o primeiro erro, para o mostrar (de cima para baixo no formulário).
@@ -79,6 +83,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   // existiam desde o início e nunca eram escritas: o estafeta ficava só com a referência.
   const [gps, setGps] = useState(null);
   const [locating, setLocating] = useState(false);
+  // O ponto no mapa, para o afinar (arrastar até à porta): migração trajeto_gps.
+  const [gpsMapOpen, setGpsMapOpen] = useState(false);
+  const locateWatch = useRef(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -292,24 +299,40 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     ...(isDigitalCartItem(item) ? { digital: true } : {}),
   }));
 
+  // A localização melhora nos primeiros segundos: fica a leitura mais precisa até ±20 m, ou 15 s.
+  // Antes era uma leitura só (`getCurrentPosition`), muitas vezes a da rede, com centenas de metros
+  // de erro — o estafeta chegava à rua errada.
+  const stopLocate = useCallback(() => {
+    if (locateWatch.current !== null) navigator.geolocation?.clearWatch(locateWatch.current);
+    locateWatch.current = null;
+    setLocating(false);
+  }, []);
+  useEffect(() => stopLocate, [stopLocate]);
   const locate = () => {
     if (!navigator.geolocation) {
       toast({ variant: 'destructive', title: 'Localização indisponível', description: 'Este dispositivo não permite partilhar a localização.' });
       return;
     }
+    stopLocate();
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
+    let best = null;
+    const done = () => {
+      stopLocate();
+      if (best) toast({ title: 'Localização guardada', description: `${accuracyLabel(best.accuracy)}. Veja no mapa e arraste o ponto até à porta, se precisar.` });
+    };
+    locateWatch.current = navigator.geolocation.watchPosition(
       ({ coords }) => {
-        setGps({ lat: coords.latitude, lng: coords.longitude });
-        setLocating(false);
-        toast({ title: 'Localização guardada', description: 'O estafeta recebe o ponto exacto além da morada.' });
+        best = betterFix(best, { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy });
+        setGps(best);
+        if (best.accuracy <= 20) done();
       },
       () => {
-        setLocating(false);
-        toast({ variant: 'destructive', title: 'Não foi possível obter a localização', description: 'Autorize o acesso à localização no browser, ou continue só com a morada.' });
+        stopLocate();
+        if (!best) toast({ variant: 'destructive', title: 'Não foi possível obter a localização', description: 'Autorize o acesso à localização no browser, ou continue só com a morada.' });
       },
-      { timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
+    setTimeout(() => { if (locateWatch.current !== null) done(); }, 15000);
   };
 
   const handleCheckout = useCallback(async (viaWhatsApp = false) => {
@@ -415,7 +438,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         shippingMethod: shipping,
         pickupStore: shipping === 'pickup' ? form.pickupStore : '',
         checkoutSignature,
-        ...(gps && needsAddress ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng } : {}),
+        ...(gps && needsAddress ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng, deliveryGpsAccuracy: gps.accuracy ?? null } : {}),
         ...(normalizeColporteurCode(form.colporteurCode) ? { colporteurCode: normalizeColporteurCode(form.colporteurCode) } : {}),
       };
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
@@ -794,13 +817,30 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             </span>
                             <Button type="button" size="sm" variant={gps ? 'secondary' : 'outline'} onClick={locate} disabled={locating}>
                               {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
-                              <span className="ml-1.5 text-xs">{gps ? 'Actualizar' : 'Usar a minha localização'}</span>
+                              <span className="ml-1.5 text-xs">{locating ? 'A afinar…' : gps ? 'Actualizar' : 'Usar a minha localização'}</span>
                             </Button>
                           </div>
                           {gps && (
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
-                            </p>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                {Number.isFinite(gps.accuracy) ? `Precisão ${accuracyLabel(gps.accuracy)}` : 'Ponto marcado no mapa'}
+                                {Number.isFinite(gps.accuracy) && gps.accuracy > 100 ? ' — pouco precisa: arraste o ponto até à porta.' : ''}
+                              </p>
+                              <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => setGpsMapOpen((o) => !o)} aria-expanded={gpsMapOpen}>
+                                {gpsMapOpen ? 'Fechar o mapa' : 'Ver no mapa e afinar'}
+                              </button>
+                            </div>
+                          )}
+                          {gps && gpsMapOpen && (
+                            <React.Suspense fallback={<div className="h-[200px] rounded-xl border bg-muted" />}>
+                              <DeliveryMap
+                                destination={gps}
+                                editable
+                                height={200}
+                                onDestinationChange={(p) => setGps({ lat: p.lat, lng: p.lng, accuracy: null })}
+                                label="Mapa do ponto de entrega: arraste a casinha até à porta"
+                              />
+                            </React.Suspense>
                           )}
                         </div>
                       </>

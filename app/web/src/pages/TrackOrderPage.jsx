@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import DeliveryConfirmPanel from '@/components/DeliveryConfirmPanel';
+import LiveTracking from '@/components/delivery/LiveTracking';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import { getDeliveryStatusLabel, orderDeliveryAddress } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
@@ -108,6 +109,9 @@ export default function TrackOrderPage() {
   const isPickup = order?.shipping_method === 'pickup';
   const isDigital = order?.shipping_method === 'digital';
   const isCancelled = order?.status === 'cancelled' || order?.delivery_status === 'cancelled';
+  // Entrega ao domicílio ainda por fazer: o mapa com o ponto de entrega e quem a leva.
+  const hasDeliveryMap = !!order && ['delivery', 'express'].includes(order.shipping_method) && !isCancelled
+    && order.delivery_status !== 'delivered';
   const steps = isDigital ? DIGITAL_STEPS : isPickup ? PICKUP_STEPS : STEPS;
   const currentStepIdx = !order ? -1
     : isDigital
@@ -273,6 +277,16 @@ export default function TrackOrderPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Trajeto com GPS (migração trajeto_gps): o ponto de entrega e quem a leva, ao vivo. */}
+                {hasDeliveryMap && (
+                  <LiveTracking
+                    order={order}
+                    orderNumber={order.order_number}
+                    email={email.trim()}
+                    onSaved={(saved) => setOrder((prev) => ({ ...prev, delivery_gps: { lat: saved.lat, lng: saved.lng, accuracy: saved.accuracy, updated_at: saved.updated_at } }))}
+                  />
+                )}
 
                 <div className="bg-card border rounded-2xl p-6">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
