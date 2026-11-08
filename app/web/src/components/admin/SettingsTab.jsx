@@ -110,6 +110,10 @@ const empty = {
   receipt_per_order_per_minute: 3,
   unpaid_cancel_days: 0,
   chat_ai_daily_limit: 500,
+  // Migração relatorio_de_pagamentos.
+  unpaid_orders_per_contact: 3,
+  company_legal_name: '',
+  company_nif: '',
   low_stock_threshold: 5,
   book_code_prefix: 'LIV-',
   ui_glass_enabled: true,
@@ -192,6 +196,7 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
   const [hasNewRules, setHasNewRules] = useState(false);
+  const [hasPaymentRules, setHasPaymentRules] = useState(false);
   // Colunas da migração 20261106180000 (páginas sem os botões flutuantes).
   const [hasFloating, setHasFloating] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -214,6 +219,7 @@ export default function SettingsTab() {
         setHasAboutImages(hasColumn(r, 'about_top_image_url'));
         setHasAboutTeam(hasColumn(r, 'about_team'));
         setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
+        setHasPaymentRules(hasColumn(r, 'unpaid_orders_per_contact'));
         setHasFloating(hasColumn(r, 'chat_hidden_on'));
         setHadLogoFile(!!r.logo);
         setHadFaviconFile(!!r.favicon);
@@ -273,6 +279,9 @@ export default function SettingsTab() {
           receipt_per_order_per_minute: r.receipt_per_order_per_minute ?? empty.receipt_per_order_per_minute,
           unpaid_cancel_days: r.unpaid_cancel_days ?? empty.unpaid_cancel_days,
           chat_ai_daily_limit: r.chat_ai_daily_limit ?? empty.chat_ai_daily_limit,
+          unpaid_orders_per_contact: r.unpaid_orders_per_contact ?? empty.unpaid_orders_per_contact,
+          company_legal_name: r.company_legal_name || '',
+          company_nif: r.company_nif || '',
           low_stock_threshold: r.low_stock_threshold ?? empty.low_stock_threshold,
           book_code_prefix: r.book_code_prefix ?? empty.book_code_prefix,
           ui_glass_enabled: r.ui_glass_enabled !== false,
@@ -428,6 +437,11 @@ export default function SettingsTab() {
         [hasNewRules, {
           unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
           chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
+        }],
+        [hasPaymentRules, {
+          unpaid_orders_per_contact: clampInt(form.unpaid_orders_per_contact, 0, 20, 3),
+          company_legal_name: String(form.company_legal_name || '').trim().slice(0, 160),
+          company_nif: String(form.company_nif || '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 20),
         }],
         [hasAboutTeam, {
           // Sem nome não é ninguém: essas linhas não são gravadas.
@@ -680,6 +694,18 @@ export default function SettingsTab() {
           <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} /></div>
           <div className="space-y-2"><Label>Telefone</Label><PhoneInput value={form.contact_phone} onChange={(v) => set('contact_phone', v)} /></div>
           <div className="space-y-2"><Label>Morada</Label><Input value={form.contact_address} onChange={(e) => set('contact_address', e.target.value)} /></div>
+          {hasPaymentRules && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="empresa-nome">Nome legal da empresa (no recibo)</Label>
+                <Input id="empresa-nome" value={form.company_legal_name} maxLength={160} onChange={(e) => set('company_legal_name', e.target.value)} placeholder="Ex.: Livraria e Editora Adventista" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="empresa-nif">NIF (no recibo)</Label>
+                <Input id="empresa-nif" value={form.company_nif} maxLength={20} onChange={(e) => set('company_nif', e.target.value)} inputMode="numeric" />
+              </div>
+            </>
+          )}
           <div className="space-y-2"><Label>WhatsApp</Label><PhoneInput value={form.whatsapp} onChange={(v) => set('whatsapp', v)} /></div>
           <div className="space-y-2"><Label>Facebook URL</Label><Input value={form.facebook} onChange={(e) => set('facebook', e.target.value)} /></div>
           <div className="space-y-2"><Label>Instagram URL</Label><Input value={form.instagram} onChange={(e) => set('instagram', e.target.value)} /></div>
@@ -967,6 +993,16 @@ export default function SettingsTab() {
               <p className="text-xs text-muted-foreground">
                 Só transferência e Multicaixa, sem pagamento nem referência indicada, ainda não preparadas. O stock volta ao catálogo e o
                 cliente e a equipa são avisados. 0 = nunca (a encomenda fica à espera, com alerta às 48 h).
+              </p>
+            </div>
+          )}
+          {hasPaymentRules && (
+            <div className="space-y-2">
+              <Label htmlFor="por-pagar-contacto">Encomendas por pagar ao mesmo tempo, por cliente</Label>
+              <Input id="por-pagar-contacto" type="number" min={0} max={20} value={form.unpaid_orders_per_contact} onChange={(e) => set('unpaid_orders_per_contact', e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Pelo mesmo telefone ou email, nos últimos 30 dias. O stock é reservado ao encomendar: sem limite, alguém
+                podia reservar a loja inteira sem pagar. 0 = sem limite.
               </p>
             </div>
           )}

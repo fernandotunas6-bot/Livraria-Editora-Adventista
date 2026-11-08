@@ -1,4 +1,5 @@
 import { isPickupOrder, orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
+import { CHANNEL_LABELS, moneySummary, outstanding } from '@/lib/payments';
 
 /**
  * Célula de CSV segura para abrir no Excel. Um texto começado por = + - @ (ou tabulação) é
@@ -47,6 +48,11 @@ function orderRow(o) {
     subtotal.toFixed(2),
     shipping.toFixed(2),
     Number(o.total || 0).toFixed(2),
+    // Pagamentos registados: o que entrou, o que foi devolvido e o que falta.
+    Number(o.amount_paid || 0).toFixed(2),
+    Number(o.amount_refunded || 0).toFixed(2),
+    outstanding(o).toFixed(2),
+    o.paid_at ? new Date(o.paid_at).toLocaleString('pt-AO') : '',
     o.status || '',
     o.payment_status || '',
     // O nome, como no recibo (antes saía o código: "entrega", "balcao").
@@ -61,6 +67,7 @@ const HEADERS = [
   'Nº Pedido', 'Data', 'Tipo', 'Canal', 'Cliente', 'Email', 'Telefone',
   'Morada', 'Cidade', 'Método Envio', 'Loja Levantamento',
   'Subtotal (Kz)', 'Envio (Kz)', 'Total (Kz)',
+  'Pago (Kz)', 'Reembolsado (Kz)', 'Em falta (Kz)', 'Pago em',
   'Estado', 'Estado Pagamento', 'Método Pagamento', 'Estado Entrega',
   'Itens', 'Notas',
 ];
@@ -104,6 +111,8 @@ export function computeSalesReport(orders) {
     byStatus[st].total += Number(o.total || 0);
   });
 
+  // Dinheiro com a definição de todo o painel (lib/payments.js): recebido é o que entrou.
+  const money = moneySummary(orders);
   return {
     totalOrders: orders.length,
     activeOrders: active.length,
@@ -112,7 +121,11 @@ export function computeSalesReport(orders) {
     whatsappOrders: whatsapp.length,
     purchases: purchases.length,
     enquiries: enquiries.length,
+    // Vendido: o total das encomendas activas. Não é receita (inclui o que ainda não entrou).
     totalRevenue: sum(active),
+    received: money.received,
+    receivable: money.receivable,
+    refundDue: money.refundDue,
     onlineRevenue: sum(online),
     whatsappRevenue: sum(whatsapp),
     cancelledRevenue: sum(cancelled),
@@ -168,9 +181,12 @@ export function exportSalesReportSummary(orders, filename = 'relatorio-vendas') 
     ['Compras online', report.onlineOrders],
     ['Encomendas WhatsApp', report.whatsappOrders],
     [],
-    ['Receita total (Kz)', report.totalRevenue.toFixed(2)],
-    ['Receita online (Kz)', report.onlineRevenue.toFixed(2)],
-    ['Receita WhatsApp (Kz)', report.whatsappRevenue.toFixed(2)],
+    ['Recebido: pago menos reembolsado (Kz)', report.received.toFixed(2)],
+    ['Por receber (Kz)', report.receivable.toFixed(2)],
+    ['Por reembolsar (Kz)', report.refundDue.toFixed(2)],
+    ['Vendido: encomendas activas (Kz)', report.totalRevenue.toFixed(2)],
+    ['Vendido online (Kz)', report.onlineRevenue.toFixed(2)],
+    ['Vendido WhatsApp (Kz)', report.whatsappRevenue.toFixed(2)],
     ['Ticket médio (Kz)', report.averageOrder.toFixed(2)],
     [],
     ['Por mês', 'Pedidos', 'Total (Kz)'],
@@ -185,6 +201,41 @@ export function exportSalesReportSummary(orders, filename = 'relatorio-vendas') 
   const a = document.createElement('a');
   a.href = url;
   a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Movimentos do relatório de pagamentos (public.payments_report): cada pagamento e reembolso
+ * confirmado no período, com a origem e quem confirmou. É o ficheiro para a contabilidade.
+ */
+export function exportPaymentMovements(report, filename = 'pagamentos') {
+  const SOURCE = { gateway: 'Gateway (automático)', staff: 'Equipa', customer: 'Indicado pelo cliente, confirmado pela equipa', migration: 'Antes do registo' };
+  const rows = [
+    ['Data', 'Encomenda', 'Cliente', 'Tipo', 'Valor (Kz)', 'Método', 'Referência', 'Conta', 'Recebido por', 'Canal', 'Origem', 'Confirmado por'],
+    ...(report?.movements || []).map((m) => [
+      m.received_at ? new Date(m.received_at).toLocaleString('pt-AO') : '',
+      m.order_number || m.order_id || '',
+      m.customer_name || '',
+      m.kind === 'refund' ? 'Reembolso' : 'Pagamento',
+      (m.kind === 'refund' ? -Number(m.amount || 0) : Number(m.amount || 0)).toFixed(2),
+      m.method_name || m.method_code || '',
+      m.reference || '',
+      m.account || '',
+      m.collected_by || '',
+      CHANNEL_LABELS[m.channel] || m.channel || '',
+      SOURCE[m.source] || m.source || '',
+      m.decided_by_name || (m.source === 'gateway' ? 'Gateway' : ''),
+    ]),
+  ];
+  const csv = '\uFEFF' + rows.map((r) => r.map(escapeCsv).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}-${report?.period?.from || ''}-${report?.period?.to || ''}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

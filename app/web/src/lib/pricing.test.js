@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectivePrice, isSaleActive, saleWindowOpen, variantPrices } from './pricing';
+import { effectivePrice, isSaleActive, normalizeVersions, saleWindowOpen, variantPrices } from './pricing';
 
 // Um instante fixo, para os testes não dependerem da hora a que correm.
 const AGORA = Date.parse('2026-11-06T12:00:00Z');
@@ -77,5 +77,35 @@ describe('variantPrices', () => {
     expect(variantPrices(livro, { price: 2500, sale_price: 0 }, AGORA).sale).toBe(null);
     expect(variantPrices(livro, { price: 2500, sale_price: 'abc' }, AGORA).sale).toBe(null);
     expect(variantPrices(null, null, AGORA)).toEqual({ price: 0, sale: null, onSale: false });
+  });
+});
+
+// O painel gravava `price: ''` num tamanho sem preço próprio: a loja mostrava 0 Kz e o
+// servidor cobrava o preço do produto, sem a promoção que o cartão da loja anunciava.
+describe('tamanho sem preço próprio', () => {
+  const farda = { price: 4500, sale_price: 4000, sale_starts_at: ANTES, sale_ends_at: DEPOIS };
+
+  it('é o produto, com a promoção do produto', () => {
+    expect(variantPrices(farda, { label: 'M', price: '' }, AGORA)).toEqual({ price: 4500, sale: 4000, onSale: true });
+    expect(variantPrices(farda, { label: 'M', price: null }, AGORA)).toEqual({ price: 4500, sale: 4000, onSale: true });
+    expect(variantPrices(farda, { label: 'M', price: 0 }, AGORA)).toEqual({ price: 4500, sale: 4000, onSale: true });
+  });
+
+  it('com preço próprio vale o dele, sem a promoção do produto', () => {
+    expect(variantPrices(farda, { label: 'G', price: '5200' }, AGORA)).toEqual({ price: 5200, sale: null, onSale: false });
+  });
+
+  it('a promoção do produto acaba também para os tamanhos sem preço', () => {
+    const acabou = { ...farda, sale_ends_at: ANTES };
+    expect(variantPrices(acabou, { label: 'M', price: '' }, AGORA)).toEqual({ price: 4500, sale: null, onSale: false });
+  });
+});
+
+describe('normalizeVersions', () => {
+  it('grava números, ou null quando fica por preencher', () => {
+    expect(normalizeVersions([{ label: 'M', format: '', price: '', stock: '', isbn: '' }, { label: 'G', price: '5200', stock: '7.9' }]))
+      .toEqual([{ label: 'M', format: '', price: null, stock: null, isbn: '' }, { label: 'G', price: 5200, stock: 7 }]);
+    expect(normalizeVersions(null)).toEqual([]);
+    expect(normalizeVersions([{ label: 'X', price: 'abc', stock: '-1' }])).toEqual([{ label: 'X', price: null, stock: null }]);
   });
 });

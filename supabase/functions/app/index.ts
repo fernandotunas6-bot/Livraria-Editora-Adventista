@@ -40,6 +40,8 @@ import {
   orderCreatedLetter,
   orderStatusLetter,
   paymentConfirmedLetter,
+  paymentPartialLetter,
+  paymentRejectedLetter,
   thankYouLetter,
   dailySummaryLetter,
   staffAlertLetter,
@@ -66,9 +68,14 @@ import {
   type EmailMessage, type ProviderResult,
 } from "./emailProviders.ts";
 import {
-  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, paymentStatusChange,
+  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
   saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
+import {
+  type PaymentAction, type PaymentResult, customerNoticeFor, deliveryNeedsPayment, kz as kwanza, outstanding, parseAmount,
+  staffNoteFor, trackPaymentSummary, unpaidLimitReached,
+} from "./payments.ts";
+import { parseGatewayEvent, providerCode, verifyWebhookSignature } from "./paymentWebhook.ts";
 import { floatingPagesFrom } from "./floatingPages.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -103,7 +110,9 @@ const bad = (msg: string) => new HttpError(400, msg);
 const tooMany = (msg: string) => new HttpError(429, msg, { "Retry-After": "60" });
 
 type Row = Record<string, any>;
-type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string };
+// `raw`: o corpo exacto, como chegou. O webhook do gateway de pagamentos verifica a assinatura
+// sobre ele (o JSON analisado pode reordenar ou reescrever números).
+type Ctx = { req: Request; url: URL; body: Row; auth: Auth; ip: string; raw: string };
 
 // Por omissão nada se guarda: estas respostas têm dados pessoais (rastreio, painel, contas)
 // e não levavam Cache-Control nenhum. As rotas iguais para todos usam `publicJson`.
@@ -257,6 +266,8 @@ function storeRules(settings: Row | null) {
     receiptPerOrder: clampInt(settings?.receipt_per_order_per_minute, 1, 10, 3),
     // 0 = nunca cancela (o valor por omissão): a loja decide se e quando.
     unpaidCancelDays: clampInt(settings?.unpaid_cancel_days, 0, 60, 0),
+    // Encomendas por pagar ao mesmo tempo com o mesmo telefone ou email. 0 = sem limite.
+    unpaidOrdersPerContact: clampInt(settings?.unpaid_orders_per_contact, 0, 20, 3),
     // Respostas com IA por dia na loja toda (custo). 0 = assistente sempre sem IA.
     chatAiDailyLimit: clampInt(settings?.chat_ai_daily_limit, 0, 100000, 500),
   };
@@ -764,14 +775,25 @@ async function sendOrderStatusEmail(order: Row, settings: Row | null, status: st
   });
 }
 
-/** Avisa o cliente de que o valor da encomenda foi devolvido. */
-async function sendRefundEmail(order: Row, settings: Row | null) {
+/** Avisa o cliente de que o valor (ou parte dele) foi devolvido. Um aviso por reembolso. */
+async function sendRefundEmail(order: Row, settings: Row | null, key = "") {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
   return sendLetter(settings, order.customer_email, refundLetter(emailBrand(settings), order), {
     context: "payment",
     customer_name: order.customer_name,
     order_number: order.order_number,
-    dedupe: `order:refund:${order.id}`,
+    dedupe: key ? `order:refund:${order.id}:${key}` : `order:refund:${order.id}`,
+  });
+}
+
+/** Aviso de pagamento ao cliente (recebido em parte, não encontrado), um por pagamento. */
+async function sendPaymentLetter(order: Row, settings: Row | null, letter: Letter, key: string) {
+  if (!settings?.order_email_enabled || !order.customer_email) return false;
+  return sendLetter(settings, order.customer_email, letter, {
+    context: "payment",
+    customer_name: order.customer_name,
+    order_number: order.order_number,
+    dedupe: `order:${key}:${order.id}`,
   });
 }
 
@@ -953,27 +975,40 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
  * tem a sua chave de idempotência: voltar a gravar o mesmo passo não repete mensagens. Uma
  * falha num canal não impede os outros nem desfaz a mudança na encomenda.
  */
-async function notifyOrderStep(order: Row, step: string, event?: Row) {
+async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { key?: string } = {}) {
   const settings = await getSettings();
   const result = { email: false, whatsapp: false, push: 0 };
+  const brand = emailBrand(settings);
+  // Passos de pagamento (pagamentos registados): recebido em parte, não encontrado, reembolso.
+  // `key` é a chave de idempotência de cada canal: um aviso por pagamento, não por encomenda.
+  const key = opts.key || step;
+  const reason = String(event?.reason || "");
+  const paymentLetter = step === "payment_partial" ? paymentPartialLetter(brand, order)
+    : step === "payment_rejected" ? paymentRejectedLetter(brand, order, reason)
+    : step === "refunded" ? refundLetter(brand, order)
+    : null;
   try {
     result.email = step === "paid"
       ? await sendPaymentConfirmedEmail(order, settings)
-      : await sendOrderStatusEmail(order, settings, step, event);
+      : step === "refunded"
+        ? await sendRefundEmail(order, settings, key)
+        : paymentLetter
+          ? await sendPaymentLetter(order, settings, paymentLetter, key)
+          : await sendOrderStatusEmail(order, settings, step, event);
   } catch (err) {
     console.log(`notifyOrderStep email ${step}:`, (err as Error)?.message || err);
   }
-  const brand = emailBrand(settings);
-  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : orderStatusLetter(brand, order, step, event);
+  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : paymentLetter || orderStatusLetter(brand, order, step, event);
   if (!letter) return result;
   const ref = String(order.order_number || order.id || "");
   const site = brand.siteUrl.replace(/\/$/, "");
   const title = letter.doc.title;
   const subtitle = letter.doc.subtitle || "";
   try {
-    result.whatsapp = await sendOrderStepWhatsApp(order, step, [
+    result.whatsapp = await sendOrderStepWhatsApp(order, key, [
       `*${title}* — ${ref}`, "", subtitle,
       event?.description ? String(event.description) : "",
+      reason ? `Motivo: ${reason}` : "",
       site ? `\nAcompanhe: ${site}/track` : "",
       `\n${settings?.site_name || "Livraria Adventista"}`,
     ].filter(Boolean).join("\n"));
@@ -1297,6 +1332,9 @@ route("GET", "/settings", async () => {
     contact_email: rec.contact_email || "",
     contact_phone: rec.contact_phone || "",
     contact_address: rec.contact_address || "",
+    // No recibo (migração relatorio_de_pagamentos).
+    company_legal_name: rec.company_legal_name || "",
+    company_nif: rec.company_nif || "",
     whatsapp: rec.whatsapp || "",
     facebook: rec.facebook || "",
     instagram: rec.instagram || "",
@@ -1462,6 +1500,8 @@ route("GET", "/payment-methods", async () => {
       id: r.id, name: r.name, code: r.code, type: r.type || "offline", instructions: r.instructions || "",
       account_info: r.account_info || "", qr_url: r.qr_url || fileUrl("payment_methods", r, "qr_code"), icon: r.icon || "",
       payment_link: r.payment_link || "",
+      // Confirmado pelo gateway de pagamentos (webhook): o cliente não indica referência.
+      automatic: !!String(r.gateway_provider || "").trim(),
       // Envios em que o método aparece; null = todos (ver checkoutRules.paymentAllowedForShipping).
       shipping_methods: Array.isArray(r.shipping_methods) && r.shipping_methods.length ? r.shipping_methods : null,
     })),
@@ -1486,12 +1526,19 @@ route("POST", "/track", async ({ body, ip }) => {
   // Como pagar, para quem paga depois de encomendar (transferência, Multicaixa): são os dados
   // públicos que o checkout já mostra. A página usa-os para pedir a referência do pagamento.
   const { data: method } = await db.from("payment_methods")
-    .select("name, type, instructions, account_info, payment_link").eq("code", order.payment_method_code || "").maybeSingle();
+    .select("name, type, instructions, account_info, payment_link, gateway_provider").eq("code", order.payment_method_code || "").maybeSingle();
   const payLater = isPaidUpfront(method?.type) && !["paid", "refunded"].includes(order.payment_status) && order.status !== "cancelled";
+  // O que o cliente precisa de saber do pagamento: quanto falta, o que indicou e, se a equipa não
+  // o encontrou, porquê (pagamentos registados, migração pagamentos_registados).
+  const { data: payRows } = await db.from("order_payments")
+    .select("kind, status, source, reference, decision_reason, created, decided_at").eq("order_id", order.id).limit(50);
   return json({
     payment_method_name: order.payment_method_name || method?.name || "",
     payment_upfront: isPaidUpfront(method?.type),
     payment_reference_present: !!order.payment_reference,
+    // Confirmado pelo gateway: a página não pede a referência, diz que a confirmação é automática.
+    payment_automatic: !!String(method?.gateway_provider || "").trim(),
+    ...trackPaymentSummary(order, payRows || []),
     ...(payLater ? {
       payment_instructions: method?.instructions || "",
       payment_account_info: method?.account_info || "",
@@ -1546,32 +1593,41 @@ route("POST", "/order/payment-reference", async ({ body, ip }) => {
   }
   // A mesma resposta para número inexistente e contacto errado: não revela que números existem.
   if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o contacto.");
-  if (order.status === "cancelled") throw bad("Esta encomenda foi cancelada.");
+  if (order.status === "cancelled" || order.delivery_status === "cancelled") throw bad("Esta encomenda foi cancelada.");
   if (["paid", "refunded"].includes(order.payment_status)) throw bad("O pagamento desta encomenda já foi confirmado.");
-  const { data: method } = await db.from("payment_methods").select("name, type").eq("code", order.payment_method_code || "").maybeSingle();
+  const { data: method } = await db.from("payment_methods").select("name, type, gateway_provider").eq("code", order.payment_method_code || "").maybeSingle();
   if (!isPaidUpfront(method?.type)) throw bad("Esta encomenda paga-se na entrega ou no balcão: não precisa de referência.");
+  // Com gateway, quem confirma é o gateway (webhook): uma referência escrita pelo cliente não
+  // serve para nada e daria à equipa uma confirmação a fazer à mão.
+  if (String(method?.gateway_provider || "").trim()) {
+    throw bad(`O pagamento por ${method?.name || "este método"} é confirmado automaticamente: não precisa de indicar a referência.`);
+  }
 
-  const { error } = await db.from("orders").update({
-    payment_reference: reference,
-    payment_status: "awaiting_confirmation",
-    delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []), timelineEvent(
-      order.delivery_status || "received", "Pagamento indicado pelo cliente", `Referência: ${reference}`, "",
-    )],
-  }).eq("id", order.id);
-  if (error) throw error;
-
+  // Fica registado como "indicado" (order_payments): a encomenda passa a "a aguardar
+  // confirmação". A mesma referência outra vez não cria outra; uma nova substitui a anterior,
+  // que fica rejeitada com o motivo. A base de dados devolve as outras encomendas com a mesma
+  // referência, para a equipa ver antes de confirmar.
+  const result = await paymentRpc("order_payment_report", { p_order_id: order.id, p_reference: reference }, null);
   const ref = order.order_number || order.id;
-  // Vai para a equipa de pagamentos (sem equipas, para quem gere encomendas), com prioridade.
-  await notifyDuty({
-    duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: order.id,
-    title: `Pagamento indicado na encomenda ${ref}`,
-    body: `${order.customer_name || "O cliente"} indicou a referência ${reference} (${method?.name || "pagamento"}). Confirme no painel.`,
-  });
-  runAfterResponse("Avisos à equipa (pagamento indicado)", () => dispatchStaffNotifications());
+  if (!result.repeated) {
+    await addTimeline(order.id, timelineEvent(
+      order.delivery_status || "received", "Pagamento indicado pelo cliente", `Referência: ${reference}`, "",
+    ));
+    const dup = result.duplicates?.length
+      ? ` Atenção: a mesma referência aparece em ${result.duplicates.map((d) => d.order_number).join(", ")}.`
+      : "";
+    // Vai para a equipa de pagamentos (sem equipas, para quem gere encomendas), com prioridade.
+    await notifyDuty({
+      duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: order.id,
+      title: `Pagamento indicado na encomenda ${ref}`,
+      body: `${order.customer_name || "O cliente"} indicou a referência ${reference} (${method?.name || "pagamento"}, ${kwanza(outstanding(order))}). Confirme no painel com o valor que entrou.${dup}`,
+    });
+    runAfterResponse("Avisos à equipa (pagamento indicado)", () => dispatchStaffNotifications());
+  }
   return json({
     ok: true,
     order_number: ref,
-    payment_status: "awaiting_confirmation",
+    payment_status: result.payment_status || "awaiting_confirmation",
     message: "Recebemos a referência. A equipa confirma o pagamento e avisa-o.",
   });
 });
@@ -1747,61 +1803,231 @@ route("POST", "/confirm-delivery", async ({ body, ip }) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Pagamentos registados (migração 20261107200000_pagamentos_registados, docs/PAGAMENTOS.md)
+// ---------------------------------------------------------------------------
+// Cada pagamento e reembolso é uma linha de `order_payments`; o estado da encomenda resulta
+// delas. A equipa com "Confirmar pagamentos" confirma (com o valor que entrou), rejeita (com o
+// motivo, que vai para o cliente), regista pagamentos ao balcão e na entrega, anula um
+// pagamento confirmado por engano e regista reembolsos. As funções da base de dados só aceitam
+// a service role: o pedido passa sempre por aqui, onde se verifica a permissão, se diz à base
+// quem foi (`x-actor-id`, para o registo de segurança) e se avisa o cliente.
+
+/** Chama uma função de pagamentos da base de dados em nome de quem pediu. */
+async function paymentRpc(fn: string, args: Row, actorId: string | null): Promise<PaymentResult & Row> {
+  const call = db.rpc(fn, args);
+  const { data, error } = await (actorId ? call.setHeader("x-actor-id", actorId) : call);
+  if (error) {
+    // As mensagens dos `raise exception` (P0001) foram escritas para quem as lê. A referência
+    // que já confirmou outra encomenda volta com 409: o painel pergunta se é partilhada.
+    if (error.code === "P0001") throw new HttpError(error.hint === "shared_reference" ? 409 : 400, error.message);
+    if (error.code === "42501") throw new HttpError(403, error.message);
+    throw error;
+  }
+  return (data || {}) as PaymentResult & Row;
+}
+
+/** Acrescenta um passo à linha do tempo da encomenda (o cliente vê-a no rastreio). */
+async function addTimeline(orderId: string, event: Row, actorId?: string | null) {
+  const { data: o } = await db.from("orders").select("delivery_timeline").eq("id", orderId).maybeSingle();
+  const timeline = [...(Array.isArray(o?.delivery_timeline) ? o!.delivery_timeline : []), event];
+  const call = db.from("orders").update({ delivery_timeline: timeline }).eq("id", orderId);
+  const { error } = await (actorId ? call.setHeader("x-actor-id", actorId) : call);
+  if (error) console.log("Linha do tempo:", error.message);
+}
+
 /**
- * Muda o estado do pagamento de uma encomenda e avisa o cliente quando fica pago.
- *
- * Esta rota existe porque o painel actualizava `payment_status` directamente na tabela, e
- * nesse caminho não passa nenhum código que possa enviar um email: o cliente nunca sabia que
- * o pagamento tinha sido aceite. Aqui a mudança e o aviso ficam no mesmo sítio, do lado do
- * servidor, que é também quem tem a permissão para decidir.
+ * Depois de uma acção da equipa: o passo na linha do tempo, o aviso ao cliente (email, WhatsApp,
+ * push, pelas regras de `customerNoticeFor`) e a nota para a equipa. Uma falha a avisar não
+ * desfaz o pagamento já registado.
  */
-route("POST", "/admin/orders/payment-status", async ({ auth, body }) => {
-  requirePermission(auth, "manage_orders");
-  const id = String(body.orderId || "").trim();
-  const status = String(body.status || "").trim();
-  if (!id) throw bad("orderId obrigatório.");
-  if (!["pending", "awaiting_confirmation", "paid", "failed", "refunded"].includes(status)) {
-    throw bad("Estado de pagamento inválido.");
-  }
-  const { data: order } = await db.from("orders").select("*").eq("id", id).maybeSingle();
-  if (!order) throw new HttpError(404, "Encomenda não encontrada.");
-  // Que transições valem e que aviso o cliente recebe: checkoutRules.ts, com testes.
-  const change = paymentStatusChange(order, status);
-  if ("error" in change) throw bad(change.error);
-
-  let saved = order;
-  if (order.payment_status !== status) {
-    // O pagamento confirmado fica na linha do tempo: é daí que conta o prazo de entrega
-    // prometido (Envios e Devoluções), que a vigilância usa para alertar atrasos.
-    const timeline = status === "paid" && order.payment_status !== "paid"
-      ? { delivery_timeline: [...(Array.isArray(order.delivery_timeline) ? order.delivery_timeline : []),
-        timelineEvent("paid", "Pagamento confirmado", "", "")] }
-      : {};
-    const { data, error } = await db.from("orders").update({ payment_status: status, ...timeline }).eq("id", id).select().single();
-    if (error) throw error;
-    saved = data;
+async function afterPaymentAction(action: PaymentAction, result: PaymentResult & Row, auth: Auth) {
+  const orderId = String(result.order_id || "");
+  const note = staffNoteFor(result);
+  if (!orderId) return { email_sent: false, notice: note };
+  const { data: before } = await db.from("orders").select("delivery_status").eq("id", orderId).maybeSingle();
+  const step = String(before?.delivery_status || "received");
+  const becamePaid = result.payment_status === "paid" && result.previous_status !== "paid";
+  if (action === "confirm" || action === "record") {
+    // O pagamento confirmado fica na linha do tempo com o passo "paid": é daí que conta o prazo
+    // de entrega prometido (opsRouting.deliveryStart), que a vigilância usa para os atrasos.
+    if (becamePaid) await addTimeline(orderId, timelineEvent("paid", "Pagamento confirmado", "", ""), auth?.id);
+    else if (Number(result.amount_paid) > 0 && Number(result.outstanding) > 0) {
+      await addTimeline(orderId, timelineEvent(step, "Pagamento recebido em parte",
+        `Recebido: ${kwanza(result.amount_paid)} · em falta: ${kwanza(result.outstanding)}`, ""), auth?.id);
+    }
+  } else if (action === "reject") {
+    await addTimeline(orderId, timelineEvent(step, "Pagamento não encontrado", String(result.reason || ""), ""), auth?.id);
+  } else if (action === "refund") {
+    await addTimeline(orderId, timelineEvent(step, "Reembolso efectuado", kwanza(result.refund_amount), ""), auth?.id);
   }
 
-  // Só o pagamento aceite gera mensagem: "pendente" ou "falhou" são estados internos, e o
-  // cliente é avisado disso pelo meio por onde está a pagar, não por um email da loja.
+  const notice = customerNoticeFor(action, result);
   let emailSent = false;
-  if (change.notify === "paid") {
+  if (notice) {
     try {
-      emailSent = (await notifyOrderStep(saved, "paid")).email;
+      const { data: fresh } = await db.from("orders").select("*").eq("id", orderId).maybeSingle();
+      if (fresh) {
+        const subject = notice === "refunded" ? { ...fresh, refund_amount: result.refund_amount } : fresh;
+        // "Pagamento confirmado" sai uma vez por encomenda; os outros, um por pagamento.
+        const key = notice === "paid" ? "paid" : `${notice}:${result.payment_id || ""}`;
+        emailSent = (await notifyOrderStep(subject, notice, { reason: result.reason || "" }, { key })).email;
+      }
     } catch (err) {
-      console.log("Email de pagamento confirmado:", err);
+      console.log(`Aviso de pagamento (${notice}):`, err);
     }
   }
-  // O reembolso é o outro estado que o cliente precisa de saber: é dinheiro a voltar para ele.
-  if (change.notify === "refunded") {
-    try {
-      emailSent = await sendRefundEmail(saved, await getSettings());
-    } catch (err) {
-      console.log("Email de reembolso:", err);
-    }
+  return { email_sent: emailSent, notice: note };
+}
+
+/** Valor vindo do painel: vazio = null (a base usa o indicado ou o que falta); inválido recusa. */
+const amountOrNull = (v: unknown) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = parseAmount(v);
+  if (!Number.isFinite(n)) throw bad("Valor inválido.");
+  return n;
+};
+const isoOrNull = (v: unknown) => {
+  const t = Date.parse(String(v || ""));
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+};
+
+// ---------------------------------------------------------------------------
+// Gateway de pagamentos (migração 20261107201500_gateway_de_pagamentos, docs/PAGAMENTOS.md)
+// ---------------------------------------------------------------------------
+// Regra do dono: um pagamento só fica confirmado pelo gateway, ou por um funcionário com
+// "Confirmar pagamentos". O gateway chama esta rota com o JSON assinado (paymentWebhook.ts).
+// Segredos da Edge Function: PAYMENT_WEBHOOK_SECRET (o segredo partilhado com o gateway) e
+// PAYMENT_GATEWAY_PROVIDER (o nome do fornecedor, "generico" por omissão). Sem o segredo, a
+// rota não existe: ninguém consegue marcar pagamentos por aqui.
+const gatewayProvider = () => providerCode(Deno.env.get("PAYMENT_GATEWAY_PROVIDER") || "generico");
+
+/** Uma chamada recusada (assinatura, dados) também fica no registo do gateway. */
+async function logGatewayRejection(provider: string, detail: string, body: Row, ip: string) {
+  const payload = JSON.stringify(body || {}).length > 20000 ? { cortado: true } : (body || {});
+  const { error } = await db.from("payment_gateway_events").insert({
+    provider, outcome: "rejected", detail: clipText(detail, 500), payload, ip: clipText(ip, 80),
+    transaction_id: clipText((body as Row)?.transaction_id ?? (body as Row)?.id ?? "", 120),
+    order_ref: clipText((body as Row)?.order_number ?? "", 80),
+  });
+  if (error) console.log("Registo do gateway:", error.message);
+}
+
+route("POST", "/webhooks/pagamentos", async ({ req, raw, body, ip }) => {
+  const secret = Deno.env.get("PAYMENT_WEBHOOK_SECRET") || "";
+  if (!secret) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("payment-webhook", ip, 300)) throw tooMany("Demasiados pedidos.");
+  const provider = gatewayProvider();
+  const signature = req.headers.get("x-signature") || req.headers.get("x-webhook-signature") || "";
+  if (!(await verifyWebhookSignature(raw, signature, secret))) {
+    await logGatewayRejection(provider, "Assinatura inválida.", body, ip);
+    throw new HttpError(401, "Assinatura inválida.");
   }
-  // `notice`: o que a equipa tem de saber e o cliente não soube (o painel mostra-o no aviso).
-  return json({ payment_status: saved.payment_status, email_sent: emailSent, notice: change.note });
+  const event = parseGatewayEvent(body);
+  if ("error" in event) {
+    await logGatewayRejection(provider, event.error, body, ip);
+    throw bad(event.error);
+  }
+  const result = await paymentRpc("order_payment_gateway", {
+    p_provider: provider, p_transaction_id: event.transactionId, p_order_ref: event.orderRef, p_amount: event.amount,
+    p_paid_at: event.paidAt, p_reference: event.reference, p_status: event.status, p_payload: body, p_ip: ip,
+  }, null);
+
+  if (result.outcome === "recorded") {
+    // O cliente é avisado como num pagamento confirmado pela equipa (email, WhatsApp, push), já
+    // depois da resposta: o gateway espera pouco e repete se não receber 200.
+    runAfterResponse("Pagamento confirmado pelo gateway", async () => { await afterPaymentAction("record", result, null); });
+    const note = staffNoteFor(result);
+    if (note) {
+      await notifyDuty({
+        duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: String(result.order_id || "") || null,
+        title: `Pagamento do gateway na encomenda ${result.order_number || event.orderRef}`, body: note,
+      });
+      runAfterResponse("Avisos à equipa (gateway)", () => dispatchStaffNotifications());
+    }
+  } else if (result.outcome === "orphan") {
+    await notifyDuty({
+      duty: "payment", storeId: null, kind: "payment_reported", severity: "high", orderId: null,
+      title: `Pagamento do gateway sem encomenda (${event.orderRef})`,
+      body: `${kwanza(event.amount)} · transacção ${event.transactionId}. Veja em Relatórios → Pagamentos e caixa e concilie à mão.`,
+    });
+    runAfterResponse("Avisos à equipa (gateway sem encomenda)", () => dispatchStaffNotifications());
+  }
+  return json({ ok: true, outcome: result.outcome });
+});
+
+/** O que o painel mostra do gateway: se está ligado, o endereço a dar ao fornecedor. */
+route("GET", "/admin/payments/gateway", async ({ auth }) => {
+  if (!can(auth, "manage_payments") && !can(auth, "confirm_payments")) throw new HttpError(403, "Sem permissão.");
+  return json({
+    configured: !!(Deno.env.get("PAYMENT_WEBHOOK_SECRET") || ""),
+    provider: gatewayProvider(),
+    webhook_url: `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/app/webhooks/pagamentos`,
+    signature_header: "X-Signature",
+  });
+});
+
+/**
+ * Mudava o estado do pagamento com um clique, sem valor nem data. O estado passou a resultar dos
+ * pagamentos registados: um separador antigo do painel recebe esta mensagem em vez de gravar.
+ */
+route("POST", "/admin/orders/payment-status", async ({ auth }) => {
+  requirePermission(auth, "confirm_payments");
+  throw new HttpError(410, "O painel foi actualizado: recarregue a página para registar o pagamento com o valor recebido.");
+});
+
+/** Pagamento já verificado: dinheiro ou TPA no balcão, dinheiro da entrega, transferência no extracto. */
+route("POST", "/admin/orders/payments/record", async ({ auth, body }) => {
+  requirePermission(auth, "confirm_payments");
+  const amount = amountOrNull(body.amount);
+  if (amount === null) throw bad("Indique o valor recebido.");
+  const result = await paymentRpc("order_payment_record", {
+    p_order_id: clipText(body.orderId, 60), p_amount: amount, p_method_code: clipText(body.methodCode, 60) || null,
+    p_reference: clipText(body.reference, 120), p_received_at: isoOrNull(body.receivedAt), p_account: clipText(body.account, 120),
+    p_collected_by: clipText(body.collectedBy, 120), p_notes: clipText(body.notes, 500), p_shared_reference_ok: body.sharedReferenceOk === true,
+  }, auth!.id);
+  return json({ ...result, ...(await afterPaymentAction("record", result, auth)) });
+});
+
+/** Confirma um pagamento indicado (pelo cliente, ou por quem entregou), com o valor que entrou. */
+route("POST", "/admin/orders/payments/confirm", async ({ auth, body }) => {
+  requirePermission(auth, "confirm_payments");
+  const result = await paymentRpc("order_payment_confirm", {
+    p_payment_id: clipText(body.paymentId, 60), p_amount: amountOrNull(body.amount), p_received_at: isoOrNull(body.receivedAt),
+    p_account: clipText(body.account, 120), p_notes: clipText(body.notes, 500), p_shared_reference_ok: body.sharedReferenceOk === true,
+  }, auth!.id);
+  return json({ ...result, ...(await afterPaymentAction("confirm", result, auth)) });
+});
+
+/** Rejeita um pagamento indicado que não se encontrou; o motivo vai para o cliente. */
+route("POST", "/admin/orders/payments/reject", async ({ auth, body }) => {
+  requirePermission(auth, "confirm_payments");
+  const result = await paymentRpc("order_payment_reject", {
+    p_payment_id: clipText(body.paymentId, 60), p_reason: clipText(body.reason, 300),
+  }, auth!.id);
+  return json({ ...result, ...(await afterPaymentAction("reject", result, auth)) });
+});
+
+/** Anula um pagamento ou reembolso confirmado por engano (avisa os administradores). */
+route("POST", "/admin/orders/payments/void", async ({ auth, body }) => {
+  requirePermission(auth, "confirm_payments");
+  const result = await paymentRpc("order_payment_void", {
+    p_payment_id: clipText(body.paymentId, 60), p_reason: clipText(body.reason, 300),
+  }, auth!.id);
+  return json({ ...result, ...(await afterPaymentAction("void", result, auth)) });
+});
+
+/** Reembolso: dinheiro devolvido ao cliente, no máximo o que ficou pago. */
+route("POST", "/admin/orders/refunds/record", async ({ auth, body }) => {
+  requirePermission(auth, "confirm_payments");
+  const amount = amountOrNull(body.amount);
+  if (amount === null) throw bad("Indique o valor devolvido.");
+  const result = await paymentRpc("order_refund_record", {
+    p_order_id: clipText(body.orderId, 60), p_amount: amount, p_method_code: clipText(body.methodCode, 60) || null,
+    p_reference: clipText(body.reference, 120), p_refunded_at: isoOrNull(body.refundedAt), p_account: clipText(body.account, 120),
+    p_reason: clipText(body.reason, 300),
+  }, auth!.id);
+  return json({ ...result, ...(await afterPaymentAction("refund", result, auth)) });
 });
 
 // Os estados que o seguimento, os emails e o painel (DELIVERY_STATUS em orderUtils.js)
@@ -1837,6 +2063,40 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
       text(body.description, 1000), text(body.location, 160),
     )];
   }
+  // Entregar com dinheiro por receber (pagamento na entrega, balcão, transferência que não
+  // chegou): o painel diz quanto recebeu quem entregou, ou porque se entrega sem pagamento.
+  // Foi o que faltou à encomenda de 245 000 Kz entregue com o pagamento pendente.
+  //   * com "Confirmar pagamentos", o dinheiro fica confirmado;
+  //   * sem ela, fica indicado por quem entregou, para a caixa confirmar quando o receber;
+  //   * sem pagamento, o motivo vai para o registo de segurança e avisa os administradores.
+  let deliveryPayment: (PaymentResult & Row) | null = null;
+  if (statusChanged && body.status === "delivered" && deliveryNeedsPayment(order)) {
+    const paid = body.payment && typeof body.payment === "object" ? body.payment as Row : null;
+    const reason = text(body.unpaidReason, 300);
+    if (paid) {
+      const amount = parseAmount(paid.amount);
+      if (!Number.isFinite(amount)) throw bad("Indique o valor que recebeu na entrega.");
+      const collectedBy = text(paid.collectedBy, 120) || auth!.email;
+      deliveryPayment = can(auth, "confirm_payments")
+        ? await paymentRpc("order_payment_record", {
+          p_order_id: order.id, p_amount: amount, p_method_code: text(paid.methodCode, 60) || null,
+          p_reference: text(paid.reference, 120), p_received_at: null, p_account: text(paid.account, 120),
+          p_collected_by: collectedBy, p_notes: "Recebido na entrega.", p_shared_reference_ok: false,
+        }, auth!.id)
+        : await paymentRpc("order_payment_report", {
+          p_order_id: order.id, p_reference: text(paid.reference, 120), p_source: "staff", p_amount: amount,
+          p_collected_by: collectedBy, p_notes: "Recebido na entrega; por confirmar na caixa.",
+        }, auth!.id);
+    } else if (reason.length >= 5) {
+      await recordSecurity(auth, {
+        table: "orders", rowId: order.id, alert: true,
+        summary: `Encomenda ${order.order_number || order.id} entregue sem pagamento (${kwanza(outstanding(order))} em falta): ${reason}`,
+      });
+    } else {
+      throw new HttpError(409, `Esta encomenda tem ${kwanza(outstanding(order))} por receber. Diga quanto recebeu na entrega, ou porque a entrega sem pagamento.`);
+    }
+  }
+
   const { data: saved, error } = await db.from("orders").update(patch).eq("id", order.id).select().single();
   if (error) throw error;
   // O email vai só quando o estado muda de facto: gravar a mesma etapa outra vez no painel
@@ -1851,7 +2111,10 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
       console.log("Email de estado da encomenda:", err);
     }
   }
-  return json({ timeline: saved.delivery_timeline, email_sent: emailSent });
+  const paymentInfo = deliveryPayment
+    ? { payment: deliveryPayment, ...(await afterPaymentAction(deliveryPayment.payment_status === "awaiting_confirmation" ? "report" : "record", deliveryPayment, auth)) }
+    : {};
+  return json({ timeline: saved.delivery_timeline, email_sent: emailSent, ...paymentInfo });
 });
 
 // ---------------------------------------------------------------------------
@@ -1992,7 +2255,9 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     payment_method_code: paymentCode,
     payment_method_name: paymentMethodRow?.name || LEGACY_PAYMENT_LABELS[paymentCode] || paymentCode,
     payment_reference: paymentReference,
-    payment_status: paidUpfront && paymentReference ? "awaiting_confirmation" : "pending",
+    // O estado do pagamento resulta dos pagamentos registados (a base põe "pending" a todas as
+    // encomendas novas); a referência trazida no checkout é indicada a seguir, já com número.
+    payment_status: "pending",
     delivery_status: "received",
     delivery_timeline: [timelineEvent(
       "received",
@@ -2047,6 +2312,25 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     order.idempotency_key = idempotencyKey;
   }
 
+  // Encomendas por pagar ao mesmo tempo com este telefone ou email (Configurações → Regras da
+  // loja). A reserva do stock é feita logo ao encomendar: sem limite, um programa reservava a
+  // loja inteira com encomendas que nunca seriam pagas.
+  if (rules.unpaidOrdersPerContact > 0) {
+    const digits = phone.replace(/\D/g, "").slice(-9);
+    const filters = [
+      ...(digits.length === 9 ? [`phone.ilike.*${digits}`] : []),
+      ...(email ? [`customer_email.eq.${JSON.stringify(email.toLowerCase())}`] : []),
+    ];
+    if (filters.length) {
+      const since = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
+      const { data: open } = await db.from("orders").select("created, status, delivery_status, payment_status")
+        .or(filters.join(",")).gte("created", since).limit(50);
+      if (unpaidLimitReached(open || [], rules.unpaidOrdersPerContact)) {
+        throw bad(`Já tem ${rules.unpaidOrdersPerContact} encomenda(s) por pagar. Pague ou cancele uma antes de fazer outra, ou fale connosco pelo WhatsApp.`);
+      }
+    }
+  }
+
   const { data: saved, error } = await db.rpc("place_order", {
     p_order: order,
     p_items: cartItems,
@@ -2069,6 +2353,17 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
       if (previous) return checkoutResponse(previous, successUrl, { emailQueued, whatsappSent: false, replayed: true });
     }
     throw error;
+  }
+
+  // A referência trazida no checkout (transferência sem gateway) fica indicada, por verificar.
+  // Num método com gateway, quem confirma é o webhook: a referência escrita não entra.
+  if (paidUpfront && paymentReference && !String(paymentMethodRow?.gateway_provider || "").trim()) {
+    try {
+      const r = await paymentRpc("order_payment_report", { p_order_id: saved.id, p_reference: paymentReference }, null);
+      saved.payment_status = r.payment_status || saved.payment_status;
+    } catch (err) {
+      console.log("Referência indicada no checkout:", (err as Error)?.message || err);
+    }
   }
 
   // O email de confirmação (SMTP, 1–3 s quando ligado) e o contacto no CRM (várias consultas)
@@ -2765,7 +3060,21 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 // Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
 // ---------------------------------------------------------------------------
 
-const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, amount_paid, amount_refunded, paid_at, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
+
+/**
+ * Encomendas pagas no fim — na entrega ou no balcão (métodos sem `isPaidUpfront`). A
+ * vigilância não pede o pagamento destas antes de as preparar (`payLater` em orderWatch.ts):
+ * é a mesma divisão do cancelamento automático por falta de pagamento.
+ */
+async function payLaterCheck(): Promise<(o: Row) => boolean> {
+  const codes = await cached("payment:pay-later", SHORT_TTL_MS, async () => {
+    const { data } = await db.from("payment_methods").select("code, type");
+    return (data || []).filter((m: Row) => m.code && !isPaidUpfront(m.type)).map((m: Row) => String(m.code));
+  });
+  const set = new Set(codes);
+  return (o: Row) => set.has(String(o.payment_method_code || ""));
+}
 
 /** Encomendas dos últimos 120 dias (as mais antigas já não estão em curso). */
 async function ordersForWatch() {
@@ -2861,7 +3170,7 @@ async function cancelUnpaidOrders(orders: Row[]) {
     // As condições repetem-se no update: se a equipa confirmou o pagamento entretanto, não cancela.
     const { data: saved, error } = await db.from("orders")
       .update({ status: "cancelled", delivery_status: "cancelled" })
-      .eq("id", o.id).eq("payment_status", "pending").neq("status", "cancelled")
+      .eq("id", o.id).in("payment_status", ["pending", "failed"]).eq("amount_paid", 0).neq("status", "cancelled")
       .select().maybeSingle();
     if (error || !saved) continue;
     cancelled += 1;
@@ -2889,11 +3198,11 @@ async function cancelUnpaidOrders(orders: Row[]) {
  * Com `summary`, envia também o resumo diário por email a quem gere encomendas.
  */
 async function runOrderWatch(summary = false) {
-  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
+  const [orders, hours, teams, storeOf, payLater] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver(), payLaterCheck()]);
   // Primeiro os cancelamentos por falta de pagamento: deixam de gerar alertas nesta passagem.
   const cancelled = await cancelUnpaidOrders(orders);
   const ackMinutes = (o: Row) => escalationMinutes(teams, "new_order", storeOf(o));
-  const alerts = orderAlerts(orders, Date.now(), { ackMinutes, hours });
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes, hours, payLater });
   const byId = new Map<string, Row>(orders.map((o) => [String(o.id), o]));
   const now = nowISO();
   const { data: open } = await db.from("order_alerts")
@@ -2965,7 +3274,7 @@ async function runOrderWatch(summary = false) {
   }
 
   let summarySent = 0;
-  if (summary) summarySent = await sendDailySummary(orders, alerts);
+  if (summary) summarySent = await sendDailySummary(orders, alerts, payLater);
   const dispatched = await dispatchStaffNotifications();
   return { orders: orders.length, cancelled, alerts: alerts.length, notified, escalated, resolved: known.size, sla_alerts: slaAlerts, summary_sent: summarySent, dispatched };
 }
@@ -3131,7 +3440,10 @@ async function dispatchStaffNotifications(limit = 100) {
     const { data: claimed } = await db.from("staff_notifications").update({ dispatched_at: nowISO() })
       .eq("id", n.id).is("dispatched_at", null).select("id");
     if (!claimed?.length) continue;
-    const path = n.thread_id ? "/admin?tab=support" : n.order_id ? "/admin?tab=acompanhamento" : "/admin";
+    const path = n.thread_id ? "/admin?tab=support"
+      : n.order_id ? "/admin?tab=acompanhamento"
+      : n.kind === "security" ? "/admin?tab=seguranca"
+      : "/admin";
     const result: Row = {};
     for (const channel of plan.channels) {
       try {
@@ -3175,15 +3487,35 @@ async function dispatchStaffNotifications(limit = 100) {
 }
 
 /** Resumo diário por email a admins e gestores com "manage_orders". Uma vez por dia (idempotente). */
-async function sendDailySummary(orders: Row[], alerts: OrderAlert[]) {
+/**
+ * Dinheiro para o resumo diário: o que entrou ontem (dia de Luanda) e o que pede acção agora.
+ * Vem do relatório de pagamentos (public.payments_report), para dizer o mesmo que o painel.
+ */
+async function paymentsDigest() {
+  const yesterday = new Date(Date.now() + 3600_000 - 24 * 3600_000).toISOString().slice(0, 10);
+  const { data, error } = await db.rpc("payments_report", { p_from: yesterday, p_to: yesterday });
+  if (error || !data) return undefined;
+  return {
+    receivedYesterday: Number(data.received?.net) || 0,
+    paymentsYesterday: Number(data.received?.count) || 0,
+    toConfirm: Number(data.to_confirm?.count) || 0,
+    deliveredUnpaid: Number(data.delivered_unpaid?.count) || 0,
+    deliveredUnpaidAmount: Number(data.delivered_unpaid?.amount) || 0,
+    refundDue: Number(data.refund_due?.count) || 0,
+    receivable: Number(data.receivable?.amount) || 0,
+  };
+}
+
+async function sendDailySummary(orders: Row[], alerts: OrderAlert[], payLater?: (o: Row) => boolean) {
   const settings = await getSettings(true);
   if (!settings) return 0;
+  const money = await paymentsDigest();
   const { data: staff } = await db.from("profiles").select("email, name, role, permissions").in("role", ["admin", "manager"]);
   const recipients = (staff || []).filter((p: Row) => p.email && (p.role === "admin" || p.permissions?.manage_orders === true));
   const day = new Date().toISOString().slice(0, 10);
   let sent = 0;
   for (const p of recipients) {
-    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders), alerts, STAGE_LABELS);
+    const letter = dailySummaryLetter(emailBrand(settings), watchSummary(orders, Date.now(), { payLater }), alerts, STAGE_LABELS, money);
     const ok = await sendLetter(settings, p.email, letter, { context: "staff_summary", customer_name: p.name || "", dedupe: `summary:${day}:${normalizeEmail(p.email)}` });
     if (ok) sent++;
   }
@@ -3271,8 +3603,8 @@ route("POST", "/admin/ops/test", async ({ auth, body }) => {
 /** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
 route("GET", "/admin/orders/watch", async ({ auth }) => {
   requirePermission(auth, "manage_orders");
-  const [orders, hours, teams, storeOf] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver()]);
-  const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours });
+  const [orders, hours, teams, storeOf, payLater] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver(), payLaterCheck()]);
+  const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours, payLater });
   const { data: since } = await db.from("order_alerts")
     .select("order_id, kind, first_seen_at, acknowledged_at, acknowledged_by, escalated_at").is("resolved_at", null);
   const state = new Map<string, Row>((since || []).map((a: Row) => [`${a.order_id}:${a.kind}`, a]));
@@ -3285,7 +3617,7 @@ route("GET", "/admin/orders/watch", async ({ auth }) => {
     .slice(0, 50)
     .map((o) => ({ order_id: o.id, order_number: o.order_number || o.id, customer_name: o.customer_name || "", created: o.created, total: o.total, shipping_method: o.shipping_method || "", pickup_store: o.pickup_store || "" }));
   return json({
-    summary: watchSummary(orders),
+    summary: watchSummary(orders, Date.now(), { payLater }),
     stage_labels: STAGE_LABELS,
     unacknowledged,
     alerts: alerts.map((a) => {
@@ -3420,6 +3752,31 @@ function safeOrigin(origin: unknown) {
     return u.protocol === "https:" || u.protocol === "http:" ? u.origin : "";
   } catch {
     return "";
+  }
+}
+
+/**
+ * Registo de segurança (migração 20261107130000_registo_de_seguranca): acções sobre contas que
+ * não passam por uma tabela com gatilho — suspender, apagar, terminar sessões, gerar um link
+ * de acesso, mudar o email de outra pessoa. `x-actor-id` diz à base quem foi (só vale com a
+ * service role). Uma falha aqui não desfaz a acção já feita: fica nos registos da função.
+ */
+async function recordSecurity(
+  auth: Auth,
+  entry: { rowId: string; summary: string; changes?: Row; alert?: boolean; action?: "insert" | "update" | "delete"; table?: string },
+) {
+  try {
+    const { error } = await db.rpc("security_audit_record", {
+      p_table: entry.table || "profiles",
+      p_row_id: entry.rowId,
+      p_action: entry.action || "update",
+      p_summary: entry.summary,
+      p_changes: entry.changes || {},
+      p_alert: !!entry.alert,
+    }).setHeader("x-actor-id", auth?.id || "");
+    if (error) console.log("Registo de segurança:", error.message);
+  } catch (err) {
+    console.log("Registo de segurança:", err);
   }
 }
 
@@ -3643,7 +4000,7 @@ route("POST", "/admin/users/create", async ({ auth, body }) => {
     phone: cleanText(body.phone, 40),
     role,
     permissions: role === "manager" ? cleanPermissions(body.permissions) : null,
-  }).eq("id", id);
+  }).eq("id", id).setHeader("x-actor-id", auth!.id);
   if (profileError) throw bad(profileError.message);
 
   let access = { link: "", emailSent: false };
@@ -3688,11 +4045,19 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
       patch.email = email;
       // Para o endereço antigo: se a mudança não foi pedida pelo cliente, é por lá que ele sabe.
       await notifyAccount(target.email, target.name, (b) => emailChangedLetter(b, target.name, email, true));
+      // Mudar o email de outra pessoa é o primeiro passo para entrar na conta dela: avisa os
+      // administradores. O gatilho da base não o distingue de o dono mudar o próprio email.
+      await recordSecurity(auth, {
+        rowId: target.id,
+        summary: `Email de uma conta mudado por ${auth!.email}: ${target.email || "—"} → ${email}`,
+        changes: { email: { de: target.email || null, para: email } },
+        alert: true,
+      });
     }
   }
 
   if (Object.keys(patch).length) {
-    const { error } = await db.from("profiles").update(patch).eq("id", target.id);
+    const { error } = await db.from("profiles").update(patch).eq("id", target.id).setHeader("x-actor-id", auth!.id);
     if (error) throw bad(error.message);
   }
   return json({ ok: true });
@@ -3715,6 +4080,11 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
     // (migração por aplicar) não pode fazer parecer que a suspensão falhou.
     await endSessions(target.id).catch((err) => console.log("Terminar sessões:", err?.message || err));
   }
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `${suspend ? "Conta suspensa" : "Conta reactivada"}: ${target.email || target.id}`,
+    alert: target.role !== "member",
+  });
   const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountStatusLetter(b, target.name, suspend));
   return json({ ok: true, suspended: suspend, email_sent: emailSent });
 });
@@ -3731,6 +4101,12 @@ route("POST", "/admin/users/access-link", async ({ auth, body }) => {
   // tem de o mandar por WhatsApp) e só a um administrador. O gestor fica a saber se o email
   // seguiu; se não seguiu, pede a um administrador.
   const canSeeLink = !access.emailSent && auth!.role === "admin";
+  // Com o link à vista, quem o pediu pode entrar na conta: isso avisa os administradores.
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `Link de acesso gerado para ${target.email}${canSeeLink ? " (mostrado no painel, o email não saiu)" : " (enviado por email ao dono)"}`,
+    alert: canSeeLink || target.role !== "member",
+  });
   return json({ emailSent: access.emailSent, link: canSeeLink ? access.link : "", link_withheld: !access.emailSent && !canSeeLink });
 });
 
@@ -3744,6 +4120,8 @@ route("POST", "/admin/users/delete", async ({ auth, body }) => {
   // As encomendas ficam (estão ligadas ao email, não à conta).
   const { error } = await db.auth.admin.deleteUser(target.id);
   if (error) throw bad(error.message);
+  // Para a equipa, o gatilho dos perfis já avisou (sem saber quem foi); isto diz quem.
+  await recordSecurity(auth, { rowId: target.id, action: "delete", summary: `Conta apagada: ${target.email || target.id}` });
   // Depois de apagada, e não antes: um aviso de encerramento de uma conta que afinal ficou
   // seria pior do que nenhum. O email e o nome já tinham sido lidos em `loadTarget`.
   const emailSent = body.notify === false ? false : await notifyAccount(target.email, target.name, (b) => accountClosedLetter(b, target.name));
@@ -3768,6 +4146,10 @@ route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   const ended = await endSessions(target.id);
+  await recordSecurity(auth, {
+    rowId: target.id,
+    summary: `Sessões terminadas em todos os aparelhos: ${target.email || target.id} (${ended})`,
+  });
   let emailSent = false;
   if (body.suspicious === true) {
     const detail = cleanText(body.detail, 500);
@@ -4416,6 +4798,7 @@ Deno.serve(async (req) => {
   let auth: Auth = null;
   try {
     let body: Row = {};
+    let rawBody = "";
     if (req.method === "POST") {
       // O maior pedido legítimo é a confirmação de entrega (assinatura até 600 KB). Sem tecto,
       // um corpo de dezenas de MB era lido e analisado inteiro antes de qualquer validação.
@@ -4423,6 +4806,7 @@ Deno.serve(async (req) => {
       if (declared > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
       const raw = await req.text();
       if (raw.length > MAX_BODY_BYTES) throw new HttpError(413, "Pedido demasiado grande.");
+      rawBody = raw;
       try {
         const parsed = raw ? JSON.parse(raw) : {};
         body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
@@ -4435,7 +4819,7 @@ Deno.serve(async (req) => {
     // por isso o primeiro valor é fiável para os limites de pedidos.
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "anon";
     auth = await getAuth(req);
-    const res = await handler({ req, url, body, auth, ip });
+    const res = await handler({ req, url, body, auth, ip, raw: rawBody });
     res.headers.set("X-Request-Id", requestId);
     return res;
   } catch (err) {

@@ -11,6 +11,9 @@ import {
   orderSteps,
   passwordChangedLetter,
   paymentConfirmedLetter,
+  paymentPartialLetter,
+  paymentRejectedLetter,
+  refundLetter,
   testLetter,
   thankYouLetter,
   welcomeLetter,
@@ -448,6 +451,9 @@ describe("emblemas", () => {
     passwordChangedLetter(brand, "João"),
     orderCreatedLetter(brand, ORDER),
     paymentConfirmedLetter(brand, ORDER),
+    paymentPartialLetter(brand, { ...ORDER, amount_paid: 1000 }),
+    paymentRejectedLetter(brand, ORDER, "Não aparece no extracto"),
+    refundLetter(brand, ORDER),
     ...["confirmed", "preparing", "shipped", "in_transit", "out_for_delivery", "delivered", "cancelled"]
       .map((st) => orderStatusLetter(brand, ORDER, st)!),
     noticeLetter(brand, "Aviso", "Corpo."),
@@ -804,5 +810,27 @@ describe("cancelar com um clique (List-Unsubscribe)", () => {
     const brand = brandFromSettings({ site_url: "https://livrariaadventista.ao" });
     const h = listUnsubscribeHeaders(unsubscribeUrlFor(brand, token), api);
     expect(h["List-Unsubscribe"]).toBe(`<${api}/unsubscribe?t=${token}>`);
+  });
+});
+
+describe("pagamentos registados", () => {
+  it("recebido em parte diz quanto entrou e quanto falta", () => {
+    const l = paymentPartialLetter(brand, { ...ORDER, total: 11500, amount_paid: 6000 });
+    const { text } = emailDocument(brand, l.doc);
+    expect(text).toContain("6.000,00");
+    expect(text).toContain("5.500,00");
+  });
+
+  it("não encontrado leva o motivo e o caminho para outra referência", () => {
+    const l = paymentRejectedLetter(brand, ORDER, "Não aparece no extracto do BAI");
+    const { text } = emailDocument(brand, l.doc);
+    expect(text).toContain("Não aparece no extracto do BAI");
+    expect(l.doc.cta?.label).toBe("Indicar outra referência");
+  });
+
+  it("reembolso de uma parte não diz que devolveu o valor todo", () => {
+    const l = refundLetter(brand, { ...ORDER, total: 10000, refund_amount: 2500 });
+    expect(l.doc.subtitle).toMatch(/Devolvemos 2\.500,00 Kz/);
+    expect(refundLetter(brand, { ...ORDER, total: 10000 }).doc.subtitle).toBe("Devolvemos o valor da sua encomenda.");
   });
 });

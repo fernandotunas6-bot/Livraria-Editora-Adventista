@@ -2,6 +2,28 @@
 
 Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Pagamentos registados e gateway (2026-11-07, ramo `claude/pagamentos-premium`)
+
+- **Pedido do dono:** "análise crítica dos pagamentos", depois "reorganizar seguindo as normas premium" e "ligar com os relatórios". A regra que ele fixou: **um pagamento só fica confirmado pelo gateway (webhook) ou por um funcionário com a permissão**. Guia completo em [PAGAMENTOS.md](PAGAMENTOS.md).
+- **Base de dados** (migrações `20261107200000`–`202000`, aplicadas no merge):
+  - `order_payments`, só de acrescentar;
+  - o estado do pagamento é calculado e ninguém o escreve à mão;
+  - a permissão `confirm_payments`;
+  - total e portes em `numeric(14,2)`;
+  - o painel só grava o seguimento;
+  - o webhook do gateway (`order_payment_gateway`, `payment_gateway_events`);
+  - o relatório `payments_report`;
+  - a comissão do colportor acertada pela diferença;
+  - os tamanhos sem preço próprio a valer o preço do produto.
+- **Inclui o PR #23** (registo de segurança, estado geral), de que depende: o registo das acções de pagamento usa `private.audit_write`. O workflow do #23 traz `supabase db push --include-all`, por isso as migrações do #23, mais antigas do que a `20261107180000` já aplicada, entram na mesma.
+- **Por fazer, do dono:**
+  - escolher o gateway e pôr `PAYMENT_WEBHOOK_SECRET` e `PAYMENT_GATEWAY_PROVIDER` nos segredos da Edge Function;
+  - decidir o link de demonstração do Multicaixa (Kursinha);
+  - ver a encomenda de 245 000 Kz entregue por pagar;
+  - pôr o prazo de cancelamento;
+  - preencher o NIF e o nome legal.
+- **Testes:** 91 cenários em PGlite, que ficam no repositório desta vez (`scripts/pglite/`; instruções em PAGAMENTOS.md); vitest; `deno check`.
+
 ## Política de privacidade (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
 
 - **Pedido do dono:** "actualizar a política de privacidade para cobrir a comunidade". O site não tinha nenhuma (nem página, nem link, nem texto no painel), por isso foi **criada** em `/privacidade` (`/privacy` e `/politica-de-privacidade` redireccionam), com uma secção própria para a comunidade.
@@ -115,9 +137,9 @@ Por decidir ou configurar (dono):
 - **`main`:** a migração do Supabase (o antigo PR #3) está integrada no `main` desde 2026-11-02 (commit `f4d9885`). Atenção: um `main` **local** antigo, da era PocketBase, ainda existe em algumas cópias de trabalho e está 114 commits atrás — usar sempre `origin/main` como referência.
 - **Supabase:** projecto "Livraria Adventista", ref `bggqkjjqbjhbjsckzopj`, organização "Colpotor" (plano grátis), região eu-north-1.
 - **Cloudflare Pages** — hoje na conta `canguelev@fata.adventist.org`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `valentinocanguele@gmail.com`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
-  - `livraria-editora-adventista` — **o que serve produção hoje** (verificado a 2026-11-06), em `livrariaadventista.com` e `livraria-editora-adventista-ben.pages.dev`, ramo `main`. Vai receber também o `.ao` ([DOMINIO.md](DOMINIO.md)).
+  - `livraria-editora-adventista` — **o que serve produção**, ramo `main`. Desde 2026-11-07 o endereço oficial é **`livrariaadventista.ao`**; o `www`, o `.com` e o `livraria-editora-adventista-ben.pages.dev` redireccionam para ele ([DOMINIO.md](DOMINIO.md)).
   - `livraria-adventista` — **o antigo**, em https://livraria-adventista.pages.dev. Já não recebe deploys e está desactualizado: a 2026-11-06 os livros apareciam sem capa (a CSP antiga não aceita o domínio novo das capas). Deve redireccionar para `livrariaadventista.com` ou ser desligado — decisão do dono.
-  - **O domínio `livrariaadventista.ao` não está registado:** os servidores autoritativos do registo `.ao` devolvem `NXDOMAIN` (verificado a 2026-11-03; `dns.ao` devolve `NOERROR` na mesma consulta). O Cloudflare não vende `.ao` — o registo é só por revendedores autorizados do DNS.ao. Passos em [LANCAMENTO.md](LANCAMENTO.md), secção 7.
+  - ~~O domínio `livrariaadventista.ao` não está registado~~ (era assim a 2026-11-03): registado na AngoWeb, zona activa no Cloudflare e oficial desde 2026-11-07.
   - Foi publicado à mão com o Wrangler porque o Actions está bloqueado.
   - Cada ramo tem o seu URL de pré-visualização (`<ramo>.livraria-adventista.pages.dev`, ver `wrangler pages deployment list`). O `main` antigo (PocketBase) está em `main-pocketbase`, e esse e os ramos `cursor/*` não têm backend.
   - Publicar à mão: `npm run deploy:site` (produção) ou `npm run deploy:site -- --preview`. O script recusa publicar se o HEAD não for a ponta do ramo remoto, faz lint, testes e build, publica e confirma que o último deploy de produção é esse commit e que o site responde. Várias sessões publicam no mesmo projecto: nunca publicar um build antigo. As variáveis `VITE_SUPABASE_*` vêm de `app/web/.env`.

@@ -19,6 +19,7 @@ import ImageField from '@/components/admin/ImageField';
 import StockHistory from '@/components/admin/StockHistory';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { isYoutubeUrl } from '@/lib/youtube';
+import { normalizeVersions } from '@/lib/pricing';
 import ProductVideo from '@/components/ProductVideo';
 import { isUploadPending } from '@/lib/mediaUpload';
 
@@ -88,7 +89,8 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
         ? form.benefit_bullets
         : (form.benefit_bullets || '').split('\n').map((s) => s.trim()).filter(Boolean),
       sample_pages: samplePages.filter(Boolean),
-      versions: Array.isArray(form.versions) ? form.versions : [],
+      // Preço e stock das variantes em número (ou null = os do produto): lib/pricing.js.
+      versions: normalizeVersions(form.versions),
       preview_enabled: !!form.preview_enabled,
       video_url: (form.video_url || '').trim(),
     });

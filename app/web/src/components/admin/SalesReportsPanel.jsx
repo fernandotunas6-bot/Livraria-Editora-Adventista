@@ -133,9 +133,13 @@ export default function SalesReportsPanel({ orders }) {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Receita Total</p>
-          <p className="text-2xl font-bold text-primary mt-1">{fmt(report.totalRevenue)}</p>
-          <p className="text-xs text-muted-foreground">{report.activeOrders} pedidos activos</p>
+          {/* Receita é o que entrou (pago menos reembolsado); o vendido inclui o que ainda falta
+              receber. Antes este cartão chamava "Receita" ao vendido: em produção, a 2026-11-07,
+              mostrava 316 670 Kz com 21 665 Kz de facto pagos. */}
+          <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Recebido</p>
+          <p className="text-2xl font-bold text-primary mt-1">{fmt(report.received)}</p>
+          <p className="text-xs text-muted-foreground">Vendido {fmt(report.totalRevenue)} · por receber {fmt(report.receivable)}</p>
+          {report.refundDue > 0 && <p className="text-xs text-destructive">Por reembolsar {fmt(report.refundDue)}</p>}
         </div>
         <div className="bg-card border rounded-xl p-4">
           <p className="text-xs text-muted-foreground flex items-center gap-1"><ShoppingBag className="h-3.5 w-3.5" /> Compras Online</p>

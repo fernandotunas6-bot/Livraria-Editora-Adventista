@@ -1557,7 +1557,7 @@ leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
 - **código**: Edge Function (as 78 rotas, com foco no envio de email, WhatsApp e cancelamento de
   subscrição), moldura e modelos dos emails, modelos do Supabase Auth, SEO e partilha, CSP,
   PWA, scripts e workflows;
-- **produção**: migrações (89 no repositório, 89 aplicadas), advisors de segurança e de
+- **produção**: migrações (89 no repositório e 89 aplicadas; 95 e 95 depois do PR #29), advisors de segurança e de
   desempenho, `site_settings` (sem ler segredos), `notification_logs`, `app_integrations` (sem
   ler tokens), registos da função das últimas 24 h, contagens de contas e encomendas;
 - **GitHub**: o último deploy (o registo confirma `→ endereços públicos:
@@ -1588,9 +1588,9 @@ leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
 | 107 | **`contacto@livrariaadventista.ao` não recebe correio** enquanto o Email Routing não estiver activo (a zona ainda tem os MX da Google, sem conta Google). É o endereço do rodapé do site, dos emails, da política de privacidade e do contacto VAPID das notificações — e, com o achado 102, o das respostas dos clientes. | Alta | ⏳ dono: Cloudflare → Email Routing (DOMINIO.md, passo 4) |
 | 108 | **WhatsApp Business ligado com um token que não é da Meta** (19 caracteres; os tokens da Meta começam por `EAA` e têm centenas). Com `auto_send` ligado, cada encomenda tenta enviar e falha (`OAuthException` 190, "Expected 1 '.' in the input between the postcard and the payload"). | Média | ⏳ dono: token permanente de *System User*, ou desligar a integração |
 | 109 | **A loja não tem telefone nem WhatsApp configurados** (`contact_phone` e `whatsapp` vazios, e as 3 lojas sem telefone). O rodapé dos emails e o site não dão um número; as mensagens de erro mandam o cliente "falar connosco pelo WhatsApp". | Média (negócio) | ⏳ dono: Configurações → Contacto e Lojas |
-| 110 | **Três PRs abertos partem o deploy do Supabase se forem integrados como estão.** #23 (`20261107130000`–`160000`), #26 (`20261107110000`) e #27 (`…130000`–`170000`) têm migrações datadas **antes** da última aplicada em produção (`20261107180000_dominio_ao`). O `supabase db push` recusa-as ("Found local migration files to be inserted before the last migration on remote database"): o workflow fica vermelho antes de publicar a função, enquanto o Cloudflare publica o site novo — site novo com base de dados e função antigas. O #21 tem ainda conflitos com o `main`. | Alta (deploy) | ⏳ renomear as migrações para depois de `20261107180000` antes do merge |
+| 110 | **Três PRs abertos partem o deploy do Supabase se forem integrados como estão.** #23 (`20261107130000`–`160000`), #26 (`20261107110000`) e #27 (`…130000`–`170000`) têm migrações datadas **antes** da última aplicada em produção (`20261107180000_dominio_ao`). O `supabase db push` recusa-as ("Found local migration files to be inserted before the last migration on remote database"): o workflow fica vermelho antes de publicar a função, enquanto o Cloudflare publica o site novo — site novo com base de dados e função antigas. O #21 tem ainda conflitos com o `main`. | Alta (deploy) | ✅ no `main` pelo PR #29 (integrado durante esta passagem): `supabase db push --include-all`, e as do #23 já estão aplicadas. Fica um cuidado: com `--include-all` uma migração de data antiga corre **depois** das mais recentes já aplicadas, por isso tem de ser independente delas (o #26 e o #27 continuam abertos) |
 | 111 | O painel apresentava o **Cloudflare Email Sending** como opção para tudo; o Cloudflare só aceita mensagens transaccionais, e campanhas por lá arriscam a suspensão da conta de envio. | Baixa | ✅ aviso no painel e na documentação |
-| 112 | **Estado geral das encomendas desencontrado da entrega e do pagamento**: em produção, uma encomenda entregue e paga continua `pending`, e outra entregue no balcão tem o pagamento por confirmar. Os relatórios e o painel lêem o estado geral. | Média | ⏳ o #23 (`estado_geral_acompanha_a_entrega`) trata a primeira parte; a segunda é processo (marcar pago no balcão) |
+| 112 | **Estado geral das encomendas desencontrado da entrega e do pagamento**: em produção, uma encomenda entregue e paga continua `pending`, e outra entregue no balcão tem o pagamento por confirmar. Os relatórios e o painel lêem o estado geral. | Média | ✅ a primeira: `estado_geral_acompanha_a_entrega` (do #23, integrada pelo #29) acertou as duas encomendas. Fica uma entregue no balcão com o pagamento por confirmar: processo (marcar pago ao entregar) |
 | 113 | Edge Function com `Access-Control-Allow-Origin: *`. Sem efeito em CSRF (a sessão vai num cabeçalho, não em cookies), mas qualquer site pode chamar as rotas públicas a partir do navegador de um visitante; os limites por IP continuam a valer. | Baixa | 📝 opcional: lista de origens (`.ao`, pré-visualizações, localhost) |
 | 114 | **Protecção contra palavras-passe vazadas desligada** no Auth (advisor). Só existe no plano Pro. | Baixa | ⏳ quando houver plano pago |
 | 115 | **Plano Free, sem PITR, e o backup semanal cifrado ainda não correu** (0 execuções; o primeiro agendado é domingo 2026-11-08, 03:30 UTC). É a única cópia da base: falta confirmar que os segredos (`BACKUP_PASSPHRASE`…) existem. A base está em Estocolmo (`eu-north-1`): ~1 s por pedido a partir de Angola, que a cache das rotas públicas atenua. | Média | ⏳ dono: Actions → Backup → *Run workflow* uma vez |
@@ -1647,6 +1647,10 @@ leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
    loja e das lojas (109).
 4. Cloudflare, zona `.com`: o 301 para o `.ao` (DOMINIO.md, passo 1). Search Console: mudança de
    endereço e o sitemap do `.ao`.
-5. Antes de integrar os PRs #23, #26 e #27: renomear as migrações para depois de
-   `20261107180000` (110).
+5. Antes de integrar o #26 e o #27: confirmar que as migrações deles não dependem das que já
+   correram depois da data delas (110).
 6. Correr o **backup** à mão uma vez e guardar a frase-passe fora do GitHub (115).
+7. Do `security_spec.md` (outra passagem, confirmado aqui): verificação em dois passos nas
+   contas da equipa; **apagar o projecto antigo `livraria-adventista.pages.dev`**, que continua
+   ligado à base de produção com um build antigo; e fechar o email do `.com` (`MX 0 .`,
+   `v=spf1 -all`, DMARC `p=reject`), que não envia nada e pode ser usado para falsificar a loja.

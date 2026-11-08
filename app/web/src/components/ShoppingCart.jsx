@@ -316,7 +316,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
       // servidor gravar), a chave repete-se e o servidor devolve essa encomenda em vez de outra.
       checkoutAttemptRef.current = nextCheckoutAttempt(checkoutAttemptRef.current, checkoutPayload);
-      const { orderId, total, orderNumber, order_type, whatsapp_sent } = await initializeCheckout({
+      const { orderId, total, orderNumber, order_type, whatsapp_sent, payment_status } = await initializeCheckout({
         ...checkoutPayload,
         idempotencyKey: checkoutAttemptRef.current.key,
       });
@@ -335,6 +335,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         paymentAccountInfo: paymentMethodInfo?.account_info || '',
         paymentInstructions: paymentMethodInfo?.instructions || '',
         paymentLink: paymentMethodInfo?.payment_link || '',
+        paymentAutomatic: !!paymentMethodInfo?.automatic,
+        // O documento só se chama "Recibo" quando o pagamento está confirmado (lib/receipt.js).
+        paymentStatus: payment_status || 'pending',
         paymentReference: (form.paymentReference || '').trim(),
         total,
         subtotal: subtotalCents / 100,
@@ -643,11 +646,16 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                               )}
                               <p className="text-xs text-muted-foreground">
                                 Paga <strong>depois</strong> de confirmar: na página seguinte mostramos o número da encomenda para usar como referência,
-                                {m.payment_link ? ' o link de pagamento' : ''} e onde indicar o comprovativo. O stock fica reservado para si.
+                                {m.payment_link ? ' o link de pagamento' : ''}{m.automatic ? '. A confirmação do pagamento é automática.' : ' e onde indicar o comprovativo.'} O stock fica reservado para si.
                               </p>
                               {m.qr_url && <img src={m.qr_url} alt={`QR de pagamento ${m.name}`} className="h-32 w-32 rounded-lg border" />}
-                              <Label htmlFor="checkout-referencia" className="text-xs font-normal text-muted-foreground">Já pagou? Referência do pagamento (opcional)</Label>
-                              <Input id="checkout-referencia" autoComplete="off" placeholder="Referência ou n.º do comprovativo" value={form.paymentReference} onChange={(e) => setForm({ ...form, paymentReference: e.target.value })} />
+                              {/* Com gateway, quem confirma é o webhook: não se pede a referência. */}
+                              {!m.automatic && (
+                                <>
+                                  <Label htmlFor="checkout-referencia" className="text-xs font-normal text-muted-foreground">Já pagou? Referência do pagamento (opcional)</Label>
+                                  <Input id="checkout-referencia" autoComplete="off" placeholder="Referência ou n.º do comprovativo" value={form.paymentReference} onChange={(e) => setForm({ ...form, paymentReference: e.target.value })} />
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
