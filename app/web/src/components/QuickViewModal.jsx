@@ -41,7 +41,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
   if (!open) return null;
 
   const variant = product?.variants?.[0];
-  const inStock = product?.purchasable && (variant?.inventory_quantity ?? 0) > 0;
+  const inStock = product?.purchasable && ((variant?.inventory_quantity ?? 0) > 0 || !!product?.has_digital);
   const price = variant?.sale_price_formatted || variant?.price_formatted;
   const descriptionText = (product?.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -163,7 +163,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
                     )}
                     <dt className="text-muted-foreground">Stock</dt>
                     <dd className={inStock ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>
-                      {inStock ? `${variant?.inventory_quantity ?? 0} un.` : 'Esgotado'}
+                      {!inStock ? 'Esgotado' : product.digital_only ? 'Edição digital' : product.has_digital && !(variant?.inventory_quantity > 0) ? 'Edição digital disponível' : `${variant?.inventory_quantity ?? 0} un.`}
                     </dd>
                   </dl>
 

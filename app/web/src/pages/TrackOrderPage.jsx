@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User, XCircle,
+  Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User, XCircle, Library,
 } from 'lucide-react';
 import CancelOrderDialog from '@/components/account/CancelOrderDialog';
 import { customerOrderStage } from '@/lib/customerOrders';
@@ -33,6 +33,11 @@ const PICKUP_LABELS = { ready: 'Pronta para levantar', delivered: 'Levantada' };
 // recebi". O primeiro passo diz o mesmo que a conta do cliente (lib/customerOrders.js).
 const CUSTOMER_LABELS = { received: 'Registada' };
 const toPickupStep = (status) => (['shipped', 'in_transit', 'out_for_delivery'].includes(status) ? 'ready' : status);
+// Edição digital (migração edicoes_digitais): sem envio. Paga, está na biblioteca.
+const DIGITAL_STEPS = ['received', 'paid', 'delivered'];
+const DIGITAL_LABELS = { paid: 'Pagamento confirmado', delivered: 'Na biblioteca' };
+const toDigitalStep = (order) => (order?.delivery_status === 'delivered' ? 'delivered'
+  : ['awaiting_confirmation', 'partially_paid'].includes(order?.payment_status) ? 'paid' : 'received');
 
 export default function TrackOrderPage() {
   const { settings } = useSiteSettings();
@@ -101,10 +106,15 @@ export default function TrackOrderPage() {
   };
 
   const isPickup = order?.shipping_method === 'pickup';
+  const isDigital = order?.shipping_method === 'digital';
   const isCancelled = order?.status === 'cancelled' || order?.delivery_status === 'cancelled';
-  const steps = isPickup ? PICKUP_STEPS : STEPS;
-  const currentStepIdx = order ? steps.indexOf(isPickup ? toPickupStep(order.delivery_status) : order.delivery_status) : -1;
-  const stepLabel = (step) => (isPickup && PICKUP_LABELS[step]) || CUSTOMER_LABELS[step] || getDeliveryStatusLabel(step);
+  const steps = isDigital ? DIGITAL_STEPS : isPickup ? PICKUP_STEPS : STEPS;
+  const currentStepIdx = !order ? -1
+    : isDigital
+      // A pagar ou por confirmar: o primeiro passo está feito e o pagamento é o que está a andar.
+      ? Math.max(0, steps.indexOf(toDigitalStep(order)) - (toDigitalStep(order) === 'paid' ? 1 : 0))
+      : steps.indexOf(isPickup ? toPickupStep(order.delivery_status) : order.delivery_status);
+  const stepLabel = (step) => (isDigital && DIGITAL_LABELS[step]) || (isPickup && PICKUP_LABELS[step]) || CUSTOMER_LABELS[step] || getDeliveryStatusLabel(step);
   const timeline = order?.timeline || [];
 
   return (
@@ -237,6 +247,15 @@ export default function TrackOrderPage() {
                         <p className="font-mono">{order.tracking_number}{order.carrier ? ` · ${order.carrier}` : ''}</p>
                       </div>
                     )}
+                    {isDigital ? (
+                      <div className="sm:col-span-2 flex items-start gap-2 text-muted-foreground" data-rastreio="digital">
+                        <Library className="h-4 w-4 shrink-0 mt-0.5 text-primary" aria-hidden="true" />
+                        <p>
+                          Edição digital, sem envio: abre na biblioteca da sua conta quando o pagamento for confirmado.{' '}
+                          <Link to="/profile?tab=biblioteca" className="font-medium text-primary hover:underline">Abrir a biblioteca</Link>
+                        </p>
+                      </div>
+                    ) : (
                     <div className="sm:col-span-2 flex items-start gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                       <div>
@@ -251,12 +270,13 @@ export default function TrackOrderPage() {
                         )}
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-card border rounded-2xl p-6">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <Package className="h-5 w-5 text-primary" /> {isPickup ? 'Estado do levantamento' : 'Estado da entrega'}
+                    <Package className="h-5 w-5 text-primary" /> {isDigital ? 'Estado da edição digital' : isPickup ? 'Estado do levantamento' : 'Estado da entrega'}
                   </h3>
                   {isPickup && order.pickup_store && (
                     <p className="text-sm text-muted-foreground -mt-4 mb-5">Levantamento em <strong className="text-foreground">{order.pickup_store}</strong></p>
@@ -310,12 +330,15 @@ export default function TrackOrderPage() {
                   </div>
                 )}
 
+                {/* "Recebi tudo bem" é da entrega: a edição digital não tem. */}
+                {!isDigital && (
                 <DeliveryConfirmPanel
                   orderNumber={orderNumber}
                   email={email}
                   order={order}
                   onConfirmed={(updated) => setOrder((prev) => ({ ...prev, ...updated }))}
                 />
+                )}
 
                 {order.can_cancel && (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">

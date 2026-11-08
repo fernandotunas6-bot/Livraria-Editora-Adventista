@@ -40,6 +40,8 @@ import { MOTION } from '@/lib/motion';
 import { hasReadingSample, variantNames } from '@/lib/productTypes';
 import CommunityFeed from '@/components/community/CommunityFeed';
 import ProductDownloads from '@/components/downloads/ProductDownloads';
+import { variantIndexOf } from '@/lib/digitalEditions';
+import { loadMyLibrary } from '@/lib/digitalLibrary';
 
 // Star rating helper component
 const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
@@ -82,6 +84,8 @@ function ProductDetailPage() {
   const [error, setError] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  // A biblioteca de quem tem sessão, só nos produtos com edição digital (para o "Já é seu").
+  const [library, setLibrary] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Separadores controlados: as estrelas do topo e o "Ler a descrição completa" abrem o
   // separador certo e levam o ecrã até lá.
@@ -131,7 +135,7 @@ function ProductDetailPage() {
     if (product && selectedVariant) {
       const availableQuantity = selectedVariant.inventory_quantity;
       try {
-        await addToCart(product, selectedVariant, quantity, availableQuantity, { silent: true });
+        await addToCart(product, selectedVariant, selectedVariant.digital === true ? 1 : quantity, availableQuantity, { silent: true });
         // Com o carrinho aberto, o aviso ficava por cima de "Continuar para finalizar a compra".
         if (openCart) {
           setIsCartOpen(true);
@@ -155,6 +159,15 @@ function ProductDetailPage() {
   const handleBuyNow = useCallback(async () => {
     await handleAddToCart(true);
   }, [handleAddToCart]);
+
+  useEffect(() => {
+    if (!user?.id || !product?.has_digital) { setLibrary(null); return undefined; }
+    let alive = true;
+    loadMyLibrary()
+      .then((rows) => { if (alive) setLibrary(rows.filter((r) => r.book_id === product.id)); })
+      .catch(() => { if (alive) setLibrary(null); });
+    return () => { alive = false; };
+  }, [user?.id, product?.id, product?.has_digital]);
 
   const handleQuantityChange = useCallback((amount) => {
     setQuantity(prevQuantity => {
@@ -269,7 +282,17 @@ function ProductDetailPage() {
   const originalPrice = selectedVariant?.price_formatted;
   const availableStock = selectedVariant ? selectedVariant.inventory_quantity : 0;
   const isStockManaged = selectedVariant?.manage_inventory ?? false;
-  const canAddToCart = !isStockManaged || quantity <= availableStock;
+  // Edição digital (lib/digitalEditions.js): sem stock nem envio, uma por conta.
+  const isDigital = selectedVariant?.digital === true;
+  // Já é seu? A biblioteca diz se esta edição está paga (abre) ou encomendada por pagar. Só
+  // conta o PDF ligado a esta variante (ou ao produto sem variantes): um PDF do produto inteiro
+  // também vem com o impresso, e não diz que edição se comprou.
+  const selectedIndex = variantIndexOf(selectedVariant?.id);
+  const ownedRow = isDigital
+    ? (library || []).find((r) => (selectedIndex === null ? r.variant == null : Number(r.variant) === selectedIndex)
+      && ['open', 'payment_review', 'awaiting_payment', 'partially_paid'].includes(r.state))
+    : null;
+  const canAddToCart = (!isStockManaged || quantity <= availableStock) && !ownedRow;
 
   // Texto simples da descrição (já sem HTML), para o resumo junto ao botão de compra.
   const descriptionText = typeof DOMParser !== 'undefined' && product.description
@@ -283,7 +306,9 @@ function ProductDetailPage() {
 
   // Uma linha só sobre o stock, logo abaixo do preço, em vez dos três avisos soltos que
   // estavam espalhados pela coluna.
-  const availability = !product.purchasable
+  const availability = isDigital
+    ? { ok: true, label: 'Edição digital: sem portes — abre na sua biblioteca quando o pagamento for confirmado', tone: 'text-emerald-700 dark:text-emerald-400' }
+    : !product.purchasable
     ? { ok: false, label: 'Esgotado de momento' , tone: 'text-destructive' }
     : isStockManaged && availableStock <= 0
       // Com variantes, a mensagem do tipo ("Este tamanho esgotou. Escolha outro." numa t-shirt,
@@ -518,6 +543,29 @@ function ProductDetailPage() {
               </div>
             )}
 
+            {isDigital ? (
+              // A edição digital é uma por conta, e fica na biblioteca: sem quantidade nem envio.
+              <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm" data-edicao-digital>
+                {ownedRow ? (
+                  ownedRow.state === 'open' ? (
+                    <p className="text-foreground">
+                      <strong>Já é seu.</strong> Está na sua biblioteca, pronto a abrir ou descarregar.{' '}
+                      <Link to="/profile?tab=biblioteca" className="font-medium text-primary underline underline-offset-2 hover:no-underline">Abrir a biblioteca</Link>
+                    </p>
+                  ) : (
+                    <p className="text-foreground">
+                      <strong>Já encomendou esta edição</strong> (encomenda {ownedRow.order_number}): abre quando o pagamento for confirmado.{' '}
+                      <Link to="/profile?tab=orders" className="font-medium text-primary underline underline-offset-2 hover:no-underline">Ver a encomenda e pagar</Link>
+                    </p>
+                  )
+                ) : (
+                  <p className="text-muted-foreground">
+                    <strong className="text-foreground">Edição digital (PDF).</strong> Sem portes nem morada: depois do pagamento confirmado,
+                    abre em Perfil → Biblioteca, neste e noutros aparelhos. Precisa de conta.
+                  </p>
+                )}
+              </div>
+            ) : (
             <div className="flex items-center gap-4 mb-8">
               <div className="flex items-center border border-border rounded-lg">
                 <Button onClick={() => handleQuantityChange(-1)} variant="ghost" size="icon" className="rounded-l-lg hover:bg-muted" aria-label="Diminuir quantidade">
@@ -529,6 +577,7 @@ function ProductDetailPage() {
                 </Button>
               </div>
             </div>
+            )}
 
             <div ref={setBotoesCompra} className="flex flex-col sm:flex-row gap-3 mb-4">
               <Button
@@ -773,7 +822,7 @@ function ProductDetailPage() {
                       {v.format && <p className="text-sm text-muted-foreground">{v.format}</p>}
                       {v.isbn && <p className="text-xs font-mono text-muted-foreground mt-1">ISBN: {v.isbn}</p>}
                       <p className="text-primary font-bold mt-2">{v.sale_price_formatted || v.price_formatted}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{v.inventory_quantity > 0 ? `${v.inventory_quantity} em stock` : 'Esgotado'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{v.digital ? 'Edição digital — sem portes, na sua biblioteca' : v.inventory_quantity > 0 ? `${v.inventory_quantity} em stock` : 'Esgotado'}</p>
                     </button>
                   ))}
                 </div>

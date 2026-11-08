@@ -76,7 +76,9 @@ export function buildReceiptText(order) {
     lines.push(`Contacto próximo: ${order.deliveryRelativeName}${order.deliveryRelativePhone ? ` (${order.deliveryRelativePhone})` : ''}`);
   }
 
-  if (order.shippingMethod === 'pickup') {
+  if (order.shippingMethod === 'digital') {
+    lines.push('Entrega: Edição digital — na biblioteca da conta, quando o pagamento for confirmado');
+  } else if (order.shippingMethod === 'pickup') {
     lines.push(`Entrega: Levantamento — ${order.pickupStore || 'Loja'}`);
   } else {
     lines.push(`Morada: ${order.address || '—'}${order.city ? `, ${order.city}` : ''}`);
@@ -129,7 +131,9 @@ export function buildReceiptHtml(order, brand = {}) {
   const company = [brand.legalName, brand.nif ? `NIF ${brand.nif}` : ''].filter(Boolean).map(e).join(' · ');
   const contact = [brand.phone, brand.email, brand.address].filter(Boolean).map(e).join(' · ');
   const logo = /^(https:\/\/|data:image\/)/.test(brand.logo || '') ? `<img src="${e(brand.logo)}" alt="" class="logo"/>` : '';
-  const delivery = order.shippingMethod === 'pickup'
+  const delivery = order.shippingMethod === 'digital'
+    ? '<strong>Entrega:</strong> Edição digital, na biblioteca da conta'
+    : order.shippingMethod === 'pickup'
     ? `<strong>Levantamento:</strong> ${e(order.pickupStore || 'Loja física')}`
     : `<strong>Entrega:</strong> ${e(order.address || '—')}${order.city ? `, ${e(order.city)}` : ''}`;
 

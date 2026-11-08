@@ -29,6 +29,8 @@ const SHIPPING_OPTIONS = [
   { value: 'delivery', label: 'Entrega ao domicílio' },
   { value: 'express', label: 'Entrega expressa' },
   { value: 'pickup', label: 'Levantamento na loja' },
+  // Encomenda só de edições digitais (migração edicoes_digitais): sem envio.
+  { value: 'digital', label: 'Edição digital (sem envio)' },
 ];
 
 const TYPE_LABELS = {
@@ -458,7 +460,10 @@ export default function PaymentsTab() {
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Nenhum marcado = aparece em todos. Ex.: "Pagar no Balcão" só no levantamento.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nenhum marcado = aparece nas entregas e no levantamento; na edição digital só se for pago antes (transferência,
+                    Multicaixa) ou pelo gateway. Ex.: "Pagar no Balcão" só no levantamento; marque "Edição digital" para o aceitar também num livro digital.
+                  </p>
                 </fieldset>
               )}
               <ImageField

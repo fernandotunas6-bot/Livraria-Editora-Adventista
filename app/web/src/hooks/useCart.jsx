@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
 import { cartVariantLabel, needsVariantChoice, variantNames } from '@/lib/productTypes';
+import { cartDigitalState, isDigitalEdition, variantIndexOf } from '@/lib/digitalEditions';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
 
@@ -45,6 +46,25 @@ export const CartProvider = ({ children }) => {
         return;
       }
       const effectiveAvailable = finalAvailable !== undefined ? finalAvailable : (variant.inventory_quantity ?? 99);
+
+      // Edição digital: uma por conta, sem stock. Pôr outra vez não soma — já lá está.
+      if (variant.digital === true) {
+        if (cartItems.some((item) => item.variant.id === variant.id)) {
+          if (!silent) toast.info(`A edição digital de "${product.title}" já está no carrinho.`);
+          resolve();
+          return;
+        }
+        setCartItems((prevItems) => (prevItems.some((item) => item.variant.id === variant.id)
+          ? prevItems
+          : [...prevItems, { product, variant, quantity: 1 }]));
+        if (!silent) {
+          toast.success(`"${product.title}" adicionado ao carrinho!`, {
+            description: 'Edição digital · fica na sua biblioteca quando o pagamento for confirmado',
+          });
+        }
+        resolve();
+        return;
+      }
 
       if (variant.manage_inventory) {
         const existingItem = cartItems.find((item) => item.variant.id === variant.id);
@@ -113,6 +133,7 @@ export const CartProvider = ({ children }) => {
     setCartItems((prevItems) =>
       prevItems.map((item) => {
         if (item.variant.id !== variantId) return item;
+        if (item.variant.digital === true) return item.quantity === 1 ? item : { ...item, quantity: 1 };
         const max = item.variant.manage_inventory ? (item.variant.inventory_quantity ?? 99) : 99;
         const safeQty = Math.max(1, Math.min(quantity, max));
         return { ...item, quantity: safeQty };
@@ -132,12 +153,13 @@ export const CartProvider = ({ children }) => {
     if (!ids.length) return [];
     const { data, error } = await supabase
       .from('stock_books')
-      .select('id, title, price, stock, active, sale_price, sale_starts_at, sale_ends_at, versions, product_type')
+      .select('*')
       .in('id', ids);
     if (error) return [];
     const byId = Object.fromEntries((data || []).filter((b) => b.active !== false).map((b) => [b.id, b]));
     const changes = [];
     const next = [];
+    let changed = false;
     for (const item of cartItems) {
       const book = byId[bookIdOf(item.variant.id)];
       const title = item.product.title;
@@ -152,12 +174,16 @@ export const CartProvider = ({ children }) => {
         changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type).ask} na página do produto.`);
         continue;
       }
+      // Edição digital: sem stock e uma só (migração edicoes_digitais). Se o painel deixar de a
+      // marcar como digital, volta às regras do stock.
+      const digital = isDigitalEdition(book, variantIndexOf(item.variant.id));
       // Stock próprio da edição, quando o painel o regista (o servidor recusa acima dele).
       if (version && /^\s*-?\d+(\.\d+)?\s*$/.test(String(version.stock ?? ''))) {
         stock = Math.min(stock, Math.max(0, Math.floor(Number(version.stock))));
       }
+      if (digital) stock = 1;
       if (stock === 0) { changes.push(`"${title}" esgotou e saiu do carrinho.`); continue; }
-      const variant = { ...item.variant, inventory_quantity: stock };
+      const variant = { ...item.variant, inventory_quantity: stock, manage_inventory: !digital, digital };
       if (version) {
         const { price, sale } = variantPrices(book, version);
         const priceInCents = Math.round(price * 100);
@@ -182,10 +208,12 @@ export const CartProvider = ({ children }) => {
         if (before !== after) changes.push(`O preço de "${title}" mudou para ${formatCurrency(after)}.`);
       }
       const quantity = Math.min(item.quantity, stock);
-      if (quantity < item.quantity) changes.push(`Só há ${stock} unidade(s) de "${title}"; a quantidade foi ajustada.`);
+      if (quantity < item.quantity && !digital) changes.push(`Só há ${stock} unidade(s) de "${title}"; a quantidade foi ajustada.`);
+      // O painel marcou (ou desmarcou) a edição como digital: grava-se, mesmo sem aviso a dar.
+      if (item.variant.digital !== digital) changed = true;
       next.push({ ...item, variant, quantity });
     }
-    if (changes.length) setCartItems(next);
+    if (changes.length || changed) setCartItems(next);
     return changes;
   }, [cartItems]);
 
@@ -215,6 +243,9 @@ export const CartProvider = ({ children }) => {
   const cartTotalCents = useMemo(() => getCartTotalCents(), [getCartTotalCents]);
   const cartTotal = useMemo(() => getCartTotal(), [getCartTotal]);
   const cartTotalAmount = useMemo(() => cartTotalCents / 100, [cartTotalCents]);
+  // Edições digitais no carrinho: só digitais (sem envio), alguma (precisa de conta), o subtotal
+  // do que se envia (os portes contam só isso).
+  const cartDigital = useMemo(() => cartDigitalState(cartItems), [cartItems]);
 
   const value = useMemo(() => ({
     cartItems,
@@ -230,6 +261,7 @@ export const CartProvider = ({ children }) => {
     cartTotalCents,
     cartTotal,
     cartTotalAmount,
+    cartDigital,
   }), [
     cartItems,
     addToCart,
@@ -244,6 +276,7 @@ export const CartProvider = ({ children }) => {
     cartTotalCents,
     cartTotal,
     cartTotalAmount,
+    cartDigital,
   ]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

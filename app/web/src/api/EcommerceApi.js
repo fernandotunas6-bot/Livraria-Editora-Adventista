@@ -7,6 +7,7 @@ import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
 import { sanitizeYoutubeUrl } from '@/lib/youtube';
+import { isDigitalEdition, productHasDigital, productOnlyDigital, versionIsDigital } from '@/lib/digitalEditions';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -39,6 +40,9 @@ function bookToProduct(book, collectionsMap = {}) {
   const variantId = `${book.id}-default`;
   const collectionId = book.collection_id || '';
   const cover = resolveBookCover(book);
+  // Edições digitais (lib/digitalEditions.js): sem stock nem envio, uma por conta.
+  const digitalDefault = isDigitalEdition(book, null);
+  const hasDigital = productHasDigital(book);
 
   const variant = {
     id: variantId,
@@ -48,8 +52,9 @@ function bookToProduct(book, collectionsMap = {}) {
     price_formatted: formatCurrency(priceInCents),
     sale_price_formatted: onSale ? formatCurrency(saleInCents) : null,
     currency_info: CURRENCY,
-    inventory_quantity: stock,
-    manage_inventory: true,
+    inventory_quantity: digitalDefault ? 1 : stock,
+    manage_inventory: !digitalDefault,
+    digital: digitalDefault,
     image_url: cover || null,
   };
 
@@ -62,7 +67,10 @@ function bookToProduct(book, collectionsMap = {}) {
     images: cover ? [{ url: cover }] : [],
     price_in_cents: priceInCents,
     type: { value: book.genre || 'Geral' },
-    purchasable: stock > 0,
+    // Um livro esgotado em papel continua à venda se tiver a edição digital.
+    purchasable: stock > 0 || hasDigital,
+    has_digital: hasDigital,
+    digital_only: productOnlyDigital(book),
     ribbon_text: book.urgency_text || (onSale ? `Promoção −${Math.round((1 - saleInCents / priceInCents) * 100)}%` : book.featured ? 'Destaque' : book.stock_low && stock > 0 ? 'Últimas unidades' : null),
     on_sale: onSale,
     sale_ends_at: onSale ? book.sale_ends_at || null : null,
@@ -301,6 +309,7 @@ export async function getProduct(id) {
       const { price, sale } = variantPrices(book, v);
       const priceInCents = Math.round(price * 100);
       const saleInCents = sale != null ? Math.round(sale * 100) : null;
+      const digital = versionIsDigital(v);
       return {
         id: `${book.id}-v${i}`,
         title: v.label || v.title || `${variantNames(book.product_type).one} ${i + 1}`,
@@ -310,8 +319,10 @@ export async function getProduct(id) {
         sale_price_formatted: saleInCents != null ? formatCurrency(saleInCents) : null,
         currency_info: CURRENCY,
         // O `place_order` exige stock no produto e na variante: o disponível é o menor dos dois.
-        inventory_quantity: variantStock(book, v),
-        manage_inventory: true,
+        // A edição digital não tem stock: vende-se uma por conta.
+        inventory_quantity: digital ? 1 : variantStock(book, v),
+        manage_inventory: !digital,
+        digital,
         image_url: v.cover || book.cover || null,
         format: v.format || '',
         isbn: v.isbn || '',

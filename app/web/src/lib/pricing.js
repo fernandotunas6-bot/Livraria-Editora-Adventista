@@ -1,3 +1,5 @@
+import { versionIsDigital } from './digitalEditions';
+
 /**
  * Preço em vigor de um livro: o promocional (sale_price) se estiver activo nas datas definidas,
  * senão o preço normal. É a mesma regra de public.effective_price na base de dados, que é a que
@@ -66,6 +68,7 @@ export function variantPrices(book, versao, now = Date.now()) {
  * era lido como 0 Kz no site.
  */
 export function normalizeVersions(list) {
+  // A edição digital (lib/digitalEditions.js) não tem stock: fica `digital: true` e sem stock.
   const toNumber = (v) => {
     if (v === null || v === undefined || String(v).trim() === '') return null;
     const n = Number(String(v).replace(',', '.'));
@@ -74,6 +77,12 @@ export function normalizeVersions(list) {
   return (Array.isArray(list) ? list : []).map((v) => {
     const out = { ...v, price: toNumber(v?.price), stock: toNumber(v?.stock) };
     if (out.stock !== null) out.stock = Math.floor(out.stock);
+    if (versionIsDigital(v)) {
+      out.digital = true;
+      out.stock = null;
+    } else {
+      delete out.digital;
+    }
     if ('sale_price' in (v || {})) out.sale_price = toNumber(v.sale_price);
     return out;
   });

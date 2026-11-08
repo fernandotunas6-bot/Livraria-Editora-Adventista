@@ -164,7 +164,7 @@ export default function OrderWatchPanel({ onOpenOrder }) {
                   <span className="font-mono text-xs text-primary">{o.order_number}</span>
                   <span className="ml-2 font-medium">{o.customer_name || 'Cliente'}</span>
                   <span className="ml-2 text-muted-foreground">
-                    {o.shipping_method === 'pickup' ? `Levantamento: ${o.pickup_store || 'loja'}` : o.shipping_method === 'express' ? 'Entrega expressa' : 'Entrega ao domicílio'}
+                    {o.shipping_method === 'pickup' ? `Levantamento: ${o.pickup_store || 'loja'}` : o.shipping_method === 'express' ? 'Entrega expressa' : o.shipping_method === 'digital' ? 'Edição digital (sem envio)' : 'Entrega ao domicílio'}
                     {' · '}{fmtKz(o.total)} · {new Date(o.created).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
                 </div>

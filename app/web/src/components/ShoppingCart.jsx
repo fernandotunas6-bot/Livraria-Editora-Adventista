@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine, Copy,
+  Library,
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,8 @@ import { useIntegrations } from '@/hooks/useIntegrations';
 import { getPaymentMethods, getPhysicalStores } from '@/api/PlatformApi';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { openWhatsAppOrder } from '@/lib/whatsapp';
-import { calcShippingCents, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
+import { calcShippingCents, DIGITAL_SHIPPING, SHIPPING_METHODS, getShippingLabel, shippingRules } from '@/lib/shipping';
+import { isDigitalCartItem, titleList } from '@/lib/digitalEditions';
 import { cartItemTitle, cartVariantLabel } from '@/lib/productTypes';
 import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
@@ -56,7 +58,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { settings } = useSiteSettings();
   const { integrations } = useIntegrations();
   const waApiActive = !!(integrations?.whatsapp_business?.enabled && integrations?.whatsapp_business?.config?.configured);
-  const { cartItems, removeFromCart, updateQuantity, getCartTotalCents, clearCart, refreshCart } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, getCartTotalCents, clearCart, refreshCart, cartDigital } = useCart();
 
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [physicalStores, setPhysicalStores] = useState([]);
@@ -211,10 +213,19 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   }, [isCartOpen]);
 
   const subtotalCents = getCartTotalCents();
+  // Edições digitais (lib/digitalEditions.js, migração edicoes_digitais). Só digitais: o envio é
+  // 'digital' — sem morada, sem loja, sem portes. Com impressos, o envio é o deles e os portes
+  // (e os portes grátis) contam só os impressos. Qualquer edição digital precisa de conta: é na
+  // conta que o livro abre.
+  const digitalOnly = !!cartDigital?.all;
+  const shipping = digitalOnly ? 'digital' : form.shippingMethod;
+  const physicalCents = cartDigital ? cartDigital.physicalCents : subtotalCents;
+  const needsLogin = !!cartDigital?.any && !user;
+  const digitalTitles = titleList(cartDigital?.titles || []);
   const FREE_SHIPPING_THRESHOLD = shippingRules(settings).freeThresholdCents;
-  const freeShippingRemaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotalCents);
+  const freeShippingRemaining = Math.max(0, FREE_SHIPPING_THRESHOLD - physicalCents);
   const freeShippingProgress = FREE_SHIPPING_THRESHOLD > 0
-    ? Math.min(100, (subtotalCents / FREE_SHIPPING_THRESHOLD) * 100)
+    ? Math.min(100, (physicalCents / FREE_SHIPPING_THRESHOLD) * 100)
     : 100;
   const maintenanceMode = !!settings.maintenance_mode;
 
@@ -249,13 +260,13 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCartOpen]);
 
-  const shippingCents = calcShippingCents(form.shippingMethod, subtotalCents, settings);
+  const shippingCents = calcShippingCents(shipping, physicalCents, settings);
 
-  // Só os métodos que servem para o envio escolhido ("Pagar no Balcão" só no levantamento).
-  // Se o escolhido deixar de servir, passa ao primeiro que serve.
+  // Só os métodos que servem para o envio escolhido ("Pagar no Balcão" só no levantamento; a
+  // edição digital só com o que se paga antes). Se o escolhido deixar de servir, passa ao primeiro.
   const availableMethods = useMemo(
-    () => paymentMethodsFor(paymentMethods, form.shippingMethod),
-    [paymentMethods, form.shippingMethod],
+    () => paymentMethodsFor(paymentMethods, shipping),
+    [paymentMethods, shipping],
   );
   useEffect(() => {
     if (availableMethods.length && !availableMethods.some((m) => m.code === form.paymentMethod)) {
@@ -278,6 +289,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     title: cartItemTitle(item),
     quantity: item.quantity,
     price: (item.variant.sale_price_in_cents ?? item.variant.price_in_cents) / 100,
+    ...(isDigitalCartItem(item) ? { digital: true } : {}),
   }));
 
   const locate = () => {
@@ -305,10 +317,18 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       toast({ variant: 'destructive', title: 'Loja em manutenção', description: 'As compras estão temporariamente indisponíveis. Tente mais tarde ou contacte-nos.' });
       return;
     }
-    const needsAddress = form.shippingMethod !== 'pickup';
-    const effectivePhone = normalizeAngolaPhone(
+    // A edição digital fica na conta: sem sessão, entra primeiro (o carrinho fica como está).
+    if (needsLogin) {
+      openAuth({ mode: 'login', reason: 'digital', defaultEmail: form.email, defaultName: form.name });
+      return;
+    }
+    const needsAddress = shipping !== 'pickup' && shipping !== 'digital';
+    const typedPhone = normalizeAngolaPhone(
       needsAddress ? (deliveryAddress.phone || form.phone) : form.phone
     );
+    // Só o indicativo (+244), que o campo traz escrito, não é um telefone: na edição digital o
+    // telefone é opcional, e o "+244" sozinho passava por um número mal escrito.
+    const effectivePhone = typedPhone.replace(/\D/g, '').replace(/^244/, '') ? typedPhone : '';
 
     // Levantamento na loja: basta saber quem vem buscar e como lhe ligar.
     // Entrega ao domicílio: email e morada. Não exige conta: o cliente acompanha a encomenda com
@@ -316,14 +336,18 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     //
     // Cada falta fica dita junto do campo, e o formulário desce até à primeira: num telemóvel,
     // "Preencha todos os campos obrigatórios" num aviso deixava a pessoa à procura de qual.
+    // Edição digital: o nome e o email (o recibo e o aviso do pagamento); o telefone é opcional.
     const found = {};
-    if (form.shippingMethod === 'pickup' && physicalStores.length > 0 && !form.pickupStore) found.pickupStore = 'Escolha a loja onde vai levantar.';
+    if (shipping === 'pickup' && physicalStores.length > 0 && !form.pickupStore) found.pickupStore = 'Escolha a loja onde vai levantar.';
     if (!form.name.trim()) found.name = 'Escreva o seu nome.';
     if (needsAddress && !form.email.trim()) found.email = 'O email serve para acompanhar a encomenda.';
+    else if (digitalOnly && !form.email.trim()) found.email = 'O recibo e o aviso do pagamento vão para este email.';
     else if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) found.email = 'Este email parece incompleto.';
     if (needsAddress) {
       const addrErr = validateAngolaAddress(deliveryAddress, { requireDelivery: true });
       if (addrErr) found.address = addrErr;
+    } else if (digitalOnly) {
+      if (effectivePhone && !isValidAngolaPhone(effectivePhone)) found.phone = 'Use o formato +244 9XX XXX XXX, ou deixe em branco.';
     } else if (!effectivePhone) {
       found.phone = 'Indique um telefone para o avisarmos.';
     } else if (!isValidAngolaPhone(effectivePhone)) {
@@ -371,9 +395,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         quantity: item.quantity,
       }));
 
-      const addressPayload = form.shippingMethod === 'pickup'
-        ? { address: `Levantamento: ${form.pickupStore || 'Loja física'}`, city: form.pickupStore || 'Loja física' }
-        : angolaAddressToPayload(deliveryAddress);
+      const addressPayload = shipping === 'digital' ? {}
+        : shipping === 'pickup'
+          ? { address: `Levantamento: ${form.pickupStore || 'Loja física'}`, city: form.pickupStore || 'Loja física' }
+          : angolaAddressToPayload(deliveryAddress);
 
       const checkoutPayload = {
         items,
@@ -387,10 +412,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         notes: form.notes.trim(),
         shippingCost: shippingCents / 100,
         saleChannel: viaWhatsApp ? 'whatsapp' : 'web_purchase',
-        shippingMethod: form.shippingMethod,
-        pickupStore: form.pickupStore,
+        shippingMethod: shipping,
+        pickupStore: shipping === 'pickup' ? form.pickupStore : '',
         checkoutSignature,
-        ...(gps && form.shippingMethod !== 'pickup' ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng } : {}),
+        ...(gps && needsAddress ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng } : {}),
         ...(normalizeColporteurCode(form.colporteurCode) ? { colporteurCode: normalizeColporteurCode(form.colporteurCode) } : {}),
       };
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
@@ -426,14 +451,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         signerName: form.name.trim(),
         email: form.email.trim(),
         phone: effectivePhone,
-        address: addressPayload.address,
-        city: addressPayload.city,
-        deliveryAddress: form.shippingMethod !== 'pickup' ? deliveryAddress : null,
+        address: addressPayload.address || '',
+        city: addressPayload.city || '',
+        deliveryAddress: needsAddress ? deliveryAddress : null,
         deliveryRelativeName: addressPayload.deliveryRelativeName || '',
         deliveryRelativePhone: addressPayload.deliveryRelativePhone || '',
-        shippingMethod: form.shippingMethod,
-        shippingLabel: getShippingLabel(form.shippingMethod),
-        pickupStore: form.pickupStore,
+        shippingMethod: shipping,
+        shippingLabel: getShippingLabel(shipping),
+        pickupStore: shipping === 'pickup' ? form.pickupStore : '',
         paymentMethod: paymentLabel,
         orderType: isWhatsApp ? 'whatsapp' : 'purchase',
         items: orderItemsForReceipt,
@@ -474,9 +499,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     } finally {
       setCheckingOut(false);
     }
-  }, [cartItems, clearCart, refreshCart, deliveryAddress, form, gps, maintenanceMode, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
+  }, [cartItems, clearCart, refreshCart, deliveryAddress, digitalOnly, form, gps, maintenanceMode, needsLogin, openAuth, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shipping, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
 
-  const maxQty = (item) => (item.variant.manage_inventory ? item.variant.inventory_quantity : 99);
+  const maxQty = (item) => (isDigitalCartItem(item) ? 1 : item.variant.manage_inventory ? item.variant.inventory_quantity : 99);
+  // Edição digital sem forma de pagar pelo site (só há pagamento na entrega ou no balcão).
+  const noDigitalPayment = digitalOnly && availableMethods.length === 0;
 
   return (
     <AnimatePresence>
@@ -553,7 +580,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     {/* Quanto falta para os portes grátis, à vista logo no carrinho: no telemóvel
                         ficava dentro do resumo recolhido, e era aqui que fazia diferença — quando
                         ainda se pode juntar mais um livro. */}
-                    {form.shippingMethod === 'delivery' && FREE_SHIPPING_THRESHOLD > 0 && subtotalCents > 0 && (
+                    {shipping === 'delivery' && FREE_SHIPPING_THRESHOLD > 0 && physicalCents > 0 && (
                       <div className="rounded-xl border border-marca/20 bg-marca/5 p-3">
                         {freeShippingRemaining > 0 ? (
                           <>
@@ -579,6 +606,17 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         )}
                       </div>
                     )}
+                    {cartDigital?.any && (
+                      <div className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground" data-carrinho-digital={digitalOnly ? 'so-digital' : 'misto'}>
+                        <Library className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                        <p>
+                          {digitalOnly
+                            ? <>Edição digital: <strong>sem portes nem morada</strong>. Fica na sua biblioteca (Perfil → Biblioteca) assim que o pagamento for confirmado.</>
+                            : <>A edição digital de <strong>{digitalTitles}</strong> não tem envio: abre na sua biblioteca quando o pagamento for confirmado. Os portes contam só os impressos.</>}
+                          {needsLogin && <> Precisa de entrar na sua conta, que é onde o livro fica.</>}
+                        </p>
+                      </div>
+                    )}
                     {cartItems.map((item) => (
                       <div key={item.variant.id} className="flex gap-3 bg-muted/30 border border-border p-3 rounded-xl">
                         <img
@@ -594,11 +632,20 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             <p className="text-xs font-medium text-foreground/80">{cartVariantLabel(item.variant)}</p>
                           )}
                           <p className="text-xs text-muted-foreground">{item.product.subtitle}</p>
+                          {isDigitalCartItem(item) && (
+                            <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                              <Library className="h-3 w-3" aria-hidden="true" /> Edição digital · sem envio
+                            </p>
+                          )}
                           <p className="text-sm text-primary font-bold mt-1">
                             {item.variant.sale_price_formatted || item.variant.price_formatted}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
+                          {/* A edição digital é uma por conta: sem quantidade. */}
+                          {isDigitalCartItem(item) ? (
+                            <span className="text-xs text-muted-foreground" aria-label="Quantidade: 1">1 por conta</span>
+                          ) : (
                           <div className="flex items-center border border-border rounded-lg bg-background">
                             <Button
                               onClick={() => updateQuantity(item.variant.id, item.quantity - 1)}
@@ -612,6 +659,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                               disabled={item.quantity >= maxQty(item)}
                             >+</Button>
                           </div>
+                          )}
                           <Button onClick={() => removeFromCart(item.variant.id)} size="sm" variant="ghost" className="text-destructive text-xs h-9 sm:h-6 px-2 sm:px-1">
                             Remover
                           </Button>
@@ -625,16 +673,35 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
               {step === 'checkout' && (
                 <div className="p-5 space-y-4">
+                  {digitalOnly ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                        <Library className="h-4 w-4" aria-hidden="true" /> Entrega
+                      </div>
+                      <div className="rounded-lg border border-marca bg-marca/5 p-3 text-sm" data-envio="digital">
+                        <span className="font-medium">{DIGITAL_SHIPPING.label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Sem portes, sem morada. O livro abre em Perfil → Biblioteca, neste e noutros aparelhos, quando o pagamento for confirmado.
+                        </span>
+                        <span className="block text-xs font-semibold mt-0.5 text-green-600">Sem portes</span>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
                       <Truck className="h-4 w-4" /> Método de Entrega
                     </div>
+                    {cartDigital?.any && (
+                      <p className="text-xs text-muted-foreground">
+                        A edição digital de <strong className="text-foreground">{digitalTitles}</strong> não tem envio: abre na sua biblioteca. O envio e os portes são dos impressos.
+                      </p>
+                    )}
                     <RadioGroup
                       value={form.shippingMethod}
                       onValueChange={(v) => setForm({ ...form, shippingMethod: v, pickupStore: v === 'pickup' ? form.pickupStore : '' })}
                     >
                       {Object.values(SHIPPING_METHODS).map((opt) => {
-                        const cost = calcShippingCents(opt.id, subtotalCents, settings);
+                        const cost = calcShippingCents(opt.id, physicalCents, settings);
                         const Icon = opt.icon;
                         return (
                           <div
@@ -679,10 +746,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       </div>
                     )}
                   </div>
+                  )}
 
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                      <MapPin className="h-4 w-4" /> {form.shippingMethod === 'pickup' ? 'Dados de Contacto' : 'Dados de Entrega'}
+                      <MapPin className="h-4 w-4" /> {digitalOnly ? 'Os seus dados' : shipping === 'pickup' ? 'Dados de Contacto' : 'Dados de Entrega'}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-nome">Nome completo *</Label>
@@ -691,21 +759,25 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-email">
-                        Email {form.shippingMethod === 'pickup'
+                        Email {digitalOnly
+                          ? <>* <span className="text-muted-foreground font-normal">(o recibo e o aviso do pagamento)</span></>
+                          : shipping === 'pickup'
                           ? <span className="text-muted-foreground font-normal">(opcional — para receber o recibo)</span>
                           : <>* <span className="text-muted-foreground font-normal">(para acompanhar a encomenda)</span></>}
                       </Label>
                       <Input id="checkout-email" type="email" autoComplete="email" inputMode="email" enterKeyHint="next" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); clearError('email'); }} placeholder="email@exemplo.com" {...fieldError('email')} />
                       {errors.email && <p id="checkout-email-erro" className="text-xs font-medium text-destructive" role="alert">{errors.email}</p>}
                     </div>
-                    {form.shippingMethod === 'pickup' && (
+                    {(shipping === 'pickup' || digitalOnly) && (
                       <div className="space-y-2">
-                        <Label htmlFor="checkout-telefone">Telefone *</Label>
+                        <Label htmlFor="checkout-telefone">
+                          Telefone {digitalOnly ? <span className="text-muted-foreground font-normal">(opcional — para o avisarmos por WhatsApp)</span> : '*'}
+                        </Label>
                         <PhoneInput id="checkout-telefone" value={form.phone} onChange={(phone) => { setForm({ ...form, phone }); clearError('phone'); }} />
                         {errors.phone && <p id="checkout-telefone-erro" className="text-xs font-medium text-destructive" role="alert">{errors.phone}</p>}
                       </div>
                     )}
-                    {form.shippingMethod !== 'pickup' && (
+                    {shipping !== 'pickup' && !digitalOnly && (
                       <>
                         <div id="checkout-morada" tabIndex={-1} className="space-y-2 focus:outline-hidden">
                           <AngolaAddressSelector value={deliveryAddress} onChange={(v) => { setDeliveryAddress(v); clearError('address'); }} />
@@ -763,7 +835,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                                 {m.icon && <span>{m.icon}</span>}
                                 {m.name}
                                 {/* "p2p"/"offline" é jargão nosso; o cliente precisa é de saber quando paga. */}
-                                <span className="text-xs text-muted-foreground font-normal">{paymentMoment(m, form.shippingMethod)}</span>
+                                <span className="text-xs text-muted-foreground font-normal">{paymentMoment(m, shipping)}</span>
                               </span>
                               {m.account_info && (
                                 // Fonte normal (Inter), não monoespaçada: nesta o "O" de AO06 e o zero eram iguais.
@@ -796,7 +868,13 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             </div>
                           )}
                         </div>
-                      )) : (
+                      )) : digitalOnly ? (
+                        // A edição digital paga-se antes (transferência, Multicaixa) ou pelo gateway:
+                        // "pagar na entrega" não tem entrega.
+                        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200" role="status">
+                          De momento a edição digital não se paga pelo site. Fale connosco pelo WhatsApp para a comprar.
+                        </p>
+                      ) : (
                         // Sem lista (falhou a carregar ou não há métodos activos): só o pagamento na
                         // entrega, que o servidor aceita quando não há métodos configurados.
                         <div className="flex items-center space-x-2 p-3 rounded-lg border"><RadioGroupItem value="entrega" id="pagamento-entrega" /><Label htmlFor="pagamento-entrega">Pagamento na entrega</Label></div>
@@ -806,7 +884,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
                   <div className="space-y-2">
                     <Label htmlFor="checkout-notas">Notas (opcional)</Label>
-                    <Textarea id="checkout-notas" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Instruções de entrega..." />
+                    <Textarea id="checkout-notas" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={digitalOnly ? 'Alguma observação para a loja...' : 'Instruções de entrega...'} />
                   </div>
 
                   <div className="space-y-2">
@@ -817,7 +895,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     )}
                   </div>
 
-                  {form.shippingMethod !== 'pickup' && (
+                  {shipping !== 'pickup' && !digitalOnly && (
                   <div className="space-y-3 pt-2 border-t border-border">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
                       <PenLine className="h-4 w-4" /> Assinatura <span className="text-muted-foreground font-normal">(opcional)</span>
@@ -856,7 +934,15 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     A loja está em manutenção — o checkout online está temporariamente desactivado.
                   </div>
                 )}
-                {!user && step === 'checkout' && (
+                {needsLogin && (
+                  <p className="text-xs text-foreground" role="status">
+                    A edição digital fica na biblioteca da sua conta.{' '}
+                    <button type="button" className="text-primary font-medium hover:underline" onClick={() => openAuth({ mode: 'login', reason: 'digital', defaultEmail: form.email, defaultName: form.name })}>
+                      Entrar ou criar conta
+                    </button>{' '}para a comprar.
+                  </p>
+                )}
+                {!user && !needsLogin && step === 'checkout' && (
                   <p className="text-xs text-muted-foreground">
                     Não precisa de conta: acompanhe a encomenda com o número e o email em <strong>Rastrear encomenda</strong>.{' '}
                     <button type="button" className="text-primary font-medium hover:underline" onClick={() => openAuth({ mode: 'login', defaultEmail: form.email, defaultName: form.name })}>
@@ -873,7 +959,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 >
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <Truck className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-                    {summaryOpen ? 'Esconder resumo' : 'Ver resumo e portes'}
+                    {summaryOpen ? 'Esconder resumo' : digitalOnly ? 'Ver resumo' : 'Ver resumo e portes'}
                   </span>
                   <span className="flex items-center gap-1.5 font-semibold">
                     {formatCurrency(totalCents)}
@@ -885,10 +971,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground justify-center pb-1">
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-green-600" /> Compra segura</span>
                   <span className="flex items-center gap-1"><Lock className="h-3 w-3 text-green-600" /> Dados protegidos</span>
-                  <span className="flex items-center gap-1"><Truck className="h-3 w-3 text-primary" /> Entrega nacional</span>
+                  {digitalOnly
+                    ? <span className="flex items-center gap-1"><Library className="h-3 w-3 text-primary" /> Na sua biblioteca</span>
+                    : <span className="flex items-center gap-1"><Truck className="h-3 w-3 text-primary" /> Entrega nacional</span>}
                 </div>
                 <div className="space-y-1.5 text-sm">
-                  {step === 'checkout' && form.shippingMethod === 'delivery' && freeShippingRemaining > 0 && subtotalCents > 0 && (
+                  {step === 'checkout' && shipping === 'delivery' && freeShippingRemaining > 0 && physicalCents > 0 && (
                     <div className="rounded-lg border border-marca/20 bg-marca/5 p-2.5 mb-2">
                       <div className="flex justify-between text-xs text-muted-foreground mb-1">
                         <span>Envio grátis</span>
@@ -899,13 +987,21 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       </div>
                     </div>
                   )}
-                  {form.shippingMethod === 'delivery' && shippingCents === 0 && subtotalCents >= FREE_SHIPPING_THRESHOLD && (
+                  {shipping === 'delivery' && shippingCents === 0 && physicalCents >= FREE_SHIPPING_THRESHOLD && (
                     <p className="text-xs text-green-600 font-medium mb-1">Envio grátis aplicado neste pedido</p>
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>{formatCurrency(subtotalCents)}</span>
                   </div>
+                  {digitalOnly ? (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Library className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> {DIGITAL_SHIPPING.label}
+                      </span>
+                      <span className="text-green-600 font-medium">Sem portes</span>
+                    </div>
+                  ) : (
                   <button
                     type="button"
                     onClick={() => setShippingOpen((o) => !o)}
@@ -913,17 +1009,18 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   >
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Truck className="h-3.5 w-3.5 text-primary" />
-                      {getShippingLabel(form.shippingMethod)}
+                      {getShippingLabel(shipping)}
                       {shippingOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     </span>
                     <span className={shippingCents === 0 ? 'text-green-600 font-medium' : ''}>
                       {shippingCents === 0 ? 'Grátis' : formatCurrency(shippingCents)}
                     </span>
                   </button>
-                  {shippingOpen && (
+                  )}
+                  {shippingOpen && !digitalOnly && (
                     <div className="rounded-lg border border-border bg-background p-2 space-y-1">
                       {Object.values(SHIPPING_METHODS).map((opt) => {
-                        const cost = calcShippingCents(opt.id, subtotalCents, settings);
+                        const cost = calcShippingCents(opt.id, physicalCents, settings);
                         const Icon = opt.icon;
                         const selected = form.shippingMethod === opt.id;
                         return (
@@ -960,27 +1057,35 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 </div>
 
                 {step === 'cart' ? (
+                  needsLogin && !maintenanceMode ? (
+                    <Button className="w-full btn-primary py-6 text-base" onClick={() => openAuth({ mode: 'login', reason: 'digital', defaultEmail: form.email, defaultName: form.name })}>
+                      Entrar para comprar a edição digital
+                    </Button>
+                  ) : (
                   <Button className="w-full btn-primary py-6 text-base" onClick={() => setStep('checkout')} disabled={maintenanceMode}>
                     {maintenanceMode ? 'Compras indisponíveis' : 'Continuar para finalizar a compra'}
                   </Button>
+                  )
                 ) : (
                   <>
                     {/* Resumo de quem e para onde, só com o que o cliente já escreveu: antes mostrava
                         "— ·" e "Luanda, Angola" a quem ainda não tinha preenchido nada. */}
-                    {(form.name.trim() || form.email.trim() || (form.shippingMethod === 'pickup' ? form.pickupStore : deliveryAddress.street.trim())) && (
+                    {(form.name.trim() || form.email.trim() || (shipping === 'pickup' ? form.pickupStore : deliveryAddress.street.trim())) && (
                       <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-2 space-y-0.5">
                         <p className="truncate sm:whitespace-normal">
                           {form.name.trim() && <strong>{form.name.trim()}</strong>}
                           {form.name.trim() && form.email.trim() ? ' · ' : ''}
                           {form.email.trim()}
                         </p>
-                        <p className="truncate sm:whitespace-normal">{form.shippingMethod === 'pickup'
+                        <p className="truncate sm:whitespace-normal">{digitalOnly
+                          ? 'Edição digital — na sua biblioteca'
+                          : shipping === 'pickup'
                           ? (form.pickupStore ? `Levantamento: ${form.pickupStore}` : 'Levantamento na loja')
                           : (deliveryAddress.street.trim() ? angolaAddressToPayload(deliveryAddress).deliveryAddressFull : 'Entrega ao domicílio')}
                         </p>
                       </div>
                     )}
-                    <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode}>
+                    <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode || noDigitalPayment}>
                       {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Confirmar Compra · {formatCurrency(totalCents)}
                     </Button>
@@ -989,14 +1094,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         variant="outline"
                         className="w-full py-5 border-green-500/50 text-green-700 hover:bg-green-50"
                         onClick={() => handleCheckout(true)}
-                        disabled={checkingOut || maintenanceMode}
+                        disabled={checkingOut || maintenanceMode || needsLogin}
                       >
                         <MessageCircle className="mr-2 h-4 w-4" />
                         {waApiActive ? 'Confirmar e receber no WhatsApp' : 'Finalizar via WhatsApp'}
                       </Button>
                     )}
                     <p className="hidden sm:block text-xs text-center text-muted-foreground">
-                      <strong>Compra online</strong> — pagamento e entrega pela loja.{' '}
+                      <strong>Compra online</strong> — {digitalOnly ? 'pagamento pela loja; o livro abre na sua biblioteca.' : 'pagamento e entrega pela loja.'}{' '}
                       {waApiActive ? (
                         <><strong>WhatsApp</strong> — confirmação automática enviada para o seu número.</>
                       ) : (
