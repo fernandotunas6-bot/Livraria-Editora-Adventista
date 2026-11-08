@@ -44,7 +44,7 @@ Storage usam.
    Android só aparece "Descarregar" (o Chrome do Android não mostra PDFs: descarrega e abre com a
    aplicação do telemóvel).
 
-## A encomenda só digital (migração `20261108170000_edicoes_digitais`)
+## A encomenda só digital (migração `20261108210000_edicoes_digitais`)
 
 - **Envio "Edição digital (sem envio)"**: o carrinho passa a ele sozinho quando só tem edições
   digitais. Sem portes, sem morada, sem loja, sem assinatura; o email é obrigatório (recibo e aviso do

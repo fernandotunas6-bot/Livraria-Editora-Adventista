@@ -24,8 +24,29 @@ export const CartProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+    } catch {
+      // armazenamento cheio ou bloqueado: o carrinho fica só nesta visita
+    }
   }, [cartItems]);
+
+  // Com a loja aberta em dois separadores, o carrinho é o mesmo: juntar um livro num aparece no
+  // outro (antes só depois de recarregar, e quem comprava no segundo separador perdia o livro).
+  // O evento só chega aos outros separadores, e gravar o mesmo valor não o volta a disparar.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== CART_STORAGE_KEY) return;
+      try {
+        const next = e.newValue ? JSON.parse(e.newValue) : [];
+        if (Array.isArray(next)) setCartItems(next);
+      } catch {
+        // valor estragado noutro separador: fica o deste
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const addToCart = useCallback((product, variant, quantity, availableQuantity, options = {}) => {
     return new Promise((resolve, reject) => {

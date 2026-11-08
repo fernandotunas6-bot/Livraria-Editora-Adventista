@@ -7,12 +7,15 @@
 // divergir.
 export const PERMISSIONS = {
   manage_catalog: { area: 'catalogo', label: 'Gerir Catálogo', description: 'Produtos, coleções, slider, materiais em PDF e a moderação da comunidade' },
+  manage_production: { area: 'producao', label: 'Produção da Editora', description: 'Ordens de produção, etapas e responsáveis, custos e fornecedores; concluir põe a tiragem no stock' },
   manage_orders: { area: 'vendas', label: 'Gerir Encomendas', description: 'Ver e actualizar encomendas, acompanhá-las e falar com os clientes' },
   manage_payments: { area: 'vendas', label: 'Pagamentos', description: 'Métodos de pagamento (IBAN, links, QR)' },
   confirm_payments: { area: 'vendas', label: 'Confirmar pagamentos', description: 'Confirmar, rejeitar e anular pagamentos, registar dinheiro recebido e reembolsos' },
   view_reports: { area: 'relatorios', label: 'Ver relatórios', description: 'A facturação: vendas por loja, o relatório de caixa e os números do mês no Início' },
   manage_users: { area: 'clientes', label: 'Utilizadores e Clientes', description: 'Gerir contas de clientes e as equipas que recebem os alertas (a equipa é só para administradores)' },
   manage_marketing: { area: 'clientes', label: 'Marketing', description: 'Contactos, campanhas por email e WhatsApp e a faixa de aviso' },
+  manage_staff: { area: 'funcionarios', label: 'Funcionários', description: 'As fichas de quem trabalha na livraria e na Editora, com ou sem conta no painel (sem salários)' },
+  manage_finance: { area: 'relatorios', label: 'Finanças (saídas)', description: 'Pagamentos a fornecedores, salários, e as entradas e saídas de dinheiro' },
   manage_church_registry: { area: 'igreja', label: 'Registo da Igreja', description: 'Campos, distritos, igrejas e pastores' },
   manage_colporteurs: { area: 'igreja', label: 'Colportagem', description: 'Colportores, relatórios, stock entregue, percentagens e acertos' },
   manage_settings: { area: 'sistema', label: 'Configurações', description: 'Marca, portes, contactos, aparência, lojas físicas e a faixa de aviso' },
@@ -26,6 +29,9 @@ export const ROLES = {
 
 export const DEFAULT_PERMISSIONS = {
   manage_catalog: false,
+  manage_production: false,
+  manage_staff: false,
+  manage_finance: false,
   manage_orders: false,
   manage_settings: false,
   manage_users: false,
@@ -39,6 +45,9 @@ export const DEFAULT_PERMISSIONS = {
 
 export const MANAGER_PERMISSIONS = {
   manage_catalog: true,
+  manage_production: false,
+  manage_staff: false,
+  manage_finance: false,
   manage_orders: true,
   manage_settings: false,
   manage_users: false,

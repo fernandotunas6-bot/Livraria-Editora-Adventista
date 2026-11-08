@@ -65,7 +65,7 @@ um mapa).
 | Rastreio ao vivo e afinar, para o cliente | Edge Function: `POST /track/live`, `POST /track/destination` (`deliveryTracking.ts`) |
 | Site | `components/delivery/LiveTracking.jsx` (quem recebe), `components/delivery/CourierShare.jsx` (quem entrega), `components/maps/DeliveryMap.jsx`, `lib/deliveryTracking.js` |
 
-Migração `20261108180000_trajeto_gps`. Testes: `scripts/pglite/trajeto.mjs` (39 cenários), vitest
+Migração `20261108211000_trajeto_gps`. Testes: `scripts/pglite/trajeto.mjs` (39 cenários), vitest
 `lib/deliveryTracking.test.js`, `components/delivery/*.test.jsx` e `deliveryTracking.test.ts` na Edge
 Function.
 

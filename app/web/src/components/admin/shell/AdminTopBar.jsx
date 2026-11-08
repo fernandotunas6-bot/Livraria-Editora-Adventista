@@ -16,8 +16,22 @@ const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(n
  * onde se está (grupo › secção), procurar (Ctrl+K), ver a loja e a conta.
  */
 /**
- * Estado da sincronização: "Actualizado há 2 min" (carregar actualiza já), a rodar enquanto
- * actualiza, e "Sem ligação" quando a rede cai — aí o que se gravar pode não chegar.
+ * O que dizer do tempo real (`sync.realtime`): 'live' com o canal «painel» ligado
+ * (lib/realtimeSignals.js); senão os dados actualizam-se de minuto a minuto.
+ */
+export function realtimeLabel(realtime) {
+  if (realtime === 'live') return { text: 'Em tempo real', title: 'Em tempo real: o que muda aparece sozinho, no momento. Carregar actualiza já.' };
+  return { text: '', title: 'Actualizar agora (os dados actualizam-se sozinhos de minuto a minuto)' };
+}
+
+/**
+ * Estado da sincronização: o ícone de actualizar, a rodar enquanto actualiza, com "Em tempo real"
+ * (a verde) quando o canal está ligado ou "Actualizado há 2 min" sem ele — carregar actualiza já
+ * — e "Sem ligação" quando a rede cai: aí o que se gravar pode não chegar.
+ *
+ * No telemóvel (abaixo de 768 px, o mesmo corte de hooks/use-mobile) o ícone fica escondido, a
+ * pedido do dono: a barra é estreita e os dados actualizam-se sozinhos na mesma. O "Sem ligação"
+ * continua à vista em todos os tamanhos — é um aviso, não um botão.
  */
 function SyncStatus({ sync }) {
   const [now, setNow] = useState(() => Date.now());
@@ -33,16 +47,23 @@ function SyncStatus({ sync }) {
       </span>
     );
   }
-  const label = sync.syncing ? 'A actualizar…' : sync.lastSync ? `Actualizado ${sinceLabel(sync.lastSync, now)}` : 'Actualizar';
+  const live = sync.realtime === 'live';
+  const rt = realtimeLabel(sync.realtime);
+  const label = live ? rt.text : sync.syncing ? 'A actualizar…' : sync.lastSync ? `Actualizado ${sinceLabel(sync.lastSync, now)}` : 'Actualizar';
   return (
     <Button
       type="button" variant="ghost" onClick={sync.refreshNow} disabled={sync.syncing}
-      className="h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground"
-      title="Actualizar agora (os dados actualizam-se sozinhos de minuto a minuto)"
+      className="hidden h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground md:inline-flex"
+      title={rt.title}
       aria-label={`${label}. Actualizar agora`}
     >
-      <RefreshCw className={cn('h-4 w-4', sync.syncing && 'animate-spin')} aria-hidden="true" />
-      <span className="hidden xl:inline">{label}</span>
+      {/* Roda só enquanto actualiza (um sinal, a consulta ou o clique), nunca sem parar: o painel
+          fica aberto o dia inteiro e uma animação contínua distrai. */}
+      <RefreshCw
+        className={cn('h-4 w-4', sync.syncing && 'animate-spin', live && 'text-emerald-600 dark:text-emerald-400')}
+        aria-hidden="true" data-syncing={sync.syncing ? 'true' : undefined}
+      />
+      <span className={cn('hidden xl:inline', live && 'text-emerald-700 dark:text-emerald-400')}>{label}</span>
     </Button>
   );
 }

@@ -326,3 +326,22 @@ saíram nulas, ou iguais ao instante em que uma captura de ecrã forçou a pintu
 O que se pode afirmar é o da compilação local, com o painel à vista: **LCP 2308 ms e CLS
 0,000 em 375 px**. O CLS de produção acima é fiável porque o cálculo do deslocamento depende
 do layout, que corre na mesma, e não da pintura.
+
+## 2026-11-08 — configurações guardadas entre visitas e tempo real
+
+Medido em produção (Chrome sem cabeça, a partir desta máquina): as quatro chamadas públicas à Edge
+Function que o site faz ao arrancar — `/settings`, `/integrations`, `/chat/config` e
+`/payment-methods` — respondem em cerca de **2,1 s** cada (em paralelo). A cache HTTP do servidor
+(`max-age=30, stale-while-revalidate=300`) só ajuda nos primeiros 5 minutos; quem voltava no dia
+seguinte via o site com as configurações de omissão (tema, ordenação da loja, textos) durante esses
+2 s.
+
+- **Configurações e integrações públicas ficam guardadas no navegador** até 7 dias
+  (`lib/localCache.js`, `hooks/useSiteSettings.jsx`, `hooks/useIntegrations.jsx`): quem volta vê-as
+  logo, e a versão nova chega por trás. Só se guarda uma resposta boa do servidor (um pedido que
+  falha não substitui a cópia pelas de omissão). Só dados públicos.
+- **O painel deixou de pedir tudo de minuto a minuto**: os sinais em tempo real dizem o que mudou e
+  ele pede só as encomendas que mudaram (`updated >= …`) ou o catálogo; a consulta completa passou
+  a ser de 5 em 5 minutos com o canal ligado. Ver `docs/PAINEL_ADMIN.md` §1.7.
+- Verificado em produção: o canal público `comunidade` liga-se (`phx_reply` com `status: ok`), sem
+  erros na consola; a CSP aceita o `wss://` do projecto.

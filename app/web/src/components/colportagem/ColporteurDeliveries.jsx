@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/hooks/useAuth';
+import { useSignal } from '@/hooks/useSignal';
 import { useToast } from '@/hooks/use-toast';
 import SignaturePad from '@/components/SignaturePad';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import { kz } from '@/lib/colporteurCommission';
+import { accountTopic } from '@/lib/realtimeSignals';
 import CourierShare from '@/components/delivery/CourierShare';
 import {
   DELIVERY_OFFER_STATUS, deliveryStep, loadMyDeliveries, respondDelivery, setAcceptsDeliveries, setMyLocation,
@@ -55,6 +58,8 @@ export default function ColporteurDeliveries({ onChanged }) {
   const [deliverForm, setDeliverForm] = useState(null);
   const [releaseForm, setReleaseForm] = useState(null);
   const signatureRef = useRef(null);
+  const { user } = useAuth();
+  const [, setClock] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +70,14 @@ export default function ColporteurDeliveries({ onChanged }) {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Ofertas novas e mudanças chegam por sinal; sem ele, de minuto a minuto. O relógio mantém certo o
+  // tempo que falta para aceitar.
+  const live = useSignal(accountTopic(user?.id), ['entregas'], () => { load(); });
+  useEffect(() => {
+    const refresh = setInterval(load, live ? 300000 : 60000);
+    const clock = setInterval(() => setClock((n) => n + 1), 30000);
+    return () => { clearInterval(refresh); clearInterval(clock); };
+  }, [load, live]);
 
   const run = async (key, fn, ok) => {
     setBusy(key);
@@ -101,7 +114,8 @@ export default function ColporteurDeliveries({ onChanged }) {
     );
   };
 
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  // Com dados no ecrã, uma falha a actualizar (rede fraca) não os tira, nem à assinatura a meio.
+  if (error && !data) return <p role="alert" className="text-sm text-destructive">{error}</p>;
   if (!data) return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> A carregar as entregas…</p>;
 
   const list = data.deliveries || [];
@@ -115,7 +129,7 @@ export default function ColporteurDeliveries({ onChanged }) {
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>
             <span className="font-medium">Aceito fazer entregas</span>
-            <span className="block text-xs text-muted-foreground">Encomendas pagas perto de si. Fica com os portes da encomenda.</span>
+            <span className="block text-xs text-muted-foreground">Encomendas pagas perto de si. Ganha os portes da encomenda, ou o mínimo da Livraria se for maior.</span>
           </span>
           <Switch checked={!!data.accepts_deliveries} disabled={busy === 'aceita'}
             onCheckedChange={(v) => run('aceita', () => setAcceptsDeliveries(v), v ? 'Passa a receber entregas' : 'Deixa de receber entregas')} />
@@ -145,7 +159,7 @@ export default function ColporteurDeliveries({ onChanged }) {
               </div>
               <p className="text-sm text-muted-foreground">
                 {d.distance_km != null ? `A ${Number(d.distance_km).toLocaleString('pt-AO')} km de si. ` : ''}
-                {Number(d.fee) > 0 ? `Ganha ${kz(d.fee)} de portes. ` : 'Envio grátis para o cliente: sem portes. '}
+                {Number(d.fee) > 0 ? `Ganha ${kz(d.fee)} por esta entrega. ` : 'Envio grátis para o cliente: esta entrega não tem portes. '}
                 {d.has_stock ? 'Tem estes livros consigo.' : 'Os livros levantam-se na loja.'}
               </p>
               <Items items={d.items} />
@@ -200,7 +214,7 @@ export default function ColporteurDeliveries({ onChanged }) {
                   {d.source === 'stock' ? 'Entrega com os livros que tem consigo: saem da sua conta à consignação quando marcar "Entregue".'
                     : d.picked_up_at ? `A equipa entregou-lhe os livros a ${when(d.picked_up_at)}.`
                       : 'Levante os livros na loja: a equipa marca quando lhos entregar, e só depois pode sair.'}
-                  {Number(d.fee) > 0 ? ` Portes para si: ${kz(d.fee)}.` : ''}
+                  {Number(d.fee) > 0 ? ` Para si: ${kz(d.fee)}.` : ''}
                 </p>
 
                 {deliverForm?.id === d.id ? (
@@ -278,7 +292,10 @@ export default function ColporteurDeliveries({ onChanged }) {
           <ul className="divide-y divide-border text-sm">
             {past.map((d) => (
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                <span>{d.order_number} · {d.place}</span>
+                <span>
+                  {d.order_number} · {d.place}
+                  {d.reason && d.status !== 'delivered' && <span className="block text-xs text-muted-foreground">{d.reason}</span>}
+                </span>
                 <span className="flex items-center gap-2">
                   {d.status === 'delivered' && Number(d.fee) > 0 && <span className="tabular-nums text-emerald-700 dark:text-emerald-400">+{kz(d.fee)}</span>}
                   <Pill tone={(DELIVERY_OFFER_STATUS[d.status] || DELIVERY_OFFER_STATUS.cancelled).tone}>{(DELIVERY_OFFER_STATUS[d.status] || {}).label || d.status}</Pill>

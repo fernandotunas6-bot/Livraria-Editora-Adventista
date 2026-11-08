@@ -663,6 +663,15 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           <p className="text-sm text-primary font-bold mt-1">
                             {item.variant.sale_price_formatted || item.variant.price_formatted}
                           </p>
+                          {/* Stock a acabar, dito no carrinho: quem hesita sabe que pode esgotar, e o
+                              "+" que deixa de funcionar explica-se. */}
+                          {item.variant.manage_inventory && (
+                            item.quantity >= maxQty(item) ? (
+                              <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">Máximo disponível: {maxQty(item)}</p>
+                            ) : maxQty(item) <= 3 ? (
+                              <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">Só {maxQty(item) === 1 ? 'resta 1' : `restam ${maxQty(item)}`}</p>
+                            ) : null
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
                           {/* A edição digital é uma por conta: sem quantidade. */}

@@ -31,7 +31,9 @@ import AdminOverview from '@/components/admin/AdminOverview';
 import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useSignal } from '@/hooks/useSignal';
+import { useEditoraAttention } from '@/hooks/useEditoraAttention';
 import { mergeOrders, newestUpdated } from '@/lib/ordersSync';
+import { loadStaffRoleName } from '@/lib/staffRolesApi';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getPaymentStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
@@ -67,6 +69,9 @@ const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
 const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
 const ChurchRegistryTab = lazy(() => import('@/components/admin/igreja/ChurchRegistryTab'));
 const ColportagemTab = lazy(() => import('@/components/admin/colportagem/ColportagemTab'));
+const ProducaoTab = lazy(() => import('@/components/admin/producao/ProducaoTab'));
+const FuncionariosTab = lazy(() => import('@/components/admin/funcionarios/FuncionariosTab'));
+const FinanceTab = lazy(() => import('@/components/admin/FinanceTab'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -120,14 +125,17 @@ const AdminPage = () => {
   // recarregar, voltar atrás ou mandar a ligação a um colega abre a lista como estava. Valores
   // desconhecidos no endereço valem "todos". Uma só escrita por acção (o `setSearchParams` não
   // junta chamadas seguidas: a segunda apagava a primeira).
-  const updateParams = useCallback((patch) => setSearchParams((prev) => {
+  // Filtros substituem a entrada do histórico (escrever na procura não enche o «voltar»); mudar de
+  // secção ou de vista acrescenta uma, para o «voltar» do navegador (e do telemóvel) regressar ao
+  // contexto anterior em vez de sair do painel.
+  const updateParams = useCallback((patch, { replace = true } = {}) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     for (const [key, value] of Object.entries(patch)) {
       if (value == null || value === '' || value === 'all') next.delete(key);
       else next.set(key, String(value));
     }
     return next;
-  }, { replace: true }), [setSearchParams]);
+  }, { replace }), [setSearchParams]);
   const param = (key, allowed) => {
     const v = searchParams.get(key) || '';
     return !allowed || allowed.includes(v) ? v : '';
@@ -175,6 +183,14 @@ const AdminPage = () => {
   const canManageColporteurs = perms.colporteurs;
   // Separadores no topo ou barra lateral: escolha de cada pessoa, neste aparelho.
   const { layout, setLayout, sidebarOpen, setSidebarOpen } = useAdminLayout(user?.id);
+  // O cargo de quem está no painel (Caixa, Atendimento…), no menu da conta.
+  const [myCargo, setMyCargo] = useState(null);
+  useEffect(() => {
+    if (!user?.id || isAdmin) { setMyCargo(null); return undefined; }
+    let alive = true;
+    loadStaffRoleName(user.id).then((name) => { if (alive) setMyCargo(name); }).catch(() => {});
+    return () => { alive = false; };
+  }, [user?.id, isAdmin]);
 
   // Só a primeira carga mostra a espera; as seguintes (depois de gravar, ou a actualização
   // automática) trocam os dados por baixo, sem a lista piscar nem perder o lugar.
@@ -219,12 +235,23 @@ const AdminPage = () => {
   }, [loadCatalog, loadOrders]);
 
   // Tempo real: a base de dados avisa quando mudam encomendas ou o catálogo, e o painel pede só
-  // isso — as encomendas que mudaram desde a última vez, ou o catálogo. Ver lib/realtimeSignals.js.
+  // isso — as encomendas que mudaram desde a última vez e/ou o catálogo (uma encomenda nova manda
+  // os dois sinais quase juntos: o stock desceu). Ver lib/realtimeSignals.js. Enquanto actualiza,
+  // o ícone da barra do topo roda, pelo menos 0,7 s para se ver.
   const syncRef = useRef(null);
-  const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
-    const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
-    run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
-  }, { enabled: access === 'allow' && (canManageOrders || canManageCatalog) });
+  const [signalLoads, setSignalLoads] = useState(0);
+  const live = useSignal('painel', ['orders', 'catalogo'], (_event, _payload, signals) => {
+    const events = new Set(signals.map((s) => s.event));
+    const started = Date.now();
+    setSignalLoads((n) => n + 1);
+    Promise.all([
+      events.has('catalogo') ? loadCatalog() : null,
+      events.has('orders') ? loadOrders({ incremental: true }) : null,
+    ])
+      .then(() => syncRef.current?.markSynced())
+      .catch((err) => console.error(err))
+      .finally(() => setTimeout(() => setSignalLoads((n) => Math.max(0, n - 1)), Math.max(0, 700 - (Date.now() - started))));
+  }, { enabled: access === 'allow' });
 
   // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
   // tempo real; e por consulta completa de 5 em 5 minutos com o canal ligado (de minuto a minuto
@@ -233,6 +260,9 @@ const AdminPage = () => {
   const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
   syncRef.current = sync;
   const { markSynced } = sync;
+  // A barra do topo diz «Em tempo real» com o canal do painel ligado, e o ícone roda enquanto
+  // actualiza (pela consulta ou por um sinal).
+  const syncState = { ...sync, syncing: sync.syncing || signalLoads > 0, realtime: live ? 'live' : 'off' };
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
   const handleSaveBook = async (data) => {
@@ -474,10 +504,14 @@ const AdminPage = () => {
 
   // O que pede acção, ao lado do nome da secção (não totais): encomendas por confirmar, stock
   // a acabar, pagamentos que o cliente diz ter feito.
+  // A Editora e as finanças (lib/editoraAttention.js): etapas atrasadas ao lado da Produção e
+  // salários de meses fechados por pagar ao lado dos Funcionários; os avisos vão para o Início.
+  const editora = useEditoraAttention(perms, { enabled: access === 'allow' });
   const nav = buildAdminNav(perms, {
     orders: { count: pendingCount, tone: 'info' },
     books: { count: lowStockBooks.length, tone: 'warning' },
     'pagamentos-caixa': { count: awaitingPaymentCount, tone: 'warning' },
+    ...editora.badges,
   });
   // A secção fica no endereço (/admin?tab=orders): os avisos, os emails e outras páginas
   // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
@@ -494,17 +528,18 @@ const AdminPage = () => {
   const attentionCount = canManageOrders ? pendingCount + awaitingPaymentCount : 0;
   // Abrir as encomendas já filtradas (do Início e da procura).
   const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search });
+    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search }, { replace: activeTab === 'orders' });
   };
   const openProducts = ({ filter = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search });
+    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search }, { replace: activeTab === 'books' });
   };
   // Ir para uma secção (e vista). Sem vista pedida, a última aberta nessa secção; a vista é
   // própria de cada secção, por isso a de outra não fica no endereço.
   const goToSection = (id, opts = {}) => {
     if (id === 'books' && opts.filter) { openProducts({ filter: opts.filter }); return; }
     const view = opts.view !== undefined ? opts.view : (lastViews.current[id] ?? null);
-    updateParams({ tab: id, vista: view });
+    if (id === activeTab && (view || null) === (requestedView || null)) return;
+    updateParams({ tab: id, vista: view }, { replace: !!opts.replace });
   };
   const setActiveTab = (id) => goToSection(id);
   const addProduct = (type = 'livro') => {
@@ -543,7 +578,7 @@ const AdminPage = () => {
           aberto noutro separador, vê-se de relance. */}
       <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${activeView ? `${findView(currentSection, activeView)?.label} · ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
-        sync={sync}
+        sync={syncState}
         nav={nav}
         active={activeTab}
         view={activeView}
@@ -554,7 +589,7 @@ const AdminPage = () => {
         sidebarOpen={sidebarOpen}
         onSidebarOpenChange={setSidebarOpen}
         user={user}
-        roleLabel={isAdmin ? 'Administrador' : 'Equipa'}
+        roleLabel={isAdmin ? 'Administrador' : myCargo ? `Gestor · ${myCargo}` : 'Gestor'}
         onProfile={() => navigate('/profile')}
         onLogout={() => { logout(); navigate('/'); }}
         actions={sectionActions}
@@ -581,6 +616,7 @@ const AdminPage = () => {
                 orders={orders}
                 books={books}
                 lowStockBooks={lowStockBooks}
+                extraAttention={editora.items}
                 loading={loading}
                 onNavigate={goToSection}
                 onOpenOrders={openOrders}
@@ -694,6 +730,29 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
+            {/* Produção da Editora, funcionários e saídas de dinheiro (migrações funcionarios, producao
+                e saidas): as mesmas regras de lib/adminSections.js. */}
+            {(perms.production || perms.finance) && (
+              <AdminSection active={activeTab} value="producao">
+                <Suspense fallback={spinner}>
+                  <ProducaoTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {(perms.staff || perms.finance) && (
+              <AdminSection active={activeTab} value="funcionarios">
+                <Suspense fallback={spinner}>
+                  <FuncionariosTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {perms.finance && (
+              <AdminSection active={activeTab} value="financas">
+                <Suspense fallback={spinner}>
+                  <FinanceTab />
+                </Suspense>
+              </AdminSection>
+            )}
             {(canManageUsers || canManageOrders) && (
               <AdminSection active={activeTab} value="equipas">
                 <Suspense fallback={spinner}>
@@ -794,9 +853,11 @@ const AdminPage = () => {
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
+                        type="search"
                         value={bookSearch}
                         onChange={(e) => setBookSearch(e.target.value)}
-                        placeholder="Pesquisar por nome, autor, código (ex.: UNI-004), SKU ou ISBN..."
+                        placeholder="Pesquisar por nome, autor, código (ex.: UNI-004), SKU ou ISBN... (tecla /)"
+                        aria-label="Pesquisar produtos"
                         className="pl-9"
                       />
                     </div>
@@ -1023,7 +1084,7 @@ const AdminPage = () => {
                           type="search"
                           value={orderSearch}
                           onChange={(e) => setOrderSearch(e.target.value)}
-                          placeholder="Cliente, email, nº, telefone ou código…"
+                          placeholder="Cliente, email, nº, telefone ou código… (tecla /)"
                           aria-label="Procurar encomendas"
                           className="h-9 w-64 pl-8"
                         />

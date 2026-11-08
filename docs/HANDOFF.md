@@ -17,7 +17,7 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   (um site não partilha em segundo plano).
 - **Privacidade:** a posição só aparece a caminho e com notícias da última hora; apaga-se 7 dias
   depois (cron `trajetos-limpeza`).
-- **Base de dados:** migração `20261108180000_trajeto_gps`, **por aplicar** (vai no merge, com a
+- **Base de dados:** migração `20261108211000_trajeto_gps`, **por aplicar** (vai no merge, com a
   Edge Function: `/track/live`, `/track/destination`, a precisão no `/checkout`). Mapa: Leaflet
   1.9.4 (dependência nova, carregada só com o mapa) e mosaicos do OpenStreetMap. Cenários:
   `scripts/pglite/trajeto.mjs` (39).
@@ -35,9 +35,106 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   envio "Edição digital (sem envio)", sem portes, morada nem loja; só os pagamentos antecipados ou do
   gateway. Paga → "Na biblioteca" (entregue sozinha); pagamento anulado → volta a esperar. Com
   impressos, os portes contam só os impressos.
-- **Base de dados:** migração `20261108170000_edicoes_digitais`, **por aplicar** (vai no merge, com
+- **Base de dados:** migração `20261108210000_edicoes_digitais`, **por aplicar** (vai no merge, com
   a Edge Function: checkout, emails, vigilância e assistente). Cenários:
   `scripts/pglite/edicoes.mjs` (50).
+
+## Refinar: a Editora e as finanças no Início, e «Pagamentos e caixa» em tempo real (2026-11-08, ramo `claude/gracious-hamilton-kfrbg8`, depois do #48)
+
+- **Pedido do dono:** "continua a refinar", depois do deploy do #48 e da resolução dos PRs
+  pendentes. Entraram o #41 (entregas) e o #40 e o #46, cada um com o main junto e testado. O #4 e
+  o #3 foram fechados: o primeiro já estava todo no main, e o main já faz o que o segundo trazia.
+- **Início:** quem gere a produção ou as finanças passa a ver em **Precisa de atenção**:
+  - as etapas atrasadas, as ordens com o prazo passado e as que estão por concluir;
+  - os salários de meses fechados por pagar e o que se deve aos fornecedores.
+
+  Os números ficam ao lado da Produção e dos Funcionários, com atalhos para as três secções novas.
+  O "Tudo em dia" passa a dizer só as áreas que a pessoa vê. Tabela em PAINEL_ADMIN.md, §4.1.
+- **Pagamentos e caixa** em tempo real: a fila dos pagamentos por verificar recebe na hora o que
+  o cliente indica (sinais `financas` e `orders`).
+- **Telemóvel** (pedido do dono: "no mobile pode estar oculto"): o ícone de tempo real da barra
+  do topo fica escondido abaixo de 768 px; o aviso "Sem ligação" continua à vista.
+- **De passagem:**
+  - o Início passava a largura do ecrã no telemóvel com encomendas de número e nome compridos. A
+    grelha não tinha `grid-cols-1` e crescia até ao texto inteiro;
+  - a mensagem "migrações por aplicar" de `productionApi.js` ainda dizia os números antigos
+    (150000–152000).
+- **Testes:**
+  - `lib/editoraAttention.test.js` (datas fixas) e `AdminOverview.test.jsx`;
+  - vitest: 179 ficheiros, 1481 testes;
+  - no browser, contra a pilha local, 19 verificações:
+    - o Início da produção e das finanças, os números e o "Ver";
+    - uma etapa feita noutro lado que sai sozinha, e um pagamento indicado que aparece na fila sem
+      recarregar;
+    - o ícone escondido a 390 px e à vista a 768 e a 1440 px, com o "Sem ligação" à vista;
+    - o Início sem deslocamento horizontal em todos os tamanhos.
+
+## Produção da Editora, funcionários e saídas de dinheiro (2026-11-08, ramo `claude/gracious-hamilton-kfrbg8`)
+
+- **Pedido do dono**, esclarecido por perguntas:
+  - um **módulo de produção** da Editora;
+  - nos funcionários, a ficha, os responsáveis por etapa e os salários. Na resposta marcou também
+    "Nada por agora", que contradiz as outras escolhas; li as três que fazem sentido;
+  - nos pagamentos, os pagamentos a fornecedores e à gráfica, e melhorar os dos clientes.
+
+  Guia completo em [PRODUCAO.md](PRODUCAO.md).
+- **Junto ao main depois do #44, do #45, do #47 e do #41:** o ramo tinha um tempo real próprio (tópicos
+  `painel:<área>`), que se perdeu de propósito: ficou o do main (`private.realtime_signal`, canal
+  `painel`, `useSignal`). As migrações mudaram de número porque `20261108150000` já existia em
+  produção (`versoes_da_app`) e seria saltada sem aviso; e o `170000` é do #41.
+- **Base de dados:** migrações `20261108190000_funcionarios`, `20261108191000_producao`,
+  `20261108192000_saidas` e `20261108193000_sinais_afinados`, **por aplicar** (vão no merge).
+  - **Permissões novas:** `manage_production`, `manage_staff` e `manage_finance`, nas três listas:
+    `private.permission_keys` (redefinida em `funcionarios`; sem isso `users_admin_update` e os
+    cargos apagavam-nas ao gravar), a Edge Function (`permissions.ts`, no mesmo deploy) e o painel.
+    Uma migração futura que redefina `private.permission_keys` tem de as manter.
+  - **Fichas:** fichas de funcionário com um só código FUN- por pessoa
+    (`profiles_codigos_pessoa` passou a usar o código da ficha).
+  - **Produção:** fornecedores (FOR-); ordens de produção (PRD-) com etapas por omissão,
+    responsáveis e prazos; custos. `production_complete` põe a tiragem no stock uma só vez, com o
+    motivo novo "producao" no histórico.
+  - **Pagamentos a fornecedores:** só se anulam.
+  - **Dinheiro dos funcionários:** salário, IBAN e NIF numa tabela só das finanças; salários por
+    mês (`payroll_generate`).
+  - **Relatório:** `cash_flow_report`.
+  - **Registo de segurança:** guarda cada pagamento e anulação; IBAN e salário mudados avisam os
+    administradores.
+  - **Tempo real:** sinais `producao`, `funcionarios` e `financas` no canal `painel`, um por
+    instrução (`private.painel_realtime_signal`). E um defeito do main corrigido
+    (`sinais_afinados`): cada visita a um livro (`increment_book_views`) dava um sinal `catalogo`
+    e fazia todos os painéis abertos voltar a pedir o catálogo.
+- **Painel:**
+  - **Grupo Editora**, secção Produção: Ordens, Etapas e prazos, Fornecedores, Contas e pagamentos.
+  - **Grupo Pessoal**, secção Funcionários: Fichas e Salários.
+  - **Relatórios → Entradas e saídas.**
+  - **Métodos de pagamento:** no topo, a lista do que falta para os clientes pagarem (nome legal e
+    NIF no recibo, telefone ou WhatsApp, prazo das encomendas por pagar, métodos sem dados,
+    gateway). Em produção faltam os três primeiros: são dados do dono, não de código.
+  - **Barra do topo:** «Em tempo real» com o canal do painel ligado, em vez de "Actualizado
+    há…". O ícone continua o de actualizar (pedido do dono: "só muda o ícone… aquele círculo a
+    girar quando estiver a actualizar") e roda também quando a actualização vem de um sinal. O
+    canal liga-se para toda a equipa, não só para quem gere encomendas ou o catálogo.
+  - **Defeito do main corrigido no site:** o `useSignal` ficava só com o último sinal de uma
+    rajada. Uma encomenda nova manda «catalogo» e «orders» quase juntos, e o stock vendido não se
+    via até à consulta de 5 em 5 minutos (o mesmo no perfil do cliente e no atendimento). Agora a
+    chamada leva todos os sinais da rajada; teste no browser e uma mutação confirmaram.
+  - **De passagem:** os números "0" a laranja nas vistas (a Colportagem também os mostrava), e os
+    motivos da colportagem no histórico do stock, que apareciam como "Ajuste manual".
+- **Testes:**
+  - PGlite `scripts/pglite/producao.mjs`: 96 cenários. Mutações confirmaram que apanha concluir
+    duas vezes e o sinal das visitas (sem `sinais_afinados`, dois falham). Os outros continuam
+    certos: cargos e níveis 46 (a contagem das chaves passou a 13), pagamentos 91, conta 35,
+    entregas 44, versões 39.
+  - `npm test`: 167 ficheiros, 1408 testes. Lint, build e o detector de segredos certos.
+  - Pilha local completa (Supabase CLI): todas as migrações aplicam do zero, e os sinais saem
+    pelo `realtime.send` real.
+  - No browser, contra essa pilha: 24 verificações, do fornecedor ao relatório e ao tempo real
+    (lista em PRODUCAO.md, "Testes"). Apanharam um defeito a sério: o painel "Concluir" sem botão
+    para voltar quando faltavam etapas.
+- **Por decidir (dono):**
+  - impostos dos salários: o sistema não calcula INSS nem IRT; escrevem-se nos descontos;
+  - se os responsáveis sem a permissão da produção marcam as suas etapas;
+  - avisos de prazo por email ou push.
 
 ## Livros digitais: só abrem pagos, biblioteca e acessos (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 
@@ -694,7 +791,6 @@ Ainda não publicada; vai no deploy depois do merge.
   - o cancelamento repõe o stock e desconta `sales_count`;
   - `customer_email` fica sempre em minúsculas.
 - O site usa só as marcas `stock_low` e `stock_alert` da base de dados (antes misturava "< 5" e "<= 5"). O botão "Marcar resolvido", que não resolvia nada, passou a "Repor stock" e abre o livro.
-
 
 ## Livros, imagens e encomendas — correcções (2026-11-01, sessão local)
 

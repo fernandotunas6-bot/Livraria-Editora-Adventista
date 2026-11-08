@@ -37,7 +37,9 @@ const api = vi.hoisted(() => ({
   pctPreview: vi.fn(), saveColporteurSettings: vi.fn(),
   loadOperations: vi.fn(async () => ({ documents: [], reports: [], ledger: [], overview: [] })),
   loadBooksForColportage: vi.fn(async () => []),
+  loadDeliveriesBoard: vi.fn(async () => ({ active: [] })),
 }));
+vi.mock('@/hooks/useSignal', () => ({ useSignal: () => false }));
 vi.mock('@/lib/colporteurApi', async (importOriginal) => ({ ...(await importOriginal()), ...api }));
 vi.mock('@/lib/churchRegistryApi', async (importOriginal) => ({ ...(await importOriginal()), loadRegistry: vi.fn(async () => REG) }));
 const toast = vi.fn();
@@ -60,6 +62,19 @@ afterEach(() => { act(() => root?.unmount()); host?.remove(); document.body.inne
 const byText = (scope, tag, text) => [...scope.querySelectorAll(tag)].find((b) => b.textContent.trim() === text);
 
 describe('ColportagemTab', () => {
+  it('a vista Entregas mostra quantas há por preparar na loja', async () => {
+    api.loadColporteurAdmin.mockResolvedValue(DATA);
+    api.loadDeliveriesBoard.mockResolvedValue({ active: [
+      { id: '1', status: 'accepted', source: 'loja', picked_up_at: null },
+      { id: '2', status: 'accepted', source: 'stock' },
+      { id: '3', status: 'offered' },
+    ] });
+    const el = await mount(<ColportagemTab />);
+    await act(async () => {});
+    const entregas = [...el.querySelectorAll('button')].find((b) => b.textContent.includes('Entregas'));
+    expect(entregas.textContent).toMatch(/^Entregas\s*1/);
+  });
+
   it('abre nas candidaturas, com o número por decidir e a recomendação', async () => {
     api.loadColporteurAdmin.mockResolvedValue(DATA);
     const el = await mount(<ColportagemTab />);

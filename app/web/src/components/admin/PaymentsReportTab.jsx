@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getPaymentsReport } from '@/api/PlatformApi';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useSignal } from '@/hooks/useSignal';
 import { supabase } from '@/lib/supabaseClient';
 import { exportPaymentMovements } from '@/lib/orderExport';
 import { CHANNEL_LABELS } from '@/lib/payments';
@@ -85,9 +87,13 @@ export default function PaymentsReportTab({ canConfirm = false, currentUserName 
   const [error, setError] = useState('');
   const [from, to] = useMemo(() => periodRange(period, custom), [period, custom]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  // `quiet`: sem a espera nem a mensagem de erro (a leitura dos sinais em tempo real e a de
+  // reserva); um erro de rede aí deixa à vista o que já estava.
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const [r, ev] = await Promise.all([
         getPaymentsReport(from, to),
@@ -97,14 +103,22 @@ export default function PaymentsReportTab({ canConfirm = false, currentUserName 
       ]);
       setReport(r);
       setEvents(ev?.data || []);
+      setError('');
     } catch (err) {
-      setError(err.message || 'Não foi possível ler o relatório.');
+      if (!quiet) setError(err.message || 'Não foi possível ler o relatório.');
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [from, to]);
 
   useEffect(() => { load(); }, [load]);
+  // Em tempo real: um pagamento indicado pelo cliente, confirmado pelo gateway ou por um colega
+  // aparece logo na fila e nos números («financas» vem dos pagamentos; «orders» das encomendas).
+  // Cada linha da fila tem a chave do pagamento: a que está aberta não fecha. Sem o canal, volta a
+  // ler de minuto a minuto (de 5 em 5 com ele).
+  const reloadQuietly = useCallback(() => load({ quiet: true }), [load]);
+  const live = useSignal('painel', ['financas', 'orders'], reloadQuietly);
+  useAutoRefresh(reloadQuietly, { intervalMs: live ? 5 * 60_000 : 60_000 });
 
   const byDay = (report?.by_day || []).map((d) => ({ ...d, label: d.day.slice(8, 10) + '/' + d.day.slice(5, 7), received: Number(d.received) || 0 }));
   const received = report?.received || {};
@@ -147,7 +161,7 @@ export default function PaymentsReportTab({ canConfirm = false, currentUserName 
               </div>
             </>
           )}
-          <Button variant="outline" size="sm" className="h-9" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => load()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />} Actualizar
           </Button>
           <Button variant="outline" size="sm" className="h-9" disabled={!report?.movements?.length} onClick={() => exportPaymentMovements(report)}>

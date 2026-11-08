@@ -74,3 +74,12 @@ export async function assignStaffRole(profileId, roleId) {
   const { error } = await supabase.rpc('staff_role_assign', { p_profile: profileId, p_role: roleId || null });
   if (error) fail(error);
 }
+
+/** O nome do cargo de uma pessoa da equipa (ou null sem cargo, ou antes da migração). */
+export async function loadStaffRoleName(profileId) {
+  if (!profileId) return null;
+  const { data, error } = await supabase.from('profiles').select('staff_role_id').eq('id', profileId).maybeSingle();
+  if (error || !data?.staff_role_id) return null;
+  const { data: role } = await supabase.from('staff_roles').select('name').eq('id', data.staff_role_id).maybeSingle();
+  return role?.name || null;
+}

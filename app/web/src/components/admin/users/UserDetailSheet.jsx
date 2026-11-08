@@ -9,6 +9,8 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { PermissionMenuPreview } from './PermissionAreas';
 import { listUserOrders } from '@/lib/usersApi';
 import { listStaffRoles, loadTeamRoles } from '@/lib/staffRolesApi';
+import { supabase } from '@/lib/supabaseClient';
+import ReaderBadge from '@/components/community/ReaderBadge';
 import { formatOrderNumber, getDeliveryStatusColor, getDeliveryStatusLabel, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/orderUtils';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, PROVIDER_LABEL, accountState, formatDate, formatKz } from './userFormat';
 
@@ -29,6 +31,16 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // O nível de leitor do cliente (Leitor, assíduo, de honra) e os livros que comprou.
+  const [reader, setReader] = useState(null);
+  useEffect(() => {
+    setReader(null);
+    if (!open || !person?.id) return undefined;
+    let alive = true;
+    supabase.from('profiles').select('reader_level, reader_books, reader_via').eq('id', person.id).maybeSingle()
+      .then(({ data, error }) => { if (alive && !error && data) setReader(data); });
+    return () => { alive = false; };
+  }, [open, person?.id]);
   // O cargo do gestor (Caixa, Atendimento…), ou «personalizado» sem cargo.
   const [cargo, setCargo] = useState(null);
   useEffect(() => {
@@ -75,6 +87,12 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
           <div className="flex flex-wrap gap-1.5 pt-2">
             <Pill className={role.className}>{role.label}</Pill>
             <Pill className={state.className}>{state.label}</Pill>
+            {reader && reader.reader_level !== 'novo' && (
+              <span className="inline-flex items-center gap-1" title={`${reader.reader_books} ${reader.reader_books === 1 ? 'livro pago' : 'livros pagos'}${reader.reader_via === 'participacao' ? ' · entrou pela participação' : ''}`}>
+                <ReaderBadge level={reader.reader_level} size="md" />
+                <span className="text-xs text-muted-foreground">{reader.reader_books} {reader.reader_books === 1 ? 'livro' : 'livros'}</span>
+              </span>
+            )}
             {(person.providers || []).map((p) => (
               <Pill key={p} className="bg-muted text-muted-foreground">{PROVIDER_LABEL[p] || p}</Pill>
             ))}

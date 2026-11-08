@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, Loader2, Pencil, Trash2, CreditCard, ArrowUp, ArrowDown, AlertTriangle, RefreshCw, Banknote, Landmark, QrCode,
-  Copy, Zap,
+  Copy, Zap, CircleAlert, Info, ListChecks,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,10 @@ import {
 import ImageField from '@/components/admin/ImageField';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { pbErrorMessage, saveRecordWithMedia } from '@/lib/mediaSave';
+import { useAuth } from '@/hooks/useAuth';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { adminHref } from '@/lib/adminSections';
+import { paymentSetupChecks } from '@/lib/paymentSetup';
 
 const empty = { name: '', code: '', type: 'p2p', enabled: true, instructions: '', account_info: '', payment_link: '', qr_url: '', icon: '', sort_order: 0, shipping_methods: [], gateway_provider: '' };
 
@@ -74,6 +79,20 @@ export default function PaymentsTab() {
     pb.send('/admin/payments/gateway').then((g) => { if (alive) setGateway(g); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+  // O que falta para os clientes pagarem (lib/paymentSetup.js): as definições públicas e, para quem
+  // gere as configurações, as regras da loja (o prazo das encomendas por pagar; o RLS só as deixa
+  // ler a essas pessoas).
+  const { settings: publicSettings } = useSiteSettings();
+  const { isAdmin, hasPermission } = useAuth();
+  const canReadRules = isAdmin || hasPermission('manage_settings');
+  const [rules, setRules] = useState(null);
+  useEffect(() => {
+    if (!canReadRules) return undefined;
+    let alive = true;
+    supabase.from('site_settings').select('unpaid_cancel_days').limit(1).maybeSingle()
+      .then(({ data }) => { if (alive && data) setRules(data); }, () => {});
+    return () => { alive = false; };
+  }, [canReadRules]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -292,6 +311,8 @@ export default function PaymentsTab() {
           <span>Nenhum método está activo. A finalização da compra aceita apenas "Pagamento na entrega" até activar um método.</span>
         </div>
       )}
+
+      {!loadError && <PaymentSetupCard items={paymentSetupChecks({ settings: publicSettings || {}, rules, methods, gateway })} />}
 
       <GatewayCard gateway={gateway} />
 
@@ -516,6 +537,44 @@ export default function PaymentsTab() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/** O que falta configurar para os clientes pagarem sem dúvidas, com o caminho para cada coisa. */
+function PaymentSetupCard({ items }) {
+  if (!items.length) return null;
+  const ICONS = { critical: CircleAlert, warning: AlertTriangle, info: Info };
+  const TONE = {
+    critical: 'text-destructive',
+    warning: 'text-amber-700 dark:text-amber-400',
+    info: 'text-sky-700 dark:text-sky-400',
+  };
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 text-sm" aria-labelledby="pagamentos-falta">
+      <h4 id="pagamentos-falta" className="flex items-center gap-2 font-sans text-sm font-semibold">
+        <ListChecks className="h-4 w-4" aria-hidden="true" />
+        Para os clientes pagarem sem dúvidas ({items.length})
+      </h4>
+      <ul className="mt-2 divide-y divide-border">
+        {items.map((item) => {
+          const Icon = ICONS[item.severity];
+          return (
+            <li key={item.id} className="flex gap-2 py-2">
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${TONE[item.severity]}`} aria-label={item.severity === 'critical' ? 'Urgente' : item.severity === 'warning' ? 'Importante' : 'A considerar'} />
+              <div>
+                <p className="font-medium">{item.title}</p>
+                <p className="text-muted-foreground">{item.detail}</p>
+                {item.action && (
+                  <Link to={adminHref(item.action.section, item.action.view)} className="mt-0.5 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline">
+                    {item.action.label} →
+                  </Link>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

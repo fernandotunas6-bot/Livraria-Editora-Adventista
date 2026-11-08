@@ -36,6 +36,9 @@ Níveis dos leitores** (quem tem «Gerir Catálogo»), que mostra também quanto
 - **Comunidade**: a conta nova vê «Publicar é para a Comunidade de Leitores» no lugar da caixa de
   publicar; ao lado do nome de cada autor, o distintivo (`community_reader_levels`, pela chave
   pública do leitor, nunca pelo id).
+- **Perfil público do leitor** (`/comunidade/leitor/…`): o distintivo ao lado dos selos.
+- **Menu da conta** (avatar no cabeçalho): o distintivo por baixo do nome.
+- **Painel, ficha do cliente**: o distintivo e os livros pagos, para a equipa saber com quem fala.
 - **Sino**: ao subir de nível chega um aviso («Bem-vindo à Comunidade de Leitores», «Subiu de
   nível: Leitor assíduo»).
 - **Política de privacidade**: secção da comunidade, «Níveis de leitor».

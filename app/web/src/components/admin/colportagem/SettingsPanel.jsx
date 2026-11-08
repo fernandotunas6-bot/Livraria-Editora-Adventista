@@ -25,6 +25,7 @@ const DELIVERY = [
   ['delivery_offer_minutes', 'Prazo para aceitar uma entrega (minutos)', 'Contados em horário de funcionamento. Depois passa ao colportor seguinte.'],
   ['delivery_near_km', 'Muito perto, por GPS (km)', 'Até esta distância, ganha a quem está no mesmo município sem localização.'],
   ['delivery_max_km', 'Distância máxima por GPS (km)', 'Mais longe do que isto, só se for da mesma província.'],
+  ['delivery_min_fee', 'Mínimo por entrega (Kz)', 'O colportor fica com os portes, nunca menos do que isto (com envio grátis os portes são 0). A diferença paga-a a Livraria. 0 = só os portes.'],
 ];
 
 export function SettingsPanel({ data, run }) {

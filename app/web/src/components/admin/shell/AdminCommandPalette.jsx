@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { History, Mail, PackageSearch, Pencil, Phone, ShoppingBag } from 'lucide-react';
-import { detectQuery } from '@/lib/adminSearch';
-import { findSection, flattenViews } from '@/lib/adminSections';
+import { detectQuery, parseRecent } from '@/lib/adminSearch';
+import { findSection, findView, flattenViews } from '@/lib/adminSections';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import AdminNavBadge from '@/components/admin/shell/AdminNavBadge';
@@ -40,7 +40,12 @@ export default function AdminCommandPalette({
   // O que se escreveu: um código de produto, um número de encomenda, um email, um telefone?
   const detected = detectQuery(term);
   const product = detected.kind === 'product' && findProduct ? findProduct(detected.value) : null;
-  const recentItems = recents.map((id) => findSection(nav, id)).filter(Boolean);
+  // As recentes trazem a vista onde se estava (Colportagem › Contas), se a pessoa ainda a pode abrir.
+  const recentItems = recents.map((entry) => {
+    const { section, view } = parseRecent(entry);
+    const item = findSection(nav, section);
+    return item ? { item, view: findView(item, view) } : null;
+  }).filter(Boolean);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,13 +94,19 @@ export default function AdminCommandPalette({
             )}
             {!term && recentItems.length > 0 && (
               <CommandGroup heading="Recentes">
-                {recentItems.map((item) => {
-                  const Icon = item.icon;
+                {recentItems.map(({ item, view }) => {
+                  const Icon = view?.icon || item.icon;
                   return (
-                    <CommandItem key={`recente-${item.id}`} value={`recente ${item.label}`} onSelect={() => run(() => onNavigate(item.id))}>
+                    <CommandItem
+                      key={`recente-${item.id}`}
+                      value={`recente ${item.label} ${view?.label || ''}`}
+                      onSelect={() => run(() => onNavigate(item.id, view ? { view: view.id } : {}))}
+                    >
                       <History className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       <Icon className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 truncate">
+                        {view ? <><span className="text-muted-foreground">{item.label} › </span>{view.label}</> : item.label}
+                      </span>
                     </CommandItem>
                   );
                 })}

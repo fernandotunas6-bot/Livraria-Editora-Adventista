@@ -3192,9 +3192,23 @@ async function dispatchColporteurNotifications(limit = 50) {
       const { data: c } = await db.from("colporteurs").select("phone, full_name").eq("profile_id", n.customer_id).maybeSingle();
       const dedupe = `wa:colportor:${n.id}`;
       if (whatsapp && c?.phone && !(await alreadySent(dedupe))) {
-        const text = [`*${n.title}*`, "", String(n.body || ""), site ? `\nAbrir: ${site}${n.href || "/colportor?tab=entregas"}` : ""]
-          .filter(Boolean).join("\n");
-        const res = await sendWhatsAppText(String(c.phone), text, whatsapp);
+        const link = site ? `${site}${n.href || "/colportor?tab=entregas"}` : "";
+        const text = [`*${n.title}*`, "", String(n.body || ""), link ? `\nAbrir: ${link}` : ""].filter(Boolean).join("\n");
+        // Fora da janela de 24 h a Meta só entrega modelos aprovados: o mesmo dos avisos à equipa
+        // (título e texto, Integrações → WhatsApp). Sem modelo, vai como texto, que só chega a quem
+        // escreveu à loja no último dia.
+        const res = whatsapp.staff_template_name
+          ? await metaSend(whatsapp, {
+            messaging_product: "whatsapp", to: waNumber(String(c.phone)), type: "template",
+            template: {
+              name: whatsapp.staff_template_name, language: { code: whatsapp.template_language || "pt_PT" },
+              components: [{ type: "body", parameters: [
+                { type: "text", text: clipText(n.title, 200) },
+                { type: "text", text: clipText(`${n.body || ""}${link ? ` Abrir: ${link}` : ""}`, 900) },
+              ] }],
+            },
+          })
+          : await sendWhatsAppText(String(c.phone), text, whatsapp);
         await logNotification({
           type: "whatsapp", context: "colportagem", recipient: c.phone, customer_name: c.full_name || "", order_number: "",
           content: text, provider: "meta", dedupe_key: dedupe, status: res?.ok ? "sent" : "failed", subject: String(n.title || ""),

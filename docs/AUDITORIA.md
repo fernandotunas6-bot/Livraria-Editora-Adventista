@@ -1885,9 +1885,10 @@ A fase seguinte dos livros digitais (9.18), pedida pelo dono: vender a edição 
 sistemas fazem" — sem stock, sem entrega nem levantamento, concluída quando o pagamento é confirmado.
 Guia em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md).
 
-**Como foi verificado.** 50 cenários novos em PGlite com as 106 migrações
-(`scripts/pglite/edicoes.mjs`), com o `place_order` e os pagamentos reais; as suites que já existiam
-continuam certas (59 + 91 + 44 + 35 + 46 + 39). No browser, o build de produção com o Supabase
+**Como foi verificado.** 50 cenários novos em PGlite com as 112 migrações (já com o `main` dos
+#49 e #50), em `scripts/pglite/edicoes.mjs`, com o `place_order` e os pagamentos reais; as suites que
+já existiam continuam certas (digitais 59, pagamentos 91, entregas 87, produção 96, conta 35, cargos 46,
+versões 39). No browser, o build de produção com o Supabase
 simulado (Playwright, telemóvel): a ficha com a edição digital e o "Já é seu", o carrinho sem sessão
 a pedir para entrar, o checkout sem envio nem morada, só com a transferência, e o pedido enviado com
 o envio "digital" — 15 verificações certas. `npm test`, `npm run lint`, `npm run build` e `deno check`.
@@ -1911,7 +1912,7 @@ o envio "digital" — 15 verificações certas. `npm test`, `npm run lint`, `npm
 
 ### Ordem de publicação
 
-A migração `20261108170000_edicoes_digitais` e a Edge Function vão juntas com o merge. Até a migração
+A migração `20261108210000_edicoes_digitais` e a Edge Function vão juntas com o merge. Até a migração
 entrar, nenhum produto é digital (a coluna não existe e o site lê-a como falsa), por isso tudo funciona
 como antes; o painel só manda `digital` quando está ligado ou quando a coluna já existe. Não marcar
 edições digitais antes de o deploy da base de dados e da Edge Function acabar: o site novo já as
@@ -1951,7 +1952,7 @@ telemóvel e guardar; a colportora com o ponto do cliente, Google Maps e Waze, a
 
 ### Ordem de publicação
 
-A migração `20261108180000_trajeto_gps` e a Edge Function vão juntas com o merge. Na janela entre o
+A migração `20261108211000_trajeto_gps` e a Edge Function vão juntas com o merge. Na janela entre o
 site novo e a migração, o rastreio mostra só o ponto de entrega (a leitura das posições falha e é
 ignorada) e o bloco de quem entrega não aparece (a função ainda não existe).
 
