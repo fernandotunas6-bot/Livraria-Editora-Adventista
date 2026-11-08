@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { ordersWithBookQuery } from '@/lib/bookOrders';
 import { setOrderDeliveryStatus } from '@/api/PlatformApi';
 import OrderPaymentsPanel from '@/components/admin/OrderPaymentsPanel';
+import OrderColporteurDelivery from '@/components/admin/OrderColporteurDelivery';
 import DeliveredPaymentDialog from '@/components/admin/DeliveredPaymentDialog';
 import { deliveryNeedsPayment, moneySummary } from '@/lib/payments';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,6 +64,7 @@ const ColportagemTab = lazy(() => import('@/components/admin/colportagem/Colport
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
   'items', 'total', 'shipping_cost', 'status', 'payment_status', 'amount_paid', 'amount_refunded', 'paid_at', 'payment_method',
+  'delivery_route', 'delivery_colporteur_id',
   'payment_method_code', 'payment_method_name', 'payment_reference',
   'delivery_status', 'tracking_number', 'carrier', 'estimated_delivery',
   'address', 'city', 'notes', 'order_type', 'sale_channel', 'shipping_method', 'pickup_store',
@@ -1105,6 +1107,10 @@ const AdminPage = () => {
                               currentUserName={user?.name || user?.email || ''}
                               onChanged={loadAll}
                             />
+                            {/* Entrega ao domicílio: o colportor mais próximo (migração entregas_por_colportor). */}
+                            {['delivery', 'express'].includes(o.shipping_method) && (
+                              <OrderColporteurDelivery order={o} onChanged={loadAll} />
+                            )}
 
                             <div className="space-y-2">
                               <p className="text-xs font-medium text-muted-foreground">Estado da encomenda</p>

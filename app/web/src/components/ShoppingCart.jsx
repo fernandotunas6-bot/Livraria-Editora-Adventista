@@ -716,7 +716,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         <div className="rounded-lg border border-border p-3 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs text-muted-foreground">
-                              {gps ? 'Localização guardada para o estafeta' : 'Ajuda o estafeta a encontrar a morada'}
+                              {gps
+                                ? 'Localização guardada: a entrega vai a quem estiver mais perto de si'
+                                : 'Partilhe a localização: a entrega vai ao colportor mais perto de si e ele encontra a morada'}
                             </span>
                             <Button type="button" size="sm" variant={gps ? 'secondary' : 'outline'} onClick={locate} disabled={locating}>
                               {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}

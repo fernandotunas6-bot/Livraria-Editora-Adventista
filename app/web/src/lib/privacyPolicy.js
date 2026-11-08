@@ -6,7 +6,7 @@
  * Blocos: { p: 'texto' } ou { list: ['…'] }. No texto, `[rótulo](/caminho)` vira link interno.
  */
 
-export const PRIVACY_UPDATED = '7 de Novembro de 2026';
+export const PRIVACY_UPDATED = '8 de Novembro de 2026';
 export const PRIVACY_PATH = '/privacidade';
 
 /** Contactos para pedidos sobre dados: o email e o telefone das Configurações, se existirem. */
@@ -87,6 +87,7 @@ export function privacySections(settings = {}) {
         { p: '**Colportores aprovados.** Guardamos o código de colportor, a ligação à conta, os livros entregues e devolvidos, os relatórios semanais (horas, visitas, vendas), a conta corrente e os pagamentos, para gerir a consignação e pagar as percentagens. Só a equipa com a permissão de Colportagem vê estes dados; cada colportor vê os seus na [área do colportor](/colportor).' },
         { p: '**Interessados.** No relatório semanal, o colportor pode registar o nome, o telefone e o bairro de quem lhe pediu estudos bíblicos, uma visita ou oração, com o acordo dessa pessoa, para a equipa o encaminhar ao pastor do distrito. Estes contactos só a equipa os vê.' },
         { p: '**Compras com o código de um colportor.** Se comprar pelo link de um colportor ou escrever o código dele no checkout, a encomenda fica ligada a ele para lhe pagarmos a percentagem. O colportor vê apenas o número, a data, o valor e o estado da encomenda; nunca o seu nome, email, telefone ou morada. O código fica guardado no seu navegador durante 30 dias.' },
+        { p: '**Entregas feitas por um colportor.** Uma encomenda paga para entrega ao domicílio pode ser entregue pelo colportor mais próximo da sua morada. Para o escolher usamos o município de entrega e, se a partilhar no checkout, a sua localização. O colportor só vê o seu nome, o telefone, a morada, o contacto próximo, a nota da encomenda e a localização **depois de aceitar a entrega**; antes, vê apenas a zona e os livros. Quem recebe a encomenda assina e pode indicar o número do Bilhete de Identidade, como numa entrega feita pela loja. Os colportores registam a sua própria localização para receberem as entregas mais próximas; só a equipa e o próprio a vêem.' },
         { p: '**Igrejas e pastores.** O registo das igrejas, dos distritos e dos pastores (nome, cargo, distrito e telefone) é usado pela equipa para organizar a colportagem. No formulário de candidatura aparecem só os nomes das igrejas e dos pastores de cada distrito, sem contactos.' },
       ],
     },
