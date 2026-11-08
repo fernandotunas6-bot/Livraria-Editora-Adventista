@@ -1878,3 +1878,80 @@ A migração `20261108160000_livros_digitais` e a Edge Function vão juntas com 
 o site novo e a migração, a Biblioteca aparece vazia e o painel explica que falta a migração; o
 download continua pela função antiga (com a regra antiga) até a migração entrar. A função
 `start_download` passa a ter um segundo argumento opcional, por isso o site antigo continua a chamá-la.
+
+## 9.19 Edições digitais à venda sem envio (2026-11-08)
+
+A fase seguinte dos livros digitais (9.18), pedida pelo dono: vender a edição digital "como os outros
+sistemas fazem" — sem stock, sem entrega nem levantamento, concluída quando o pagamento é confirmado.
+Guia em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md).
+
+**Como foi verificado.** 50 cenários novos em PGlite com as 106 migrações
+(`scripts/pglite/edicoes.mjs`), com o `place_order` e os pagamentos reais; as suites que já existiam
+continuam certas (59 + 91 + 44 + 35 + 46 + 39). No browser, o build de produção com o Supabase
+simulado (Playwright, telemóvel): a ficha com a edição digital e o "Já é seu", o carrinho sem sessão
+a pedir para entrar, o checkout sem envio nem morada, só com a transferência, e o pedido enviado com
+o envio "digital" — 15 verificações certas. `npm test`, `npm run lint`, `npm run build` e `deno check`.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 151 | Cliente | **Para comprar um PDF, o checkout pedia entrega ou levantamento**, a morada e o telefone; a saída era escolher o levantamento, e a encomenda ficava "por preparar" e "por levantar". | Média | ✅ envio "Edição digital (sem envio)": sem portes, morada, loja nem assinatura; telefone opcional; "Na biblioteca" quando paga |
+| 152 | Loja | A edição digital tinha stock: com 0, a ficha dizia "Esgotado" e o carrinho limitava a quantidade; um livro esgotado em papel não se vendia em PDF. | Média | ✅ sem stock (não se verifica nem desconta; conta nas vendas), uma por conta; o impresso esgotado continua à venda com a digital; o produto só digital não fica "Esgotado" no painel |
+| 153 | Cliente | Nada impedia comprar a mesma edição digital duas vezes, nem comprá-la sem conta (e depois sem onde a abrir). | Média | ✅ conta obrigatória; "Já é seu" na ficha; o servidor recusa a segunda compra da mesma edição já paga |
+| 154 | Loja | Vendia-se uma edição digital sem ficheiro (o PDF por carregar ou por publicar). | Média | ✅ o `place_order` exige um material pago publicado, ligado ao produto ou à edição |
+| 155 | Equipa | A encomenda de um PDF entrava na operação como uma entrega: "assumir", "por preparar", prazo de entrega, passos de envio, "Encomenda entregue" ao cliente e o stock devolvido ao cancelar. | Média | ✅ "Nova encomenda digital" à equipa dos pagamentos; sem assumir, preparar, prazo nem passos de envio (recusados na base de dados e na Edge Function); sem avisos de entrega; cancelar não devolve stock que não saiu |
+| 156 | Loja | Um PDF podia ser pago "na entrega" — e os portes grátis contavam o PDF. | Baixa | ✅ a edição digital só com métodos pagos antes, pelo gateway ou com "Edição digital" marcado; os portes contam só os impressos |
+
+### Limites que ficam
+
+- Sem limite de downloads nem marca d'água (por decidir, como em 9.18).
+- Numa encomenda com impressos e digitais, o PDF abre com a encomenda inteira paga (como antes): não
+  há pagamento por artigo.
+
+### Ordem de publicação
+
+A migração `20261108170000_edicoes_digitais` e a Edge Function vão juntas com o merge. Até a migração
+entrar, nenhum produto é digital (a coluna não existe e o site lê-a como falsa), por isso tudo funciona
+como antes; o painel só manda `digital` quando está ligado ou quando a coluna já existe. Não marcar
+edições digitais antes de o deploy da base de dados e da Edge Function acabar: o site novo já as
+venderia sem envio, e o servidor antigo pediria a morada.
+
+## 9.20 Trajeto da encomenda com GPS dos dois lados (2026-11-08)
+
+Pedido do dono: "refinar também o trajeto da encomenda, GPS refinado dos dois lados, de quem recebe e
+de quem envia". Guia em [TRAJETO_GPS.md](TRAJETO_GPS.md).
+
+**Como foi verificado.** 39 cenários novos em PGlite (`scripts/pglite/trajeto.mjs`): partilhar só
+quem entrega e só a caminho, fora de Angola e GPS fraco recusados, o trajeto com os últimos 200
+pontos, parar sozinho ao entregar e ao cancelar, o cliente a afinar o ponto (só pelo servidor) e o
+colportor avisado, a limpeza de 7 dias. No browser (Playwright, telemóvel, GPS simulado): o rastreio
+com quem vem, a distância, o tempo e o mapa com os dois pontos e o caminho; afinar com o GPS do
+telemóvel e guardar; a colportora com o ponto do cliente, Google Maps e Waze, a partilhar e a parar —
+12 verificações certas. Vitest das contas e dos dois componentes.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 157 | Cliente | O ponto de entrega do checkout era uma leitura só (muitas vezes pela rede, com centenas de metros de erro), sem a precisão guardada e sem forma de o corrigir depois. | Média | ✅ espera pela leitura mais precisa (até 15 s), guarda a precisão e a hora, e afina-se no mapa no checkout e no rastreio até à entrega |
+| 158 | Cliente | "Saiu para entrega" não dizia onde vinha a encomenda, nem quanto faltava. | Média | ✅ mapa ao vivo no rastreio: quem a leva, o caminho, a distância e o tempo estimado, de 15 em 15 s |
+| 159 | Colportor | Na entrega, só um link para o ponto do cliente: sem distância, sem navegação, e o cliente sem notícias. | Média | ✅ mapa com o ponto e a precisão, Google Maps e Waze, e a partilha da posição com o ecrã ligado |
+| 160 | Equipa | Quando a equipa entrega, não havia nada disto. | Baixa | ✅ o mesmo bloco na encomenda, nas entregas que não foram para um colportor |
+
+### Limites que ficam
+
+- Um site não partilha a localização com a página fechada: quem entrega deixa-a aberta (o ecrã fica
+  ligado com o Wake Lock, onde o telemóvel o deixa).
+- Mosaicos do servidor público do OpenStreetMap: servem para o tráfego da loja; com muito mais uso,
+  troca-se por um fornecedor com chave (só o endereço em `DeliveryMap.jsx`).
+- O tempo estimado é pela distância, sem trânsito nem ruas.
+- A política de privacidade fala da localização do checkout; falta acrescentar a de quem entrega
+  (texto para o dono decidir).
+
+### Ordem de publicação
+
+A migração `20261108180000_trajeto_gps` e a Edge Function vão juntas com o merge. Na janela entre o
+site novo e a migração, o rastreio mostra só o ponto de entrega (a leitura das posições falha e é
+ignorada) e o bloco de quem entrega não aparece (a função ainda não existe).
+
