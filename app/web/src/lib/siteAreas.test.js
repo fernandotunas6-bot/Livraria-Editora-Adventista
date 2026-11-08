@@ -9,7 +9,7 @@ const perms = (keys = [], isAdmin = false) => adminPermissions({ isAdmin, hasPer
 
 describe('A minha conta', () => {
   it('mantém os identificadores que o rodapé, os emails e a política de privacidade usam', () => {
-    expect(ACCOUNT_VIEWS.map((v) => v.id)).toEqual(['orders', 'wishlist', 'pdfs', 'notifications', 'settings', 'security', 'workspace', 'crm']);
+    expect(ACCOUNT_VIEWS.map((v) => v.id)).toEqual(['orders', 'wishlist', 'biblioteca', 'notifications', 'settings', 'security', 'workspace', 'crm']);
   });
 
   it('as ferramentas da equipa só para quem as pode abrir', () => {
@@ -22,6 +22,9 @@ describe('A minha conta', () => {
   it('uma vista desconhecida ou sem acesso abre as encomendas', () => {
     expect(resolveAccountView('wishlist')).toBe('wishlist');
     expect(resolveAccountView('crm')).toBe('orders');
+    // Ligações antigas para os PDFs abrem a Biblioteca (há ligações em emails e avisos).
+    expect(resolveAccountView('pdfs')).toBe('biblioteca');
+    expect(resolveAccountView('biblioteca')).toBe('biblioteca');
     expect(resolveAccountView('crm', { canManageContacts: true })).toBe('crm');
     expect(resolveAccountView('nada')).toBe('orders');
     expect(accountHref('settings')).toBe('/profile?tab=settings');
