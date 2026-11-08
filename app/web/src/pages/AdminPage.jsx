@@ -743,9 +743,11 @@ const AdminPage = () => {
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
+                        type="search"
                         value={bookSearch}
                         onChange={(e) => setBookSearch(e.target.value)}
-                        placeholder="Pesquisar por nome, autor, código (ex.: UNI-004), SKU ou ISBN..."
+                        placeholder="Pesquisar por nome, autor, código (ex.: UNI-004), SKU ou ISBN... (tecla /)"
+                        aria-label="Pesquisar produtos"
                         className="pl-9"
                       />
                     </div>
@@ -973,7 +975,7 @@ const AdminPage = () => {
                           type="search"
                           value={orderSearch}
                           onChange={(e) => setOrderSearch(e.target.value)}
-                          placeholder="Cliente, email, nº, telefone ou código…"
+                          placeholder="Cliente, email, nº, telefone ou código… (tecla /)"
                           aria-label="Procurar encomendas"
                           className="h-9 w-64 pl-8"
                         />

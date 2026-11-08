@@ -329,19 +329,21 @@ export default function StoresTab() {
             const image = imageOf(s);
             const index = stores.findIndex((x) => x.id === s.id);
             return (
-              <article key={s.id} className={`bg-card border rounded-xl overflow-hidden flex flex-col ${s.active ? '' : 'opacity-70'}`}>
+              // Loja escondida: contorno tracejado em vez de esbatida (esbatida, o texto ficava sem
+              // contraste para ler).
+              <article key={s.id} className={`bg-card border rounded-xl overflow-hidden flex flex-col ${s.active ? '' : 'border-dashed bg-muted/40'}`}>
                 <div className="relative h-36 bg-muted">
                   {image ? (
                     <img src={image} alt={s.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground text-xs gap-1">
+                    <div className="w-full h-full flex flex-col items-center justify-center text-foreground/70 text-xs gap-1">
                       <Store className="h-7 w-7 text-primary/40" /> Sem foto
                     </div>
                   )}
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur">{s.province}</span>
-                    {!hasCoords(s) && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">Sem GPS</span>}
-                    {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">Sem telefone</span>}
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur">{s.province}</span>
+                    {!hasCoords(s) && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem GPS</span>}
+                    {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem telefone</span>}
                   </div>
                   <div className="absolute top-2 right-2 flex gap-1">
                     <Button type="button" size="icon" variant="secondary" className="h-7 w-7" disabled={index <= 0 || busyId === s.id} onClick={() => move(s, -1)} aria-label="Subir">

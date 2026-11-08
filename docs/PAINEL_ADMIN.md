@@ -197,6 +197,7 @@ Os prazos estão em `ATTENTION_RULES`.
 |---|---|
 | Ctrl+K / ⌘K | Procurar no painel |
 | Ctrl+B / ⌘B | Mostrar ou esconder a barra lateral (no telemóvel, a gaveta) |
+| / | Vai à procura da lista aberta (encomendas, produtos…); onde não há, abre a procura do painel |
 | Escape | Fecha a procura, a gaveta e os menus |
 | Tab no início da página | "Saltar para o conteúdo" |
 

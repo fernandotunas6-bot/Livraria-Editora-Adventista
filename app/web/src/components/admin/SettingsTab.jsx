@@ -759,12 +759,12 @@ export default function SettingsTab() {
               <p className="text-xs text-muted-foreground">Credenciais SMTP do seu provedor (ex.: smtp.hostinger.com, smtp-relay.brevo.com). Use a porta 465 (SSL): o Supabase bloqueia as portas 25 e 587.</p>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Servidor SMTP</Label>
-                  <Input value={form.smtp_host} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.hostinger.com" />
+                  <Label htmlFor="config-smtp-host">Servidor SMTP</Label>
+                  <Input id="config-smtp-host" value={form.smtp_host} onChange={(e) => set('smtp_host', e.target.value)} placeholder="smtp.hostinger.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Porta</Label>
-                  <Input type="number" value={form.smtp_port} onChange={(e) => set('smtp_port', e.target.value)} placeholder="465" />
+                  <Label htmlFor="config-smtp-port">Porta</Label>
+                  <Input id="config-smtp-port" type="number" value={form.smtp_port} onChange={(e) => set('smtp_port', e.target.value)} placeholder="465" />
                   {[25, 587].includes(Number(form.smtp_port)) && (
                     <p className="text-xs font-medium text-destructive">A porta {form.smtp_port} está bloqueada no Supabase: nenhum email sairia. Use 465 ou, melhor, a Brevo por API.</p>
                   )}
@@ -772,8 +772,8 @@ export default function SettingsTab() {
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Utilizador SMTP</Label>
-                  <Input value={form.smtp_user} onChange={(e) => set('smtp_user', e.target.value)} placeholder="noreply@dominio.ao" />
+                  <Label htmlFor="config-smtp-user">Utilizador SMTP</Label>
+                  <Input id="config-smtp-user" value={form.smtp_user} onChange={(e) => set('smtp_user', e.target.value)} placeholder="noreply@dominio.ao" />
                 </div>
                 <SecretField {...secretProps('smtp_password', 'Password SMTP')} />
               </div>
@@ -805,20 +805,20 @@ export default function SettingsTab() {
                 não podem sair por aqui: para essas, use a Brevo.
               </p>
               <div className="space-y-2">
-                <Label>ID da conta Cloudflare</Label>
-                <Input value={form.cloudflare_account_id} onChange={(e) => set('cloudflare_account_id', e.target.value)} placeholder="701800d01d428c5141fa1fdb60ee01ae" className="font-mono text-xs" />
+                <Label htmlFor="config-cloudflare-account-id">ID da conta Cloudflare</Label>
+                <Input id="config-cloudflare-account-id" value={form.cloudflare_account_id} onChange={(e) => set('cloudflare_account_id', e.target.value)} placeholder="701800d01d428c5141fa1fdb60ee01ae" className="font-mono text-xs" />
               </div>
               <SecretField {...secretProps('cloudflare_email_token', 'Token da API Cloudflare')} className="font-mono text-sm" />
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Email remetente</Label>
-              <Input type="email" value={form.smtp_from_email} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="loja@livrariaadventista.ao" />
+              <Label htmlFor="config-smtp-from-email">Email remetente</Label>
+              <Input id="config-smtp-from-email" type="email" value={form.smtp_from_email} onChange={(e) => set('smtp_from_email', e.target.value)} placeholder="loja@livrariaadventista.ao" />
             </div>
             <div className="space-y-2">
-              <Label>Nome remetente</Label>
-              <Input value={form.smtp_from_name} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="Livraria Adventista" />
+              <Label htmlFor="config-smtp-from-name">Nome remetente</Label>
+              <Input id="config-smtp-from-name" value={form.smtp_from_name} onChange={(e) => set('smtp_from_name', e.target.value)} placeholder="Livraria Adventista" />
             </div>
           </div>
           <p className="text-xs text-muted-foreground -mt-3">
@@ -836,8 +836,8 @@ export default function SettingsTab() {
             <Label>Activar notificações push na PWA</Label>
           </div>
           <div className="space-y-2">
-            <Label>Chave pública VAPID</Label>
-            <Input value={form.vapid_public_key} onChange={(e) => set('vapid_public_key', e.target.value)} className="font-mono text-xs" />
+            <Label htmlFor="config-vapid-public-key">Chave pública VAPID</Label>
+            <Input id="config-vapid-public-key" value={form.vapid_public_key} onChange={(e) => set('vapid_public_key', e.target.value)} className="font-mono text-xs" />
           </div>
           <SecretField {...secretProps('vapid_private_key', 'Chave privada VAPID')} className="font-mono text-xs" />
 
@@ -874,14 +874,14 @@ export default function SettingsTab() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label>Modelo (opcional)</Label>
-                <Input value={form.chat_model} onChange={(e) => set('chat_model', e.target.value)} placeholder="gemini-2.0-flash-lite ou deepseek-chat" className="font-mono text-xs" />
+                <Label htmlFor="config-chat-model">Modelo (opcional)</Label>
+                <Input id="config-chat-model" value={form.chat_model} onChange={(e) => set('chat_model', e.target.value)} placeholder="gemini-2.0-flash-lite ou deepseek-chat" className="font-mono text-xs" />
               </div>
             </>
           )}
           <div className="space-y-2">
-            <Label>Mensagem de boas-vindas</Label>
-            <Textarea rows={2} value={form.chat_welcome} onChange={(e) => set('chat_welcome', e.target.value)} placeholder="Olá! Sou o assistente da livraria…" />
+            <Label htmlFor="config-chat-welcome">Mensagem de boas-vindas</Label>
+            <Textarea id="config-chat-welcome" rows={2} value={form.chat_welcome} onChange={(e) => set('chat_welcome', e.target.value)} placeholder="Olá! Sou o assistente da livraria…" />
           </div>
 
           {hasFloating && (
@@ -931,16 +931,16 @@ export default function SettingsTab() {
 
         <TabsContent value="shipping" className="space-y-4 max-w-xl">
           <div className="space-y-2">
-            <Label>Envio grátis acima de (Kz)</Label>
-            <Input type="number" value={form.shipping_free_threshold} onChange={(e) => set('shipping_free_threshold', e.target.value)} />
+            <Label htmlFor="config-shipping-free-threshold">Envio grátis acima de (Kz)</Label>
+            <Input id="config-shipping-free-threshold" type="number" value={form.shipping_free_threshold} onChange={(e) => set('shipping_free_threshold', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Custo de envio padrão (Kz)</Label>
-            <Input type="number" value={form.shipping_cost} onChange={(e) => set('shipping_cost', e.target.value)} />
+            <Label htmlFor="config-shipping-cost">Custo de envio padrão (Kz)</Label>
+            <Input id="config-shipping-cost" type="number" value={form.shipping_cost} onChange={(e) => set('shipping_cost', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Custo de envio expresso (Kz)</Label>
-            <Input type="number" value={form.shipping_express_cost} onChange={(e) => set('shipping_express_cost', e.target.value)} />
+            <Label htmlFor="config-shipping-express-cost">Custo de envio expresso (Kz)</Label>
+            <Input id="config-shipping-express-cost" type="number" value={form.shipping_express_cost} onChange={(e) => set('shipping_express_cost', e.target.value)} />
           </div>
         </TabsContent>
 
@@ -949,8 +949,8 @@ export default function SettingsTab() {
             Regras aplicadas pelo servidor em cada encomenda. Os métodos de pagamento aceites são os que estiverem activos em <strong>Vendas → Pagamentos</strong>.
           </p>
           <div className="space-y-2">
-            <Label>Prefixo do número de encomenda</Label>
-            <Input
+            <Label htmlFor="config-order-number-prefix">Prefixo do número de encomenda</Label>
+            <Input id="config-order-number-prefix"
               value={form.order_number_prefix}
               onChange={(e) => set('order_number_prefix', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8))}
               placeholder="ENC-"
@@ -962,15 +962,15 @@ export default function SettingsTab() {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Stock baixo: até quantas unidades</Label>
-              <Input type="number" min={0} max={1000} value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} />
+              <Label htmlFor="config-low-stock-threshold">Stock baixo: até quantas unidades</Label>
+              <Input id="config-low-stock-threshold" type="number" min={0} max={1000} value={form.low_stock_threshold} onChange={(e) => set('low_stock_threshold', e.target.value)} />
               <p className="text-xs text-muted-foreground">
                 Livros com {Number(form.low_stock_threshold) || 0} ou menos unidades ficam marcados como "Últimas unidades" e aparecem no alerta do painel. Ao guardar, todos os livros são recalculados.
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Prefixo do código de livro (SKU)</Label>
-              <Input
+              <Label htmlFor="config-book-code-prefix">Prefixo do código de livro (SKU)</Label>
+              <Input id="config-book-code-prefix"
                 value={form.book_code_prefix}
                 onChange={(e) => set('book_code_prefix', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8))}
                 placeholder="LIV-"
@@ -982,8 +982,8 @@ export default function SettingsTab() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Máximo de caracteres nas notas da encomenda</Label>
-            <Input type="number" min={0} max={5000} value={form.checkout_notes_max} onChange={(e) => set('checkout_notes_max', e.target.value)} />
+            <Label htmlFor="config-checkout-notes-max">Máximo de caracteres nas notas da encomenda</Label>
+            <Input id="config-checkout-notes-max" type="number" min={0} max={5000} value={form.checkout_notes_max} onChange={(e) => set('checkout_notes_max', e.target.value)} />
             <p className="text-xs text-muted-foreground">0 a 5000. Com 0, as notas do cliente não são guardadas.</p>
           </div>
           {hasNewRules && (
@@ -1033,16 +1033,16 @@ export default function SettingsTab() {
             Personalize a página <strong>/shop</strong> — centro do catálogo. A cor principal (aba Marca) aplica-se automaticamente ao hero e botões.
           </p>
           <div className="space-y-2">
-            <Label>Badge do hero</Label>
-            <Input value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo Premium" />
+            <Label htmlFor="config-shop-hero-badge">Badge do hero</Label>
+            <Input id="config-shop-hero-badge" value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo Premium" />
           </div>
           <div className="space-y-2">
-            <Label>Título do hero</Label>
-            <Input value={form.shop_hero_title} onChange={(e) => set('shop_hero_title', e.target.value)} placeholder="Todos os Livros" />
+            <Label htmlFor="config-shop-hero-title">Título do hero</Label>
+            <Input id="config-shop-hero-title" value={form.shop_hero_title} onChange={(e) => set('shop_hero_title', e.target.value)} placeholder="Todos os Livros" />
           </div>
           <div className="space-y-2">
-            <Label>Subtítulo do hero</Label>
-            <Textarea rows={2} value={form.shop_hero_subtitle} onChange={(e) => set('shop_hero_subtitle', e.target.value)} />
+            <Label htmlFor="config-shop-hero-subtitle">Subtítulo do hero</Label>
+            <Textarea id="config-shop-hero-subtitle" rows={2} value={form.shop_hero_subtitle} onChange={(e) => set('shop_hero_subtitle', e.target.value)} />
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1065,8 +1065,8 @@ export default function SettingsTab() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Livros por página</Label>
-              <Input type="number" min={12} max={96} value={form.shop_per_page} onChange={(e) => set('shop_per_page', e.target.value)} />
+              <Label htmlFor="config-shop-per-page">Livros por página</Label>
+              <Input id="config-shop-per-page" type="number" min={12} max={96} value={form.shop_per_page} onChange={(e) => set('shop_per_page', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Colunas da grelha (desktop)</Label>
@@ -1133,8 +1133,8 @@ export default function SettingsTab() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label>Opacidade do overlay (0–1)</Label>
-                  <Input type="number" step="0.05" min="0" max="1" value={form.shop_bg_overlay} onChange={(e) => set('shop_bg_overlay', e.target.value)} />
+                  <Label htmlFor="config-shop-bg-overlay">Opacidade do overlay (0–1)</Label>
+                  <Input id="config-shop-bg-overlay" type="number" step="0.05" min="0" max="1" value={form.shop_bg_overlay} onChange={(e) => set('shop_bg_overlay', e.target.value)} />
                 </div>
               </>
             )}
@@ -1151,13 +1151,13 @@ export default function SettingsTab() {
             <Label>Activar superfícies opacas (header, rodapé, painéis)</Label>
           </div>
           <div className="space-y-2">
-            <Label>Opacidade do vidro (0.5 – 0.95)</Label>
-            <Input type="number" step="0.05" min="0.5" max="0.95" value={form.ui_glass_opacity} onChange={(e) => set('ui_glass_opacity', e.target.value)} />
+            <Label htmlFor="config-ui-glass-opacity">Opacidade do vidro (0.5 – 0.95)</Label>
+            <Input id="config-ui-glass-opacity" type="number" step="0.05" min="0.5" max="0.95" value={form.ui_glass_opacity} onChange={(e) => set('ui_glass_opacity', e.target.value)} />
             <p className="text-xs text-muted-foreground">Recomendado: 0.72 (similar ao macOS)</p>
           </div>
           <div className="space-y-2">
-            <Label>Google Maps Embed API Key (opcional)</Label>
-            <Input value={form.google_maps_embed_key} onChange={(e) => set('google_maps_embed_key', e.target.value)} placeholder="AIza..." className="font-mono text-sm" />
+            <Label htmlFor="config-google-maps-embed-key">Google Maps Embed API Key (opcional)</Label>
+            <Input id="config-google-maps-embed-key" value={form.google_maps_embed_key} onChange={(e) => set('google_maps_embed_key', e.target.value)} placeholder="AIza..." className="font-mono text-sm" />
             <p className="text-xs text-muted-foreground">Para mapas embutidos nas lojas físicas. Sem chave, usa links Google Maps.</p>
           </div>
           <div className={`p-4 rounded-xl border glass-surface ${!form.ui_glass_enabled ? 'opacity-60' : ''}`}>
@@ -1171,21 +1171,21 @@ export default function SettingsTab() {
             Personalize a barra superior do site. Use <code className="text-primary">{'{nome}'}</code> para inserir o primeiro nome do utilizador.
           </p>
           <div className="space-y-2">
-            <Label>Mensagem (utilizador logado)</Label>
-            <Input value={form.header_welcome_logged} onChange={(e) => set('header_welcome_logged', e.target.value)} placeholder="Bem-vindo de volta, {nome}" />
+            <Label htmlFor="config-header-welcome-logged">Mensagem (utilizador logado)</Label>
+            <Input id="config-header-welcome-logged" value={form.header_welcome_logged} onChange={(e) => set('header_welcome_logged', e.target.value)} placeholder="Bem-vindo de volta, {nome}" />
           </div>
           <div className="space-y-2">
-            <Label>Mensagem (visitante)</Label>
-            <Input value={form.header_welcome_guest} onChange={(e) => set('header_welcome_guest', e.target.value)} />
+            <Label htmlFor="config-header-welcome-guest">Mensagem (visitante)</Label>
+            <Input id="config-header-welcome-guest" value={form.header_welcome_guest} onChange={(e) => set('header_welcome_guest', e.target.value)} />
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Texto do link CTA</Label>
-              <Input value={form.header_cta_text} onChange={(e) => set('header_cta_text', e.target.value)} placeholder="Explorar novidades" />
+              <Label htmlFor="config-header-cta-text">Texto do link CTA</Label>
+              <Input id="config-header-cta-text" value={form.header_cta_text} onChange={(e) => set('header_cta_text', e.target.value)} placeholder="Explorar novidades" />
             </div>
             <div className="space-y-2">
-              <Label>Link CTA</Label>
-              <Input value={form.header_cta_link} onChange={(e) => set('header_cta_link', e.target.value)} placeholder="/shop" />
+              <Label htmlFor="config-header-cta-link">Link CTA</Label>
+              <Input id="config-header-cta-link" value={form.header_cta_link} onChange={(e) => set('header_cta_link', e.target.value)} placeholder="/shop" />
             </div>
           </div>
           <div className="rounded-lg border p-3 bg-muted/30 text-sm">
@@ -1200,12 +1200,12 @@ export default function SettingsTab() {
 
         <TabsContent value="footer" className="space-y-4 max-w-2xl">
           <div className="space-y-2">
-            <Label>Tagline do Rodapé</Label>
-            <Input value={form.footer_tagline} onChange={(e) => set('footer_tagline', e.target.value)} placeholder="Literatura cristã, educação e inspiração..." />
+            <Label htmlFor="config-footer-tagline">Tagline do Rodapé</Label>
+            <Input id="config-footer-tagline" value={form.footer_tagline} onChange={(e) => set('footer_tagline', e.target.value)} placeholder="Literatura cristã, educação e inspiração..." />
           </div>
           <div className="space-y-2">
-            <Label>Texto de Copyright</Label>
-            <Input value={form.footer_copyright} onChange={(e) => set('footer_copyright', e.target.value)} placeholder="© 2026 Livraria Adventista. Todos os direitos reservados." />
+            <Label htmlFor="config-footer-copyright">Texto de Copyright</Label>
+            <Input id="config-footer-copyright" value={form.footer_copyright} onChange={(e) => set('footer_copyright', e.target.value)} placeholder="© 2026 Livraria Adventista. Todos os direitos reservados." />
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.show_stores_in_footer} onCheckedChange={(v) => set('show_stores_in_footer', v)} aria-label="Mostrar lojas físicas no rodapé" />

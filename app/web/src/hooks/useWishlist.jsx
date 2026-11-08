@@ -47,7 +47,18 @@ function toItem(bookId, book, addedAt) {
 }
 
 // Estado partilhado por todos os componentes (cada cartão de livro usa o hook).
-const store = { userId: undefined, items: [], loading: false, listeners: new Set() };
+const store = { userId: undefined, items: [], loading: false, listeners: new Set(), loadedAt: 0 };
+
+// Sincronizada com os outros separadores: sem sessão, pelo armazenamento local (o evento chega
+// logo); com sessão, voltando ao separador recarrega da conta (no máximo de minuto a minuto).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === LOCAL_KEY && !store.userId) setItems(readLocal());
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && store.userId && Date.now() - store.loadedAt > 60_000) loadFor(store.userId);
+  });
+}
 
 function setStore(patch) {
   Object.assign(store, patch);
@@ -80,6 +91,7 @@ async function loadFor(userId) {
       .order('created', { ascending: false });
     if (error) throw error;
     if (store.userId === userId) {
+      store.loadedAt = Date.now();
       setItems((data || []).map((row) => toItem(row.book_id, row.stock_books, row.created)));
     }
   } catch (error) {
