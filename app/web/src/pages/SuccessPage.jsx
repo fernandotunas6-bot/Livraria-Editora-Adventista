@@ -301,7 +301,7 @@ const SuccessPage = () => {
               </Button>
               {isAuthed ? (
                 <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
-                  <Link to="/profile" state={{ tab: 'orders' }}>
+                  <Link to="/profile?tab=orders">
                     <User className="mr-2 h-5 w-5" aria-hidden="true" /> Ver {isWhatsApp ? 'Pedidos' : 'Compras'}
                   </Link>
                 </Button>

@@ -48,7 +48,7 @@ function SyncStatus({ sync }) {
 }
 
 export default function AdminTopBar({
-  current, layout, showTrigger, showBrand, onOpenSearch, user, roleLabel, onLayoutChange, onProfile, onLogout, sync,
+  current, currentView = null, onNavigate, layout, showTrigger, showBrand, onOpenSearch, user, roleLabel, onLayoutChange, onProfile, onLogout, sync,
 }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm supports-backdrop-filter:bg-background/85 sm:px-4 lg:px-6">
@@ -61,7 +61,8 @@ export default function AdminTopBar({
       )}
       {showBrand && <Separator orientation="vertical" className="mx-1 hidden h-5 sm:block" />}
 
-      {/* Onde se está. No telemóvel só a secção (o grupo já está na gaveta). */}
+      {/* Onde se está: Grupo › Secção › Vista. No telemóvel só o último (o resto está na gaveta e
+          no cabeçalho da secção). Com uma vista aberta, a secção leva à vista de omissão. */}
       <nav aria-label="Localização" className="min-w-0 flex-1">
         <ol className="flex min-w-0 items-center gap-1 text-sm">
           {current?.groupLabel && (
@@ -70,7 +71,23 @@ export default function AdminTopBar({
               <li className="hidden shrink-0 text-muted-foreground/60 md:block" aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
             </>
           )}
-          <li className="min-w-0 truncate font-medium text-foreground" aria-current="page">{current?.label || 'Painel'}</li>
+          {currentView ? (
+            <>
+              <li className="hidden min-w-0 shrink sm:block">
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.(current.id, { view: current.views?.[0]?.id || null })}
+                  className="block max-w-full truncate rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {current.label}
+                </button>
+              </li>
+              <li className="hidden shrink-0 text-muted-foreground/60 sm:block" aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
+              <li className="min-w-0 truncate font-medium text-foreground" aria-current="page">{currentView.label}</li>
+            </>
+          ) : (
+            <li className="min-w-0 truncate font-medium text-foreground" aria-current="page">{current?.label || 'Painel'}</li>
+          )}
         </ol>
       </nav>
 

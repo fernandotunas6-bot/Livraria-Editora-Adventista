@@ -12,6 +12,18 @@ vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ settings: 
 
 const { default: AdminShell } = await import('./AdminShell');
 const { default: AdminTabsNav } = await import('./AdminTabsNav');
+const { AdminViewNav, useSectionView } = await import('./AdminViewNav');
+
+/** Uma secção com vistas, como as verdadeiras: a linha das vistas e a vista aberta. */
+function SecaoComVistas() {
+  const sv = useSectionView('colportagem');
+  return (
+    <div>
+      <AdminViewNav state={sv} badges={{ candidaturas: { count: 2, tone: 'warning' } }} />
+      <p data-vista={sv.view}>Vista {sv.view}</p>
+    </div>
+  );
+}
 
 const nav = buildAdminNav(adminPermissions({ isAdmin: true }), { orders: { count: 4 }, books: { count: 2, tone: 'warning' } });
 let root;
@@ -41,7 +53,7 @@ const shell = (props = {}) => (
     roleLabel="Administrador" onProfile={() => {}} onLogout={() => {}}
     {...props}
   >
-    <p>Conteúdo da secção</p>
+    {props.children || <p>Conteúdo da secção</p>}
   </AdminShell>
 );
 
@@ -105,5 +117,70 @@ describe('AdminTabsNav', () => {
     const el = await mount(<AdminTabsNav nav={nav} active="inicio" onNavigate={() => {}} />);
     const vendas = [...el.querySelectorAll('nav[aria-label="Grupos do painel"] button')].find((b) => b.textContent.includes('Vendas'));
     expect(vendas.textContent).toContain('4');
+  });
+});
+
+describe('navegação por contexto (vistas)', () => {
+  const colp = (props = {}) => shell({ active: 'colportagem', view: 'contas', viewExplicit: true, children: <SecaoComVistas />, ...props });
+
+  it('barra lateral: a secção aberta desdobra-se com as suas vistas, e a aberta fica marcada', async () => {
+    const el = await mount(colp({ layout: 'sidebar' }));
+    const sub = el.querySelector('ul[aria-label="Vistas de Colportagem"]');
+    expect(sub).not.toBeNull();
+    expect(sub.querySelectorAll('button').length).toBe(10);
+    expect(sub.querySelector('[aria-current="page"]').textContent).toContain('Contas');
+    // só a secção aberta se desdobra
+    expect(el.querySelectorAll('[data-sidebar="menu-sub"]').length).toBe(1);
+    // a secção diz que está aberta; a página actual é a vista
+    const secao = [...el.querySelectorAll('button[data-sidebar="menu-button"]')].find((b) => b.textContent.includes('Colportagem'));
+    expect(secao.getAttribute('aria-expanded')).toBe('true');
+    // com a barra aberta, a linha das vistas não se repete no conteúdo
+    expect(el.querySelector('#conteudo-painel nav[aria-label="Vistas de Colportagem"]')).toBeNull();
+  });
+
+  it('a secção mostra a vista do endereço, e o cabeçalho e o caminho dizem onde se está', async () => {
+    const el = await mount(colp());
+    expect(el.querySelector('[data-vista]').dataset.vista).toBe('contas');
+    expect(el.querySelector('h1').textContent).toBe('Contas');
+    expect(el.textContent).toContain('Igreja › Colportagem');
+    const caminho = el.querySelector('nav[aria-label="Localização"]');
+    expect(caminho.textContent).toContain('Colportagem');
+    expect(caminho.querySelector('[aria-current="page"]').textContent).toBe('Contas');
+  });
+
+  it('separadores no topo: a linha das vistas aparece no conteúdo, com os números', async () => {
+    const onNavigate = vi.fn();
+    const el = await mount(colp({ onNavigate }));
+    const linha = el.querySelector('#conteudo-painel nav[aria-label="Vistas de Colportagem"]');
+    expect(linha).not.toBeNull();
+    const cand = [...linha.querySelectorAll('button')].find((b) => b.textContent.includes('Candidaturas'));
+    expect(cand.textContent).toContain('2');
+    act(() => cand.click());
+    // mudar na linha não rouba o foco
+    expect(onNavigate).toHaveBeenLastCalledWith('colportagem', { focus: false, view: 'candidaturas' });
+  });
+
+  it('carregar na secção do caminho volta à vista de omissão', async () => {
+    const onNavigate = vi.fn();
+    const el = await mount(colp({ onNavigate }));
+    const btn = el.querySelector('nav[aria-label="Localização"] button');
+    act(() => btn.click());
+    expect(onNavigate).toHaveBeenLastCalledWith('colportagem', { view: 'resumo' });
+  });
+
+  it('uma vista sem acesso não aparece (Importar no registo da Igreja, só leitura)', async () => {
+    const leitor = buildAdminNav(adminPermissions({ hasPermission: (k) => k === 'manage_colporteurs' }));
+    const el = await mount(shell({ nav: leitor, layout: 'sidebar', active: 'igreja', view: 'resumo' }));
+    const sub = el.querySelector('ul[aria-label="Vistas de Registo da Igreja"]');
+    expect(sub.textContent).toContain('Pastores');
+    expect(sub.textContent).not.toContain('Importar');
+  });
+
+  it('fora do painel a secção guarda a vista sozinha, com a linha das vistas', async () => {
+    const el = await mount(<SecaoComVistas />);
+    expect(el.querySelector('[data-vista]').dataset.vista).toBe('resumo');
+    const contas = [...el.querySelectorAll('nav button')].find((b) => b.textContent.includes('Contas'));
+    act(() => contas.click());
+    expect(el.querySelector('[data-vista]').dataset.vista).toBe('contas');
   });
 });

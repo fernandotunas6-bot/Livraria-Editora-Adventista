@@ -12,6 +12,7 @@ import { getDeliveryStatusLabel, getOrderStatusLabel, getPaymentStatusLabel } fr
 import SupportRating from '@/components/assistant/SupportRating';
 import SupportReport from '@/components/admin/SupportReport';
 import { suggestSupportReply } from '@/lib/opsApi';
+import { adminHref } from '@/lib/adminSections';
 import {
   addSupportNote,
   createSupportThread,
@@ -35,6 +36,9 @@ import {
   sendSupportMessage,
   updateSupportThread,
 } from '@/lib/supportApi';
+
+// Avisos da colportagem para a equipa → a vista da Colportagem onde se tratam.
+const COLPORTEUR_NOTICE_VIEW = { colporteur_application: 'candidaturas', colporteur_report: 'relatorios' };
 
 const STATUS_LABELS = {
   bot: 'Com o assistente',
@@ -277,7 +281,8 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
       } else if (staff && String(notification.kind).startsWith('colporteur_')) {
-        navigate('/admin?tab=colportagem');
+        // Directo à vista que o aviso pede: a candidatura nova ou o relatório por validar.
+        navigate(adminHref('colportagem', COLPORTEUR_NOTICE_VIEW[notification.kind] || null));
       } else if (notification.href?.startsWith('/')) {
         navigate(notification.href);
       }

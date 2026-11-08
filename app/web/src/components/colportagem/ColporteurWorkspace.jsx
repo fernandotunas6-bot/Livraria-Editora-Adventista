@@ -9,6 +9,7 @@ import { kz } from '@/lib/colporteurCommission';
 import { LEDGER_KINDS, REPORT_STATUSES, ledgerWithBalance, recentWeeks, weekLabel } from '@/lib/colporteurReports';
 import { documentHtml, openPrint, statementHtml } from '@/lib/colporteurPrint';
 import { referralLink } from '@/lib/colporteurReferral';
+import { DEFAULT_COLPORTEUR_VIEW, resolveColporteurView } from '@/lib/siteAreas';
 import { getDeliveryStatusLabel, getPaymentStatusLabel } from '@/lib/orderUtils';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import ReportForm, { EMPTY_REPORT, reportPayload, reportToForm } from './ReportForm';
@@ -30,9 +31,16 @@ export function pickWeek(reports, weeks) {
  * rascunho guardado no telemóvel e na base de dados), os relatórios enviados e a conta corrente.
  */
 export default function ColporteurWorkspace({ me }) {
-  // Os avisos de entrega abrem /colportor?tab=entregas.
-  const [params] = useSearchParams();
-  const startTab = ['relatorio', 'entregas', 'livros', 'historico', 'site', 'conta'].includes(params.get('tab')) ? params.get('tab') : 'relatorio';
+  // O separador fica no endereço (/colportor?tab=entregas): os avisos de entrega abrem-no
+  // directamente, e recarregar ou voltar atrás mantém-no. As vistas vêm de lib/siteAreas.js.
+  const [params, setParams] = useSearchParams();
+  const tab = resolveColporteurView(params.get('tab'));
+  const changeTab = (value) => setParams((prev) => {
+    const next = new URLSearchParams(prev);
+    if (value === DEFAULT_COLPORTEUR_VIEW) next.delete('tab');
+    else next.set('tab', value);
+    return next;
+  }, { replace: true });
   const { toast } = useToast();
   const [ops, setOps] = useState(null);
   const [books, setBooks] = useState([]);
@@ -130,7 +138,7 @@ export default function ColporteurWorkspace({ me }) {
         ))}
       </div>
 
-      <Tabs defaultValue={startTab}>
+      <Tabs value={tab} onValueChange={changeTab}>
         <TabsList className="h-auto w-full flex-wrap justify-start">
           <TabsTrigger value="relatorio"><Send className="mr-1.5 h-4 w-4" />Relatório</TabsTrigger>
           <TabsTrigger value="entregas"><Truck className="mr-1.5 h-4 w-4" />Entregas</TabsTrigger>

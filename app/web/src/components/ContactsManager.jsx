@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminViewNav, ViewPanel, ViewPanels, useSectionView } from '@/components/admin/shell/AdminViewNav';
 import { useToast } from '@/hooks/use-toast';
 import {
   listContacts, createContact, updateContact, deleteContact,
@@ -61,7 +61,9 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
   const token = googleToken || getCachedGoogleToken();
   const canUseCrm = isCrmReady() && (isAdmin || hasPermission('manage_marketing') || hasPermission('manage_users'));
 
-  const [activeTab, setActiveTab] = useState('contacts');
+  // As vistas (Contactos, Grupos, Campanhas, Histórico) vêm do registo do painel; no painel a
+  // aberta fica no endereço (vista=campaigns), no perfil (CRM) fica só nesta página.
+  const sv = useSectionView('contacts');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -652,16 +654,19 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-1.5" />Contactos ({totalContacts})</TabsTrigger>
-          <TabsTrigger value="groups"><UserPlus className="h-4 w-4 mr-1.5" />Grupos ({groups.length})</TabsTrigger>
-          <TabsTrigger value="campaigns"><Megaphone className="h-4 w-4 mr-1.5" />Campanhas ({campaigns.length})</TabsTrigger>
-          <TabsTrigger value="history"><Bell className="h-4 w-4 mr-1.5" />Histórico</TabsTrigger>
-        </TabsList>
+      <AdminViewNav
+        state={sv}
+        className="mb-0"
+        badges={{
+          contacts: { count: totalContacts, tone: 'count' },
+          groups: { count: groups.length, tone: 'count' },
+          campaigns: { count: campaigns.length, tone: 'count' },
+        }}
+      />
+      <ViewPanels value={sv.view}>
 
         {/* CONTACTOS */}
-        <TabsContent value="contacts" className="mt-4">
+        <ViewPanel value="contacts" className="mt-4">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 space-y-3">
               <div className="flex gap-2 flex-wrap">
@@ -805,10 +810,10 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
               )}
             </div>
           </div>
-        </TabsContent>
+        </ViewPanel>
 
         {/* GRUPOS */}
-        <TabsContent value="groups" className="mt-4">
+        <ViewPanel value="groups" className="mt-4">
           <div className="flex justify-between mb-4">
             <p className="text-sm text-muted-foreground">Agrupe contactos para envios periódicos automáticos.</p>
             <Button size="sm" onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '', color: '#0ea5c9' }); setShowGroupForm(true); }}>
@@ -856,10 +861,10 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
               })}
             </div>
           )}
-        </TabsContent>
+        </ViewPanel>
 
         {/* CAMPANHAS */}
-        <TabsContent value="campaigns" className="mt-4">
+        <ViewPanel value="campaigns" className="mt-4">
           <div className="flex justify-between mb-4">
             <p className="text-sm text-muted-foreground">Envios periódicos com novidades da loja. Quando chega a data, saem pelo agendador; "Enviar pendentes" força o envio agora.</p>
             <div className="flex gap-2 shrink-0">
@@ -949,10 +954,10 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
               })}
             </div>
           )}
-        </TabsContent>
+        </ViewPanel>
 
         {/* HISTÓRICO */}
-        <TabsContent value="history" className="mt-4">
+        <ViewPanel value="history" className="mt-4">
           {notifications.length === 0 ? (
             <div className="text-center py-16 border rounded-xl bg-muted/10">
               <Bell className="h-10 w-10 mx-auto mb-3 opacity-40" />
@@ -979,8 +984,8 @@ const ContactsManager = ({ googleToken = null, onOpenGmail = null }) => {
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </ViewPanel>
+      </ViewPanels>
 
       {/* Dialog: Contacto */}
       <Dialog open={showContactForm} onOpenChange={setShowContactForm}>

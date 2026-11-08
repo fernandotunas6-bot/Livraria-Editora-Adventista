@@ -8,7 +8,7 @@ import { linkHost } from '@/lib/communityLinks';
 import { relativeTime } from '@/lib/communityText';
 import BlockedDomainsPanel from '@/components/admin/BlockedDomainsPanel';
 import { ClubsPanel, PostsPanel, TopicsPanel } from '@/components/admin/CommunityStaffPanels';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
 
 /**
  * Moderação da comunidade: publicações denunciadas ou ocultas. À terceira denúncia a base de
@@ -116,30 +116,22 @@ function ReportsPanel({ onMissing }) {
   );
 }
 
-const SECTIONS = [
-  ['denuncias', 'Denúncias'],
-  ['publicacoes', 'Publicações'],
-  ['temas', 'Temas'],
-  ['clube', 'Clube do livro'],
-  ['sites', 'Sites bloqueados'],
-];
-
 /** Painel da comunidade: moderação, publicações, temas, clube do livro e sites bloqueados. */
 export default function CommunityTab() {
-  const [section, setSection] = useState('denuncias');
+  // As vistas vêm do registo do painel (lib/adminSections.js) e a aberta do endereço.
+  const sv = useSectionView('community');
+  const view = sv.view;
   return (
     <div className="space-y-4">
       {/* Título e descrição no cabeçalho do painel (lib/adminSections.js). */}
-      <Tabs value={section} onValueChange={setSection}>
-        <TabsList className="h-auto flex-wrap justify-start">
-          {SECTIONS.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
-        </TabsList>
-        <TabsContent value="denuncias" className="pt-2"><ReportsPanel /></TabsContent>
-        <TabsContent value="publicacoes" className="pt-2"><PostsPanel /></TabsContent>
-        <TabsContent value="temas" className="pt-2"><TopicsPanel /></TabsContent>
-        <TabsContent value="clube" className="pt-2"><ClubsPanel /></TabsContent>
-        <TabsContent value="sites" className="pt-2"><BlockedDomainsPanel /></TabsContent>
-      </Tabs>
+      <AdminViewNav state={sv} className="mb-0" />
+      <div className="pt-2">
+        {view === 'denuncias' && <ReportsPanel />}
+        {view === 'publicacoes' && <PostsPanel />}
+        {view === 'temas' && <TopicsPanel />}
+        {view === 'clube' && <ClubsPanel />}
+        {view === 'sites' && <BlockedDomainsPanel />}
+      </div>
     </div>
   );
 }

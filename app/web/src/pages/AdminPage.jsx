@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AdminShell from '@/components/admin/shell/AdminShell';
 import AdminOverview from '@/components/admin/AdminOverview';
-import { adminPermissions, buildAdminNav, resolveSection } from '@/lib/adminSections';
+import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -451,23 +451,30 @@ const AdminPage = () => {
   // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
   const activeTab = resolveSection(nav, searchParams.get('tab'));
   const currentSection = nav.flatMap((g) => g.items).find((i) => i.id === activeTab);
+  // A vista da secção (Colportagem › Contas) fica em `vista`: /admin?tab=colportagem&vista=contas.
+  // Sem vista, ou sem acesso a ela, a de omissão. `viewExplicit`: estava no endereço.
+  const requestedView = searchParams.get('vista');
+  const activeView = resolveView(currentSection, requestedView);
+  const viewExplicit = !!findView(currentSection, requestedView);
+  // A última vista aberta em cada secção, nesta visita: voltar à Colportagem volta às Contas.
+  const lastViews = useRef({});
+  if (activeView && viewExplicit) lastViews.current[activeTab] = activeView;
   const attentionCount = canManageOrders ? pendingCount + awaitingPaymentCount : 0;
-  const setActiveTab = (value) => setSearchParams((prev) => {
-    const next = new URLSearchParams(prev);
-    next.set('tab', value);
-    return next;
-  }, { replace: true });
   // Abrir as encomendas já filtradas (do Início e da procura).
   const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'orders', estado: status, pagamento: payment, encomenda: search });
+    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search });
   };
   const openProducts = ({ filter = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'books', filtro: filter, tipo: null, produto: search });
+    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search });
   };
+  // Ir para uma secção (e vista). Sem vista pedida, a última aberta nessa secção; a vista é
+  // própria de cada secção, por isso a de outra não fica no endereço.
   const goToSection = (id, opts = {}) => {
-    if (id === 'books' && opts.filter) openProducts({ filter: opts.filter });
-    else setActiveTab(id);
+    if (id === 'books' && opts.filter) { openProducts({ filter: opts.filter }); return; }
+    const view = opts.view !== undefined ? opts.view : (lastViews.current[id] ?? null);
+    updateParams({ tab: id, vista: view });
   };
+  const setActiveTab = (id) => goToSection(id);
   const addProduct = (type = 'livro') => {
     setNewProductType(type);
     setEditingBook(null);
@@ -502,11 +509,13 @@ const AdminPage = () => {
     <>
       {/* O separador do navegador diz a secção e quantas encomendas pedem acção: com o painel
           aberto noutro separador, vê-se de relance. */}
-      <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
+      <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${activeView ? `${findView(currentSection, activeView)?.label} · ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
         sync={sync}
         nav={nav}
         active={activeTab}
+        view={activeView}
+        viewExplicit={viewExplicit}
         onNavigate={goToSection}
         layout={layout}
         onLayoutChange={setLayout}

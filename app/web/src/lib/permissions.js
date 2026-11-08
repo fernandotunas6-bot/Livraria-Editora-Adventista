@@ -1,15 +1,20 @@
 // Permissões granulares do painel. As mesmas chaves são verificadas no servidor
 // (private.has_permission na base de dados e requirePermission na Edge Function).
+//
+// `area`: o grupo do painel onde a permissão mora (o mesmo id de ADMIN_GROUPS em
+// lib/adminSections.js), para o ecrã das permissões as arrumar como a navegação. O que cada uma
+// abre não se escreve aqui: calcula-se do registo das secções (`sectionsOpenedBy`), para não
+// divergir.
 export const PERMISSIONS = {
-  manage_catalog: { label: 'Gerir Catálogo', description: 'Livros, coleções e slides' },
-  manage_orders: { label: 'Gerir Encomendas', description: 'Ver e actualizar encomendas' },
-  manage_settings: { label: 'Configurações', description: 'Marca, rodapé, lojas físicas e integrações' },
-  manage_users: { label: 'Utilizadores e Clientes', description: 'Gerir contas de clientes (a equipa é só para administradores)' },
-  manage_payments: { label: 'Pagamentos', description: 'Métodos de pagamento (IBAN, links, QR)' },
-  confirm_payments: { label: 'Confirmar pagamentos', description: 'Confirmar, rejeitar e anular pagamentos, registar dinheiro recebido e reembolsos' },
-  manage_marketing: { label: 'Marketing', description: 'Mensagens, barra superior, SEO' },
-  manage_church_registry: { label: 'Registo da Igreja', description: 'Campos, distritos, igrejas e pastores' },
-  manage_colporteurs: { label: 'Colportagem', description: 'Colportores, relatórios, stock entregue, percentagens e acertos' },
+  manage_catalog: { area: 'catalogo', label: 'Gerir Catálogo', description: 'Produtos, coleções, slider, materiais em PDF e a moderação da comunidade' },
+  manage_orders: { area: 'vendas', label: 'Gerir Encomendas', description: 'Ver e actualizar encomendas, acompanhá-las e falar com os clientes' },
+  manage_payments: { area: 'vendas', label: 'Pagamentos', description: 'Métodos de pagamento (IBAN, links, QR)' },
+  confirm_payments: { area: 'vendas', label: 'Confirmar pagamentos', description: 'Confirmar, rejeitar e anular pagamentos, registar dinheiro recebido e reembolsos' },
+  manage_users: { area: 'clientes', label: 'Utilizadores e Clientes', description: 'Gerir contas de clientes e as equipas que recebem os alertas (a equipa é só para administradores)' },
+  manage_marketing: { area: 'clientes', label: 'Marketing', description: 'Contactos, campanhas por email e WhatsApp e a faixa de aviso' },
+  manage_church_registry: { area: 'igreja', label: 'Registo da Igreja', description: 'Campos, distritos, igrejas e pastores' },
+  manage_colporteurs: { area: 'igreja', label: 'Colportagem', description: 'Colportores, relatórios, stock entregue, percentagens e acertos' },
+  manage_settings: { area: 'sistema', label: 'Configurações', description: 'Marca, portes, contactos, aparência, lojas físicas e a faixa de aviso' },
 };
 
 export const ROLES = {

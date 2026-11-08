@@ -3,8 +3,8 @@ import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  User, Mail, Shield, ShoppingBag, Settings, LogOut, Loader2, ChevronRight, Lock, BookOpen, LayoutDashboard, Truck,
-  Heart, Trash2, Users, Bell, FileDown, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,
+  User, Mail, Shield, ShoppingBag, LogOut, Loader2, ChevronRight, BookOpen, LayoutDashboard, Truck,
+  Heart, Trash2, Bell, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,
 } from 'lucide-react';
 import { toast as notify } from 'sonner';
 import MyDownloads from '@/components/downloads/MyDownloads';
@@ -12,6 +12,10 @@ import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ColporteurProfileLink from '@/components/colportagem/ColporteurProfileLink';
+import AreaBreadcrumb from '@/components/AreaBreadcrumb';
+import { useColporteurMe } from '@/hooks/useColporteurMe';
+import { adminPermissions, buildAdminNav, navAreas } from '@/lib/adminSections';
+import { DEFAULT_ACCOUNT_VIEW, accountViews, colporteurHref, resolveAccountView } from '@/lib/siteAreas';
 import ShoppingCart from '@/components/ShoppingCart';
 import CustomerOrders from '@/components/account/CustomerOrders';
 import AccountPrivacy from '@/components/account/AccountPrivacy';
@@ -44,8 +48,6 @@ import { ROLES } from '@/lib/permissions';
 import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
 import { kwanza } from '@/lib/money';
 import { cn } from '@/lib/utils';
-
-const PROFILE_TABS = ['orders', 'pdfs', 'notifications', 'settings', 'security', 'wishlist', 'workspace', 'crm'];
 
 const dateOnly = (value) => {
   const d = new Date(value);
@@ -127,8 +129,16 @@ const ProfilePage = () => {
   // O separador fica no URL (/profile?tab=wishlist), como no painel: permite ligar-lhe
   // directamente do rodapé e do menu, e sobrevive a um recarregamento.
   const [searchParams, setSearchParams] = useSearchParams();
+  // As vistas da conta vêm de lib/siteAreas.js; as da equipa (Workspace, CRM) só para quem pode.
+  const views = accountViews({ canAccessAdmin, canManageContacts });
+  const PROFILE_TABS = views.map((v) => v.id);
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
-  const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
+  const [activeTabState, setActiveTab] = useState(tabFromUrl || location.state?.tab || DEFAULT_ACCOUNT_VIEW);
+  const activeTab = resolveAccountView(activeTabState, { canAccessAdmin, canManageContacts });
+  const activeView = views.find((v) => v.id === activeTab);
+  // As outras áreas da pessoa: a de colportor (se tem ficha) e o painel (se tem permissões).
+  const colporteur = useColporteurMe(user?.id, { enabled: isAuthed });
+  const staffAreas = canAccessAdmin ? navAreas(buildAdminNav(adminPermissions({ isAdmin, hasPermission }))) : [];
 
   const tabsRef = useRef(null);
   const tabClicked = useRef(false);
@@ -366,12 +376,13 @@ const ProfilePage = () => {
 
   return (
     <>
-      <Helmet><title>{pageTitle('A Minha Conta')}</title></Helmet>
+      <Helmet><title>{pageTitle(`${activeView ? `${activeView.label} · ` : ''}A minha conta`)}</title></Helmet>
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main className="min-h-screen bg-muted/20">
         <div className="container-custom py-6 md:py-10">
+          <AreaBreadcrumb items={[{ label: 'A minha conta', to: '/profile' }, activeView && { label: activeView.label }]} />
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
             {/* Cabeçalho do perfil: compacto no telemóvel, para as encomendas aparecerem cedo. */}
             <div className="mb-5 rounded-2xl border bg-linear-to-br from-marca/10 via-background to-background p-4 sm:p-6 md:mb-6 md:p-8">
@@ -423,18 +434,67 @@ const ProfilePage = () => {
             <div className="mb-6 empty:hidden md:mb-8 [&>a]:max-w-md"><ColporteurProfileLink /></div>
 
             {/* Tabs principais */}
-            <Tabs ref={tabsRef} value={activeTab} onValueChange={changeTab} className="w-full scroll-mt-20">
-              <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-2 [&>button]:min-h-10">
-                <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" aria-hidden="true" />Encomendas</TabsTrigger>
-                <TabsTrigger value="wishlist"><Heart className="h-4 w-4 mr-2" aria-hidden="true" />Lista de desejos</TabsTrigger>
-                <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" aria-hidden="true" />PDFs</TabsTrigger>
-                <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" aria-hidden="true" />Notificações</TabsTrigger>
-                <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" aria-hidden="true" />Dados pessoais</TabsTrigger>
-                <TabsTrigger value="security"><Lock className="h-4 w-4 mr-2" aria-hidden="true" />Segurança e privacidade</TabsTrigger>
-                {canAccessAdmin && <TabsTrigger value="workspace"><LayoutDashboard className="h-4 w-4 mr-2" aria-hidden="true" />Google Workspace</TabsTrigger>}
-                {canManageContacts && <TabsTrigger value="crm"><Users className="h-4 w-4 mr-2" aria-hidden="true" />CRM Contactos</TabsTrigger>}
-              </TabsList>
+            {/* Tabs principais. No computador, o menu da conta à esquerda (a conta, as ferramentas
+                da equipa e as outras áreas da pessoa); no telemóvel, a fila de separadores. As
+                vistas vêm de lib/siteAreas.js e a aberta fica no endereço (?tab=…). */}
+            <Tabs ref={tabsRef} value={activeTab} onValueChange={changeTab} className="w-full scroll-mt-20 grid items-start gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
+              <aside aria-label="Menu da conta" className="space-y-4 lg:sticky lg:top-24 lg:rounded-xl lg:border lg:border-border lg:bg-background lg:p-2">
+                <div>
+                  <p className="hidden px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground lg:block">A minha conta</p>
+                  <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 lg:flex-col lg:items-stretch lg:gap-0.5 lg:bg-transparent lg:p-0 [&>button]:min-h-10">
+                    {views.filter((v) => !v.staff).map((v) => (
+                    <TabsTrigger
+                      key={v.id}
+                      value={v.id}
+                      className="lg:justify-start lg:px-2.5 lg:py-2 lg:data-[state=active]:bg-marca/10 lg:data-[state=active]:text-primary lg:data-[state=active]:shadow-none"
+                    >
+                      <v.icon className="h-4 w-4 mr-2" />{v.label}
+                    </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+                {views.some((v) => v.staff) && (
+                  <div>
+                    <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Equipa</p>
+                    <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 lg:flex-col lg:items-stretch lg:gap-0.5 lg:bg-transparent lg:p-0 [&>button]:min-h-10">
+                      {views.filter((v) => v.staff).map((v) => (
+                    <TabsTrigger
+                        key={v.id}
+                        value={v.id}
+                        className="lg:justify-start lg:px-2.5 lg:py-2 lg:data-[state=active]:bg-marca/10 lg:data-[state=active]:text-primary lg:data-[state=active]:shadow-none"
+                      >
+                        <v.icon className="h-4 w-4 mr-2" />{v.label}
+                      </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </div>
+                )}
+                {(colporteur || canAccessAdmin) && (
+                  <div className="hidden lg:block">
+                    <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Outras áreas</p>
+                    <ul className="space-y-0.5 text-sm">
+                      {colporteur && (
+                        <li><Link to={colporteurHref()} className="flex items-center gap-2 rounded-md px-2.5 py-2 font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BookOpen className="h-4 w-4" />Área do colportor</Link></li>
+                      )}
+                      {canAccessAdmin && (
+                        <li>
+                          <Link to="/admin" className="flex items-center gap-2 rounded-md px-2.5 py-2 font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+                            <LayoutDashboard className="h-4 w-4 shrink-0" />
+                            <span className="min-w-0 flex-1">
+                              Painel da equipa
+                              {/* As áreas que esta pessoa vê no painel, não uma lista fixa. */}
+                              <span className="block truncate text-xs font-normal">{isAdmin ? 'Todas as áreas' : staffAreas.join(' · ') || 'Início'}</span>
+                            </span>
+                            <ChevronRight className="h-4 w-4 shrink-0" />
+                          </Link>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </aside>
 
+              <div className="min-w-0">
               <TabsContent value="orders">
                 <CustomerOrders
                   orders={orders}
@@ -652,6 +712,7 @@ const ProfilePage = () => {
                   <ContactsManager />
                 </TabsContent>
               )}
+              </div>
             </Tabs>
           </motion.div>
         </div>

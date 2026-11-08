@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Mail, MessageSquare, RotateCw, Terminal, CheckCircle2, XCircle, MinusCircle,
-  Trash2, RefreshCw, Search, Play, Activity, Smartphone, BookOpen
+  Trash2, RefreshCw, Search, Play, BookOpen
 } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import EmailTemplatesPanel from '@/components/admin/EmailTemplatesPanel.jsx';
@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { testWhatsAppApi, testEmailApi } from '@/lib/messaging';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import PhoneInput from '@/components/PhoneInput';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
 
 // Estado de cada envio, tal como a Edge Function "app" o grava em notification_logs.
 const LOG_STATUS = {
@@ -233,7 +234,10 @@ export default function AppsTab() {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState('apps'); // 'apps', 'templates', 'logs'
+  // As vistas (Serviços, Modelos de email, Registo de envios) vêm do registo do painel e a
+  // aberta do endereço (/admin?tab=apps&vista=logs).
+  const sv = useSectionView('apps');
+  const activeSubTab = sv.view;
   const [resendingId, setResendingId] = useState(null);
   
   // Notification logs state
@@ -392,42 +396,7 @@ export default function AppsTab() {
 
   return (
     <div className="space-y-6">
-      {/* Sub Tabs Toggle */}
-      <div className="flex border-b border-border pb-1 gap-2">
-        <button
-          onClick={() => setActiveSubTab('apps')}
-          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === 'apps' 
-              ? 'border-primary text-primary' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Smartphone className="h-4 w-4" />
-          Integrações
-        </button>
-        <button
-          onClick={() => setActiveSubTab('templates')}
-          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === 'templates'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Mail className="h-4 w-4" />
-          Modelos de email
-        </button>
-        <button
-          onClick={() => setActiveSubTab('logs')}
-          className={`px-4 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 relative ${
-            activeSubTab === 'logs' 
-              ? 'border-primary text-primary' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Activity className="h-4 w-4" />
-          Registo de envios
-        </button>
-      </div>
+      <AdminViewNav state={sv} className="mb-0" />
 
       {activeSubTab === 'templates' && <EmailTemplatesPanel />}
 

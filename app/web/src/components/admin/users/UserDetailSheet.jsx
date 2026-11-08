@@ -6,6 +6,7 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { PERMISSIONS } from '@/lib/permissions';
+import { PermissionMenuPreview } from './PermissionAreas';
 import { listUserOrders } from '@/lib/usersApi';
 import { formatOrderNumber, getDeliveryStatusColor, getDeliveryStatusLabel, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/orderUtils';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, PROVIDER_LABEL, accountState, formatDate, formatKz } from './userFormat';
@@ -140,6 +141,9 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Nenhuma permissão activa: este gestor não vê nada no painel.</p>
+              )}
+              {activePermissions.length > 0 && (
+                <PermissionMenuPreview role={person.role} permissions={person.permissions} className="rounded-lg border p-3" />
               )}
             </div>
           )}
