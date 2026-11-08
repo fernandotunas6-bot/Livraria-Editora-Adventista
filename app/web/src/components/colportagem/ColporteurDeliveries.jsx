@@ -114,7 +114,7 @@ export default function ColporteurDeliveries({ onChanged }) {
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>
             <span className="font-medium">Aceito fazer entregas</span>
-            <span className="block text-xs text-muted-foreground">Encomendas pagas perto de si. Fica com os portes da encomenda.</span>
+            <span className="block text-xs text-muted-foreground">Encomendas pagas perto de si. Ganha os portes da encomenda, ou o mínimo da Livraria se for maior.</span>
           </span>
           <Switch checked={!!data.accepts_deliveries} disabled={busy === 'aceita'}
             onCheckedChange={(v) => run('aceita', () => setAcceptsDeliveries(v), v ? 'Passa a receber entregas' : 'Deixa de receber entregas')} />
@@ -144,7 +144,7 @@ export default function ColporteurDeliveries({ onChanged }) {
               </div>
               <p className="text-sm text-muted-foreground">
                 {d.distance_km != null ? `A ${Number(d.distance_km).toLocaleString('pt-AO')} km de si. ` : ''}
-                {Number(d.fee) > 0 ? `Ganha ${kz(d.fee)} de portes. ` : 'Envio grátis para o cliente: sem portes. '}
+                {Number(d.fee) > 0 ? `Ganha ${kz(d.fee)} por esta entrega. ` : 'Envio grátis para o cliente: esta entrega não tem portes. '}
                 {d.has_stock ? 'Tem estes livros consigo.' : 'Os livros levantam-se na loja.'}
               </p>
               <Items items={d.items} />
@@ -197,7 +197,7 @@ export default function ColporteurDeliveries({ onChanged }) {
                   {d.source === 'stock' ? 'Entrega com os livros que tem consigo: saem da sua conta à consignação quando marcar "Entregue".'
                     : d.picked_up_at ? `A equipa entregou-lhe os livros a ${when(d.picked_up_at)}.`
                       : 'Levante os livros na loja: a equipa marca quando lhos entregar, e só depois pode sair.'}
-                  {Number(d.fee) > 0 ? ` Portes para si: ${kz(d.fee)}.` : ''}
+                  {Number(d.fee) > 0 ? ` Para si: ${kz(d.fee)}.` : ''}
                 </p>
 
                 {deliverForm?.id === d.id ? (

@@ -160,11 +160,11 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
         </div>
       )}
       <div className="space-y-2">
-        <Label className="text-xs">Template dos avisos à equipa (opcional)</Label>
+        <Label className="text-xs">Template dos avisos à equipa e aos colportores (opcional)</Label>
         <Input value={staffTemplate} onChange={(e) => setStaffTemplate(e.target.value)} placeholder="alerta_equipa" className="font-mono text-xs" />
         <p className="text-[11px] text-muted-foreground">
           O WhatsApp só aceita texto livre até 24 h depois da última mensagem da pessoa. Para os avisos à equipa
-          (encomendas novas, alertas) chegarem sempre, aprove na Meta um template de categoria «Utility» com duas
+          (encomendas novas, alertas) e aos colportores (entregas para aceitar) chegarem sempre, aprove na Meta um template de categoria «Utility» com duas
           variáveis no corpo — {'{{1}}'} o título e {'{{2}}'} o detalhe — e escreva aqui o nome.
         </p>
       </div>
