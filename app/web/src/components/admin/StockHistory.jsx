@@ -7,6 +7,12 @@ const REASONS = {
   venda: { label: 'Venda', className: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
   cancelamento: { label: 'Cancelamento', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
   ajuste: { label: 'Ajuste manual', className: 'bg-purple-500/10 text-purple-700 dark:text-purple-300' },
+  // Entrada da tiragem de uma ordem de produção (migração producao): a referência é o código PRD-.
+  producao: { label: 'Produção', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+  // Colportagem (migração colportagem_movimentos): caíam em "Ajuste manual".
+  consignacao: { label: 'Consignação a colportor', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  devolucao_consignacao: { label: 'Devolução de colportor', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  compra_colportor: { label: 'Compra de colportor', className: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
 };
 
 const formatDateTime = (value) => {

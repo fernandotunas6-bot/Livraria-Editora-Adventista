@@ -37,6 +37,11 @@ export const PERMISSION_KEYS = [
   "manage_marketing",
   "manage_church_registry",
   "manage_colporteurs",
+  // Produção da Editora, fichas dos funcionários e saídas de dinheiro (migrações funcionarios,
+  // producao e saidas). Finanças à parte: quem regista a produção não paga a gráfica.
+  "manage_production",
+  "manage_staff",
+  "manage_finance",
 ];
 
 /** Faz parte da equipa — distinto de ter uma permissão concreta. */

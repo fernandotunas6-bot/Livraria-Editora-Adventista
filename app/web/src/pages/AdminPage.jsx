@@ -66,6 +66,9 @@ const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
 const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
 const ChurchRegistryTab = lazy(() => import('@/components/admin/igreja/ChurchRegistryTab'));
 const ColportagemTab = lazy(() => import('@/components/admin/colportagem/ColportagemTab'));
+const ProducaoTab = lazy(() => import('@/components/admin/producao/ProducaoTab'));
+const FuncionariosTab = lazy(() => import('@/components/admin/funcionarios/FuncionariosTab'));
+const FinanceTab = lazy(() => import('@/components/admin/FinanceTab'));
 
 // Colunas das encomendas para a lista e os relatórios. Fica de fora o que é grande e
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
@@ -218,12 +221,23 @@ const AdminPage = () => {
   }, [loadCatalog, loadOrders]);
 
   // Tempo real: a base de dados avisa quando mudam encomendas ou o catálogo, e o painel pede só
-  // isso — as encomendas que mudaram desde a última vez, ou o catálogo. Ver lib/realtimeSignals.js.
+  // isso — as encomendas que mudaram desde a última vez e/ou o catálogo (uma encomenda nova manda
+  // os dois sinais quase juntos: o stock desceu). Ver lib/realtimeSignals.js. Enquanto actualiza,
+  // o ícone da barra do topo roda, pelo menos 0,7 s para se ver.
   const syncRef = useRef(null);
-  const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
-    const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
-    run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
-  }, { enabled: access === 'allow' && (canManageOrders || canManageCatalog) });
+  const [signalLoads, setSignalLoads] = useState(0);
+  const live = useSignal('painel', ['orders', 'catalogo'], (_event, _payload, signals) => {
+    const events = new Set(signals.map((s) => s.event));
+    const started = Date.now();
+    setSignalLoads((n) => n + 1);
+    Promise.all([
+      events.has('catalogo') ? loadCatalog() : null,
+      events.has('orders') ? loadOrders({ incremental: true }) : null,
+    ])
+      .then(() => syncRef.current?.markSynced())
+      .catch((err) => console.error(err))
+      .finally(() => setTimeout(() => setSignalLoads((n) => Math.max(0, n - 1)), Math.max(0, 700 - (Date.now() - started))));
+  }, { enabled: access === 'allow' });
 
   // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
   // tempo real; e por consulta completa de 5 em 5 minutos com o canal ligado (de minuto a minuto
@@ -232,6 +246,9 @@ const AdminPage = () => {
   const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
   syncRef.current = sync;
   const { markSynced } = sync;
+  // A barra do topo diz «Em tempo real» com o canal do painel ligado, e o ícone roda enquanto
+  // actualiza (pela consulta ou por um sinal).
+  const syncState = { ...sync, syncing: sync.syncing || signalLoads > 0, realtime: live ? 'live' : 'off' };
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
   const handleSaveBook = async (data) => {
@@ -542,7 +559,7 @@ const AdminPage = () => {
           aberto noutro separador, vê-se de relance. */}
       <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${activeView ? `${findView(currentSection, activeView)?.label} · ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
-        sync={sync}
+        sync={syncState}
         nav={nav}
         active={activeTab}
         view={activeView}
@@ -690,6 +707,29 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="igreja">
                 <Suspense fallback={spinner}>
                   <ChurchRegistryTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {/* Produção da Editora, funcionários e saídas de dinheiro (migrações funcionarios, producao
+                e saidas): as mesmas regras de lib/adminSections.js. */}
+            {(perms.production || perms.finance) && (
+              <AdminSection active={activeTab} value="producao">
+                <Suspense fallback={spinner}>
+                  <ProducaoTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {(perms.staff || perms.finance) && (
+              <AdminSection active={activeTab} value="funcionarios">
+                <Suspense fallback={spinner}>
+                  <FuncionariosTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {perms.finance && (
+              <AdminSection active={activeTab} value="financas">
+                <Suspense fallback={spinner}>
+                  <FinanceTab />
                 </Suspense>
               </AdminSection>
             )}

@@ -57,8 +57,9 @@ Separadores no topo                         Barra lateral
      painel**, O meu perfil, Ver a loja, Terminar sessão, e os atalhos de teclado.
 
 ### 1.2 Navegação — separadores — `AdminTabsNav.jsx`
-- **Grupos** (sublinhado na cor da marca no activo, 44 px de altura): Início, Catálogo, Vendas,
-  Relatórios, Clientes, Igreja, Sistema. Cada grupo mostra a **soma** dos números das suas secções.
+- **Grupos** (sublinhado na cor da marca no activo, 44 px de altura): Início, Catálogo, Editora,
+  Vendas, Relatórios, Clientes, Pessoal, Igreja, Sistema (Editora e Pessoal desde 2026-11-08,
+  [PRODUCAO.md](PRODUCAO.md)). Cada grupo mostra a **soma** dos números das suas secções.
 - Carregar num grupo abre **a secção onde se estava nesse grupo da última vez** (ou a primeira).
 - **Secções do grupo**: pílulas de 36 px com ícone, nome e número; a activa a cheio.
 - No telemóvel só aparece a linha das secções do grupo (desliza na horizontal, colada por baixo da
@@ -111,8 +112,21 @@ Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera
 (incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da navegação,
 o Início e o título do separador do navegador acompanham.
 
+A barra do topo mostra o ícone de actualizar com **Em tempo real** (a verde) quando o canal está
+ligado; sem ele, "Actualizado há 2 min". O ícone roda enquanto actualiza — também quando a
+actualização vem de um sinal (pelo menos 0,7 s, para se ver) — e carregar actualiza já, nos dois
+casos. O canal liga-se para toda a equipa.
+
+Uma rajada de sinais dá uma só leitura, mas com todos os sinais da rajada (`useSignal` passa a lista
+em terceiro argumento): uma encomenda nova manda «catalogo» (o stock desceu) e «orders» quase juntos,
+e o painel lê os dois. Antes ficava só o último, e o stock vendido só aparecia na consulta de 5 em
+5 minutos; o mesmo no perfil do cliente («orders» e «avisos») e no atendimento (mensagens de duas
+conversas).
+
 O mesmo canal acorda os **alertas da equipa** (antes de 20 em 20 s; agora na hora, e de reserva de
-2 em 2 min) e o **atendimento** (antes de 30 em 30 s). Fora do painel, cada conta ouve o seu canal
+2 em 2 min), o **atendimento** (antes de 30 em 30 s) e a **Produção**, os **Funcionários** e as
+**Entradas e saídas** (sinais `producao`, `funcionarios` e `financas`, [PRODUCAO.md](PRODUCAO.md)).
+As visitas aos livros não contam como mudança do catálogo (migração `20261108193000_sinais_afinados`). Fora do painel, cada conta ouve o seu canal
 `conta:<id>`: as encomendas e o nível no perfil, os avisos do sino e as respostas no chat chegam na
 hora. A comunidade tem um canal público (`comunidade`) que só diz «há publicações novas».
 
