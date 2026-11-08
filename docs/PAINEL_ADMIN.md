@@ -91,7 +91,19 @@ navegação, o Início e o título do separador do navegador acompanham.
 O **título do separador do navegador** diz a secção e, para quem gere encomendas, quantas pedem
 acção: `(7) Encomendas · Painel`.
 
-### 1.8 Conteúdo
+### 1.8 Filtros no endereço
+Os filtros das listas ficam no endereço da página — recarregar, voltar atrás ou mandar a ligação a
+um colega abre a lista como estava. Valores desconhecidos valem "todos".
+
+| Lista | Parâmetros |
+|---|---|
+| Encomendas | `estado` (pending, confirmed, shipped, delivered, cancelled), `pagamento` (awaiting_confirmation, paid…), `encomenda` (texto procurado) |
+| Produtos | `filtro` (featured, low_stock, no_cover, no_description, hidden, promo), `tipo` (livro, biblia…), `produto` (texto procurado) |
+
+Exemplo: `/admin?tab=orders&estado=pending&encomenda=LA-1234`. Nas Encomendas, os estados são
+botões com o número de cada um, e "Limpar filtros" aparece quando há algum.
+
+### 1.9 Conteúdo
 Largura máxima 1440 px, margens de 16 / 24 / 32 px (telemóvel / tablet / computador), 64 px livres
 no fim. Ao mudar de secção, a página volta ao topo e o foco passa para o título da secção.
 

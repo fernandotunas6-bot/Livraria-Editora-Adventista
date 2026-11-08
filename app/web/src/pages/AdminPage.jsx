@@ -30,7 +30,7 @@ import { adminPermissions, buildAdminNav, resolveSection } from '@/lib/adminSect
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
@@ -64,6 +64,9 @@ const ColportagemTab = lazy(() => import('@/components/admin/colportagem/Colport
 // só serve numa encomenda à vez: as duas assinaturas em base64 (até 200 KB e 600 KB
 // cada) e a linha temporal. Com `select *` o painel descarregava tudo isso de todas as
 // encomendas a cada abertura.
+// Filtros da lista de produtos que o endereço pode trazer (?filtro=…).
+const BOOK_FILTERS = ['featured', 'low_stock', 'no_cover', 'no_description', 'hidden', 'promo'];
+
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
   'items', 'total', 'shipping_cost', 'status', 'payment_status', 'amount_paid', 'amount_refunded', 'paid_at', 'payment_method',
@@ -100,16 +103,39 @@ const AdminPage = () => {
   const [editingBook, setEditingBook] = useState(null);
   const [duplicatingBook, setDuplicatingBook] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [bookSearch, setBookSearch] = useState('');
   const [selectedBookIds, setSelectedBookIds] = useState([]);
-  const [bookFilter, setBookFilter] = useState('all');
-  // Tipo de produto no catálogo ('all' ou um valor de PRODUCT_TYPES) e o tipo de um produto novo.
-  const [typeFilter, setTypeFilter] = useState('all');
+  // Tipo de um produto novo (o "Adicionar produto" pergunta qual).
   const [newProductType, setNewProductType] = useState('livro');
 
-  const [orderFilter, setOrderFilter] = useState('all');
-  const [orderSearch, setOrderSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('all');
+  // Os filtros das listas ficam no endereço (/admin?tab=orders&estado=pending&encomenda=LA-…):
+  // recarregar, voltar atrás ou mandar a ligação a um colega abre a lista como estava. Valores
+  // desconhecidos no endereço valem "todos". Uma só escrita por acção (o `setSearchParams` não
+  // junta chamadas seguidas: a segunda apagava a primeira).
+  const updateParams = useCallback((patch) => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value == null || value === '' || value === 'all') next.delete(key);
+      else next.set(key, String(value));
+    }
+    return next;
+  }, { replace: true }), [setSearchParams]);
+  const param = (key, allowed) => {
+    const v = searchParams.get(key) || '';
+    return !allowed || allowed.includes(v) ? v : '';
+  };
+  const bookSearch = param('produto');
+  const setBookSearch = (v) => updateParams({ produto: v });
+  const bookFilter = param('filtro', BOOK_FILTERS) || 'all';
+  const setBookFilter = (v) => updateParams({ filtro: v });
+  // Tipo de produto no catálogo ('all' ou um valor de PRODUCT_TYPES).
+  const typeFilter = param('tipo', PRODUCT_TYPES.map((t) => t.value)) || 'all';
+  const setTypeFilter = (v) => updateParams({ tipo: v });
+  const orderFilter = param('estado', Object.keys(ORDER_STATUS)) || 'all';
+  const setOrderFilter = (v) => updateParams({ estado: v });
+  const orderSearch = param('encomenda');
+  const setOrderSearch = (v) => updateParams({ encomenda: v });
+  const paymentFilter = param('pagamento', Object.keys(PAYMENT_STATUS)) || 'all';
+  const setPaymentFilter = (v) => updateParams({ pagamento: v });
   // Encomenda a marcar como entregue com dinheiro por receber (DeliveredPaymentDialog).
   const [deliveryDialog, setDeliveryDialog] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
@@ -428,16 +454,10 @@ const AdminPage = () => {
   }, { replace: true });
   // Abrir as encomendas já filtradas (do Início e da procura).
   const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
-    setOrderFilter(status);
-    setPaymentFilter(payment);
-    setOrderSearch(search);
-    setActiveTab('orders');
+    updateParams({ tab: 'orders', estado: status, pagamento: payment, encomenda: search });
   };
   const openProducts = ({ filter = 'all', search = '' } = {}) => {
-    setBookFilter(filter);
-    setTypeFilter('all');
-    setBookSearch(search);
-    setActiveTab('books');
+    updateParams({ tab: 'books', filtro: filter, tipo: null, produto: search });
   };
   const goToSection = (id, opts = {}) => {
     if (id === 'books' && opts.filter) openProducts({ filter: opts.filter });
@@ -631,7 +651,7 @@ const AdminPage = () => {
             {canManageOrders && (
               <AdminSection active={activeTab} value="acompanhamento">
                 <Suspense fallback={spinner}>
-                  <OrderWatchPanel onOpenOrder={(ref) => { setOrderSearch(ref); setActiveTab('orders'); }} />
+                  <OrderWatchPanel onOpenOrder={(ref) => openOrders({ search: ref })} />
                 </Suspense>
               </AdminSection>
             )}
@@ -914,30 +934,54 @@ const AdminPage = () => {
                     </div>
                   </div>
 
+                  {/* Estados com o número de cada um (um toque filtra; o título está no cabeçalho do
+                      painel). Os filtros ficam no endereço da página. */}
+                  <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
+                    {[['all', 'Todas', orders.length], ...Object.keys(ORDER_STATUS).map((st) => [st, getOrderStatusLabel(st), orders.filter((o) => o.status === st).length])]
+                      .filter(([value, , count]) => value === 'all' || count > 0 || orderFilter === value)
+                      .map(([value, label, count]) => {
+                        const on = orderFilter === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setOrderFilter(value)}
+                            aria-pressed={on}
+                            className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors ${on ? 'border-primary bg-primary text-primary-foreground' : 'bg-card hover:border-primary/60'}`}
+                          >
+                            {label} <span className={on ? undefined : 'text-muted-foreground'}>{count}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
                   <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
-                    <h2 className="text-2xl font-bold">Encomendas</h2>
+                    <p className="text-sm text-muted-foreground" aria-live="polite">
+                      {filteredOrders.length === orders.length ? `${orders.length} encomendas` : `${filteredOrders.length} de ${orders.length} encomendas`}
+                      {(orderFilter !== 'all' || paymentFilter !== 'all' || orderSearch) && (
+                        <>
+                          {' · '}
+                          <button type="button" className="font-medium text-primary hover:underline" onClick={() => openOrders()}>Limpar filtros</button>
+                        </>
+                      )}
+                    </p>
                     <div className="flex flex-wrap gap-2 items-center">
-                      <Input
-                        value={orderSearch}
-                        onChange={(e) => setOrderSearch(e.target.value)}
-                        placeholder="Cliente, email, nº ou referência…"
-                        className="w-48 h-9"
-                      />
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                        <Input
+                          type="search"
+                          value={orderSearch}
+                          onChange={(e) => setOrderSearch(e.target.value)}
+                          placeholder="Cliente, email, nº, telefone ou código…"
+                          aria-label="Procurar encomendas"
+                          className="h-9 w-64 pl-8"
+                        />
+                      </div>
                       <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                      <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-[190px]" aria-label="Pagamento"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os pagamentos</SelectItem>
                         {['awaiting_confirmation', 'pending', 'partially_paid', 'paid', 'failed', 'refunded'].map((ps) => (
                           <SelectItem key={ps} value={ps}>{getPaymentStatusLabel(ps)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                      </Select>
-                      <Select value={orderFilter} onValueChange={setOrderFilter}>
-                      <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {Object.keys(ORDER_STATUS).map((s) => (
-                          <SelectItem key={s} value={s}>{getOrderStatusLabel(s)}</SelectItem>
                         ))}
                       </SelectContent>
                       </Select>

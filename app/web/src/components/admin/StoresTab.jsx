@@ -309,10 +309,10 @@ export default function StoresTab() {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome, morada, telefone…" className="pl-9" />
+          <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome, morada, telefone…" className="pl-9" aria-label="Pesquisar lojas" />
         </div>
         <Select value={province} onValueChange={setProvince}>
-          <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[190px]" aria-label="Província"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as províncias</SelectItem>
             {usedProvinces.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}

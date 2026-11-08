@@ -528,26 +528,26 @@ export default function SettingsTab() {
 
         <TabsContent value="brand" className="space-y-4 max-w-xl">
           <div className="space-y-2">
-            <Label>Nome do Sistema *</Label>
-            <Input value={form.site_name} onChange={(e) => set('site_name', e.target.value)} required />
+            <Label htmlFor="config-nome">Nome do Sistema *</Label>
+            <Input id="config-nome" value={form.site_name} onChange={(e) => set('site_name', e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label>Slogan / Tagline</Label>
-            <Input value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
+            <Label htmlFor="config-slogan">Slogan / Tagline</Label>
+            <Input id="config-slogan" value={form.tagline} onChange={(e) => set('tagline', e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Cor Principal</Label>
             <div className="flex gap-2">
-              <Input type="color" value={form.primary_color} onChange={(e) => set('primary_color', e.target.value)} className="w-14 h-10 p-1" />
-              <Input value={form.primary_color} onChange={(e) => set('primary_color', e.target.value)} className="font-mono" />
+              <Input type="color" value={form.primary_color} onChange={(e) => set('primary_color', e.target.value)} className="w-14 h-10 p-1" aria-label="Cor principal (escolher)" />
+              <Input value={form.primary_color} onChange={(e) => set('primary_color', e.target.value)} className="font-mono" aria-label="Cor principal (código)" />
             </div>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.maintenance_mode} onCheckedChange={(v) => set('maintenance_mode', v)} />
+            <Switch checked={form.maintenance_mode} onCheckedChange={(v) => set('maintenance_mode', v)} aria-label="Modo manutenção (bloqueia as compras)" />
             <Label>Modo manutenção (bloqueia as compras)</Label>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.google_oauth_enabled} onCheckedChange={(v) => set('google_oauth_enabled', v)} />
+            <Switch checked={form.google_oauth_enabled} onCheckedChange={(v) => set('google_oauth_enabled', v)} aria-label="Login com Google" />
             <div>
               <Label>Login com Google</Label>
               <p className="text-xs text-muted-foreground">Feito pelo Firebase Authentication (adicione o domínio do site em Authorized domains)</p>
@@ -716,7 +716,7 @@ export default function SettingsTab() {
 
         <TabsContent value="pwa" className="space-y-4 max-w-xl">
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.pwa_enabled} onCheckedChange={(v) => set('pwa_enabled', v)} />
+            <Switch checked={form.pwa_enabled} onCheckedChange={(v) => set('pwa_enabled', v)} aria-label="Permitir instalação como app (PWA)" />
             <Label>Permitir instalação como app (PWA)</Label>
           </div>
           <div className="space-y-2"><Label>Nome da App</Label><Input value={form.pwa_name} onChange={(e) => set('pwa_name', e.target.value)} placeholder={form.site_name} /></div>
@@ -739,7 +739,7 @@ export default function SettingsTab() {
             </p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.order_email_enabled} onCheckedChange={(v) => set('order_email_enabled', v)} />
+            <Switch checked={form.order_email_enabled} onCheckedChange={(v) => set('order_email_enabled', v)} aria-label="Activar email automático de confirmação" />
             <Label>Activar email automático de confirmação</Label>
           </div>
           <div className="space-y-2">
@@ -832,7 +832,7 @@ export default function SettingsTab() {
             <p className="text-xs text-muted-foreground mt-1">Gere chaves VAPID em <a href="https://vapidkeys.com" target="_blank" rel="noreferrer" className="text-primary underline">vapidkeys.com</a></p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.push_enabled} onCheckedChange={(v) => set('push_enabled', v)} />
+            <Switch checked={form.push_enabled} onCheckedChange={(v) => set('push_enabled', v)} aria-label="Activar notificações push na PWA" />
             <Label>Activar notificações push na PWA</Label>
           </div>
           <div className="space-y-2">
@@ -848,7 +848,7 @@ export default function SettingsTab() {
             </p>
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.chat_enabled} onCheckedChange={(v) => set('chat_enabled', v)} />
+            <Switch checked={form.chat_enabled} onCheckedChange={(v) => set('chat_enabled', v)} aria-label="Mostrar assistente no site" />
             <Label>Mostrar assistente no site</Label>
           </div>
           <div className="space-y-2">
@@ -1147,7 +1147,7 @@ export default function SettingsTab() {
         <TabsContent value="theme" className="space-y-4 max-w-xl">
           <p className="text-sm text-muted-foreground">Opacidade suave estilo macOS — translúcido com blur, sem efeitos extra.</p>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.ui_glass_enabled} onCheckedChange={(v) => set('ui_glass_enabled', v)} />
+            <Switch checked={form.ui_glass_enabled} onCheckedChange={(v) => set('ui_glass_enabled', v)} aria-label="Activar superfícies opacas (header, rodapé, painéis)" />
             <Label>Activar superfícies opacas (header, rodapé, painéis)</Label>
           </div>
           <div className="space-y-2">
@@ -1208,7 +1208,7 @@ export default function SettingsTab() {
             <Input value={form.footer_copyright} onChange={(e) => set('footer_copyright', e.target.value)} placeholder="© 2026 Livraria Adventista. Todos os direitos reservados." />
           </div>
           <div className="flex items-center gap-3 p-3 rounded-lg border">
-            <Switch checked={form.show_stores_in_footer} onCheckedChange={(v) => set('show_stores_in_footer', v)} />
+            <Switch checked={form.show_stores_in_footer} onCheckedChange={(v) => set('show_stores_in_footer', v)} aria-label="Mostrar lojas físicas no rodapé" />
             <Label>Mostrar lojas físicas no rodapé</Label>
           </div>
           <div className="space-y-2">

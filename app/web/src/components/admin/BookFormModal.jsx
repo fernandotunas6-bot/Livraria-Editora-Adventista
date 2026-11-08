@@ -109,6 +109,9 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         className="bg-background rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-border flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="formulario-produto-titulo"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-marca/10 to-transparent">
           <div className="flex items-center gap-3">
@@ -116,11 +119,11 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{editing ? `Editar ${type.label.toLowerCase()}` : template ? `Duplicar ${type.label.toLowerCase()}` : `Adicionar ${type.label.toLowerCase()}`}</h2>
+              <h2 id="formulario-produto-titulo" className="text-xl font-bold">{editing ? `Editar ${type.label.toLowerCase()}` : template ? `Duplicar ${type.label.toLowerCase()}` : `Adicionar ${type.label.toLowerCase()}`}</h2>
               <p className="text-sm text-muted-foreground">Catálogo profissional com ID e código único</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar o formulário"><X className="h-5 w-5" aria-hidden="true" /></Button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">

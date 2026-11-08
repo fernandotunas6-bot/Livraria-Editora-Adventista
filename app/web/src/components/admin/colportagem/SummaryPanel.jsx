@@ -67,10 +67,10 @@ export default function SummaryPanel({ data, ops, reg, idx }) {
 
       <div>
         <Toolbar>
-          <NativeSelect value={groupBy} onChange={setGroupBy} className="w-auto">
+          <NativeSelect value={groupBy} onChange={setGroupBy} className="w-auto" aria-label="Agrupar por">
             {Object.entries(SUMMARY_GROUPS).map(([k, l]) => <option key={k} value={k}>Por {l.toLowerCase()}</option>)}
           </NativeSelect>
-          <NativeSelect value={period} onChange={setPeriod} className="w-auto">
+          <NativeSelect value={period} onChange={setPeriod} className="w-auto" aria-label="Período">
             {Object.entries(PERIODS).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
           </NativeSelect>
           <Button variant="outline" size="sm" className="ml-auto" onClick={exportCsv}><Download className="mr-1.5 h-4 w-4" />Excel</Button>
