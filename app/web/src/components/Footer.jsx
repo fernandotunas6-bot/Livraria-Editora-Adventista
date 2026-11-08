@@ -34,6 +34,7 @@ const DEFAULT_FOOTER_COLUMNS = [
       { label: 'Levantamento na loja', url: '/lojas', internal: true },
       { label: 'Pagamento na entrega', url: '/shipping-returns', internal: true },
       { label: 'Sobre nós', url: '/about', internal: true },
+      { label: 'Ser colportor', url: '/colportor/candidatura', internal: true },
     ],
   },
   {

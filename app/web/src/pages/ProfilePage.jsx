@@ -11,6 +11,7 @@ import MyDownloads from '@/components/downloads/MyDownloads';
 import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import ColporteurProfileLink from '@/components/colportagem/ColporteurProfileLink';
 import ShoppingCart from '@/components/ShoppingCart';
 import { pageTitle } from '@/lib/brand';
 import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
@@ -311,6 +312,7 @@ const ProfilePage = () => {
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
               </Link>
+              <ColporteurProfileLink />
               <div className="bg-card border rounded-xl p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
                   <ShoppingBag className="h-5 w-5 text-green-600" />
