@@ -35,7 +35,8 @@ const user = async (email, role = 'member') => {
   return u.id;
 };
 const perfil = async (id) => (await q(`select phone, phone_verified_at from public.profiles where id = $1`, [id]))[0];
-const start = async (id, phone) => (await svc(`select public.phone_verification_start($1::uuid, $2) as r`, [id, phone]))[0].r;
+const start = async (id, phone, hash = 'resumo') => (await svc(`select public.phone_verification_start($1::uuid, $2, $3) as r`, [id, phone, hash]))[0].r;
+const codeOk = async (id, hash) => (await svc(`select public.phone_verification_code_ok($1::uuid, $2) as r`, [id, hash]))[0].r;
 const pending = async (id) => (await svc(`select public.phone_verification_pending($1::uuid) as r`, [id]))[0].r;
 const failed = async (id) => (await svc(`select public.phone_verification_failed($1::uuid) as r`, [id]))[0].r;
 const confirm = async (id) => (await svc(`select public.phone_verification_confirm($1::uuid) as r`, [id]))[0].r;
@@ -53,7 +54,7 @@ check('o pedido fica guardado', (await start(ana, NUMERO)) === 0);
 check('sabe-se o número à espera', (await pending(ana)) === NUMERO);
 check('o perfil ainda não está confirmado', (await perfil(ana)).phone_verified_at === null);
 let r = await confirm(ana);
-check('a Twilio aprovou: confirma', r.ok === true && r.phone === NORMAL, r);
+check('o código certo confirma', r.ok === true && r.phone === NORMAL, r);
 let p = await perfil(ana);
 check('o perfil fica com o número pedido e confirmado', p.phone === NORMAL && p.phone_verified_at !== null, p);
 check('só serve uma vez', (await confirm(ana)).ok === false && (await pending(ana)) === null);
@@ -87,7 +88,26 @@ await cancel(bento);
 await start(bento, NUMERO);
 await q(`update public.phone_verifications set expires_at = now() - interval '1 second' where user_id = $1`, [bento]);
 check('depois do prazo não há número à espera', (await pending(bento)) === null);
-check('nem confirma, mesmo que a Twilio dissesse que sim', (await confirm(bento)).ok === false && (await perfil(bento)).phone_verified_at === null);
+check('nem confirma, mesmo com o código certo', (await confirm(bento)).ok === false && (await perfil(bento)).phone_verified_at === null);
+
+// 4b. O código: só o resumo fica guardado, e verifica-se aqui -------------------------------------------
+const dina = await user('dina@exemplo.ao');
+await start(dina, '244923000777', 'resumo-certo');
+check('o código errado não passa', (await codeOk(dina, 'resumo-errado')) === false);
+check('o certo passa', (await codeOk(dina, 'resumo-certo')) === true);
+check('passar não confirma sozinho: o perfil não muda', (await perfil(dina)).phone_verified_at === null);
+check('sem resumo não passa', (await codeOk(dina, null)) === false);
+for (let k = 0; k < 5; k++) await failed(dina);
+check('à quinta errada, o código certo já não entra', (await codeOk(dina, 'resumo-certo')) === false && (await pending(dina)) === null);
+await start(dina, '244923000777', 'r2');
+await passaMinuto(dina);
+await start(dina, '244923000777', 'r3');
+check('só vale o último código', (await codeOk(dina, 'r2')) === false && (await codeOk(dina, 'r3')) === true);
+await q(`update public.phone_verifications set expires_at = now() - interval '1 second' where user_id = $1`, [dina]);
+check('depois do prazo, o código certo não entra', (await codeOk(dina, 'r3')) === false);
+await cancel(dina);
+check('sem pedido não passa', (await codeOk(dina, 'r3')) === false);
+await raises('um pedido sem resumo é recusado', () => start(dina, '244923000777', null), /code_hash/);
 
 // 5. Um número, uma conta confirmada -------------------------------------------------------------------
 await start(bento, NUMERO);
@@ -115,7 +135,8 @@ check('a equipa mudar o telefone também tira a confirmação', p.phone === '+24
 // 7. Só a Edge Function lhe chega ------------------------------------------------------------------------
 await start(ana, '244923000555');
 for (const [nome, sql] of [
-  ['start', `select public.phone_verification_start($1::uuid, '244923000666')`],
+  ['start', `select public.phone_verification_start($1::uuid, '244923000666', 'x')`],
+  ['code_ok', `select public.phone_verification_code_ok($1::uuid, 'x')`],
   ['confirm', `select public.phone_verification_confirm($1::uuid)`],
   ['failed', `select public.phone_verification_failed($1::uuid)`],
   ['pending', `select public.phone_verification_pending($1::uuid)`],
@@ -131,7 +152,7 @@ await raises('nem quem não entrou', () => db.transaction(async (tx) => {
 }), /permission denied/);
 
 // 8. O registo aceita as SMS ------------------------------------------------------------------------------
-await svc(`insert into public.notification_logs (type, context, status, provider, recipient) values ('sms', 'otp', 'sent', 'twilio', '244923000111')`);
+await svc(`insert into public.notification_logs (type, context, status, provider, recipient) values ('sms', 'otp', 'sent', 'pro2sms', '244923000111')`);
 check('o registo aceita SMS de código', (await q(`select count(*)::int n from public.notification_logs where type = 'sms' and context = 'otp'`))[0].n === 1);
 
 console.log(`\n${ok} certos, ${fail} falhados`);

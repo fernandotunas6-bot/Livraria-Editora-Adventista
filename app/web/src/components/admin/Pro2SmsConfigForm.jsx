@@ -11,22 +11,20 @@ import pb from '@/lib/dataClient';
 const CHANNELS = [
   { key: 'otp', label: 'Códigos de confirmação do telefone', hint: 'Na conta do cliente: «Confirmar por SMS».', fallback: true },
   { key: 'orders', label: 'Passos da encomenda', hint: 'Paga, expedida e a caminho, quando o WhatsApp não foi.' },
-  { key: 'colporteurs', label: 'Avisos aos colportores', hint: 'Ofertas de entrega, quando o WhatsApp não foi.' },
-  { key: 'staff', label: 'Avisos urgentes à equipa', hint: 'Só os urgentes, quando o WhatsApp não foi.' },
+  { key: 'colporteurs', label: 'Avisos aos colportores', hint: 'Ofertas de entrega, quando o WhatsApp não foi. Até 2 partes.' },
+  { key: 'staff', label: 'Avisos urgentes à equipa', hint: 'Só os urgentes, quando o WhatsApp não foi. Até 2 partes.' },
 ];
 
 /**
- * Twilio (docs/SMS.md). As credenciais não passam por aqui: são os segredos TWILIO_ACCOUNT_SID e
- * TWILIO_AUTH_TOKEN da Edge Function. Aqui ficam o remetente, o que vai por SMS e o teto diário, que
- * protege o saldo.
+ * PRO2SMS (docs/SMS.md). A chave não passa por aqui: é o segredo PRO2SMS_API_KEY da Edge Function.
+ * Aqui ficam o remetente, o que vai por SMS e o teto diário, que protege o saldo.
  */
-export default function TwilioConfigForm({ app, onSave }) {
+export default function Pro2SmsConfigForm({ app, onSave }) {
   const cfg = app.config || {};
   const { toast } = useToast();
   const [sender, setSender] = useState(cfg.sender || '');
-  const [verifyService, setVerifyService] = useState(cfg.verify_service || '');
   const [flags, setFlags] = useState(() => Object.fromEntries(CHANNELS.map((c) => [c.key, cfg[c.key] ?? !!c.fallback])));
-  const [dailyLimit, setDailyLimit] = useState(String(cfg.daily_limit ?? 50));
+  const [dailyLimit, setDailyLimit] = useState(String(cfg.daily_limit ?? 200));
   const [state, setState] = useState(null);
   const [saving, setSaving] = useState(false);
   const [testPhone, setTestPhone] = useState('');
@@ -41,7 +39,7 @@ export default function TwilioConfigForm({ app, onSave }) {
   };
   useEffect(() => { loadState(); }, []);
 
-  const config = () => ({ sender: sender.trim(), verify_service: verifyService.trim(), ...flags, daily_limit: Math.max(1, Number(dailyLimit) || 50) });
+  const config = () => ({ sender: sender.trim(), ...flags, daily_limit: Math.max(1, Number(dailyLimit) || 200) });
 
   const save = async () => {
     setSaving(true);
@@ -66,7 +64,6 @@ export default function TwilioConfigForm({ app, onSave }) {
     }
   };
 
-  const codesOff = flags.otp && !/^VA[0-9a-f]{32}$/i.test(verifyService.trim());
   const noBalance = state?.ok && state.balance != null && Number(state.balance) <= 0;
 
   return (
@@ -75,38 +72,27 @@ export default function TwilioConfigForm({ app, onSave }) {
         {!state ? (
           <span className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />A ver o saldo…</span>
         ) : !state.configured ? (
-          <span className="text-destructive">{state.error || 'Faltam os segredos TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN da Edge Function.'}</span>
+          <span className="text-destructive">{state.error || 'Falta a chave: o segredo PRO2SMS_API_KEY da Edge Function.'}</span>
         ) : !state.ok ? (
           <span className="text-destructive">{state.error}</span>
         ) : (
           <span>
-            {state.balance != null
-              ? <strong className="font-semibold tabular-nums">{Number(state.balance).toFixed(2)} {state.currency}</strong>
-              : <span className="text-muted-foreground">Ligada à Twilio. Saldo indisponível.</span>}
-            {state.account_type === 'Trial' && (
-              <span className="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-400">Conta de teste: só envia para números verificados na Twilio.</span>
-            )}
-            {noBalance && <span className="mt-1 block text-xs font-medium text-destructive">Sem saldo, nenhuma SMS sai. Carregue a conta na Twilio.</span>}
+            <strong className="font-semibold tabular-nums">{state.balance_formatted || `${state.balance} Kz`}</strong>
+            {state.sms_estimated != null && <span className="text-muted-foreground"> · cerca de {state.sms_estimated} SMS</span>}
+            {state.price_per_sms != null && <span className="text-muted-foreground"> · {state.price_per_sms} Kz por SMS</span>}
+            {noBalance && <span className="mt-1 block text-xs font-medium text-destructive">Sem saldo, nenhuma SMS sai. Carregue a conta em pro2sms.ao.</span>}
           </span>
         )}
         <Button type="button" size="sm" variant="ghost" className="h-8" onClick={loadState} aria-label="Actualizar o saldo"><RefreshCw className="h-3.5 w-3.5" /></Button>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="sms-sender" className="text-xs">Remetente dos avisos</Label>
-        <Input id="sms-sender" className="max-w-xs" maxLength={40} value={sender} onChange={(e) => setSender(e.target.value)} placeholder="LivrariaAdv" />
+        <Label htmlFor="sms-sender" className="text-xs">Remetente</Label>
+        <Input id="sms-sender" className="max-w-xs" maxLength={11} value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Vazio: o da chave, ou INFO" />
         <p className="text-xs text-muted-foreground">
-          Até 11 letras e números, sem precisar de registo em Angola; ou um número da Twilio, ou um serviço de mensagens (MG…). Vazio: LivrariaAdv.
-          {' '}Ligue Angola em <a href="https://console.twilio.com/us1/develop/sms/settings/geo-permissions" target="_blank" rel="noreferrer" className="text-primary underline">Geo Permissions</a>, senão as SMS são recusadas.
-        </p>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="sms-verify" className="text-xs">Serviço Verify, para os códigos</Label>
-        <Input id="sms-verify" className="max-w-md font-mono text-xs" maxLength={34} value={verifyService} onChange={(e) => setVerifyService(e.target.value)} placeholder="VA…" />
-        <p className="text-xs text-muted-foreground">
-          {codesOff ? <strong className="font-medium text-destructive">Sem um serviço válido (VA seguido de 32 caracteres), os códigos não saem. </strong> : null}
-          A Twilio Verify gera os códigos, conta as tentativas e protege contra fraude. Os avisos saem pelo remetente acima.
+          Só um remetente aprovado na{' '}
+          <a href="https://pro2sms.ao/area-do-cliente/?p2s_tab=sender_ids#sender-id-request" target="_blank" rel="noreferrer" className="text-primary underline">sua conta da PRO2SMS</a>.
+          {' '}Um por aprovar faz as SMS falharem.
         </p>
       </div>
 
@@ -126,7 +112,7 @@ export default function TwilioConfigForm({ app, onSave }) {
       <div className="space-y-1.5">
         <Label htmlFor="sms-limit" className="text-xs">Teto de SMS por dia</Label>
         <Input id="sms-limit" className="max-w-[8rem]" type="number" min={1} max={5000} value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} />
-        <p className="text-xs text-muted-foreground">Protege o saldo: passado o teto, nenhuma SMS sai até ao dia seguinte, e fica no registo de envios. Veja o preço para Angola na Twilio antes de o subir.</p>
+        <p className="text-xs text-muted-foreground">Protege o saldo: passado o teto, nenhuma SMS sai até ao dia seguinte, e fica no registo de envios.</p>
       </div>
 
       <Button type="button" size="sm" onClick={save} disabled={saving}>

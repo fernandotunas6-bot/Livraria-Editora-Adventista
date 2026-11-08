@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { testWhatsAppApi, testEmailApi } from '@/lib/messaging';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import PhoneInput from '@/components/PhoneInput';
-import TwilioConfigForm from '@/components/admin/TwilioConfigForm';
+import Pro2SmsConfigForm from '@/components/admin/Pro2SmsConfigForm';
 import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
 
 // Estado de cada envio, tal como a Edge Function "app" o grava em notification_logs.
@@ -62,11 +62,11 @@ const DEFAULT_APPS = [
     config: { phone_number_id: '', access_token: '', template_name: 'order_confirmation', template_language: 'pt_PT', use_template: false, auto_send: true },
   },
   {
-    name: 'Twilio (SMS)',
-    code: 'twilio',
+    name: 'PRO2SMS (SMS)',
+    code: 'pro2sms',
     description: 'SMS em Angola: códigos para confirmar o telefone e avisos quando o WhatsApp não chega.',
     icon: '📲',
-    config: { sender: '', verify_service: 'VA08a140b7f8e25a09788894e9e521f148', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 50 },
+    config: { sender: '', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 200 },
   },
 ];
 const ACTIVE_CODES = DEFAULT_APPS.map((a) => a.code);
@@ -444,8 +444,8 @@ export default function AppsTab() {
                     <WhatsAppBusinessConfigForm app={app} onSave={saveConfig} />
                   )}
 
-                  {app.code === 'twilio' && (
-                    <TwilioConfigForm app={app} onSave={saveConfig} />
+                  {app.code === 'pro2sms' && (
+                    <Pro2SmsConfigForm app={app} onSave={saveConfig} />
                   )}
 
                 </div>
