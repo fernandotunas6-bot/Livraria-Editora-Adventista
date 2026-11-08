@@ -78,7 +78,7 @@ export function PostsPanel() {
                 {p.hidden && <span className="rounded-full bg-destructive/10 px-2 py-0.5 font-medium text-destructive">Oculta</span>}
                 {p.reports_count > 0 && <span className="text-destructive">{p.reports_count} denúncia(s)</span>}
               </div>
-              <p className="mt-1.5 line-clamp-3 whitespace-pre-line break-words text-sm">{p.body}</p>
+              <p className="mt-1.5 line-clamp-3 whitespace-pre-line wrap-break-word text-sm">{p.body}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {!p.hidden && (
                   <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => run(p.id, () => setPinned(p.id, !p.pinned_at), p.pinned_at ? 'Publicação desafixada' : 'Publicação fixada no topo', () => load(query))}>

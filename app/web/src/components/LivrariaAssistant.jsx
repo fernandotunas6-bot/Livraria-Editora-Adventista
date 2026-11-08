@@ -84,10 +84,10 @@ export function layoutMessages(messages, now = new Date()) {
 function TypingBubble() {
   return (
     <div className="flex items-start gap-2" aria-label="O assistente está a escrever">
-      <span aria-hidden className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm">
+      <span aria-hidden className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary shadow-xs">
         <img src="/logo-icon-light.svg" alt="" className="h-4 w-4 object-contain" />
       </span>
-      <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/70 bg-card px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-1 rounded-2xl rounded-tl-md border border-border/70 bg-card px-4 py-3 shadow-xs">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -396,7 +396,7 @@ export default function LivrariaAssistant() {
             title="Ajuda"
             // Cor da marca com um aro branco: o azul-escuro de antes perdia-se no carrossel e no
             // rodapé, ambos escuros. O aro separa o botão de qualquer fundo, claro ou escuro.
-            className="pointer-events-auto relative flex h-12 items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,0.28)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-4 focus-visible:ring-white 2xl:pr-4"
+            className="pointer-events-auto relative flex h-12 items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,0.28)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-hidden focus-visible:ring-4 focus-visible:ring-white 2xl:pr-4"
             aria-label={`${showSupportTab ? 'Ajuda, mensagens e atendimento' : 'Assistente da livraria'}${unread ? ` — ${unread} resposta(s) da equipa por ler` : ''}`}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}
@@ -433,7 +433,7 @@ export default function LivrariaAssistant() {
             transition={{ duration: 0.2, ease: 'easeOut' }}
             // Telemóvel: ecrã inteiro, por cima do cabeçalho e da barra de navegação. A partir de
             // 640 px: janela flutuante no canto.
-            className="pointer-events-auto fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-background sm:static sm:inset-auto sm:h-auto sm:max-h-[min(78vh,640px)] sm:w-[400px] sm:rounded-2xl sm:border sm:border-border sm:shadow-2xl"
+            className="pointer-events-auto fixed inset-0 flex h-dvh flex-col overflow-hidden bg-background sm:static sm:inset-auto sm:h-auto sm:max-h-[min(78vh,640px)] sm:w-[400px] sm:rounded-2xl sm:border sm:border-border sm:shadow-2xl"
           >
             <header className="flex shrink-0 items-center gap-3 bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] text-primary-foreground sm:pt-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15">
@@ -452,7 +452,7 @@ export default function LivrariaAssistant() {
                   onClick={newConversation}
                   title={ticket && ticket.status !== 'closed' ? `Nova conversa (o pedido #${ticket.ticket_number} continua aberto nas Mensagens)` : 'Nova conversa'}
                   aria-label="Nova conversa"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
@@ -460,7 +460,7 @@ export default function LivrariaAssistant() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
                 aria-label="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -643,7 +643,7 @@ export default function LivrariaAssistant() {
                       placeholder={withTeam && status !== 'closed' ? 'Escreva à equipa…' : 'Escreva a sua pergunta…'}
                       aria-label={withTeam ? 'Mensagem para a equipa' : 'Mensagem para o assistente'}
                       // 16 px no telemóvel: abaixo disso o Safari do iPhone amplia a página ao tocar.
-                      className="block max-h-32 min-h-[44px] w-full resize-none rounded-2xl border border-input bg-muted/40 px-4 py-2.5 text-base leading-snug placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:min-h-[40px] sm:py-2 sm:text-sm"
+                      className="block max-h-32 min-h-[44px] w-full resize-none rounded-2xl border border-input bg-muted/40 px-4 py-2.5 text-base leading-snug placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:min-h-[40px] sm:py-2 sm:text-sm/5"
                       disabled={sending}
                       maxLength={MAX_LENGTH}
                       enterKeyHint="send"
@@ -658,7 +658,7 @@ export default function LivrariaAssistant() {
                     type="submit"
                     aria-label="Enviar"
                     disabled={sending || !input.trim()}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-opacity hover:bg-primary/90 disabled:opacity-40 sm:h-10 sm:w-10"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xs transition-opacity hover:bg-primary/90 disabled:opacity-40 sm:h-10 sm:w-10"
                   >
                     {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </button>

@@ -246,7 +246,7 @@ const ShopPage = () => {
         </div>
       )}
       {availableFilters.genres?.length > 0 && (
-        <div className="border-b border-border bg-muted/20 sticky top-[var(--header-offset,0px)] z-20 backdrop-blur-md bg-background/80">
+        <div className="border-b border-border bg-muted/20 sticky top-(--header-offset,0px) z-20 backdrop-blur-md bg-background/80">
           <div className="container-custom py-3 flex gap-2 overflow-x-auto scrollbar-hide items-center">
             <span className="text-xs font-medium text-muted-foreground shrink-0 mr-1">Género:</span>
             <Button
@@ -294,8 +294,8 @@ const ShopPage = () => {
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar filtros */}
-          <aside className="hidden lg:block w-72 flex-shrink-0">
-            <div className="sticky top-28 bg-card border border-border rounded-2xl p-6 shadow-sm">
+          <aside className="hidden lg:block w-72 shrink-0">
+            <div className="sticky top-28 bg-card border border-border rounded-2xl p-6 shadow-xs">
               <FilterPanel
                 availableFilters={availableFilters}
                 activeFilters={activeFilters}
@@ -332,7 +332,7 @@ const ShopPage = () => {
             {activeFilterChips.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mb-5">
                 {activeFilterChips.map((chip) => (
-                  <span key={chip.key} className="text-sm bg-[rgb(var(--brand-primary-rgb)/0.1)] text-[var(--brand-primary)] px-3 py-1 rounded-full flex items-center gap-1">
+                  <span key={chip.key} className="text-sm bg-[rgb(var(--brand-primary-rgb)/0.1)] text-(--brand-primary) px-3 py-1 rounded-full flex items-center gap-1">
                     {chip.label}
                     <button type="button" className="ml-1 hover:opacity-70" onClick={chip.clear}>×</button>
                   </span>

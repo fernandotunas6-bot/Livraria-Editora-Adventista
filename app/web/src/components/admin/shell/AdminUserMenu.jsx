@@ -20,11 +20,11 @@ export default function AdminUserMenu({ user, roleLabel, layout, onLayoutChange,
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="flex h-9 items-center gap-2 rounded-full pl-0.5 pr-0.5 outline-none ring-offset-background transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:pr-3"
+        className="flex h-9 items-center gap-2 rounded-full pl-0.5 pr-0.5 outline-hidden ring-offset-background transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:pr-3"
         aria-label={`Conta: ${name}`}
       >
         <UserAvatar user={user} size="sm" />
-        <span className="hidden max-w-[10rem] truncate text-sm font-medium lg:inline">{name}</span>
+        <span className="hidden max-w-40 truncate text-sm font-medium lg:inline">{name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel className="font-normal">

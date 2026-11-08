@@ -1,6 +1,262 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  /* Alturas de linha dos tamanhos de texto como no Tailwind 3: valores absolutos. O 4 usa
+     proporções sem unidade (1,43 no text-sm), e um filho com tamanho próprio — `text-[11px]`,
+     por exemplo — herdava a proporção em vez dos 20 px e ficava mais baixo (a lista de
+     integrações do painel encolhia 4 px por linha). */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl--line-height: 1;
+  --text-6xl--line-height: 1;
+  --text-7xl--line-height: 1;
+  --text-8xl--line-height: 1;
+  --text-9xl--line-height: 1;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-marca: hsl(var(--marca));
+
+  --color-editorial-papel: #fffdf8;
+  --color-editorial-tela: #f6f1e6;
+  --color-editorial-filete: #ebe1c9;
+  --color-editorial-ouro: #b8892f;
+  --color-editorial-ouro-texto: #7a5716;
+  --color-editorial-tinta: #1d2a3f;
+  --color-editorial-tinta-suave: #5c6574;
+  --color-editorial-marinho: #141e33;
+  --color-editorial-petroleo: #0a748f;
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --transition-duration-fast: var(--motion-fast);
+  --transition-duration-base: var(--motion-base);
+  --transition-duration-slow: var(--motion-slow);
+
+  --ease-brand: var(--ease-out);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  Compatibilidade com o Tailwind 3 (migração para o 4, 2026-11-08). Três predefinições mudaram
+  no 4 e o site foi desenhado com as antigas:
+  - a cor das bordas passou a `currentcolor` (era o cinzento 200);
+  - os botões passaram a cursor normal (era a mão);
+  - o texto de exemplo dos campos passou a ser a cor do texto a 50% (era o cinzento 400).
+  Para tirar uma destas regras, é preciso pôr a classe explícita em cada sítio que dependa dela.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+}
+
+@utility container-custom {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+@utility section-spacing {
+  /* No telemóvel 40 px em vez de 64: com cinco ou seis secções por página, eram ecrãs inteiros
+     de espaço vazio entre elas. */
+  @apply py-10 md:py-20 lg:py-24;
+}
+
+@utility btn-primary {
+  /* Sem `transition` própria: a animação destas três vem das regras de `control-press`,
+     que as nomeia junto com a classe. Antes cada uma tinha `transition-all` com a sua
+     duração — três compassos diferentes na mesma interface, e a animar também
+     propriedades capazes de obrigar o navegador a recalcular posições. */
+  @apply bg-primary text-white hover:bg-primary/90;
+}
+
+@utility btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+}
+
+@utility input-focus {
+  @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+}
+
+@utility glass-surface {
+  /* Opacidade suave estilo macOS — só translúcido + blur */
+  background: hsl(var(--background) / var(--glass-opacity, 0.72));
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%);
+}
+
+@utility glass-surface-dark {
+  background: hsl(var(--foreground) / calc(var(--glass-opacity, 0.72) * 0.92));
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(160%);
+}
+
+@utility glass-topbar {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--foreground) / 0.88),
+    hsl(var(--foreground) / 0.82)
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@utility mobile-menu-container {
+  /* Beautiful smooth collapse animation for mobile hamburger menu */
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  transition:
+    max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    padding 0.3s ease,
+    visibility 0.35s;
+
+  /* Aberto, o menu desloca-se por dentro e acaba acima da barra de baixo: com sessão (e mais
+     ainda para a equipa) a lista passa da altura do ecrã, e com `overflow: hidden` e 90vh o
+     fim — "Terminar sessão", "Rastrear encomenda" — ficava cortado ou por baixo da barra. */
+  &.open {
+    max-height: calc(
+      100vh - 4rem - env(safe-area-inset-top, 0px) -
+        var(--barra-navegacao-total, 0px)
+    );
+    max-height: calc(
+      100dvh - 4rem - env(safe-area-inset-top, 0px) -
+        var(--barra-navegacao-total, 0px)
+    );
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 1;
+    visibility: visible;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@utility open {
+  /* Aberto, o menu desloca-se por dentro e acaba acima da barra de baixo: com sessão (e mais
+     ainda para a equipa) a lista passa da altura do ecrã, e com `overflow: hidden` e 90vh o
+     fim — "Terminar sessão", "Rastrear encomenda" — ficava cortado ou por baixo da barra. */
+  &.mobile-menu-container {
+    max-height: calc(
+      100vh - 4rem - env(safe-area-inset-top, 0px) -
+        var(--barra-navegacao-total, 0px)
+    );
+    max-height: calc(
+      100dvh - 4rem - env(safe-area-inset-top, 0px) -
+        var(--barra-navegacao-total, 0px)
+    );
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 1;
+    visibility: visible;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@utility animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+@utility animation-delay-400 {
+  animation-delay: 0.4s;
+}
+
+@utility animation-delay-600 {
+  animation-delay: 0.6s;
+}
+
+@utility animation-delay-800 {
+  animation-delay: 0.8s;
+}
 
 @layer base {
   :root {
@@ -144,8 +400,12 @@
     @apply text-xl md:text-2xl font-medium;
   }
 
+  /* Sem `@apply leading-relaxed`: no Tailwind 4 isso grava `--tw-leading` em todos os parágrafos,
+     e o `text-xs`/`text-sm` desses parágrafos passava a usar 1,625 em vez da sua própria altura
+     de linha (os cartões das lojas no rodapé cresciam 10 px cada). A altura de linha directa dá
+     o mesmo que no Tailwind 3: vale para o parágrafo sem classe e perde para qualquer classe. */
   p {
-    @apply leading-relaxed max-w-prose;
+    @apply max-w-prose;
     line-height: 1.625;
   }
 
@@ -154,414 +414,383 @@
   }
 }
 
-@layer components {
-  .container-custom {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
-  }
-
-  /* No telemóvel 40 px em vez de 64: com cinco ou seis secções por página, eram ecrãs inteiros
-     de espaço vazio entre elas. */
-  .section-spacing {
-    @apply py-10 md:py-20 lg:py-24;
-  }
-
-  /* Sem `transition` própria: a animação destas três vem das regras de `control-press`,
-     que as nomeia junto com a classe. Antes cada uma tinha `transition-all` com a sua
-     duração — três compassos diferentes na mesma interface, e a animar também
-     propriedades capazes de obrigar o navegador a recalcular posições. */
-  .btn-primary {
-    @apply bg-primary text-white hover:bg-primary/90;
-  }
-
-  .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
-  }
-
-  .input-focus {
-    @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
-  }
-
-  /* Opacidade suave estilo macOS — só translúcido + blur */
-  .glass-surface {
-    background: hsl(var(--background) / var(--glass-opacity, 0.72));
-    backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%);
-    -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%);
-  }
-
-  .glass-surface-dark {
-    background: hsl(var(--foreground) / calc(var(--glass-opacity, 0.72) * 0.92));
-    backdrop-filter: blur(var(--glass-blur, 20px)) saturate(160%);
-    -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(160%);
-  }
-
-  .glass-topbar {
-    background: linear-gradient(90deg, hsl(var(--foreground) / 0.88), hsl(var(--foreground) / 0.82));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  /* Beautiful smooth collapse animation for mobile hamburger menu */
-  .mobile-menu-container {
-    max-height: 0;
-    opacity: 0;
-    visibility: hidden;
-    overflow: hidden;
-    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), 
-                opacity 0.25s ease, 
-                padding 0.3s ease, 
-                visibility 0.35s;
-  }
-
-  /* Aberto, o menu desloca-se por dentro e acaba acima da barra de baixo: com sessão (e mais
-     ainda para a equipa) a lista passa da altura do ecrã, e com `overflow: hidden` e 90vh o
-     fim — "Terminar sessão", "Rastrear encomenda" — ficava cortado ou por baixo da barra. */
-  .mobile-menu-container.open {
-    max-height: calc(100vh - 4rem - env(safe-area-inset-top, 0px) - var(--barra-navegacao-total, 0px));
-    max-height: calc(100dvh - 4rem - env(safe-area-inset-top, 0px) - var(--barra-navegacao-total, 0px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    opacity: 1;
-    visibility: visible;
-    padding-bottom: 1.5rem;
-  }
-}
-
+/* ---------------------------------------------------------------------------
+   Regras próprias do site, na camada `utilities` depois das classes do Tailwind.
+   No Tailwind 3 ficavam soltas a seguir às classes: ganhavam a uma classe com a mesma
+   especificidade e perdiam com menos (o `:where(.tap-target)` foi escrito para isso). No
+   Tailwind 4 as classes vivem em camadas, e uma regra solta ganha a TODAS as camadas: o
+   `position: relative` do `.tap-target` vencia o `absolute` e o olho da palavra-passe saía do
+   campo. Nesta camada, a seguir às classes, a ordem e a especificidade voltam a ser as do 3.
+   --------------------------------------------------------------------------- */
 @layer utilities {
-  .animation-delay-200 {
-    animation-delay: 0.2s;
+
+  /* Quem pediu menos movimento no sistema operativo recebe a interface sem ele.
+     As animações não são removidas, são encurtadas para quase zero: uma animação que
+     não corre pode deixar um elemento preso no estado inicial — invisível, se começava
+     com `opacity: 0` —, enquanto uma que salta para o fim chega sempre ao sítio certo.
+     `scroll-behavior: auto` porque o deslocamento suave também é movimento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
-  .animation-delay-400 {
-    animation-delay: 0.4s;
+  /* ---------------------------------------------------------------------------
+     Refinamento visual
+     Ligado e desligado pelos atributos `data-ff-*` que `lib/featureFlags.js` põe no
+     `<html>`. Em CSS, e não em React, para um efeito se poder desligar sem nenhum
+     componente voltar a desenhar.
+     Só `transform`, `opacity`, `box-shadow` e `filter`: nenhuma destas obriga o
+     navegador a recalcular a posição do resto da página, que é o que torna um efeito
+     bonito numa página lenta.
+     --------------------------------------------------------------------------- */
+
+  /* Superfície com profundidade. Sobe um pouco ao ser apontada ou tocada. */
+  .surface-raise {
+    box-shadow: var(--elev-1);
   }
 
-  .animation-delay-600 {
-    animation-delay: 0.6s;
+  :root[data-ff-elevacao="1"] .surface-raise {
+    transition: box-shadow var(--motion-base) var(--ease-out),
+                transform var(--motion-base) var(--ease-out);
   }
 
-  .animation-delay-800 {
-    animation-delay: 0.8s;
+  :root[data-ff-elevacao="1"] .surface-raise:hover,
+  :root[data-ff-elevacao="1"] .surface-raise:focus-within {
+    box-shadow: var(--elev-3);
+    transform: translate3d(0, var(--elev-rise), 0);
   }
 
-}
-
-/* Quem pediu menos movimento no sistema operativo recebe a interface sem ele.
-   As animações não são removidas, são encurtadas para quase zero: uma animação que
-   não corre pode deixar um elemento preso no estado inicial — invisível, se começava
-   com `opacity: 0` —, enquanto uma que salta para o fim chega sempre ao sítio certo.
-   `scroll-behavior: auto` porque o deslocamento suave também é movimento. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  /* No toque não há "passar por cima": a elevação acontece enquanto o dedo está pousado.
+     `:active` dá a resposta imediata que o toque pede. */
+  :root[data-ff-elevacao="1"] .surface-raise:active {
+    box-shadow: var(--elev-2);
+    transform: translate3d(0, 0, 0);
+    transition-duration: var(--motion-fast);
   }
-}
 
-/* ---------------------------------------------------------------------------
-   Refinamento visual
-   Ligado e desligado pelos atributos `data-ff-*` que `lib/featureFlags.js` põe no
-   `<html>`. Em CSS, e não em React, para um efeito se poder desligar sem nenhum
-   componente voltar a desenhar.
-   Só `transform`, `opacity`, `box-shadow` e `filter`: nenhuma destas obriga o
-   navegador a recalcular a posição do resto da página, que é o que torna um efeito
-   bonito numa página lenta.
-   --------------------------------------------------------------------------- */
+  /* O contorno de foco por cima de tudo: a elevação nunca pode esconder onde o teclado está. */
+  .surface-raise:focus-visible {
+    position: relative;
+    z-index: 1;
+  }
 
-/* Superfície com profundidade. Sobe um pouco ao ser apontada ou tocada. */
-.surface-raise {
-  box-shadow: var(--elev-1);
-}
+  /* Capas com aproximação lenta dentro do cartão.
+     O `overflow: hidden` do contentor é que a mantém dentro da moldura; sem ele, a
+     imagem crescia por cima do que está à volta. */
+  :root[data-ff-zoomimagem="1"] .media-zoom {
+    transition: transform var(--motion-slow) var(--ease-out);
+    will-change: transform;
+  }
 
-:root[data-ff-elevacao="1"] .surface-raise {
-  transition: box-shadow var(--motion-base) var(--ease-out),
-              transform var(--motion-base) var(--ease-out);
-}
+  :root[data-ff-zoomimagem="1"] .surface-raise:hover .media-zoom,
+  :root[data-ff-zoomimagem="1"] .surface-raise:focus-within .media-zoom {
+    transform: scale(1.04);
+  }
 
-:root[data-ff-elevacao="1"] .surface-raise:hover,
-:root[data-ff-elevacao="1"] .surface-raise:focus-within {
-  box-shadow: var(--elev-3);
-  transform: translate3d(0, var(--elev-rise), 0);
-}
+  /* Controlos: resposta ao toque e ao rato.
+     O botão afunda ligeiramente em vez de subir — é o gesto de carregar, e lê-se
+     como tal mesmo sem cor a mudar. */
+  :root[data-ff-transicoes="1"] .control-press,
+  :root[data-ff-transicoes="1"] .btn-primary,
+  :root[data-ff-transicoes="1"] .btn-secondary,
+  :root[data-ff-transicoes="1"] .input-focus {
+    transition: transform var(--motion-fast) var(--ease-out),
+                box-shadow var(--motion-fast) var(--ease-out),
+                background-color var(--motion-fast) var(--ease-out),
+                border-color var(--motion-fast) var(--ease-out),
+                color var(--motion-fast) var(--ease-out);
+  }
 
-/* No toque não há "passar por cima": a elevação acontece enquanto o dedo está pousado.
-   `:active` dá a resposta imediata que o toque pede. */
-:root[data-ff-elevacao="1"] .surface-raise:active {
-  box-shadow: var(--elev-2);
-  transform: translate3d(0, 0, 0);
-  transition-duration: var(--motion-fast);
-}
+  :root[data-ff-transicoes="1"] .control-press:active:not(:disabled),
+  :root[data-ff-transicoes="1"] .btn-primary:active:not(:disabled),
+  :root[data-ff-transicoes="1"] .btn-secondary:active:not(:disabled) {
+    transform: scale(0.97);
+  }
 
-/* O contorno de foco por cima de tudo: a elevação nunca pode esconder onde o teclado está. */
-.surface-raise:focus-visible {
-  position: relative;
-  z-index: 1;
-}
+  /* Brilho de destaque: um reflexo que atravessa o elemento uma vez, quando ele é
+     apontado. Não repete — um brilho contínuo cansa e chama a atenção para onde ela
+     não é precisa. */
+  :root[data-ff-transicoes="1"] .sheen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
 
-/* Capas com aproximação lenta dentro do cartão.
-   O `overflow: hidden` do contentor é que a mantém dentro da moldura; sem ele, a
-   imagem crescia por cima do que está à volta. */
-:root[data-ff-zoomimagem="1"] .media-zoom {
-  transition: transform var(--motion-slow) var(--ease-out);
-  will-change: transform;
-}
+  :root[data-ff-transicoes="1"] .sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.16) 48%, transparent 58%);
+    transform: translate3d(-130%, 0, 0);
+    opacity: 0;
+  }
 
-:root[data-ff-zoomimagem="1"] .surface-raise:hover .media-zoom,
-:root[data-ff-zoomimagem="1"] .surface-raise:focus-within .media-zoom {
-  transform: scale(1.04);
-}
+  :root[data-ff-transicoes="1"] .sheen:hover::after,
+  :root[data-ff-transicoes="1"] .sheen:focus-visible::after {
+    opacity: 1;
+    transform: translate3d(130%, 0, 0);
+    transition: transform var(--motion-slow) var(--ease-out), opacity var(--motion-fast) linear;
+  }
 
-/* Controlos: resposta ao toque e ao rato.
-   O botão afunda ligeiramente em vez de subir — é o gesto de carregar, e lê-se
-   como tal mesmo sem cor a mudar. */
-:root[data-ff-transicoes="1"] .control-press,
-:root[data-ff-transicoes="1"] .btn-primary,
-:root[data-ff-transicoes="1"] .btn-secondary,
-:root[data-ff-transicoes="1"] .input-focus {
-  transition: transform var(--motion-fast) var(--ease-out),
-              box-shadow var(--motion-fast) var(--ease-out),
-              background-color var(--motion-fast) var(--ease-out),
-              border-color var(--motion-fast) var(--ease-out),
-              color var(--motion-fast) var(--ease-out);
-}
+  /* Texto na cor da marca, legível sobre fundo claro.
+     `--brand-ink` é a cor da marca escurecida até passar os 4,5 de contraste que a WCAG pede
+     (ver `ensureContrastOnWhite`). A cor da marca em si fica para fundos e para áreas
+     grandes, onde o contraste exigido é menor.
+     No tema escuro volta a cor original: aí o fundo é escuro, e é a versão clara que se lê. */
+  .text-brand-ink {
+    color: var(--brand-ink, hsl(var(--primary)));
+  }
 
-:root[data-ff-transicoes="1"] .control-press:active:not(:disabled),
-:root[data-ff-transicoes="1"] .btn-primary:active:not(:disabled),
-:root[data-ff-transicoes="1"] .btn-secondary:active:not(:disabled) {
-  transform: scale(0.97);
-}
+  .dark .text-brand-ink {
+    color: var(--brand-primary, hsl(var(--primary)));
+  }
 
-/* Brilho de destaque: um reflexo que atravessa o elemento uma vez, quando ele é
-   apontado. Não repete — um brilho contínuo cansa e chama a atenção para onde ela
-   não é precisa. */
-:root[data-ff-transicoes="1"] .sheen {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
+  /* Fundo na cor da marca com texto branco por cima. A cor da marca sozinha dava 2,9 de
+     contraste contra o branco — a mesma conta, do outro lado. */
+  .bg-brand-solid {
+    background-color: var(--brand-ink, hsl(var(--primary)));
+    color: #fff;
+  }
 
-:root[data-ff-transicoes="1"] .sheen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.16) 48%, transparent 58%);
-  transform: translate3d(-130%, 0, 0);
-  opacity: 0;
-}
+  /* ---------------------------------------------------------------------------
+     Toque e barras do sistema
+     --------------------------------------------------------------------------- */
 
-:root[data-ff-transicoes="1"] .sheen:hover::after,
-:root[data-ff-transicoes="1"] .sheen:focus-visible::after {
-  opacity: 1;
-  transform: translate3d(130%, 0, 0);
-  transition: transform var(--motion-slow) var(--ease-out), opacity var(--motion-fast) linear;
-}
+  /* O `index.html` tem `viewport-fit=cover`, que estende a página para baixo do
+     entalhe e da barra inferior do telemóvel. Isso só se usa se o conteúdo for
+     depois afastado dessas zonas — sem estas regras, o cabeçalho fica por baixo da
+     hora e da bateria, e o que está preso ao fundo fica por baixo da barra de
+     gestos do sistema, onde o toque não chega ao sítio certo.
+     `env()` devolve zero nos equipamentos que não têm entalhe, por isso não é
+     preciso separar por aparelho. */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 
-/* Texto na cor da marca, legível sobre fundo claro.
-   `--brand-ink` é a cor da marca escurecida até passar os 4,5 de contraste que a WCAG pede
-   (ver `ensureContrastOnWhite`). A cor da marca em si fica para fundos e para áreas
-   grandes, onde o contraste exigido é menor.
-   No tema escuro volta a cor original: aí o fundo é escuro, e é a versão clara que se lê. */
-.text-brand-ink {
-  color: var(--brand-ink, hsl(var(--primary)));
-}
+  /* Herói da página inicial: 85% do ecrã *pequeno* (svh), o que se vê com as barras do
+     navegador à mostra. Com `vh`, no iPhone o herói media mais do que o ecrã visível e a secção
+     seguinte não espreitava — e é ela que diz que a página continua. */
+  .hero-height {
+    height: 85vh;
+    height: 85svh;
+  }
 
-.dark .text-brand-ink {
-  color: var(--brand-primary, hsl(var(--primary)));
-}
-
-/* Fundo na cor da marca com texto branco por cima. A cor da marca sozinha dava 2,9 de
-   contraste contra o branco — a mesma conta, do outro lado. */
-.bg-brand-solid {
-  background-color: var(--brand-ink, hsl(var(--primary)));
-  color: #fff;
-}
-
-/* ---------------------------------------------------------------------------
-   Toque e barras do sistema
-   --------------------------------------------------------------------------- */
-
-/* O `index.html` tem `viewport-fit=cover`, que estende a página para baixo do
-   entalhe e da barra inferior do telemóvel. Isso só se usa se o conteúdo for
-   depois afastado dessas zonas — sem estas regras, o cabeçalho fica por baixo da
-   hora e da bateria, e o que está preso ao fundo fica por baixo da barra de
-   gestos do sistema, onde o toque não chega ao sítio certo.
-   `env()` devolve zero nos equipamentos que não têm entalhe, por isso não é
-   preciso separar por aparelho. */
-.safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
-
-/* Herói da página inicial: 85% do ecrã *pequeno* (svh), o que se vê com as barras do
-   navegador à mostra. Com `vh`, no iPhone o herói media mais do que o ecrã visível e a secção
-   seguinte não espreitava — e é ela que diz que a página continua. */
-.hero-height {
-  height: 85vh;
-  height: 85svh;
-}
-
-/* Banners do topo das páginas (PageBannerSlider): no telemóvel a barra fina do cabeçalho
-   (56 px, mais a área segura do iPhone) fica por cima deles. */
-.pt-below-thin-bar {
-  padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
-}
-@media (min-width: 768px) {
+  /* Banners do topo das páginas (PageBannerSlider): no telemóvel a barra fina do cabeçalho
+     (56 px, mais a área segura do iPhone) fica por cima deles. */
   .pt-below-thin-bar {
-    padding-top: 0;
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
   }
-}
-
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Flutuantes do canto inferior: afastam-se da barra de gestos do sistema e também da
-   barra de compra, que aparece na ficha de um livro quando os botões reais já passaram.
-   Sem a segunda parcela, o botão de subir ficava por cima do preço e do botão de comprar.
-   Em classe própria e não na sintaxe arbitrária do Tailwind: `calc()` com `env()` e `var()`
-   leva vírgulas, e o que saía dali não chegava a gerar regra nenhuma. */
-.float-above-bar {
-  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px) + var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px));
-  /* Acompanha a barra de baixo quando ela se esconde (300 ms, como ela). Só o `bottom` e as
-     cores: a escala e a opacidade são do framer-motion, e uma transição CSS por cima delas
-     atrasava cada fotograma da animação. */
-  transition-property: bottom, box-shadow, background-color, border-color;
-  transition-duration: 300ms;
-  transition-timing-function: ease-out;
-}
-
-/* O mesmo afastamento ao canto que o assistente do outro lado (16 px + a área segura do
-   telemóvel deitado), em vez de 24 px de um lado e 16 do outro. */
-.float-right-edge {
-  right: calc(1rem + env(safe-area-inset-right, 0px));
-}
-
-/* Para quem está preso ao fundo com `bottom`: afasta-se do indicador de gestos
-   em vez de lhe ficar por baixo. */
-.safe-float-bottom {
-  bottom: calc(var(--float-gap, 1.5rem) + env(safe-area-inset-bottom, 0px) + var(--barra-navegacao, 0px));
-}
-
-/* Barra de navegação inferior do telemóvel (MobileBottomNav). A variável vale 0 quando a
-   barra não está à vista (desktop, ficha do livro, painel), por isso nada muda fora dela.
-   O corpo ganha espaço no fim, para o último cartão não ficar por baixo da barra, e os
-   avisos sobem acima dela. */
-body {
-  padding-bottom: var(--barra-navegacao-total, 0px);
-}
-/* Os avisos (sonner) sobem acima da barra de baixo e da barra de compra da ficha do livro:
-   o "Adicionado ao carrinho" aparecia por cima do botão de comprar. Até aos 768 px, o mesmo
-   corte do resto do telemóvel (o sonner muda de desenho aos 600, e entre um e outro os
-   avisos ficavam por cima da barra). Sem barra, ao menos a área segura do sistema. */
-@media (max-width: 767px) {
-  [data-sonner-toaster][data-y-position=bottom] {
-    bottom: calc(var(--mobile-offset-bottom, 16px) + max(var(--barra-navegacao-total, 0px), env(safe-area-inset-bottom, 0px)) + var(--barra-compra, 0px)) !important;
+  @media (min-width: 768px) {
+    .pt-below-thin-bar {
+      padding-top: 0;
+    }
   }
-}
 
-/* Área de toque de 44px sem mudar o tamanho do que se vê.
-   O alvo cresce por baixo, num pseudo-elemento centrado: o ícone continua
-   pequeno e discreto, e o dedo acerta à primeira. Aumentar o botão em si daria
-   cartões com ícones enormes a competir com a capa do livro.
-   44px é o mínimo que a Apple recomenda; a Google pede 48dp. Fica nos 44 porque
-   é o que cabe entre dois ícones nos cantos de um cartão sem eles se tocarem. */
-/* `:where()` não tem especificidade nenhuma, de propósito. A regra e o `.absolute` do
-   Tailwind são os dois um selector de classe, e à mesma especificidade ganha quem vier
-   depois no ficheiro — que é esta, por estar fora das camadas. No login isso punha o
-   botão de ver a palavra-passe em fluxo normal, fora da caixa e à esquerda dela, e, ao
-   aumentar a altura do contentor, arrastava o cadeado para baixo do centro. Com
-   `:where()`, quem escrever uma posição ganha sempre; quem não escrever nenhuma continua
-   a receber `relative`, que é o que o pseudo-elemento do alvo de toque precisa. */
-:where(.tap-target) {
-  position: relative;
-}
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 
-.tap-target::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: max(100%, 44px);
-  height: max(100%, 44px);
-  transform: translate(-50%, -50%);
-  /* Só nos equipamentos de toque: com rato, o ponteiro é preciso e áreas
-     invisíveis a mais só atrapalham quem passa por perto. */
-  display: none;
-}
+  /* Flutuantes do canto inferior: afastam-se da barra de gestos do sistema e também da
+     barra de compra, que aparece na ficha de um livro quando os botões reais já passaram.
+     Sem a segunda parcela, o botão de subir ficava por cima do preço e do botão de comprar.
+     Em classe própria e não na sintaxe arbitrária do Tailwind: `calc()` com `env()` e `var()`
+     leva vírgulas, e o que saía dali não chegava a gerar regra nenhuma. */
+  .float-above-bar {
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + var(--barra-compra, 0px) + var(--barra-navegacao, 0px) + var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px));
+    /* Acompanha a barra de baixo quando ela se esconde (300 ms, como ela). Só o `bottom` e as
+       cores: a escala e a opacidade são do framer-motion, e uma transição CSS por cima delas
+       atrasava cada fotograma da animação. */
+    transition-property: bottom, box-shadow, background-color, border-color;
+    transition-duration: 300ms;
+    transition-timing-function: ease-out;
+  }
 
-@media (pointer: coarse) {
+  /* O mesmo afastamento ao canto que o assistente do outro lado (16 px + a área segura do
+     telemóvel deitado), em vez de 24 px de um lado e 16 do outro. */
+  .float-right-edge {
+    right: calc(1rem + env(safe-area-inset-right, 0px));
+  }
+
+  /* Para quem está preso ao fundo com `bottom`: afasta-se do indicador de gestos
+     em vez de lhe ficar por baixo. */
+  .safe-float-bottom {
+    bottom: calc(var(--float-gap, 1.5rem) + env(safe-area-inset-bottom, 0px) + var(--barra-navegacao, 0px));
+  }
+
+  /* Barra de navegação inferior do telemóvel (MobileBottomNav). A variável vale 0 quando a
+     barra não está à vista (desktop, ficha do livro, painel), por isso nada muda fora dela.
+     O corpo ganha espaço no fim, para o último cartão não ficar por baixo da barra, e os
+     avisos sobem acima dela. */
+  body {
+    padding-bottom: var(--barra-navegacao-total, 0px);
+  }
+  /* Os avisos (sonner) sobem acima da barra de baixo e da barra de compra da ficha do livro:
+     o "Adicionado ao carrinho" aparecia por cima do botão de comprar. Até aos 768 px, o mesmo
+     corte do resto do telemóvel (o sonner muda de desenho aos 600, e entre um e outro os
+     avisos ficavam por cima da barra). Sem barra, ao menos a área segura do sistema. */
+  @media (max-width: 767px) {
+    [data-sonner-toaster][data-y-position=bottom] {
+      bottom: calc(var(--mobile-offset-bottom, 16px) + max(var(--barra-navegacao-total, 0px), env(safe-area-inset-bottom, 0px)) + var(--barra-compra, 0px)) !important;
+    }
+  }
+
+  /* Área de toque de 44px sem mudar o tamanho do que se vê.
+     O alvo cresce por baixo, num pseudo-elemento centrado: o ícone continua
+     pequeno e discreto, e o dedo acerta à primeira. Aumentar o botão em si daria
+     cartões com ícones enormes a competir com a capa do livro.
+     44px é o mínimo que a Apple recomenda; a Google pede 48dp. Fica nos 44 porque
+     é o que cabe entre dois ícones nos cantos de um cartão sem eles se tocarem. */
+  /* `:where()` não tem especificidade nenhuma, de propósito. A regra e o `.absolute` do
+     Tailwind são os dois um selector de classe, e à mesma especificidade ganha quem vier
+     depois no ficheiro — que é esta, por estar fora das camadas. No login isso punha o
+     botão de ver a palavra-passe em fluxo normal, fora da caixa e à esquerda dela, e, ao
+     aumentar a altura do contentor, arrastava o cadeado para baixo do centro. Com
+     `:where()`, quem escrever uma posição ganha sempre; quem não escrever nenhuma continua
+     a receber `relative`, que é o que o pseudo-elemento do alvo de toque precisa. */
+  :where(.tap-target) {
+    position: relative;
+  }
+
   .tap-target::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+    /* Só nos equipamentos de toque: com rato, o ponteiro é preciso e áreas
+       invisíveis a mais só atrapalham quem passa por perto. */
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .tap-target::before {
+      display: block;
+    }
+  }
+
+  /* Resposta ao toque.
+     O rectângulo cinzento que o Android desenha por cima do que se toca aparece
+     sempre tarde e com a forma errada — tapa o canto arredondado e fica depois de
+     o dedo sair. A resposta é dada pelo próprio elemento, com `:active`, que
+     acontece no instante do toque.
+     `touch-action: manipulation` tira o atraso de 300 ms que os navegadores
+     guardavam para ver se era um toque duplo para ampliar. */
+  @media (pointer: coarse) {
+    button,
+    a,
+    [role="button"],
+    summary {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+  }
+
+  /* Painéis que flutuam sobre a página: modais, gavetas, menus.
+     A sombra do Tailwind é uma mancha única; esta tem as duas camadas dos restantes níveis,
+     mais fundas, porque estes elementos estão mais acima. O contorno claríssimo por cima
+     separa o painel do que está por baixo quando os dois são claros — sem ele, a aresta
+     desaparece num fundo branco e o painel parece colado à página. */
+  .elev-overlay {
+    box-shadow: var(--elev-3), 0 0 0 1px rgb(0 0 0 / 0.04);
+  }
+
+  /* Indicador de carregamento da loja.
+     Três barras com a proporção de um livro de pé, a subir e descer desencontradas — lê-se
+     como "a buscar livros" e não como o círculo a girar que qualquer sítio usa. Anima só
+     `transform`, por isso não custa mais do que o círculo que substitui.
+     `scaleY` a partir da base: sem `transform-origin`, as barras cresciam para os dois lados
+     e pareciam respirar em vez de se levantarem. */
+  .book-loader {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 22px;
+  }
+
+  .book-loader span {
     display: block;
+    width: 5px;
+    height: 100%;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.85;
+    transform-origin: bottom center;
+    animation: book-loader-bar 1s var(--ease-out) infinite;
+  }
+
+  .book-loader span:nth-child(2) { animation-delay: 0.14s; }
+  .book-loader span:nth-child(3) { animation-delay: 0.28s; }
+
+  @keyframes book-loader-bar {
+    0%, 100% { transform: scaleY(0.45); }
+    40%      { transform: scaleY(1); }
+  }
+
+  /* Com menos movimento pedido, as barras ficam quietas e de alturas diferentes: continua a
+     ler-se como indicador, sem nada a mexer. A regra global encurta a animação, e sem isto
+     as barras ficavam todas no mesmo tamanho, parecendo um bloco. */
+  @media (prefers-reduced-motion: reduce) {
+    .book-loader span { transform: scaleY(0.6); }
+    .book-loader span:nth-child(2) { transform: scaleY(1); }
+    .book-loader span:nth-child(3) { transform: scaleY(0.75); }
   }
 }
 
-/* Resposta ao toque.
-   O rectângulo cinzento que o Android desenha por cima do que se toca aparece
-   sempre tarde e com a forma errada — tapa o canto arredondado e fica depois de
-   o dedo sair. A resposta é dada pelo próprio elemento, com `:active`, que
-   acontece no instante do toque.
-   `touch-action: manipulation` tira o atraso de 300 ms que os navegadores
-   guardavam para ver se era um toque duplo para ampliar. */
-@media (pointer: coarse) {
-  button,
-  a,
-  [role="button"],
-  summary {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+/* ---------------------------------------------------------------------------
+   `space-y-*` e `space-x-*` como no Tailwind 3.
+   O 4 passou a pôr a margem no FIM de cada filho menos o último; o 3 punha-a no INÍCIO de cada
+   filho menos o primeiro. Com um <label> (elemento de linha) como primeiro filho — o padrão de
+   todos os formulários: rótulo e campo dentro de um `space-y-2` — a margem do 4 é ignorada e o
+   campo cola-se ao rótulo. Aqui: anula-se a regra do 4 (mesma especificidade zero, mais à frente)
+   e repõe-se a do 3, com a especificidade de então.
+   Só os valores que o site usa; um valor novo tem de entrar aqui (o teste
+   `lib/spaceUtilities.test.js` falha até entrar).
+   --------------------------------------------------------------------------- */
+@layer utilities {
+  :where(.space-y-0\.5 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-0\.5 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.125rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.125rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-1 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-1 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.25rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-1\.5 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-1\.5 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.375rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.375rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-2 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-2 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.5rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-2\.5 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-2\.5 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.625rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.625rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-3 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-3 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(0.75rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-4 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(1rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-5 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-5 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(1.25rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(1.25rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-6 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(1.5rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-7 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-7 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(1.75rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(1.75rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-8 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-8 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(2rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(2rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-10 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-10 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(2.5rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(2.5rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-12 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-12 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(3rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(3rem * var(--tw-space-y-reverse)); }
+  :where(.space-y-16 > :not(:last-child)) { margin-block-end: 0; }
+  .space-y-16 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(4rem * calc(1 - var(--tw-space-y-reverse))); margin-bottom: calc(4rem * var(--tw-space-y-reverse)); }
+  :where(.space-x-1 > :not(:last-child)) { margin-inline-end: 0; }
+  .space-x-1 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 0; margin-right: calc(0.25rem * var(--tw-space-x-reverse)); margin-left: calc(0.25rem * calc(1 - var(--tw-space-x-reverse))); }
+  :where(.space-x-2 > :not(:last-child)) { margin-inline-end: 0; }
+  .space-x-2 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 0; margin-right: calc(0.5rem * var(--tw-space-x-reverse)); margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse))); }
+  @media (width >= 40rem) {
+    :where(.sm\:space-x-2 > :not(:last-child)) { margin-inline-end: 0; }
+    .sm\:space-x-2 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 0; margin-right: calc(0.5rem * var(--tw-space-x-reverse)); margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse))); }
   }
-}
-
-/* Painéis que flutuam sobre a página: modais, gavetas, menus.
-   A sombra do Tailwind é uma mancha única; esta tem as duas camadas dos restantes níveis,
-   mais fundas, porque estes elementos estão mais acima. O contorno claríssimo por cima
-   separa o painel do que está por baixo quando os dois são claros — sem ele, a aresta
-   desaparece num fundo branco e o painel parece colado à página. */
-.elev-overlay {
-  box-shadow: var(--elev-3), 0 0 0 1px rgb(0 0 0 / 0.04);
-}
-
-/* Indicador de carregamento da loja.
-   Três barras com a proporção de um livro de pé, a subir e descer desencontradas — lê-se
-   como "a buscar livros" e não como o círculo a girar que qualquer sítio usa. Anima só
-   `transform`, por isso não custa mais do que o círculo que substitui.
-   `scaleY` a partir da base: sem `transform-origin`, as barras cresciam para os dois lados
-   e pareciam respirar em vez de se levantarem. */
-.book-loader {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 22px;
-}
-
-.book-loader span {
-  display: block;
-  width: 5px;
-  height: 100%;
-  border-radius: 2px;
-  background: currentColor;
-  opacity: 0.85;
-  transform-origin: bottom center;
-  animation: book-loader-bar 1s var(--ease-out) infinite;
-}
-
-.book-loader span:nth-child(2) { animation-delay: 0.14s; }
-.book-loader span:nth-child(3) { animation-delay: 0.28s; }
-
-@keyframes book-loader-bar {
-  0%, 100% { transform: scaleY(0.45); }
-  40%      { transform: scaleY(1); }
-}
-
-/* Com menos movimento pedido, as barras ficam quietas e de alturas diferentes: continua a
-   ler-se como indicador, sem nada a mexer. A regra global encurta a animação, e sem isto
-   as barras ficavam todas no mesmo tamanho, parecendo um bloco. */
-@media (prefers-reduced-motion: reduce) {
-  .book-loader span { transform: scaleY(0.6); }
-  .book-loader span:nth-child(2) { transform: scaleY(1); }
-  .book-loader span:nth-child(3) { transform: scaleY(0.75); }
 }

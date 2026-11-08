@@ -33,7 +33,7 @@ export default function AdminSidebarNav({ nav, active, onNavigate, collapsible =
       <SidebarHeader className="border-b border-sidebar-border">
         <Link
           to="/admin"
-          className="flex h-10 items-center gap-2.5 rounded-md px-1.5 outline-none ring-sidebar-ring focus-visible:ring-2"
+          className="flex h-10 items-center gap-2.5 rounded-md px-1.5 outline-hidden ring-sidebar-ring focus-visible:ring-2"
           onClick={(e) => { e.preventDefault(); go('inicio'); }}
         >
           <img src="/logo-icon.svg" alt="" className="h-8 w-8 shrink-0 object-contain" />

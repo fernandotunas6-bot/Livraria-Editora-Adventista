@@ -16,7 +16,7 @@ function Info({ icon: Icon, label, children }) {
       <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="break-words">{children}</div>
+        <div className="wrap-break-word">{children}</div>
       </div>
     </div>
   );

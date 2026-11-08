@@ -65,7 +65,7 @@ const LoginPage = () => {
       <div className="min-h-screen grid lg:grid-cols-2 bg-background">
         <div className="relative hidden lg:block">
           <img src={bgImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0c4a6e]/95 via-[#0c4a6e]/50 to-[#0c4a6e]/20" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#0c4a6e]/95 via-[#0c4a6e]/50 to-[#0c4a6e]/20" />
           <div className="absolute bottom-12 left-12 right-12 text-white">
             <BrandLogo linkTo="/" variant="light" className="mb-6" />
             <h2 className="text-3xl font-bold mb-3">{settings.site_name}</h2>
@@ -77,7 +77,7 @@ const LoginPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-center p-6 sm:p-10 bg-gradient-to-b from-muted/30 to-background">
+        <div className="flex items-center justify-center p-6 sm:p-10 bg-linear-to-b from-muted/30 to-background">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -85,7 +85,7 @@ const LoginPage = () => {
           >
             <div className="mb-6 lg:hidden flex justify-center"><BrandLogo /></div>
 
-            <div className="rounded-2xl border bg-card/80 backdrop-blur-sm shadow-xl p-6 sm:p-8">
+            <div className="rounded-2xl border bg-card/80 backdrop-blur-xs shadow-xl p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h1 className="text-2xl font-bold">{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>

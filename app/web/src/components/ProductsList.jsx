@@ -73,7 +73,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
         >
           {Array.from({ length: skeletonCount }, (_, i) => (
             <div key={i} className="space-y-4">
-              <Skeleton className="aspect-[2/3] w-full rounded-xl" />
+              <Skeleton className="aspect-2/3 w-full rounded-xl" />
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="h-4 w-1/3" />
             </div>
@@ -86,7 +86,7 @@ const ProductsList = ({ products = [], isLoading, onCartOpen, viewMode = 'grid',
   return (
     <div className="space-y-6">
       {!embedded && (
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-card border border-border p-4 rounded-2xl shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-card border border-border p-4 rounded-2xl shadow-xs">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

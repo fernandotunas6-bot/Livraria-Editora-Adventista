@@ -30,7 +30,7 @@ export default function MobileFilterDrawer({ open, onClose, titleId, count = 0, 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm lg:hidden" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs lg:hidden" onClick={onClose}>
       <motion.div
         initial={{ x: '-100%' }}
         animate={{ x: 0 }}
@@ -61,7 +61,7 @@ export default function MobileFilterDrawer({ open, onClose, titleId, count = 0, 
               Limpar ({filterCount})
             </Button>
           )}
-          <Button type="button" className="btn-primary h-12 flex-[2]" onClick={onClose} aria-live="polite">
+          <Button type="button" className="btn-primary h-12 flex-2" onClick={onClose} aria-live="polite">
             {count === 0 ? 'Sem livros com estes filtros' : `Ver ${count} ${count === 1 ? 'livro' : 'livros'}`}
           </Button>
         </div>

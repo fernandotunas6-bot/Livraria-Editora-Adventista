@@ -46,7 +46,7 @@ export default function UnsubscribePage() {
   return (
     <>
       <Helmet><title>{pageTitle('Cancelar subscrição')}</title></Helmet>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-muted/30 to-background p-6">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-b from-muted/30 to-background p-6">
         <div className="w-full max-w-md">
           <div className="mb-6 flex justify-center"><BrandLogo linkTo="/" /></div>
 

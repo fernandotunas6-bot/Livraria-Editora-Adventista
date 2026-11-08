@@ -51,7 +51,7 @@ const ShippingReturnsPage = () => {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider>
-        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Envios e Devoluções</h1>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Envios e Devoluções</h1>
         <p className="text-base text-white/85 sm:text-lg">Tudo o que precisa saber sobre entregas e devoluções</p>
       </PageBannerSlider>
 

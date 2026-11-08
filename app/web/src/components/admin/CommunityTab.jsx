@@ -83,7 +83,7 @@ function ReportsPanel({ onMissing }) {
                 <span>· {relativeTime(p.created)}</span>
                 {p.book_id && <Link to={`/product/${p.book_id}`} className="text-primary hover:underline">· ver o livro</Link>}
               </div>
-              <p className="mt-2 whitespace-pre-line break-words text-sm">{p.body}</p>
+              <p className="mt-2 whitespace-pre-line wrap-break-word text-sm">{p.body}</p>
               {p.quote && <p className="mt-1 border-l-2 pl-2 text-sm italic text-muted-foreground">“{p.quote}”</p>}
               {Array.isArray(p.links) && p.links.length > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">Links: {p.links.map(linkHost).join(', ')}</p>

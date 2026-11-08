@@ -101,7 +101,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           <button
             type="button"
             onClick={() => toggleWishlist(product)}
-            className="tap-target h-8 w-8 rounded-full border bg-background shadow-sm hover:bg-muted control-press sm:h-10 sm:w-10"
+            className="tap-target h-8 w-8 rounded-full border bg-background shadow-xs hover:bg-muted control-press sm:h-10 sm:w-10"
             aria-label={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
           >
             <Heart className={`mx-auto h-4 w-4 transition-colors ${isWish ? 'text-red-500 fill-red-500' : 'text-muted-foreground hover:text-red-500'}`} />
@@ -116,7 +116,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           <button
             type="button"
             onClick={handleQuickView}
-            className="tap-target h-8 w-8 rounded-full border bg-background shadow-sm hover:bg-muted control-press sm:h-10 sm:w-10"
+            className="tap-target h-8 w-8 rounded-full border bg-background shadow-xs hover:bg-muted control-press sm:h-10 sm:w-10"
             aria-label="Visualizar"
           >
             <Eye className="mx-auto h-4 w-4" />
@@ -130,7 +130,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             <button
               type="button"
               onClick={handleShare}
-              className="tap-target h-8 w-8 rounded-full bg-green-700 text-white shadow-sm hover:bg-green-800 control-press sm:h-10 sm:w-10"
+              className="tap-target h-8 w-8 rounded-full bg-green-700 text-white shadow-xs hover:bg-green-800 control-press sm:h-10 sm:w-10"
               aria-label="Partilhar no WhatsApp"
             >
               <MessageCircle className="mx-auto h-4 w-4" />
@@ -147,7 +147,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   if (isList) return (
     <div className={`group h-full flex ${isList ? 'flex-row gap-4' : 'flex-col'}`}>
       <div className={`bg-card rounded-xl overflow-hidden surface-raise border border-border h-full flex flex-1 ${isList ? 'flex-row' : 'flex-col'}`}>
-          <div className={`relative overflow-hidden bg-muted shrink-0 ${isList ? 'w-28 h-36' : 'aspect-[2/3] sm:aspect-[3/4]'}`}>
+          <div className={`relative overflow-hidden bg-muted shrink-0 ${isList ? 'w-28 h-36' : 'aspect-2/3 sm:aspect-3/4'}`}>
             <Link to={`/product/${product.id}`} onClick={handleQuickView} className="block h-full">
             <img
               src={product.image || PLACEHOLDER}
@@ -170,7 +170,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10 pointer-events-none">
               {product.featured && (
                 <span
-                  className="h-6 w-6 rounded-full bg-amber-400 text-amber-950 shadow-sm flex items-center justify-center"
+                  className="h-6 w-6 rounded-full bg-amber-400 text-amber-950 shadow-xs flex items-center justify-center"
                   title="Destaque"
                 >
                   <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
@@ -179,7 +179,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
               )}
               {isLowStock && (
                 <span
-                  className="h-6 w-6 rounded-full bg-rose-500 text-white shadow-sm flex items-center justify-center"
+                  className="h-6 w-6 rounded-full bg-rose-500 text-white shadow-xs flex items-center justify-center"
                   title={qty > 0 ? `Últimas ${qty} unidades` : 'Poucas unidades'}
                 >
                   <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -191,7 +191,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
                   mesmo. "Destaque da semana" ou outro texto continua a aparecer. */}
               {product.ribbon_text && inStock && !isLowStock
                 && product.ribbon_text.trim().toLowerCase() !== 'destaque' && (
-                <span className="bg-primary text-white text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
+                <span className="bg-primary text-white text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-xs">
                   {product.ribbon_text}
                 </span>
               )}
@@ -203,9 +203,9 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             )}
           </div>
           {!isList && cardActions}
-          <div className={`p-4 flex flex-col flex-grow ${isList ? 'justify-center' : ''}`}>
+          <div className={`p-4 flex flex-col grow ${isList ? 'justify-center' : ''}`}>
             {isList && cardActions}
-            <Link to={`/product/${product.id}`} onClick={handleQuickView} className="flex flex-col flex-grow">
+            <Link to={`/product/${product.id}`} onClick={handleQuickView} className="flex flex-col grow">
               {product.book_code && <code className="text-[10px] text-brand-ink font-mono mb-1">{product.book_code}</code>}
               <h3 className="font-semibold text-foreground mb-0.5 line-clamp-2 group-hover:text-primary transition-colors">
                 {product.title}
@@ -273,12 +273,12 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   // rápida, partilha no WhatsApp, comprar, ver detalhes, destaque, stock baixo, esgotado e
   // promoção.
   const discount = discountPercent(variant);
-  const iconButton = 'tap-target flex h-8 w-8 items-center justify-center rounded-full shadow-sm control-press';
+  const iconButton = 'tap-target flex h-8 w-8 items-center justify-center rounded-full shadow-xs control-press';
 
   return (
     <div className="group h-full">
       <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card surface-raise transition-shadow duration-base hover:shadow-md">
-        <div className="relative aspect-[2/3] shrink-0 overflow-hidden bg-muted">
+        <div className="relative aspect-2/3 shrink-0 overflow-hidden bg-muted">
           <Link to={`/product/${product.id}`} onClick={handleQuickView} className="block h-full" tabIndex={-1} aria-hidden="true">
             <img
               src={product.image || PLACEHOLDER}
@@ -294,19 +294,19 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
               de passarem por baixo dela num cartão estreito. */}
           <div className="pointer-events-none absolute left-2 right-12 top-2 z-10 flex flex-wrap items-center gap-1.5">
             {product.featured && (
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm" title="Destaque">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-xs" title="Destaque">
                 <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                 <span className="sr-only">Destaque</span>
               </span>
             )}
             {discount > 0 && inStock && (
-              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white shadow-sm tabular-nums">−{discount}%</span>
+              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white shadow-xs tabular-nums">−{discount}%</span>
             )}
             {/* Com stock baixo, a etiqueta do admin (muitas vezes "Últimas unidades") repetia o
                 "Restam N" por baixo do preço. */}
             {product.ribbon_text && inStock && !isLowStock && !discount
               && product.ribbon_text.trim().toLowerCase() !== 'destaque' && (
-              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs">
                 {product.ribbon_text}
               </span>
             )}
@@ -316,7 +316,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             <button
               type="button"
               onClick={() => toggleWishlist(product)}
-              className={`${iconButton} bg-background/90 backdrop-blur-sm hover:bg-background`}
+              className={`${iconButton} bg-background/90 backdrop-blur-xs hover:bg-background`}
               aria-label={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
               title={isWish ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
             >
@@ -346,7 +346,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           <button
             type="button"
             onClick={handleQuickView}
-            className="absolute inset-x-2 bottom-2 z-20 hidden items-center justify-center gap-1.5 rounded-lg bg-background/95 py-1.5 text-xs font-medium shadow-sm backdrop-blur-sm transition-opacity duration-base hover:bg-background focus-visible:opacity-100 sm:flex sm:opacity-0 sm:group-hover:opacity-100"
+            className="absolute inset-x-2 bottom-2 z-20 hidden items-center justify-center gap-1.5 rounded-lg bg-background/95 py-1.5 text-xs font-medium shadow-xs backdrop-blur-xs transition-opacity duration-base hover:bg-background focus-visible:opacity-100 sm:flex sm:opacity-0 sm:group-hover:opacity-100"
             aria-label={`Visualização rápida de ${product.title}`}
           >
             <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Visualização rápida
@@ -358,7 +358,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             que os preços e os botões fiquem alinhados em toda a fila, com ou sem subtítulo.
             O código interno (LIV-…) fica na página do livro e na pesquisa. */}
         <Link to={`/product/${product.id}`} onClick={handleQuickView} className="flex flex-1 flex-col px-2.5 pt-2 sm:px-3 sm:pt-2.5">
-          <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground transition-colors [font-family:inherit] group-hover:text-primary sm:text-sm">
+          <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground transition-colors font-[inherit] group-hover:text-primary sm:text-sm/5">
             {product.title}
           </h3>
           <p className="mt-0.5 line-clamp-1 min-h-[1.4em] text-xs text-muted-foreground">{product.subtitle || '\u00a0'}</p>
@@ -449,7 +449,7 @@ export function ProductGrid({ products, isLoading, onCartOpen, viewMode = 'grid'
     return (
       <div className={viewMode === 'list' ? 'product-grid grid grid-cols-1 gap-6' : PRODUCT_GRID_CLASS}>
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="animate-pulse bg-muted rounded-xl aspect-[2/3]" />
+          <div key={i} className="animate-pulse bg-muted rounded-xl aspect-2/3" />
         ))}
       </div>
     );

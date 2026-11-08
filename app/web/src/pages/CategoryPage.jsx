@@ -73,13 +73,13 @@ const CategoryPage = () => {
           <ChevronRight className="h-4 w-4" />
           <span className="text-white">{categoryName}</span>
         </nav>
-        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">{categoryName}</h1>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">{categoryName}</h1>
         <p className="text-base text-white/85 sm:text-lg">Os livros desta categoria, com filtros e ordenação</p>
       </PageBannerSlider>
 
       <main className="container-custom py-12 min-h-screen">
         <div className="flex flex-col lg:flex-row gap-8">
-          <aside className="hidden lg:block w-64 flex-shrink-0">
+          <aside className="hidden lg:block w-64 shrink-0">
             <div className="sticky top-24 bg-card border border-border rounded-xl p-6">
               <FilterPanel 
                 availableFilters={availableFilters}

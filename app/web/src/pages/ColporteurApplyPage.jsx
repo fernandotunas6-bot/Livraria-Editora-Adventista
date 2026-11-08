@@ -89,7 +89,7 @@ export default function ColporteurApplyPage() {
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
       <main className="bg-background">
-        <section className="border-b border-border bg-gradient-to-b from-primary/10 to-background">
+        <section className="border-b border-border bg-linear-to-b from-primary/10 to-background">
           <div className="container mx-auto max-w-3xl px-4 py-10 sm:py-14">
             <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">Evangelismo pela literatura</p>
             <h1 className="mb-3 text-3xl font-bold sm:text-4xl">Quer ser colportor?</h1>
@@ -215,7 +215,7 @@ export default function ColporteurApplyPage() {
               </fieldset>
 
               {/* Isco para robôs: escondido de quem vê a página. */}
-              <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <div aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
                 <label htmlFor="cp-site">Website</label>
                 <input id="cp-site" tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => set({ website: e.target.value })} />
               </div>

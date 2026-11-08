@@ -29,7 +29,7 @@ export default function ChatHome({ name, welcome, onPick, disabled = false, onSe
   return (
     <div className="space-y-4 pb-1">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm" aria-hidden>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary shadow-xs" aria-hidden>
           <img src="/logo-icon-light.svg" alt="" className="h-6 w-6 object-contain" />
         </span>
         <div className="min-w-0">
@@ -49,7 +49,7 @@ export default function ChatHome({ name, welcome, onPick, disabled = false, onSe
             aria-describedby={`${hintId}-${i}`}
             disabled={disabled}
             onClick={() => onPick(a.message)}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-border/70 bg-card p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+            className="group flex flex-col items-start gap-1.5 rounded-xl border border-border/70 bg-card p-3 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-marca/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
               <a.icon className="h-4 w-4" />

@@ -67,7 +67,7 @@ export default function MobileBottomNav() {
       <nav
         aria-label="Navegação principal"
         className={cn(
-          'safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden',
+          'safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-xs transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden',
           hidden && 'translate-y-full',
         )}
       >

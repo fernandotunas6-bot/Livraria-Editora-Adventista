@@ -81,7 +81,7 @@ const ContactPage = () => {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider>
-        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Contacte-nos</h1>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Contacte-nos</h1>
         <p className="text-base text-white/85 sm:text-lg">Teremos todo o gosto em ouvir de si</p>
       </PageBannerSlider>
 
@@ -192,7 +192,7 @@ const ContactPage = () => {
                 <div className="space-y-6">
                   {contactEmail && (
                     <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <Mail className="h-5 w-5 text-primary" />
                       </div>
                       <div>
@@ -204,7 +204,7 @@ const ContactPage = () => {
 
                   {contactPhone && (
                     <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <Phone className="h-5 w-5 text-primary" />
                       </div>
                       <div>
@@ -215,7 +215,7 @@ const ContactPage = () => {
                   )}
 
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <MapPin className="h-5 w-5 text-primary" />
                     </div>
                     <div>

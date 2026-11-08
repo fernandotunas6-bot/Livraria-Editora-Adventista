@@ -10,9 +10,9 @@ import TopicIcon from '@/components/community/TopicIcon';
 export function GoldRule({ className = '' }) {
   return (
     <div className={`flex items-center gap-3 ${className}`} aria-hidden="true">
-      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-editorial-ouro/70" />
+      <span className="h-px flex-1 bg-linear-to-r from-transparent to-editorial-ouro/70" />
       <span className="h-1.5 w-1.5 rotate-45 bg-editorial-ouro" />
-      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-editorial-ouro/70" />
+      <span className="h-px flex-1 bg-linear-to-l from-transparent to-editorial-ouro/70" />
     </div>
   );
 }
@@ -52,9 +52,9 @@ export function ClubBanner({ club }) {
   if (!club) return null;
   const month = new Date(`${club.month}T12:00:00`).toLocaleDateString('pt-PT', { month: 'long' });
   return (
-    <section aria-labelledby="clube-do-livro" className="overflow-hidden rounded-2xl border border-editorial-ouro/40 bg-gradient-to-br from-editorial-papel to-editorial-tela shadow-sm">
+    <section aria-labelledby="clube-do-livro" className="overflow-hidden rounded-2xl border border-editorial-ouro/40 bg-linear-to-br from-editorial-papel to-editorial-tela shadow-xs">
       <div className="flex items-start gap-4 p-4 sm:items-center sm:p-5">
-        {club.book_cover && <img src={club.book_cover} alt={`Capa de ${club.book_title}`} className="h-28 w-[4.5rem] shrink-0 rounded-md object-cover shadow-md sm:h-36 sm:w-24" />}
+        {club.book_cover && <img src={club.book_cover} alt={`Capa de ${club.book_title}`} className="h-28 w-18 shrink-0 rounded-md object-cover shadow-md sm:h-36 sm:w-24" />}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-ouro-texto">Clube do livro · {month}</p>
           <h2 id="clube-do-livro" className="mt-1 text-xl font-semibold text-editorial-tinta sm:text-2xl">{club.title || club.book_title}</h2>
@@ -111,7 +111,7 @@ export function TopicNav({ topics = [], active = '', onChange, counts = {} }) {
   return (
     <nav aria-label="Temas da comunidade">
       <p className="mb-2 hidden px-3 text-xs font-semibold uppercase tracking-[0.18em] text-editorial-tinta-suave lg:block">Temas</p>
-      <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1.5rem),transparent)] [scrollbar-width:none] lg:mx-0 lg:snap-none lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:[mask-image:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 mask-[linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1.5rem),transparent)] scrollbar-none lg:mx-0 lg:snap-none lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:mask-none [&::-webkit-scrollbar]:hidden">
         {item('', 'Todos os temas', <LayoutGrid className="h-4 w-4" aria-hidden="true" />)}
         {topics.map((t) => item(t.slug, t.name, <TopicIcon name={t.icon} />))}
       </div>
@@ -136,7 +136,7 @@ export function FeedToolbar({ filters, onChange }) {
             <button
               key={s.value} type="button" role="tab" aria-selected={filters.sort === s.value}
               onClick={() => onChange({ sort: s.value })}
-              className={`flex min-h-10 items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors sm:min-h-9 ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-sm' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
+              className={`flex min-h-10 items-center gap-1 rounded-full px-3.5 py-1.5 text-sm transition-colors sm:min-h-9 ${filters.sort === s.value ? 'bg-editorial-papel font-semibold text-editorial-tinta shadow-xs' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
             >
               {s.value === 'em_alta' && <Flame className="h-3.5 w-3.5" aria-hidden="true" />}
               {s.label}
@@ -157,7 +157,7 @@ export function FeedToolbar({ filters, onChange }) {
         </form>
       </div>
       {/* No telemóvel numa só fila que desliza (eram duas linhas, e o botão do chat tapava uma). */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de publicação">
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de publicação">
         <button type="button" className={chip(!filters.kind)} aria-pressed={!filters.kind} onClick={() => onChange({ kind: '' })}>Tudo</button>
         {POST_KINDS.map((k) => (
           <button key={k.value} type="button" className={chip(filters.kind === k.value)} aria-pressed={filters.kind === k.value} onClick={() => onChange({ kind: filters.kind === k.value ? '' : k.value })}>
@@ -183,7 +183,7 @@ export function CommunitySidebar({ sidebar }) {
             {books.map((b) => (
               <li key={b.id}>
                 <Link to={`/comunidade?livro=${encodeURIComponent(b.id)}`} className="flex items-center gap-3 rounded-lg p-1 hover:bg-editorial-tela">
-                  {b.cover ? <img src={b.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover shadow-sm" /> : <span className="h-14 w-10 shrink-0 rounded bg-editorial-tela" aria-hidden="true" />}
+                  {b.cover ? <img src={b.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover shadow-xs" /> : <span className="h-14 w-10 shrink-0 rounded bg-editorial-tela" aria-hidden="true" />}
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-editorial-tinta">{b.title}</span>
                     <span className="block text-xs text-editorial-tinta-suave">{plural(b.posts, 'publicação', 'publicações')}</span>
@@ -243,7 +243,7 @@ export function MobileHighlights({ sidebar }) {
             {books.map((b) => (
               <li key={b.id} className="shrink-0">
                 <Link to={`/comunidade?livro=${encodeURIComponent(b.id)}`} className="flex w-56 items-center gap-3 rounded-xl border border-editorial-filete bg-editorial-papel p-2">
-                  {b.cover ? <img src={b.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover shadow-sm" /> : <span className="h-14 w-10 shrink-0 rounded bg-editorial-tela" aria-hidden="true" />}
+                  {b.cover ? <img src={b.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover shadow-xs" /> : <span className="h-14 w-10 shrink-0 rounded bg-editorial-tela" aria-hidden="true" />}
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-editorial-tinta">{b.title}</span>
                     <span className="block text-xs text-editorial-tinta-suave">{plural(b.posts, 'publicação', 'publicações')}</span>

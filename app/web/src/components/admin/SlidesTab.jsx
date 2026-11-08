@@ -488,7 +488,7 @@ export default function SlidesTab({ onChange }) {
                   )}
                   {form.book_cover && (
                     <div className="flex gap-4 items-start p-3 rounded-xl border bg-muted/20">
-                      <img src={form.book_cover} alt="" className="w-20 h-28 object-cover rounded-lg shadow" />
+                      <img src={form.book_cover} alt="" className="w-20 h-28 object-cover rounded-lg shadow-sm" />
                       <div>
                         <p className="font-semibold">{form.book_title}</p>
                         <p className="text-sm text-muted-foreground">{form.book_author}</p>
@@ -642,7 +642,7 @@ export default function SlidesTab({ onChange }) {
                   {/* Mini preview */}
                   <div className="rounded-xl border overflow-hidden">
                     <p className="text-xs font-medium text-muted-foreground px-3 py-2 border-b flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Pré-visualização</p>
-                    <div className="relative h-40 bg-gradient-to-r from-[#0c4a6e] to-marca flex items-center p-4">
+                    <div className="relative h-40 bg-linear-to-r from-[#0c4a6e] to-marca flex items-center p-4">
                       {previewTemplate === 'book_promo' && form.book_cover && (
                         <img src={form.book_cover} alt="" className="w-16 h-24 object-cover rounded shadow-lg mr-4" />
                       )}

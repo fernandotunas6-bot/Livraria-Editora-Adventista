@@ -54,7 +54,7 @@ function ImageCard({ to, image, title, subtitle, onNavigate, tall = false }) {
       onClick={onNavigate}
       className="group/card block rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-marca/50 hover:shadow-md transition-all"
     >
-      <div className={`${tall ? 'aspect-[3/4]' : 'aspect-[4/3]'} bg-muted overflow-hidden`}>
+      <div className={`${tall ? 'aspect-3/4' : 'aspect-4/3'} bg-muted overflow-hidden`}>
         {image ? (
           <img
             src={image}
@@ -188,7 +188,7 @@ export default function MegaMenu() {
                 p ? (
                   <ImageCard key={p.id} to={`/product/${p.id}`} image={p.image} title={p.title} subtitle={displayPrice(p).price} onNavigate={close} tall />
                 ) : (
-                  <div key={i} className="aspect-[3/4] rounded-xl bg-muted animate-pulse" />
+                  <div key={i} className="aspect-3/4 rounded-xl bg-muted animate-pulse" />
                 )
               ))}
             </div>
@@ -235,7 +235,7 @@ export default function MegaMenu() {
               c ? (
                 <ImageCard key={c.id} to={`/colecoes/${c.slug || c.id}`} image={c.cover} title={c.title} subtitle={c.marketing_tagline} onNavigate={close} />
               ) : (
-                <div key={i} className="aspect-[4/3] rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="aspect-4/3 rounded-xl bg-muted animate-pulse" />
               )
             ))}
           </div>
@@ -275,7 +275,7 @@ export default function MegaMenu() {
                 <Link
                   to="/track"
                   onClick={close}
-                  className="rounded-xl border border-border bg-gradient-to-br from-marca/15 to-transparent p-5 flex flex-col justify-between hover:border-marca/50 hover:shadow-md transition-all"
+                  className="rounded-xl border border-border bg-linear-to-br from-marca/15 to-transparent p-5 flex flex-col justify-between hover:border-marca/50 hover:shadow-md transition-all"
                 >
                   <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center"><Truck className="h-5 w-5" /></span>
                   <span>
@@ -332,7 +332,7 @@ export default function MegaMenu() {
                 key={tab}
                 to={`/admin?tab=${tab}`}
                 onClick={close}
-                className="group/tile rounded-xl border border-border p-4 bg-gradient-to-br from-marca/10 to-transparent hover:border-marca/50 hover:shadow-md transition-all"
+                className="group/tile rounded-xl border border-border p-4 bg-linear-to-br from-marca/10 to-transparent hover:border-marca/50 hover:shadow-md transition-all"
               >
                 <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center mb-6 transition-transform group-hover/tile:scale-110">
                   <Icon className="h-5 w-5" aria-hidden="true" />

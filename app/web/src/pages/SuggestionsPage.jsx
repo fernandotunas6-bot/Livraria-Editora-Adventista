@@ -75,7 +75,7 @@ export default function SuggestionsPage() {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider>
-        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Sugestões para si</h1>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Sugestões para si</h1>
         <p className="text-base text-white/85 sm:text-lg">
           {data?.personal ? 'Escolhidas a partir dos livros que viu, guardou e comprou.' : 'As novidades da livraria e os livros que andou a ver.'}
         </p>
@@ -86,7 +86,7 @@ export default function SuggestionsPage() {
           {loading && (
             <div className={PRODUCT_GRID_CLASS} role="status" aria-busy="true" aria-label="A carregar sugestões">
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
+                <div key={i} className="aspect-2/3 animate-pulse rounded-xl bg-muted" />
               ))}
             </div>
           )}

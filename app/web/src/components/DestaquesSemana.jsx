@@ -95,7 +95,7 @@ export default function DestaquesSemana({ onCartOpen }) {
   return (
     <>
     <section
-      className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-slate-950 to-background text-white py-16 md:py-24 border-b border-border"
+      className="relative overflow-hidden bg-linear-to-b from-slate-900 via-slate-950 to-background text-white py-16 md:py-24 border-b border-border"
       {...(books.length > 1 ? swipe : {})}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -154,14 +154,14 @@ export default function DestaquesSemana({ onCartOpen }) {
                 <button
                   type="button"
                   onClick={() => setQuickView(currentBook)}
-                  className="group relative block aspect-[3/4] w-64 md:w-full max-w-[280px] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(14,165,201,0.25)] border border-slate-800 text-left"
+                  className="group relative block aspect-3/4 w-64 md:w-full max-w-[280px] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(14,165,201,0.25)] border border-slate-800 text-left"
                 >
                   <img
                     src={currentBook.image || PLACEHOLDER}
                     alt={currentBook.title}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-slow"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 justify-center">
+                  <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 justify-center">
                     <span className="text-sm font-semibold bg-primary text-white px-4 py-2 rounded-full">Ver detalhes</span>
                   </div>
                 </button>
@@ -173,7 +173,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                   {currentBook.book_code && (
                     <code className="text-xs text-[#22d3ee] font-mono">{currentBook.book_code}</code>
                   )}
-                  <h3 className="text-2xl md:text-4xl font-extrabold text-white leading-tight line-clamp-2 mt-1">
+                  <h3 className="text-2xl md:text-4xl/10 font-extrabold text-white leading-tight line-clamp-2 mt-1">
                     {currentBook.title}
                   </h3>
                   {currentBook.subtitle && (
@@ -186,7 +186,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                   )}
                 </div>
 
-                <p className="text-slate-300 text-base md:text-lg line-clamp-3 leading-relaxed">
+                <p className="text-slate-300 text-base md:text-lg/7 line-clamp-3 leading-relaxed">
                   {currentBook.description?.replace(/<[^>]+>/g, ' ').trim() || 'Literatura adventista de qualidade — disponível na nossa loja.'}
                 </p>
 

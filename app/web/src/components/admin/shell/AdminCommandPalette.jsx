@@ -45,7 +45,7 @@ export default function AdminCommandPalette({
         <DialogTitle className="sr-only">Procurar no painel</DialogTitle>
         <DialogDescription className="sr-only">Escreva o nome de uma secção, um número de encomenda ou um produto.</DialogDescription>
         <Command
-          className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:py-2.5"
+          className="**:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-input]]:h-12 **:[[cmdk-item]]:py-2.5"
           filter={(value, search, keywords) => {
             const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
             if (value.startsWith('acao:')) return 1;

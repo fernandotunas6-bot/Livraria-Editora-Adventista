@@ -102,7 +102,7 @@ function SlideContent({ slide }) {
         )}
         <div>
           {slide.promo_badge && <span className="inline-block bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full mb-3">{slide.promo_badge}</span>}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 leading-tight">{slide.title}</h1>
+          <h1 className="text-3xl sm:text-4xl/10 md:text-5xl/none font-bold mb-3 leading-tight">{slide.title}</h1>
           {slide.book_author && <p className="text-[#22d3ee] font-medium mb-2">{slide.book_author}</p>}
           {slide.subtitle && <p className="text-lg text-white/85 mb-2">{slide.subtitle}</p>}
           {slide.body_html && <div className="text-sm text-white/75 prose prose-invert prose-sm max-w-none mb-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(slide.body_html) }} />}
@@ -116,12 +116,12 @@ function SlideContent({ slide }) {
   if (template === 'split') {
     return (
       <div className="grid md:grid-cols-2 gap-8 items-center max-w-5xl text-white w-full">
-        <div className="hidden md:block rounded-2xl overflow-hidden shadow-2xl aspect-[4/3]">
+        <div className="hidden md:block rounded-2xl overflow-hidden shadow-2xl aspect-4/3">
           <SlideMedia slide={slide} eager={false} />
         </div>
         <div>
           {slide.promo_badge && <span className="inline-block bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">{slide.promo_badge}</span>}
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">{slide.title}</h1>
+          <h1 className="text-4xl md:text-5xl/none font-bold mb-4 leading-tight">{slide.title}</h1>
           {slide.subtitle && <p className="text-lg text-white/85 mb-4">{slide.subtitle}</p>}
           {slide.body_html && <div className="text-sm text-white/75 prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(slide.body_html) }} />}
           {ctaButton}
@@ -145,7 +145,7 @@ function SlideContent({ slide }) {
   return (
     <div className="max-w-2xl text-white">
       {slide.promo_badge && <span className="inline-block bg-amber-400/90 text-amber-900 text-xs font-bold px-3 py-1 rounded-full mb-3">{slide.promo_badge}</span>}
-      <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 md:mb-6 text-balance leading-tight">{slide.title}</h1>
+      <h1 className="text-4xl sm:text-5xl/none md:text-6xl/none lg:text-7xl/none font-bold mb-4 md:mb-6 text-balance leading-tight">{slide.title}</h1>
       {slide.subtitle && <p className="text-lg md:text-xl text-white/85 mb-4 max-w-xl">{slide.subtitle}</p>}
       {slide.body_html && <div className="text-sm text-white/75 prose prose-invert prose-sm max-w-none mb-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(slide.body_html) }} />}
       {priceLabel && <p className="text-2xl font-bold text-[#22d3ee] mb-2">{priceLabel}</p>}
@@ -218,10 +218,10 @@ const HeroSlider = () => {
                   direita do subtítulo e do botão cai sobre a zona clara da imagem — em cima das
                   capas, que são o que há de mais claro. No computador o texto ocupa o terço
                   esquerdo e o gradiente original chega, por isso fica como estava. */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/50 md:from-black/75 md:via-black/45 md:to-black/20" />
+              <div className="absolute inset-0 bg-linear-to-r from-black/85 via-black/70 to-black/50 md:from-black/75 md:via-black/45 md:to-black/20" />
             </>
           )}
-          {isSplit && <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand-dark)] to-[var(--brand-primary)]" />}
+          {isSplit && <div className="absolute inset-0 bg-linear-to-br from-(--brand-dark) to-(--brand-primary)" />}
         </motion.div>
       </AnimatePresence>
 
@@ -243,10 +243,10 @@ const HeroSlider = () => {
               que tem de largura máxima, por isso em tudo abaixo de ~1392px (um portátil de
               1366 incluído) a seta assentava em cima do título. Em baixo não há largura em
               que colida. */}
-          <button type="button" onClick={prev} className="absolute left-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Slide anterior">
+          <button type="button" onClick={prev} className="absolute left-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Slide anterior">
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <button type="button" onClick={next} className="absolute right-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm" aria-label="Próximo slide">
+          <button type="button" onClick={next} className="absolute right-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Próximo slide">
             <ChevronRight className="h-6 w-6" />
           </button>
           {/* O ponto mede 8px: em vez de o engordar, o botão à volta dele passa a medir 24,
@@ -270,7 +270,7 @@ const HeroSlider = () => {
             {!paused && (
               <motion.div
                 key={`progress-${current}-${progressKey}`}
-                className="h-full bg-[var(--brand-primary)]"
+                className="h-full bg-(--brand-primary)"
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
                 transition={{ duration: duration / 1000, ease: 'linear' }}

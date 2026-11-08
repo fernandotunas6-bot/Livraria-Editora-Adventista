@@ -442,7 +442,7 @@ export default function AppsTab() {
           )}
           
           {apps.map((app) => (
-            <div key={app.id} className="bg-card border rounded-xl p-5 space-y-4 shadow-xs hover:shadow-md transition-shadow duration-base">
+            <div key={app.id} className="bg-card border rounded-xl p-5 space-y-4 shadow-2xs hover:shadow-md transition-shadow duration-base">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl p-2 bg-muted rounded-xl">{app.icon || '⚙️'}</span>
@@ -639,7 +639,7 @@ export default function AppsTab() {
                           </p>
                           {isEmail ? (
                             <div 
-                              className="border rounded p-3 bg-white text-black text-xs overflow-auto max-h-80 shadow-xs"
+                              className="border rounded p-3 bg-white text-black text-xs overflow-auto max-h-80 shadow-2xs"
                               dangerouslySetInnerHTML={{ __html: sanitizeHtml(log.content) }}
                             />
                           ) : (

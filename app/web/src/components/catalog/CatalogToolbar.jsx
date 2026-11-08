@@ -38,7 +38,7 @@ export default function CatalogToolbar({
   const mostraIntervalo = Number.isFinite(shownTo) && total > (shownCount ?? shownTo ?? 0);
 
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm ${className}`}>
+    <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs ${className}`}>
       <div className="flex flex-wrap items-center gap-2">
         {onOpenFilters && (
           <Tooltip>

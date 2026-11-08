@@ -12,7 +12,7 @@ export function NativeSelect({ value, onChange, children, className, ...props })
     <select
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
-      className={cn('flex h-11 sm:h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50', className)}
+      className={cn('flex h-11 sm:h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50', className)}
       {...props}
     >
       {children}

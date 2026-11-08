@@ -80,7 +80,7 @@ export default function StickyBuyBar({ alvo, price, originalPrice, onBuy, onAdd,
 
   return (
     <div
-      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm animate-in slide-in-from-bottom-4 duration-200 md:hidden"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-xs animate-in slide-in-from-bottom-4 duration-200 md:hidden"
       style={{ boxShadow: '0 -4px 16px -6px rgb(0 0 0 / 0.14)' }}
     >
       <div className="flex items-center gap-2 px-4 py-3">

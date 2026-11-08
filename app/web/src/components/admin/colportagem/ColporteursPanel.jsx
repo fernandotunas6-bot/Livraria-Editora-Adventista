@@ -53,7 +53,7 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
             {Object.entries(CATEGORIES).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
           </NativeSelect>
         )}
-        <NativeSelect value={district} onChange={setDistrict} className="w-auto max-w-[14rem]">
+        <NativeSelect value={district} onChange={setDistrict} className="w-auto max-w-56">
           <option value="">Todos os distritos</option>
           {[...reg.districts].sort((a, b) => a.name.localeCompare(b.name)).map((d) => <option key={d.id} value={d.id}>{d.name} · {idx.provinceName(d.province_id)}</option>)}
         </NativeSelect>

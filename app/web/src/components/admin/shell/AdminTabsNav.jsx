@@ -38,7 +38,7 @@ export default function AdminTabsNav({ nav, active, onNavigate, compact = false 
     <div className={cn('border-b border-border bg-background', compact && 'sticky top-14 z-20')}>
       {!compact && (
         <nav aria-label="Grupos do painel" className="px-3 sm:px-4 lg:px-6">
-          <ul className="-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none]">
+          <ul className="-mb-px flex gap-1 overflow-x-auto scrollbar-none">
             {nav.map((group) => {
               const isActive = group.id === activeGroup?.id;
               const total = groupTotal(group);
@@ -49,7 +49,7 @@ export default function AdminTabsNav({ nav, active, onNavigate, compact = false 
                     onClick={() => openGroup(group)}
                     aria-current={isActive ? 'true' : undefined}
                     className={cn(
-                      'inline-flex h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                      'inline-flex h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
                       isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
                     )}
                   >
@@ -67,7 +67,7 @@ export default function AdminTabsNav({ nav, active, onNavigate, compact = false 
           aria-label={`Secções de ${activeGroup.label || 'Início'}`}
           className={cn('px-3 sm:px-4 lg:px-6', !compact && 'border-t border-border bg-muted/40')}
         >
-          <ul ref={sectionsRef} className="flex gap-1.5 overflow-x-auto py-2 [scrollbar-width:none]">
+          <ul ref={sectionsRef} className="flex gap-1.5 overflow-x-auto py-2 scrollbar-none">
             {activeGroup.items.map((item) => {
               const isActive = item.id === active;
               const Icon = item.icon;
@@ -78,9 +78,9 @@ export default function AdminTabsNav({ nav, active, onNavigate, compact = false 
                     onClick={() => onNavigate(item.id)}
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
-                      'inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
                       isActive
-                        ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                        ? 'border-primary bg-primary text-primary-foreground shadow-xs'
                         : 'border-border bg-background text-foreground/80 hover:border-primary/50 hover:text-foreground',
                     )}
                   >

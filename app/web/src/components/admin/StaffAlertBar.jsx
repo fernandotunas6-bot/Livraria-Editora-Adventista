@@ -134,7 +134,7 @@ export default function StaffAlertBar({ onOpen }) {
         )}
         {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         {alerts.slice(0, 4).map((a) => (
-          <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-background/90 px-3 py-2 text-sm shadow-sm">
+          <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-background/90 px-3 py-2 text-sm shadow-xs">
             {a.severity === 'critical' ? <Siren className="h-4 w-4 shrink-0 text-destructive" /> : <BellRing className="h-4 w-4 shrink-0 text-amber-600" />}
             <span className="min-w-0 flex-1">
               <span className="font-semibold">{a.title}</span>

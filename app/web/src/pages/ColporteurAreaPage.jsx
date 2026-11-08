@@ -93,7 +93,7 @@ export default function ColporteurAreaPage() {
     const status = STATUSES[me.status] || { label: me.status, tone: 'muted' };
     body = (
       <div className="space-y-6">
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 to-background p-6">
+        <div className="rounded-2xl border border-border bg-linear-to-br from-primary/10 to-background p-6">
           <p className="text-sm text-muted-foreground">Colportor</p>
           <h2 className="text-2xl font-bold">{me.full_name}</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2">

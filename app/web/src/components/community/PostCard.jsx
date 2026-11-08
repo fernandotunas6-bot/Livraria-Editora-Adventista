@@ -31,7 +31,7 @@ function Body({ text, clamp = true }) {
   const long = clamp && needsClamp(text);
   return (
     <div>
-      <p className={`whitespace-pre-line break-words text-[15px] leading-relaxed text-editorial-tinta ${long && !open ? 'line-clamp-6' : ''}`}>
+      <p className={`whitespace-pre-line wrap-break-word text-[15px] leading-relaxed text-editorial-tinta ${long && !open ? 'line-clamp-6' : ''}`}>
         {linkifySegments(text).map((seg, i) => (seg.type === 'link'
           ? <a key={i} href={seg.href} target="_blank" rel={USER_LINK_REL} className="break-all text-editorial-petroleo underline underline-offset-2">{seg.label}</a>
           : <React.Fragment key={i}>{seg.value}</React.Fragment>))}
@@ -246,7 +246,7 @@ function BookCard({ post }) {
       className="flex items-center gap-3 rounded-xl border border-editorial-filete bg-editorial-papel p-2.5 transition-colors hover:bg-editorial-tela"
     >
       {post.book_cover ? (
-        <img src={post.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />
+        <img src={post.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />
       ) : (
         <span className="grid h-16 w-11 shrink-0 place-items-center rounded bg-editorial-tela" aria-hidden="true"><BookOpen className="h-5 w-5 text-editorial-ouro" /></span>
       )}

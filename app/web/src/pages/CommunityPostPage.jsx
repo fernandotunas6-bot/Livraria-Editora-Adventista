@@ -112,7 +112,7 @@ export default function CommunityPostPage() {
                     {related.map((r) => (
                       <li key={r.id}>
                         <Link to={postPath(r.id)} className="flex h-full gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
-                          {r.book_cover && <img src={r.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />}
+                          {r.book_cover && <img src={r.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />}
                           <span className="min-w-0">
                             <span className="block text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(r.kind).label}</span>
                             <span className="mt-1 line-clamp-3 block text-sm text-editorial-tinta">{r.body}</span>

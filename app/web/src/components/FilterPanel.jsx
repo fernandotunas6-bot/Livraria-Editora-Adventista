@@ -49,7 +49,7 @@ const FilterPanel = ({
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-foreground">Refinar catálogo</h2>
         {filterCount > 0 && (
-          <span className="bg-[rgb(var(--brand-primary-rgb)/0.1)] text-[var(--brand-primary)] text-xs font-medium px-2.5 py-0.5 rounded-full">
+          <span className="bg-[rgb(var(--brand-primary-rgb)/0.1)] text-(--brand-primary) text-xs font-medium px-2.5 py-0.5 rounded-full">
             {filterCount} activo{filterCount !== 1 ? 's' : ''}
           </span>
         )}
@@ -58,7 +58,7 @@ const FilterPanel = ({
       {/* Disponibilidade */}
       <div>
         <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
-          <Package className="h-3.5 w-3.5 text-[var(--brand-primary)]" /> Disponibilidade
+          <Package className="h-3.5 w-3.5 text-(--brand-primary)" /> Disponibilidade
         </h3>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ const FilterPanel = ({
       {bookCollections.length > 0 && (
         <div>
           <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-[var(--brand-primary)]" /> Coleção
+            <Layers className="h-3.5 w-3.5 text-(--brand-primary)" /> Coleção
           </h3>
           <Select
             value={activeFilters.collection || '_all'}
@@ -105,7 +105,7 @@ const FilterPanel = ({
       {genres.length > 0 && (
         <div>
           <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
-            <BookOpen className="h-3.5 w-3.5 text-[var(--brand-primary)]" /> Género
+            <BookOpen className="h-3.5 w-3.5 text-(--brand-primary)" /> Género
           </h3>
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
             {genres.map((cat) => {
