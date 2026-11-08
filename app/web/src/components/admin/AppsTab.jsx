@@ -34,6 +34,12 @@ const LOG_CONTEXT = {
   campaign: 'Campanha',
   account: 'Conta',
   welcome: 'Boas-vindas',
+  thanks: 'Agradecimento',
+  support_reply: 'Resposta do atendimento',
+  support_notice: 'Aviso do atendimento',
+  staff_alert: 'Aviso à equipa',
+  staff_summary: 'Resumo diário da equipa',
+  staff_report: 'Relatório semanal',
 };
 
 // Integrações com efeito real no site (lidas pela Edge Function ou pelo painel).

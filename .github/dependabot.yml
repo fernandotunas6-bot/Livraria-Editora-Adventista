@@ -1,0 +1,27 @@
+# Actualizações automáticas das dependências (pedidos de alteração abertos pelo Dependabot).
+#
+# As GitHub Actions estão fixadas por commit (SHA) nos workflows, para que uma etiqueta mexida
+# num repositório de terceiros não chegue aos segredos de deploy. O Dependabot é quem as mantém
+# actualizadas: abre um PR com o SHA novo, que passa pelo CI antes de entrar.
+#
+# Uma vez por mês e agrupado (um PR por ecossistema), para não encher a lista de PRs. As
+# correcções de segurança chegam fora deste calendário quando os "Dependabot alerts" e
+# "Dependabot security updates" estão ligados em Settings → Code security.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      dependencias:
+        update-types: [minor, patch]

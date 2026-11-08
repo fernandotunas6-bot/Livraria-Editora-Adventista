@@ -119,8 +119,14 @@ export function buildReceiptHtml(order, brand = {}) {
     return `<tr><td>${qty}× ${e(orderItemTitle(item))}${code}</td><td class="num">${old}${fmtMoney(price * qty)}</td></tr>`;
   }).join('');
   const paymentStatus = {
-    paid: 'Pago', awaiting_confirmation: 'A aguardar confirmação', pending: 'Pendente', failed: 'Falhou', refunded: 'Reembolsado',
+    paid: 'Pago', awaiting_confirmation: 'A aguardar confirmação', partially_paid: 'Pago em parte', pending: 'Pendente',
+    failed: 'Não confirmado', refunded: 'Reembolsado',
   }[order.paymentStatus] || '';
+  // Um recibo prova um pagamento: antes de pago, o documento é uma nota de encomenda.
+  const docTitle = receiptTitle(order);
+  const paid = Number(order.amountPaid) || 0;
+  const due = Math.max((Number(order.total) || 0) - paid, 0);
+  const company = [brand.legalName, brand.nif ? `NIF ${brand.nif}` : ''].filter(Boolean).map(e).join(' · ');
   const contact = [brand.phone, brand.email, brand.address].filter(Boolean).map(e).join(' · ');
   const logo = /^(https:\/\/|data:image\/)/.test(brand.logo || '') ? `<img src="${e(brand.logo)}" alt="" class="logo"/>` : '';
   const delivery = order.shippingMethod === 'pickup'
@@ -132,7 +138,7 @@ export function buildReceiptHtml(order, brand = {}) {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Recibo ${e(order.orderNumber || '')}</title>
+  <title>${docTitle} ${e(order.orderNumber || '')}</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 24px; color: #1a1a1a; }
     header { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #0ea5c9; padding-bottom: 14px; margin-bottom: 18px; }
@@ -167,10 +173,11 @@ export function buildReceiptHtml(order, brand = {}) {
     <div>
       <h1>${e(siteName)}</h1>
       ${contact ? `<p class="contact">${contact}</p>` : ''}
+      ${company ? `<p class="contact">${company}</p>` : ''}
     </div>
   </header>
   <div class="meta">
-    <span>Recibo <strong>${e(order.orderNumber || '—')}</strong></span>
+    <span>${docTitle} <strong>${e(order.orderNumber || '—')}</strong></span>
     <span>${e(fmtDate(order.createdAt))}</span>
   </div>
   <p><strong>Cliente:</strong> ${e(order.customerName || '—')}<br/>
@@ -183,6 +190,8 @@ export function buildReceiptHtml(order, brand = {}) {
     ${order.subtotal != null ? `<p>Subtotal: ${fmtMoney(order.subtotal)}</p>` : ''}
     ${order.shippingCost != null ? `<p>Envio: ${order.shippingCost > 0 ? fmtMoney(order.shippingCost) : 'Grátis'}</p>` : ''}
     <p class="total">Total: ${fmtMoney(order.total)}</p>
+    ${order.amountPaid != null && paid > 0 && due > 0 ? `<p>Pago: ${fmtMoney(paid)} · Em falta: ${fmtMoney(due)}</p>` : ''}
+    ${Number(order.amountRefunded) > 0 ? `<p>Reembolsado: ${fmtMoney(order.amountRefunded)}</p>` : ''}
   </div>
   ${order.paymentMethod || order.paymentReference || paymentStatus ? `<div class="payment">
     ${order.paymentMethod ? `<div><strong>Pagamento:</strong> ${e(order.paymentMethod)}${paymentStatus ? ` — ${e(paymentStatus)}` : ''}</div>` : ''}
@@ -190,7 +199,7 @@ export function buildReceiptHtml(order, brand = {}) {
     ${/^https:\/\//.test(order.paymentLink || '') && order.paymentStatus !== 'paid' ? `<div><a href="${e(order.paymentLink)}">Pagar pelo link</a></div>` : ''}
   </div>` : ''}
   ${buildSignatureHtmlBlock(order)}
-  <p class="footer">Documento gerado automaticamente. Guarde para referência.<br/>
+  <p class="footer">${docTitle === 'Recibo' ? 'Documento gerado automaticamente. Guarde para referência.' : 'Nota de encomenda: não é recibo nem factura. O recibo fica disponível quando o pagamento for confirmado.'}<br/>
     <button class="print" onclick="window.print()">Imprimir / guardar como PDF</button>
   </p>
 </body>
@@ -218,7 +227,19 @@ export function receiptBrand(settings = {}) {
     phone: settings.contact_phone || '',
     email: settings.contact_email || '',
     address: settings.contact_address || '',
+    // Configurações → Marca (migração relatorio_de_pagamentos).
+    legalName: settings.company_legal_name || '',
+    nif: settings.company_nif || '',
   };
+}
+
+/**
+ * "Recibo" só quando o pagamento está confirmado (um reembolso parcial deixa-o pago); antes
+ * disso, e sem estado conhecido, "Nota de encomenda". Um recibo prova um pagamento: emiti-lo por
+ * pagar dizia ao cliente — e a quem o recebesse — que estava pago.
+ */
+export function receiptTitle(order) {
+  return order?.paymentStatus === 'paid' ? 'Recibo' : 'Nota de encomenda';
 }
 
 /** Converte uma encomenda da base de dados no formato do recibo (para emitir no painel). */
@@ -247,6 +268,8 @@ export function receiptFromOrder(o) {
     paymentMethod: orderPaymentLabel(o),
     paymentReference: o.payment_reference || '',
     paymentStatus: o.payment_status || '',
+    amountPaid: Number(o.amount_paid) || 0,
+    amountRefunded: Number(o.amount_refunded) || 0,
     checkoutSignature: o.checkout_signature_data || '',
     signatureSignedAt: o.checkout_signature_at || o.created,
   };

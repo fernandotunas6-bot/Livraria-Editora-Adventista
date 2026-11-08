@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound, Church, BookHeart } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound, ShieldCheck, Church, BookHeart } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
 import BrandLogo from '@/components/BrandLogo';
@@ -12,8 +12,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { pageTitle } from '@/lib/brand';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
-import { setOrderPaymentStatus, setOrderDeliveryStatus } from '@/api/PlatformApi';
-import { EDGE_FUNCTION_DESACTUALIZADA } from '@/lib/apiCompat';
+import { ordersWithBookQuery } from '@/lib/bookOrders';
+import { setOrderDeliveryStatus } from '@/api/PlatformApi';
+import OrderPaymentsPanel from '@/components/admin/OrderPaymentsPanel';
+import DeliveredPaymentDialog from '@/components/admin/DeliveredPaymentDialog';
+import { deliveryNeedsPayment, moneySummary } from '@/lib/payments';
 import { useAuth } from '@/hooks/useAuth';
 import SessionGate from '@/components/SessionGate.jsx';
 import { sessionDecision } from '@/lib/authSession';
@@ -37,6 +40,8 @@ const SettingsTab = lazy(() => import('@/components/admin/SettingsTab'));
 const UsersTab = lazy(() => import('@/components/admin/UsersTab'));
 const PaymentsTab = lazy(() => import('@/components/admin/PaymentsTab'));
 const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
+const SecurityLogTab = lazy(() => import('@/components/admin/SecurityLogTab'));
+const PaymentsReportTab = lazy(() => import('@/components/admin/PaymentsReportTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
 const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
@@ -57,7 +62,7 @@ const ColportagemTab = lazy(() => import('@/components/admin/colportagem/Colport
 // encomendas a cada abertura.
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
-  'items', 'total', 'shipping_cost', 'status', 'payment_status', 'payment_method',
+  'items', 'total', 'shipping_cost', 'status', 'payment_status', 'amount_paid', 'amount_refunded', 'paid_at', 'payment_method',
   'payment_method_code', 'payment_method_name', 'payment_reference',
   'delivery_status', 'tracking_number', 'carrier', 'estimated_delivery',
   'address', 'city', 'notes', 'order_type', 'sale_channel', 'shipping_method', 'pickup_store',
@@ -93,6 +98,8 @@ const AdminPage = () => {
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  // Encomenda a marcar como entregue com dinheiro por receber (DeliveredPaymentDialog).
+  const [deliveryDialog, setDeliveryDialog] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [lowStockBooks, setLowStockBooks] = useState([]);
 
@@ -110,6 +117,8 @@ const AdminPage = () => {
   const canManageSettings = isAdmin || hasPermission('manage_settings');
   const canManageUsers = isAdmin || hasPermission('manage_users');
   const canManagePayments = isAdmin || hasPermission('manage_payments');
+  // Confirmar dinheiro é separado de gerir os métodos (IBAN, links): migração pagamentos_registados.
+  const canConfirmPayments = isAdmin || hasPermission('confirm_payments');
   const canManageMarketing = isAdmin || hasPermission('manage_marketing');
   // Quem gere colportores também precisa de ver as igrejas e os pastores (só leitura).
   const canSeeChurchRegistry = isAdmin || hasPermission('manage_church_registry') || hasPermission('manage_colporteurs');
@@ -205,13 +214,12 @@ const AdminPage = () => {
 
   const handleDeleteBook = async (b) => {
     // As encomendas guardam uma cópia dos itens; eliminar o livro não as apaga, mas convém avisar.
-    const { count } = await supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .contains('items', [{ book_id: b.id }]);
+    const { count, error: countError } = await ordersWithBookQuery(supabase, b.id);
     const warning = count
       ? `\n\nEste livro aparece em ${count} encomenda(s). As encomendas mantêm o título, mas o livro desaparece da loja, das listas de desejos e das avaliações. Para o tirar só de venda, ponha o stock a 0.`
-      : '';
+      : countError
+        ? '\n\nNão foi possível confirmar se este livro aparece em encomendas. Para o tirar só de venda, ponha o stock a 0.'
+        : '';
     if (!confirm(`Eliminar "${b.title}"? Esta acção não pode ser desfeita.${warning}`)) return;
     try {
       await pb.collection('stock_books').delete(b.id);
@@ -271,18 +279,30 @@ const AdminPage = () => {
     }
   };
 
-  const handleDeliveryStatus = async (order, deliveryStatus) => {
+  const handleDeliveryStatus = async (order, deliveryStatus, extra) => {
     if (order.delivery_status === deliveryStatus) return;
+    // Entregar com dinheiro por receber pede quanto se recebeu, ou o motivo (o servidor recusa
+    // sem um dos dois): foi o que faltou à encomenda de 245 000 Kz entregue por pagar.
+    if (deliveryStatus === 'delivered' && !extra && deliveryNeedsPayment(order)) {
+      setDeliveryDialog(order);
+      return;
+    }
     try {
-      const res = await setOrderDeliveryStatus(order.id, deliveryStatus);
+      const res = await setOrderDeliveryStatus(order.id, deliveryStatus, extra);
       toast({
         title: 'Estado de entrega actualizado',
-        description: res?.via === 'fallback'
-          ? `Cliente não avisado. ${EDGE_FUNCTION_DESACTUALIZADA}`
-          : res?.email_sent ? 'Cliente avisado por email' : undefined,
+        description: [res?.email_sent ? 'Cliente avisado por email' : '', res?.notice || ''].filter(Boolean).join(' · ') || undefined,
+        duration: res?.notice ? 12000 : 5000,
       });
+      setDeliveryDialog(null);
       loadAll();
     } catch (err) {
+      // A lista estava desactualizada e o servidor diz que falta o pagamento: pergunta-o.
+      if (err?.status === 409 && deliveryStatus === 'delivered' && !extra) {
+        setDeliveryDialog(order);
+        return;
+      }
+      if (extra) throw err; // o diálogo mostra o erro
       toast({ variant: 'destructive', title: 'Erro', description: err.message });
     }
   };
@@ -328,37 +348,6 @@ const AdminPage = () => {
     downloadReceipt(receiptFromOrder(full), receiptBrand(siteSettings));
   };
 
-  const handlePaymentStatus = async (order, paymentStatus) => {
-    if (paymentStatus === order.payment_status) return;
-    // O reembolso avisa o cliente de que o dinheiro foi devolvido: só depois de o ter sido.
-    if (paymentStatus === 'refunded'
-      && !confirm(`Marcar a encomenda ${formatOrderNumber(order)} como reembolsada?\n\nO cliente recebe um email a dizer que o valor foi devolvido.`)) return;
-    try {
-      // Pela API, e não por `orders.update`: é no servidor que o cliente é avisado de que o
-      // pagamento foi confirmado. A gravação directa mudava o estado em silêncio.
-      const res = await setOrderPaymentStatus(order.id, paymentStatus);
-      const label = getPaymentStatusLabel(paymentStatus);
-      if (res?.via === 'fallback') {
-        toast({
-          title: 'Pagamento actualizado, cliente não avisado',
-          description: `${label}. ${EDGE_FUNCTION_DESACTUALIZADA}`,
-        });
-      } else if (res?.notice) {
-        // Gravado, mas falta a equipa fazer alguma coisa — por exemplo, reembolsar uma
-        // encomenda cancelada cujo pagamento chegou depois (o cliente não foi avisado).
-        toast({ title: 'Pagamento actualizado — atenção', description: `${label}. ${res.notice}`, duration: 12000 });
-      } else {
-        toast({
-          title: 'Pagamento actualizado',
-          description: res?.email_sent ? `${label} · cliente avisado por email` : label,
-        });
-      }
-      loadAll();
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Erro', description: err.message });
-    }
-  };
-
   const filteredOrders = orders.filter((o) => {
     if (orderFilter !== 'all' && o.status !== orderFilter) return false;
     if (paymentFilter !== 'all' && (o.payment_status || 'pending') !== paymentFilter) return false;
@@ -381,10 +370,9 @@ const AdminPage = () => {
   // Pagamentos por P2P/transferência que o cliente diz ter feito e falta confirmar.
   const awaitingPaymentCount = orders.filter((o) => o.payment_status === 'awaiting_confirmation' && o.status !== 'cancelled').length;
   const paymentLabelOf = orderPaymentLabel;
-  // Receita é o que foi pago; o resto das encomendas activas é valor por receber.
-  const activeOrders = orders.filter((o) => o.status !== 'cancelled');
-  const totalRevenue = activeOrders.filter((o) => o.payment_status === 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
-  const pendingRevenue = activeOrders.filter((o) => o.payment_status !== 'paid').reduce((s, o) => s + (Number(o.total) || 0), 0);
+  // Receita é o que entrou (pago menos reembolsado), a mesma definição dos relatórios e do
+  // resumo diário (lib/payments.js · moneySummary); o resto das encomendas activas é por receber.
+  const money = moneySummary(orders);
 
   const bookMetrics = [
     // `filter`: carregar no indicador mostra a lista correspondente (o mesmo critério do filtro).
@@ -415,6 +403,7 @@ const AdminPage = () => {
     { label: 'Relatórios', tabs: [
       // Facturação: com a permissão de encomendas, como na base (migração vendas_so_com_encomendas).
       canManageOrders && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
+      (canManageOrders || canConfirmPayments) && { value: 'pagamentos-caixa', label: 'Pagamentos e caixa', icon: CreditCard },
     ] },
     { label: 'Clientes', tabs: [
       canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
@@ -430,6 +419,7 @@ const AdminPage = () => {
       canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
       (canManageSettings || canManageMarketing) && { value: 'notices', label: 'Faixa de aviso', icon: PanelTop },
       isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
+      isAdmin && { value: 'seguranca', label: 'Registo de segurança', icon: ShieldCheck },
     ] },
   ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
   const allowedTabs = tabGroups.flatMap((g) => g.tabs.map((t) => t.value));
@@ -599,6 +589,20 @@ const AdminPage = () => {
               <TabsContent value="apps">
                 <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
                   <AppsTab />
+                </Suspense>
+              </TabsContent>
+            )}
+            {(canManageOrders || canConfirmPayments) && (
+              <TabsContent value="pagamentos-caixa">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <PaymentsReportTab canConfirm={canConfirmPayments} currentUserName={user?.name || user?.email || ''} />
+                </Suspense>
+              </TabsContent>
+            )}
+            {isAdmin && (
+              <TabsContent value="seguranca">
+                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+                  <SecurityLogTab />
                 </Suspense>
               </TabsContent>
             )}
@@ -872,6 +876,13 @@ const AdminPage = () => {
                 {canManageOrders && (
                 <TabsContent value="orders">
                   <SalesReportsPanel orders={orders} />
+                  <DeliveredPaymentDialog
+                    order={deliveryDialog}
+                    canConfirm={canConfirmPayments}
+                    currentUserName={user?.name || user?.email || ''}
+                    onCancel={() => setDeliveryDialog(null)}
+                    onSubmit={(extra) => handleDeliveryStatus(deliveryDialog, 'delivered', extra)}
+                  />
 
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <button
@@ -892,10 +903,13 @@ const AdminPage = () => {
                       <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
                     </div>
                     <div className="bg-card border rounded-xl p-4">
-                      <p className="text-sm text-muted-foreground">Receita (pagas)</p>
-                      <p className="text-2xl font-bold text-primary">Kz {totalRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
-                      {pendingRevenue > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">+ Kz {pendingRevenue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                      <p className="text-sm text-muted-foreground">Recebido</p>
+                      <p className="text-2xl font-bold text-primary">Kz {money.received.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      {money.receivable > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">+ Kz {money.receivable.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                      )}
+                      {money.refundDue > 0 && (
+                        <p className="text-xs text-destructive mt-1">Kz {money.refundDue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por reembolsar</p>
                       )}
                     </div>
                   </div>
@@ -913,7 +927,7 @@ const AdminPage = () => {
                       <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os pagamentos</SelectItem>
-                        {['awaiting_confirmation', 'pending', 'paid', 'failed', 'refunded'].map((ps) => (
+                        {['awaiting_confirmation', 'pending', 'partially_paid', 'paid', 'failed', 'refunded'].map((ps) => (
                           <SelectItem key={ps} value={ps}>{getPaymentStatusLabel(ps)}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1085,16 +1099,12 @@ const AdminPage = () => {
                                 Emitir recibo
                               </Button>
                             </div>
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">Confirmar pagamento</p>
-                              <div className="flex flex-wrap gap-1">
-                                {['pending', 'awaiting_confirmation', 'paid', 'failed', 'refunded'].map((ps) => (
-                                  <Button key={ps} size="sm" variant={o.payment_status === ps ? 'default' : 'outline'} className={`text-xs h-7 ${o.payment_status === ps ? 'btn-primary' : ''}`} onClick={() => handlePaymentStatus(o, ps)}>
-                                    {getPaymentStatusLabel(ps)}
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
+                            <OrderPaymentsPanel
+                              order={o}
+                              canConfirm={canConfirmPayments}
+                              currentUserName={user?.name || user?.email || ''}
+                              onChanged={loadAll}
+                            />
 
                             <div className="space-y-2">
                               <p className="text-xs font-medium text-muted-foreground">Estado da encomenda</p>

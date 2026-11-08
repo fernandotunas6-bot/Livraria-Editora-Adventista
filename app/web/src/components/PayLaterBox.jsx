@@ -14,6 +14,11 @@ import { reportPaymentReference } from '@/api/PlatformApi';
 export default function PayLaterBox({
   orderNumber, email = '', phone = '', total, methodName = '', accountInfo = '', instructions = '', paymentLink = '',
   referenceAlreadySent = false,
+  // Confirmado pelo gateway de pagamentos (webhook): não se pede a referência.
+  automatic = false,
+  // Pagamentos registados: o que falta (pago em parte), o que o cliente indicou e, se a equipa
+  // não o encontrou, porquê.
+  outstandingAmount = null, reportedReference = '', rejectedReference = '', rejectedReason = '',
 }) {
   const [reference, setReference] = useState('');
   const [sending, setSending] = useState(false);
@@ -50,6 +55,8 @@ export default function PayLaterBox({
   };
 
   const safeLink = /^https:\/\//.test(paymentLink || '') ? paymentLink : '';
+  const due = outstandingAmount != null && Number(outstandingAmount) > 0 ? Number(outstandingAmount) : Number(total || 0);
+  const partial = outstandingAmount != null && Number(outstandingAmount) > 0 && Number(outstandingAmount) < Number(total || 0);
 
   return (
     <section className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:p-5 text-left space-y-3" aria-labelledby="como-pagar">
@@ -58,11 +65,21 @@ export default function PayLaterBox({
       </h2>
       <ol className="list-decimal pl-5 space-y-1.5 text-sm text-muted-foreground">
         <li>
-          Pague <strong className="text-foreground">{formatCurrency(Number(total || 0) * 100)}</strong>
+          Pague <strong className="text-foreground">{formatCurrency(due * 100)}</strong>
+          {partial && <> (já recebemos {formatCurrency((Number(total || 0) - due) * 100)})</>}
           {orderNumber && <> e escreva <strong className="text-foreground font-mono">{orderNumber}</strong> no descritivo</>}.
         </li>
-        <li>Indique abaixo a referência do pagamento. A equipa confirma e avisa-o.</li>
+        {automatic
+          ? <li>A confirmação é automática: assim que o pagamento for processado, a encomenda fica paga e avisamo-lo.</li>
+          : <li>Indique abaixo a referência do pagamento. A equipa confirma e avisa-o.</li>}
       </ol>
+
+      {rejectedReason && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          Não encontrámos o pagamento{rejectedReference ? <> com a referência <strong className="font-mono">{rejectedReference}</strong></> : ''}: {rejectedReason}.
+          {!automatic && ' Verifique e indique a referência certa.'}
+        </p>
+      )}
 
       {accountInfo && (
         <div className="rounded-lg bg-background border border-border p-3 space-y-2">
@@ -86,9 +103,10 @@ export default function PayLaterBox({
         </Button>
       )}
 
-      {sent ? (
+      {automatic ? null : sent ? (
         <p className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400" role="status">
-          <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Referência recebida. A equipa confirma o pagamento e avisa-o.
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          Referência recebida{reportedReference ? <> (<span className="font-mono">{reportedReference}</span>)</> : ''}. A equipa confirma o pagamento e avisa-o.
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-2">

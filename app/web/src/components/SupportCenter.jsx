@@ -72,6 +72,8 @@ function authorOf(message, thread) {
 }
 
 const NOTIFICATION_KINDS = {
+  // Do registo de segurança (alterações a pagamentos, permissões, contactos…).
+  security: 'Segurança',
   order: 'Encomenda',
   payment: 'Pagamento',
   delivery: 'Entrega',
@@ -262,6 +264,12 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
         }
       }
       await refresh();
+      // Aviso do registo de segurança (alteração a pagamentos, permissões, contactos…): vai
+      // ao separador Segurança do painel. Nunca traz encomenda.
+      if (staff && notification.kind === 'security' && !notification.order_id) {
+        navigate('/admin?tab=seguranca');
+        return;
+      }
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
       } else if (notification.href?.startsWith('/')) {

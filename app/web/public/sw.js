@@ -129,7 +129,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin === self.location.origin && /^\/assets\/.+-[A-Za-z0-9_-]{8}\./.test(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-        if (response.ok) {
+        // Um ficheiro que já não existe (versão anterior) vem do Pages como o index.html, com
+        // 200: guardá-lo aqui servia HTML no lugar do JavaScript para sempre, sem rede.
+        const html = (response.headers.get('content-type') || '').includes('text/html');
+        if (response.ok && !html) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }

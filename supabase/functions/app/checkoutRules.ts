@@ -41,26 +41,34 @@ export function cleanPaymentReference(value: unknown): string {
 
 type OrderLike = {
   id?: string; status?: string; delivery_status?: string; payment_status?: string;
-  payment_reference?: string; payment_method_code?: string; created?: string;
+  payment_reference?: string; payment_method_code?: string; created?: string; updated?: string;
+  amount_paid?: number | string;
 };
 
 /**
  * Encomendas a cancelar por falta de pagamento: pagas antes do envio (o método está em
- * `upfrontCodes`), ainda pendentes e sem referência indicada, ainda não preparadas, e criadas há
- * mais de `days` dias. `days` 0 (o valor por omissão) desliga a regra: nada é cancelado.
- * Quem já indicou a referência fica de fora: espera pela equipa, não pelo relógio.
+ * `upfrontCodes`), sem nada pago, ainda não preparadas, e paradas há mais de `days` dias. `days`
+ * 0 (o valor por omissão) desliga a regra: nada é cancelado.
+ *
+ * - Pendente e sem referência: conta desde a encomenda.
+ * - Pagamento rejeitado pela equipa (`failed`) e nenhum outro indicado: conta desde a rejeição
+ *   (`updated`), para o cliente ter o mesmo prazo para indicar a referência certa.
+ * - Quem tem uma referência por verificar, ou já pagou uma parte, fica de fora: espera pela
+ *   equipa, não pelo relógio.
  */
 export function unpaidOrdersToCancel<T extends OrderLike>(orders: T[], upfrontCodes: Set<string>, days: number, now = Date.now()): T[] {
   if (!(days > 0)) return [];
   const limit = now - days * 24 * 3600_000;
   return orders.filter((o) => {
-    const created = new Date(String(o.created || "")).getTime();
+    const status = o.payment_status || "pending";
+    const since = new Date(String((status === "failed" ? o.updated || o.created : o.created) || "")).getTime();
     return o.status !== "cancelled"
       && ["received", "confirmed"].includes(o.delivery_status || "received")
-      && (o.payment_status || "pending") === "pending"
+      && (status === "pending" || status === "failed")
+      && !(Number(o.amount_paid) > 0)
       && !String(o.payment_reference || "").trim()
       && upfrontCodes.has(String(o.payment_method_code || ""))
-      && Number.isFinite(created) && created < limit;
+      && Number.isFinite(since) && since < limit;
   });
 }
 
@@ -81,39 +89,4 @@ export function successPath(value: unknown): string {
   } catch {
     return "/success";
   }
-}
-
-/** Aviso que acompanha uma mudança de estado do pagamento. */
-export type PaymentNotice = "paid" | "refunded" | null;
-
-/**
- * Decide uma mudança de estado do pagamento feita no painel, e que aviso o cliente recebe.
- *
- * - **Reembolso só de uma encomenda paga.** O email de reembolso diz "Devolvemos o valor da
- *   sua encomenda", com o total: numa encomenda pendente ou falhada dizia a quem nunca pagou que
- *   lhe tinham devolvido dinheiro. Se o dinheiro chegou, marca-se primeiro como paga.
- * - **Pago numa encomenda cancelada grava-se, mas sem o "Pagamento confirmado".** Esse email diz
- *   "Vamos preparar a sua encomenda", e uma encomenda cancelada já não pode ser reaberta (o
- *   trigger `orders_before_update` não deixa). Acontece de facto: o cancelamento automático das
- *   encomendas por pagar (`unpaidOrdersToCancel`) e um pagamento que chega depois. O pagamento
- *   tem de ficar registado, para o reembolso; a equipa recebe a nota de que falta reembolsar.
- */
-export function paymentStatusChange(
-  order: { payment_status?: string | null; status?: string | null },
-  next: string,
-): { error: string } | { notify: PaymentNotice; note: string } {
-  const before = String(order?.payment_status || "pending");
-  if (next === before) return { notify: null, note: "" };
-  if (next === "refunded" && before !== "paid") {
-    return { error: "Só se reembolsa uma encomenda paga. Se o dinheiro chegou, marque-a primeiro como paga." };
-  }
-  if (next === "paid" && order?.status === "cancelled") {
-    return {
-      notify: null,
-      note: "A encomenda está cancelada: o cliente não foi avisado do pagamento. Falta reembolsá-lo.",
-    };
-  }
-  if (next === "paid") return { notify: "paid", note: "" };
-  if (next === "refunded") return { notify: "refunded", note: "" };
-  return { notify: null, note: "" };
 }

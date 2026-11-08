@@ -1,4 +1,4 @@
-import pb from '@/lib/dataClient';
+import { avatarSrc } from '@/lib/avatar';
 
 export function getUserDisplayName(user) {
   if (!user) return 'Visitante';
@@ -24,10 +24,6 @@ export function getUserInitials(user) {
 }
 
 export function getUserAvatarUrl(user) {
-  if (!user?.avatar) return null;
-  try {
-    return pb.files.getURL(user, user.avatar, { thumb: '100x100' });
-  } catch {
-    return null;
-  }
+  // Ficheiro do bucket ou foto da conta Google (ver lib/avatar.js).
+  return avatarSrc(user?.id, user?.avatar) || null;
 }

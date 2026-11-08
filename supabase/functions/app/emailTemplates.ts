@@ -432,11 +432,76 @@ export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
       detailsTitle: "Detalhes da compra",
       details: [
         ...deliveryDetails(order),
-        { label: "Total pago", value: money(order.total) },
+        { label: "Total pago", value: money(Number(order.amount_paid) > 0 ? order.amount_paid : order.total) },
       ],
       stepsTitle: "Estado da encomenda",
       steps: orderSteps(order, "confirmed"),
       cta: trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined,
+      reason: REASON_ORDER,
+    },
+  };
+}
+
+/** Quanto falta pagar de uma encomenda (nunca negativo). */
+const stillDue = (order: Row) => Math.max(Number(order.total || 0) - Number(order.amount_paid || 0), 0);
+
+/**
+ * Recebemos uma parte do pagamento (transferência de valor menor, pagamento em duas vezes):
+ * quanto entrou, quanto falta e onde indicar o resto. A encomenda só se prepara paga.
+ */
+export function paymentPartialLetter(brand: Brand, order: Row): Letter {
+  const due = stillDue(order);
+  return {
+    key: "payment_partial",
+    vars: orderVars(brand, order),
+    subject: `Recebemos parte do pagamento — ${orderRef(order)}`,
+    doc: {
+      symbol: "●",
+      tone: "warning",
+      title: "Recebemos parte do pagamento",
+      subtitle: `Faltam ${money(due)} para completar a encomenda.`,
+      lead: [
+        `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}! Já recebemos ${money(order.amount_paid)} da encomenda ${orderRef(order)}.`,
+        `Para a prepararmos, falta pagar ${money(due)}. Use o número da encomenda no descritivo e indique a referência na página da encomenda.`,
+      ],
+      detailsTitle: "Pagamento",
+      details: [
+        { label: "Total", value: money(order.total) },
+        { label: "Recebido", value: money(order.amount_paid) },
+        { label: "Em falta", value: money(due) },
+      ],
+      cta: trackUrl(brand.siteUrl) ? { label: "Indicar a referência", url: trackUrl(brand.siteUrl) } : undefined,
+      reason: REASON_ORDER,
+    },
+  };
+}
+
+/**
+ * A equipa não encontrou o pagamento que o cliente indicou. Leva o motivo, para o cliente saber
+ * o que corrigir, e o caminho para indicar outra referência.
+ */
+export function paymentRejectedLetter(brand: Brand, order: Row, reason = ""): Letter {
+  const why = String(reason || "").trim();
+  return {
+    key: "payment_rejected",
+    vars: orderVars(brand, order),
+    subject: `Não encontrámos o pagamento — ${orderRef(order)}`,
+    doc: {
+      symbol: "!",
+      tone: "warning",
+      title: "Não encontrámos o seu pagamento",
+      subtitle: "Verifique a referência e indique-a outra vez.",
+      lead: [
+        `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}. Procurámos o pagamento da encomenda ${orderRef(order)} e não o encontrámos.`,
+        why ? `Motivo: ${why}` : "",
+        "Se já pagou, indique a referência certa (ou o número do comprovativo) na página da encomenda. Se ainda não pagou, os livros continuam reservados até ao fim do prazo.",
+      ].filter(Boolean),
+      detailsTitle: "Encomenda",
+      details: [
+        { label: "Encomenda", value: orderRef(order) },
+        { label: "Valor a pagar", value: money(stillDue(order) || order.total) },
+      ],
+      cta: trackUrl(brand.siteUrl) ? { label: "Indicar outra referência", url: trackUrl(brand.siteUrl) } : undefined,
       reason: REASON_ORDER,
     },
   };
@@ -449,9 +514,12 @@ export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
  * pagamento passa a "reembolsado" no painel, que é o momento em que o valor foi devolvido.
  */
 export function refundLetter(brand: Brand, order: Row): Letter {
+  const amount = Number(order.refund_amount ?? order.total) || 0;
+  // Reembolso de uma parte (um livro em falta, portes devolvidos): diz quanto, não "o valor".
+  const partial = amount > 0 && amount < (Number(order.total) || 0);
   const details = [
     { label: "Encomenda", value: orderRef(order) },
-    { label: "Valor reembolsado", value: money(order.refund_amount ?? order.total) },
+    { label: "Valor reembolsado", value: money(amount) },
   ];
   const payment = paymentLabel(order);
   if (payment) details.push({ label: "Pago com", value: payment });
@@ -464,9 +532,11 @@ export function refundLetter(brand: Brand, order: Row): Letter {
       symbol: "↺",
       tone: "success",
       title: "Reembolso efectuado",
-      subtitle: "Devolvemos o valor da sua encomenda.",
+      subtitle: partial ? `Devolvemos ${money(amount)} da sua encomenda.` : "Devolvemos o valor da sua encomenda.",
       lead: [
-        `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}. O valor da encomenda ${orderRef(order)} foi devolvido.`,
+        partial
+          ? `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}. Devolvemos ${money(amount)} da encomenda ${orderRef(order)}.`
+          : `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}. O valor da encomenda ${orderRef(order)} foi devolvido.`,
         "Conforme o meio de pagamento, pode levar alguns dias até aparecer na sua conta.",
       ],
       detailsTitle: "Reembolso",
@@ -596,6 +666,11 @@ export function dailySummaryLetter(
   summary: { stages: Record<string, number>; newToday: number; revenueToday: number; deliveredToday: number; confirmedByCustomer: number },
   alerts: { order_number: string; customer_name: string; label: string; hours: number; severity: string; detail?: string }[],
   stageLabels: Record<string, string>,
+  // Dinheiro (relatório de pagamentos): o que entrou ontem e o que pede acção.
+  payments?: {
+    receivedYesterday: number; paymentsYesterday: number; toConfirm: number; deliveredUnpaid: number;
+    deliveredUnpaidAmount: number; refundDue: number; receivable: number;
+  },
 ): Letter {
   const today = dateLong(new Date().toISOString());
   const critical = alerts.filter((a) => a.severity === "critical").length;
@@ -615,6 +690,14 @@ export function dailySummaryLetter(
         alerts.length
           ? `${alerts.length} encomenda(s) estão paradas tempo demais ou têm um problema do cliente${critical ? ` (${critical} crítica(s))` : ""}.`
           : "Nenhuma encomenda parada. Bom trabalho!",
+        ...(payments ? [
+          `Recebido ontem: ${money(payments.receivedYesterday)} (${payments.paymentsYesterday} pagamento(s)). Por receber: ${money(payments.receivable)}.`,
+          [
+            payments.toConfirm ? `${payments.toConfirm} pagamento(s) indicado(s) por verificar` : "",
+            payments.deliveredUnpaid ? `${payments.deliveredUnpaid} entregue(s) sem pagamento registado (${money(payments.deliveredUnpaidAmount)})` : "",
+            payments.refundDue ? `${payments.refundDue} paga(s) e cancelada(s) por reembolsar` : "",
+          ].filter(Boolean).join("; ") || "Nenhum pagamento à espera da equipa.",
+        ] : []),
       ],
       detailsTitle: "Encomendas em curso, por passo",
       details: Object.entries(stageLabels)

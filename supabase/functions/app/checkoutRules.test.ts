@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping, paymentStatusChange,
+  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
   saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
@@ -102,6 +102,16 @@ describe("unpaidOrdersToCancel", () => {
     ];
     expect(unpaidOrdersToCancel(fora, upfront, 3, agora)).toEqual([]);
   });
+  it("pagamento rejeitado: conta o prazo desde a rejeição", () => {
+    const rejeitada = { ...base, id: "rej", payment_status: "failed", updated: new Date(agora - 1 * dia).toISOString() };
+    expect(unpaidOrdersToCancel([rejeitada], upfront, 3, agora)).toEqual([]);
+    const antiga = { ...rejeitada, updated: new Date(agora - 4 * dia).toISOString() };
+    expect(unpaidOrdersToCancel([antiga], upfront, 3, agora).map((o) => o.id)).toEqual(["rej"]);
+  });
+  it("com uma parte paga nunca cancela pelo relógio", () => {
+    expect(unpaidOrdersToCancel([{ ...base, id: "parte", payment_status: "partially_paid", amount_paid: 500 }], upfront, 3, agora)).toEqual([]);
+    expect(unpaidOrdersToCancel([{ ...base, id: "parte2", payment_status: "failed", amount_paid: 500 }], upfront, 3, agora)).toEqual([]);
+  });
 });
 
 describe("successPath", () => {
@@ -132,44 +142,5 @@ describe("successPath", () => {
 
   it("corta caminhos compridos", () => {
     expect(successPath("/" + "a".repeat(500)).length).toBe(200);
-  });
-});
-
-describe("paymentStatusChange", () => {
-  const encomenda = (payment_status: string, status = "pending") => ({ payment_status, status });
-
-  it("pago numa encomenda activa avisa o cliente", () => {
-    expect(paymentStatusChange(encomenda("pending"), "paid")).toEqual({ notify: "paid", note: "" });
-    expect(paymentStatusChange(encomenda("awaiting_confirmation"), "paid")).toEqual({ notify: "paid", note: "" });
-  });
-
-  // O email de reembolso diz "Devolvemos o valor da sua encomenda": a quem nunca pagou, era falso.
-  it("reembolso só de uma encomenda paga", () => {
-    expect(paymentStatusChange(encomenda("paid"), "refunded")).toEqual({ notify: "refunded", note: "" });
-    for (const antes of ["pending", "awaiting_confirmation", "failed"]) {
-      const r = paymentStatusChange(encomenda(antes), "refunded");
-      expect("error" in r && r.error).toMatch(/Só se reembolsa uma encomenda paga/);
-    }
-    // Sem estado gravado conta como pendente.
-    expect("error" in paymentStatusChange({}, "refunded")).toBe(true);
-  });
-
-  // O email de pago diz "Vamos preparar a sua encomenda", e uma cancelada não pode ser reaberta.
-  it("pago numa encomenda cancelada grava sem avisar, e deixa nota à equipa", () => {
-    const r = paymentStatusChange(encomenda("pending", "cancelled"), "paid");
-    expect(r).toEqual({ notify: null, note: expect.stringMatching(/Falta reembolsá-lo/) });
-  });
-
-  it("o mesmo estado não faz nada", () => {
-    expect(paymentStatusChange(encomenda("paid"), "paid")).toEqual({ notify: null, note: "" });
-    expect(paymentStatusChange(encomenda("refunded"), "refunded")).toEqual({ notify: null, note: "" });
-  });
-
-  it("os estados internos não avisam ninguém", () => {
-    expect(paymentStatusChange(encomenda("paid"), "pending")).toEqual({ notify: null, note: "" });
-    expect(paymentStatusChange(encomenda("pending"), "failed")).toEqual({ notify: null, note: "" });
-    // Desfazer um reembolso marcado por engano é permitido: o email e o WhatsApp de "pago" têm
-    // deduplicação (`order:paid:<id>`), por isso o cliente não recebe a confirmação duas vezes.
-    expect(paymentStatusChange(encomenda("refunded"), "paid")).toEqual({ notify: "paid", note: "" });
   });
 });
