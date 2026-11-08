@@ -66,12 +66,12 @@ const CategoryPage = () => {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider contentClassName="text-left">
-        <nav className="mb-4 flex items-center gap-2 text-sm text-white/75">
+        <nav aria-label="Caminho" className="mb-4 flex items-center gap-2 text-sm text-white/75">
           <Link to="/" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Início</Link>
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
           <Link to="/shop" className="-my-1.5 inline-block py-1.5 transition-colors hover:text-white">Loja</Link>
-          <ChevronRight className="h-4 w-4" />
-          <span className="text-white">{categoryName}</span>
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          <span className="text-white" aria-current="page">{categoryName}</span>
         </nav>
         <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">{categoryName}</h1>
         <p className="text-base text-white/85 sm:text-lg">Os livros desta categoria, com filtros e ordenação</p>

@@ -35,12 +35,13 @@ export default function ColporteurWorkspace({ me }) {
   // directamente, e recarregar ou voltar atrás mantém-no. As vistas vêm de lib/siteAreas.js.
   const [params, setParams] = useSearchParams();
   const tab = resolveColporteurView(params.get('tab'));
+  // Uma entrada no histórico por separador: o «voltar» do telemóvel regressa ao anterior.
   const changeTab = (value) => setParams((prev) => {
     const next = new URLSearchParams(prev);
     if (value === DEFAULT_COLPORTEUR_VIEW) next.delete('tab');
     else next.set('tab', value);
     return next;
-  }, { replace: true });
+  });
   const { toast } = useToast();
   const [ops, setOps] = useState(null);
   const [books, setBooks] = useState([]);

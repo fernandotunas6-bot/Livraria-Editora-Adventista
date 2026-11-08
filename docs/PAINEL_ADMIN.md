@@ -112,6 +112,8 @@ Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera
 (incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da navegação,
 o Início e o título do separador do navegador acompanham.
 
+O menu da conta mostra o papel e o cargo de quem está: «Gestor · Caixa».
+
 A barra do topo mostra o ícone de actualizar com **Em tempo real** (a verde) quando o canal está
 ligado; sem ele, "Actualizado há 2 min". O ícone roda enquanto actualiza — também quando a
 actualização vem de um sinal (pelo menos 0,7 s, para se ver) — e carregar actualiza já, nos dois
@@ -157,6 +159,10 @@ no fim. Ao mudar de secção, a página volta ao topo e o foco passa para o tít
   linha não se repete. Nas Configurações é uma coluna à esquerda, com os grupos.
 - Numa vista, o cabeçalho da secção mostra `Grupo › Secção` por cima e o título da vista.
 - Voltar a uma secção abre a última vista onde se estava nela (nesta visita).
+- **O «voltar» do navegador (e do telemóvel) regressa ao contexto anterior**: mudar de secção ou de
+  vista acrescenta uma entrada ao histórico; os filtros e a procura dentro de uma lista substituem a
+  entrada (escrever não enche o «voltar»). O mesmo nos separadores do perfil e da área do
+  colportor.
 - Mudar de vista na linha deixa o foco na linha; mudar pela barra lateral, pelo caminho ou pela
   procura leva o foco ao título, como ao mudar de secção.
 - Os números: o que pede acção (`warning`/`info`) aparece na linha e na barra lateral; os totais
@@ -272,7 +278,8 @@ Os prazos estão em `ATTENTION_RULES`.
 
 ## 5. Procurar (Ctrl+K / ⌘K) — `AdminCommandPalette.jsx`, `lib/adminSearch.js`
 - Abre com Ctrl+K / ⌘K em qualquer secção, ou no campo do topo; fecha com Escape.
-- Vazia, começa pelas **secções recentes** (as últimas 5 abertas, por pessoa, neste aparelho).
+- Vazia, começa pelas **secções recentes** (as últimas 5 abertas, por pessoa, neste aparelho),
+  cada uma com a vista onde se estava («Colportagem › Contas»).
 - Encontra secções pelo nome, título, descrição, grupo e **sinónimos** ("iban" → Métodos de
   pagamento, "faturação" → Vendas por loja, "senha" → Utilizadores…), sem acentos nem maiúsculas.
 - **Reconhece o que se escreveu** e põe a acção certa à frente:

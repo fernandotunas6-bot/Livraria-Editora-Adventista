@@ -135,17 +135,19 @@ export default function CollectionsPage() {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider contentClassName="text-left">
-        <div className="mb-4 flex items-center gap-2 text-sm text-white/75">
+        <nav aria-label="Caminho" className="mb-4 flex items-center gap-2 text-sm text-white/75">
           <Link to="/" className="-my-1.5 inline-block py-1.5 hover:text-white">Início</Link>
-          <ChevronRight className="h-4 w-4" />
-          <Link to="/colecoes" className="-my-1.5 inline-block py-1.5 hover:text-white">Coleções</Link>
-          {activeCollection && (
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          {activeCollection ? (
             <>
-              <ChevronRight className="h-4 w-4" />
-              <span>{activeCollection.title}</span>
+              <Link to="/colecoes" className="-my-1.5 inline-block py-1.5 hover:text-white">Coleções</Link>
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              <span className="text-white" aria-current="page">{activeCollection.title}</span>
             </>
+          ) : (
+            <span className="text-white" aria-current="page">Coleções</span>
           )}
-        </div>
+        </nav>
         <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight sm:gap-3 sm:text-3xl/9 md:text-4xl/10">
           <Layers className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
           {activeCollection ? activeCollection.title : 'Coleções de Livros'}

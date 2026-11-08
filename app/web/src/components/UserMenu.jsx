@@ -19,11 +19,20 @@ import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { useColporteurMe } from '@/hooks/useColporteurMe';
 import { adminPermissions } from '@/lib/adminSections';
 import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
+import { useReaderStatus } from '@/hooks/useReader';
+import ReaderBadge from '@/components/community/ReaderBadge';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
 import { ROLES } from '@/lib/permissions';
 
 const groupLabel = 'px-2 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
+
+/** O nível de leitor, por baixo do nome (pergunta quando o menu abre; depois fica guardado). */
+function ReaderLevelLine() {
+  const status = useReaderStatus();
+  if (!status || status.level === 'novo') return null;
+  return <ReaderBadge level={status.level} className="mt-1" />;
+}
 
 /** "Área do colportor", só para quem tem a ficha ligada à conta. Pergunta quando o menu abre. */
 function ColporteurItems({ userId }) {
@@ -91,6 +100,7 @@ export function UserMenu({ compact = false, className }) {
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{getUserDisplayName(user)}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              <ReaderLevelLine />
               {/* Quem é da equipa vê-o (o gestor também, não só o administrador), com o código FUN-. */}
               {(isAdmin || user?.role === 'manager') && (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-primary">

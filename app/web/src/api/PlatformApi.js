@@ -45,14 +45,22 @@ const DEFAULT_SETTINGS = {
   assets_version: '',
 };
 
+/**
+ * As configurações públicas do site, ou um erro (sem rede, servidor em baixo). `no-cache` revalida
+ * no servidor e actualiza a cópia do browser; ver PUBLIC_CACHE na Edge Function.
+ */
+export async function fetchSiteSettings({ fresh = false } = {}) {
+  const res = await fetch(`${APP_API_URL}/settings`, fresh ? { cache: 'no-cache' } : undefined);
+  if (!res.ok) throw new Error(`settings: ${res.status}`);
+  const merged = { ...DEFAULT_SETTINGS, ...await res.json() };
+  merged.shop_bg_mode = resolveShopBgMode(merged);
+  return merged;
+}
+
+/** O mesmo, mas sem falhar: num erro devolve as de omissão. */
 export async function getSiteSettings({ fresh = false } = {}) {
   try {
-    // `no-cache` revalida no servidor e actualiza a cópia do browser; ver PUBLIC_CACHE na Edge Function.
-    const res = await fetch(`${APP_API_URL}/settings`, fresh ? { cache: 'no-cache' } : undefined);
-    if (!res.ok) return DEFAULT_SETTINGS;
-    const merged = { ...DEFAULT_SETTINGS, ...await res.json() };
-    merged.shop_bg_mode = resolveShopBgMode(merged);
-    return merged;
+    return await fetchSiteSettings({ fresh });
   } catch {
     return DEFAULT_SETTINGS;
   }
