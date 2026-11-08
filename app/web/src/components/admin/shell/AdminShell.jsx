@@ -91,6 +91,25 @@ function ShellBody({
     if (active && active !== 'inicio') setRecents(pushRecentSection(user?.id, active));
   }, [active, user?.id]);
 
+  // Tecla "/": vai à procura da lista aberta (encomendas, produtos, utilizadores…); onde não há
+  // nenhuma, abre a procura do painel. Não interfere com quem está a escrever num campo.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target?.closest?.('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      e.preventDefault();
+      const field = document.querySelector('#conteudo-painel input[type="search"]');
+      if (field) {
+        field.focus();
+        field.select?.();
+      } else {
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const sidebarLayout = layout === 'sidebar';
   const showSidebar = sidebarLayout || isMobile;
   // A linha das vistas dentro da secção: sempre, menos quando a barra lateral aberta já as mostra.
