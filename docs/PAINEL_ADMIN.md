@@ -117,7 +117,9 @@ O menu da conta mostra o papel e o cargo de quem está: «Gestor · Caixa».
 A barra do topo mostra o ícone de actualizar com **Em tempo real** (a verde) quando o canal está
 ligado; sem ele, "Actualizado há 2 min". O ícone roda enquanto actualiza — também quando a
 actualização vem de um sinal (pelo menos 0,7 s, para se ver) — e carregar actualiza já, nos dois
-casos. O canal liga-se para toda a equipa.
+casos. No telemóvel (abaixo de 768 px) o ícone fica escondido, a pedido do dono: os dados
+actualizam-se sozinhos na mesma. O aviso "Sem ligação" aparece em todos os tamanhos. O canal
+liga-se para toda a equipa.
 
 Uma rajada de sinais dá uma só leitura, mas com todos os sinais da rajada (`useSignal` passa a lista
 em terceiro argumento): uma encomenda nova manda «catalogo» (o stock desceu) e «orders» quase juntos,
@@ -126,8 +128,11 @@ e o painel lê os dois. Antes ficava só o último, e o stock vendido só aparec
 conversas).
 
 O mesmo canal acorda os **alertas da equipa** (antes de 20 em 20 s; agora na hora, e de reserva de
-2 em 2 min), o **atendimento** (antes de 30 em 30 s) e a **Produção**, os **Funcionários** e as
-**Entradas e saídas** (sinais `producao`, `funcionarios` e `financas`, [PRODUCAO.md](PRODUCAO.md)).
+2 em 2 min), o **atendimento** (antes de 30 em 30 s), a **Produção**, os **Funcionários** e as
+**Entradas e saídas** (sinais `producao`, `funcionarios` e `financas`, [PRODUCAO.md](PRODUCAO.md)),
+e **Pagamentos e caixa**: um pagamento indicado pelo cliente, confirmado pelo gateway ou por um
+colega aparece logo na fila dos pagamentos por verificar (sinais `financas` e `orders`), sem
+fechar a linha que se está a tratar.
 As visitas aos livros não contam como mudança do catálogo (migração `20261108193000_sinais_afinados`). Fora do painel, cada conta ouve o seu canal
 `conta:<id>`: as encomendas e o nível no perfil, os avisos do sino e as respostas no chat chegam na
 hora. A comunidade tem um canal público (`comunidade`) que só diz «há publicações novas».
@@ -258,8 +263,9 @@ encomendas por pagar), cada um leva à lista já filtrada; **o mês até hoje** 
 encomendas, encomendado, recebido e ticket médio, comparados com os mesmos dias do mês anterior,
 e as canceladas) e **Mais vendidos (30 dias)**; **Últimas encomendas** (6,
 cada uma abre a encomenda na lista); **Stock** (os 5 mais urgentes, com "Repor"); **Atalhos**
-(Adicionar produto, Produtos, Atendimento, Faixa de aviso, Ver a loja). Cada bloco só aparece a
-quem tem a permissão correspondente.
+(Adicionar produto, Produtos, Atendimento, Produção da Editora, Funcionários, Entradas e saídas,
+Faixa de aviso, Ver a loja). Cada bloco só aparece a quem tem a permissão correspondente, e o
+"Tudo em dia" diz só as áreas que a pessoa vê ("nada atrasado na produção").
 
 ### 4.1 Precisa de atenção — `lib/adminAttention.js`
 Situações que pioram se ninguém fizer nada, por ordem de urgência, cada uma com "Ver" (a lista já
@@ -275,6 +281,22 @@ filtrada). Só as que a pessoa pode tratar. Sem nenhuma: "Tudo em dia".
 | Produtos sem capa / sem descrição | visíveis na loja | sugestão |
 
 Os prazos estão em `ATTENTION_RULES`.
+
+A **Editora e as finanças** juntam-se à mesma lista (`lib/editoraAttention.js`, lido por
+`hooks/useEditoraAttention.js` com os sinais em tempo real «producao», «funcionarios» e «financas»,
+e de reserva de minuto a minuto), e dão o número ao lado da secção:
+
+| Situação | Quem vê | Gravidade | Número na navegação |
+|---|---|---|---|
+| Etapas da produção com o prazo passado (a mais atrasada, com o responsável) | produção | a tratar; **urgente** com mais de 7 dias | Produção (também para as finanças) |
+| Ordens com o prazo de entrega passado | produção | a tratar | — |
+| Ordens com as etapas todas feitas, por concluir (a tiragem só entra no stock ao concluir) | produção | sugestão | — |
+| Salários de meses já fechados por pagar | finanças | a tratar | Funcionários |
+| Salários do mês por pagar, a partir do dia 25 | finanças | sugestão | — |
+| O que se deve aos fornecedores (total e o maior) | finanças | sugestão | — |
+
+Os limites estão em `EDITORA_RULES`. "Ver" abre a vista onde se resolve (Produção › Etapas e
+prazos, Produção › Contas e pagamentos, Funcionários › Salários).
 
 ## 5. Procurar (Ctrl+K / ⌘K) — `AdminCommandPalette.jsx`, `lib/adminSearch.js`
 - Abre com Ctrl+K / ⌘K em qualquer secção, ou no campo do topo; fecha com Escape.

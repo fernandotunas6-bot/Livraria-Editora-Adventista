@@ -30,6 +30,7 @@ import AdminOverview from '@/components/admin/AdminOverview';
 import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useSignal } from '@/hooks/useSignal';
+import { useEditoraAttention } from '@/hooks/useEditoraAttention';
 import { mergeOrders, newestUpdated } from '@/lib/ordersSync';
 import { loadStaffRoleName } from '@/lib/staffRolesApi';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -502,10 +503,14 @@ const AdminPage = () => {
 
   // O que pede acção, ao lado do nome da secção (não totais): encomendas por confirmar, stock
   // a acabar, pagamentos que o cliente diz ter feito.
+  // A Editora e as finanças (lib/editoraAttention.js): etapas atrasadas ao lado da Produção e
+  // salários de meses fechados por pagar ao lado dos Funcionários; os avisos vão para o Início.
+  const editora = useEditoraAttention(perms, { enabled: access === 'allow' });
   const nav = buildAdminNav(perms, {
     orders: { count: pendingCount, tone: 'info' },
     books: { count: lowStockBooks.length, tone: 'warning' },
     'pagamentos-caixa': { count: awaitingPaymentCount, tone: 'warning' },
+    ...editora.badges,
   });
   // A secção fica no endereço (/admin?tab=orders): os avisos, os emails e outras páginas
   // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
@@ -610,6 +615,7 @@ const AdminPage = () => {
                 orders={orders}
                 books={books}
                 lowStockBooks={lowStockBooks}
+                extraAttention={editora.items}
                 loading={loading}
                 onNavigate={goToSection}
                 onOpenOrders={openOrders}

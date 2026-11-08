@@ -7,7 +7,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { friendlyDbError } from '@/lib/production';
 
-const MIGRATION_MISSING = 'A produção, os funcionários e as finanças ainda não estão na base de dados (migrações 20261108150000 a 20261108152000 por aplicar).';
+const MIGRATION_MISSING = 'A produção, os funcionários e as finanças ainda não estão na base de dados (migrações 20261108190000 a 20261108192000 por aplicar).';
 
 function fail(error) {
   const msg = error?.message || String(error || '');
@@ -50,6 +50,27 @@ export async function loadProduction() {
     all(() => supabase.from('stock_books').select('id, title, book_code, stock, product_type').order('title')),
   ]);
   return { orders, stages, costs, suppliers, payments, staff, books };
+}
+
+/**
+ * O que o Início precisa para o "Precisa de atenção" da Editora e das finanças
+ * (lib/editoraAttention.js): só as ordens abertas, as etapas delas e as colunas usadas. As finanças
+ * lêem também o que se deve aos fornecedores e os salários por pagar (o RLS só lhes deixa ler a elas).
+ */
+export async function loadEditoraAttention({ finance = false } = {}) {
+  const orders = await all(() => supabase.from('production_orders')
+    .select('id, code, title, status, due_date').in('status', ['planeada', 'em_curso']).order('created'));
+  const ids = orders.map((o) => o.id);
+  const [stages, staff, suppliers, costs, payments, payroll] = await Promise.all([
+    ids.length ? all(() => supabase.from('production_stages')
+      .select('id, order_id, name, status, due_date, responsible_id, position').in('order_id', ids).order('position')) : [],
+    all(() => supabase.from('staff_members').select('id, full_name').order('full_name')),
+    finance ? all(() => supabase.from('suppliers').select('id, name').order('name')) : [],
+    finance ? all(() => supabase.from('production_costs').select('id, supplier_id, amount').not('supplier_id', 'is', null).order('id')) : [],
+    finance ? all(() => supabase.from('supplier_payments').select('id, supplier_id, amount, status').order('id')) : [],
+    finance ? all(() => supabase.from('staff_payroll').select('id, period, net, status').eq('status', 'por_pagar').order('period')) : [],
+  ]);
+  return { orders, stages, staff, suppliers, costs, payments, payroll };
 }
 
 const SUPPLIER_FIELDS = ['name', 'kind', 'nif', 'contact_name', 'phone', 'email', 'address', 'iban', 'notes', 'active'];
