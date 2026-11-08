@@ -9,6 +9,7 @@
  */
 
 export const TWILIO_API = "https://api.twilio.com/2010-04-01";
+export const VERIFY_API = "https://verify.twilio.com/v2";
 
 type Row = Record<string, any>;
 
@@ -94,29 +95,10 @@ export function smsNotice(parts: { title: string; detail?: string; link?: string
   return link ? `${fitted}\n${link}` : fitted;
 }
 
-/** Um código de 6 dígitos, sem o desvio de usar o resto da divisão. */
-export function otpCode(): string {
-  const limit = Math.floor(0xffffffff / 1_000_000) * 1_000_000;
-  const buffer = new Uint32Array(1);
-  do crypto.getRandomValues(buffer); while (buffer[0] >= limit);
-  return String(buffer[0] % 1_000_000).padStart(6, "0");
-}
-
+/** Quanto tempo vale um código da Twilio Verify. */
 export const OTP_MINUTES = 10;
 
-export function otpMessage(siteName: string, code: string): string {
-  return clipSms(smsText(`${siteName}: o seu codigo e ${code}. Valido ${OTP_MINUTES} minutos. Nao o partilhe com ninguem.`));
-}
-
-/**
- * O código guarda-se só como este resumo, ligado à conta e ao número: não serve noutra conta nem
- * noutro número. O `pepper` fica fora da base de dados, porque 6 dígitos sem ele descobrem-se logo.
- */
-export async function otpHash(userId: string, number: string, code: string, pepper: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pepper), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${userId}:${number}:${code}`));
-  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+export const isVerifyService = (sid: unknown) => /^VA[0-9a-f]{32}$/i.test(String(sid ?? ""));
 
 export type SmsResult = { ok: boolean; id?: string; status?: string; parts?: number; code?: string; error?: string };
 
@@ -151,6 +133,11 @@ export function smsErrorText(code: string | undefined, fallback = ""): string {
     21610: "Este número pediu para não receber SMS.",
     21612: "A Twilio não consegue enviar para este destino com este remetente.",
     21614: "Este número não é um telemóvel: não recebe SMS.",
+    60200: "Número inválido.",
+    60202: "Demasiadas tentativas. Peça um código novo.",
+    60203: "Demasiados códigos pedidos para este número. Aguarde 10 minutos.",
+    60212: "Demasiados códigos pedidos para este número. Aguarde um pouco.",
+    60410: "A Twilio bloqueou o envio para este prefixo, por suspeita de fraude. O bloqueio dura 12 horas; veja em Verify → Fraud Guard.",
     invalid_phone: "Número inválido.",
     daily_limit: "Teto diário de SMS atingido.",
   };
@@ -163,15 +150,14 @@ export const smsSender = (sender: string): Record<string, string> =>
 
 export type TwilioCredentials = { sid: string; token: string };
 
-/** Pedido à API. Nunca lança: a falha volta como `{ ok: false }`, com o corpo em `body` se o houver. */
-export async function twilioRequest(
+async function twilioFetch(
   credentials: TwilioCredentials,
-  path: string,
-  form?: Record<string, string>,
-  fetchImpl: typeof fetch = fetch,
+  url: string,
+  form: Record<string, string> | undefined,
+  fetchImpl: typeof fetch,
 ): Promise<SmsResult & { body?: Row }> {
   try {
-    const res = await fetchImpl(`${TWILIO_API}/Accounts/${credentials.sid}${path}`, {
+    const res = await fetchImpl(url, {
       method: form ? "POST" : "GET",
       headers: {
         Authorization: `Basic ${btoa(`${credentials.sid}:${credentials.token}`)}`,
@@ -186,4 +172,36 @@ export async function twilioRequest(
   } catch (err) {
     return { ok: false, code: "sem_resposta", error: `Sem resposta da Twilio: ${(err as Error)?.message || err}` };
   }
+}
+
+/** Pedido à API de mensagens. Nunca lança: a falha volta como `{ ok: false }`, com o corpo se o houver. */
+export function twilioRequest(credentials: TwilioCredentials, path: string, form?: Record<string, string>, fetchImpl: typeof fetch = fetch) {
+  return twilioFetch(credentials, `${TWILIO_API}/Accounts/${credentials.sid}${path}`, form, fetchImpl);
+}
+
+/** Envia o código pela Twilio Verify, que o gera e o guarda. Em português: sem `Locale`, vai conforme o país. */
+export function verifySend(credentials: TwilioCredentials, service: string, to: string, fetchImpl: typeof fetch = fetch) {
+  return twilioFetch(credentials, `${VERIFY_API}/Services/${service}/Verifications`, { To: to, Channel: "sms", Locale: "pt" }, fetchImpl);
+}
+
+export function verifyCheck(credentials: TwilioCredentials, service: string, to: string, code: string, fetchImpl: typeof fetch = fetch) {
+  return twilioFetch(credentials, `${VERIFY_API}/Services/${service}/VerificationCheck`, { To: to, Code: code }, fetchImpl);
+}
+
+export type VerifyOutcome = "approved" | "wrong" | "expired" | "attempts" | "unavailable";
+
+/**
+ * O resultado de uma verificação. Depois de aprovada, expirada ou com as tentativas esgotadas, a
+ * Twilio apaga-a e responde 404. Só `approved` confirma: o campo `valid` é antigo.
+ */
+export function verifyOutcome(res: SmsResult): VerifyOutcome {
+  if (res.ok) {
+    if (res.status === "approved") return "approved";
+    if (res.status === "pending") return "wrong";
+    if (res.status === "max_attempts_reached") return "attempts";
+    return "expired";
+  }
+  if (res.code === "60202") return "attempts";
+  if (res.code === "20404" || res.code === "http_404") return "expired";
+  return "unavailable";
 }

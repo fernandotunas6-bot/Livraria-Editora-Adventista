@@ -35,8 +35,12 @@ const user = async (email, role = 'member') => {
   return u.id;
 };
 const perfil = async (id) => (await q(`select phone, phone_verified_at from public.profiles where id = $1`, [id]))[0];
-const start = async (id, phone, hash) => (await svc(`select public.phone_verification_start($1::uuid, $2, $3) as r`, [id, phone, hash]))[0].r;
-const confirm = async (id, hash) => (await svc(`select public.phone_verification_confirm($1::uuid, $2) as r`, [id, hash]))[0].r;
+const start = async (id, phone) => (await svc(`select public.phone_verification_start($1::uuid, $2) as r`, [id, phone]))[0].r;
+const pending = async (id) => (await svc(`select public.phone_verification_pending($1::uuid) as r`, [id]))[0].r;
+const failed = async (id) => (await svc(`select public.phone_verification_failed($1::uuid) as r`, [id]))[0].r;
+const confirm = async (id) => (await svc(`select public.phone_verification_confirm($1::uuid) as r`, [id]))[0].r;
+const cancel = (id) => svc(`select public.phone_verification_cancel($1::uuid)`, [id]);
+const passaMinuto = (id) => q(`update public.phone_verifications set sent_at = now() - interval '61 seconds' where user_id = $1`, [id]);
 const NUMERO = '244923000111';
 const NORMAL = '+244 923 000 111';
 
@@ -45,42 +49,49 @@ const bento = await user('bento@exemplo.ao');
 const admin = await user('admin@loja.ao', 'admin');
 
 // 1. O caminho normal ---------------------------------------------------------------------------------
-check('o código fica guardado', (await start(ana, NUMERO, 'certo')) === 0);
-check('sabe-se o número por confirmar', (await svc(`select public.phone_verification_pending($1::uuid) as r`, [ana]))[0].r === NUMERO);
-check('sem resumo em claro no perfil', (await perfil(ana)).phone_verified_at === null);
-let r = await confirm(ana, 'certo');
-check('o código certo confirma', r.ok === true && r.phone === NORMAL, r);
+check('o pedido fica guardado', (await start(ana, NUMERO)) === 0);
+check('sabe-se o número à espera', (await pending(ana)) === NUMERO);
+check('o perfil ainda não está confirmado', (await perfil(ana)).phone_verified_at === null);
+let r = await confirm(ana);
+check('a Twilio aprovou: confirma', r.ok === true && r.phone === NORMAL, r);
 let p = await perfil(ana);
-check('o perfil fica com o número e confirmado', p.phone === NORMAL && p.phone_verified_at !== null, p);
-check('o código só serve uma vez', (await confirm(ana, 'certo')).reason === 'none');
+check('o perfil fica com o número pedido e confirmado', p.phone === NORMAL && p.phone_verified_at !== null, p);
+check('só serve uma vez', (await confirm(ana)).ok === false && (await pending(ana)) === null);
 
 // 2. Pedir outro: espera 60 segundos ------------------------------------------------------------------
-check('logo a seguir, recusa e diz quanto falta', (await start(bento, NUMERO, 'b1')) === 0 && (await start(bento, NUMERO, 'b2')) > 0);
-check('o código antigo continua a valer durante a espera', (await q(`select code_hash from public.phone_verifications where user_id = $1`, [bento]))[0].code_hash === 'b1');
-await svc(`select public.phone_verification_cancel($1::uuid)`, [bento]);
-check('se a SMS não sai, pode tentar logo', (await start(bento, NUMERO, 'b3')) === 0);
-await q(`update public.phone_verifications set sent_at = now() - interval '61 seconds' where user_id = $1`, [bento]);
-check('passado o minuto, pode pedir outro', (await start(bento, NUMERO, 'b4')) === 0);
-check('e só vale o último', (await confirm(bento, 'b3')).reason === 'wrong');
+check('logo a seguir, recusa e diz quanto falta', (await start(bento, NUMERO)) === 0 && (await start(bento, '244923000999')) > 0);
+check('o número pedido não muda durante a espera', (await pending(bento)) === NUMERO);
+await cancel(bento);
+check('se a SMS não sai, pode tentar logo', (await start(bento, NUMERO)) === 0);
+await passaMinuto(bento);
+check('passado o minuto, pode pedir para outro número', (await start(bento, '244923000999')) === 0);
+check('e passa a ser esse que se confirma', (await pending(bento)) === '244923000999');
 
-// 3. Adivinhar o código ------------------------------------------------------------------------------
-await q(`update public.phone_verifications set sent_at = now() - interval '61 seconds' where user_id = $1`, [bento]);
-await start(bento, NUMERO, 'b5');
-const respostas = [];
-for (let i = 0; i < 5; i++) respostas.push(await confirm(bento, `errado${i}`));
-check('diz quantas tentativas faltam', respostas[0].left === 4 && respostas[3].left === 1, respostas);
-check('à quinta errada o código deixa de valer', respostas[4].reason === 'attempts', respostas[4]);
-check('e nem o certo já entra', (await confirm(bento, 'b5')).reason === 'none');
-check('sem confirmar', (await perfil(bento)).phone_verified_at === null);
+// 3. Códigos errados ----------------------------------------------------------------------------------
+await passaMinuto(bento);
+await start(bento, NUMERO);
+const restam = [];
+for (let i = 0; i < 5; i++) restam.push(await failed(bento));
+check('diz quantas tentativas restam, e à quinta acabou', JSON.stringify(restam) === '[4,3,2,1,0]', restam);
+check('já não há nada à espera', (await pending(bento)) === null);
+check('nem se confirma depois disso', (await confirm(bento)).ok === false && (await perfil(bento)).phone_verified_at === null);
+check('errar sem pedido não rebenta', (await failed(bento)) === 0);
+await start(bento, NUMERO);
+await failed(bento);
+await passaMinuto(bento);
+await start(bento, NUMERO);
+check('um pedido novo volta às 5 tentativas', (await failed(bento)) === 4);
+await cancel(bento);
 
 // 4. Expirado ----------------------------------------------------------------------------------------
-await start(bento, NUMERO, 'b6');
+await start(bento, NUMERO);
 await q(`update public.phone_verifications set expires_at = now() - interval '1 second' where user_id = $1`, [bento]);
-check('depois do prazo não vale', (await confirm(bento, 'b6')).reason === 'expired');
+check('depois do prazo não há número à espera', (await pending(bento)) === null);
+check('nem confirma, mesmo que a Twilio dissesse que sim', (await confirm(bento)).ok === false && (await perfil(bento)).phone_verified_at === null);
 
 // 5. Um número, uma conta confirmada -------------------------------------------------------------------
-await start(bento, NUMERO, 'b7');
-check('o Bento prova que tem o número', (await confirm(bento, 'b7')).ok === true);
+await start(bento, NUMERO);
+check('o Bento prova que tem o número', (await confirm(bento)).ok === true);
 p = await perfil(ana);
 check('a conta anterior perde a confirmação, e não o número', p.phone === NORMAL && p.phone_verified_at === null, p);
 check('o Bento fica confirmado', (await perfil(bento)).phone_verified_at !== null);
@@ -93,8 +104,8 @@ check('marcar a confirmação pela API não pega', p.phone === '+244 923 000 222
 await asUser(bento, `update public.profiles set phone = '+244 923 000 333' where id = $1`, [bento]);
 p = await perfil(bento);
 check('mudar o telefone tira a confirmação', p.phone === '+244 923 000 333' && p.phone_verified_at === null, p);
-await start(carla, '244923000222', 'c1');
-await confirm(carla, 'c1');
+await start(carla, '244923000222');
+await confirm(carla);
 await asUser(carla, `update public.profiles set name = 'Carla' where id = $1`, [carla]);
 check('mudar outra coisa mantém a confirmação', (await perfil(carla)).phone_verified_at !== null);
 await asUser(admin, `select public.users_admin_update($1::uuid, 'Carla', '+244 923 000 444', 'member', '{}'::jsonb)`, [carla]);
@@ -102,16 +113,17 @@ p = await perfil(carla);
 check('a equipa mudar o telefone também tira a confirmação', p.phone === '+244 923 000 444' && p.phone_verified_at === null, p);
 
 // 7. Só a Edge Function lhe chega ------------------------------------------------------------------------
-await start(ana, '244923000555', 'a2');
+await start(ana, '244923000555');
 for (const [nome, sql] of [
-  ['start', `select public.phone_verification_start($1::uuid, '244923000666', 'x')`],
-  ['confirm', `select public.phone_verification_confirm($1::uuid, 'a2')`],
+  ['start', `select public.phone_verification_start($1::uuid, '244923000666')`],
+  ['confirm', `select public.phone_verification_confirm($1::uuid)`],
+  ['failed', `select public.phone_verification_failed($1::uuid)`],
   ['pending', `select public.phone_verification_pending($1::uuid)`],
   ['cancel', `select public.phone_verification_cancel($1::uuid)`],
 ]) {
   await raises(`quem usa o site não chama ${nome}`, () => asUser(ana, sql, [ana]), /permission denied/);
 }
-await raises('quem usa o site não lê os códigos', () => asUser(ana, `select * from public.phone_verifications`), /permission denied/);
+await raises('quem usa o site não lê os pedidos', () => asUser(ana, `select * from public.phone_verifications`), /permission denied/);
 await raises('nem a equipa', () => asUser(admin, `select * from public.phone_verifications`), /permission denied/);
 await raises('nem quem não entrou', () => db.transaction(async (tx) => {
   await tx.exec('set local role anon');

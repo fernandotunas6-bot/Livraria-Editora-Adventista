@@ -24,6 +24,7 @@ export default function TwilioConfigForm({ app, onSave }) {
   const cfg = app.config || {};
   const { toast } = useToast();
   const [sender, setSender] = useState(cfg.sender || '');
+  const [verifyService, setVerifyService] = useState(cfg.verify_service || '');
   const [flags, setFlags] = useState(() => Object.fromEntries(CHANNELS.map((c) => [c.key, cfg[c.key] ?? !!c.fallback])));
   const [dailyLimit, setDailyLimit] = useState(String(cfg.daily_limit ?? 50));
   const [state, setState] = useState(null);
@@ -40,7 +41,7 @@ export default function TwilioConfigForm({ app, onSave }) {
   };
   useEffect(() => { loadState(); }, []);
 
-  const config = () => ({ sender: sender.trim(), ...flags, daily_limit: Math.max(1, Number(dailyLimit) || 50) });
+  const config = () => ({ sender: sender.trim(), verify_service: verifyService.trim(), ...flags, daily_limit: Math.max(1, Number(dailyLimit) || 50) });
 
   const save = async () => {
     setSaving(true);
@@ -65,6 +66,7 @@ export default function TwilioConfigForm({ app, onSave }) {
     }
   };
 
+  const codesOff = flags.otp && !/^VA[0-9a-f]{32}$/i.test(verifyService.trim());
   const noBalance = state?.ok && state.balance != null && Number(state.balance) <= 0;
 
   return (
@@ -91,11 +93,20 @@ export default function TwilioConfigForm({ app, onSave }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="sms-sender" className="text-xs">Remetente</Label>
+        <Label htmlFor="sms-sender" className="text-xs">Remetente dos avisos</Label>
         <Input id="sms-sender" className="max-w-xs" maxLength={40} value={sender} onChange={(e) => setSender(e.target.value)} placeholder="LivrariaAdv" />
         <p className="text-xs text-muted-foreground">
           Até 11 letras e números, sem precisar de registo em Angola; ou um número da Twilio, ou um serviço de mensagens (MG…). Vazio: LivrariaAdv.
           {' '}Ligue Angola em <a href="https://console.twilio.com/us1/develop/sms/settings/geo-permissions" target="_blank" rel="noreferrer" className="text-primary underline">Geo Permissions</a>, senão as SMS são recusadas.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="sms-verify" className="text-xs">Serviço Verify, para os códigos</Label>
+        <Input id="sms-verify" className="max-w-md font-mono text-xs" maxLength={34} value={verifyService} onChange={(e) => setVerifyService(e.target.value)} placeholder="VA…" />
+        <p className="text-xs text-muted-foreground">
+          {codesOff ? <strong className="font-medium text-destructive">Sem um serviço válido (VA seguido de 32 caracteres), os códigos não saem. </strong> : null}
+          A Twilio Verify gera os códigos, conta as tentativas e protege contra fraude. Os avisos saem pelo remetente acima.
         </p>
       </div>
 

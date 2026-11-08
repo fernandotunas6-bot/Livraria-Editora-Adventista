@@ -88,7 +88,17 @@ describe('integração Twilio no painel', () => {
     const onSave = vi.fn();
     const el = await mount(<TwilioConfigForm app={app} onSave={onSave} />);
     await act(async () => button(el, 'Guardar').click());
-    expect(onSave).toHaveBeenCalledWith(app, { sender: '', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 50 });
+    expect(onSave).toHaveBeenCalledWith(app, { sender: '', verify_service: '', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 50 });
+  });
+
+  it('sem o serviço Verify, avisa de que os códigos não saem', async () => {
+    send.mockResolvedValue(COM_SALDO);
+    const semServico = await mount(<TwilioConfigForm app={app} onSave={vi.fn()} />);
+    expect(semServico.textContent).toContain('os códigos não saem');
+    act(() => root.unmount());
+    host.remove();
+    const comServico = await mount(<TwilioConfigForm app={{ ...app, config: { verify_service: `VA${'0a'.repeat(16)}` } }} onSave={vi.fn()} />);
+    expect(comServico.textContent).not.toContain('os códigos não saem');
   });
 
   it('o teste grava primeiro e explica a falha', async () => {

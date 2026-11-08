@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  clipSms, isAngolaMobile, maskedNumber, otpCode, otpHash, otpMessage, parseSmsResponse, smsE164, smsErrorText,
-  smsNotice, smsNumber, smsParts, smsSender, smsText, twilioRequest,
+  clipSms, isAngolaMobile, isVerifyService, maskedNumber, parseSmsResponse, smsE164, smsErrorText, smsNotice, smsNumber,
+  smsParts, smsSender, smsText, twilioRequest, verifyCheck, verifyOutcome, verifySend,
 } from "./sms.ts";
 
 describe("números", () => {
@@ -69,24 +69,23 @@ describe("texto", () => {
   });
 });
 
-describe("códigos", () => {
-  it("6 dígitos", () => {
-    for (let i = 0; i < 50; i++) expect(otpCode()).toMatch(/^\d{6}$/);
+describe("serviço e resultado da Twilio Verify", () => {
+  it("reconhece o identificador do serviço", () => {
+    expect(isVerifyService(`VA${"0a".repeat(16)}`)).toBe(true);
+    for (const v of ["", "VA123", `MG${"0a".repeat(16)}`, null, undefined]) expect(isVerifyService(v)).toBe(false);
   });
-  it("a mensagem cabe numa SMS e não leva acentos", () => {
-    const m = otpMessage("Livraria Adventista", "123456");
-    expect(m).toContain("123456");
-    expect(smsParts(m)).toBe(1);
-    expect(m).toMatch(/^[\x20-\x7e]*$/);
+  it("só «approved» confirma", () => {
+    expect(verifyOutcome({ ok: true, status: "approved" })).toBe("approved");
+    expect(verifyOutcome({ ok: true, status: "pending" })).toBe("wrong");
+    expect(verifyOutcome({ ok: true, status: "max_attempts_reached" })).toBe("attempts");
+    for (const status of ["canceled", "expired", "deleted"]) expect(verifyOutcome({ ok: true, status })).toBe("expired");
   });
-  it("o resumo fica preso à conta, ao número e ao segredo", async () => {
-    const a = await otpHash("u1", "244923000000", "123456", "segredo");
-    expect(a).toMatch(/^[0-9a-f]{64}$/);
-    expect(await otpHash("u1", "244923000000", "123456", "segredo")).toBe(a);
-    expect(await otpHash("u2", "244923000000", "123456", "segredo")).not.toBe(a);
-    expect(await otpHash("u1", "244923000001", "123456", "segredo")).not.toBe(a);
-    expect(await otpHash("u1", "244923000000", "123457", "segredo")).not.toBe(a);
-    expect(await otpHash("u1", "244923000000", "123456", "outro")).not.toBe(a);
+  it("erros: esgotado, já não existe, ou a Twilio em baixo", () => {
+    expect(verifyOutcome({ ok: false, code: "60202" })).toBe("attempts");
+    expect(verifyOutcome({ ok: false, code: "20404" })).toBe("expired");
+    expect(verifyOutcome({ ok: false, code: "http_404" })).toBe("expired");
+    expect(verifyOutcome({ ok: false, code: "sem_resposta" })).toBe("unavailable");
+    expect(verifyOutcome({ ok: false, code: "20003" })).toBe("unavailable");
   });
 });
 
@@ -110,6 +109,8 @@ describe("respostas da API", () => {
     expect(smsErrorText("21408")).toContain("Geo Permissions");
     expect(smsErrorText("21608")).toContain("Conta de teste");
     expect(smsErrorText("20003")).toContain("TWILIO_AUTH_TOKEN");
+    expect(smsErrorText("60203")).toContain("10 minutos");
+    expect(smsErrorText("60410")).toContain("Fraud Guard");
     expect(smsErrorText("99999", "Outro")).toBe("Outro");
     expect(smsErrorText(undefined)).toBe("Não foi possível enviar a SMS.");
   });
@@ -142,6 +143,29 @@ describe("pedido à API", () => {
     const form = new URLSearchParams(String(init.body));
     expect(form.get("To")).toBe("+244923000000");
     expect(form.get("Body")).toBe("ola e adeus");
+  });
+  it("o código vai pela Twilio Verify, em português", async () => {
+    const service = `VA${"0a".repeat(16)}`;
+    const fake = vi.fn(async () => resposta(201, { sid: "VE1", status: "pending", valid: false }));
+    const r = await verifySend(cred, service, "+244923000000", fake as unknown as typeof fetch);
+    expect(r).toMatchObject({ ok: true, id: "VE1", status: "pending" });
+    const [url, init] = fake.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://verify.twilio.com/v2/Services/${service}/Verifications`);
+    expect(String(init.body)).not.toContain("TOKEN-SECRETO");
+    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ To: "+244923000000", Channel: "sms", Locale: "pt" });
+  });
+  it("verificar o código usa o número e o código", async () => {
+    const service = `VA${"0a".repeat(16)}`;
+    const fake = vi.fn(async () => resposta(200, { sid: "VE1", status: "approved", valid: true }));
+    const r = await verifyCheck(cred, service, "+244923000000", "123456", fake as unknown as typeof fetch);
+    expect(verifyOutcome(r)).toBe("approved");
+    const [url, init] = fake.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://verify.twilio.com/v2/Services/${service}/VerificationCheck`);
+    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ To: "+244923000000", Code: "123456" });
+  });
+  it("verificação que já não existe: 404", async () => {
+    const fake = vi.fn(async () => resposta(404, { code: 20404, message: "not found", status: 404 }));
+    expect(verifyOutcome(await verifyCheck(cred, "VA1", "+244923000000", "1", fake as unknown as typeof fetch))).toBe("expired");
   });
   it("sem formulário é GET", async () => {
     const fake = vi.fn(async () => resposta(200, { balance: "12.34", currency: "USD" }));

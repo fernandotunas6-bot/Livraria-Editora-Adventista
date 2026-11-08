@@ -66,7 +66,7 @@ const DEFAULT_APPS = [
     code: 'twilio',
     description: 'SMS em Angola: códigos para confirmar o telefone e avisos quando o WhatsApp não chega.',
     icon: '📲',
-    config: { sender: '', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 50 },
+    config: { sender: '', verify_service: 'VA08a140b7f8e25a09788894e9e521f148', otp: true, orders: false, colporteurs: false, staff: false, daily_limit: 50 },
   },
 ];
 const ACTIVE_CODES = DEFAULT_APPS.map((a) => a.code);

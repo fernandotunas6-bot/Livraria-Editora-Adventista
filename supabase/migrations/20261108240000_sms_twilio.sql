@@ -10,9 +10,10 @@
 --    * Quem usa o site não o pode escrever: só a função de confirmação.
 --    * Mudar o telefone, por qualquer caminho, tira a confirmação.
 --    * Um número só fica confirmado numa conta: quem prova que o tem tira-o da conta anterior.
--- 3. phone_verifications: o código por confirmar, um por conta, só como resumo (HMAC ligado à
---    conta e ao número, com um segredo fora da base de dados). Dura 10 minutos, com 5 tentativas.
---    Só a Edge Function lhe chega.
+-- 3. phone_verifications: o número à espera de confirmação em cada conta. O código é gerado e
+--    guardado pela Twilio Verify; aqui fica a garantia de que se confirma o número pedido por esta
+--    conta, e não outro, além da espera de 60 segundos e de um limite de 5 tentativas erradas. Só a
+--    Edge Function lhe chega.
 --
 -- Reverter: drop das funções phone_verification_*, da tabela phone_verifications, do gatilho e da
 -- função profiles_phone_verified_guard, do índice e da coluna phone_verified_at; repor as regras
@@ -65,19 +66,18 @@ create trigger profiles_z_phone_verified_guard
 create table if not exists public.phone_verifications (
   user_id uuid primary key references public.profiles (id) on delete cascade,
   phone text not null,
-  code_hash text not null,
   attempts integer not null default 0,
   sent_at timestamptz not null default now(),
   expires_at timestamptz not null
 );
 comment on table public.phone_verifications is
-  'O código por confirmar de cada conta, só como resumo. Só a Edge Function lhe chega.';
+  'O número à espera de confirmação em cada conta. O código fica na Twilio Verify. Só a Edge Function lhe chega.';
 alter table public.phone_verifications enable row level security;
 revoke all on public.phone_verifications from public, anon, authenticated;
 grant all on public.phone_verifications to service_role;
 
--- Guarda o código novo. Devolve quantos segundos faltam para poder pedir outro; 0 = guardado.
-create or replace function public.phone_verification_start(p_user uuid, p_phone text, p_code_hash text, p_minutes integer default 10)
+-- Guarda o pedido. Devolve quantos segundos faltam para poder pedir outro código; 0 = guardado.
+create or replace function public.phone_verification_start(p_user uuid, p_phone text, p_minutes integer default 10)
 returns integer
 language plpgsql
 security definer
@@ -91,11 +91,10 @@ begin
   select ceil(extract(epoch from (sent_at + interval '60 seconds' - now())))::integer into v_wait
   from public.phone_verifications where user_id = p_user for update;
   if coalesce(v_wait, 0) > 0 then return v_wait; end if;
-  insert into public.phone_verifications (user_id, phone, code_hash, attempts, sent_at, expires_at)
-  values (p_user, p_phone, p_code_hash, 0, now(), now() + make_interval(mins => p_minutes))
+  insert into public.phone_verifications (user_id, phone, attempts, sent_at, expires_at)
+  values (p_user, p_phone, 0, now(), now() + make_interval(mins => p_minutes))
   on conflict (user_id) do update
-    set phone = excluded.phone, code_hash = excluded.code_hash, attempts = 0,
-        sent_at = excluded.sent_at, expires_at = excluded.expires_at;
+    set phone = excluded.phone, attempts = 0, sent_at = excluded.sent_at, expires_at = excluded.expires_at;
   return 0;
 end;
 $$;
@@ -113,7 +112,7 @@ begin
 end;
 $$;
 
--- O número do código por confirmar: é com ele que a Edge Function calcula o resumo.
+-- O número à espera de confirmação nesta conta, enquanto o código valer. É este que se verifica.
 create or replace function public.phone_verification_pending(p_user uuid)
 returns text
 language plpgsql
@@ -122,12 +121,33 @@ set search_path = ''
 as $$
 begin
   perform private.assert_server();
-  return (select phone from public.phone_verifications where user_id = p_user);
+  return (select phone from public.phone_verifications where user_id = p_user and expires_at >= now());
 end;
 $$;
 
--- Confirma o código. Uma tentativa errada conta sempre; à quinta, o código deixa de valer.
-create or replace function public.phone_verification_confirm(p_user uuid, p_code_hash text)
+-- Um código errado. Devolve quantas tentativas restam; à quinta, o pedido deixa de valer.
+create or replace function public.phone_verification_failed(p_user uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_attempts integer;
+begin
+  perform private.assert_server();
+  update public.phone_verifications set attempts = attempts + 1 where user_id = p_user returning attempts into v_attempts;
+  if v_attempts is null then return 0; end if;
+  if v_attempts >= 5 then
+    delete from public.phone_verifications where user_id = p_user;
+    return 0;
+  end if;
+  return 5 - v_attempts;
+end;
+$$;
+
+-- A Twilio aprovou o código: o número pedido por esta conta fica confirmado.
+create or replace function public.phone_verification_confirm(p_user uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -139,20 +159,10 @@ declare
 begin
   perform private.assert_server();
   select * into v from public.phone_verifications where user_id = p_user for update;
-  if not found then return jsonb_build_object('ok', false, 'reason', 'none'); end if;
-  if v.expires_at < now() then
+  if not found or v.expires_at < now() then
     delete from public.phone_verifications where user_id = p_user;
-    return jsonb_build_object('ok', false, 'reason', 'expired');
+    return jsonb_build_object('ok', false);
   end if;
-  if v.code_hash is distinct from p_code_hash then
-    if v.attempts + 1 >= 5 then
-      delete from public.phone_verifications where user_id = p_user;
-      return jsonb_build_object('ok', false, 'reason', 'attempts');
-    end if;
-    update public.phone_verifications set attempts = attempts + 1 where user_id = p_user;
-    return jsonb_build_object('ok', false, 'reason', 'wrong', 'left', 4 - v.attempts);
-  end if;
-
   v_phone := public.normalize_angola_phone(v.phone);
   -- Quem prova que tem o número tira-o da conta que o tinha confirmado.
   update public.profiles set phone_verified_at = null
@@ -167,10 +177,11 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'public.phone_verification_start(uuid, text, text, integer)',
+    'public.phone_verification_start(uuid, text, integer)',
     'public.phone_verification_cancel(uuid)',
     'public.phone_verification_pending(uuid)',
-    'public.phone_verification_confirm(uuid, text)'
+    'public.phone_verification_failed(uuid)',
+    'public.phone_verification_confirm(uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon, authenticated', f);
     execute format('grant execute on function %s to service_role', f);
