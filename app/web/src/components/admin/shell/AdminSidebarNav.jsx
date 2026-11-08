@@ -23,9 +23,13 @@ export default function AdminSidebarNav({ nav, active, view = null, onNavigate, 
   const { isMobile, setOpenMobile, openMobile } = useSidebar();
   const navRef = useRef(null);
 
-  // A secção aberta fica à vista na lista (Colportagem, Configurações… ficam lá em baixo).
+  // A secção aberta fica à vista na lista (Colportagem, Configurações… ficam lá em baixo) — e,
+  // desdobrada, a vista aberta dela, que fica por baixo do nome.
   useEffect(() => {
-    navRef.current?.querySelector('[data-active="true"]')?.scrollIntoView?.({ block: 'nearest' });
+    const el = navRef.current;
+    const target = el?.querySelector('[data-sidebar="menu-sub-button"][data-active="true"]')
+      || el?.querySelector('[data-sidebar="menu-button"][data-active="true"]');
+    target?.scrollIntoView?.({ block: 'nearest' });
   }, [active, view, openMobile]);
 
   const go = (id, opts) => {
