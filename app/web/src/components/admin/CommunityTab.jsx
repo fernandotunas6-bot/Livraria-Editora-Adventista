@@ -8,7 +8,8 @@ import { linkHost } from '@/lib/communityLinks';
 import { relativeTime } from '@/lib/communityText';
 import BlockedDomainsPanel from '@/components/admin/BlockedDomainsPanel';
 import { ClubsPanel, PostsPanel, TopicsPanel } from '@/components/admin/CommunityStaffPanels';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import ReaderLevelsPanel from '@/components/admin/ReaderLevelsPanel';
 
 /**
  * Moderação da comunidade: publicações denunciadas ou ocultas. À terceira denúncia a base de
@@ -83,7 +84,7 @@ function ReportsPanel({ onMissing }) {
                 <span>· {relativeTime(p.created)}</span>
                 {p.book_id && <Link to={`/product/${p.book_id}`} className="text-primary hover:underline">· ver o livro</Link>}
               </div>
-              <p className="mt-2 whitespace-pre-line break-words text-sm">{p.body}</p>
+              <p className="mt-2 whitespace-pre-line wrap-break-word text-sm">{p.body}</p>
               {p.quote && <p className="mt-1 border-l-2 pl-2 text-sm italic text-muted-foreground">“{p.quote}”</p>}
               {Array.isArray(p.links) && p.links.length > 0 && (
                 <p className="mt-1 text-xs text-muted-foreground">Links: {p.links.map(linkHost).join(', ')}</p>
@@ -116,30 +117,23 @@ function ReportsPanel({ onMissing }) {
   );
 }
 
-const SECTIONS = [
-  ['denuncias', 'Denúncias'],
-  ['publicacoes', 'Publicações'],
-  ['temas', 'Temas'],
-  ['clube', 'Clube do livro'],
-  ['sites', 'Sites bloqueados'],
-];
-
 /** Painel da comunidade: moderação, publicações, temas, clube do livro e sites bloqueados. */
 export default function CommunityTab() {
-  const [section, setSection] = useState('denuncias');
+  // As vistas vêm do registo do painel (lib/adminSections.js) e a aberta do endereço.
+  const sv = useSectionView('community');
+  const view = sv.view;
   return (
     <div className="space-y-4">
       {/* Título e descrição no cabeçalho do painel (lib/adminSections.js). */}
-      <Tabs value={section} onValueChange={setSection}>
-        <TabsList className="h-auto flex-wrap justify-start">
-          {SECTIONS.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
-        </TabsList>
-        <TabsContent value="denuncias" className="pt-2"><ReportsPanel /></TabsContent>
-        <TabsContent value="publicacoes" className="pt-2"><PostsPanel /></TabsContent>
-        <TabsContent value="temas" className="pt-2"><TopicsPanel /></TabsContent>
-        <TabsContent value="clube" className="pt-2"><ClubsPanel /></TabsContent>
-        <TabsContent value="sites" className="pt-2"><BlockedDomainsPanel /></TabsContent>
-      </Tabs>
+      <AdminViewNav state={sv} className="mb-0" />
+      <div className="pt-2">
+        {view === 'denuncias' && <ReportsPanel />}
+        {view === 'publicacoes' && <PostsPanel />}
+        {view === 'temas' && <TopicsPanel />}
+        {view === 'clube' && <ClubsPanel />}
+        {view === 'sites' && <BlockedDomainsPanel />}
+        {view === 'niveis' && <ReaderLevelsPanel />}
+      </div>
     </div>
   );
 }

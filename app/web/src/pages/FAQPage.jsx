@@ -32,7 +32,7 @@ const FAQPage = () => {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider>
-        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">Perguntas Frequentes</h1>
+        <h1 className="mb-3 text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Perguntas Frequentes</h1>
         <p className="text-base text-white/85 sm:text-lg">Encontre respostas às dúvidas mais comuns</p>
       </PageBannerSlider>
 

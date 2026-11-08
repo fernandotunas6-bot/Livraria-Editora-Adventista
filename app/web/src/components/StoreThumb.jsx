@@ -38,7 +38,7 @@ export default function StoreThumb({ store, className = '' }) {
 
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-1 overflow-hidden bg-gradient-to-br from-primary/15 via-primary/5 to-transparent ${className}`}
+      className={`flex flex-col items-center justify-center gap-1 overflow-hidden bg-linear-to-br from-primary/15 via-primary/5 to-transparent ${className}`}
       aria-hidden="true"
     >
       <span className="text-base font-bold leading-none tracking-wider text-primary/85">

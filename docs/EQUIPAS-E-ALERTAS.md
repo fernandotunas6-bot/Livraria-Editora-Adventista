@@ -41,7 +41,11 @@ para quem gere encomendas e as escaladas para os administradores.
 3. Quem tem o painel aberto vê uma **barra no topo com som** (depois de carregar em "Activar
    som e notificações" uma vez por aparelho) e o botão **Assumir**.
 4. Quem assume fica registado; o aviso desaparece para os outros. Mudar o pagamento ou o estado
-   da encomenda também conta como assumir.
+   da encomenda também conta como assumir — e, desde 2026-11-08, também fecha o aviso para toda a
+   equipa (antes só o botão o fechava: encomendas já enviadas, entregues ou canceladas continuavam
+   a pedir "assumir" na barra; trigger `orders_assumida_fecha_avisos`).
+   Se o cliente cancelar sozinho, a equipa recebe "Cancelada pelo cliente" (push), para não a
+   preparar.
 5. Se ninguém assumir dentro do tempo da equipa (só conta o horário de funcionamento), a
    encomenda passa a **crítica** e sobe aos responsáveis e às urgências, por todos os canais,
    mesmo fora de horas.

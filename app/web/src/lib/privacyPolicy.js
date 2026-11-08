@@ -1,7 +1,8 @@
 /**
  * Política de privacidade. O texto descreve o que o sistema faz de facto (levantado do código
- * e das migrações em 2026-11-07); quem mudar o que se recolhe ou para onde vai, muda aqui
- * também. Os contactos vêm das Configurações, para não ficarem desactualizados.
+ * e das migrações em 2026-11-07; os direitos na própria conta — descarregar e apagar — em
+ * 2026-11-08); quem mudar o que se recolhe ou para onde vai, muda aqui também. Os contactos vêm
+ * das Configurações, para não ficarem desactualizados.
  *
  * Blocos: { p: 'texto' } ou { list: ['…'] }. No texto, `[rótulo](/caminho)` vira link interno.
  */
@@ -68,8 +69,10 @@ export function privacySections(settings = {}) {
           'o nome do seu perfil, ao lado de cada publicação, resposta e citação;',
           'o que escreve: o texto, a citação e a página, os links e o livro que escolher;',
           'a data de cada publicação e o número de gostos e de respostas;',
-          'o seu perfil de leitor: o nome, desde quando é leitor (mês e ano), quantas publicações e respostas fez, quantos gostos recebeu, quantos livros comentou e os selos "Equipa da Livraria" ou "Membro fundador" (quem publicou nos três primeiros meses da comunidade).',
+          'o seu perfil de leitor: o nome, desde quando é leitor (mês e ano), quantas publicações e respostas fez, quantos gostos recebeu, quantos livros comentou e os selos "Equipa da Livraria" ou "Membro fundador" (quem publicou nos três primeiros meses da comunidade);',
+          'o seu nível de leitor ("Leitor", "Leitor assíduo" ou "Leitor de honra"), ao lado do nome. O número de livros que comprou não é mostrado.',
         ] },
+        { p: '**Níveis de leitor.** Criar publicações é para os membros da Comunidade de Leitores: entra-se ao pagar o primeiro livro, ou ao fim de algum tempo a participar sem comprar (por omissão, conta com 30 dias e 5 dias diferentes a usar o site). Para isso contamos os livros das suas encomendas pagas e, enquanto a conta for nova, guardamos os dias em que usou o site com a conta — só a data, nunca as páginas que viu. Esses dias apagam-se quando entra na comunidade. O nível e o que falta para o seguinte estão no seu [perfil](/profile).' },
         { p: 'As publicações têm um endereço próprio e podem aparecer em motores de pesquisa. Quando alguém partilha esse endereço, por exemplo no WhatsApp, a pré-visualização mostra o seu nome, o início do texto e a capa do livro. Os perfis de leitor pedem aos motores de pesquisa que não os mostrem.' },
         { p: '**Nunca é mostrado:** o email, o telefone, a fotografia, as encomendas nem o identificador da sua conta. O endereço do seu perfil de leitor usa um código aleatório.' },
         { p: '**Fica privado:** de quem gostou (cada pessoa vê só os seus gostos; os outros vêem apenas o número) e as denúncias, que só a equipa vê. Quem é denunciado não sabe quem o denunciou.' },
@@ -131,10 +134,12 @@ export function privacySections(settings = {}) {
       blocks: [
         { p: 'Tem direito a saber que dados temos sobre si, a corrigi-los, a pedir que sejam apagados, a opor-se ao envio de comunicações de marketing e a retirar um consentimento que nos tenha dado.' },
         { list: [
-          'Corrigir o nome, o telefone e a fotografia: em [Perfil → Definições](/profile?tab=settings).',
+          'Corrigir o nome, o telefone e a fotografia: em [Perfil → Dados pessoais](/profile?tab=settings).',
           'Desligar avisos e notificações: em [Perfil → Notificações](/profile?tab=notifications).',
           'Apagar publicações da comunidade: no menu "⋯" de cada uma.',
-          `Pedir uma cópia dos seus dados ou apagar a conta: contacte-nos ${contactLine}. Podemos pedir-lhe que confirme a identidade antes de responder.`,
+          'Descarregar uma cópia dos seus dados (perfil, encomendas, pagamentos, lista de desejos, avaliações, comunidade, avisos e conversas de apoio): em [Perfil → Segurança e privacidade](/profile?tab=security), num ficheiro JSON.',
+          'Apagar a conta: no mesmo sítio. Saem o perfil, a lista de desejos, as publicações e os gostos da comunidade e os avisos; as encomendas ficam, porque a lei obriga a guardá-las, e continuam a poder ser rastreadas com o número e o email. As contas da equipa e dos colportores apagam-se pela administração.',
+          `Sem conta, ou se preferir: contacte-nos ${contactLine}. Podemos pedir-lhe que confirme a identidade antes de responder.`,
         ] },
         { p: 'Se achar que não tratámos bem os seus dados, pode apresentar queixa à Agência de Protecção de Dados (APD).' },
       ],

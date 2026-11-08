@@ -27,17 +27,23 @@ import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AdminShell from '@/components/admin/shell/AdminShell';
 import AdminOverview from '@/components/admin/AdminOverview';
-import { adminPermissions, buildAdminNav, resolveSection } from '@/lib/adminSections';
+import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
+import { useSignal } from '@/hooks/useSignal';
+import { mergeOrders, newestUpdated } from '@/lib/ordersSync';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getPaymentStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
+import { kwanza } from '@/lib/money';
+import { orderUnits, unitsLabel } from '@/lib/customerOrders';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
 import { hasCover, hasDescription } from '@/lib/bookContent';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+// Pequeno: os gráficos (a parte pesada) carregam lá dentro, só quando se abre a secção.
+import OrdersReportSection from '@/components/admin/OrdersReportSection';
 
 const CollectionsTab = lazy(() => import('@/components/admin/CollectionsTab'));
 const SlidesTab = lazy(() => import('@/components/admin/SlidesTab'));
@@ -51,9 +57,9 @@ const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
 const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
 const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
+const ReleasesTab = lazy(() => import('@/components/admin/ReleasesTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
-const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -172,31 +178,59 @@ const AdminPage = () => {
   // Só a primeira carga mostra a espera; as seguintes (depois de gravar, ou a actualização
   // automática) trocam os dados por baixo, sem a lista piscar nem perder o lugar.
   const loadedOnce = useRef(false);
+  // A data de actualização mais recente das encomendas que o painel já tem (relógio do servidor):
+  // a partir dela, cada actualização pede só as que mudaram.
+  const ordersSince = useRef(null);
+  const loadOrders = useCallback(async ({ incremental = false } = {}) => {
+    if (!canManageOrders) return [];
+    const since = incremental ? ordersSince.current : null;
+    const list = await pb.collection('orders').getFullList({
+      sort: '-created', fields: ORDER_LIST_FIELDS.join(','),
+      ...(since ? { filter: `updated >= "${since}"` } : {}),
+    });
+    ordersSince.current = newestUpdated(list, ordersSince.current);
+    if (since) setOrders((prev) => mergeOrders(prev, list));
+    else setOrders(list);
+    return list;
+  }, [canManageOrders]);
+
+  const loadCatalog = useCallback(async () => {
+    const [booksList, lowStock] = await Promise.all([
+      pb.collection('stock_books').getFullList({ sort: '-featured,title' }),
+      canManageCatalog ? getLowStockBooks() : [],
+    ]);
+    setBooks(booksList);
+    setLowStockBooks(lowStock);
+  }, [canManageCatalog]);
+
   const loadAll = useCallback(async () => {
     if (!loadedOnce.current) setLoading(true);
     try {
       // Os slides carrega-os o próprio separador (SlidesTab); aqui só serviam para o número no
       // nome do separador, que saiu.
-      const [booksList, ordersList, lowStock] = await Promise.all([
-        pb.collection('stock_books').getFullList({ sort: '-featured,title' }),
-        canManageOrders ? pb.collection('orders').getFullList({ sort: '-created', fields: ORDER_LIST_FIELDS.join(',') }).catch(() => []) : [],
-        canManageCatalog ? getLowStockBooks() : [],
-      ]);
-      setBooks(booksList);
-      setOrders(ordersList);
-      setLowStockBooks(lowStock);
+      await Promise.all([loadCatalog(), loadOrders().catch(() => setOrders([]))]);
     } catch (err) {
       console.error(err);
     } finally {
       loadedOnce.current = true;
       setLoading(false);
     }
-  }, [canManageOrders, canManageCatalog]);
+  }, [loadCatalog, loadOrders]);
 
-  // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos (de minuto a minuto com o
-  // painel à vista, ao voltar a ele, e quando a rede volta). Os números ao lado das secções e o
-  // Início acompanham, sem recarregar a página.
-  const sync = useAutoRefresh(loadAll, { intervalMs: 60_000, enabled: access === 'allow' });
+  // Tempo real: a base de dados avisa quando mudam encomendas ou o catálogo, e o painel pede só
+  // isso — as encomendas que mudaram desde a última vez, ou o catálogo. Ver lib/realtimeSignals.js.
+  const syncRef = useRef(null);
+  const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
+    const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
+    run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
+  }, { enabled: access === 'allow' && (canManageOrders || canManageCatalog) });
+
+  // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
+  // tempo real; e por consulta completa de 5 em 5 minutos com o canal ligado (de minuto a minuto
+  // sem ele), ao voltar ao painel e quando a rede volta. Os números ao lado das secções e o Início
+  // acompanham, sem recarregar a página.
+  const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
+  syncRef.current = sync;
   const { markSynced } = sync;
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
@@ -448,23 +482,30 @@ const AdminPage = () => {
   // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
   const activeTab = resolveSection(nav, searchParams.get('tab'));
   const currentSection = nav.flatMap((g) => g.items).find((i) => i.id === activeTab);
+  // A vista da secção (Colportagem › Contas) fica em `vista`: /admin?tab=colportagem&vista=contas.
+  // Sem vista, ou sem acesso a ela, a de omissão. `viewExplicit`: estava no endereço.
+  const requestedView = searchParams.get('vista');
+  const activeView = resolveView(currentSection, requestedView);
+  const viewExplicit = !!findView(currentSection, requestedView);
+  // A última vista aberta em cada secção, nesta visita: voltar à Colportagem volta às Contas.
+  const lastViews = useRef({});
+  if (activeView && viewExplicit) lastViews.current[activeTab] = activeView;
   const attentionCount = canManageOrders ? pendingCount + awaitingPaymentCount : 0;
-  const setActiveTab = (value) => setSearchParams((prev) => {
-    const next = new URLSearchParams(prev);
-    next.set('tab', value);
-    return next;
-  }, { replace: true });
   // Abrir as encomendas já filtradas (do Início e da procura).
   const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'orders', estado: status, pagamento: payment, encomenda: search });
+    updateParams({ tab: 'orders', vista: null, estado: status, pagamento: payment, encomenda: search });
   };
   const openProducts = ({ filter = 'all', search = '' } = {}) => {
-    updateParams({ tab: 'books', filtro: filter, tipo: null, produto: search });
+    updateParams({ tab: 'books', vista: null, filtro: filter, tipo: null, produto: search });
   };
+  // Ir para uma secção (e vista). Sem vista pedida, a última aberta nessa secção; a vista é
+  // própria de cada secção, por isso a de outra não fica no endereço.
   const goToSection = (id, opts = {}) => {
-    if (id === 'books' && opts.filter) openProducts({ filter: opts.filter });
-    else setActiveTab(id);
+    if (id === 'books' && opts.filter) { openProducts({ filter: opts.filter }); return; }
+    const view = opts.view !== undefined ? opts.view : (lastViews.current[id] ?? null);
+    updateParams({ tab: id, vista: view });
   };
+  const setActiveTab = (id) => goToSection(id);
   const addProduct = (type = 'livro') => {
     setNewProductType(type);
     setEditingBook(null);
@@ -499,11 +540,13 @@ const AdminPage = () => {
     <>
       {/* O separador do navegador diz a secção e quantas encomendas pedem acção: com o painel
           aberto noutro separador, vê-se de relance. */}
-      <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
+      <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${activeView ? `${findView(currentSection, activeView)?.label} · ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
         sync={sync}
         nav={nav}
         active={activeTab}
+        view={activeView}
+        viewExplicit={viewExplicit}
         onNavigate={goToSection}
         layout={layout}
         onLayoutChange={setLayout}
@@ -594,6 +637,13 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
+            {canManageSettings && (
+              <AdminSection active={activeTab} value="versoes">
+                <Suspense fallback={spinner}>
+                  <ReleasesTab />
+                </Suspense>
+              </AdminSection>
+            )}
             {canManageCatalog && (
               <AdminSection active={activeTab} value="downloads">
                 <Suspense fallback={spinner}>
@@ -615,7 +665,7 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
-            {(canManageOrders || canConfirmPayments) && (
+            {(perms.reports || canConfirmPayments) && (
               <AdminSection active={activeTab} value="pagamentos-caixa">
                 <Suspense fallback={spinner}>
                   <PaymentsReportTab canConfirm={canConfirmPayments} currentUserName={user?.name || user?.email || ''} />
@@ -732,7 +782,7 @@ const AdminPage = () => {
                           onClick={() => setBookFilter(filter)}
                           aria-pressed={active}
                           title={`Mostrar: ${label.toLowerCase()}`}
-                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
+                          className={`rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${active && filter !== 'all' ? 'border-primary ring-1 ring-primary' : ''}`}
                         >
                           {body}
                         </button>
@@ -845,12 +895,12 @@ const AdminPage = () => {
                             <td className="p-4 whitespace-nowrap">
                               {isSaleActive(b) ? (
                                 <>
-                                  <span className="text-rose-600 font-medium">Kz {Number(b.sale_price).toFixed(2)}</span>
-                                  <span className="block text-[10px] text-muted-foreground line-through">Kz {Number(b.price).toFixed(2)}</span>
+                                  <span className="text-rose-600 font-medium">{kwanza(b.sale_price)}</span>
+                                  <span className="block text-[10px] text-muted-foreground line-through">{kwanza(b.price)}</span>
                                 </>
                               ) : (
                                 <>
-                                  Kz {Number(b.price).toFixed(2)}
+                                  {kwanza(b.price)}
                                   {isSaleScheduled(b) && <span className="block text-[10px] text-rose-600">promoção agendada</span>}
                                 </>
                               )}
@@ -897,7 +947,6 @@ const AdminPage = () => {
 
                 {canManageOrders && (
                 <AdminSection active={activeTab} value="orders">
-                  <SalesReportsPanel orders={orders} />
                   <DeliveredPaymentDialog
                     order={deliveryDialog}
                     canConfirm={canConfirmPayments}
@@ -906,7 +955,7 @@ const AdminPage = () => {
                     onSubmit={(extra) => handleDeliveryStatus(deliveryDialog, 'delivered', extra)}
                   />
 
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                     <button
                       type="button"
                       onClick={() => setPaymentFilter(paymentFilter === 'awaiting_confirmation' ? 'all' : 'awaiting_confirmation')}
@@ -914,7 +963,7 @@ const AdminPage = () => {
                       title="Mostrar só estas encomendas"
                     >
                       <p className="text-sm text-muted-foreground">Pagamentos por confirmar</p>
-                      <p className="text-2xl font-bold text-orange-600">{awaitingPaymentCount}</p>
+                      <p className={`text-2xl font-bold ${awaitingPaymentCount ? 'text-orange-600' : 'text-foreground'}`}>{awaitingPaymentCount}</p>
                     </button>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Total Encomendas</p>
@@ -922,16 +971,16 @@ const AdminPage = () => {
                     </div>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Pendentes</p>
-                      <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+                      <p className={`text-2xl font-bold ${pendingCount ? 'text-amber-600' : 'text-foreground'}`}>{pendingCount}</p>
                     </div>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Recebido</p>
-                      <p className="text-2xl font-bold text-primary">Kz {money.received.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-2xl font-bold text-primary">{kwanza(money.received)}</p>
                       {money.receivable > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">+ Kz {money.receivable.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                        <p className="text-xs text-muted-foreground mt-1">+ {kwanza(money.receivable)} por receber</p>
                       )}
                       {money.refundDue > 0 && (
-                        <p className="text-xs text-destructive mt-1">Kz {money.refundDue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por reembolsar</p>
+                        <p className="text-xs text-destructive mt-1">{kwanza(money.refundDue)} por reembolsar</p>
                       )}
                     </div>
                   </div>
@@ -1001,8 +1050,16 @@ const AdminPage = () => {
                     {filteredOrders.map((o) => (
                       <div key={o.id} className="bg-card border rounded-xl overflow-hidden">
                         <div
-                          className="p-4 flex flex-wrap justify-between gap-3 cursor-pointer hover:bg-muted/20"
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={expandedOrder === o.id}
+                          className="p-4 flex flex-wrap justify-between gap-3 cursor-pointer hover:bg-muted/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                           onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                            e.preventDefault();
+                            setExpandedOrder(expandedOrder === o.id ? null : o.id);
+                          }}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1013,9 +1070,16 @@ const AdminPage = () => {
                               <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-marca/10 text-primary'}`}>
                                 {getOrderChannelLabel(o)}
                               </span>
-                              {o.delivery_status && (
+                              {o.delivery_status && o.status !== 'cancelled' && (
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getDeliveryStatusColor(o.delivery_status)}`}>
                                   {getDeliveryStatusLabel(o.delivery_status)}
+                                </span>
+                              )}
+                              {/* O pagamento à vista na lista: era preciso abrir a encomenda para saber se estava paga. */}
+                              {o.status !== 'cancelled' && (
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getPaymentStatusColor(o.payment_status || 'pending')}`}>
+                                  {/* "Pendente" repetia a etiqueta do estado ao lado: no pagamento diz o que é. */}
+                                  {{ paid: 'Paga', pending: 'Por pagar' }[o.payment_status || 'pending'] || getPaymentStatusLabel(o.payment_status)}
                                 </span>
                               )}
                               {o.customer_feedback?.outcome === 'ok' && (
@@ -1041,11 +1105,13 @@ const AdminPage = () => {
                               {o.customer_name || 'Cliente'} · {o.customer_email}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {new Date(o.created).toLocaleString('pt-AO')} · {(o.items || []).length} itens
+                              {new Date(o.created).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {' · '}{unitsLabel(orderUnits(o))}
+                              {' · '}{o.shipping_method === 'pickup' ? `Levantamento${orderPickupStore(o) ? ` · ${orderPickupStore(o)}` : ''}` : `Entrega${orderLocality(o, ', ') ? ` · ${orderLocality(o, ', ')}` : ''}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <p className="font-bold text-primary">Kz {Number(o.total).toFixed(2)}</p>
+                            <p className="font-bold text-primary tabular-nums">{kwanza(o.total)}</p>
                             {expandedOrder === o.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </div>
                         </div>
@@ -1125,10 +1191,10 @@ const AdminPage = () => {
                                     {item.book_code && <code className="ml-1 text-[10px] text-muted-foreground font-mono">{item.book_code}</code>}
                                   </span>
                                   <span className="font-medium text-right whitespace-nowrap">
-                                    Kz {(Number(item.price) * item.quantity).toFixed(2)}
+                                    {kwanza(Number(item.price) * item.quantity)}
                                     {Number(item.list_price) > Number(item.price) && (
                                       <span className="block text-[10px] text-muted-foreground line-through font-normal">
-                                        Kz {(Number(item.list_price) * item.quantity).toFixed(2)}
+                                        {kwanza(Number(item.list_price) * item.quantity)}
                                       </span>
                                     )}
                                   </span>
@@ -1197,10 +1263,9 @@ const AdminPage = () => {
                         )}
                       </div>
                     ))}
-                    {filteredOrders.length === 0 && (
-                      <p className="text-muted-foreground text-center py-8">Sem encomendas{orderFilter !== 'all' ? ' com este estado' : ''}.</p>
-                    )}
                   </div>
+                  {/* Totais e produtos mais vendidos: facturação, só com «Ver relatórios». */}
+                  {perms.reports && <OrdersReportSection orders={orders} />}
                 </AdminSection>
                 )}
               </>

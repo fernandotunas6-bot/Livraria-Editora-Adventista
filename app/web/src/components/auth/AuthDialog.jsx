@@ -24,11 +24,11 @@ export default function AuthDialog({ request, returnPath, onOpenChange, onDone }
   return (
     <Dialog open={!!request} onOpenChange={onOpenChange}>
       <DialogContent
-        className="z-[60] max-h-[92dvh] overflow-y-auto sm:max-w-md p-0 gap-0 rounded-2xl"
+        className="z-60 max-h-[92dvh] overflow-y-auto sm:max-w-md p-0 gap-0 rounded-2xl"
         // O carrinho fecha-se com Esc ouvido na janela; sem isto, fechar o modal fechava os dois.
         onEscapeKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-primary/10 to-transparent rounded-t-2xl">
+        <div className="px-6 pt-6 pb-4 bg-linear-to-b from-primary/10 to-transparent rounded-t-2xl">
           <div className="mb-4"><BrandLogo linkTo={null} /></div>
           <DialogHeader className="text-left space-y-1.5">
             <DialogTitle className="text-xl">{copy.title}</DialogTitle>
@@ -53,6 +53,7 @@ export default function AuthDialog({ request, returnPath, onOpenChange, onDone }
               initialMode={request.mode}
               defaultEmail={request.defaultEmail}
               defaultName={request.defaultName}
+              remembered={request.remembered}
               returnPath={returnPath}
               onModeChange={setMode}
               onDone={onDone}

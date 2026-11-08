@@ -27,7 +27,7 @@ function MiniBook({ product }) {
   const { price } = displayPrice(product);
   return (
     <Link to={`/product/${product.id}`} className="group flex items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted">
-      <img src={product.image} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />
+      <img src={product.image} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />
       <span className="min-w-0">
         <span className="line-clamp-2 text-xs font-medium leading-snug group-hover:text-primary">{product.title}</span>
         {price && <span className="mt-0.5 block text-xs font-bold text-brand-ink tabular-nums">{price}</span>}
@@ -64,11 +64,11 @@ function DiscoveryAside({ products, excludeId }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
         <h2 className="mb-4 text-base font-semibold">Refinar catálogo</h2>
 
         <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
-          <Package className="h-3.5 w-3.5 text-[var(--brand-primary)]" aria-hidden="true" /> Disponibilidade
+          <Package className="h-3.5 w-3.5 text-(--brand-primary)" aria-hidden="true" /> Disponibilidade
         </h3>
         <nav aria-label="Disponibilidade" className="mb-4 space-y-0.5">
           <Link to="/shop?inStockOnly=true" className={link}>Apenas com stock</Link>
@@ -79,7 +79,7 @@ function DiscoveryAside({ products, excludeId }) {
         {genres.length > 0 && (
           <>
             <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
-              <BookOpen className="h-3.5 w-3.5 text-[var(--brand-primary)]" aria-hidden="true" /> Género
+              <BookOpen className="h-3.5 w-3.5 text-(--brand-primary)" aria-hidden="true" /> Género
             </h3>
             <nav aria-label="Géneros" className="mb-4 space-y-0.5">
               {genres.map(([g, n]) => (
@@ -114,7 +114,7 @@ function DiscoveryAside({ products, excludeId }) {
       </div>
 
       {mini.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
             <Star className="h-4 w-4 text-amber-500" aria-hidden="true" /> Escolhas da livraria
           </h2>
@@ -213,7 +213,7 @@ export default function DiscoveryFeed({ onCartOpen, excludeId = null, title = 'M
         <div className="flex gap-8">
           {!isMobile && catalog && (
             <aside className="hidden w-64 shrink-0 lg:block">
-              <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-2 [scrollbar-width:thin]">
+              <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-2 scrollbar-thin">
                 <DiscoveryAside products={catalog} excludeId={excludeId} />
               </div>
             </aside>

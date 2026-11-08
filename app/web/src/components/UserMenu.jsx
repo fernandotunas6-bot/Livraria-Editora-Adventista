@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield, Sparkles,
+  User, ShoppingBag, LayoutDashboard, LogOut, ChevronDown, Settings, Shield, Sparkles, BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -15,11 +16,41 @@ import {
 import UserAvatar from '@/components/UserAvatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthDialog } from '@/hooks/useAuthDialog';
+import { useColporteurMe } from '@/hooks/useColporteurMe';
+import { adminPermissions } from '@/lib/adminSections';
+import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
+import { ROLES } from '@/lib/permissions';
 
+const groupLabel = 'px-2 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
+
+/** "Área do colportor", só para quem tem a ficha ligada à conta. Pergunta quando o menu abre. */
+function ColporteurItems({ userId }) {
+  const me = useColporteurMe(userId);
+  if (!me) return null;
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className={groupLabel}>Colportagem</DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <Link to={colporteurHref()} className="cursor-pointer">
+            <BadgeCheck className="mr-2" /> Área do colportor
+            {me.code && <span className="ml-auto font-mono text-[11px] text-muted-foreground">{me.code}</span>}
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </>
+  );
+}
+
+/**
+ * Menu da conta, arrumado pelos contextos da pessoa: a sua conta; a colportagem, se é colportor;
+ * e a equipa, se tem acesso ao painel — com os atalhos das secções que pode abrir.
+ */
 export function UserMenu({ compact = false, className }) {
-  const { user, isAdmin, canAccessAdmin, logout } = useAuth();
+  const { user, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -60,9 +91,11 @@ export function UserMenu({ compact = false, className }) {
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{getUserDisplayName(user)}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              {isAdmin && (
+              {/* Quem é da equipa vê-o (o gestor também, não só o administrador), com o código FUN-. */}
+              {(isAdmin || user?.role === 'manager') && (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-primary">
-                  <Shield className="h-3 w-3" /> Administrador
+                  <Shield className="h-3 w-3" aria-hidden="true" /> {ROLES[user?.role]?.label || 'Equipa'}
+                  {user?.staff_code && <span className="font-mono text-muted-foreground">· {user.staff_code}</span>}
                 </span>
               )}
             </div>
@@ -71,35 +104,51 @@ export function UserMenu({ compact = false, className }) {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild>
-          <Link to="/profile" className="cursor-pointer">
-            <User className="mr-2" /> Minha Conta
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/profile" state={{ tab: 'orders' }} className="cursor-pointer">
-            <ShoppingBag className="mr-2" /> As Minhas Encomendas
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/sugestoes" className="cursor-pointer">
-            <Sparkles className="mr-2" /> Sugestões para si
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/profile" state={{ tab: 'settings' }} className="cursor-pointer">
-            <Settings className="mr-2" /> Definições
-          </Link>
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className={groupLabel}>A minha conta</DropdownMenuLabel>
+          <DropdownMenuItem asChild>
+            <Link to="/profile" className="cursor-pointer">
+              <User className="mr-2" /> Minha Conta
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to={accountHref('orders')} className="cursor-pointer">
+              <ShoppingBag className="mr-2" /> As Minhas Encomendas
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/sugestoes" className="cursor-pointer">
+              <Sparkles className="mr-2" /> Sugestões para si
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to={accountHref('settings')} className="cursor-pointer">
+              <Settings className="mr-2" /> Definições
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+
+        <ColporteurItems userId={user?.id} />
 
         {canAccessAdmin && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/admin" className="cursor-pointer text-primary">
-                <LayoutDashboard className="mr-2" /> Painel Admin
-              </Link>
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className={groupLabel}>Equipa</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <Link to="/admin" className="cursor-pointer text-primary">
+                  <LayoutDashboard className="mr-2" /> Painel da equipa
+                </Link>
+              </DropdownMenuItem>
+              {/* As secções que esta pessoa pode abrir, as três mais usadas. */}
+              {staffShortcuts(adminPermissions({ isAdmin, hasPermission }), 3).map(({ id, to, label, icon: Icon }) => (
+                <DropdownMenuItem key={id} asChild>
+                  <Link to={to} className="cursor-pointer pl-8">
+                    <Icon className="mr-2 opacity-70" /> {label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </>
         )}
 

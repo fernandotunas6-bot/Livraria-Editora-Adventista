@@ -88,7 +88,7 @@ function BotAvatar({ visible }) {
   return (
     <span
       aria-hidden
-      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${visible ? 'bg-primary shadow-sm' : ''}`}
+      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${visible ? 'bg-primary shadow-xs' : ''}`}
     >
       {visible && <img src="/logo-icon-light.svg" alt="" className="h-4 w-4 object-contain" />}
     </span>
@@ -106,7 +106,7 @@ export default function ChatRichMessage({
   if (message.role === 'user') {
     return (
       <div className="flex flex-col items-end gap-0.5">
-        <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground shadow-sm ${message.pending ? 'opacity-70' : ''}`}>
+        <div className={`max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground shadow-xs ${message.pending ? 'opacity-70' : ''}`}>
           {message.text}
         </div>
         <Time time={message.pending ? 'A enviar…' : time} align="right" />
@@ -132,7 +132,7 @@ export default function ChatRichMessage({
         </span>
         <div className="min-w-0 max-w-[85%] space-y-0.5">
           {showAvatar && <p className="text-[11px] font-semibold text-emerald-700">{message.author || 'Equipa'} · Equipa</p>}
-          <div className="whitespace-pre-line break-words rounded-2xl rounded-tl-md border border-emerald-600/25 bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
+          <div className="whitespace-pre-line wrap-break-word rounded-2xl rounded-tl-md border border-emerald-600/25 bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground shadow-xs">
             {linkify(message.text, { urls: true })}
           </div>
           <Time time={time} />
@@ -151,7 +151,7 @@ export default function ChatRichMessage({
     <BotAvatar visible={showAvatar} />
     <div className="min-w-0 flex-1 space-y-2">
       {text && (
-        <div className="max-w-[92%] whitespace-pre-line break-words rounded-2xl rounded-tl-md border border-border/70 bg-card px-3.5 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
+        <div className="max-w-[92%] whitespace-pre-line wrap-break-word rounded-2xl rounded-tl-md border border-border/70 bg-card px-3.5 py-2.5 text-sm leading-relaxed text-foreground shadow-xs">
           {formatText(text)}
         </div>
       )}
@@ -167,7 +167,7 @@ export default function ChatRichMessage({
                 className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-2 pr-3 transition-colors hover:border-marca/50 hover:bg-marca/5"
               >
                 {p.cover ? (
-                  <img src={p.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover bg-muted shadow-sm" />
+                  <img src={p.cover} alt="" loading="lazy" className="h-14 w-10 shrink-0 rounded object-cover bg-muted shadow-xs" />
                 ) : (
                   <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded bg-muted">
                     <BookOpen className="h-4 w-4 text-muted-foreground" />

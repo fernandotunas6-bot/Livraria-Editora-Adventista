@@ -65,6 +65,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api')) return;
+  // A versão publicada vai sempre à rede: servida da cache, a app nunca saberia que há uma nova.
+  if (url.pathname === '/version.json') return;
   // API do Supabase (login, dados, Edge Functions, tempo real): sempre pela rede, nunca da cache,
   // para não mostrar dados antigos nem misturar sessões. As imagens do Storage continuam em cache.
   if (/\/(auth|rest|functions|realtime)\/v1\//.test(url.pathname)) return;

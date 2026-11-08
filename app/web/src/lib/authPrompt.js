@@ -80,15 +80,49 @@ export function nudgeMode(hadAccount) {
   return hadAccount ? 'login' : 'signup';
 }
 
-/** Lê o email lembrado (só para preencher o campo); qualquer coisa estranha dá vazio. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Caracteres de controlo: um nome guardado nunca os deve ter, e um nome com eles não se mostra.
+const CONTROL = /[\u0000-\u001f\u007f]/g;
+
+/**
+ * A conta lembrada neste navegador: `{ email, name, provider }`, ou `null`.
+ *
+ * Serve só para identificar quem volta — "Continuar como Maria", o email já preenchido e o
+ * caminho certo à frente (a palavra-passe ou a Google). Nada disto dá acesso: quem decide se a
+ * pessoa entra é o Supabase Auth. `provider` é `'email'`, `'google'` ou `''` (não se sabe: as
+ * contas lembradas antes de 2026-11-08 só tinham o email). Qualquer coisa estranha dá `null`.
+ */
 export function readHadAccount(raw) {
   try {
     const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
     const email = typeof v?.email === 'string' ? v.email.trim().toLowerCase() : '';
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? { email } : null;
+    if (!EMAIL_RE.test(email)) return null;
+    const name = typeof v.name === 'string' ? v.name.replace(CONTROL, '').replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+    const provider = v.provider === 'google' || v.provider === 'email' ? v.provider : '';
+    return { email, name, provider };
   } catch {
     return null;
   }
+}
+
+/**
+ * O que guardar para lembrar a conta que acabou de entrar. Uma sessão que não diz como se entrou
+ * (`provider` vazio) não apaga o que já se sabia da mesma conta. Devolve o texto a guardar, ou
+ * `null` se o email não servir.
+ */
+export function hadAccountValue({ email, name = '', provider = '' } = {}, previous = null) {
+  const prev = readHadAccount(previous);
+  const clean = readHadAccount({ email, name, provider });
+  if (!clean) return null;
+  if (!clean.provider && prev?.email === clean.email) clean.provider = prev.provider;
+  return JSON.stringify(clean);
+}
+
+/** Primeiro nome, para "Continuar como Maria"; sem nome, a parte do email antes do @. */
+export function rememberedFirstName(account) {
+  const name = String(account?.name || '').trim();
+  if (name) return name.split(' ')[0];
+  return String(account?.email || '').split('@')[0] || '';
 }
 
 /** Validação em tempo real do formulário. Devolve mensagens só para os campos já tocados. */
@@ -140,6 +174,12 @@ export function authDialogCopy(reason = '', mode = 'signup') {
         description: 'Use o email da compra: a encomenda aparece logo no seu perfil, com o estado da entrega.',
         dismiss: 'Agora não',
         benefits: true,
+      };
+    case 'session-ended':
+      return {
+        title: 'A sua sessão terminou',
+        description: 'Por segurança, entre de novo neste aparelho. O carrinho e o que estava a ver ficam como estavam.',
+        dismiss: 'Agora não',
       };
     case 'nudge':
       return signup

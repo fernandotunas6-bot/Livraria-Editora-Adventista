@@ -86,7 +86,7 @@ export default function BlockedDomainsPanel() {
       </div>
 
       <form onSubmit={add} className="flex flex-wrap items-end gap-2">
-        <div className="min-w-[12rem] flex-1 space-y-1">
+        <div className="min-w-48 flex-1 space-y-1">
           <Label htmlFor="bloquear-site">Site a bloquear</Label>
           <Input id="bloquear-site" value={domain} placeholder="exemplo.com" onChange={(e) => setDomain(e.target.value)} />
         </div>

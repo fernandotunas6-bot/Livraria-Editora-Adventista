@@ -12,6 +12,9 @@
 -- 3. private.colporteur_delivery_complete junta a guia, os portes e o fecho, para o passo do
 --    colportor e o gatilho usarem o mesmo código. O passo liga app.colporteur_step, e assim o
 --    gatilho não fecha a entrega uma segunda vez.
+-- 4. O gatilho das entregas passa a comparar valores: a encomenda que fica paga porque o total
+--    baixou também vai a um colportor.
+-- 5. public.colporteur_deliveries_board: o quadro das entregas para a equipa.
 
 alter table public.colporteur_settings
   add column if not exists delivery_min_fee numeric(14,2) not null default 0;
@@ -168,6 +171,20 @@ begin
   return null;
 end;
 $$;
+
+-- Sem lista de colunas ("after update of …") de propósito. Quando o total baixa (a equipa tira os
+-- portes, por exemplo), a encomenda fica paga dentro do gatilho orders_0_pagamento, sem a coluna
+-- no SET: um gatilho "of payment_status" não corria, e a encomenda nunca era oferecida. A condição
+-- compara os valores, seja qual for o caminho.
+drop trigger if exists orders_entrega_colportor on public.orders;
+create trigger orders_entrega_colportor
+  after update on public.orders
+  for each row when (
+    old.payment_status is distinct from new.payment_status
+    or old.status is distinct from new.status
+    or old.delivery_status is distinct from new.delivery_status
+  )
+  execute function private.orders_entrega_colportor();
 
 -- "Entregue" pelo colportor passa por private.colporteur_delivery_complete.
 create or replace function public.colporteur_delivery_step(

@@ -93,7 +93,7 @@ export default function PageBannerSlider({
             type="button"
             onClick={() => navigate(-1)}
             aria-label="Banner anterior"
-            className="absolute left-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/25 p-2 text-white transition hover:bg-black/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:block md:left-6"
+            className="absolute left-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/25 p-2 text-white transition hover:bg-black/50 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-white sm:block md:left-6"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -101,7 +101,7 @@ export default function PageBannerSlider({
             type="button"
             onClick={() => navigate(1)}
             aria-label="Próximo banner"
-            className="absolute right-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/25 p-2 text-white transition hover:bg-black/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:block md:right-6"
+            className="absolute right-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full bg-black/25 p-2 text-white transition hover:bg-black/50 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-white sm:block md:right-6"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -116,7 +116,7 @@ export default function PageBannerSlider({
                 onClick={() => setCurrent(index)}
                 aria-label={`Mostrar banner ${index + 1}`}
                 aria-pressed={activeIndex === index}
-                className="group grid h-11 place-items-center px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white sm:h-6"
+                className="group grid h-11 place-items-center px-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-white sm:h-6"
               >
                 <span
                   className={`block h-2 rounded-full transition-all ${

@@ -13,7 +13,7 @@ export const toast = (opts) => {
       const imgElement = product.image ? React.createElement('img', {
         src: product.image,
         alt: product.title,
-        className: "w-10 h-14 object-cover rounded bg-muted shrink-0 shadow-sm border border-border/50"
+        className: "w-10 h-14 object-cover rounded bg-muted shrink-0 shadow-xs border border-border/50"
       }) : null;
 
       const titleElement = React.createElement('p', {
@@ -33,7 +33,7 @@ export const toast = (opts) => {
           sonnerToast.dismiss(t);
           onCartOpen?.();
         },
-        className: "text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0 shadow-sm cursor-pointer"
+        className: "text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0 shadow-xs cursor-pointer"
       }, "Ver");
 
       return React.createElement('div', {

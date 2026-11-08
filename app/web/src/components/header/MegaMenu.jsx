@@ -4,14 +4,15 @@ import { displayPrice } from '@/lib/productSort';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronDown, BookOpen, Star, PackageCheck, Layers, Truck, Search, Info, Mail, HelpCircle,
-  RotateCcw, MessageCircle, MapPin, ShoppingBag, Image as ImageIcon, Settings,
-  Users, CreditCard, Plug, BarChart3, ArrowRight,
+  RotateCcw, MessageCircle, MapPin, ArrowRight,
 } from 'lucide-react';
 import { getFeaturedProducts, getProducts } from '@/api/EcommerceApi';
 import { getCollections, getPhysicalStores } from '@/api/PlatformApi';
 import { SHOWCASE_CATEGORIES, CATEGORY_SHOP_FILTERS } from '@/lib/catalogCategories';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useAuth } from '@/hooks/useAuth';
+import { adminPermissions } from '@/lib/adminSections';
+import { staffShortcuts } from '@/lib/siteAreas';
 import { MOTION } from '@/lib/motion';
 
 const OPEN_DELAY = 90;
@@ -54,7 +55,7 @@ function ImageCard({ to, image, title, subtitle, onNavigate, tall = false }) {
       onClick={onNavigate}
       className="group/card block rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-marca/50 hover:shadow-md transition-all"
     >
-      <div className={`${tall ? 'aspect-[3/4]' : 'aspect-[4/3]'} bg-muted overflow-hidden`}>
+      <div className={`${tall ? 'aspect-3/4' : 'aspect-4/3'} bg-muted overflow-hidden`}>
         {image ? (
           <img
             src={image}
@@ -110,7 +111,7 @@ function ShortcutList({ title, items, onNavigate }) {
 
 function PanelLayout({ heading, lead, footerLink, children, aside }) {
   return (
-    <div className="grid lg:grid-cols-[1fr_300px] gap-0">
+    <div className={`grid gap-0 ${aside ? 'lg:grid-cols-[1fr_300px]' : ''}`}>
       <div className="p-6 min-w-0">
         <div className="flex items-end justify-between gap-4 mb-4">
           <div>
@@ -121,7 +122,7 @@ function PanelLayout({ heading, lead, footerLink, children, aside }) {
         </div>
         {children}
       </div>
-      <aside className="p-6 bg-muted/40 border-l border-border">{aside}</aside>
+      {aside && <aside className="p-6 bg-muted/40 border-l border-border">{aside}</aside>}
     </div>
   );
 }
@@ -135,7 +136,7 @@ const SeeAll = ({ to, label, onNavigate }) => (
 export default function MegaMenu() {
   const location = useLocation();
   const { settings } = useSiteSettings();
-  const { canAccessAdmin } = useAuth();
+  const { canAccessAdmin, isAdmin, hasPermission } = useAuth();
   const [open, setOpen] = useState(null);
   const [everOpened, setEverOpened] = useState(false);
   const timer = useRef(null);
@@ -188,7 +189,7 @@ export default function MegaMenu() {
                 p ? (
                   <ImageCard key={p.id} to={`/product/${p.id}`} image={p.image} title={p.title} subtitle={displayPrice(p).price} onNavigate={close} tall />
                 ) : (
-                  <div key={i} className="aspect-[3/4] rounded-xl bg-muted animate-pulse" />
+                  <div key={i} className="aspect-3/4 rounded-xl bg-muted animate-pulse" />
                 )
               ))}
             </div>
@@ -235,7 +236,7 @@ export default function MegaMenu() {
               c ? (
                 <ImageCard key={c.id} to={`/colecoes/${c.slug || c.id}`} image={c.cover} title={c.title} subtitle={c.marketing_tagline} onNavigate={close} />
               ) : (
-                <div key={i} className="aspect-[4/3] rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="aspect-4/3 rounded-xl bg-muted animate-pulse" />
               )
             ))}
           </div>
@@ -275,7 +276,7 @@ export default function MegaMenu() {
                 <Link
                   to="/track"
                   onClick={close}
-                  className="rounded-xl border border-border bg-gradient-to-br from-marca/15 to-transparent p-5 flex flex-col justify-between hover:border-marca/50 hover:shadow-md transition-all"
+                  className="rounded-xl border border-border bg-linear-to-br from-marca/15 to-transparent p-5 flex flex-col justify-between hover:border-marca/50 hover:shadow-md transition-all"
                 >
                   <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center"><Truck className="h-5 w-5" /></span>
                   <span>
@@ -297,12 +298,12 @@ export default function MegaMenu() {
   ];
 
   if (canAccessAdmin) {
-    const tiles = [
-      { tab: 'books', label: 'Livros', icon: BookOpen },
-      { tab: 'orders', label: 'Encomendas', icon: ShoppingBag },
-      { tab: 'slides', label: 'Slider', icon: ImageIcon },
-      { tab: 'collections', label: 'Coleções', icon: Layers },
-    ];
+    // Os atalhos do painel que esta pessoa pode abrir (lib/siteAreas.js), pela ordem de uso:
+    // os quatro primeiros em destaque, os seguintes ao lado. Antes eram sempre os mesmos —
+    // Integrações e Utilizadores também para quem não lhes tinha acesso.
+    const shortcuts = staffShortcuts(adminPermissions({ isAdmin, hasPermission }), 9);
+    const tiles = shortcuts.slice(0, 4);
+    const more = shortcuts.slice(4);
     menus.push({
       id: 'gestao',
       label: 'Gestão',
@@ -310,29 +311,23 @@ export default function MegaMenu() {
       panel: (
         <PanelLayout
           heading="Gestão da livraria"
-          lead="Acesso rápido às áreas do painel"
+          lead="As suas áreas do painel"
           footerLink={<SeeAll to="/admin" label="Abrir painel" onNavigate={close} />}
-          aside={(
+          aside={more.length > 0 ? (
             <ShortcutList
-              title="Sistema"
+              title="Mais áreas"
               onNavigate={close}
-              items={[
-                { to: '/admin?tab=settings', label: 'Configurações', description: 'Marca, loja, email e PWA', icon: Settings },
-                { to: '/admin?tab=users', label: 'Utilizadores', description: 'Papéis e permissões', icon: Users },
-                { to: '/admin?tab=payments', label: 'Pagamentos', description: 'Métodos e instruções', icon: CreditCard },
-                { to: '/admin?tab=apps', label: 'Integrações', description: 'WhatsApp, Drive, SMTP', icon: Plug },
-                { to: '/admin?tab=vendas-huambo', label: 'Painel de Vendas', description: 'Vendas de cada loja', icon: BarChart3 },
-              ]}
+              items={more.map((i) => ({ to: i.to, label: i.label, description: i.group, icon: i.icon }))}
             />
-          )}
+          ) : null}
         >
           <div className="grid grid-cols-4 gap-4">
-            {tiles.map(({ tab, label, icon: Icon }) => (
+            {tiles.map(({ id, to, label, icon: Icon }) => (
               <Link
-                key={tab}
-                to={`/admin?tab=${tab}`}
+                key={id}
+                to={to}
                 onClick={close}
-                className="group/tile rounded-xl border border-border p-4 bg-gradient-to-br from-marca/10 to-transparent hover:border-marca/50 hover:shadow-md transition-all"
+                className="group/tile rounded-xl border border-border p-4 bg-linear-to-br from-marca/10 to-transparent hover:border-marca/50 hover:shadow-md transition-all"
               >
                 <span className="h-10 w-10 rounded-lg bg-primary text-white flex items-center justify-center mb-6 transition-transform group-hover/tile:scale-110">
                   <Icon className="h-5 w-5" aria-hidden="true" />

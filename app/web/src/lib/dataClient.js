@@ -7,7 +7,8 @@
  * - Ficheiros vão para o bucket "media" em <colecção>/<id>/<ficheiro>; a coluna guarda o nome.
  */
 import { supabase, mediaUrl, APP_API_URL } from '@/lib/supabaseClient';
-import { createReadyGate } from '@/lib/authSession';
+import { SIGN_OUT_KEY, authEventAction, authReturnInUrl, createReadyGate, sessionMethod, signOutReason } from '@/lib/authSession';
+import { preventSilentSignIn } from '@/lib/savedCredentials';
 
 const TABLE_FOR = { users: 'profiles' };
 
@@ -321,22 +322,68 @@ function readStoredSession() {
   }
 }
 
+const endedListeners = new Set();
+// Um fim de sessão que chega antes de alguém ouvir (no arranque, o aviso pode vir antes de a
+// página montar) fica à espera do primeiro ouvinte.
+let pendingEnded = null;
+
+function readSignOutMark() {
+  try {
+    return localStorage.getItem(SIGN_OUT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSignOutMark(reason) {
+  try {
+    if (reason) localStorage.setItem(SIGN_OUT_KEY, JSON.stringify({ reason, at: Date.now() }));
+    else localStorage.removeItem(SIGN_OUT_KEY);
+  } catch {
+    // armazenamento indisponível
+  }
+}
+
 const authStore = {
   token: '',
   record: null,
   get model() { return this.record; },
   get isValid() { return !!this.token && !!this.record; },
+  /** Como se entrou nesta sessão (`'email'`, `'google'` ou `''`), lido do token. */
+  get method() { return sessionMethod(this.token); },
+  /** `true` enquanto a conta fica à vista com a sessão por renovar (sem rede ao abrir). */
+  get offline() { return keptOffline; },
   onChange(callback, fireImmediately = false) {
     listeners.add(callback);
     if (fireImmediately) callback(this.token, this.record);
     return () => listeners.delete(callback);
   },
   clear() {
+    // Antes do `signOut`: os outros separadores recebem o `SIGNED_OUT` e têm de saber que foi a
+    // pessoa a sair, e não o servidor a terminar a sessão.
+    writeSignOutMark('user');
     setAuth('', null);
     // Só este aparelho. `signOut()` sem argumento é `scope: 'global'` no supabase-js (auth-js
     // 2.118.0): carregar em "Sair" no telemóvel terminava a sessão em todos os aparelhos da conta.
     // Terminar em todo o lado é o `logoutEverywhere` (Perfil → Segurança). Ideia do PR #3.
     supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  },
+  /** Marca a saída como pedida pela pessoa (para quem chama o `signOut` directamente). */
+  noteUserSignOut() { writeSignOutMark('user'); },
+  /** Como acabou a última sessão neste aparelho (`lib/authSession.js`, `readSignOut`). */
+  get lastSignOut() { return readSignOutMark(); },
+  /**
+   * Avisa quando o servidor termina a sessão sem a pessoa ter saído (terminada noutro aparelho,
+   * palavra-passe mudada, conta suspensa). Recebe o perfil que estava à vista.
+   */
+  onSessionEnded(callback) {
+    endedListeners.add(callback);
+    if (pendingEnded) {
+      const shown = pendingEnded;
+      pendingEnded = null;
+      setTimeout(() => callback(shown), 0);
+    }
+    return () => endedListeners.delete(callback);
   },
   /** `true` quando o arranque já determinou se existe sessão (com ou sem utilizador). */
   get isReady() { return authGate.ready; },
@@ -364,7 +411,8 @@ async function loadProfile(user) {
 // Sessão guardada: disponível de imediato (o papel vem do perfil em cache até ser confirmado).
 const stored = readStoredSession();
 const cachedProfile = readCachedProfile();
-if (stored?.access_token && stored?.user && cachedProfile?.id === stored.user.id) {
+const cachedSession = !!(stored?.access_token && stored?.user && cachedProfile?.id === stored.user.id);
+if (cachedSession) {
   authStore.token = stored.access_token;
   authStore.record = cachedProfile;
 }
@@ -375,12 +423,49 @@ if (stored?.access_token && stored?.user && cachedProfile?.id === stored.user.id
 // que o login com a Google acabava de volta no ecrã de entrada.
 const authGate = createReadyGate();
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  if (!session?.user) {
-    setAuth('', null);
+// Com a sessão e o perfil da mesma conta já guardados neste aparelho, a conta aparece logo, sem
+// esperar pela rede: no telemóvel com rede fraca, abrir a app na conta ficava até 8 segundos em
+// "A verificar a sua sessão…" (o supabase-js insiste na renovação até meio minuto). Se a sessão
+// tiver sido terminada noutro sítio, o `SIGNED_OUT` chega a seguir e a conta sai, com o aviso.
+// Não com o regresso de uma entrada no endereço: aí a sessão que vai ficar pode ser outra.
+if (cachedSession && typeof window !== 'undefined' && !authReturnInUrl(window.location.href)) authGate.resolve();
+
+// Sem rede ao abrir a app, a conta fica à vista com a sessão por renovar (`authEventAction`,
+// caso `keep`). O supabase-js volta a tentar sozinho de minuto a minuto com a página à vista;
+// quando a rede volta, tenta-se logo, para a pessoa não esperar por esse minuto.
+let keptOffline = false;
+
+supabase.auth.onAuthStateChange((event, session) => {
+  const action = authEventAction(event, session, readStoredSession());
+  if (action === 'keep') {
+    keptOffline = true;
     authGate.resolve();
     return;
   }
+  keptOffline = false;
+  if (action === 'signed-out') {
+    const shown = authStore.record;
+    setAuth('', null);
+    // A conta estava à vista e ninguém carregou em "Sair": foi o servidor que a terminou.
+    if (event === 'SIGNED_OUT' && shown && signOutReason(readSignOutMark()) === 'ended') {
+      writeSignOutMark('ended');
+      // O navegador deixa de entrar sozinho com a palavra-passe guardada: sem isto, "Terminar
+      // sessão em todos os aparelhos" para um telemóvel perdido não servia de nada, se lá
+      // estivesse a palavra-passe.
+      preventSilentSignIn();
+      if (!endedListeners.size) pendingEnded = shown;
+      endedListeners.forEach((cb) => {
+        try {
+          cb(shown);
+        } catch {
+          // um ouvinte partido não impede os outros
+        }
+      });
+    }
+    authGate.resolve();
+    return;
+  }
+  writeSignOutMark(null);
   // Fora do callback: o supabase-js não permite chamadas ao cliente dentro dele.
   setTimeout(async () => {
     const record = await loadProfile(session.user).catch(() => authStore.record);
@@ -388,6 +473,32 @@ supabase.auth.onAuthStateChange((_event, session) => {
     authGate.resolve();
   }, 0);
 });
+
+/**
+ * Tenta renovar a sessão já. O supabase-js guarda a última falha de renovação durante um minuto e
+ * responde com ela a quem pedir de novo (para não insistir durante uma falha da rede): com a rede
+ * de volta, ficava até um minuto sem sessão válida, e o perfil mostrava as encomendas vazias.
+ * Quando a rede volta, ou a pessoa volta à app, essa falha já não diz nada e esquece-se — como o
+ * próprio supabase-js faz quando outro separador renova. (`lastRefreshFailure` é interno do
+ * auth-js 2.11x: se mudar de nome, fica a tentativa normal dele, de minuto a minuto.)
+ */
+function retryRefreshNow() {
+  try {
+    if (supabase.auth && 'lastRefreshFailure' in supabase.auth) supabase.auth.lastRefreshFailure = null;
+  } catch {
+    // sem acesso: fica a tentativa normal do supabase-js
+  }
+  supabase.auth.getSession().catch(() => {});
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (keptOffline) retryRefreshNow();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (keptOffline && document.visibilityState === 'visible' && navigator.onLine !== false) retryRefreshNow();
+  });
+}
 
 function translateAuthError(error) {
   const msg = String(error?.message || '');
@@ -523,6 +634,13 @@ async function createUser(data) {
   });
   if (error) throw translateAuthError(error);
   if (!result.user) throw new DataError('Não foi possível criar a conta.');
+  // Email que já tem conta confirmada: com a confirmação de email activa, o Supabase não dá erro
+  // (para não revelar quem tem conta) e devolve um utilizador sem identidades, sem enviar email
+  // nenhum. Antes a pessoa lia "enviámos um link de confirmação" e ficava à espera de um email
+  // que nunca chegava; agora o formulário passa a "Entrar" com o email preenchido.
+  if (!result.session && Array.isArray(result.user.identities) && result.user.identities.length === 0) {
+    return { alreadyRegistered: true, email };
+  }
   // Com a confirmação de email activa, o Supabase cria a conta mas não abre sessão.
   if (!result.session) return { needsConfirmation: true, email };
   const record = await loadProfile(result.user);

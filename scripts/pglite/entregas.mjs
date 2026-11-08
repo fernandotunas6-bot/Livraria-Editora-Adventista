@@ -218,6 +218,14 @@ await svc(`update public.orders set delivery_status = 'delivered' where id = $1`
 check('a equipa entregou: a oferta fecha', (await q(`select status from public.colporteur_deliveries where id = $1`, [d.id]))[0].status === 'released'
   && (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and title like 'Entrega fechada%'`, [o10.id]))[0].n === 1);
 
+// O total baixa (a equipa tira os portes) e a encomenda fica paga sem pagamento novo: o estado muda
+// dentro do gatilho dos pagamentos, sem a coluna no SET, e mesmo assim tem de ir a um colportor.
+const o11 = await encomenda();
+await svc(`select public.order_payment_record($1, $2::numeric, 'transferencia', $3)`, [o11.id, 10000, `TRF-${o11.order_number}`], admin);
+check('paga em parte: nada oferecido', (await order(o11.id)).payment_status === 'partially_paid' && (await ofertas(o11)).length === 0, (await order(o11.id)).payment_status);
+await svc(`update public.orders set shipping_cost = 0 where id = $1`, [o11.id]);
+check('o total baixou e ficou paga: vai a um colportor', (await order(o11.id)).payment_status === 'paid' && !!(await activa(o11)), { p: (await order(o11.id)).payment_status, r: (await order(o11.id)).delivery_route });
+
 // 7. Segurança, localização e prazo em horário de funcionamento ----------------------------------------
 const d8 = await activa(o8);
 await raises('o colportor não chama a função directamente', () => asUser(perfil['CPT-0002'], `select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d8.id, perfil['CPT-0002']]), /permission denied/);

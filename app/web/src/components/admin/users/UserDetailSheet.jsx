@@ -6,7 +6,9 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { PERMISSIONS } from '@/lib/permissions';
+import { PermissionMenuPreview } from './PermissionAreas';
 import { listUserOrders } from '@/lib/usersApi';
+import { listStaffRoles, loadTeamRoles } from '@/lib/staffRolesApi';
 import { formatOrderNumber, getDeliveryStatusColor, getDeliveryStatusLabel, getPaymentStatusColor, getPaymentStatusLabel } from '@/lib/orderUtils';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, PROVIDER_LABEL, accountState, formatDate, formatKz } from './userFormat';
 
@@ -16,7 +18,7 @@ function Info({ icon: Icon, label, children }) {
       <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="break-words">{children}</div>
+        <div className="wrap-break-word">{children}</div>
       </div>
     </div>
   );
@@ -27,6 +29,20 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // O cargo do gestor (Caixa, Atendimento…), ou «personalizado» sem cargo.
+  const [cargo, setCargo] = useState(null);
+  useEffect(() => {
+    setCargo(null);
+    if (!open || person?.role !== 'manager' || !person?.id) return undefined;
+    let alive = true;
+    Promise.all([listStaffRoles(), loadTeamRoles()])
+      .then(([{ roles, missing }, team]) => {
+        if (!alive || missing) return;
+        setCargo(roles.find((r) => r.id === team[person.id])?.name || 'Personalizado');
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [open, person?.id, person?.role]);
 
   useEffect(() => {
     if (!open || !person?.email) return;
@@ -132,7 +148,7 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
           {person.role === 'manager' && (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                <KeyRound className="h-3.5 w-3.5" /> Permissões
+                <KeyRound className="h-3.5 w-3.5" /> Permissões{cargo ? ` · cargo: ${cargo}` : ''}
               </p>
               {activePermissions.length ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -140,6 +156,9 @@ export default function UserDetailSheet({ person, open, onOpenChange, actions })
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Nenhuma permissão activa: este gestor não vê nada no painel.</p>
+              )}
+              {activePermissions.length > 0 && (
+                <PermissionMenuPreview role={person.role} permissions={person.permissions} className="rounded-lg border p-3" />
               )}
             </div>
           )}

@@ -2,10 +2,13 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { supabaseCspPlugin } from '../../scripts/csp-supabase.mjs';
+import { appVersionPlugin } from '../../scripts/app-version.mjs';
 
 export default defineConfig(({ mode }) => ({
-  // O CSP do `_headers` passa a aceitar só o projecto Supabase da loja (ver o script).
-  plugins: [react(), supabaseCspPlugin(loadEnv(mode, __dirname, 'VITE_').VITE_SUPABASE_URL)],
+  // O CSP do `_headers` passa a aceitar só o projecto Supabase da loja (ver o script). A versão
+  // de cada build vai para o código e para /version.json: é como a app aberta sabe que há uma
+  // versão nova (scripts/app-version.mjs).
+  plugins: [react(), supabaseCspPlugin(loadEnv(mode, __dirname, 'VITE_').VITE_SUPABASE_URL), appVersionPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

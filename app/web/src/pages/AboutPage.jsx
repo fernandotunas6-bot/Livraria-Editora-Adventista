@@ -40,7 +40,7 @@ const AboutPage = () => {
         <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0">
             <img src={topImage} alt="Capas de livros do catálogo da livraria" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0c4a6e]/80 to-marca/40" />
+            <div className="absolute inset-0 bg-linear-to-r from-[#0c4a6e]/80 to-marca/40" />
           </div>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: MOTION.base }} className="relative z-10 container-custom text-center text-white">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">A Nossa História</h1>

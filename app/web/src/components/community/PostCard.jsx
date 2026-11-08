@@ -15,6 +15,8 @@ import Monogram from '@/components/community/Monogram';
 import TopicIcon from '@/components/community/TopicIcon';
 import PostComposer from '@/components/community/PostComposer';
 import { useMinuteTick } from '@/hooks/useMinuteTick';
+import { useReaderLevel } from '@/hooks/useReader';
+import ReaderBadge from '@/components/community/ReaderBadge';
 
 const REPORT_REASONS = ['Spam ou publicidade', 'Link suspeito', 'Ofensivo ou desrespeitoso', 'Outro motivo'];
 // Links de utilizadores: sem passar autoridade de pesquisa, sem dar acesso à página de origem.
@@ -31,7 +33,7 @@ function Body({ text, clamp = true }) {
   const long = clamp && needsClamp(text);
   return (
     <div>
-      <p className={`whitespace-pre-line break-words text-[15px] leading-relaxed text-editorial-tinta ${long && !open ? 'line-clamp-6' : ''}`}>
+      <p className={`whitespace-pre-line wrap-break-word text-[15px] leading-relaxed text-editorial-tinta ${long && !open ? 'line-clamp-6' : ''}`}>
         {linkifySegments(text).map((seg, i) => (seg.type === 'link'
           ? <a key={i} href={seg.href} target="_blank" rel={USER_LINK_REL} className="break-all text-editorial-petroleo underline underline-offset-2">{seg.label}</a>
           : <React.Fragment key={i}>{seg.value}</React.Fragment>))}
@@ -47,6 +49,8 @@ function Body({ text, clamp = true }) {
 
 function Author({ post, small = false, linkToPost = true }) {
   const now = useMinuteTick();
+  // O distintivo do leitor (Leitor, assíduo, de honra), pedido em lote pela chave pública.
+  const level = useReaderLevel(post.author_is_staff ? null : post.author_key);
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <Monogram name={post.author_name} authorKey={post.author_key} size={small ? 'sm' : 'md'} staff={post.author_is_staff} />
@@ -60,6 +64,7 @@ function Author({ post, small = false, linkToPost = true }) {
               <BadgeCheck className="h-3 w-3" aria-hidden="true" /> Equipa da Livraria
             </span>
           )}
+          {!post.author_is_staff && !small && <ReaderBadge level={level} />}
         </p>
         <p className="text-xs text-editorial-tinta-suave">
           {linkToPost && !post.parent_id ? (
@@ -246,7 +251,7 @@ function BookCard({ post }) {
       className="flex items-center gap-3 rounded-xl border border-editorial-filete bg-editorial-papel p-2.5 transition-colors hover:bg-editorial-tela"
     >
       {post.book_cover ? (
-        <img src={post.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />
+        <img src={post.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />
       ) : (
         <span className="grid h-16 w-11 shrink-0 place-items-center rounded bg-editorial-tela" aria-hidden="true"><BookOpen className="h-5 w-5 text-editorial-ouro" /></span>
       )}

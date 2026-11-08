@@ -43,6 +43,7 @@ Três identificadores, todos fixos depois de atribuídos:
 - **Encomendas.** `orders.customer_code` é preenchido pelo trigger `orders_codigo_cliente` a partir do email (na criação e quando o email muda). A encomenda, portanto, fica ligada ao cliente mesmo sem conta.
 - **Contadores.** Partilham `private.product_code_counters` com os de produto (`CLI-`, `FUN-`); a atribuição é `private.codigo_seguinte`.
 - **Pesquisa.** Em `/admin/users` a pesquisa aceita o código em qualquer grafia (`cli1`, `CLI-000001`, ` fun 3 `), via `public.normalize_person_code`. A listagem `admin_users_list` devolve `customer_code` e `staff_code`.
+- **O cliente vê o seu `CLI-`** (desde 2026-11-08) na conta, com botão de copiar, e a dica de o dizer quando fala com a loja. A equipa vê o seu `FUN-` no perfil e no menu.
 - **Privacidade.** Os clientes só vêem o próprio perfil (RLS de `profiles`); os códigos de outros clientes não são acessíveis pela API. `private.guest_customer_codes` tem RLS activo e sem políticas: só o service role e as funções da base de dados leem.
 - **Migrações:** `20261106033302_codigos_cliente_funcionario` (esquema, triggers, pesquisa e dados existentes) e `20261106033425_codigo_cliente_tambem_na_equipa` (listagem).
 
@@ -72,6 +73,28 @@ Três identificadores, todos fixos depois de atribuídos:
 
 Cancelar no painel passa pela API (`/delivery-event` com `cancelled`), para o cliente ser avisado.
 
+**Cancelamento pelo próprio cliente** (desde 2026-11-08): na conta (botão "Cancelar" no cartão da
+encomenda) ou no rastreio, sem conta, com o número e o email. Rota `POST /order/cancel`; quem
+decide é `public.order_cancel_by_customer` (só o servidor a chama), com a linha bloqueada:
+
+| Pode cancelar | Não pode (fala com a loja) |
+|---|---|
+| Por pagar, sem dinheiro registado | Paga, paga em parte ou reembolsada (há reembolso a tratar) |
+| Estado pendente ou confirmada | Pagamento indicado à espera de confirmação (o dinheiro pode ter saído) |
+| Entrega recebida ou confirmada | A preparar, expedida, a caminho, entregue ou já cancelada |
+
+O stock volta pelo trigger `orders_before_update`, como no painel; a linha do tempo fica com
+"Cancelada pelo cliente: <motivo>"; o cliente recebe o aviso do passo `cancelled`; a equipa das
+encomendas novas (a da loja, no levantamento) recebe o aviso `order_cancelled` por push. As
+mesmas regras estão em `app/web/src/lib/customerOrders.js` e em
+`supabase/functions/app/customerCancel.ts` (o teste `customerCancel.test.ts` confirma que dizem o
+mesmo em todas as combinações). O `/track` devolve `can_cancel` para mostrar o botão.
+
+**Na conta, o cliente vê o ponto em que a encomenda está em palavras dele** (`customerOrderStage`):
+Registada, Falta pagar, Pagamento em verificação, Confirmada, A preparar, A caminho / Pronta para
+levantar, Saiu para entrega, Entregue / Levantada, Cancelada — com o que falta fazer e uma barra de
+4 passos. As etiquetas da equipa ("Pendente", "Recebida") ficam no painel.
+
 **Agradecimento:** ao marcar "Entregue", fica na fila de emails uma nota de agradecimento para 24 h depois (`order:thanks:<id>`), com "Recebi tudo bem" e "Tive um problema". Os botões levam a `/confirmar-encomenda` com o segredo da encomenda (`receipt_token`); a resposta (`POST /order-feedback`) fica em `customer_feedback`, na linha do tempo, e avisa a equipa.
 
 ## 3. Vigilância
@@ -97,3 +120,7 @@ Os agendadores usam o endereço e o token do Vault da fila de emails (`email_que
 ## 4. Migrações
 
 `tipos_de_produto`, `variantes_nas_encomendas`, `confirmacao_do_cliente`, `avisos_de_encomenda_em_portugues`, `vigilancia_encomendas` (todas aplicadas em 2026-11-05).
+
+`20261108120000_conta_do_cliente` (vai com o merge): avisos "assumir" fechados quando a encomenda
+fica assumida por qualquer caminho (e os que já estavam nesse estado), o tipo de aviso
+`order_cancelled` e `order_cancel_by_customer`. Cenários: `scripts/pglite/conta.mjs` (35).

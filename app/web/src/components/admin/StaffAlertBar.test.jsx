@@ -10,7 +10,7 @@ const ops = {
   dismissAlert: vi.fn(),
 };
 vi.mock('@/lib/opsApi', () => ops);
-const { default: StaffAlertBar } = await import('./StaffAlertBar');
+const { default: StaffAlertBar, alertSummary } = await import('./StaffAlertBar');
 
 let root;
 let host;
@@ -68,6 +68,27 @@ describe('StaffAlertBar', () => {
     await act(async () => button('Marcar como visto').click());
     await flush();
     expect(ops.dismissAlert).toHaveBeenCalledWith(7);
+  });
+
+  it('com muitos avisos fica compacta: um resumo, dois avisos e "Ver todos" para o resto', async () => {
+    const list = [1, 2, 3, 4, 5].map((n) => ({ id: n, kind: 'new_order', title: `Nova encomenda ENC-${n} — assumir`, body: '', order_id: `o${n}`, severity: 'high' }));
+    ops.listActionAlerts.mockResolvedValue(list);
+    await mount();
+    expect(host.textContent).toContain('5 avisos por tratar · 5 encomendas por assumir');
+    expect(host.textContent).toContain('ENC-2');
+    expect(host.textContent).not.toContain('ENC-3');
+    const more = [...host.querySelectorAll('button')].find((b) => b.textContent.includes('Ver todos (5)'));
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => more.click());
+    expect(host.textContent).toContain('ENC-5');
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('o resumo diz quantos, quantos por assumir e quantos críticos, com os plurais certos', () => {
+    expect(alertSummary([{ kind: 'new_order' }])).toBe('1 aviso por tratar · 1 encomenda por assumir');
+    expect(alertSummary([{ kind: 'escalation', severity: 'critical' }, { kind: 'new_order' }]))
+      .toBe('2 avisos por tratar · 1 encomenda por assumir · 1 crítico');
+    expect(alertSummary([])).toBe('0 avisos por tratar');
   });
 
   it('pede um clique para activar o som (regra dos browsers) e lembra-se neste aparelho', async () => {

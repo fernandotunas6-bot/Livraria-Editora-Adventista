@@ -4,11 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PERMISSIONS, ROLES, MANAGER_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/permissions';
+import { ROLES, MANAGER_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/permissions';
+import { PermissionMenuPreview, PermissionSwitches } from './PermissionAreas';
 import { createUser, updateUser } from '@/lib/usersApi';
+import { assignStaffRole, listStaffRoles, loadTeamRoles } from '@/lib/staffRolesApi';
 import PhoneInput from '@/components/PhoneInput';
 import { isValidAngolaPhone, localDigits, normalizeAngolaPhone } from '@/lib/angolaPhone';
 
@@ -22,7 +23,11 @@ const emptyForm = {
   permissions: { ...DEFAULT_PERMISSIONS },
   password: '',
   sendLink: true,
+  staffRoleId: '',
 };
+
+// Valor do Select para «sem cargo»: as permissões são as da pessoa («personalizado»).
+const NO_ROLE = 'personalizado';
 
 /**
  * Criar ou editar uma conta.
@@ -35,6 +40,24 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Cargos (Caixa, Atendimento…) e o cargo que a pessoa tem agora; só para administradores.
+  const [roles, setRoles] = useState([]);
+  const [initialRoleId, setInitialRoleId] = useState('');
+
+  useEffect(() => {
+    if (!open || !isAdmin) return undefined;
+    let alive = true;
+    Promise.all([listStaffRoles(), user?.id ? loadTeamRoles() : Promise.resolve({})])
+      .then(([{ roles: list }, team]) => {
+        if (!alive) return;
+        setRoles(list);
+        const current = (user?.id && team[user.id]) || '';
+        setInitialRoleId(current);
+        setForm((f) => ({ ...f, staffRoleId: current }));
+      })
+      .catch(() => { if (alive) setRoles([]); });
+    return () => { alive = false; };
+  }, [open, isAdmin, user?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +75,9 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const isSelf = isEdit && user.id === currentUserId;
   const canEditRole = isAdmin && !isSelf;
+  const cargo = roles.find((r) => r.id === form.staffRoleId) || null;
+  // Com cargo, as permissões são as do cargo (a base de dados garante-o; aqui mostra-se).
+  const shownPermissions = cargo ? cargo.permissions : form.permissions;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -71,7 +97,7 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
         if (form.email.trim().toLowerCase() !== (user.email || '').toLowerCase()) patch.email = form.email;
         if (canEditRole) {
           if (form.role !== user.role) patch.role = form.role;
-          if (form.role === 'manager') patch.permissions = form.permissions;
+          if (form.role === 'manager') patch.permissions = shownPermissions;
         }
         if (Object.keys(patch).length) await updateUser(user.id, patch);
         result = { id: user.id };
@@ -81,10 +107,15 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
           email: form.email,
           phone,
           role: isAdmin ? form.role : 'member',
-          permissions: form.role === 'manager' ? form.permissions : undefined,
+          permissions: form.role === 'manager' ? shownPermissions : undefined,
           password: form.password || undefined,
           send_link: form.password ? form.sendLink : true,
         });
+      }
+      // O cargo vai à parte (só administradores, pela staff_role_assign): com ele, a base de dados
+      // copia as permissões do cargo para a pessoa.
+      if (canEditRole && form.role === 'manager' && result?.id && (form.staffRoleId || '') !== (initialRoleId || '')) {
+        await assignStaffRole(result.id, form.staffRoleId || null);
       }
       onSaved?.(result, { created: !isEdit, name: form.name, email: form.email, phone });
       onOpenChange(false);
@@ -155,22 +186,40 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
               </div>
             )}
 
+            {isAdmin && form.role === 'manager' && roles.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label>Cargo</Label>
+                <Select
+                  value={form.staffRoleId || NO_ROLE}
+                  onValueChange={(v) => set({ staffRoleId: v === NO_ROLE ? '' : v })}
+                  disabled={!canEditRole && isEdit}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_ROLE}>Sem cargo (permissões à medida)</SelectItem>
+                    {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {cargo
+                    ? `As permissões são as do cargo «${cargo.name}»: mudam quando o cargo mudar (Utilizadores › Cargos).`
+                    : 'Escolha as permissões uma a uma, ou um cargo para as preencher de uma vez.'}
+                </p>
+              </div>
+            )}
+
             {isAdmin && form.role === 'manager' && (
-              <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Permissões do gestor</p>
-                {Object.entries(PERMISSIONS).map(([key, p]) => (
-                  <label key={key} className="flex items-start gap-3 cursor-pointer">
-                    <Switch
-                      checked={!!form.permissions[key]}
-                      disabled={!canEditRole && isEdit}
-                      onCheckedChange={(v) => set({ permissions: { ...form.permissions, [key]: v } })}
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">{p.label}</span>
-                      <span className="block text-xs text-muted-foreground">{p.description}</span>
-                    </span>
-                  </label>
-                ))}
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {cargo ? `Permissões do cargo «${cargo.name}»` : 'Permissões do gestor'}
+                </p>
+                {/* Por área, como a navegação do painel, com o que cada uma abre. */}
+                <PermissionSwitches
+                  value={shownPermissions}
+                  disabled={(!canEditRole && isEdit) || !!cargo}
+                  onChange={(permissions) => set({ permissions })}
+                />
+                <PermissionMenuPreview role={form.role} permissions={shownPermissions} className="border-t pt-3" />
               </div>
             )}
           </div>
