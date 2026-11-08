@@ -39,6 +39,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { getUserDisplayName } from '@/lib/userUtils';
 import { formatAngolaPhone } from '@/lib/angolaPhone';
 import PhoneInput from '@/components/PhoneInput';
+import PhoneVerify from '@/components/account/PhoneVerify';
 import MfaSettings from '@/components/MfaSettings';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
 import ContactsManager from '@/components/ContactsManager';
@@ -573,6 +574,15 @@ const ProfilePage = () => {
                         <div className="space-y-2">
                           <Label>Telefone</Label>
                           <PhoneInput value={phone} onChange={setPhone} />
+                          <PhoneVerify
+                            phone={phone}
+                            user={user}
+                            onConfirmed={async (confirmed) => {
+                              // Volta a ler o perfil: o número e a confirmação foram gravados no servidor.
+                              await updateProfile({ phone: confirmed });
+                              setPhone(formatAngolaPhone(confirmed));
+                            }}
+                          />
                           <p className="text-[11px] text-muted-foreground">Usado para pré-preencher a compra e para o contacto na entrega.</p>
                         </div>
                         <Button type="submit" className="btn-primary" disabled={saving}>

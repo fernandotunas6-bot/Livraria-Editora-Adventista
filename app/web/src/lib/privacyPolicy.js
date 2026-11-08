@@ -104,6 +104,7 @@ export function privacySections(settings = {}) {
           'Cloudflare: alojamento do site, estatísticas de visitas sem cookies e o filtro de links da comunidade;',
           'o serviço de email configurado pela loja (Brevo, Cloudflare ou SendGrid), para os emails de conta, encomendas e atendimento;',
           'WhatsApp Business (Meta), quando falamos consigo por WhatsApp;',
+          'Twilio, para enviar SMS: o número de telemóvel e o texto da mensagem (o código para confirmar o telefone e, se a loja o usar, avisos da encomenda);',
           'Google: entrada com a conta Google, tipos de letra do site, mapas das lojas e, se for o caso, o assistente (Gemini);',
           'OpenStreetMap, para os mapas das lojas quando não se usa o do Google;',
           'DeepSeek, se for o serviço de inteligência artificial escolhido para o assistente;',
