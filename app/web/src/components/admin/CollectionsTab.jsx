@@ -251,15 +251,8 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Layers className="h-6 w-6 text-primary" /> Coleções do catálogo
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Agrupe livros em coleções temáticas. A ordem aqui é a ordem na página Coleções.
-          </p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui as acções. */}
+      <div className="flex justify-end">
         <Button className="btn-primary shrink-0" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-2" /> Nova coleção
         </Button>

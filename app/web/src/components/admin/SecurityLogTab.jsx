@@ -59,18 +59,17 @@ export default function SecurityLogTab() {
 
   return (
     <div className="space-y-4">
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui o que fazer. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-3xl">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" /> Registo de segurança
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Cada alteração a dados de pagamento, contactos da loja, permissões da equipa, segredos, preços e
-            pagamentos de encomendas fica aqui, com quem a fez e o valor antes e depois. Ninguém consegue
-            apagar nem alterar estas linhas. As marcadas com <BellRing className="inline h-3.5 w-3.5" aria-label="aviso" /> foram
-            avisadas por email e push aos administradores.
+        <div className="max-w-3xl rounded-xl border border-border bg-card p-3">
+          <p className="flex items-start gap-2 text-sm text-muted-foreground">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              As linhas marcadas com <BellRing className="inline h-3.5 w-3.5" aria-label="aviso" /> foram avisadas por
+              email e push aos administradores.
+            </span>
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 pl-6 text-sm text-muted-foreground">
             Se vir uma alteração que ninguém da equipa fez: mude a palavra-passe dessa conta, active a verificação em
             dois passos, termine as sessões dela em Utilizadores e reponha o valor anterior.
           </p>

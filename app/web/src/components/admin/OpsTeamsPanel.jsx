@@ -216,17 +216,12 @@ export default function OpsTeamsPanel({ canEdit = false }) {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Equipas e alertas</h2>
-          <p className="text-sm text-muted-foreground">
-            Quem recebe cada encomenda e cada alerta, quem tem de assumir, e a quem sobe quando ninguém responde a tempo.
-          </p>
-        </div>
-        {canEdit && !editing && (
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui as acções. */}
+      {canEdit && !editing && (
+        <div className="flex justify-end">
           <Button type="button" className="btn-primary" onClick={() => setEditing({ ...EMPTY_TEAM })}><Plus className="mr-2 h-4 w-4" /> Nova equipa</Button>
-        )}
-      </header>
+        </div>
+      )}
 
       {missingDuties.length > 0 && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900">

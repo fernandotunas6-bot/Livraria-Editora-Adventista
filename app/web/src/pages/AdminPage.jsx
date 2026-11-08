@@ -2,10 +2,9 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, LogOut, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, Settings, Users, CreditCard, Plug, Layers, AlertTriangle, BarChart3, Megaphone, Store, Search, Star, Copy, MessageCircle, MessagesSquare, Siren, FileDown, PanelTop, UsersRound, ShieldCheck, Church, BookHeart } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, PackageSearch, Image, ShoppingBag, ChevronDown, ChevronUp, Phone, MapPin, AlertTriangle, Search, Star, Copy } from 'lucide-react';
 import { sanitizeBookPayload } from '@/lib/bookSave';
 import { pbErrorMessage } from '@/lib/mediaSave';
-import BrandLogo from '@/components/BrandLogo';
 import BookFormModal from '@/components/admin/BookFormModal';
 import BooksBulkBar from '@/components/admin/BooksBulkBar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,7 +23,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import AdminShell from '@/components/admin/shell/AdminShell';
+import AdminOverview from '@/components/admin/AdminOverview';
+import { adminPermissions, buildAdminNav, resolveSection } from '@/lib/adminSections';
+import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
@@ -72,6 +75,15 @@ const ORDER_LIST_FIELDS = [
   'customer_confirmed_at', 'customer_feedback',
 ];
 
+/**
+ * Uma secção do painel: só monta quando é a aberta. Fora do componente da página de propósito —
+ * definida lá dentro seria um componente novo a cada pintura, e o React desmontava e voltava a
+ * montar o conteúdo (perdendo o que se estava a escrever) sempre que a página actualizasse.
+ */
+function AdminSection({ active, value, children }) {
+  return active === value ? children : null;
+}
+
 const AdminPage = () => {
   const { user, ready, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -80,7 +92,6 @@ const AdminPage = () => {
   const { settings: siteSettings } = useSiteSettings();
 
   const [books, setBooks] = useState([]);
-  const [slides, setSlides] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -112,29 +123,34 @@ const AdminPage = () => {
     else if (access === 'forbidden') navigate('/profile');
   }, [access, navigate]);
 
-  const canManageCatalog = isAdmin || hasPermission('manage_catalog');
-  const canManageOrders = isAdmin || hasPermission('manage_orders');
-  const canManageSettings = isAdmin || hasPermission('manage_settings');
-  const canManageUsers = isAdmin || hasPermission('manage_users');
-  const canManagePayments = isAdmin || hasPermission('manage_payments');
+  // As permissões e as secções vêm do registo central (lib/adminSections.js), que as duas
+  // disposições do painel, a gaveta do telemóvel e a procura (Ctrl+K) partilham.
+  const perms = adminPermissions({ isAdmin, hasPermission });
+  const canManageCatalog = perms.catalog;
+  const canManageOrders = perms.orders;
+  const canManageSettings = perms.settings;
+  const canManageUsers = perms.users;
+  const canManagePayments = perms.payments;
   // Confirmar dinheiro é separado de gerir os métodos (IBAN, links): migração pagamentos_registados.
-  const canConfirmPayments = isAdmin || hasPermission('confirm_payments');
-  const canManageMarketing = isAdmin || hasPermission('manage_marketing');
+  const canConfirmPayments = perms.confirmPayments;
+  const canManageMarketing = perms.marketing;
   // Quem gere colportores também precisa de ver as igrejas e os pastores (só leitura).
-  const canSeeChurchRegistry = isAdmin || hasPermission('manage_church_registry') || hasPermission('manage_colporteurs');
-  const canManageColporteurs = isAdmin || hasPermission('manage_colporteurs');
+  const canSeeChurchRegistry = perms.churchRegistry;
+  const canManageColporteurs = perms.colporteurs;
+  // Separadores no topo ou barra lateral: escolha de cada pessoa, neste aparelho.
+  const { layout, setLayout, sidebarOpen, setSidebarOpen } = useAdminLayout(user?.id);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [booksList, slidesList, ordersList, lowStock] = await Promise.all([
+      // Os slides carrega-os o próprio separador (SlidesTab); aqui só serviam para o número no
+      // nome do separador, que saiu.
+      const [booksList, ordersList, lowStock] = await Promise.all([
         pb.collection('stock_books').getFullList({ sort: '-featured,title' }),
-        pb.collection('hero_slides').getFullList({ sort: 'sort_order' }).catch(() => []),
         canManageOrders ? pb.collection('orders').getFullList({ sort: '-created', fields: ORDER_LIST_FIELDS.join(',') }).catch(() => []) : [],
         canManageCatalog ? getLowStockBooks() : [],
       ]);
       setBooks(booksList);
-      setSlides(slidesList);
       setOrders(ordersList);
       setLowStockBooks(lowStock);
     } catch (err) {
@@ -383,56 +399,64 @@ const AdminPage = () => {
     { label: 'Sem descrição', value: books.filter((book) => !hasDescription(book)).length, icon: AlertTriangle, filter: 'no_description' },
   ];
 
-  const defaultTab = canManageCatalog ? 'books' : canManageOrders ? 'orders' : canManageSettings ? 'settings' : canManageUsers ? 'users' : 'payments';
-
-  // Separadores agrupados por área; o separador activo fica no URL (/admin?tab=orders) para os atalhos do cabeçalho.
-  const tabGroups = [
-    { label: 'Catálogo', tabs: [
-      canManageCatalog && { value: 'books', label: `Produtos (${books.length})`, icon: PackageSearch },
-      canManageCatalog && { value: 'collections', label: 'Coleções', icon: Layers },
-      canManageCatalog && { value: 'slides', label: `Slider (${slides.length})`, icon: Image },
-      canManageCatalog && { value: 'downloads', label: 'Materiais (PDF)', icon: FileDown },
-    ] },
-    { label: 'Vendas', tabs: [
-      canManageOrders && { value: 'orders', label: `Encomendas (${orders.length})`, icon: ShoppingBag },
-      canManageOrders && { value: 'acompanhamento', label: 'Acompanhamento', icon: Siren },
-      (canManageUsers || canManageOrders) && { value: 'equipas', label: 'Equipas e alertas', icon: UsersRound },
-      canManagePayments && { value: 'payments', label: 'Pagamentos', icon: CreditCard },
-      canManageSettings && { value: 'stores', label: 'Lojas', icon: Store },
-    ] },
-    { label: 'Relatórios', tabs: [
-      // Facturação: com a permissão de encomendas, como na base (migração vendas_so_com_encomendas).
-      canManageOrders && { value: 'vendas-huambo', label: 'Vendas por loja', icon: BarChart3 },
-      (canManageOrders || canConfirmPayments) && { value: 'pagamentos-caixa', label: 'Pagamentos e caixa', icon: CreditCard },
-    ] },
-    { label: 'Clientes', tabs: [
-      canManageUsers && { value: 'users', label: 'Utilizadores e Clientes', icon: Users },
-      canManageMarketing && { value: 'contacts', label: 'Contactos e campanhas', icon: Megaphone },
-      canManageOrders && { value: 'support', label: 'Atendimento', icon: MessageCircle },
-      canManageCatalog && { value: 'community', label: 'Comunidade', icon: MessagesSquare },
-    ] },
-    { label: 'Igreja', tabs: [
-      canManageColporteurs && { value: 'colportagem', label: 'Colportagem', icon: BookHeart },
-      canSeeChurchRegistry && { value: 'igreja', label: 'Registo da Igreja', icon: Church },
-    ] },
-    { label: 'Sistema', tabs: [
-      canManageSettings && { value: 'settings', label: 'Configurações', icon: Settings },
-      (canManageSettings || canManageMarketing) && { value: 'notices', label: 'Faixa de aviso', icon: PanelTop },
-      isAdmin && { value: 'apps', label: 'Integrações', icon: Plug },
-      isAdmin && { value: 'seguranca', label: 'Registo de segurança', icon: ShieldCheck },
-    ] },
-  ].map((g) => ({ ...g, tabs: g.tabs.filter(Boolean) })).filter((g) => g.tabs.length);
-  const allowedTabs = tabGroups.flatMap((g) => g.tabs.map((t) => t.value));
-  const requestedTab = searchParams.get('tab');
-  // O separador por omissão pode não estar entre os permitidos (um gestor só com Marketing caía
-  // em Pagamentos): nesse caso abre o primeiro a que a pessoa tem acesso.
-  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab
-    : allowedTabs.includes(defaultTab) ? defaultTab : (allowedTabs[0] || defaultTab);
+  // O que pede acção, ao lado do nome da secção (não totais): encomendas por confirmar, stock
+  // a acabar, pagamentos que o cliente diz ter feito.
+  const nav = buildAdminNav(perms, {
+    orders: { count: pendingCount, tone: 'info' },
+    books: { count: lowStockBooks.length, tone: 'warning' },
+    'pagamentos-caixa': { count: awaitingPaymentCount, tone: 'warning' },
+  });
+  // A secção fica no endereço (/admin?tab=orders): os avisos, os emails e outras páginas
+  // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
+  const activeTab = resolveSection(nav, searchParams.get('tab'));
   const setActiveTab = (value) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     next.set('tab', value);
     return next;
   }, { replace: true });
+  // Abrir as encomendas já filtradas (do Início e da procura).
+  const openOrders = ({ status = 'all', payment = 'all', search = '' } = {}) => {
+    setOrderFilter(status);
+    setPaymentFilter(payment);
+    setOrderSearch(search);
+    setActiveTab('orders');
+  };
+  const openProducts = ({ filter = 'all', search = '' } = {}) => {
+    setBookFilter(filter);
+    setTypeFilter('all');
+    setBookSearch(search);
+    setActiveTab('books');
+  };
+  const goToSection = (id, opts = {}) => {
+    if (id === 'books' && opts.filter) openProducts({ filter: opts.filter });
+    else setActiveTab(id);
+  };
+  const addProduct = (type = 'livro') => {
+    setNewProductType(type);
+    setEditingBook(null);
+    setDuplicatingBook(null);
+    setShowBookForm(true);
+  };
+  const spinner = <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+
+  // Acções da secção, à direita do título (o mesmo sítio em todas).
+  const sectionActions = activeTab === 'books' && canManageCatalog ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button className="btn-primary h-10 gap-1.5">
+          <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar produto <ChevronDown className="h-4 w-4 opacity-80" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tipo de produto</DropdownMenuLabel>
+        {PRODUCT_TYPES.map((t) => (
+          <DropdownMenuItem key={t.value} onSelect={() => addProduct(t.value)} className="justify-between">
+            {t.label} <span className="font-mono text-xs text-muted-foreground">{t.prefix}-</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
   if (access === 'wait') return <SessionGate />;
   if (access !== 'allow') return null;
@@ -440,27 +464,23 @@ const AdminPage = () => {
   return (
     <>
       <Helmet><title>{pageTitle('Painel Admin')}</title></Helmet>
-      <div className="min-h-screen bg-muted/20">
-        <header className="bg-background border-b border-border sticky top-0 z-40">
-          <div className="container-custom flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <BrandLogo linkTo="/" />
-              <span className="font-bold text-lg hidden md:inline border-l border-border pl-3">Painel Admin</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {user?.name || user?.email} {isAdmin && <span className="text-primary font-medium">· Admin</span>}
-              </span>
-              <Button variant="outline" size="sm" onClick={() => navigate('/profile')}>Perfil</Button>
-              <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/'); }}>
-                <LogOut className="h-4 w-4 mr-2" /> Sair
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        {/* Encomendas novas e alertas urgentes, com som, para quem está na loja com o painel aberto. */}
-        {canManageOrders && (
+      <AdminShell
+        nav={nav}
+        active={activeTab}
+        onNavigate={goToSection}
+        layout={layout}
+        onLayoutChange={setLayout}
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        user={user}
+        roleLabel={isAdmin ? 'Administrador' : 'Equipa'}
+        onProfile={() => navigate('/profile')}
+        onLogout={() => { logout(); navigate('/'); }}
+        actions={sectionActions}
+        onSearchOrders={canManageOrders ? (q) => openOrders({ search: q }) : undefined}
+        onSearchProducts={canManageCatalog ? (q) => openProducts({ search: q }) : undefined}
+        alerts={canManageOrders ? (
+          // Encomendas novas e alertas urgentes, com som, para quem está na loja com o painel aberto.
           <Suspense fallback={null}>
             <StaffAlertBar
               onOpen={(alert) => {
@@ -469,212 +489,173 @@ const AdminPage = () => {
               }}
             />
           </Suspense>
-        )}
-
-        <main className="container-custom py-10">
-          {!canAccessAdmin && (
-            <div className="mb-6 p-4 rounded-lg bg-secondary/40 text-sm">Sem permissões de acesso ao painel.</div>
-          )}
-
-          {canManageCatalog && lowStockBooks.length > 0 && (
-            <div className="mb-6 p-4 rounded-xl border border-amber-500/40 bg-amber-50/80 dark:bg-amber-950/20">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-amber-900 dark:text-amber-200">
-                    {lowStockBooks.length} livro{lowStockBooks.length !== 1 ? 's' : ''} precisam de reabastecimento
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {lowStockBooks.slice(0, 5).map((b) => (
-                      <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
-                        <span>
-                          <code className="text-xs font-mono text-primary">{b.book_code}</code>
-                          {' '}{b.title} — <strong className={Number(b.stock) <= 0 ? 'text-red-600' : 'text-amber-700'}>{b.stock} un.</strong>
-                          {b.stock_alert && <span className="ml-1 text-xs text-red-600">(esgotado)</span>}
-                        </span>
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openEditBook(b)}>
-                          Repor stock
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                  {lowStockBooks.length > 5 && (
-                    <p className="text-xs text-muted-foreground mt-2">+{lowStockBooks.length - 5} mais na tabela de livros</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="mb-8 flex flex-wrap items-stretch gap-3">
-              {tabGroups.map((group) => (
-                <div key={group.label} className="rounded-xl border border-border bg-background p-1.5">
-                  <p className="px-2 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{group.label}</p>
-                  <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-                    {group.tabs.map(({ value, label, icon: Icon }) => (
-                      <TabsTrigger key={value} value={value} className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                        <Icon className="h-4 w-4 mr-1.5" />{label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </div>
-              ))}
-            </div>
+        ) : null}
+      >
+            <AdminSection active={activeTab} value="inicio">
+              <AdminOverview
+                userName={user?.name}
+                perms={perms}
+                orders={orders}
+                books={books}
+                lowStockBooks={lowStockBooks}
+                loading={loading}
+                onNavigate={goToSection}
+                onOpenOrders={openOrders}
+                onEditBook={openEditBook}
+                onAddProduct={() => addProduct('livro')}
+              />
+            </AdminSection>
 
             {canManageSettings && (
-              <TabsContent value="settings">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="settings">
+                <Suspense fallback={spinner}>
                   <SettingsTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageUsers && (
-              <TabsContent value="users">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="users">
+                <Suspense fallback={spinner}>
                   <UsersTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManagePayments && (
-              <TabsContent value="payments">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="payments">
+                <Suspense fallback={spinner}>
                   <PaymentsTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageSettings && (
-              <TabsContent value="stores">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="stores">
+                <Suspense fallback={spinner}>
                   <StoresTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageMarketing && (
-              <TabsContent value="contacts">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="contacts">
+                <Suspense fallback={spinner}>
                   <ContactsManager />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageOrders && (
-              <TabsContent value="support">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="support">
+                <Suspense fallback={spinner}>
                   <SupportCenter />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {(canManageSettings || canManageMarketing) && (
-              <TabsContent value="notices">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="notices">
+                <Suspense fallback={spinner}>
                   <NoticesTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageCatalog && (
-              <TabsContent value="downloads">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="downloads">
+                <Suspense fallback={spinner}>
                   <DownloadsTab books={books} />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageCatalog && (
-              <TabsContent value="community">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="community">
+                <Suspense fallback={spinner}>
                   <CommunityTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {isAdmin && (
-              <TabsContent value="apps">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="apps">
+                <Suspense fallback={spinner}>
                   <AppsTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {(canManageOrders || canConfirmPayments) && (
-              <TabsContent value="pagamentos-caixa">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="pagamentos-caixa">
+                <Suspense fallback={spinner}>
                   <PaymentsReportTab canConfirm={canConfirmPayments} currentUserName={user?.name || user?.email || ''} />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {isAdmin && (
-              <TabsContent value="seguranca">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="seguranca">
+                <Suspense fallback={spinner}>
                   <SecurityLogTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageColporteurs && (
-              <TabsContent value="colportagem">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="colportagem">
+                <Suspense fallback={spinner}>
                   <ColportagemTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canSeeChurchRegistry && (
-              <TabsContent value="igreja">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="igreja">
+                <Suspense fallback={spinner}>
                   <ChurchRegistryTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {(canManageUsers || canManageOrders) && (
-              <TabsContent value="equipas">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="equipas">
+                <Suspense fallback={spinner}>
                   <OpsTeamsPanel canEdit={canManageUsers} />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageOrders && (
-              <TabsContent value="acompanhamento">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="acompanhamento">
+                <Suspense fallback={spinner}>
                   <OrderWatchPanel onOpenOrder={(ref) => { setOrderSearch(ref); setActiveTab('orders'); }} />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canAccessAdmin && (
-              <TabsContent value="vendas-huambo">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="vendas-huambo">
+                <Suspense fallback={spinner}>
                   <VendasHuamboTab />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
             {canManageCatalog && (
-              <TabsContent value="collections">
-                <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+              <AdminSection active={activeTab} value="collections">
+                <Suspense fallback={spinner}>
                   <CollectionsTab books={books} onBooksChange={loadAll} />
                 </Suspense>
-              </TabsContent>
+              </AdminSection>
             )}
 
+            {/* Produtos, slider e encomendas usam os dados que a página carrega; enquanto chegam, o
+                indicador de espera só nessas secções. */}
             {loading ? (
-              <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+              ['books', 'orders'].includes(activeTab) ? spinner : null
             ) : (
               <>
                 {canManageCatalog && (
-                <TabsContent value="books">
-                  <div className="flex justify-between mb-6">
-                    <div>
-                      <h2 className="text-2xl font-bold">Catálogo</h2>
-                      <p className="text-sm text-muted-foreground mt-1">Livros, Bíblias, revistas, uniformes, t-shirts e materiais: tudo gerido aqui.</p>
+                <AdminSection active={activeTab} value="books">
+                  {/* Stock a acabar: aqui e no Início (antes ficava por cima de todas as secções). */}
+                  {lowStockBooks.length > 0 && (
+                    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-500/40 bg-amber-50/80 px-4 py-3 text-sm dark:bg-amber-950/20">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 text-amber-900 dark:text-amber-200">
+                        <strong className="font-semibold">{lowStockBooks.length} produto{lowStockBooks.length !== 1 ? 's' : ''}</strong> a precisar de reposição
+                        {lowStockBooks.length <= 3 && <>: {lowStockBooks.map((b) => b.title).join(', ')}</>}.
+                      </span>
+                      {bookFilter !== 'low_stock' ? (
+                        <Button size="sm" variant="outline" className="h-8 bg-background" onClick={() => setBookFilter('low_stock')}>Mostrar só esses</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-8 bg-background" onClick={() => setBookFilter('all')}>Mostrar todos</Button>
+                      )}
                     </div>
-                    <Select
-                      value=""
-                      onValueChange={(v) => { setNewProductType(v); setEditingBook(null); setDuplicatingBook(null); setShowBookForm(true); }}
-                      disabled={!canManageCatalog}
-                    >
-                      <SelectTrigger className="w-auto gap-2 bg-primary text-primary-foreground hover:bg-primary/90 border-0" aria-label="Adicionar produto">
-                        <Plus className="h-4 w-4" /><span>Adicionar</span>
-                      </SelectTrigger>
-                      <SelectContent align="end">
-                        {PRODUCT_TYPES.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>{t.label} <span className="text-muted-foreground font-mono text-xs">{t.prefix}-</span></SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  )}
                   {/* Tipos de produto: separadores com contagem; os tipos sem produtos ficam de fora. */}
                   <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filtrar por tipo de produto">
                     {[{ value: 'all', plural: 'Todos', prefix: '' }, ...PRODUCT_TYPES].map((t) => {
@@ -689,7 +670,7 @@ const AdminPage = () => {
                           aria-pressed={active}
                           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? 'border-primary bg-primary text-primary-foreground' : 'bg-card hover:border-primary/60'}`}
                         >
-                          {t.plural} <span className={active ? 'opacity-80' : 'text-muted-foreground'}>({count})</span>
+                          {t.plural} <span className={active ? undefined : 'text-muted-foreground'}>({count})</span>
                         </button>
                       );
                     })}
@@ -730,7 +711,7 @@ const AdminPage = () => {
                       />
                     </div>
                     <Select value={bookFilter} onValueChange={setBookFilter}>
-                      <SelectTrigger className="sm:w-56"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="sm:w-56" aria-label="Mostrar"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os produtos</SelectItem>
                         <SelectItem value="featured">Em destaque</SelectItem>
@@ -850,31 +831,33 @@ const AdminPage = () => {
                                 size="icon"
                                 onClick={() => toggleFeatured(b)}
                                 title={b.featured ? 'Remover destaque' : 'Destacar na homepage'}
+                                aria-label={b.featured ? `Remover o destaque de ${b.title}` : `Destacar ${b.title} na página inicial`}
+                                aria-pressed={!!b.featured}
                               >
                                 <Star className={`h-4 w-4 ${b.featured ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
                               </Button>
                             </td>
                             <td className="p-4 text-right whitespace-nowrap">
-                              <Button variant="ghost" size="icon" onClick={() => openEditBook(b)} disabled={!canManageCatalog} title="Editar"><Pencil className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => openDuplicateBook(b)} disabled={!canManageCatalog} title="Duplicar"><Copy className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteBook(b)} disabled={!canManageCatalog}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openEditBook(b)} disabled={!canManageCatalog} title="Editar" aria-label={`Editar ${b.title}`}><Pencil className="h-4 w-4" aria-hidden="true" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openDuplicateBook(b)} disabled={!canManageCatalog} title="Duplicar" aria-label={`Duplicar ${b.title}`}><Copy className="h-4 w-4" aria-hidden="true" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteBook(b)} disabled={!canManageCatalog} title="Eliminar" aria-label={`Eliminar ${b.title}`}><Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" /></Button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </TabsContent>
+                </AdminSection>
                 )}
 
                 {canManageCatalog && (
-                <TabsContent value="slides">
+                <AdminSection active={activeTab} value="slides">
                   <SlidesTab onChange={loadAll} />
-                </TabsContent>
+                </AdminSection>
                 )}
 
                 {canManageOrders && (
-                <TabsContent value="orders">
+                <AdminSection active={activeTab} value="orders">
                   <SalesReportsPanel orders={orders} />
                   <DeliveredPaymentDialog
                     order={deliveryDialog}
@@ -1151,12 +1134,11 @@ const AdminPage = () => {
                       <p className="text-muted-foreground text-center py-8">Sem encomendas{orderFilter !== 'all' ? ' com este estado' : ''}.</p>
                     )}
                   </div>
-                </TabsContent>
+                </AdminSection>
                 )}
               </>
             )}
-          </Tabs>
-        </main>
+      </AdminShell>
 
         <BookFormModal
           open={showBookForm}
@@ -1167,8 +1149,6 @@ const AdminPage = () => {
           initialType={newProductType}
           saving={saving}
         />
-
-      </div>
     </>
   );
 };
