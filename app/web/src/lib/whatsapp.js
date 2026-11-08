@@ -6,7 +6,9 @@ export function buildWhatsAppUrl(phone, message) {
 }
 
 export function buildBookShareMessage(product, siteUrl = typeof window !== 'undefined' ? window.location.origin : '') {
-  const price = product.variants?.[0]?.price_formatted || '';
+  // O preço que se paga: com promoção, o promocional (antes ia o preço cheio na mensagem).
+  const variant = product.variants?.[0];
+  const price = variant?.sale_price_formatted || variant?.price_formatted || '';
   return [
     `📚 *${product.title}*`,
     product.subtitle ? `por ${product.subtitle}` : '',
@@ -39,6 +41,11 @@ export function buildWhatsAppOrderMessage({ cartItems, form, totalFormatted, ord
   if (form.paymentMethod) lines.push(`Pagamento: ${form.paymentMethod}`);
   if (form.notes) lines.push(`Notas: ${form.notes}`);
   return lines.filter((l) => l !== '').join('\n');
+}
+
+/** Partilhar com qualquer contacto (sem número): o WhatsApp abre a escolha da conversa. */
+export function buildWhatsAppShareUrl(message) {
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
 export function shareBookOnWhatsApp(product, whatsappPhone) {

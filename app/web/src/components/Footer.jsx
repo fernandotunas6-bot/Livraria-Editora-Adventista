@@ -12,6 +12,8 @@ import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
 import SafeLink from '@/components/SafeLink.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useIsMobile } from '@/hooks/use-mobile';
+import FooterCompact from '@/components/FooterCompact.jsx';
 
 // Só caminhos que existem no App.jsx. O separador do perfil vai no URL (/profile?tab=…),
 // como no painel, para estes atalhos abrirem já na secção certa.
@@ -34,6 +36,7 @@ const DEFAULT_FOOTER_COLUMNS = [
       { label: 'Levantamento na loja', url: '/lojas', internal: true },
       { label: 'Pagamento na entrega', url: '/shipping-returns', internal: true },
       { label: 'Sobre nós', url: '/about', internal: true },
+      { label: 'Ser colportor', url: '/colportor/candidatura', internal: true },
     ],
   },
   {
@@ -460,4 +463,17 @@ const Footer = () => {
   );
 };
 
-export default Footer;
+/**
+ * Rodapé de todas as páginas: no telemóvel a versão curta (o essencial que a barra de baixo
+ * não tem: rastrear, lojas, contactos, devoluções, privacidade), no computador o completo.
+ *
+ * Antes só a página inicial, a loja, as categorias e as colecções trocavam de rodapé; nas
+ * outras dezasseis o telemóvel recebia o completo — newsletter, três colunas, lojas com mapas
+ * — dois a três ecrãs de rolagem no fim de cada página. Um só, no telemóvel, e o completo nem
+ * chega a montar (não pede as lojas nem os métodos de pagamento).
+ */
+function SiteFooter() {
+  return useIsMobile() ? <FooterCompact /> : <Footer />;
+}
+
+export default SiteFooter;

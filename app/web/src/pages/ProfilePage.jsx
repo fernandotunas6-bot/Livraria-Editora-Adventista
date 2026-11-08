@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { orderItemTitle } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -11,6 +11,7 @@ import MyDownloads from '@/components/downloads/MyDownloads';
 import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import ColporteurProfileLink from '@/components/colportagem/ColporteurProfileLink';
 import ShoppingCart from '@/components/ShoppingCart';
 import { pageTitle } from '@/lib/brand';
 import { ALLOWED_IMAGE_ACCEPT, ALLOWED_IMAGE_LABEL, imageFileError } from '@/lib/imageTypes';
@@ -64,7 +65,10 @@ const ProfilePage = () => {
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
+  const tabsRef = useRef(null);
+  const tabClicked = useRef(false);
   const changeTab = (tab) => {
+    tabClicked.current = true;
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     if (tab === 'orders') next.delete('tab');
@@ -136,6 +140,16 @@ const ProfilePage = () => {
   useEffect(() => {
     if (tabFromUrl) setActiveTab(tabFromUrl);
     else if (location.state?.tab) setActiveTab(location.state.tab);
+    // Chegou por um link para um separador (menu, sino, rodapé): no telemóvel o cartão do
+    // perfil ocupa o ecrã todo e o separador ficava escondido lá em baixo; desce até ele.
+    // Um clique nos próprios separadores não mexe no scroll.
+    const wanted = tabFromUrl || location.state?.tab;
+    if (wanted && !tabClicked.current && window.matchMedia?.('(max-width: 767px)').matches) {
+      const t = setTimeout(() => tabsRef.current?.scrollIntoView({ block: 'start' }), 150);
+      return () => clearTimeout(t);
+    }
+    tabClicked.current = false;
+    return undefined;
   }, [tabFromUrl, location.state?.tab]);
 
   useEffect(() => {
@@ -311,6 +325,7 @@ const ProfilePage = () => {
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
               </Link>
+              <ColporteurProfileLink />
               <div className="bg-card border rounded-xl p-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
                   <ShoppingBag className="h-5 w-5 text-green-600" />
@@ -335,8 +350,8 @@ const ProfilePage = () => {
             </div>
 
             {/* Tabs principais */}
-            <Tabs value={activeTab} onValueChange={changeTab} className="w-full">
-              <TabsList className="mb-6 flex flex-wrap gap-2">
+            <Tabs ref={tabsRef} value={activeTab} onValueChange={changeTab} className="w-full scroll-mt-20">
+              <TabsList className="mb-6 flex h-auto flex-wrap gap-2 [&>button]:min-h-10">
                 <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
                 <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
                 <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" />Notificações</TabsTrigger>

@@ -1,52 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, CheckCheck, Headset, Loader2, MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
-import { loadNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/communityApi';
+import { useNotifications } from '@/hooks/useNotifications';
 import { relativeTime } from '@/lib/communityText';
 import { cn } from '@/lib/utils';
-
-const POLL_MS = 60_000;
 
 /** Só caminhos do próprio site: um `href` estranho nunca vira link para fora. */
 const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '');
 
-/** Avisos do cliente (comunidade e atendimento), com recarga periódica enquanto a página está à vista. */
-export function useNotifications({ enabled = true, limit = 20 } = {}) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const refresh = useCallback(async () => {
-    if (!enabled) return;
-    setLoading(true);
-    try { setItems(await loadNotifications(limit)); } catch { /* sem a tabela, o sino fica vazio */ } finally { setLoading(false); }
-  }, [enabled, limit]);
-
-  useEffect(() => {
-    if (!enabled) { setItems([]); return undefined; }
-    refresh();
-    const tick = () => { if (document.visibilityState === 'visible') refresh(); };
-    const timer = setInterval(tick, POLL_MS);
-    document.addEventListener('visibilitychange', tick);
-    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
-  }, [enabled, refresh]);
-
-  const markAll = useCallback(async () => {
-    const now = new Date().toISOString();
-    setItems((list) => list.map((n) => ({ ...n, read_at: n.read_at || now })));
-    try { await markAllNotificationsRead(); } catch { refresh(); }
-  }, [refresh]);
-
-  const markOne = useCallback(async (id) => {
-    const now = new Date().toISOString();
-    setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: n.read_at || now } : n)));
-    try { await markNotificationRead(id); } catch { /* fica por ler no próximo carregamento */ }
-  }, []);
-
-  return { items, loading, unread: items.filter((n) => !n.read_at).length, refresh, markAll, markOne };
-}
+// O estado dos avisos é partilhado (um só pedido para os sinos, o perfil e a barra de baixo).
+export { useNotifications };
 
 /** Lista de avisos: usada no sino e no separador "Notificações" do perfil. */
 export function NotificationList({ items, loading, onOpen, className }) {

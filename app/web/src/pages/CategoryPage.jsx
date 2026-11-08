@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProductFilters } from '@/hooks/useProductFilters.jsx';
 import CatalogToolbar from '@/components/catalog/CatalogToolbar.jsx';
@@ -10,10 +9,10 @@ import ProductsList from '@/components/ProductsList.jsx';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import { useCatalogWindow } from '@/hooks/useCatalogWindow';
 import FilterPanel from '@/components/FilterPanel.jsx';
+import MobileFilterDrawer from '@/components/catalog/MobileFilterDrawer.jsx';
 import Header from '@/components/Header.jsx';
 import { pageTitle } from '@/lib/brand';
 import Footer from '@/components/Footer.jsx';
-import FooterCompact from '@/components/FooterCompact.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import PageBannerSlider from '@/components/PageBannerSlider';
 
@@ -22,6 +21,7 @@ const CategoryPage = () => {
   
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const closeMobileFilters = useCallback(() => setIsMobileFilterOpen(false), []);
 
   const {
     allProducts,
@@ -37,13 +37,6 @@ const CategoryPage = () => {
     isLoading
   } = useProductFilters(category);
 
-  // Escape fecha o painel de filtros, como na loja e como fecha o carrinho.
-  useEffect(() => {
-    if (!isMobileFilterOpen) return undefined;
-    const aoTeclar = (e) => { if (e.key === 'Escape') setIsMobileFilterOpen(false); };
-    window.addEventListener('keydown', aoTeclar);
-    return () => window.removeEventListener('keydown', aoTeclar);
-  }, [isMobileFilterOpen]);
 
   // O endereço traz a categoria como slug ("catalogo-geral"): mostra-se com espaços e
   // maiúscula inicial. A página vinha do modelo inicial em inglês; ficou em português.
@@ -149,59 +142,28 @@ const CategoryPage = () => {
           </div>
         </div>
 
-        {/* Mobile Filter Drawer */}
-        {isMobileFilterOpen && (
-          /* Tocar na zona escurecida fecha — num telemóvel é o primeiro gesto que se tenta, e
-             aqui não fazia nada: só o X fechava. A loja já se comportava assim. */
-          <div
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm lg:hidden"
-            onClick={() => setIsMobileFilterOpen(false)}
-          >
-            <motion.div 
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              className="fixed inset-y-0 left-0 w-full max-w-sm bg-background border-r border-border p-6 overflow-y-auto shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="titulo-filtros-categoria"
-            >
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-                <h2 id="titulo-filtros-categoria" className="text-xl font-semibold">Filtros</h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsMobileFilterOpen(false)}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <FilterPanel 
-                availableFilters={availableFilters}
-                activeFilters={activeFilters}
-                updateFilter={updateFilter}
-                updateOptionFilter={updateOptionFilter}
-                clearFilters={clearFilters}
-                filterCount={filterCount}
-              />
-              <div className="mt-8 pt-4 border-t border-border">
-                <Button className="w-full btn-primary" onClick={() => setIsMobileFilterOpen(false)}>
-                  Ver {sortedProducts.length} livros
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+        {/* Filtros do telemóvel: "Ver N livros" preso ao fundo (components/catalog/MobileFilterDrawer). */}
+        <MobileFilterDrawer
+          open={isMobileFilterOpen}
+          onClose={closeMobileFilters}
+          titleId="titulo-filtros-categoria"
+          count={sortedProducts.length}
+          filterCount={filterCount}
+          onClear={clearFilters}
+        >
+          <FilterPanel
+            availableFilters={availableFilters}
+            activeFilters={activeFilters}
+            updateFilter={updateFilter}
+            updateOptionFilter={updateOptionFilter}
+            clearFilters={clearFilters}
+            filterCount={filterCount}
+          />
+        </MobileFilterDrawer>
       </main>
 
-      {/* Rodapé completo no computador; no telemóvel a versão curta, com o essencial que a
-          barra inferior não tem (privacidade, rastreio, lojas, devoluções). Ver
-          components/FooterCompact.jsx. */}
-      <div className="hidden md:block">
-        <Footer />
-      </div>
-      <FooterCompact />
+      {/* No telemóvel o rodapé curto, no computador o completo (ver components/Footer.jsx). */}
+      <Footer />
     </>
   );
 };

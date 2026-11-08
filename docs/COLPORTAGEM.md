@@ -190,6 +190,12 @@ O separador **Resumo** tem:
 
 O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
+### Avisos e atalhos
+
+- **Avisos à equipa:** uma candidatura nova e cada relatório enviado geram um aviso no sino do painel para os administradores e para os gestores com a permissão "Colportagem". Saem também por email, WhatsApp ou push, conforme a equipa de cada pessoa em "Equipas e alertas". Abrir o aviso leva ao separador Colportagem.
+- **Rodapé do site:** "Ser colportor", na coluna "Comprar", leva à candidatura.
+- **Perfil:** quem é colportor vê o atalho "Área do colportor" no seu perfil.
+
 ## Técnico
 
 - Migração `supabase/migrations/20261107100000_registo_igreja.sql`:
@@ -215,3 +221,4 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
   - o trigger `orders_colportor_comissao` mete a comissão (paga e entregue) ou a anulação (cancelada ou reembolsada) na conta corrente, uma vez por encomenda;
   - `colporteur_overview` passa a trazer as vendas no site.
 - O checkout (`POST /checkout`) aceita `colporteurCode`. Sem a migração, o `place_order` ignora a coluna, e por isso a Edge Function pode ser publicada antes.
+- Migração `20261107110000_colportagem_avisos.sql`: tipos `colporteur_application` e `colporteur_report` em `staff_notifications`, avisados por triggers em `colporteurs` (inserção) e `colporteur_reports` (passagem a enviado).

@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { ShoppingCart as ShoppingCartIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 /**
- * Barra de compra presa ao fundo, só em telemóvel.
+ * Barra de compra presa ao fundo, só no telemóvel (abaixo de 768 px).
  *
  * A ficha de um livro mede quase 6000px num ecrã de telemóvel, e os botões de compra ficam
- * a mais de mil do topo: quem desce a ler a descrição e as avaliações deixa de ter como
- * comprar sem voltar atrás.
+ * a mais de mil do topo: no primeiro ecrã via-se a capa e o título, e nem preço nem botão.
  *
- * **Aparece só quando os botões reais já passaram para cima.** Uma barra permanente taparia
- * conteúdo durante toda a leitura para repetir um botão que ainda está à vista, e no topo da
- * página estaria a insistir numa compra que ninguém chegou a considerar.
+ * **Aparece sempre que os botões verdadeiros não estão à vista** — por baixo do ecrã (ao
+ * chegar à página) ou já passados para cima (ao descer a ler a descrição e as avaliações),
+ * como nas lojas grandes, em que comprar e juntar ao carrinho estão sempre ao alcance do
+ * polegar. Quando os botões verdadeiros entram no ecrã, a barra sai: não se repete o que já
+ * está à vista.
  *
  * Mede no deslocamento e não com `IntersectionObserver`. O observador seria o instrumento
  * indicado, e isolado comportava-se bem, mas dentro deste ecrã avisava à entrada dos botões
@@ -25,17 +27,26 @@ import { Button } from '@/components/ui/button';
 /** Altura da barra, para quem flutua no fundo se afastar dela. */
 const ALTURA_BARRA = 72;
 
-export default function StickyBuyBar({ alvo, price, originalPrice, onBuy, disabled = false, label = 'Comprar' }) {
+/** Os botões estão fora do ecrã (acima ou abaixo)? Exportada para os testes. */
+export function buttonsOffScreen(rect, viewportHeight) {
+  if (!rect) return false;
+  return rect.bottom < 0 || rect.top > viewportHeight;
+}
+
+export default function StickyBuyBar({ alvo, price, originalPrice, onBuy, onAdd, disabled = false, label = 'Comprar' }) {
+  const isMobile = useIsMobile();
   const [visivel, setVisivel] = useState(false);
 
   useEffect(() => {
-    if (!alvo) return undefined;
+    if (!alvo || !isMobile) {
+      setVisivel(false);
+      return undefined;
+    }
     let agendado = false;
 
     const medir = () => {
       agendado = false;
-      // Já passou para cima: o fundo do bloco de botões está acima do topo do ecrã.
-      setVisivel(alvo.getBoundingClientRect().bottom < 0);
+      setVisivel(buttonsOffScreen(alvo.getBoundingClientRect(), window.innerHeight));
     };
 
     const aoMover = () => {
@@ -53,11 +64,12 @@ export default function StickyBuyBar({ alvo, price, originalPrice, onBuy, disabl
       window.removeEventListener('scroll', aoMover);
       window.removeEventListener('resize', aoMover);
     };
-  }, [alvo]);
+  }, [alvo, isMobile]);
 
-  // Avisa o resto da página da altura que esta barra ocupa, para o assistente e o botão de
-  // subir se afastarem em vez de ficarem por cima dela. Uma variável no documento mantém
-  // isto desacoplado: nenhum desses componentes precisa de saber que esta barra existe.
+  // Avisa o resto da página da altura que esta barra ocupa, para o assistente, o botão de
+  // subir e os avisos se afastarem em vez de ficarem por cima dela. Uma variável no documento
+  // mantém isto desacoplado: nenhum desses componentes precisa de saber que esta barra existe.
+  // Só quando se vê mesmo (antes ficava a 72 px também no tablet, onde a barra não aparece).
   useEffect(() => {
     const raiz = document.documentElement;
     raiz.style.setProperty('--barra-compra', visivel ? `${ALTURA_BARRA}px` : '0px');
@@ -68,20 +80,31 @@ export default function StickyBuyBar({ alvo, price, originalPrice, onBuy, disabl
 
   return (
     <div
-      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm sm:hidden"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm animate-in slide-in-from-bottom-4 duration-200 md:hidden"
       style={{ boxShadow: '0 -4px 16px -6px rgb(0 0 0 / 0.14)' }}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-2 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold text-primary">{price}</p>
+          <p className="truncate text-base font-bold text-primary tabular-nums">{price}</p>
           {/* Só quando há mesmo promoção: sem ela, `originalPrice` é igual ao preço e a
               barra mostrava o mesmo valor duas vezes, uma delas riscada. */}
           {originalPrice && originalPrice !== price && (
-            <p className="truncate text-xs text-muted-foreground line-through">{originalPrice}</p>
+            <p className="truncate text-xs text-muted-foreground line-through tabular-nums">{originalPrice}</p>
           )}
         </div>
-        <Button onClick={onBuy} disabled={disabled} className="btn-primary h-12 shrink-0 px-6 text-base">
-          <ShoppingCartIcon className="mr-2 h-5 w-5" aria-hidden />
+        {onAdd && (
+          <Button
+            onClick={onAdd}
+            disabled={disabled}
+            variant="outline"
+            className="h-12 w-12 shrink-0 border-marca p-0 text-primary hover:bg-marca/10"
+            aria-label="Adicionar ao carrinho"
+            title="Adicionar ao carrinho"
+          >
+            <ShoppingCartIcon className="h-5 w-5" aria-hidden="true" />
+          </Button>
+        )}
+        <Button onClick={onBuy} disabled={disabled} className="btn-primary h-12 shrink-0 px-5 text-base">
           {label}
         </Button>
       </div>

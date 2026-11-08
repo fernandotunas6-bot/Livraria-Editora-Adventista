@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BadgeCheck, BookOpen, Copy, ExternalLink, EyeOff, Flag, Heart, MessageCircle, MoreHorizontal, Pin, PinOff,
   Share2, Trash2,
@@ -14,6 +14,7 @@ import { needsClamp, plural, postKind, postPath, readerPath, whatsappShareUrl } 
 import Monogram from '@/components/community/Monogram';
 import TopicIcon from '@/components/community/TopicIcon';
 import PostComposer from '@/components/community/PostComposer';
+import { useMinuteTick } from '@/hooks/useMinuteTick';
 
 const REPORT_REASONS = ['Spam ou publicidade', 'Link suspeito', 'Ofensivo ou desrespeitoso', 'Outro motivo'];
 // Links de utilizadores: sem passar autoridade de pesquisa, sem dar acesso à página de origem.
@@ -45,6 +46,7 @@ function Body({ text, clamp = true }) {
 }
 
 function Author({ post, small = false, linkToPost = true }) {
+  const now = useMinuteTick();
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <Monogram name={post.author_name} authorKey={post.author_key} size={small ? 'sm' : 'md'} staff={post.author_is_staff} />
@@ -61,17 +63,39 @@ function Author({ post, small = false, linkToPost = true }) {
         </p>
         <p className="text-xs text-editorial-tinta-suave">
           {linkToPost && !post.parent_id ? (
-            <Link to={postPath(post.id)} className="hover:underline"><time dateTime={post.created}>{relativeTime(post.created)}</time></Link>
-          ) : <time dateTime={post.created}>{relativeTime(post.created)}</time>}
+            <Link to={postPath(post.id)} className="hover:underline"><time dateTime={post.created}>{relativeTime(post.created, now)}</time></Link>
+          ) : <time dateTime={post.created}>{relativeTime(post.created, now)}</time>}
         </p>
       </div>
     </div>
   );
 }
 
+const canNativeShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
 function ShareMenu({ post }) {
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  // No telemóvel, a folha de partilha do próprio sistema (WhatsApp, Facebook, SMS, copiar…),
+  // como nas lojas e redes sociais; o menu fica para o computador e para quem a cancelar.
+  const nativeShare = async () => {
+    try {
+      await navigator.share({
+        title: `${postKind(post.kind).label} de ${post.author_name}`,
+        text: String(post.quote || post.body || '').replace(/\s+/g, ' ').slice(0, 140),
+        url: `${origin}${postPath(post.id)}`,
+      });
+    } catch {
+      // cancelado pela pessoa ou não suportado neste navegador: nada a fazer
+    }
+  };
+  if (canNativeShare()) {
+    return (
+      <Button type="button" variant="ghost" size="sm" onClick={nativeShare} className="h-11 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta sm:h-9">
+        <Share2 className="h-4 w-4" aria-hidden="true" /> Partilhar
+      </Button>
+    );
+  }
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(`${origin}${postPath(post.id)}`);
@@ -84,7 +108,7 @@ function ShareMenu({ post }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta">
+        <Button type="button" variant="ghost" size="sm" className="h-11 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta sm:h-9">
           <Share2 className="h-4 w-4" aria-hidden="true" /> {copied ? 'Copiado' : 'Partilhar'}
         </Button>
       </DropdownMenuTrigger>
@@ -120,7 +144,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
       <div className="flex flex-wrap items-center gap-0.5">
         <Button
           type="button" variant="ghost" size="sm"
-          className={`h-9 gap-1.5 px-2.5 ${liked ? 'text-rose-700 hover:text-rose-700' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
+          className={`h-11 gap-1.5 px-2.5 sm:h-9 ${liked ? 'text-rose-700 hover:text-rose-700' : 'text-editorial-tinta-suave hover:text-editorial-tinta'}`}
           aria-pressed={liked} aria-label={`${liked ? 'Retirar gosto' : 'Gostar'} (${post.likes_count || 0})`}
           onClick={guard(() => onLike(post))}
         >
@@ -128,7 +152,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
           <span className="tabular-nums">{post.likes_count || 0}</span>
         </Button>
         {onReply && (
-          <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta" onClick={guard(onReply)}>
+          <Button type="button" variant="ghost" size="sm" className="h-11 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta sm:h-9" onClick={guard(onReply)}>
             <MessageCircle className="h-4 w-4" aria-hidden="true" />
             Responder{replyCount ? <span className="tabular-nums">({replyCount})</span> : null}
           </Button>
@@ -136,7 +160,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
         {share && <ShareMenu post={post} />}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="ml-auto h-9 w-9 text-editorial-tinta-suave" aria-label="Mais acções">
+            <Button type="button" variant="ghost" size="icon" className="ml-auto h-11 w-11 text-editorial-tinta-suave sm:h-9 sm:w-9" aria-label="Mais acções">
               <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
@@ -182,16 +206,16 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-editorial-filete bg-editorial-tela p-2.5 text-xs" role="group" aria-label="Motivo da denúncia">
           <span className="font-semibold text-editorial-tinta">Porquê?</span>
           {REPORT_REASONS.map((r) => (
-            <Button key={r} type="button" size="sm" variant="outline" className="h-8 bg-editorial-papel text-xs" onClick={() => sendReport(r)}>{r}</Button>
+            <Button key={r} type="button" size="sm" variant="outline" className="h-10 bg-editorial-papel text-xs sm:h-8" onClick={() => sendReport(r)}>{r}</Button>
           ))}
-          <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setReporting(false)}>Cancelar</Button>
+          <Button type="button" size="sm" variant="ghost" className="h-10 text-xs sm:h-8" onClick={() => setReporting(false)}>Cancelar</Button>
         </div>
       )}
       {confirmDelete && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-2.5 text-xs">
           <span>Apagar {post.parent_id ? 'esta resposta' : 'esta publicação e as respostas'}?</span>
-          <Button type="button" size="sm" variant="destructive" className="h-8 text-xs" onClick={async () => { const err = await onRemove(post); if (err) setNotice(err); setConfirmDelete(false); }}>Apagar</Button>
-          <Button type="button" size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+          <Button type="button" size="sm" variant="destructive" className="h-10 text-xs sm:h-8" onClick={async () => { const err = await onRemove(post); if (err) setNotice(err); setConfirmDelete(false); }}>Apagar</Button>
+          <Button type="button" size="sm" variant="ghost" className="h-10 text-xs sm:h-8" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
         </div>
       )}
       {notice && <p className="text-xs text-editorial-tinta-suave" role="status">{notice}</p>}
@@ -265,18 +289,44 @@ export default function PostCard({
   // Na página da publicação o editor de resposta fica sempre aberto para quem tem sessão;
   // "Responder" leva-lhe o foco em vez de o fechar.
   const [replying, setReplying] = useState(full);
+  const [focusReply, setFocusReply] = useState(false);
   const replyBox = useRef(null);
-  const onReply = () => {
-    if (!full) { setReplying((v) => !v); return; }
+  const navigate = useNavigate();
+  const focusBox = () => {
     const box = replyBox.current?.querySelector('textarea');
     box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     box?.focus({ preventScroll: true });
+  };
+  const onReply = () => {
+    if (!full) {
+      setReplying((v) => !v);
+      setFocusReply(true);
+      return;
+    }
+    focusBox();
+  };
+  // No feed, "Responder" abre a caixa e já põe o cursor nela (antes abria sem foco).
+  useEffect(() => {
+    if (!focusReply || !replying) return;
+    setFocusReply(false);
+    focusBox();
+  }, [focusReply, replying]);
+
+  // Tocar no cartão (fora dos botões e links) abre a conversa, como num feed de telemóvel; antes
+  // só a hora, minúscula, e "Ver … respostas" levavam lá. Seleccionar texto não conta.
+  const openThread = (e) => {
+    if (full || e.defaultPrevented) return;
+    if (e.target.closest('a, button, input, textarea, select, label, summary, [role="menuitem"], [role="dialog"], form, [data-no-card-link]')) return;
+    if (typeof window !== 'undefined' && String(window.getSelection?.() || '').trim()) return;
+    navigate(postPath(post.id));
   };
   const showComposer = replying && signedIn;
   const official = replies.filter((r) => r.is_official);
   const others = replies.filter((r) => !r.is_official);
   const visibleReplies = full ? replies : [...official, ...others.slice(-(official.length ? 1 : 2))];
-  const hiddenCount = replies.length - visibleReplies.length;
+  // O feed só recebe as respostas que mostra (FEED_REPLIES_PER_POST): o total vem da publicação.
+  const totalReplies = Math.max(Number(post.replies_count) || 0, replies.length);
+  const hiddenCount = totalReplies - visibleReplies.length;
   const links = cleanLinks(post.links);
   const topic = post.topic ? topics[post.topic] : null;
   const kind = postKind(post.kind);
@@ -287,8 +337,9 @@ export default function PostCard({
 
   return (
     <article
-      className="overflow-hidden rounded-2xl border border-editorial-filete bg-editorial-papel shadow-[0_1px_2px_rgba(29,42,63,0.06)] transition-shadow hover:shadow-[0_6px_24px_-8px_rgba(29,42,63,0.18)]"
+      className={`overflow-hidden rounded-2xl border border-editorial-filete bg-editorial-papel shadow-[0_1px_2px_rgba(29,42,63,0.06)] transition-shadow hover:shadow-[0_6px_24px_-8px_rgba(29,42,63,0.18)] ${full ? '' : 'cursor-pointer'}`}
       aria-label={`${kind.label} de ${post.author_name}`}
+      onClick={openThread}
     >
       {post.pinned && (
         <div className="flex items-center gap-1.5 border-b border-editorial-filete bg-editorial-tela px-4 py-1.5 text-xs font-semibold text-editorial-ouro-texto sm:px-5">
@@ -345,11 +396,11 @@ export default function PostCard({
             {visibleReplies.map((r) => <Reply key={r.id} reply={r} {...actionProps} liked={liked?.has(r.id)} />)}
             {hiddenCount > 0 && (
               <Link to={postPath(post.id)} className="inline-block text-sm font-semibold text-editorial-petroleo hover:underline">
-                Ver {hiddenCount === 1 ? 'mais 1 resposta' : `todas as ${plural(replies.length, 'resposta', 'respostas')}`}
+                Ver {hiddenCount === 1 ? 'mais 1 resposta' : `todas as ${plural(totalReplies, 'resposta', 'respostas')}`}
               </Link>
             )}
             {showComposer && (
-              <div ref={replyBox}>
+              <div ref={replyBox} data-no-card-link="">
               <PostComposer
                 compact
                 placeholder={`Responder a ${post.author_name}…`}

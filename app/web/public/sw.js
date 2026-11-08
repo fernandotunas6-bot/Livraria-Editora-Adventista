@@ -28,18 +28,32 @@ self.addEventListener('push', (event) => {
       icon: '/icons/icon-192.svg',
       badge: '/icons/icon-192.svg',
       data: { url: data.url || '/' },
-      tag: 'livraria-notification',
+      // Uma etiqueta por destino: com a mesma para todas, cada aviso apagava o anterior (duas
+      // respostas seguidas a publicações diferentes deixavam só uma no telemóvel). O mesmo
+      // destino continua a juntar-se num só aviso.
+      tag: data.tag || `livraria:${data.url || '/'}`,
+      renotify: true,
     })
   );
 });
 
+// Tocar no aviso abre o sítio dele (a publicação, a encomenda…). Com o site já aberto, essa
+// janela vem para a frente E vai para lá — antes só vinha para a frente, e quem tocava numa
+// resposta da comunidade ficava na página onde estava.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const target = new URL(event.notification.data?.url || '/', self.location.origin);
+  // Só endereços do próprio site.
+  const url = target.origin === self.location.origin ? target.href : self.location.origin + '/';
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ('focus' in client) return client.focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
+      const same = list.find((client) => client.url === url);
+      if (same && 'focus' in same) return same.focus();
+      const client = list.find((c) => 'focus' in c);
+      if (client) {
+        const focused = await client.focus();
+        if ('navigate' in focused) return focused.navigate(url).catch(() => self.clients.openWindow?.(url));
+        return focused;
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
       return null;

@@ -38,6 +38,9 @@ const SignaturePad = forwardRef(function SignaturePad(
   {
     label = 'Assinatura',
     hint = 'Assine com o dedo ou caneta no quadro abaixo.',
+    // Dentro do quadro vazio, onde a pessoa vai assinar: a assinatura tem de ser a do documento,
+    // para a equipa e o estafeta a poderem comparar (pedido do dono, 2026-11-08).
+    placeholder = 'Assine como está no Bilhete',
     className = '',
     height = 'h-36',
     disabled = false,
@@ -146,8 +149,9 @@ const SignaturePad = forwardRef(function SignaturePad(
           <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-green-600 pointer-events-none" />
         )}
         {!hasStroke && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground/30">
-            <PenLine className="h-8 w-8" strokeWidth={1} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 pointer-events-none text-muted-foreground/60">
+            <PenLine className="h-7 w-7 opacity-50" strokeWidth={1} aria-hidden="true" />
+            {placeholder && <span className="text-sm font-medium">{placeholder}</span>}
           </div>
         )}
       </div>

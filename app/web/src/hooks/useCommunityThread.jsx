@@ -7,7 +7,12 @@ import { preparePost } from '@/lib/communityText';
 
 /**
  * Uma publicação com todas as respostas (página /comunidade/p/:id), com as mesmas acções do
- * feed. `status`: 'loading', 'ready', 'missing' (não existe ou está oculta) ou 'unavailable'.
+ * feed. `status`: 'loading', 'ready', 'missing' (não existe ou está oculta), 'error' (sem rede:
+ * dá para tentar outra vez) ou 'unavailable'.
+ *
+ * Depois de responder ou de marcar a resposta oficial, a conversa actualiza-se por baixo do que
+ * está à vista (`silent`): antes a página inteira voltava ao spinner e o telemóvel saltava para
+ * o topo, longe da resposta acabada de escrever.
  */
 export function useCommunityThread(id) {
   const { user, isAuthed } = useAuth();
@@ -17,8 +22,8 @@ export function useCommunityThread(id) {
   const [liked, setLiked] = useState(() => new Set());
   const [status, setStatus] = useState('loading');
 
-  const load = useCallback(async () => {
-    setStatus('loading');
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setStatus('loading');
     try {
       const thread = await loadThread(id);
       if (!thread) { setStatus('missing'); return; }
@@ -33,7 +38,9 @@ export function useCommunityThread(id) {
       }
       setStatus('ready');
     } catch (e) {
-      setStatus(isMissingTable(e) ? 'unavailable' : 'missing');
+      if (isMissingTable(e)) setStatus('unavailable');
+      // Sem rede não é "já não existe": com a conversa à vista, fica como está; sem ela, erro.
+      else if (!silent) setStatus('error');
     }
   }, [id, userId]);
 
@@ -45,7 +52,7 @@ export function useCommunityThread(id) {
     if (prepared.error) return prepared.error;
     try {
       await createPost(userId, prepared.data);
-      await load();
+      await load({ silent: true });
       return '';
     } catch (e) {
       return /Muitas publicações|Link|links|Sites|site|já não existe|No máximo/.test(e.message) ? e.message : 'Não foi possível responder. Tente de novo.';
@@ -59,7 +66,7 @@ export function useCommunityThread(id) {
     const bump = (p) => (p.id === target.id ? { ...p, likes_count: Math.max(0, (p.likes_count || 0) + (next ? 1 : -1)) } : p);
     setPost((p) => (p ? bump(p) : p));
     setReplies((list) => list.map(bump));
-    try { await setLike(target.id, userId, next); } catch { load(); }
+    try { await setLike(target.id, userId, next); } catch { load({ silent: true }); }
     return true;
   }, [userId, liked, load]);
 
@@ -84,7 +91,7 @@ export function useCommunityThread(id) {
   }, []);
 
   const markOfficial = useCallback(async (reply) => {
-    try { await setOfficial(reply.id, !reply.is_official); await load(); return ''; } catch { return 'Não foi possível marcar a resposta.'; }
+    try { await setOfficial(reply.id, !reply.is_official); await load({ silent: true }); return ''; } catch { return 'Não foi possível marcar a resposta.'; }
   }, [load]);
 
   const hide = useCallback(async (target) => {
@@ -98,5 +105,5 @@ export function useCommunityThread(id) {
     }
   }, []);
 
-  return { post, replies, liked, status, signedIn: !!userId, publish, toggleLike, report, remove, pin, markOfficial, hide };
+  return { post, replies, liked, status, signedIn: !!userId, reload: load, publish, toggleLike, report, remove, pin, markOfficial, hide };
 }

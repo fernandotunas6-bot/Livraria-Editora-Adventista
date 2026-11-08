@@ -27,6 +27,7 @@ Só quem tem a permissão **gerir utilizadores** altera; quem gere encomendas v�
 4. **Canais:** painel (sempre), push, email e WhatsApp. Para o WhatsApp, cada membro precisa do
    telefone no perfil.
 5. **Horário de funcionamento** (hora de Luanda; por omissão, segunda a sábado das 08h às 18h).
+   O chat do site mostra-o aos clientes: "A equipa está disponível" ou "Volta amanhã às 08h".
 6. **Testar**, em cada equipa: envia um aviso de teste a todos os membros e diz por que canais chegou.
 
 A tabela **Quem recebe o quê** mostra, com a configuração actual, quem é avisado de cada assunto
