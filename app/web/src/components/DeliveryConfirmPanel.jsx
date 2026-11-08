@@ -97,7 +97,7 @@ export default function DeliveryConfirmPanel({ orderNumber, email, order, onConf
       <SignaturePad
         ref={signatureRef}
         label="Assinatura *"
-        hint="Assine com o dedo ou caneta ao receber a encomenda."
+        hint="Quem recebe assina como está no Bilhete de Identidade, com o dedo ou caneta."
       />
 
       <Button type="submit" className="w-full btn-primary" disabled={submitting}>
