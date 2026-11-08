@@ -18,16 +18,40 @@ export function saleChannelFrom(value: unknown): string {
   return SALE_CHANNELS.includes(channel) ? channel : "web_purchase";
 }
 
-/** O método de pagamento serve para este envio? Sem lista (ou lista vazia) serve para todos. */
-export function paymentAllowedForShipping(method: { shipping_methods?: unknown } | null | undefined, shipping: string): boolean {
+/** Pago antes do envio (transferência, Multicaixa Express): a referência pode vir depois da encomenda. */
+export const isPaidUpfront = (type: unknown) => type === "p2p" || type === "transfer";
+
+/** Os envios que o checkout aceita; 'digital' é a encomenda só de edições digitais (sem envio). */
+export const SHIPPING_METHODS: readonly string[] = ["delivery", "express", "pickup", "digital"];
+
+/**
+ * O método de pagamento serve para este envio?
+ *
+ * - Com lista ("Disponível para" em Pagamentos), só os envios indicados.
+ * - Sem lista, serve para as entregas e o levantamento. Para a edição digital (sem envio), só os
+ *   que se pagam antes — transferência, Multicaixa Express — ou pelo gateway: "pagar na entrega"
+ *   não tem entrega, e o livro só abre com o pagamento confirmado. Pagar no balcão por um livro
+ *   digital é possível, mas só com 'digital' marcado nesse método.
+ */
+export function paymentAllowedForShipping(
+  method: { shipping_methods?: unknown; type?: unknown; gateway_provider?: unknown } | null | undefined,
+  shipping: string,
+): boolean {
   const list = Array.isArray(method?.shipping_methods)
     ? (method!.shipping_methods as unknown[]).filter((s): s is string => typeof s === "string")
     : [];
-  return list.length === 0 || list.includes(shipping);
+  if (list.length) return list.includes(shipping);
+  if (shipping === "digital") return isPaidUpfront(method?.type) || !!String(method?.gateway_provider ?? "").trim();
+  return true;
 }
 
-/** Pago antes do envio (transferência, Multicaixa Express): a referência pode vir depois da encomenda. */
-export const isPaidUpfront = (type: unknown) => type === "p2p" || type === "transfer";
+/** Como o cliente lê o envio, nas mensagens do checkout. */
+export function shippingPhrase(shipping: string): string {
+  if (shipping === "pickup") return "levantamento na loja";
+  if (shipping === "digital") return "a edição digital";
+  if (shipping === "express") return "entrega expressa";
+  return "entrega ao domicílio";
+}
 
 /** Assinatura desenhada no site: imagem PNG em data URL, até `maxLength` caracteres. */
 export function isPngSignature(value: unknown, maxLength: number): value is string {

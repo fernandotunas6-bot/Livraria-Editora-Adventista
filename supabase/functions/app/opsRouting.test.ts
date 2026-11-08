@@ -49,6 +49,8 @@ describe("prazo de entrega prometido", () => {
   it("a data prevista pela equipa manda; levantamentos e encomendas por confirmar não têm prazo", () => {
     expect(deliveryDeadline({ shipping_method: "delivery", estimated_delivery: "2026-11-12T12:00:00Z" })).toEqual({ deadline: at("2026-11-12T12:00:00Z"), basis: "estimated" });
     expect(deliveryDeadline({ shipping_method: "pickup", estimated_delivery: "2026-11-12T12:00:00Z" })).toBeNull();
+    // A edição digital não tem entrega: conclui-se ao pagar.
+    expect(deliveryDeadline({ ...paid("2026-11-09T10:00:00Z"), shipping_method: "digital" })).toBeNull();
     expect(deliveryDeadline({ shipping_method: "delivery", delivery_timeline: [{ status: "received", at: "2026-11-01T10:00:00Z" }] })).toBeNull();
   });
 

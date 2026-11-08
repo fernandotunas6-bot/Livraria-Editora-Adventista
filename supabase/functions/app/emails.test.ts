@@ -283,6 +283,21 @@ describe("orderCreatedLetter", () => {
   });
 });
 
+describe("orderCreatedLetter da edição digital", () => {
+  const DIGITAL = { ...ORDER, shipping_method: "digital", shipping_cost: 0, delivery_address_full: "", total: 3000,
+    items: [{ quantity: 1, title: "O Desejado", variant_label: "Edição digital · PDF", price: 3000, digital: true }] };
+
+  it("diz que abre na biblioteca quando o pagamento for confirmado, sem envio nem morada", () => {
+    const l = orderCreatedLetter(brand, DIGITAL, "", { payLater: true });
+    expect(l.doc.subtitle).toBe("Falta só o pagamento: a edição digital abre na sua biblioteca quando for confirmado.");
+    expect(l.doc.notes?.[0]).toContain("A edição digital abre na sua biblioteca quando o pagamento for confirmado.");
+    expect(l.doc.notes?.[0]).not.toContain("Preparamos");
+    expect(l.doc.totals?.some((t) => t.label === "Envio")).toBe(false);
+    expect(l.doc.details?.find((d) => d.label === "Entrega")?.value).toBe("Edição digital, na biblioteca da sua conta");
+    expect(l.doc.steps?.map((s) => s.label)).toEqual(["Encomenda recebida", "Pagamento confirmado", "Na biblioteca"]);
+  });
+});
+
 describe("orderSteps", () => {
   it("marca o que já passou e onde está agora", () => {
     const steps = orderSteps(ORDER, "in_transit");
@@ -302,6 +317,12 @@ describe("orderSteps", () => {
     ]);
     // Nada de "em trânsito" nem "saiu para entrega" para quem levanta ao balcão.
     expect(steps.find((s) => s.current)?.label).toBe("Pronta para levantamento");
+  });
+
+  it("a edição digital não tem envio: recebida, paga, na biblioteca", () => {
+    const steps = orderSteps({ ...ORDER, shipping_method: "digital" }, "received");
+    expect(steps.map((s) => s.label)).toEqual(["Encomenda recebida", "Pagamento confirmado", "Na biblioteca"]);
+    expect(steps.find((s) => s.current)?.label).toBe("Encomenda recebida");
   });
 
   it("não marca nada como feito num estado fora da sequência", () => {
@@ -372,6 +393,15 @@ describe("paymentConfirmedLetter", () => {
     expect(l.doc.steps).toBeUndefined();
     expect(l.doc.cta?.label).toBe("Abrir a biblioteca");
     expect(l.doc.cta?.url).toMatch(/\/profile\?tab=biblioteca$/);
+  });
+
+  it("encomenda 'digital' (sem envio): na biblioteca, sem passos nem portes, mesmo sem os títulos", () => {
+    const digital = { ...ORDER, payment_status: "paid", shipping_method: "digital", shipping_cost: 0, delivery_address_full: "", total: 3000 };
+    const l = paymentConfirmedLetter(brand, digital);
+    expect(l.doc.subtitle).toBe("O seu livro digital já está na sua biblioteca.");
+    expect(l.doc.steps).toBeUndefined();
+    expect(l.doc.cta?.label).toBe("Abrir a biblioteca");
+    expect(l.doc.details?.find((d) => d.label === "Entrega")?.value).toBe("Edição digital, na biblioteca da sua conta");
   });
 
   it("encomenda mista: os digitais na biblioteca e o resto a preparar, com os dois botões", () => {

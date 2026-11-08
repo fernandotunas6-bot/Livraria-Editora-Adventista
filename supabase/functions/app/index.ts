@@ -68,8 +68,8 @@ import {
   type EmailMessage, type ProviderResult,
 } from "./emailProviders.ts";
 import {
-  cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
-  saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
+  SHIPPING_METHODS, cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
+  saleChannelFrom, settingNumber, shippingPhrase, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 import {
   type PaymentAction, type PaymentResult, customerNoticeFor, deliveryNeedsPayment, kz as kwanza, outstanding, parseAmount,
@@ -81,7 +81,7 @@ import { cleanCancelReason, customerCancelBlock } from "./customerCancel.ts";
 import {
   RELEASE_PUSH_BATCH, RELEASE_PUSH_CONCURRENCY, mapLimit, nextReleaseBatch, pushFailure, releasePushAlive, releasePushPayload,
 } from "./releasePush.ts";
-import { type PaidMaterial, digitalBooksFor } from "./digitalBooks.ts";
+import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -2155,6 +2155,11 @@ route("POST", "/delivery-event", async ({ auth, body }) => {
   if (!order) throw new HttpError(404, "Encomenda não encontrada.");
   const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
   const statusChanged = !!body.status && body.status !== order.delivery_status;
+  // Encomenda só digital (migração edicoes_digitais): não tem passos de envio. Conclui-se sozinha
+  // quando o pagamento é confirmado; daqui só se cancela.
+  if (statusChanged && order.shipping_method === "digital" && body.status !== "cancelled") {
+    throw new HttpError(409, "Encomenda só digital: não tem envio. Fica concluída sozinha quando o pagamento é confirmado.");
+  }
   const patch: Row = {};
   if (body.tracking_number) patch.tracking_number = text(body.tracking_number, 120);
   if (body.carrier) patch.carrier = text(body.carrier, 120);
@@ -2273,23 +2278,53 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
 
   // Textos com tamanho máximo, para ninguém encher a base de dados.
   const clip = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
-  const email = clip(data.customerEmail, 254);
   const name = clip(data.customerName, 120);
   const phone = clip(data.phone, 40);
   const address = clip(data.address, 500);
-  const shippingMethod = ["delivery", "express", "pickup"].includes(data.shippingMethod) ? data.shippingMethod : "delivery";
   const pickupStore = clip(data.pickupStore, 120);
+
+  const parseBookId = (variantId: string) => String(variantId || "").replace(/-(default|v\d+)$/, "");
+  const cartItems = items.map((item) => {
+    const bookId = parseBookId(item.variant_id || item.book_id || "");
+    if (!bookId) throw bad("Item inválido no carrinho.");
+    // "<id>-v2" é a terceira variante (tamanho, edição): o preço e o stock são os dela.
+    const variant = /-v(\d+)$/.exec(String(item.variant_id || ""));
+    return {
+      book_id: bookId,
+      quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99),
+      ...(variant ? { variant: Math.min(Number(variant[1]), 50) } : {}),
+    };
+  });
+
+  // Edições digitais (migração edicoes_digitais): só digitais, não há envio — nem morada, nem
+  // loja, nem portes; com impressos, o envio é o deles. Qualquer edição digital precisa de conta,
+  // que é onde o livro abre. O `place_order` confirma tudo isto; aqui é para as mensagens certas.
+  // Sem a coluna `digital` (migração por aplicar), a leitura falha e nada conta como digital.
+  const { data: cartBooks } = await db.from("stock_books").select("id, versions, digital")
+    .in("id", [...new Set(cartItems.map((i) => i.book_id))]);
+  const digital = digitalCart(cartItems, cartBooks || []);
+  if (digital.any && !auth) throw new HttpError(401, "Entre na sua conta para comprar a edição digital: é na conta que o livro fica.");
+  if (!digital.all && data.shippingMethod === "digital") {
+    throw bad("Os produtos impressos precisam de entrega ou levantamento: escolha como os quer receber.");
+  }
+  const shippingMethod = digital.all ? "digital"
+    : SHIPPING_METHODS.includes(data.shippingMethod) && data.shippingMethod !== "digital" ? data.shippingMethod : "delivery";
+  const isDigital = shippingMethod === "digital";
+  // O recibo da edição digital vai para o email escrito, ou para o da conta.
+  const email = clip(data.customerEmail, 254) || (isDigital ? clip(auth?.email, 254) : "");
 
   // Levantamento na loja: a loja só precisa de saber quem vem buscar e como lhe ligar.
   // Nem morada (não há entrega), nem assinatura (os livros são entregues ao balcão), nem
   // email (o recibo é dado na hora). Entrega ao domicílio continua a exigir tudo.
+  // Edição digital: o nome e o email (o recibo); o telefone é opcional — não há entrega.
   const isPickup = shippingMethod === "pickup";
   if (!name) throw bad("Nome obrigatório.");
-  if (!phone) throw bad("Telefone obrigatório.");
-  if (!isPickup && !email) throw bad("Email obrigatório para entrega ao domicílio.");
+  if (!phone && !isDigital) throw bad("Telefone obrigatório.");
+  if (isDigital && !email) throw bad("Email obrigatório: é para lá que vai o recibo da edição digital.");
+  if (!isPickup && !isDigital && !email) throw bad("Email obrigatório para entrega ao domicílio.");
   // No levantamento o email é opcional, mas se vier tem de servir para enviar o recibo.
   if (email && !isDeliverableEmail(email)) throw bad("Email inválido.");
-  if (!isPickup) {
+  if (!isPickup && !isDigital) {
     if (!data.deliveryProvince) throw bad("Província de entrega obrigatória.");
     if (!data.deliveryMunicipality) throw bad("Município de entrega obrigatório.");
     if (!data.deliveryLocality) throw bad("Bairro/comuna/localidade obrigatória.");
@@ -2307,29 +2342,17 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
 
   if (settings?.maintenance_mode) throw bad("Loja em manutenção. Tente mais tarde.");
 
-  const parseBookId = (variantId: string) => String(variantId || "").replace(/-(default|v\d+)$/, "");
-  const cartItems = items.map((item) => {
-    const bookId = parseBookId(item.variant_id || item.book_id || "");
-    if (!bookId) throw bad("Item inválido no carrinho.");
-    // "<id>-v2" é a terceira variante (tamanho, edição): o preço e o stock são os dela.
-    const variant = /-v(\d+)$/.exec(String(item.variant_id || ""));
-    return {
-      book_id: bookId,
-      quantity: Math.min(Math.max(Number(item.quantity) || 1, 1), 99),
-      ...(variant ? { variant: Math.min(Number(variant[1]), 50) } : {}),
-    };
-  });
-
   const paymentCode = clip(data.paymentMethodCode || data.paymentMethod || "entrega", 60);
   // Só os métodos de pagamento que o admin tem activos. Se nenhum estiver activo, aceita "entrega".
   // `*` e não uma lista de colunas: `shipping_methods` só existe depois da migração
   // 20261106050000, e uma coluna em falta partia o checkout.
   const { data: activeMethods } = await db.from("payment_methods").select("*").eq("enabled", true);
   const paymentMethodRow = (activeMethods || []).find((m: Row) => m.code === paymentCode);
-  if (!paymentMethodRow && !(paymentCode === "entrega" && !(activeMethods || []).length)) throw bad("Método de pagamento indisponível.");
-  // "Pagar no Balcão" só no levantamento, por exemplo (payment_methods.shipping_methods).
+  if (!paymentMethodRow && !(paymentCode === "entrega" && !(activeMethods || []).length && !isDigital)) throw bad("Método de pagamento indisponível.");
+  // "Pagar no Balcão" só no levantamento, por exemplo (payment_methods.shipping_methods); a
+  // edição digital só com o que se paga antes ou pelo gateway (checkoutRules.ts).
   if (paymentMethodRow && !paymentAllowedForShipping(paymentMethodRow, shippingMethod)) {
-    throw bad(`${paymentMethodRow.name} não está disponível para ${isPickup ? "levantamento na loja" : "entrega ao domicílio"}.`);
+    throw bad(`${paymentMethodRow.name} não está disponível para ${shippingPhrase(shippingMethod)}.`);
   }
   // Transferência e Multicaixa Express são pagos antes do envio, mas depois de encomendar: o
   // cliente paga com o número da encomenda e indica a referência na página da encomenda
@@ -2339,10 +2362,11 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const paidUpfront = isPaidUpfront(paymentMethodRow?.type);
   const saleChannel = saleChannelFrom(data.saleChannel || data.orderType);
   const isWhatsApp = saleChannel === "whatsapp";
-  // Morada de entrega numa linha (o levantamento não tem morada: tem a loja, em pickup_store).
+  // Morada de entrega numa linha (o levantamento não tem morada: tem a loja, em pickup_store; a
+  // edição digital não tem nenhuma das duas).
   const deliveryAddress = clip(data.deliveryAddressFull, 600) || address;
-  const deliveryCity = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.city, 120) || "Luanda");
-  const timelineLocation = shippingMethod === "pickup" ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.deliveryProvince, 120) || "Angola");
+  const deliveryCity = isDigital ? "" : isPickup ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.city, 120) || "Luanda");
+  const timelineLocation = isDigital ? "" : isPickup ? (pickupStore || "Loja física") : (clip(data.deliveryMunicipality || data.deliveryProvince, 120) || "Angola");
   // Hora + 3 caracteres aleatórios: evita números repetidos em compras simultâneas e números fáceis de adivinhar.
   const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
   const orderNum = rules.orderPrefix + Date.now().toString(36).toUpperCase().slice(-6) + randomPart;
@@ -2361,7 +2385,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     checkout_signature_data: signatureOk ? signature : "",
     checkout_signature_at: signatureOk ? nowISO() : null,
     shipping_method: shippingMethod,
-    pickup_store: pickupStore,
+    pickup_store: isDigital ? "" : pickupStore,
     payment_method_code: paymentCode,
     payment_method_name: paymentMethodRow?.name || LEGACY_PAYMENT_LABELS[paymentCode] || paymentCode,
     payment_reference: paymentReference,
@@ -2372,7 +2396,9 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
     delivery_timeline: [timelineEvent(
       "received",
       isWhatsApp ? "Pedido via WhatsApp" : "Compra registada",
-      isWhatsApp ? "Cliente iniciou pedido pelo WhatsApp." : "A sua compra foi registada com sucesso.",
+      isWhatsApp ? "Cliente iniciou pedido pelo WhatsApp."
+        : isDigital ? "A sua compra foi registada. A edição digital abre na sua biblioteca quando o pagamento for confirmado."
+        : "A sua compra foi registada com sucesso.",
       timelineLocation,
     )],
     status: "pending",
@@ -2383,7 +2409,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   // início e nunca eram escritas — o estafeta não tinha como chegar a uma referência vaga.
   const gpsLat = Number(data.deliveryGpsLat);
   const gpsLng = Number(data.deliveryGpsLng);
-  if (!isPickup && Number.isFinite(gpsLat) && Number.isFinite(gpsLng)
+  if (!isPickup && !isDigital && Number.isFinite(gpsLat) && Number.isFinite(gpsLng)
       && Math.abs(gpsLat) <= 90 && Math.abs(gpsLng) <= 180 && (gpsLat !== 0 || gpsLng !== 0)) {
     order.delivery_gps_lat = gpsLat;
     order.delivery_gps_lng = gpsLng;
@@ -2394,7 +2420,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   // inválido é ignorado e nunca impede a compra. Sem a migração, o place_order ignora a coluna.
   const colporteurCode = clip(data.colporteurCode, 20).toUpperCase();
   if (/^CPT[-\s]?\d{1,6}$/.test(colporteurCode)) order.colporteur_code = colporteurCode;
-  if (shippingMethod !== "pickup") {
+  if (!isPickup && !isDigital) {
     Object.assign(order, {
       delivery_province_id: clip(data.deliveryProvinceId, 40),
       delivery_province: clip(data.deliveryProvince, 120),
