@@ -11,7 +11,7 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   - nos pagamentos, os pagamentos a fornecedores e à gráfica, e melhorar os dos clientes.
 
   Guia completo em [PRODUCAO.md](PRODUCAO.md).
-- **Junto ao main depois do #44 e do #45:** o ramo tinha um tempo real próprio (tópicos
+- **Junto ao main depois do #44, do #45 e do #47:** o ramo tinha um tempo real próprio (tópicos
   `painel:<área>`), que se perdeu de propósito: ficou o do main (`private.realtime_signal`, canal
   `painel`, `useSignal`). As migrações mudaram de número porque `20261108150000` já existia em
   produção (`versoes_da_app`) e seria saltada sem aviso; e o `170000` é do #41.
@@ -63,6 +63,31 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   - impostos dos salários: o sistema não calcula INSS nem IRT; escrevem-se nos descontos;
   - se os responsáveis sem a permissão da produção marcam as suas etapas;
   - avisos de prazo por email ou push.
+
+## Livros digitais: só abrem pagos, biblioteca e acessos (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** "cada livro digital só pode ser descarregado se for pago; painel de abrir
+  ligado ao pagamento; tudo bem organizado, como os outros sistemas fazem". Guia completo, com o passo
+  a passo de venda e a comparação com outras lojas, em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md);
+  achados 146–150 em [AUDITORIA.md](AUDITORIA.md), secção **9.18**.
+- **Regra:** um PDF pago abre só com a encomenda **paga** (pagamentos confirmados pelo gateway ou por
+  quem tem «Confirmar pagamentos») e fecha com o reembolso, o cancelamento ou um bloqueio. Antes
+  também abria com a encomenda "entregue" ou com a recepção confirmada pelo cliente, sem pagamento.
+  Uma só função decide (`private.can_download`).
+- **Cliente:** Perfil → **Biblioteca** (`?tab=biblioteca`; `?tab=pdfs` continua a abrir) com cada
+  livro comprado e o estado ligado ao pagamento: disponível (abrir/descarregar), pagamento por
+  confirmar, por pagar e pago em parte (com o caminho para pagar), reembolsado, bloqueado. Aviso na
+  conta "Livro digital disponível" quando a encomenda fica paga; o email, o WhatsApp e o push de
+  "Pagamento confirmado" dizem que o livro está na biblioteca.
+- **Equipa:** Catálogo → Materiais (PDF) → **Acessos e pagamentos**: quem comprou, o pagamento e o
+  acesso, com filtros e procura; "Confirmar o pagamento" abre a encomenda; bloquear (com motivo) e
+  desbloquear, no registo de segurança; cada download fica registado.
+- **Base de dados:** migração `20261108160000_livros_digitais`, **por aplicar** (vai no merge, com a
+  Edge Function). Cenários: `scripts/pglite/digitais.mjs` (59).
+- **Fase seguinte (por decidir com o dono):** vender a edição digital sem pedir entrega nem
+  levantamento no checkout, concluída ao pagar. Mexe em mais de 20 sítios do circuito da encomenda
+  (checkout, `place_order`, avisos à equipa, vigilância, recibo, rastreio): ficou fora desta passagem
+  de propósito. Também por decidir: limite de downloads e marca d'água com o nome do comprador.
 
 ## Telemóvel: entrar ao abrir a app, conta identificada e versões (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 
@@ -199,7 +224,7 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
 
 - **Pedido do dono:** PDFs e revistas para descarregar. Escolhas: **gratuitos e pagos**; os gratuitos para **qualquer visitante**, sem conta; numa **página própria** e **na ficha do produto**.
 - **Feito:** página `/materiais` (filtros por tipo e por gratuito/com compra, link "Materiais" no menu e no sitemap), caixa "PDFs deste produto" na ficha, separador **PDFs** no perfil (os pagos que a conta já pode descarregar) e painel → Catálogo → **Materiais (PDF)** (carregar o PDF, capa, tipo, edição, gratuito ou pago, produto e variante, publicar, contagem de downloads).
-- **Regra dos pagos:** ligados a um produto e, se quiser, a uma variante (ex.: "Edição digital · PDF"). Descarrega quem tem sessão e comprou esse produto numa encomenda não cancelada e já paga, entregue ou confirmada (a regra da compra verificada). A encomenda é da conta pelo `customer_id`, ou pelo email da conta **só se estiver confirmado**.
+- **Regra dos pagos:** ligados a um produto e, se quiser, a uma variante (ex.: "Edição digital · PDF"). Descarrega quem tem sessão e comprou esse produto numa encomenda não cancelada e já paga, entregue ou confirmada (a regra da compra verificada). **Desde 2026-11-08, só paga** — ver [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md). A encomenda é da conta pelo `customer_id`, ou pelo email da conta **só se estiver confirmado**.
 - **Segurança:** os PDFs ficam no bucket **privado** `downloads` (só `application/pdf`, até 50 MB). O site chama `start_download` (confirma o acesso, conta) e pede um link temporário de 2 minutos; o Storage só o passa a quem `private.can_download` deixa. A lista pública é a função `downloads_list` (até à migração `leituras_publicas_por_funcoes`, a vista `downloads_public`), sem o caminho do ficheiro; o download tem limite de 30 por hora por conta ou por IP. A tabela só a lê e escreve quem tem `manage_catalog`.
 - **Migração `20261106200000_materiais_para_descarregar`, ainda não aplicada** (vai no merge, com as outras). Testada num Supabase local completo (`supabase start`, com API e Storage): o visitante descarrega o gratuito e recebe "Object not found" no pago; o comprador com a encomenda por pagar é recusado e, depois de paga, descarrega; a encomenda cancelada tira o acesso; outra conta e o email por confirmar são recusados; o cliente não envia ficheiros; HTML recusado pelo bucket; rascunhos só para a equipa; o contador não se edita à mão. No browser: download real pelo botão, painel a criar um material com o PDF enviado.
 - **Limites que ficam:** vender **só** o PDF faz-se com uma variante "Edição digital" no produto, mas o checkout continua a pedir levantamento ou entrega (não há encomenda só digital). A variante é guardada pelo índice: reordenar as variantes do produto muda qual dá acesso. Um link temporário, enquanto dura (2 min), abre para quem o tiver. Não há email "o seu PDF está pronto".

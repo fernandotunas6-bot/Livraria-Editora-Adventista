@@ -84,9 +84,15 @@ export default function DownloadItem({ item, product = null, compact = false }) 
                 : 'Vem com a compra deste produto, depois de paga.'}
             </p>
           ) : (
-            <Button size="sm" variant="outline" asChild disabled={!item.book_id}>
-              <Link to={`/product/${item.book_id}`}><ShoppingBag className="mr-1.5 h-4 w-4" />{action.label}</Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button size="sm" variant="outline" asChild disabled={!item.book_id}>
+                <Link to={`/product/${item.book_id}`}><ShoppingBag className="mr-1.5 h-4 w-4" />{action.label}</Link>
+              </Button>
+              {/* Quem já o comprou e ainda não pagou vê na biblioteca o que falta para abrir. */}
+              {isAuthed && (
+                <Link to="/profile?tab=biblioteca" className="text-xs font-medium text-primary hover:underline">Já comprou? Veja na sua biblioteca</Link>
+              )}
+            </div>
           ))}
         </div>
       </div>

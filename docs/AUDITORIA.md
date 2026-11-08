@@ -1838,3 +1838,43 @@ A migração `20261108150000_versoes_da_app` e a Edge Function vão juntas com o
 funciona antes delas: a página `/novidades` diz que ainda não há novidades, o painel explica que
 falta a migração, e o aviso de versão nova não precisa de nada do servidor (só do `version.json`
 do próprio build).
+
+## 9.18 Livros digitais: só abrem pagos, biblioteca e acessos (2026-11-08)
+
+Pedido do dono: "cada livro digital só pode ser descarregado se for pago; criar painel de abrir e
+ligar com o pagamento; tudo bem organizado, como os outros sistemas fazem". Guia e comparação com
+outras lojas em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md).
+
+**Como foi verificado.** 59 cenários novos em PGlite com as 104 migrações
+(`scripts/pglite/digitais.mjs`), com os pagamentos registados e confirmados pelas funções reais
+(`order_payment_report`, `order_payment_record`, `order_refund_record`); as suites que já existiam
+continuam certas (91 + 44 + 35 + 46 + 39). No browser, o build de produção com o Supabase simulado
+(Playwright, telemóvel e computador): a biblioteca, o "Descarregar" a pedir o acesso e o link
+temporário, o painel com os filtros, "Confirmar o pagamento" e o bloqueio — 11 verificações certas.
+`npm test` (1417), `npm run lint`, `npm run build` e `deno check`.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 146 | Loja | **Um livro digital pago abria sem pagamento.** A regra (`private.bought_product`) aceitava a encomenda paga, **ou entregue, ou com a recepção confirmada pelo cliente**. Uma encomenda entregue e por pagar — como a de 245 000 Kz da passagem dos pagamentos — dava os PDFs. | Alta | ✅ só `payment_status = 'paid'` (pagamentos confirmados pelo gateway ou por quem tem «Confirmar pagamentos»); fecha com o reembolso e o cancelamento |
+| 147 | Cliente | O separador "PDFs" só mostrava os livros já abertos: quem comprou e ainda não pagou não via a compra nem o que faltava para abrir. | Média | ✅ Perfil → Biblioteca com todos os livros comprados e o estado de cada um (por pagar, por confirmar, pago em parte com o que falta, disponível, reembolsado, bloqueado) e o caminho para pagar |
+| 148 | Cliente | Nada dizia ao cliente que o livro tinha aberto. | Baixa | ✅ aviso na conta "Livro digital disponível"; o email, o WhatsApp e o push de "Pagamento confirmado" dizem que está na biblioteca, com "Abrir a biblioteca" |
+| 149 | Equipa | A equipa não via quem tinha acesso a cada livro pago, nem o pagamento de cada compra, nem podia retirar um acesso. | Média | ✅ Catálogo → Materiais (PDF) → Acessos e pagamentos: compradores, pagamento, estado, downloads, filtros e procura; "Confirmar o pagamento" abre a encomenda; bloquear com motivo e desbloquear, no registo de segurança |
+| 150 | Equipa | Os downloads só tinham um contador geral por material: não se sabia quem abria nem quantas vezes. | Baixa | ✅ `download_events`: cada abertura e download de um livro pago, por pessoa |
+
+### Limites que ficam
+
+- O checkout ainda pede levantamento ou entrega para a edição digital (a fase seguinte, por decidir:
+  edições digitais sem envio, concluídas ao pagar; mexe em mais de 20 sítios do circuito da
+  encomenda).
+- Sem limite de downloads nem marca d'água com o nome do comprador (por decidir; o registo e o
+  bloqueio cobrem o abuso).
+- Um link temporário vale 2 minutos para quem o tiver (como antes).
+
+### Ordem de publicação
+
+A migração `20261108160000_livros_digitais` e a Edge Function vão juntas com o merge. Na janela entre
+o site novo e a migração, a Biblioteca aparece vazia e o painel explica que falta a migração; o
+download continua pela função antiga (com a regra antiga) até a migração entrar. A função
+`start_download` passa a ter um segundo argumento opcional, por isso o site antigo continua a chamá-la.

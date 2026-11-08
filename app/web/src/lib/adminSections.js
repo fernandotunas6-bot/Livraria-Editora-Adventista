@@ -13,7 +13,7 @@
 
 import {
   Activity, ArrowLeftRight, Award, Ban, Banknote, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, CalendarClock, Church,
-  ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, LayoutDashboard,
+  ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, KeyRound, LayoutDashboard,
   LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
@@ -73,10 +73,14 @@ export const ADMIN_SECTIONS = {
     allowed: (p) => p.catalog,
   },
   downloads: {
-    label: 'Materiais (PDF)', title: 'Materiais para descarregar', icon: FileDown,
-    keywords: 'pdf ficheiros materiais descarregar gratis',
-    description: 'PDFs gratuitos para todos, ou para quem comprou o produto. Aparecem em /materiais e na ficha do produto.',
+    label: 'Materiais (PDF)', title: 'Materiais e livros digitais', icon: FileDown,
+    keywords: 'pdf ficheiros materiais descarregar gratis livros digitais ebook edicao digital',
+    description: 'PDFs gratuitos para todos, ou livros digitais que abrem a quem comprou e pagou. Aparecem em /materiais, na ficha do produto e na biblioteca de cada cliente.',
     allowed: (p) => p.catalog,
+    views: [
+      { id: 'materiais', label: 'Materiais', icon: FileDown, keywords: 'carregar publicar ficheiro capa', description: 'Os PDFs: carregar, publicar, gratuitos ou ligados a um produto ou à sua edição digital.' },
+      { id: 'acessos', label: 'Acessos e pagamentos', icon: KeyRound, keywords: 'compradores biblioteca bloquear desbloquear confirmar pagamento abrir', description: 'Quem comprou cada livro digital, o pagamento e o acesso: abre com o pagamento confirmado; bloquear e desbloquear.' },
+    ],
   },
   producao: {
     label: 'Produção', title: 'Produção da Editora', icon: Factory,

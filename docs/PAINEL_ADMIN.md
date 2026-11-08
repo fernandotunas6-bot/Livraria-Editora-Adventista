@@ -174,7 +174,7 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | Grupo | Secção (`id`) | Quem vê |
 |---|---|---|
 | — | Início (`inicio`) | toda a equipa com acesso ao painel |
-| Catálogo | Produtos (`books`), Coleções (`collections`), Slider (`slides`), Materiais (`downloads`) | `manage_catalog` |
+| Catálogo | Produtos (`books`), Coleções (`collections`), Slider (`slides`), Materiais (`downloads`: vistas Materiais e Acessos e pagamentos — [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md)) | `manage_catalog` |
 | Vendas | Encomendas (`orders`), Acompanhamento (`acompanhamento`) | `manage_orders` |
 | | Equipas e alertas (`equipas`) | `manage_users` ou `manage_orders` |
 | | Métodos de pagamento (`payments`) | `manage_payments` |
