@@ -64,6 +64,15 @@ select private.check_list_add('public.customer_notifications', 'customer_notific
 select private.check_list_add('public.staff_notifications', 'staff_notifications_kind_check', 'kind', array['colporteur_delivery']);
 select private.check_list_add('public.colporteur_ledger', 'colporteur_ledger_kind_check', 'kind', array['taxa_entrega']);
 
+-- O registo de envios aceita o contexto dos avisos aos colportores (WhatsApp). Escrito por
+-- extenso, como em 20261107140000: o notificationContexts.test.ts lê a última definição.
+alter table public.notification_logs drop constraint if exists notification_logs_context_check;
+alter table public.notification_logs add constraint notification_logs_context_check
+  check (context = any (array[
+    'order', 'order_status', 'payment', 'receipt', 'account', 'welcome', 'test', 'contact', 'campaign',
+    'staff_alert', 'staff_summary', 'staff_report', 'support_reply', 'support_notice', 'thanks', 'colportagem'
+  ]));
+
 -- ---------------------------------------------------------------------------
 -- 1. Definições, colportores e encomendas
 -- ---------------------------------------------------------------------------
