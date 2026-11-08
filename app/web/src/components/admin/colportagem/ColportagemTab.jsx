@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AdminViewNav, useReportViewBadges, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import { useSignal } from '@/hooks/useSignal';
 import { useToast } from '@/hooks/use-toast';
 import { indexRegistry, loadRegistry } from '@/lib/churchRegistryApi';
-import { loadBooksForColportage, loadColporteurAdmin, loadOperations } from '@/lib/colporteurApi';
+import { loadBooksForColportage, loadColporteurAdmin, loadDeliveriesBoard, loadOperations } from '@/lib/colporteurApi';
 import { Spinner } from '@/components/admin/igreja/registryUi';
 import ColporteursPanel from './ColporteursPanel';
 import CommissionPanel from './CommissionPanel';
@@ -13,7 +14,7 @@ import ReportsPanel from './ReportsPanel';
 import GuidesPanel from './GuidesPanel';
 import { AccountsPanel, ReclassPanel } from './AccountsPanel';
 import SummaryPanel from './SummaryPanel';
-import DeliveriesPanel from './DeliveriesPanel';
+import DeliveriesPanel, { countToPrepare } from './DeliveriesPanel';
 
 const EMPTY_REG = { fields: [], districts: [], churches: [], pastors: [], assignments: [], provinces: [], municipalities: [] };
 
@@ -52,6 +53,16 @@ export default function ColportagemTab() {
   }, []);
   useEffect(() => { reload(); }, [reload]);
 
+  // O número na vista Entregas: os livros por preparar na loja, que pedem acção da equipa.
+  const [toPrepare, setToPrepare] = useState(0);
+  const loadToPrepare = useCallback(async () => {
+    try {
+      setToPrepare(countToPrepare((await loadDeliveriesBoard(7)).active));
+    } catch { /* o número é só uma ajuda: sem ele, a vista abre na mesma */ }
+  }, []);
+  useEffect(() => { loadToPrepare(); }, [loadToPrepare]);
+  useSignal('painel', ['entregas'], () => { loadToPrepare(); });
+
   const run = useCallback(async (fn, success) => {
     try {
       const out = await fn();
@@ -74,6 +85,7 @@ export default function ColportagemTab() {
   const viewBadges = {
     candidaturas: { count: pending, tone: 'warning' },
     relatorios: { count: toValidate, tone: 'warning' },
+    entregas: { count: toPrepare, tone: 'warning' },
     colportores: { count: active, tone: 'count' },
   };
   useReportViewBadges(sv, viewBadges);
@@ -106,7 +118,7 @@ export default function ColportagemTab() {
       {view === 'candidaturas' && <ColporteursPanel mode="candidaturas" {...props} />}
       {view === 'colportores' && <ColporteursPanel mode="colportores" {...props} />}
       {view === 'relatorios' && needsOps(<ReportsPanel {...opsProps} />)}
-      {view === 'entregas' && <DeliveriesPanel />}
+      {view === 'entregas' && <DeliveriesPanel onCount={setToPrepare} />}
       {view === 'guias' && needsOps(<GuidesPanel {...opsProps} />)}
       {view === 'contas' && needsOps(<AccountsPanel {...opsProps} />)}
       {view === 'reclassificacao' && needsOps(<ReclassPanel {...opsProps} />)}

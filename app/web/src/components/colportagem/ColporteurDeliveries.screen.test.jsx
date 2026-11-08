@@ -17,6 +17,11 @@ const api = vi.hoisted(() => ({
   loadOrderDeliveries: vi.fn(), handoverDelivery: vi.fn(), takeBackDelivery: vi.fn(),
 }));
 vi.mock('@/lib/colporteurApi', async (importOriginal) => ({ ...(await importOriginal()), ...api }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'perfil-1' } }) }));
+const signals = vi.hoisted(() => ({ byTopic: {} }));
+vi.mock('@/hooks/useSignal', () => ({
+  useSignal: (topic, events, cb) => { signals.byTopic[topic] = { events, fire: cb }; return false; },
+}));
 
 const { default: ColporteurDeliveries } = await import('./ColporteurDeliveries');
 const { default: OrderColporteurDelivery } = await import('@/components/admin/OrderColporteurDelivery');
@@ -92,6 +97,35 @@ describe('área do colportor: entregas', () => {
   });
 });
 
+describe('área do colportor: actualizar sozinha', () => {
+  it('um sinal na conta dele traz a oferta nova', async () => {
+    api.loadMyDeliveries.mockResolvedValueOnce({ ...MINE, deliveries: [] }).mockResolvedValueOnce(MINE);
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.textContent).not.toContain('ENC-1');
+    expect(signals.byTopic['conta:perfil-1'].events).toEqual(['entregas']);
+    await act(async () => signals.byTopic['conta:perfil-1'].fire());
+    expect(el.textContent).toContain('ENC-1 · Zango, Viana, Luanda');
+  });
+
+  it('uma falha a actualizar não apaga o ecrã nem a assinatura a meio', async () => {
+    const aceite = { ...MINE.deliveries[1], picked_up_at: new Date().toISOString() };
+    api.loadMyDeliveries.mockResolvedValueOnce({ ...MINE, deliveries: [aceite] }).mockRejectedValueOnce(new Error('Sem rede'));
+    const el = await mount(<ColporteurDeliveries />);
+    await act(async () => button(el, 'Entregue').click());
+    const canvas = el.querySelector('canvas');
+    expect(canvas).toBeTruthy();
+    await act(async () => signals.byTopic['conta:perfil-1'].fire());
+    expect(el.querySelector('canvas')).toBe(canvas);
+    expect(el.textContent).toContain('Maria Cliente');
+  });
+
+  it('sem dados nenhuns, mostra o erro', async () => {
+    api.loadMyDeliveries.mockRejectedValue(new Error('Sem acesso.'));
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.querySelector('[role="alert"]').textContent).toBe('Sem acesso.');
+  });
+});
+
 describe('painel: entrega por colportor da encomenda', () => {
   const colportor = { id: 'k1', name: 'Bento', code: 'CPT-0002', phone: '923111222' };
   it('aceite com os livros da loja: a equipa marca "Entregue ao colportor"', async () => {
@@ -103,6 +137,14 @@ describe('painel: entrega por colportor da encomenda', () => {
     expect(el.textContent).toContain('Entrega com Bento (CPT-0002)');
     await act(async () => button(el, 'Entregue ao colportor').click());
     expect(api.handoverDelivery).toHaveBeenCalledWith('d1');
+  });
+
+  it('um sinal de entregas actualiza o painel da encomenda', async () => {
+    api.loadOrderDeliveries.mockResolvedValue({ route: 'colportor', deliveries: [] });
+    await mount(<OrderColporteurDelivery order={{ id: 'z', payment_status: 'paid' }} />);
+    expect(signals.byTopic.painel.events).toEqual(['entregas']);
+    await act(async () => signals.byTopic.painel.fire());
+    expect(api.loadOrderDeliveries).toHaveBeenCalledTimes(2);
   });
 
   it('ninguém aceitou: a equipa entrega', async () => {

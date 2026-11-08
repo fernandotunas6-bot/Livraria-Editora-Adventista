@@ -8,18 +8,22 @@ vi.setConfig({ testTimeout: 30000 });
 
 const api = vi.hoisted(() => ({ loadDeliveriesBoard: vi.fn(), handoverDelivery: vi.fn() }));
 vi.mock('@/lib/colporteurApi', async (importOriginal) => ({ ...(await importOriginal()), ...api }));
+const signal = vi.hoisted(() => ({ topic: null, events: null, fire: null }));
+vi.mock('@/hooks/useSignal', () => ({
+  useSignal: (topic, events, cb) => { Object.assign(signal, { topic, events, fire: cb }); return false; },
+}));
 
-const { default: DeliveriesPanel, deliveryStage } = await import('./DeliveriesPanel');
+const { default: DeliveriesPanel, countToPrepare, deliveryStage } = await import('./DeliveriesPanel');
 const { kz } = await import('@/lib/colporteurCommission');
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root;
 let host;
-async function mount() {
+async function mount(props = {}) {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  await act(async () => root.render(<MemoryRouter><DeliveriesPanel /></MemoryRouter>));
+  await act(async () => root.render(<MemoryRouter><DeliveriesPanel {...props} /></MemoryRouter>));
   await act(async () => {});
   return host;
 }
@@ -88,6 +92,40 @@ describe('painel → Colportagem → Entregas', () => {
       select.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(api.loadDeliveriesBoard).toHaveBeenLastCalledWith(90);
+  });
+
+  it('um sinal de entregas actualiza o quadro, e diz quantas há por preparar', async () => {
+    api.loadDeliveriesBoard.mockResolvedValue(BOARD);
+    const onCount = vi.fn();
+    await mount({ onCount });
+    expect(signal.topic).toBe('painel');
+    expect(signal.events).toEqual(['entregas']);
+    expect(onCount).toHaveBeenLastCalledWith(1);
+    await act(async () => signal.fire());
+    expect(api.loadDeliveriesBoard).toHaveBeenCalledTimes(2);
+    expect(countToPrepare(BOARD.active)).toBe(1);
+    expect(countToPrepare()).toBe(0);
+  });
+
+  it('uma falha a actualizar mantém o quadro e avisa', async () => {
+    api.loadDeliveriesBoard.mockResolvedValueOnce(BOARD).mockRejectedValueOnce(new Error('Sem rede'));
+    const el = await mount();
+    await act(async () => signal.fire());
+    expect(el.textContent).toContain('ENC-2');
+    expect(el.querySelector('[role="alert"]').textContent).toContain('Sem rede');
+  });
+
+  it('uma resposta antiga não fica por cima da mais recente', async () => {
+    let answerOld;
+    api.loadDeliveriesBoard.mockResolvedValueOnce(BOARD);
+    const el = await mount();
+    api.loadDeliveriesBoard.mockReturnValueOnce(new Promise((resolve) => { answerOld = resolve; }));
+    api.loadDeliveriesBoard.mockResolvedValueOnce({ ...BOARD, to_team: [{ order_id: 'n', order_number: 'ENC-NOVA', place: 'Lobito', reason: '' }] });
+    await act(async () => { signal.fire(); });
+    await act(async () => signal.fire());
+    await act(async () => answerOld({ ...BOARD, to_team: [{ order_id: 'v', order_number: 'ENC-VELHA', place: 'Lobito', reason: '' }] }));
+    expect(el.textContent).toContain('ENC-NOVA');
+    expect(el.textContent).not.toContain('ENC-VELHA');
   });
 
   it('sem a migração, explica e deixa tentar de novo', async () => {

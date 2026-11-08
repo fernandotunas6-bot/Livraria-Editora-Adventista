@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108110000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores e o quadro da equipa).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão, ou porque o total baixou e o que já foi pago chega. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 
@@ -228,7 +228,7 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 
 **Onde se vê:**
 - área do colportor → Entregas: «Aceito fazer entregas», a localização («Registar a minha localização», só dentro de Angola), as ofertas com o tempo que falta, as entregas aceites e os últimos 30 dias;
-- painel → Colportagem → **Entregas** (`?tab=colportagem&vista=entregas`): o quadro da equipa. Os avisos «Preparar para o colportor» e «Entrega pela equipa» abrem-no.
+- painel → Colportagem → **Entregas** (`?tab=colportagem&vista=entregas`): o quadro da equipa. Os avisos «Preparar para o colportor» e «Entrega pela equipa» abrem-no. A vista mostra um número com as que há por preparar. O quadro, o painel da encomenda e a área do colportor actualizam-se sozinhos (sinal `entregas`, nos canais `painel` e `conta:<id>`) e, sem tempo real, de minuto a minuto.
   - Em curso, por esta ordem: primeiro as que é preciso preparar na loja (com «Entregue ao colportor» ali mesmo), depois as ofertas à espera, com o prazo, depois as que estão com o colportor.
   - As encomendas que ficaram com a equipa, com o motivo.
   - Por colportor, no período escolhido (7, 30, 90 ou 365 dias): oferecidas, entregues, recusadas, sem resposta, devolvidas, em curso e quanto ganhou. Exporta para Excel.
@@ -245,7 +245,7 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 - funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_deliveries_board` (o quadro; «Gerir encomendas» ou «Gerir colportores»), `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
 - rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
-- testes: 62 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
+- testes: 65 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
 ## Técnico
 

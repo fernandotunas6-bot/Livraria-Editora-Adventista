@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, Handshake, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSignal } from '@/hooks/useSignal';
 import { useToast } from '@/hooks/use-toast';
 import { CodeChip } from '@/components/admin/users/userFormat';
 import { DataTable, NativeSelect, Pill, Spinner, Toolbar } from '@/components/admin/igreja/registryUi';
@@ -21,27 +22,42 @@ export function deliveryStage(d) {
   return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: `livros entregues a ${when(d.picked_up_at)}` };
 }
 
+/** Quantas entregas pedem acção da equipa: os livros por preparar na loja. */
+export const countToPrepare = (active = []) => active.filter((d) => deliveryStage(d).key === 'prepare').length;
+
 /**
- * Colportagem → Entregas: o quadro das entregas por colportor (migração 20261108110000). O que a
+ * Colportagem → Entregas: o quadro das entregas por colportor (migração 20261108170000). O que a
  * equipa tem de preparar, as ofertas à espera, as entregas com os colportores, as encomendas que
- * ficaram com a equipa e, por colportor, quantas fez e quanto ganhou.
+ * ficaram com a equipa e, por colportor, quantas fez e quanto ganhou. Actualiza-se com os sinais em
+ * tempo real; sem eles, de minuto a minuto. `onCount` recebe quantas há por preparar.
  */
-export default function DeliveriesPanel() {
+export default function DeliveriesPanel({ onCount }) {
   const { toast } = useToast();
   const [days, setDays] = useState('30');
   const [board, setBoard] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
+  // Mudar de período depressa não deixa uma resposta antiga por cima da mais recente.
+  const lastRequest = useRef(0);
   const load = useCallback(async () => {
+    const request = ++lastRequest.current;
     try {
-      setBoard(await loadDeliveriesBoard(Number(days)));
+      const next = await loadDeliveriesBoard(Number(days));
+      if (request !== lastRequest.current) return;
+      setBoard(next);
       setError('');
+      onCount?.(countToPrepare(next.active));
     } catch (err) {
-      setError(err.message);
+      if (request === lastRequest.current) setError(err.message);
     }
-  }, [days]);
+  }, [days, onCount]);
   useEffect(() => { load(); }, [load]);
+  const live = useSignal('painel', ['entregas'], () => { load(); });
+  useEffect(() => {
+    const timer = setInterval(load, live ? 300000 : 60000);
+    return () => clearInterval(timer);
+  }, [load, live]);
 
   const handover = async (d) => {
     setBusy(d.id);
@@ -84,6 +100,7 @@ export default function DeliveriesPanel() {
           {Object.entries(PERIODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </NativeSelect>
         <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="mr-1.5 h-4 w-4" />Actualizar</Button>
+        {error && <p role="alert" className="text-xs text-destructive">Não foi possível actualizar: {error}</p>}
       </Toolbar>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

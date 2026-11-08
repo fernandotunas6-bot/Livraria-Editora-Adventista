@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/hooks/useAuth';
+import { useSignal } from '@/hooks/useSignal';
 import { useToast } from '@/hooks/use-toast';
 import SignaturePad from '@/components/SignaturePad';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import { kz } from '@/lib/colporteurCommission';
+import { accountTopic } from '@/lib/realtimeSignals';
 import {
   DELIVERY_OFFER_STATUS, deliveryStep, loadMyDeliveries, respondDelivery, setAcceptsDeliveries, setMyLocation,
 } from '@/lib/colporteurApi';
@@ -54,6 +57,8 @@ export default function ColporteurDeliveries({ onChanged }) {
   const [deliverForm, setDeliverForm] = useState(null);
   const [releaseForm, setReleaseForm] = useState(null);
   const signatureRef = useRef(null);
+  const { user } = useAuth();
+  const [, setClock] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +69,14 @@ export default function ColporteurDeliveries({ onChanged }) {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Ofertas novas e mudanças chegam por sinal; sem ele, de minuto a minuto. O relógio mantém certo o
+  // tempo que falta para aceitar.
+  const live = useSignal(accountTopic(user?.id), ['entregas'], () => { load(); });
+  useEffect(() => {
+    const refresh = setInterval(load, live ? 300000 : 60000);
+    const clock = setInterval(() => setClock((n) => n + 1), 30000);
+    return () => { clearInterval(refresh); clearInterval(clock); };
+  }, [load, live]);
 
   const run = async (key, fn, ok) => {
     setBusy(key);
@@ -100,7 +113,8 @@ export default function ColporteurDeliveries({ onChanged }) {
     );
   };
 
-  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>;
+  // Com dados no ecrã, uma falha a actualizar (rede fraca) não os tira, nem à assinatura a meio.
+  if (error && !data) return <p role="alert" className="text-sm text-destructive">{error}</p>;
   if (!data) return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> A carregar as entregas…</p>;
 
   const list = data.deliveries || [];

@@ -262,5 +262,23 @@ check('quadro: o período fica entre 1 e 366 dias', vazio.days === 1 && (await a
 await raises('quadro: o cliente não vê', () => asUser(cliente, `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
 await raises('quadro: o colportor não vê', () => asUser(perfil['CPT-0002'], `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
 
+// 9. Sinais em tempo real: ao painel e à conta do colportor, sem dados --------------------------------
+await db.exec(`create schema if not exists realtime;
+  create table public._sinais (topic text, event text, payload jsonb);
+  create function realtime.send(p_payload jsonb, p_event text, p_topic text, p_private boolean default true) returns void
+    language sql as $$ insert into public._sinais values (p_topic, p_event, p_payload) $$;`);
+const o12 = await encomenda();
+await pagar(o12);
+const d12 = await activa(o12);
+const dono12 = (await q(`select profile_id from public.colporteurs where id = $1`, [d12.colporteur_id]))[0].profile_id;
+const sinais = async () => (await q(`select topic, payload from public._sinais where event = 'entregas'`));
+let s12 = await sinais();
+check('oferta nova: sinal ao painel e à conta do colportor', s12.some((x) => x.topic === 'painel') && s12.some((x) => x.topic === `conta:${dono12}`), s12);
+check('o sinal não leva dados', s12.every((x) => JSON.stringify(x.payload) === '{}'), s12);
+await q(`delete from public._sinais`);
+await svc(`select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d12.id, dono12]);
+s12 = await sinais();
+check('resposta do colportor: novo sinal', s12.some((x) => x.topic === 'painel') && s12.some((x) => x.topic === `conta:${dono12}`), s12);
+
 console.log(`\n${ok} cenários certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);

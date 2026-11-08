@@ -15,6 +15,11 @@
 -- 4. O gatilho das entregas passa a comparar valores: a encomenda que fica paga porque o total
 --    baixou também vai a um colportor.
 -- 5. public.colporteur_deliveries_board: o quadro das entregas para a equipa.
+-- 6. Sinais em tempo real das entregas, para o quadro e a área do colportor se actualizarem sozinhos.
+--
+-- Reverter: drop dos gatilhos colporteur_deliveries_realtime_signal, das funções
+-- colporteur_deliveries_board e colporteur_delivery_complete e da coluna delivery_min_fee; repor as
+-- funções e o gatilho orders_entrega_colportor da 20261108100000.
 
 alter table public.colporteur_settings
   add column if not exists delivery_min_fee numeric(14,2) not null default 0;
@@ -362,3 +367,31 @@ end;
 $$;
 revoke all on function public.colporteur_deliveries_board(integer) from public, anon;
 grant execute on function public.colporteur_deliveries_board(integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Sinais em tempo real (ver 20261108132000): uma oferta, uma resposta ou um passo da entrega avisa
+-- o quadro da equipa e a área do colportor, que voltam a pedir os dados pelo caminho de sempre.
+-- O sinal não leva dados. Sem o serviço de tempo real perde-se, e a escrita segue.
+-- ---------------------------------------------------------------------------
+create or replace function private.colporteur_deliveries_realtime_signal()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_profile uuid;
+begin
+  perform private.realtime_signal('painel', 'entregas');
+  select profile_id into v_profile from public.colporteurs where id = new.colporteur_id;
+  if v_profile is not null then
+    perform private.realtime_signal('conta:' || v_profile::text, 'entregas');
+  end if;
+  return null;
+end;
+$$;
+revoke all on function private.colporteur_deliveries_realtime_signal() from public, anon, authenticated;
+drop trigger if exists colporteur_deliveries_realtime_signal on public.colporteur_deliveries;
+create trigger colporteur_deliveries_realtime_signal
+  after insert or update on public.colporteur_deliveries
+  for each row execute function private.colporteur_deliveries_realtime_signal();
