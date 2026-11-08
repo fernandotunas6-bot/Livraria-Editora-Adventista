@@ -1,5 +1,7 @@
-import React from 'react';
-import { ChevronRight, ExternalLink, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronRight, ExternalLink, RefreshCw, Search, WifiOff } from 'lucide-react';
+import { sinceLabel } from '@/hooks/useAutoRefresh';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -13,8 +15,40 @@ const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(n
  * Barra do topo do painel (as duas disposições): menu (barra lateral, ou a gaveta no telemóvel),
  * onde se está (grupo › secção), procurar (Ctrl+K), ver a loja e a conta.
  */
+/**
+ * Estado da sincronização: "Actualizado há 2 min" (carregar actualiza já), a rodar enquanto
+ * actualiza, e "Sem ligação" quando a rede cai — aí o que se gravar pode não chegar.
+ */
+function SyncStatus({ sync }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!sync) return null;
+  if (!sync.online) {
+    return (
+      <span role="status" className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-amber-500/15 px-3 text-xs font-medium text-amber-800 dark:text-amber-300">
+        <WifiOff className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden sm:inline">Sem ligação</span><span className="sr-only sm:hidden">Sem ligação</span>
+      </span>
+    );
+  }
+  const label = sync.syncing ? 'A actualizar…' : sync.lastSync ? `Actualizado ${sinceLabel(sync.lastSync, now)}` : 'Actualizar';
+  return (
+    <Button
+      type="button" variant="ghost" onClick={sync.refreshNow} disabled={sync.syncing}
+      className="h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground"
+      title="Actualizar agora (os dados actualizam-se sozinhos de minuto a minuto)"
+      aria-label={`${label}. Actualizar agora`}
+    >
+      <RefreshCw className={cn('h-4 w-4', sync.syncing && 'animate-spin')} aria-hidden="true" />
+      <span className="hidden xl:inline">{label}</span>
+    </Button>
+  );
+}
+
 export default function AdminTopBar({
-  current, layout, showTrigger, showBrand, onOpenSearch, user, roleLabel, onLayoutChange, onProfile, onLogout,
+  current, layout, showTrigger, showBrand, onOpenSearch, user, roleLabel, onLayoutChange, onProfile, onLogout, sync,
 }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-4 lg:px-6">
@@ -41,6 +75,7 @@ export default function AdminTopBar({
       </nav>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        <SyncStatus sync={sync} />
         <Button
           type="button" variant="outline" onClick={onOpenSearch}
           className="h-9 w-9 justify-center gap-2 px-0 text-muted-foreground sm:w-64 sm:justify-start sm:px-3"

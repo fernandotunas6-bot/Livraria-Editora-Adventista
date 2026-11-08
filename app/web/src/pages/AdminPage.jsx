@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { PRODUCT_TYPES, looksLikeProductCode, normalizeProductCode, orderItemTitle, productType, productTypeLabel } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,6 +28,7 @@ import AdminShell from '@/components/admin/shell/AdminShell';
 import AdminOverview from '@/components/admin/AdminOverview';
 import { adminPermissions, buildAdminNav, resolveSection } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
@@ -140,8 +141,11 @@ const AdminPage = () => {
   // Separadores no topo ou barra lateral: escolha de cada pessoa, neste aparelho.
   const { layout, setLayout, sidebarOpen, setSidebarOpen } = useAdminLayout(user?.id);
 
+  // Só a primeira carga mostra a espera; as seguintes (depois de gravar, ou a actualização
+  // automática) trocam os dados por baixo, sem a lista piscar nem perder o lugar.
+  const loadedOnce = useRef(false);
   const loadAll = useCallback(async () => {
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     try {
       // Os slides carrega-os o próprio separador (SlidesTab); aqui só serviam para o número no
       // nome do separador, que saiu.
@@ -156,11 +160,17 @@ const AdminPage = () => {
     } catch (err) {
       console.error(err);
     } finally {
+      loadedOnce.current = true;
       setLoading(false);
     }
   }, [canManageOrders, canManageCatalog]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos (de minuto a minuto com o
+  // painel à vista, ao voltar a ele, e quando a rede volta). Os números ao lado das secções e o
+  // Início acompanham, sem recarregar a página.
+  const sync = useAutoRefresh(loadAll, { intervalMs: 60_000, enabled: access === 'allow' });
+  const { markSynced } = sync;
+  useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
   const handleSaveBook = async (data) => {
     setSaving(true);
@@ -409,6 +419,8 @@ const AdminPage = () => {
   // A secção fica no endereço (/admin?tab=orders): os avisos, os emails e outras páginas
   // ligam directamente a uma. Sem secção, ou sem acesso a ela, abre o Início.
   const activeTab = resolveSection(nav, searchParams.get('tab'));
+  const currentSection = nav.flatMap((g) => g.items).find((i) => i.id === activeTab);
+  const attentionCount = canManageOrders ? pendingCount + awaitingPaymentCount : 0;
   const setActiveTab = (value) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev);
     next.set('tab', value);
@@ -463,8 +475,11 @@ const AdminPage = () => {
 
   return (
     <>
-      <Helmet><title>{pageTitle('Painel Admin')}</title></Helmet>
+      {/* O separador do navegador diz a secção e quantas encomendas pedem acção: com o painel
+          aberto noutro separador, vê-se de relance. */}
+      <Helmet><title>{pageTitle(`${attentionCount ? `(${attentionCount}) ` : ''}${currentSection?.label || 'Painel'} · Painel`)}</title></Helmet>
       <AdminShell
+        sync={sync}
         nav={nav}
         active={activeTab}
         onNavigate={goToSection}
@@ -479,6 +494,8 @@ const AdminPage = () => {
         actions={sectionActions}
         onSearchOrders={canManageOrders ? (q) => openOrders({ search: q }) : undefined}
         onSearchProducts={canManageCatalog ? (q) => openProducts({ search: q }) : undefined}
+        findProduct={canManageCatalog ? (code) => books.find((b) => normalizeProductCode(b.book_code) === code) || null : undefined}
+        onEditProduct={canManageCatalog ? (b) => { setActiveTab('books'); openEditBook(b); } : undefined}
         alerts={canManageOrders ? (
           // Encomendas novas e alertas urgentes, com som, para quem está na loja com o painel aberto.
           <Suspense fallback={null}>

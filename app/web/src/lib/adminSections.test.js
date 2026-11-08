@@ -110,6 +110,13 @@ describe('searchSections', () => {
     expect(searchSections(nav, 'relatorios').map((i) => i.id)).toEqual(['vendas-huambo', 'pagamentos-caixa', 'colportagem']);
   });
 
+  it('entende as palavras que as pessoas usam para a mesma coisa', () => {
+    expect(searchSections(nav, 'iban').map((i) => i.id)).toEqual(['payments']);
+    expect(searchSections(nav, 'faturação').map((i) => i.id)).toEqual(['vendas-huambo']);
+    expect(searchSections(nav, 'senha').map((i) => i.id)).toEqual(['users']);
+    expect(searchSections(nav, 'banner').map((i) => i.id)).toEqual(['slides', 'notices']);
+  });
+
   it('várias palavras têm de estar todas; vazio devolve tudo', () => {
     expect(searchSections(nav, 'faixa aviso').map((i) => i.id)).toEqual(['notices']);
     expect(searchSections(nav, '  ')).toHaveLength(flattenNav(nav).length);

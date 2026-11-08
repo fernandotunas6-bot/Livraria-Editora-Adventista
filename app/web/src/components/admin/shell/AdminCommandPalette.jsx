@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { PackageSearch, ShoppingBag } from 'lucide-react';
+import { History, Mail, PackageSearch, Pencil, Phone, ShoppingBag } from 'lucide-react';
+import { detectQuery } from '@/lib/adminSearch';
+import { findSection } from '@/lib/adminSections';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import AdminNavBadge from '@/components/admin/shell/AdminNavBadge';
@@ -9,7 +11,9 @@ import AdminNavBadge from '@/components/admin/shell/AdminNavBadge';
  * e procurar logo uma encomenda (número, cliente, telefone) ou um produto (título, código).
  * Com 22 secções em 7 grupos, é o caminho mais curto — e o mesmo nas duas disposições.
  */
-export default function AdminCommandPalette({ open, onOpenChange, nav, onNavigate, onSearchOrders, onSearchProducts }) {
+export default function AdminCommandPalette({
+  open, onOpenChange, nav, onNavigate, onSearchOrders, onSearchProducts, recents = [], findProduct, onEditProduct,
+}) {
   const [query, setQuery] = useState('');
   useEffect(() => { if (!open) setQuery(''); }, [open]);
 
@@ -30,6 +34,10 @@ export default function AdminCommandPalette({ open, onOpenChange, nav, onNavigat
     fn();
   };
   const term = query.trim();
+  // O que se escreveu: um código de produto, um número de encomenda, um email, um telefone?
+  const detected = detectQuery(term);
+  const product = detected.kind === 'product' && findProduct ? findProduct(detected.value) : null;
+  const recentItems = recents.map((id) => findSection(nav, id)).filter(Boolean);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,7 +56,49 @@ export default function AdminCommandPalette({ open, onOpenChange, nav, onNavigat
           <CommandInput value={query} onValueChange={setQuery} placeholder="Secção, nº de encomenda, cliente ou produto…" />
           <CommandList className="max-h-[60vh]">
             <CommandEmpty>Nenhuma secção com esse nome.</CommandEmpty>
-            {term && (onSearchOrders || onSearchProducts) && (
+            {/* Reconhecido: a acção certa primeiro. */}
+            {detected.kind === 'product' && (product && onEditProduct ? (
+              <CommandGroup heading="Ir directamente">
+                <CommandItem value={`acao:produto ${detected.value}`} onSelect={() => run(() => onEditProduct(product))}>
+                  <Pencil className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="truncate">Editar {detected.value} · {product.title}</span>
+                </CommandItem>
+              </CommandGroup>
+            ) : onSearchProducts && (
+              <CommandGroup heading="Ir directamente">
+                <CommandItem value={`acao:produto ${detected.value}`} onSelect={() => run(() => onSearchProducts(detected.value))}>
+                  <PackageSearch className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  Produtos com o código {detected.value}
+                </CommandItem>
+              </CommandGroup>
+            ))}
+            {['order', 'email', 'phone'].includes(detected.kind) && onSearchOrders && (
+              <CommandGroup heading="Ir directamente">
+                <CommandItem value={`acao:encomenda ${detected.value}`} onSelect={() => run(() => onSearchOrders(detected.value))}>
+                  {detected.kind === 'email' ? <Mail className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    : detected.kind === 'phone' ? <Phone className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      : <ShoppingBag className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+                  {detected.kind === 'order' ? `Abrir a encomenda ${detected.value}`
+                    : detected.kind === 'email' ? `Encomendas de ${detected.value}`
+                      : `Encomendas do telefone ${detected.value}`}
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {!term && recentItems.length > 0 && (
+              <CommandGroup heading="Recentes">
+                {recentItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <CommandItem key={`recente-${item.id}`} value={`recente ${item.label}`} onSelect={() => run(() => onNavigate(item.id))}>
+                      <History className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Icon className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <span className="flex-1 truncate">{item.label}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
+            {detected.kind === 'text' && (onSearchOrders || onSearchProducts) && (
               <CommandGroup heading="Procurar">
                 {onSearchOrders && (
                   <CommandItem value={`acao:encomendas ${term}`} onSelect={() => run(() => onSearchOrders(term))}>
@@ -72,7 +122,7 @@ export default function AdminCommandPalette({ open, onOpenChange, nav, onNavigat
                     <CommandItem
                       key={item.id}
                       value={`${item.label} ${item.title}`}
-                      keywords={[item.description, group.label]}
+                      keywords={[item.description, group.label, item.keywords]}
                       onSelect={() => run(() => onNavigate(item.id))}
                     >
                       <Icon className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />

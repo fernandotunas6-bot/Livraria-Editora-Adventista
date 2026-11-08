@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, Clock, ExternalLink, MessageCircle, PackageSearch, PanelTop, Plus,
-  ShoppingBag, Wallet,
+  AlertTriangle, ArrowRight, CheckCircle2, Clock, ExternalLink, Info, MessageCircle, PackageSearch, PanelTop, Plus,
+  ShoppingBag, Siren, Wallet,
 } from 'lucide-react';
+import { attentionItems } from '@/lib/adminAttention';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { formatOrderNumber, getOrderStatusColor, getOrderStatusLabel } from '@/lib/orderUtils';
@@ -53,6 +54,54 @@ function StatCard({ icon: Icon, label, value, hint, tone = 'default', onClick })
   );
 }
 
+const SEVERITY = {
+  critical: { icon: Siren, row: 'border-l-red-600', iconCls: 'text-red-600', label: 'Urgente' },
+  warning: { icon: AlertTriangle, row: 'border-l-amber-500', iconCls: 'text-amber-600', label: 'A tratar' },
+  info: { icon: Info, row: 'border-l-primary/60', iconCls: 'text-primary', label: 'Sugestão' },
+};
+
+/**
+ * "Precisa de atenção": as situações que pioram se ninguém fizer nada (lib/adminAttention.js),
+ * por ordem de urgência, cada uma com o caminho para a resolver. Sem nenhuma, diz que está tudo
+ * em dia — também é informação.
+ */
+function AttentionList({ items, onAct, loading }) {
+  if (loading) return null;
+  if (!items.length) {
+    return (
+      <p className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200" role="status">
+        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> Tudo em dia: nada atrasado nas encomendas, nos pagamentos nem no catálogo.
+      </p>
+    );
+  }
+  return (
+    <section aria-labelledby="painel-atencao" className="rounded-xl border border-border bg-card shadow-sm">
+      <h2 id="painel-atencao" className="border-b border-border px-4 py-3 font-sans text-sm font-semibold tracking-normal text-foreground">
+        Precisa de atenção <span className="font-normal text-muted-foreground">({items.length})</span>
+      </h2>
+      <ul className="divide-y divide-border">
+        {items.map((item) => {
+          const sev = SEVERITY[item.severity] || SEVERITY.info;
+          const Icon = sev.icon;
+          return (
+            <li key={item.id} className={cn('flex items-start gap-3 border-l-4 px-4 py-3', sev.row)}>
+              <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', sev.iconCls)} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="sr-only">{sev.label}: </span>
+                <span className="block text-sm font-medium text-foreground">{item.title}</span>
+                <span className="block text-xs text-muted-foreground">{item.detail}</span>
+              </span>
+              <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => onAct(item.action)}>
+                Ver <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function Panel({ title, action, children }) {
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm" aria-label={title}>
@@ -86,6 +135,11 @@ export default function AdminOverview({
   const month = active.filter((o) => Date.parse(o.created) >= since);
   const monthTotal = month.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const recent = orders.slice(0, 6);
+  const attention = useMemo(() => attentionItems({ orders, books, perms }), [orders, books, perms]);
+  const act = (action) => {
+    if (action.section === 'orders') onOpenOrders({ status: action.status, payment: action.payment });
+    else onNavigate(action.section, { filter: action.filter });
+  };
 
   return (
     <div className="space-y-6">
@@ -93,6 +147,8 @@ export default function AdminOverview({
         {firstName ? <>Olá, <strong className="font-medium text-foreground">{firstName}</strong>. </> : null}
         {today}.
       </p>
+
+      <AttentionList items={attention} onAct={act} loading={loading} />
 
       {perms.orders && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Indicadores">

@@ -6,6 +6,7 @@ import AdminSidebarNav from '@/components/admin/shell/AdminSidebarNav';
 import AdminSectionHeader from '@/components/admin/shell/AdminSectionHeader';
 import AdminCommandPalette from '@/components/admin/shell/AdminCommandPalette';
 import { findSection } from '@/lib/adminSections';
+import { pushRecentSection, readRecentSections } from '@/lib/adminSearch';
 
 /**
  * A estrutura do painel, nas duas disposições (ver docs/PAINEL_ADMIN.md):
@@ -28,7 +29,7 @@ export default function AdminShell(props) {
 
 function ShellBody({
   nav, active, onNavigate, layout, onLayoutChange, user, roleLabel, onProfile, onLogout,
-  alerts, actions, onSearchOrders, onSearchProducts, children,
+  alerts, actions, onSearchOrders, onSearchProducts, sync, findProduct, onEditProduct, children,
 }) {
   const { isMobile } = useSidebar();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -43,6 +44,13 @@ function ShellBody({
     window.scrollTo({ top: 0, behavior: 'instant' });
     headingRef.current?.focus({ preventScroll: true });
   }, [active]);
+
+  // As secções abertas há pouco (por pessoa), para a procura vazia começar por elas. A que está
+  // aberta não conta: já se está lá.
+  const [recents, setRecents] = useState(() => readRecentSections(user?.id));
+  useEffect(() => {
+    if (active && active !== 'inicio') setRecents(pushRecentSection(user?.id, active));
+  }, [active, user?.id]);
 
   const sidebarLayout = layout === 'sidebar';
   const showSidebar = sidebarLayout || isMobile;
@@ -68,6 +76,7 @@ function ShellBody({
           showTrigger={sidebarLayout || isMobile}
           showBrand={!sidebarLayout || isMobile}
           onOpenSearch={() => setSearchOpen(true)}
+          sync={sync}
           user={user} roleLabel={roleLabel}
           onLayoutChange={onLayoutChange} onProfile={onProfile} onLogout={onLogout}
         />
@@ -89,6 +98,8 @@ function ShellBody({
         open={searchOpen} onOpenChange={setSearchOpen}
         nav={nav} onNavigate={onNavigate}
         onSearchOrders={onSearchOrders} onSearchProducts={onSearchProducts}
+        recents={recents.filter((id) => id !== active)}
+        findProduct={findProduct} onEditProduct={onEditProduct}
       />
     </>
   );
