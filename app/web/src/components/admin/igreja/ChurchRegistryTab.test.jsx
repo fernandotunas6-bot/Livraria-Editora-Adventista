@@ -57,7 +57,8 @@ describe('ChurchRegistryTab', () => {
   it('carrega o registo e mostra o resumo por província', async () => {
     api.loadRegistry.mockResolvedValue(REG);
     const el = await mount(<ChurchRegistryTab />);
-    expect(el.textContent).toContain('Registo da Igreja');
+    // O título está no cabeçalho do painel (lib/adminSections.js); aqui diz se pode editar.
+    expect(el.textContent).toContain('Pode editar.');
     expect(el.textContent).toContain('Distritos (2)');
     expect(el.textContent).toContain('Importar');
     const rows = [...el.querySelectorAll('tbody tr')].map((tr) => tr.textContent);

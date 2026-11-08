@@ -138,7 +138,8 @@ export default function StaffAlertBar({ onOpen }) {
             {a.severity === 'critical' ? <Siren className="h-4 w-4 shrink-0 text-destructive" /> : <BellRing className="h-4 w-4 shrink-0 text-amber-600" />}
             <span className="min-w-0 flex-1">
               <span className="font-semibold">{a.title}</span>
-              <span className="ml-2 text-muted-foreground">{a.body}</span>
+              {/* No telemóvel, três linhas do texto (o título já diz o essencial). */}
+              <span className="ml-2 text-muted-foreground max-sm:line-clamp-3">{a.body}</span>
             </span>
             {a.kind === 'new_order' && a.order_id ? (
               <button

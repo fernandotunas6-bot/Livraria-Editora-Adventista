@@ -312,13 +312,9 @@ export default function SlidesTab({ onChange }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Slides: homepage e loja</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            O slide <strong>principal</strong> aparece sempre primeiro; os outros seguem a ordem da lista. {liveCount} no ar.
-          </p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui o estado e as acções. */}
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <p className="text-sm text-muted-foreground"><strong className="font-semibold text-foreground">{liveCount}</strong> no ar agora.</p>
         <Button className="btn-primary shrink-0" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-2" /> Novo slide
         </Button>
@@ -331,7 +327,9 @@ export default function SlidesTab({ onChange }) {
         </div>
       )}
 
-      <div className="grid gap-3">
+      {/* minmax(0, 1fr): sem isto a coluna não encolhia abaixo do título mais comprido (que
+          não parte), e no telemóvel cada cartão saía 60 px para fora do ecrã. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
         {slides.map((s, i) => {
           const status = slideStatus(s);
           const thumb = s.image || s.book_cover;
@@ -353,7 +351,7 @@ export default function SlidesTab({ onChange }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-semibold truncate">{s.title}</h3>
-                  {s.is_primary && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1"><Crown className="h-3 w-3" /> Principal</span>}
+                  {s.is_primary && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1"><Crown className="h-3 w-3" /> Principal</span>}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-marca/10 text-primary font-medium">
                     {SLIDE_TEMPLATES.find((t) => t.id === (s.template || 'classic'))?.label || 'Clássico'}
                   </span>
@@ -369,7 +367,7 @@ export default function SlidesTab({ onChange }) {
                   {s.book_id && (() => {
                     const b = books.find((x) => x.id === s.book_id);
                     return b && s.promo_price != null && s.promo_price !== '' && Number(s.promo_price) !== effectivePrice(b)
-                      ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400">Preço diferente do livro</span>
+                      ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">Preço diferente do livro</span>
                       : null;
                   })()}
                 </div>

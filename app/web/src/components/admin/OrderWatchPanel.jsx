@@ -102,13 +102,9 @@ export default function OrderWatchPanel({ onOpenOrder }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Acompanhamento das encomendas</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Encomendas por assumir, cada passo, os atrasos e os problemas dos clientes. Verificado de 10 em 10 minutos; resumo por email às 07:29.
-          </p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui as acções. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">Resumo por email todos os dias às 07:29.</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => run(false)} disabled={!!busy}>
             {busy === 'run' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Verificar agora

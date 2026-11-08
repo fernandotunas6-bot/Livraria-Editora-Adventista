@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -324,7 +323,7 @@ export default function UsersModule() {
           <Button variant="outline" onClick={exportCsv} disabled={exporting || !data.total} title="Exportar a lista filtrada">
             {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Exportar
           </Button>
-          <Button variant="outline" size="icon" onClick={load} title="Recarregar">
+          <Button variant="outline" size="icon" onClick={load} title="Recarregar" aria-label="Recarregar a lista">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Button onClick={() => openCreate(null)}><Plus className="h-4 w-4 mr-1" />Nova conta</Button>
@@ -339,18 +338,27 @@ export default function UsersModule() {
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <Tabs value={scope} onValueChange={changeScope}>
-          <TabsList>
-            <TabsTrigger value="customers">Clientes</TabsTrigger>
-            <TabsTrigger value="team">Equipa</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Clientes ou equipa: um interruptor de duas posições sobre a mesma tabela (antes eram
+            separadores sem painel, e os leitores de ecrã anunciavam um painel que não existia). */}
+        <div role="group" aria-label="Mostrar" className="inline-flex h-9 w-fit shrink-0 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+          {[['customers', 'Clientes'], ['team', 'Equipa']].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={scope === value}
+              onClick={() => changeScope(value)}
+              className={`inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${scope === value ? 'bg-background text-foreground shadow' : 'hover:text-foreground'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome, email, telefone ou código (CLI-, FUN-)…" className="pl-9" />
+          <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar por nome, email, telefone ou código (CLI-, FUN-)…" className="pl-9" aria-label="Pesquisar utilizadores" />
         </div>
         <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-          <SelectTrigger className="w-full lg:w-[190px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full lg:w-[190px]" aria-label="Estado"><SelectValue /></SelectTrigger>
           <SelectContent>
             {STATUS_FILTERS[scope].map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
           </SelectContent>
@@ -410,7 +418,7 @@ export default function UsersModule() {
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busyId === (u.id || u.email)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busyId === (u.id || u.email)} aria-label={`Acções para ${u.name || u.email || 'este utilizador'}`}>
                           {busyId === (u.id || u.email) ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                         </Button>
                       </DropdownMenuTrigger>
@@ -487,6 +495,7 @@ export default function UsersModule() {
               variant="outline"
               size="icon"
               title="Copiar"
+              aria-label="Copiar o link"
               onClick={() => navigator.clipboard?.writeText(accessInfo?.link || '').then(() => toast({ title: 'Link copiado' }))}
             >
               <Copy className="h-4 w-4" />

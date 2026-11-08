@@ -106,13 +106,9 @@ export default function NoticesTab() {
 
   return (
     <div className="space-y-4">
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui as acções. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Faixa de aviso</h2>
-          <p className="text-sm text-muted-foreground">
-            Um aviso curto no topo de todas as páginas da loja. Aparece um de cada vez: urgente, depois promoção, depois informação.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">Aparece um de cada vez: urgente, depois promoção, depois informação.</p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar

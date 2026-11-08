@@ -278,15 +278,9 @@ export default function StoresTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-start gap-4">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Store className="h-6 w-6 text-primary" /> Lojas físicas
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Aparecem na página <a href="/lojas" target="_blank" rel="noreferrer" className="text-primary hover:underline">/lojas</a>, no rodapé, no menu e no levantamento do checkout.
-          </p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui as acções. */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <a href="/lojas" target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">Ver a página /lojas</a>
         <Button className="btn-primary shrink-0" onClick={openCreate} type="button">
           <Plus className="h-4 w-4 mr-2" /> Nova loja
         </Button>
@@ -315,10 +309,10 @@ export default function StoresTab() {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome, morada, telefone…" className="pl-9" />
+          <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome, morada, telefone…" className="pl-9" aria-label="Pesquisar lojas" />
         </div>
         <Select value={province} onValueChange={setProvince}>
-          <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[190px]" aria-label="Província"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as províncias</SelectItem>
             {usedProvinces.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}

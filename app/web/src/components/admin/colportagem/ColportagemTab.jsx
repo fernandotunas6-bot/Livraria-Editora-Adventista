@@ -81,11 +81,9 @@ export default function ColportagemTab() {
   const toValidate = ops ? ops.reports.filter((r) => r.status === 'enviado').length : 0;
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-xl font-bold">Colportagem</h2>
-          <p className="text-sm text-muted-foreground">{active} colportores activos · {pending} candidaturas por decidir</p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui os números e as acções. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground"><strong className="font-semibold text-foreground">{active}</strong> colportores activos · <strong className="font-semibold text-foreground">{pending}</strong> candidaturas por decidir</p>
         <Button variant="ghost" size="sm" onClick={reload}><RefreshCw className="mr-1.5 h-4 w-4" />Actualizar</Button>
       </div>
       <Tabs value={tab ?? (pending > 0 ? 'candidaturas' : 'resumo')} onValueChange={setTab}>

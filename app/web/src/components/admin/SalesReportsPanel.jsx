@@ -93,9 +93,9 @@ export default function SalesReportsPanel({ orders }) {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Canal</Label>
+          <Label className="text-xs" id="relatorio-canal">Canal</Label>
           <Select value={channel} onValueChange={setChannel}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9" aria-labelledby="relatorio-canal"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="online">Compra Online</SelectItem>
@@ -104,9 +104,9 @@ export default function SalesReportsPanel({ orders }) {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Estado</Label>
+          <Label className="text-xs" id="relatorio-estado">Estado</Label>
           <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9" aria-labelledby="relatorio-estado"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
@@ -117,12 +117,12 @@ export default function SalesReportsPanel({ orders }) {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" /> De</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+          <Label htmlFor="relatorio-de" className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" aria-hidden="true" /> De</Label>
+          <Input id="relatorio-de" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Até</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+          <Label htmlFor="relatorio-ate" className="text-xs">Até</Label>
+          <Input id="relatorio-ate" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
         </div>
         {hasFilters && (
           <div className="sm:col-span-2 lg:col-span-5">

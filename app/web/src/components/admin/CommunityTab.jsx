@@ -129,10 +129,7 @@ export default function CommunityTab() {
   const [section, setSection] = useState('denuncias');
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Comunidade</h2>
-        <p className="text-sm text-muted-foreground">Moderar, destacar e organizar a comunidade de leitores.</p>
-      </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js). */}
       <Tabs value={section} onValueChange={setSection}>
         <TabsList className="h-auto flex-wrap justify-start">
           {SECTIONS.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}

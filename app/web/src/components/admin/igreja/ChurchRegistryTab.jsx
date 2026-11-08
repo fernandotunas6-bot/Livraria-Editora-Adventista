@@ -65,11 +65,9 @@ export default function ChurchRegistryTab() {
   const props = { reg, idx, canEdit, run };
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-xl font-bold">Registo da Igreja</h2>
-          <p className="text-sm text-muted-foreground">Campos, distritos, igrejas e pastores, por província e município.{!canEdit && ' Só leitura.'}</p>
-        </div>
+      {/* Título e descrição no cabeçalho do painel (lib/adminSections.js); aqui o acesso e as acções. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">{canEdit ? 'Pode editar.' : 'Só leitura: para alterar, peça a quem gere o registo da Igreja.'}</p>
         <Button variant="ghost" size="sm" onClick={reload}><RefreshCw className="mr-1.5 h-4 w-4" />Actualizar</Button>
       </div>
       <Tabs value={tab} onValueChange={setTab}>
