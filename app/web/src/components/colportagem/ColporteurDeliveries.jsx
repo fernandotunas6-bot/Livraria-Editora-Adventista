@@ -289,7 +289,10 @@ export default function ColporteurDeliveries({ onChanged }) {
           <ul className="divide-y divide-border text-sm">
             {past.map((d) => (
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                <span>{d.order_number} · {d.place}</span>
+                <span>
+                  {d.order_number} · {d.place}
+                  {d.reason && d.status !== 'delivered' && <span className="block text-xs text-muted-foreground">{d.reason}</span>}
+                </span>
                 <span className="flex items-center gap-2">
                   {d.status === 'delivered' && Number(d.fee) > 0 && <span className="tabular-nums text-emerald-700 dark:text-emerald-400">+{kz(d.fee)}</span>}
                   <Pill tone={(DELIVERY_OFFER_STATUS[d.status] || DELIVERY_OFFER_STATUS.cancelled).tone}>{(DELIVERY_OFFER_STATUS[d.status] || {}).label || d.status}</Pill>

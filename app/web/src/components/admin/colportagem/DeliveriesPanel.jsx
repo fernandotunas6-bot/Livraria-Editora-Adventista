@@ -14,12 +14,23 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString('pt-AO', { dateStyle: 
 const PERIODS = { 7: 'Últimos 7 dias', 30: 'Últimos 30 dias', 90: 'Últimos 3 meses', 365: 'Último ano' };
 const orderHref = (number) => `/admin?tab=orders&encomenda=${encodeURIComponent(number)}`;
 
+/** Há quanto tempo: «há 3 h», «há 2 dias». */
+export function since(iso, now = Date.now()) {
+  if (!iso) return '';
+  const hours = Math.floor((now - new Date(iso).getTime()) / 3600000);
+  if (hours < 1) return 'há menos de 1 h';
+  if (hours < 48) return `há ${hours} h`;
+  return `há ${Math.floor(hours / 24)} dias`;
+}
+
 /** Em que ponto está uma entrega em curso, do ponto de vista da equipa. */
 export function deliveryStage(d) {
   if (d.status === 'offered') return { key: 'waiting', tone: 'amber', label: 'À espera de resposta', detail: d.expires_at ? `até ${when(d.expires_at)}` : '' };
-  if (d.source === 'loja' && !d.picked_up_at) return { key: 'prepare', tone: 'red', label: 'Preparar na loja', detail: 'levanta os livros na loja' };
-  if (d.source === 'stock') return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: 'com livros à consignação' };
-  return { key: 'out', tone: 'blue', label: 'Com o colportor', detail: `livros entregues a ${when(d.picked_up_at)}` };
+  const accepted = d.responded_at ? ` · aceite ${since(d.responded_at)}` : '';
+  if (d.source === 'loja' && !d.picked_up_at) return { key: 'prepare', tone: 'red', label: 'Preparar na loja', detail: `levanta os livros na loja${accepted}` };
+  const label = d.delivery_status === 'out_for_delivery' ? 'A caminho do cliente' : 'Com o colportor';
+  if (d.source === 'stock') return { key: 'out', tone: 'blue', label, detail: `com livros à consignação${accepted}` };
+  return { key: 'out', tone: 'blue', label, detail: `livros entregues a ${when(d.picked_up_at)}` };
 }
 
 /** Quantas entregas pedem acção da equipa: os livros por preparar na loja. */

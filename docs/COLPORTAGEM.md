@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) e `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão, ou porque o total baixou e o que já foi pago chega. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 
@@ -226,8 +226,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
   - Se a guia não se puder fazer (por exemplo, já não tem os livros à consignação), fica também «libertada», e a equipa resolve à mão.
 - «Não posso entregar» (antes de levantar os livros na loja) devolve a entrega, que passa ao seguinte. A equipa pode **«Retirar ao colportor»** a qualquer momento, com o motivo, e passa a ser ela a entregar. Cancelar a encomenda cancela a entrega e avisa o colportor.
 
+**Se a encomenda deixar de estar paga** (reembolso) com a entrega em curso, a entrega fecha como «Cancelada», sem portes, e o colportor e a equipa são avisados. Se ele já tinha os livros da loja, ou a encomenda já saiu, o aviso à equipa é urgente e a encomenda fica com ela. Se voltar a ficar paga antes de sair, vai ao colportor seguinte. Uma entrega já feita não muda.
+
+**Se o colportor deixar de estar activo** (suspenso, inactivo ou sem conta), as entregas dele fecham como «Devolvida» e deixa de ver os dados do cliente. Uma oferta, ou uma entrega que ainda não saiu, passa logo ao colportor seguinte. A que já saiu ou tem os livros da loja com ele fica com a equipa, com aviso urgente para os recuperar.
+
 **Onde se vê:**
-- área do colportor → Entregas: «Aceito fazer entregas», a localização («Registar a minha localização», só dentro de Angola), as ofertas com o tempo que falta, as entregas aceites e os últimos 30 dias;
+- área do colportor → Entregas: «Aceito fazer entregas», a localização («Registar a minha localização», só dentro de Angola), as ofertas com o tempo que falta, as entregas aceites e os últimos 30 dias, com o motivo de cada uma que fechou;
 - painel → Colportagem → **Entregas** (`?tab=colportagem&vista=entregas`): o quadro da equipa. Os avisos «Preparar para o colportor» e «Entrega pela equipa» abrem-no. A vista mostra um número com as que há por preparar. O quadro, o painel da encomenda e a área do colportor actualizam-se sozinhos (sinal `entregas`, nos canais `painel` e `conta:<id>`) e, sem tempo real, de minuto a minuto.
   - Em curso, por esta ordem: primeiro as que é preciso preparar na loja (com «Entregue ao colportor» ali mesmo), depois as ofertas à espera, com o prazo, depois as que estão com o colportor.
   - As encomendas que ficaram com a equipa, com o motivo.
@@ -240,12 +244,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 **Técnico:**
 - tabela `colporteur_deliveries` (uma oferta activa por encomenda; RLS: a equipa e o próprio);
 - `orders.delivery_route` e `orders.delivery_colporteur_id`;
-- `private.delivery_candidates`, `private.offer_next_delivery` e o gatilho `orders_entrega_colportor`;
+- `private.delivery_candidates`, `private.offer_next_delivery` e os gatilhos `orders_entrega_colportor`, `orders_entrega_sem_pagamento` e `colporteurs_entregas_fecham`;
 - `private.colporteur_delivery_complete` (a guia, os portes e o fecho, usada pelo colportor e pelo gatilho; o passo do colportor liga `app.colporteur_step` para o gatilho não fechar a entrega duas vezes);
 - funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_deliveries_board` (o quadro; «Gerir encomendas» ou «Gerir colportores»), `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
 - rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
-- testes: 65 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
+- testes: 87 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
 ## Técnico
 

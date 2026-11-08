@@ -13,7 +13,7 @@ vi.mock('@/hooks/useSignal', () => ({
   useSignal: (topic, events, cb) => { Object.assign(signal, { topic, events, fire: cb }); return false; },
 }));
 
-const { default: DeliveriesPanel, countToPrepare, deliveryStage } = await import('./DeliveriesPanel');
+const { default: DeliveriesPanel, countToPrepare, deliveryStage, since } = await import('./DeliveriesPanel');
 const { kz } = await import('@/lib/colporteurCommission');
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -50,6 +50,18 @@ describe('em que ponto está cada entrega', () => {
     expect(deliveryStage({ status: 'accepted', source: 'loja', picked_up_at: null }).key).toBe('prepare');
     expect(deliveryStage({ status: 'accepted', source: 'loja', picked_up_at: '2026-11-08T10:00:00Z' }).key).toBe('out');
     expect(deliveryStage({ status: 'accepted', source: 'stock' }).detail).toBe('com livros à consignação');
+  });
+
+  it('a caminho do cliente, e há quanto tempo foi aceite', () => {
+    expect(deliveryStage({ status: 'accepted', source: 'stock', delivery_status: 'out_for_delivery' }).label).toBe('A caminho do cliente');
+    expect(deliveryStage({ status: 'accepted', source: 'stock', delivery_status: 'confirmed' }).label).toBe('Com o colportor');
+    const horas = new Date(Date.now() - 3 * 3600000 - 60000).toISOString();
+    expect(deliveryStage({ status: 'accepted', source: 'loja', responded_at: horas }).detail).toBe('levanta os livros na loja · aceite há 3 h');
+    const agora = Date.parse('2026-11-08T12:00:00Z');
+    expect(since('2026-11-08T11:30:00Z', agora)).toBe('há menos de 1 h');
+    expect(since('2026-11-07T12:00:00Z', agora)).toBe('há 24 h');
+    expect(since('2026-11-05T12:00:00Z', agora)).toBe('há 3 dias');
+    expect(since(null)).toBe('');
   });
 });
 
