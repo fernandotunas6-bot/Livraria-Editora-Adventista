@@ -21,6 +21,7 @@ import { adminPermissions } from '@/lib/adminSections';
 import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
+import { ROLES } from '@/lib/permissions';
 
 const groupLabel = 'px-2 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
 
@@ -90,9 +91,11 @@ export function UserMenu({ compact = false, className }) {
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{getUserDisplayName(user)}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              {canAccessAdmin && (
+              {/* Quem é da equipa vê-o (o gestor também, não só o administrador), com o código FUN-. */}
+              {(isAdmin || user?.role === 'manager') && (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-primary">
-                  <Shield className="h-3 w-3" /> {isAdmin ? 'Administrador' : 'Equipa'}
+                  <Shield className="h-3 w-3" aria-hidden="true" /> {ROLES[user?.role]?.label || 'Equipa'}
+                  {user?.staff_code && <span className="font-mono text-muted-foreground">· {user.staff_code}</span>}
                 </span>
               )}
             </div>

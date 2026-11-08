@@ -18,12 +18,12 @@ import { adminHref, buildAdminNav, flattenNav } from '@/lib/adminSections';
 
 /** A minha conta. `allowed(c)`: c = { canAccessAdmin, canManageContacts }. `staff`: ferramentas da equipa. */
 export const ACCOUNT_VIEWS = [
-  { id: 'orders', label: 'Encomendas', icon: ShoppingBag, description: 'As suas encomendas, o estado de cada uma e os recibos.' },
+  { id: 'orders', label: 'Encomendas', icon: ShoppingBag, description: 'As suas encomendas, o estado de cada uma, pagar, cancelar e os recibos.' },
+  { id: 'wishlist', label: 'Lista de desejos', icon: Heart, description: 'Os livros que guardou para mais tarde.' },
   { id: 'pdfs', label: 'PDFs', icon: FileDown, description: 'Os materiais que pode descarregar.' },
   { id: 'notifications', label: 'Notificações', icon: Bell, description: 'Os avisos da loja e da comunidade, e o que quer receber.' },
-  { id: 'settings', label: 'Definições', icon: Settings, description: 'O nome, o telefone e a fotografia.' },
-  { id: 'security', label: 'Segurança', icon: Lock, description: 'A palavra-passe, a verificação em dois passos e as sessões.' },
-  { id: 'wishlist', label: 'Lista de desejos', icon: Heart, description: 'Os livros que guardou para mais tarde.' },
+  { id: 'settings', label: 'Dados pessoais', icon: Settings, description: 'O nome, o telefone e a fotografia.' },
+  { id: 'security', label: 'Segurança e privacidade', icon: Lock, description: 'A palavra-passe, a verificação em dois passos, as sessões e os seus dados.' },
   { id: 'workspace', label: 'Google Workspace', icon: LayoutDashboard, staff: true, allowed: (c) => c.canAccessAdmin, description: 'Drive, Docs e Sheets da loja.' },
   { id: 'crm', label: 'CRM Contactos', icon: Users, staff: true, allowed: (c) => c.canManageContacts, description: 'Contactos e campanhas.' },
 ];

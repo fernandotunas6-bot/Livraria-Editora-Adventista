@@ -83,9 +83,12 @@ Separadores no topo                         Barra lateral
 - Alertas da equipa com o texto em 3 linhas no máximo.
 
 ### 1.5 Alertas da equipa — `components/admin/StaffAlertBar.jsx`
-Largura inteira, por baixo da navegação, para quem gere encomendas: activar som e notificações,
-encomendas novas, alertas urgentes e de segurança. Deslocam-se com a página (não tapam a barra do
-topo). "Ver" leva ao Acompanhamento ou ao Atendimento.
+Largura inteira, por baixo da navegação, para quem gere encomendas: encomendas novas, alertas
+urgentes e de segurança. Compacta (2026-11-08): uma linha de resumo ("4 avisos por tratar · 3
+encomendas por assumir · 1 crítico"), "Activar som" pequeno à direita, dois avisos à vista (um no
+telemóvel) e "Ver todos (N)" para abrir o resto numa lista com scroll. Antes mostrava quatro avisos
+de três linhas e o botão do som em largura inteira: no telemóvel tapava o ecrã todo, em todas as
+páginas. "Ver" leva ao Acompanhamento ou ao Atendimento.
 
 ### 1.6 Cabeçalho da secção — `AdminSectionHeader.jsx`
 Igual em todas as secções: **grupo** (12 px, maiúsculas), **título** (`h1`, 28 px, Fraunces),
@@ -207,7 +210,10 @@ que protege os dados são as regras da base de dados (RLS) e da Edge Function.**
 
 ## 4. Início — `components/admin/AdminOverview.jsx`
 Para quem entra: saudação e data; **Precisa de atenção** (§4.1); **indicadores** (Por confirmar, Pagamentos a verificar, Por
-enviar, Vendas dos últimos 30 dias), cada um leva à lista já filtrada; **Últimas encomendas** (6,
+enviar, Encomendado nos últimos 30 dias — com o recebido ao lado; chamava-se "Vendas" e somava as
+encomendas por pagar), cada um leva à lista já filtrada; **o mês até hoje** (`lib/managerSummary.js`:
+encomendas, encomendado, recebido e ticket médio, comparados com os mesmos dias do mês anterior,
+e as canceladas) e **Mais vendidos (30 dias)**; **Últimas encomendas** (6,
 cada uma abre a encomenda na lista); **Stock** (os 5 mais urgentes, com "Repor"); **Atalhos**
 (Adicionar produto, Produtos, Atendimento, Faixa de aviso, Ver a loja). Cada bloco só aparece a
 quem tem a permissão correspondente.

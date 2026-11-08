@@ -1684,3 +1684,89 @@ Ficaram de fora, de propósito: os PRs do Dependabot (#30–#33) — o #33 (Tail
 (tailwind-merge 2 → 3, que é para o Tailwind 4) são mudanças de versão maior que partem o CSS do
 site, e o #31 junta 36 actualizações de uma vez; cada um pede o seu teste. E os #3 e #4, que
 apontam para outro ramo (`claude/tender-archimedes-gq0s8m`), não para o `main`.
+
+## 9.16 Análise crítica e estética por perfil: visitante, cliente, funcionário e gestor (2026-11-08)
+
+Pedido do dono: "análise crítica e de estética em todo o sistema e adicionar o que falta na óptica
+do utilizador e gestor e cliente funcionário". Os perfis olhados um a um: o **visitante** (loja sem
+conta), o **cliente** (conta, encomendas, rastreio), o **funcionário** (gestor só com "Gerir
+encomendas": a fila do dia a dia) e o **gestor** (catálogo, encomendas, utilizadores, pagamentos e
+marketing: quem acompanha os números).
+
+**Como foi verificado — pela primeira vez com a pilha inteira a correr nesta sessão.** A rede não
+chega a produção nem ao projecto Supabase (como nas passagens 9.12–9.15), e não há Docker para o
+`supabase start`. Em vez da API simulada com respostas fixas (9.14), montou-se uma réplica fora do
+repositório: **Postgres 16 real** com as 99 migrações (a nova incluída) e o mínimo do Supabase de
+`scripts/pglite/base.mjs`; um **emulador do PostgREST** sobre ele (papéis, RLS, claims do JWT,
+funções RPC, recursos embutidos), um **Auth simulado** (palavra-passe, refresh, API de administração)
+e a **Edge Function `app` verdadeira a correr em Deno 2.9** contra ele. O site (Vite) falou com
+essa pilha. Dados: os 98 livros com títulos, capas e descrições reais do repositório, colecções,
+3 lojas, 4 métodos de pagamento e quatro contas (administradora, gestor, funcionária e cliente); as
+encomendas foram feitas pelo **checkout real** (`/checkout` → `place_order`) e avançadas como a
+equipa faria (`/admin/orders/payments/record`). O próprio limite de "3 encomendas por pagar por
+contacto" travou a semente — foi aí que apareceu o achado 118. Capturas a 1280 e 390 px de cada
+perfil; fluxos clicados no browser (Playwright) com 0 erros na consola.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 118 | Cliente | **O cliente não podia cancelar uma encomenda.** Ao chegar ao limite de encomendas por pagar, o checkout respondia "Pague ou cancele uma antes de fazer outra, ou fale connosco pelo WhatsApp" — sem botão de cancelar em lado nenhum, e com o WhatsApp da loja vazio em produção (achado 109). Um beco sem saída, também para quem se enganou na morada ou no livro. | Alta | ✅ `POST /order/cancel` + `order_cancel_by_customer`: na conta e no rastreio (com número e email, sem conta), enquanto não está paga nem em preparação; stock reposto, motivo na linha do tempo, aviso à equipa |
+| 119 | Cliente | **A conta mostrava as etiquetas da equipa:** "Pendente" ao lado de "Recebida" (para quem compra, "recebida" é "já a recebi"); numa encomenda cancelada, o pagamento continuava "Pendente"; "1 item · 2 items"; "Tracking:". Sem capas, sem dizer o que falta fazer. | Média | ✅ `lib/customerOrders.js`: estado em palavras simples (Registada, Falta pagar, Pagamento em verificação, A preparar, A caminho, Pronta para levantar, Entregue/Levantada, Cancelada — "não há nada a pagar"), o passo seguinte, barra de 4 passos, capas, "Em curso / Todas" |
+| 120 | Cliente | **Sem forma de descarregar os dados nem de apagar a conta** (direitos de acesso e apagamento, Lei n.º 22/11). A política mandava pedir pelos contactos — que hoje não recebem email (107) nem têm telefone (109). | Média (legal) | ✅ `GET /account/export` (JSON com perfil, encomendas e pagamentos, lista de desejos, avaliações, comunidade, avisos, conversas de apoio sem as notas internas, aparelhos; sem as imagens das assinaturas) e `POST /account/delete` (escrever o email para confirmar; recusa contas da equipa e de colportores; as encomendas ficam); política de privacidade actualizada |
+| 121 | Cliente | O cliente não via o seu código `CLI-`, que a equipa usa para o encontrar (ficou como "decisão tua" no HANDOFF de 2026-11-06). | Baixa | ✅ no cabeçalho da conta, com "copiar" |
+| 122 | Cliente | Lista de desejos: "Adicionado em" era sempre **a data de hoje** (lia `addedAt.seconds`, formato do Firestore; a coluna é uma data ISO); sem "Juntar ao carrinho"; preço "3 500 Kz" num formato diferente do resto da loja. | Baixa | ✅ |
+| 123 | Cliente | Segurança: "Alterar Password", "Password Actual" — o resto do site diz "palavra-passe" (achado 65); os campos não diziam ao navegador o que são (`autocomplete`), e os gestores de palavras-passe não os preenchiam. | Baixa | ✅ |
+| 124 | Cliente | **No telemóvel, o cartão do perfil e três atalhos ocupavam o primeiro ecrã** e as encomendas começavam abaixo da dobra; "Sair" em largura total; três atalhos numa grelha de quatro (um buraco à direita no computador). | Média (telemóvel) | ✅ cabeçalho compacto, resumo 2×2 que diz o que precisa de si ("2 por pagar"), uma capa por encomenda e o passo actual por extenso no telemóvel |
+| 125 | Cliente | Rastreio: três etiquetas da equipa ("Pendente · Recebida · Pendente"), "Tracking", e o primeiro passo "Recebida". | Baixa | ✅ o mesmo estado da conta; "Registada"; "Número de seguimento" |
+| 126 | Funcionário | **Avisos "Nova encomenda — assumir" que nunca se fechavam.** Só o botão "Assumir" (`order_acknowledge`) os marcava como lidos. Mudar o estado, o pagamento ou a entrega assume a encomenda (`orders_implicit_acknowledge`), mas deixava os avisos — e o mesmo no cancelamento automático por falta de pagamento. Na réplica, 3 dos 7 avisos de cada pessoa eram de encomendas já enviadas, entregues ou canceladas; a barra pedia para "assumir" uma encomenda cancelada. | Alta | ✅ migração `conta_do_cliente`: trigger `orders_assumida_fecha_avisos` (AFTER com WHEN — um `UPDATE OF acknowledged_at` não dispararia, porque quem muda a coluna é outro trigger) e correcção dos avisos já nesse estado |
+| 127 | Funcionário | **Barra de avisos a tapar o painel.** É fixa no topo e mostrava até quatro avisos de três linhas mais o botão do som em largura inteira: no telemóvel ocupava o ecrã todo, em todas as páginas. | Média | ✅ resumo numa linha ("4 avisos por tratar · 4 encomendas por assumir"), dois avisos à vista (um no telemóvel), "Ver todos (N)", som num botão pequeno |
+| 128 | Funcionário | **"Encomendas" começava pelos relatórios:** filtros, oito cartões de totais, dois gráficos e duas tabelas antes da primeira encomenda, a ~1 900 px do topo. Quem abre o separador vai tratar a fila. | Média | ✅ a lista vem primeiro; os relatórios ficam numa secção no fim, fechada por omissão (o navegador lembra-se), e os gráficos só carregam quando se abre |
+| 129 | Funcionário | Cartão da encomenda na lista: "Kz 7500.00" (`toFixed`), "1 itens", sem o pagamento nem a forma de entrega (era preciso abrir cada uma); o cabeçalho abria-se só com o rato (um `div` com `onClick`); dois estados "sem encomendas" ao mesmo tempo. A tabela de produtos também escrevia "Kz 7500.00". | Média | ✅ "Por pagar / Paga / …" e "Entrega · Cidade Baixa, Huambo" ou "Levantamento · <loja>" no cartão, "1 artigo", teclado (`role="button"`, Enter/Espaço, `aria-expanded`) |
+| 130 | Funcionário | A equipa não tinha como saber que o cliente desistiu (até 118 não podia). | — | ✅ aviso `order_cancelled` ("Cancelada pelo cliente — ENC-…, motivo, não é para preparar") à equipa das encomendas novas, por push |
+| 131 | Funcionário / Gestor | Um gestor não via em lado nenhum que era da equipa: a etiqueta e o botão "Admin" do perfil e do menu eram só para administradores (o gestor chegava ao painel pelo menu "Gestão"). | Baixa | ✅ "Equipa · Gestor", o código `FUN-` e o botão "Painel" para quem tem acesso |
+| 132 | Gestor | Relatórios de vendas: **ticket médio "Kz 14 316,667"** (sem máximo de casas decimais), "**Novembro De 2026**" (`capitalize` do CSS), "1 pedidos", "1 cancelados", os títulos do gráfico dos mais vendidos **sobrepostos** (eixo de 100 px para títulos de 60 caracteres), zeros a laranja como se fossem alertas, e "Recebido" repetido duas vezes no mesmo ecrã. | Média | ✅ |
+| 133 | Gestor | **O Início não dizia como corre o mês.** O único número de negócio era "Vendas (30 dias)", que somava as encomendas por pagar e não se comparava com nada. | Média | ✅ "Encomendado (30 dias)" com o recebido ao lado, e o mês até hoje (encomendas, encomendado, recebido, ticket médio, canceladas) comparado com **os mesmos dias** do mês anterior, mais os 5 mais vendidos em 30 dias (`lib/managerSummary.js`) |
+| 134 | Todos | **Parágrafos "centrados" desviados para a esquerda.** O estilo base dá a todos os `<p>` `max-w-prose` (65 caracteres) sem margem automática: num bloco centrado, o texto centrava dentro de uma caixa encostada à esquerda — "Ainda não tem encomendas." aparecia desviado do ícone e do botão. Afectava os estados vazios de todo o site. | Média (visual) | ✅ `.text-center > p { margin-inline: auto }` na camada base (qualquer `mx-*` explícito continua a mandar) |
+| 135 | Todos | **Dinheiro em quatro formatos:** "Kz 7500.00", "Kz 14 316,667", "68 900 Kz" e "Kz 68 900,00". | Baixa | ✅ `lib/money.js` (`kwanza`), com um teste que o obriga a ser igual ao `formatCurrency` da loja; aplicado no painel (encomendas, produtos, relatórios, Início) e na conta. Ficam com "x Kz" a colportagem e os utilizadores, que são módulos à parte |
+
+### Verificado sem problemas
+
+- **Visitante:** 15 páginas no telemóvel (início, loja, ficha, rastreio, lojas, contacto, sobre,
+  FAQ, comunidade, entrar, colecções, materiais, sugestões, envios, privacidade): 0 erros na
+  consola, sem scroll horizontal, um `h1` por página. A loja já tinha recebido as passagens
+  anteriores e está em bom estado; as melhorias desta passagem foram para dentro da conta e do painel.
+- **Regras do cancelamento** (35 cenários em PGlite, `scripts/pglite/conta.mjs`): cancela por
+  pagar e confirmada; recusa a preparar, a caminho, entregue, já cancelada, com referência
+  indicada e com pagamento em parte; o stock volta; a linha do tempo diz quem e porquê; fica no
+  registo de segurança; o cliente e o visitante não chamam a função directamente; os avisos
+  "assumir" fecham-se pelos três caminhos (assumir, mudar a entrega, cancelar no painel) e os das
+  outras encomendas ficam.
+- **Rotas, ponta a ponta na réplica:** cancelar a própria encomenda com sessão; 404 para a de
+  outra pessoa com a minha sessão, para o visitante sem email e com o email errado; o visitante
+  cancela com número e email; recusa a encomenda a caminho; `can_cancel` no `/track`. A
+  exportação não leva as imagens das assinaturas nem quem tratou a encomenda. Apagar a conta:
+  recusa contas da equipa e o email errado; apaga a conta, o perfil desaparece, a entrada passa a
+  ser recusada e fica no registo de segurança; o limite de 3 pedidos por minuto trava.
+- **No browser:** cancelar na conta (diálogo, motivo, aviso, estado "Cancelada · Não há nada a
+  pagar"); "Comprar de novo" junta ao carrinho e abre-o; descarregar os dados; o botão de apagar só
+  activa com o email certo; cancelar no rastreio sem conta. Os relatórios abertos: "Kz 14 316,67",
+  "Novembro de 2026", gráfico legível.
+- As suites que já existiam continuam certas: `pagamentos.mjs` (91) e `entregas.mjs` (44).
+- `npm test` (1223, eram 1195), `npm run lint`, `npm run build`, `deno check`, scanner de segredos.
+
+### Ordem de publicação
+
+A migração `20261108120000_conta_do_cliente` e a Edge Function vão juntas com o merge (o workflow
+do Supabase aplica e publica). O site novo funciona com a função antiga durante a janela entre os
+dois deploys: sem `/order/cancel`, o botão "Cancelar" responde com a mensagem de erro da função
+(nada se cancela), e sem `can_cancel` o rastreio simplesmente não mostra a caixa.
+
+### Por fazer (dono)
+
+1. Decidir se quer **pedir confirmação por email** antes de apagar uma conta. Hoje basta escrever o
+   email da conta com a sessão aberta (como o painel, que apaga sem pedir nada ao cliente). Com o
+   SMTP do Auth ligado (achado 106), pode passar a usar a reautenticação do Supabase.
+2. Os pontos das passagens anteriores continuam: email (105–107), WhatsApp (108), telefones (109).
+   Sem eles, o cliente que cancela ou apaga a conta não recebe a confirmação por email — fica com o
+   aviso no ecrã e, na conta, com o aviso no sino.

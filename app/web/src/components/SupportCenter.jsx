@@ -94,6 +94,8 @@ const NOTIFICATION_KINDS = {
   ops_test: 'Teste de avisos',
   colporteur_application: 'Candidatura a colportor',
   colporteur_report: 'Relatório de colportor',
+  colporteur_delivery: 'Entrega por colportor',
+  order_cancelled: 'Cancelada pelo cliente',
 };
 
 // Avisos da vigilância: levam ao Acompanhamento, onde se assume e trata.

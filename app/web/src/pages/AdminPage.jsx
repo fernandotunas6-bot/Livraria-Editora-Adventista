@@ -31,13 +31,17 @@ import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView 
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
+import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getPaymentStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
+import { kwanza } from '@/lib/money';
+import { orderUnits, unitsLabel } from '@/lib/customerOrders';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
 import { hasCover, hasDescription } from '@/lib/bookContent';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+// Pequeno: os gráficos (a parte pesada) carregam lá dentro, só quando se abre a secção.
+import OrdersReportSection from '@/components/admin/OrdersReportSection';
 
 const CollectionsTab = lazy(() => import('@/components/admin/CollectionsTab'));
 const SlidesTab = lazy(() => import('@/components/admin/SlidesTab'));
@@ -53,7 +57,6 @@ const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
 const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
-const SalesReportsPanel = lazy(() => import('@/components/admin/SalesReportsPanel'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -854,12 +857,12 @@ const AdminPage = () => {
                             <td className="p-4 whitespace-nowrap">
                               {isSaleActive(b) ? (
                                 <>
-                                  <span className="text-rose-600 font-medium">Kz {Number(b.sale_price).toFixed(2)}</span>
-                                  <span className="block text-[10px] text-muted-foreground line-through">Kz {Number(b.price).toFixed(2)}</span>
+                                  <span className="text-rose-600 font-medium">{kwanza(b.sale_price)}</span>
+                                  <span className="block text-[10px] text-muted-foreground line-through">{kwanza(b.price)}</span>
                                 </>
                               ) : (
                                 <>
-                                  Kz {Number(b.price).toFixed(2)}
+                                  {kwanza(b.price)}
                                   {isSaleScheduled(b) && <span className="block text-[10px] text-rose-600">promoção agendada</span>}
                                 </>
                               )}
@@ -906,7 +909,6 @@ const AdminPage = () => {
 
                 {canManageOrders && (
                 <AdminSection active={activeTab} value="orders">
-                  <SalesReportsPanel orders={orders} />
                   <DeliveredPaymentDialog
                     order={deliveryDialog}
                     canConfirm={canConfirmPayments}
@@ -915,7 +917,7 @@ const AdminPage = () => {
                     onSubmit={(extra) => handleDeliveryStatus(deliveryDialog, 'delivered', extra)}
                   />
 
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                     <button
                       type="button"
                       onClick={() => setPaymentFilter(paymentFilter === 'awaiting_confirmation' ? 'all' : 'awaiting_confirmation')}
@@ -923,7 +925,7 @@ const AdminPage = () => {
                       title="Mostrar só estas encomendas"
                     >
                       <p className="text-sm text-muted-foreground">Pagamentos por confirmar</p>
-                      <p className="text-2xl font-bold text-orange-600">{awaitingPaymentCount}</p>
+                      <p className={`text-2xl font-bold ${awaitingPaymentCount ? 'text-orange-600' : 'text-foreground'}`}>{awaitingPaymentCount}</p>
                     </button>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Total Encomendas</p>
@@ -931,16 +933,16 @@ const AdminPage = () => {
                     </div>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Pendentes</p>
-                      <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+                      <p className={`text-2xl font-bold ${pendingCount ? 'text-amber-600' : 'text-foreground'}`}>{pendingCount}</p>
                     </div>
                     <div className="bg-card border rounded-xl p-4">
                       <p className="text-sm text-muted-foreground">Recebido</p>
-                      <p className="text-2xl font-bold text-primary">Kz {money.received.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-2xl font-bold text-primary">{kwanza(money.received)}</p>
                       {money.receivable > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">+ Kz {money.receivable.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por receber</p>
+                        <p className="text-xs text-muted-foreground mt-1">+ {kwanza(money.receivable)} por receber</p>
                       )}
                       {money.refundDue > 0 && (
-                        <p className="text-xs text-destructive mt-1">Kz {money.refundDue.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} por reembolsar</p>
+                        <p className="text-xs text-destructive mt-1">{kwanza(money.refundDue)} por reembolsar</p>
                       )}
                     </div>
                   </div>
@@ -1010,8 +1012,16 @@ const AdminPage = () => {
                     {filteredOrders.map((o) => (
                       <div key={o.id} className="bg-card border rounded-xl overflow-hidden">
                         <div
-                          className="p-4 flex flex-wrap justify-between gap-3 cursor-pointer hover:bg-muted/20"
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={expandedOrder === o.id}
+                          className="p-4 flex flex-wrap justify-between gap-3 cursor-pointer hover:bg-muted/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                           onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+                            e.preventDefault();
+                            setExpandedOrder(expandedOrder === o.id ? null : o.id);
+                          }}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1022,9 +1032,16 @@ const AdminPage = () => {
                               <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${o.order_type === 'whatsapp_order' ? 'bg-green-100 text-green-800' : 'bg-marca/10 text-primary'}`}>
                                 {getOrderChannelLabel(o)}
                               </span>
-                              {o.delivery_status && (
+                              {o.delivery_status && o.status !== 'cancelled' && (
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getDeliveryStatusColor(o.delivery_status)}`}>
                                   {getDeliveryStatusLabel(o.delivery_status)}
+                                </span>
+                              )}
+                              {/* O pagamento à vista na lista: era preciso abrir a encomenda para saber se estava paga. */}
+                              {o.status !== 'cancelled' && (
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getPaymentStatusColor(o.payment_status || 'pending')}`}>
+                                  {/* "Pendente" repetia a etiqueta do estado ao lado: no pagamento diz o que é. */}
+                                  {{ paid: 'Paga', pending: 'Por pagar' }[o.payment_status || 'pending'] || getPaymentStatusLabel(o.payment_status)}
                                 </span>
                               )}
                               {o.customer_feedback?.outcome === 'ok' && (
@@ -1050,11 +1067,13 @@ const AdminPage = () => {
                               {o.customer_name || 'Cliente'} · {o.customer_email}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {new Date(o.created).toLocaleString('pt-AO')} · {(o.items || []).length} itens
+                              {new Date(o.created).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {' · '}{unitsLabel(orderUnits(o))}
+                              {' · '}{o.shipping_method === 'pickup' ? `Levantamento${orderPickupStore(o) ? ` · ${orderPickupStore(o)}` : ''}` : `Entrega${orderLocality(o, ', ') ? ` · ${orderLocality(o, ', ')}` : ''}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <p className="font-bold text-primary">Kz {Number(o.total).toFixed(2)}</p>
+                            <p className="font-bold text-primary tabular-nums">{kwanza(o.total)}</p>
                             {expandedOrder === o.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </div>
                         </div>
@@ -1134,10 +1153,10 @@ const AdminPage = () => {
                                     {item.book_code && <code className="ml-1 text-[10px] text-muted-foreground font-mono">{item.book_code}</code>}
                                   </span>
                                   <span className="font-medium text-right whitespace-nowrap">
-                                    Kz {(Number(item.price) * item.quantity).toFixed(2)}
+                                    {kwanza(Number(item.price) * item.quantity)}
                                     {Number(item.list_price) > Number(item.price) && (
                                       <span className="block text-[10px] text-muted-foreground line-through font-normal">
-                                        Kz {(Number(item.list_price) * item.quantity).toFixed(2)}
+                                        {kwanza(Number(item.list_price) * item.quantity)}
                                       </span>
                                     )}
                                   </span>
@@ -1206,10 +1225,8 @@ const AdminPage = () => {
                         )}
                       </div>
                     ))}
-                    {filteredOrders.length === 0 && (
-                      <p className="text-muted-foreground text-center py-8">Sem encomendas{orderFilter !== 'all' ? ' com este estado' : ''}.</p>
-                    )}
                   </div>
+                  <OrdersReportSection orders={orders} />
                 </AdminSection>
                 )}
               </>

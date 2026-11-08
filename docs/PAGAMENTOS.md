@@ -197,6 +197,7 @@ As encomendas pagas ou reembolsadas ganham um pagamento confirmado pelo total, n
   npm i --prefix /tmp/pglite @electric-sql/pglite@0.2.17
   PGLITE_MODULE=/tmp/pglite/node_modules/@electric-sql/pglite/dist/index.js node scripts/pglite/pagamentos.mjs supabase/migrations
   ```
+  Com o mesmo módulo: `scripts/pglite/entregas.mjs` (44, entregas por colportor) e `scripts/pglite/conta.mjs` (35, cancelamento pelo cliente e avisos "assumir").
 - **vitest:**
   - `payments.test.ts`, `paymentWebhook.test.ts`, `orderWatch.test.ts`, `checkoutRules.test.ts` e `emails.test.ts` (Edge Function);
   - `payments.test.js`, `pricing.test.js` e `receipt.test.js` (site).

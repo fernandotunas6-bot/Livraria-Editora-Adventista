@@ -125,6 +125,8 @@ export function channelsFor(kind: string, severity: Severity): Channel[] {
   if (kind === "new_order") return ["push", "whatsapp", "email"];
   if (severity === "high") return ["push", "email"];
   if (kind === "support") return ["push"];
+  // Cancelada pelo cliente: um push basta para não a prepararem (não é urgente, nada se perde).
+  if (kind === "order_cancelled") return ["push"];
   return [];
 }
 

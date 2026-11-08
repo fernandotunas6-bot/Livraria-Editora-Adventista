@@ -5,8 +5,10 @@ import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User,
+  Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User, XCircle,
 } from 'lucide-react';
+import CancelOrderDialog from '@/components/account/CancelOrderDialog';
+import { customerOrderStage } from '@/lib/customerOrders';
 import { trackOrder } from '@/api/PlatformApi';
 import { pageTitle } from '@/lib/brand';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -19,10 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import DeliveryConfirmPanel from '@/components/DeliveryConfirmPanel';
 import PageBannerSlider from '@/components/PageBannerSlider';
-import {
-  getOrderStatusLabel, getOrderStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor,
-  getPaymentStatusLabel, getPaymentStatusColor, orderDeliveryAddress,
-} from '@/lib/orderUtils';
+import { getDeliveryStatusLabel, orderDeliveryAddress } from '@/lib/orderUtils';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 
 const STEPS = ['received', 'confirmed', 'preparing', 'shipped', 'in_transit', 'out_for_delivery', 'delivered'];
@@ -30,6 +29,9 @@ const STEPS = ['received', 'confirmed', 'preparing', 'shipped', 'in_transit', 'o
 // Levantamento na loja: os estados de transporte contam todos como "pronta para levantar".
 const PICKUP_STEPS = ['received', 'confirmed', 'preparing', 'ready', 'delivered'];
 const PICKUP_LABELS = { ready: 'Pronta para levantar', delivered: 'Levantada' };
+// "Recebida" é a palavra da equipa (a loja recebeu a encomenda); para quem compra soava a "já a
+// recebi". O primeiro passo diz o mesmo que a conta do cliente (lib/customerOrders.js).
+const CUSTOMER_LABELS = { received: 'Registada' };
 const toPickupStep = (status) => (['shipped', 'in_transit', 'out_for_delivery'].includes(status) ? 'ready' : status);
 
 export default function TrackOrderPage() {
@@ -45,6 +47,7 @@ export default function TrackOrderPage() {
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
+  const [cancelling, setCancelling] = useState('');
 
   useEffect(() => {
     if (location.state?.orderNumber) setOrderNumber(location.state.orderNumber);
@@ -88,11 +91,20 @@ export default function TrackOrderPage() {
     }
   };
 
+  // Depois de cancelar, a encomenda volta a ser lida (estado, histórico e o botão).
+  const refresh = async () => {
+    try {
+      setOrder(await trackOrder(order.order_number, email.trim()));
+    } catch {
+      // Fica o que estava; o aviso de sucesso já saiu.
+    }
+  };
+
   const isPickup = order?.shipping_method === 'pickup';
   const isCancelled = order?.status === 'cancelled' || order?.delivery_status === 'cancelled';
   const steps = isPickup ? PICKUP_STEPS : STEPS;
   const currentStepIdx = order ? steps.indexOf(isPickup ? toPickupStep(order.delivery_status) : order.delivery_status) : -1;
-  const stepLabel = (step) => (isPickup && PICKUP_LABELS[step]) || getDeliveryStatusLabel(step);
+  const stepLabel = (step) => (isPickup && PICKUP_LABELS[step]) || CUSTOMER_LABELS[step] || getDeliveryStatusLabel(step);
   const timeline = order?.timeline || [];
 
   return (
@@ -176,19 +188,17 @@ export default function TrackOrderPage() {
                         <p className="text-sm text-muted-foreground mt-1">{order.customer_name}</p>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2 justify-end">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(order.status)}`}>
-                        {getOrderStatusLabel(order.status)}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(order.delivery_status)}`}>
-                        {getDeliveryStatusLabel(order.delivery_status)}
-                      </span>
-                      {order.payment_status && (
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                          {getPaymentStatusLabel(order.payment_status)}
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      // O ponto em que está, em palavras de quem compra (lib/customerOrders.js): as
+                      // etiquetas da equipa diziam "Pendente" e "Recebida" a quem ainda não recebeu nada.
+                      const stage = customerOrderStage(order, { upfront: !!order.payment_upfront });
+                      return (
+                        <div className="text-right">
+                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${stage.className}`}>{stage.label}</span>
+                          <p className="mt-1.5 max-w-60 text-xs text-muted-foreground">{stage.hint}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-3 text-sm">
@@ -223,7 +233,7 @@ export default function TrackOrderPage() {
                     )}
                     {order.tracking_number && (
                       <div className="sm:col-span-2">
-                        <span className="text-muted-foreground">Tracking</span>
+                        <span className="text-muted-foreground">Número de seguimento</span>
                         <p className="font-mono">{order.tracking_number}{order.carrier ? ` · ${order.carrier}` : ''}</p>
                       </div>
                     )}
@@ -253,7 +263,7 @@ export default function TrackOrderPage() {
                   )}
                   {isCancelled ? (
                     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                      Esta encomenda foi cancelada. Se tiver dúvidas, contacte a loja.
+                      Esta encomenda foi cancelada e não há nada a pagar. Se tiver dúvidas, contacte a loja.
                     </div>
                   ) : (
                   <div className="relative">
@@ -306,6 +316,18 @@ export default function TrackOrderPage() {
                   order={order}
                   onConfirmed={(updated) => setOrder((prev) => ({ ...prev, ...updated }))}
                 />
+
+                {order.can_cancel && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Ainda não está paga nem em preparação: pode cancelá-la, e os livros voltam à loja.
+                    </p>
+                    <Button type="button" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelling(order.order_number)}>
+                      <XCircle className="mr-2 h-4 w-4" aria-hidden="true" /> Cancelar a encomenda
+                    </Button>
+                  </div>
+                )}
+                <CancelOrderDialog orderNumber={cancelling} email={email.trim()} onClose={() => setCancelling('')} onCancelled={refresh} />
 
                 <p className="text-center text-sm text-muted-foreground">
                   Dúvidas? <Link to="/contact" className="text-primary hover:underline">Contacte-nos</Link>

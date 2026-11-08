@@ -124,7 +124,9 @@ const Footer = () => {
   const { toast } = useToast();
   const { settings } = useSiteSettings();
 
-  const tagline = settings.footer_tagline || settings.tagline || BRAND.tagline;
+  // Sem a pontuação final: a frase leva "." a seguir, e uma frase escrita no painel já com ponto
+  // final saía "transforma.. Literatura cristã".
+  const tagline = String(settings.footer_tagline || settings.tagline || BRAND.tagline).trim().replace(/[.!?…]+$/, '');
   const copyright = settings.footer_copyright || `© ${new Date().getFullYear()} ${settings.site_name || BRAND.name}. Todos os direitos reservados.`;
   const columns = Array.isArray(settings.footer_columns) && settings.footer_columns.length > 0
     ? settings.footer_columns

@@ -9,7 +9,7 @@ const perms = (keys = [], isAdmin = false) => adminPermissions({ isAdmin, hasPer
 
 describe('A minha conta', () => {
   it('mantém os identificadores que o rodapé, os emails e a política de privacidade usam', () => {
-    expect(ACCOUNT_VIEWS.map((v) => v.id)).toEqual(['orders', 'pdfs', 'notifications', 'settings', 'security', 'wishlist', 'workspace', 'crm']);
+    expect(ACCOUNT_VIEWS.map((v) => v.id)).toEqual(['orders', 'wishlist', 'pdfs', 'notifications', 'settings', 'security', 'workspace', 'crm']);
   });
 
   it('as ferramentas da equipa só para quem as pode abrir', () => {
