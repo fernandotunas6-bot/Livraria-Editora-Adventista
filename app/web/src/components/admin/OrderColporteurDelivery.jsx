@@ -64,7 +64,7 @@ export default function OrderColporteurDelivery({ order, onChanged }) {
         <p className="text-xs text-muted-foreground">
           {active.source === 'stock' ? 'Entrega com os livros que tem à consignação.'
             : active.picked_up_at ? `Livros entregues ao colportor a ${when(active.picked_up_at)}.`
-              : 'Levanta os livros na loja: prepare-os e marque quando lhos entregar.'}
+              : `Levanta os livros ${active.pickup_store ? `em ${active.pickup_store}` : 'na loja'}: prepare-os e marque quando lhos entregar.`}
           {' '}Telefone: {active.colporteur.phone}.{Number(active.fee) > 0 ? ` Ganha ${kz(active.fee)}.` : ''}
         </p>
       )}

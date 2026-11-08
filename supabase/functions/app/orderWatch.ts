@@ -185,8 +185,10 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
   }
 
   const hours = (now - stageSince(o)) / HOUR;
+  // Com um colportor, quem está a demorar é ele, não a preparação da loja.
+  const withColporteur = o.delivery_route === "colportor" ? "com um colportor: ver Colportagem → Entregas" : "";
   const rule = (kind: StageAlertKind) => {
-    if (hours >= WATCH_RULES[kind].hours) out.push(alert(o, kind, hours, WATCH_RULES[kind].hours));
+    if (hours >= WATCH_RULES[kind].hours) out.push(alert(o, kind, hours, WATCH_RULES[kind].hours, withColporteur));
   };
   switch (stage) {
     case "awaiting_payment": rule(o.payment_status === "awaiting_confirmation" ? "payment_to_confirm" : "payment_pending"); break;

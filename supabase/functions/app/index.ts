@@ -3453,7 +3453,7 @@ route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
 // Vigilância das encomendas (alertas de encomendas paradas e resumo diário)
 // ---------------------------------------------------------------------------
 
-const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, total, amount_paid, amount_refunded, paid_at, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
+const WATCH_FIELDS = "id, order_number, customer_name, customer_email, created, updated, delivery_route, total, amount_paid, amount_refunded, paid_at, status, payment_status, payment_method_code, payment_reference, delivery_status, delivery_timeline, shipping_method, pickup_store, delivery_province, city, estimated_delivery, customer_feedback, customer_confirmed_at, acknowledged_at";
 
 /**
  * Encomendas pagas no fim — na entrega ou no balcão (métodos sem `isPaidUpfront`). A
