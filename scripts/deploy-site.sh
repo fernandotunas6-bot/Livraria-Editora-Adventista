@@ -8,7 +8,7 @@
 #   CLOUDFLARE_PAGES_PROJECT → projecto Pages (por omissão livraria-editora-adventista, na conta
 #                              Cloudflare valentinocanguele@gmail.com — é nela que o wrangler
 #                              tem de estar autenticado: `npx wrangler@4 whoami`)
-#   SITE_URL                 → o endereço público (por omissão https://livrariaadventista.com).
+#   SITE_URL                 → o endereço público (por omissão https://livrariaadventista.ao).
 #                              Não se deriva do nome do projecto: o endereço .pages.dev deste
 #                              é livraria-editora-adventista-ben.pages.dev, com um sufixo que o
 #                              Cloudflare acrescentou por o nome já existir noutra conta. Vai para o canonical,
@@ -23,7 +23,7 @@ set -euo pipefail
 
 PROJECT="${CLOUDFLARE_PAGES_PROJECT:-livraria-editora-adventista}"
 PROD_BRANCHES="${PROD_BRANCHES:-main claude/youthful-heisenberg-rq5gnw}"
-SITE_URL="${SITE_URL:-https://livrariaadventista.com}"
+SITE_URL="${SITE_URL:-https://livrariaadventista.ao}"
 
 fail() { echo "✘ $*" >&2; exit 1; }
 

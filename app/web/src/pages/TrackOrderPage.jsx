@@ -160,6 +160,11 @@ export default function TrackOrderPage() {
                     instructions={order.payment_instructions}
                     paymentLink={order.payment_link}
                     referenceAlreadySent={order.payment_reference_present || order.payment_status === 'awaiting_confirmation'}
+                    automatic={!!order.payment_automatic}
+                    outstandingAmount={order.outstanding ?? null}
+                    reportedReference={order.reported_reference || ''}
+                    rejectedReference={order.rejected_reference || ''}
+                    rejectedReason={order.rejected_reason || ''}
                   />
                 )}
                 <div className="bg-card border rounded-2xl p-6">

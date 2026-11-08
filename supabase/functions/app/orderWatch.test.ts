@@ -90,3 +90,46 @@ describe("orderWatch", () => {
     });
   });
 });
+
+describe("alertas de dinheiro (pagamentos registados)", () => {
+  const entregue = {
+    id: "d", order_number: "ENC-245", payment_status: "pending", payment_method_code: "balcao", total: 245000, amount_paid: 0,
+    amount_refunded: 0, status: "delivered", delivery_status: "delivered", created: hoursAgo(120),
+    delivery_timeline: [{ status: "delivered", at: hoursAgo(3) }],
+  };
+
+  it("entregue sem pagamento alerta logo; 48 h depois é crítico", () => {
+    const [a] = alertsForOrder(entregue, NOW);
+    expect(a).toMatchObject({ kind: "delivered_unpaid", severity: "warning" });
+    expect(a.detail).toMatch(/faltam 245 000 Kz/);
+    const antigo = { ...entregue, delivery_timeline: [{ status: "delivered", at: hoursAgo(50) }] };
+    expect(alertsForOrder(antigo, NOW)[0].severity).toBe("critical");
+  });
+
+  it("dinheiro indicado por quem entregou: diz que falta confirmar na caixa", () => {
+    const [a] = alertsForOrder({ ...entregue, payment_status: "awaiting_confirmation" }, NOW);
+    expect(a.detail).toMatch(/por confirmar na caixa/);
+  });
+
+  it("entregue e paga não alerta", () => {
+    expect(alertsForOrder({ ...entregue, payment_status: "paid", amount_paid: 245000 }, NOW)).toEqual([]);
+  });
+
+  it("paga e cancelada: falta reembolsar", () => {
+    const o = { ...entregue, status: "cancelled", delivery_status: "cancelled", payment_status: "paid", amount_paid: 5000, total: 5000, updated: hoursAgo(80) };
+    expect(alertsForOrder(o, NOW)[0]).toMatchObject({ kind: "refund_due", severity: "critical" });
+    expect(alertsForOrder({ ...o, amount_refunded: 5000, payment_status: "refunded" }, NOW)).toEqual([]);
+  });
+
+  it("pago a mais: falta devolver a diferença", () => {
+    const o = { id: "e", payment_status: "paid", total: 1000, amount_paid: 1500, amount_refunded: 0, delivery_status: "received", created: hoursAgo(2) };
+    expect(alertsForOrder(o, NOW).map((a) => a.kind)).toContain("overpaid");
+  });
+
+  it("referência indicada pelo cliente: prazo de 12 h para a loja verificar", () => {
+    const o = { id: "f", payment_status: "awaiting_confirmation", delivery_status: "received", created: hoursAgo(14),
+      delivery_timeline: [{ status: "received", at: hoursAgo(13) }] };
+    expect(alertsForOrder(o, NOW)[0]).toMatchObject({ kind: "payment_to_confirm", severity: "warning" });
+    expect(alertsForOrder({ ...o, payment_status: "pending" }, NOW)).toEqual([]);
+  });
+});

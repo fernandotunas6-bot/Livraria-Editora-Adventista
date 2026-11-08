@@ -1,12 +1,12 @@
 {
-  "site_url": "https://livrariaadventista.com",
+  "site_url": "https://livrariaadventista.ao",
   "uri_allow_list": [
+    "https://livrariaadventista.ao/**",
+    "https://www.livrariaadventista.ao/**",
     "https://livrariaadventista.com/**",
     "https://www.livrariaadventista.com/**",
     "https://livraria-editora-adventista-ben.pages.dev/**",
-    "https://*.livraria-editora-adventista-ben.pages.dev/**",
-    "https://livrariaadventista.ao/**",
-    "https://www.livrariaadventista.ao/**"
+    "https://*.livraria-editora-adventista-ben.pages.dev/**"
   ],
   "subjects": {
     "confirmation": "Confirme o seu email — Livraria Adventista",

@@ -55,7 +55,7 @@ jobs:
         run: node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL"
         env:
           # Não se deriva do nome do projecto: o endereço .pages.dev deste tem o sufixo -ben.
-          SITE_URL: ${{ vars.SITE_URL || 'https://livrariaadventista.com' }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://livrariaadventista.ao' }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 

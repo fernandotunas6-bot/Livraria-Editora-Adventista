@@ -103,6 +103,10 @@ export function deliveryDeadline(o: Row): { deadline: number; basis: "estimated"
 export const DUTY_OF_ALERT: Record<string, Duty> = {
   new_unacknowledged: "new_order",
   payment_pending: "payment",
+  payment_to_confirm: "payment",
+  delivered_unpaid: "payment",
+  refund_due: "payment",
+  overpaid: "payment",
   not_prepared: "preparation",
   preparing_too_long: "preparation",
   pickup_waiting: "pickup",

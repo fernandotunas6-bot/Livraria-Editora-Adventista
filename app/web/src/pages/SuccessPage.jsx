@@ -53,11 +53,14 @@ const SuccessPage = () => {
     }
   }, [orderId, orderNumber, total, orderType]);
 
+  // Paga antes do envio (transferência, Multicaixa) e ainda por pagar: a encomenda está
+  // registada, não "confirmada" — dizê-lo antes do pagamento era prometer o que não está feito.
+  const awaitsPayment = !isWhatsApp && isPaidUpfront(orderData?.paymentType);
   useEffect(() => {
     if (!hasOrder || isWhatsApp) return;
     const notify = async () => {
       const shown = await showLocalNotification({
-        title: 'Encomenda confirmada! 🎉',
+        title: awaitsPayment ? 'Encomenda registada — falta o pagamento' : 'Encomenda confirmada! 🎉',
         body: orderNumber ? `Pedido ${orderNumber} registado com sucesso.` : 'A sua compra foi registada.',
         url: '/profile',
       });
@@ -66,7 +69,7 @@ const SuccessPage = () => {
       }
     };
     notify();
-  }, [hasOrder, isWhatsApp, orderNumber, settings.push_enabled, settings.vapid_public_key]);
+  }, [hasOrder, isWhatsApp, orderNumber, awaitsPayment, settings.push_enabled, settings.vapid_public_key]);
 
   // Transferência e Multicaixa: paga-se agora, depois de encomendar. Até lá a compra não está
   // "confirmada": está registada e com o stock reservado.
@@ -183,6 +186,7 @@ const SuccessPage = () => {
                   instructions={orderData.paymentInstructions || ''}
                   paymentLink={orderData.paymentLink || ''}
                   referenceAlreadySent={!!orderData.paymentReference}
+                  automatic={!!orderData.paymentAutomatic}
                 />
               </div>
             )}

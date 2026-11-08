@@ -15,6 +15,7 @@ export const PAYMENT_METHODS = {
 export const PAYMENT_STATUS = {
   pending: { label: 'Pendente', color: 'bg-amber-500/10 text-amber-700' },
   awaiting_confirmation: { label: 'Aguarda confirmação', color: 'bg-orange-500/10 text-orange-700' },
+  partially_paid: { label: 'Pago em parte', color: 'bg-yellow-500/10 text-yellow-800' },
   paid: { label: 'Pago', color: 'bg-green-500/10 text-green-700' },
   failed: { label: 'Falhou', color: 'bg-destructive/10 text-destructive' },
   refunded: { label: 'Reembolsado', color: 'bg-violet-500/10 text-violet-700' },

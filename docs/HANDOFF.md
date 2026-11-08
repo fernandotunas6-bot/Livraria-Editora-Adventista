@@ -2,6 +2,28 @@
 
 Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Pagamentos registados e gateway (2026-11-07, ramo `claude/pagamentos-premium`)
+
+- **Pedido do dono:** "análise crítica dos pagamentos", depois "reorganizar seguindo as normas premium" e "ligar com os relatórios". A regra que ele fixou: **um pagamento só fica confirmado pelo gateway (webhook) ou por um funcionário com a permissão**. Guia completo em [PAGAMENTOS.md](PAGAMENTOS.md).
+- **Base de dados** (migrações `20261107200000`–`202000`, aplicadas no merge):
+  - `order_payments`, só de acrescentar;
+  - o estado do pagamento é calculado e ninguém o escreve à mão;
+  - a permissão `confirm_payments`;
+  - total e portes em `numeric(14,2)`;
+  - o painel só grava o seguimento;
+  - o webhook do gateway (`order_payment_gateway`, `payment_gateway_events`);
+  - o relatório `payments_report`;
+  - a comissão do colportor acertada pela diferença;
+  - os tamanhos sem preço próprio a valer o preço do produto.
+- **Inclui o PR #23** (registo de segurança, estado geral), de que depende: o registo das acções de pagamento usa `private.audit_write`. O workflow do #23 traz `supabase db push --include-all`, por isso as migrações do #23, mais antigas do que a `20261107180000` já aplicada, entram na mesma.
+- **Por fazer, do dono:**
+  - escolher o gateway e pôr `PAYMENT_WEBHOOK_SECRET` e `PAYMENT_GATEWAY_PROVIDER` nos segredos da Edge Function;
+  - decidir o link de demonstração do Multicaixa (Kursinha);
+  - ver a encomenda de 245 000 Kz entregue por pagar;
+  - pôr o prazo de cancelamento;
+  - preencher o NIF e o nome legal.
+- **Testes:** 91 cenários em PGlite, que ficam no repositório desta vez (`scripts/pglite/`; instruções em PAGAMENTOS.md); vitest; `deno check`.
+
 ## Política de privacidade (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
 
 - **Pedido do dono:** "actualizar a política de privacidade para cobrir a comunidade". O site não tinha nenhuma (nem página, nem link, nem texto no painel), por isso foi **criada** em `/privacidade` (`/privacy` e `/politica-de-privacidade` redireccionam), com uma secção própria para a comunidade.

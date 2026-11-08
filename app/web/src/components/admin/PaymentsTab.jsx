@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, Loader2, Pencil, Trash2, CreditCard, ArrowUp, ArrowDown, AlertTriangle, RefreshCw, Banknote, Landmark, QrCode,
+  Copy, Zap,
 } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -21,7 +22,7 @@ import ImageField from '@/components/admin/ImageField';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { pbErrorMessage, saveRecordWithMedia } from '@/lib/mediaSave';
 
-const empty = { name: '', code: '', type: 'p2p', enabled: true, instructions: '', account_info: '', payment_link: '', qr_url: '', icon: '', sort_order: 0, shipping_methods: [] };
+const empty = { name: '', code: '', type: 'p2p', enabled: true, instructions: '', account_info: '', payment_link: '', qr_url: '', icon: '', sort_order: 0, shipping_methods: [], gateway_provider: '' };
 
 // Envios em que cada método aparece no checkout (payment_methods.shipping_methods). Nenhum marcado = todos.
 const SHIPPING_OPTIONS = [
@@ -64,6 +65,13 @@ export default function PaymentsTab() {
   const [busyId, setBusyId] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const { driveImageConfig } = useIntegrations();
+  // Estado do gateway de pagamentos (Edge Function): ligado, fornecedor, endereço do webhook.
+  const [gateway, setGateway] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    pb.send('/admin/payments/gateway').then((g) => { if (alive) setGateway(g); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +114,7 @@ export default function PaymentsTab() {
       qr_url: m.qr_url || (m.qr_code ? pb.files.getURL(m, m.qr_code) : ''),
       icon: m.icon || '', sort_order: m.sort_order ?? 0,
       shipping_methods: Array.isArray(m.shipping_methods) ? m.shipping_methods : [],
+      gateway_provider: m.gateway_provider || '',
     });
     setShowForm(true);
   };
@@ -150,6 +159,8 @@ export default function PaymentsTab() {
         enabled: !!form.enabled,
         // Nenhum envio marcado = serve para todos (null na base de dados).
         shipping_methods: form.shipping_methods?.length ? form.shipping_methods : null,
+        // Confirmado pelo gateway (webhook) ou pela equipa. Só letras, algarismos e _ (regra da base).
+        gateway_provider: String(form.gateway_provider || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 30),
       };
       // A coluna só existe depois da migração 20261106050000; antes, enviá-la partia a gravação.
       if (!methods.some((m) => 'shipping_methods' in m)) delete data.shipping_methods;
@@ -280,6 +291,8 @@ export default function PaymentsTab() {
         </div>
       )}
 
+      <GatewayCard gateway={gateway} />
+
       {duplicateCodes.size > 0 && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -321,6 +334,7 @@ export default function PaymentsTab() {
                     : ''}
                   {(m.qr_url || m.qr_code) ? ' · com QR' : ''}
                   {m.payment_link ? ' · com link de pagamento' : ''}
+                  {m.gateway_provider ? ' · confirmação automática (gateway)' : ' · a equipa confirma'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -387,6 +401,21 @@ export default function PaymentsTab() {
               <div className="space-y-2">
                 <Label>Conta / número / IBAN</Label>
                 <Input value={form.account_info} onChange={(e) => setForm({ ...form, account_info: e.target.value })} maxLength={200} />
+              </div>
+              <div className="space-y-2">
+                <Label>Quem confirma o pagamento</Label>
+                <Select value={form.gateway_provider ? 'gateway' : 'equipa'}
+                  onValueChange={(v) => setForm({ ...form, gateway_provider: v === 'gateway' ? (gateway?.provider || 'generico') : '' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="equipa">A equipa (quem tem "Confirmar pagamentos")</SelectItem>
+                    <SelectItem value="gateway">O gateway de pagamentos, automaticamente (webhook)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Com gateway, o cliente não indica referência: o pagamento fica confirmado quando o gateway avisa a loja.
+                  {form.gateway_provider && gateway && !gateway.configured && ' O gateway ainda não está ligado (falta o segredo do webhook): até lá, ninguém confirma estes pagamentos automaticamente.'}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Link de pagamento (opcional)</Label>
@@ -481,6 +510,36 @@ export default function PaymentsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+/**
+ * O gateway de pagamentos: se está ligado e o endereço do webhook a dar ao fornecedor. Regra do
+ * dono: os pagamentos confirmam-se pelo gateway; à mão, só quem tem "Confirmar pagamentos".
+ */
+function GatewayCard({ gateway }) {
+  const { toast } = useToast();
+  if (!gateway) return null;
+  const copy = () => navigator.clipboard?.writeText(gateway.webhook_url).then(() => toast({ title: 'Endereço copiado' })).catch(() => {});
+  return (
+    <div className={`rounded-xl border p-4 text-sm space-y-2 ${gateway.configured ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/10'}`}>
+      <p className="font-semibold flex items-center gap-2">
+        <Zap className="h-4 w-4" aria-hidden="true" />
+        Gateway de pagamentos: {gateway.configured ? `ligado (${gateway.provider})` : 'por ligar'}
+      </p>
+      <p className="text-muted-foreground">
+        {gateway.configured
+          ? 'Os métodos marcados com "O gateway" ficam pagos quando o gateway avisa a loja; cada aviso fica em Relatórios → Pagamentos e caixa.'
+          : 'Para ligar: o gateway (ProxyPay, EMIS, AppyPay…) tem de enviar os avisos de pagamento para o endereço abaixo, assinados com um segredo partilhado. O segredo fica nos segredos da Edge Function (PAYMENT_WEBHOOK_SECRET).'}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <code className="rounded bg-background border px-2 py-1 text-xs break-all">{gateway.webhook_url}</code>
+        <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={copy}>
+          <Copy className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Copiar
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Assinatura no cabeçalho {gateway.signature_header}: HMAC-SHA256 do corpo. Contrato em docs/PAGAMENTOS.md.</p>
     </div>
   );
 }

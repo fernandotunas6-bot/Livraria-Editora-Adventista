@@ -3,7 +3,33 @@
 Objectivo: **https://livrariaadventista.ao** (sem `www`) passa a ser o endereço oficial e o
 `livrariaadventista.com` redirecciona para ele.
 
-## Estado (verificado em 2026-11-05)
+## Estado actual (2026-11-07): o `.ao` é o endereço oficial
+
+| O quê | Estado |
+|-------|--------|
+| Zona `livrariaadventista.ao` (conta do projecto, `cody`/`hadlee`) | **Active**; DNSSEC desligado |
+| Pages: `livrariaadventista.ao` e `www.livrariaadventista.ao` | **Active**, certificado até 2027-02-05 (renova sozinho) |
+| `www.livrariaadventista.ao` → `livrariaadventista.ao` | **301** no Cloudflare (Single Redirect da zona `.ao`), com caminho e pesquisa |
+| `livrariaadventista.com` e `www` → `.ao` | No site (`canonicalHost.js`). **Falta o 301 no Cloudflare**: o token do repositório não tem permissão na zona `.com` |
+| Código | `CANONICAL_ORIGIN` = `.ao`; `SITE_URL` por omissão (deploy e `deploy-site.sh`) = `.ao`; Edge Function `DEFAULT_SITE_URL` = `.ao` |
+| Base de dados | Migração `20261107180000_dominio_ao`: 96 capas, 4 capas de colecções e `site_settings.site_url` no `.ao` |
+| Supabase Auth | `supabase/auth/config.json` com Site URL `.ao`. **Falta aplicar no painel** (Authentication → URL Configuration): o token do Supabase do ambiente deixou de ser válido |
+| Subdomínios | O `.com` só tem o principal e o `www`; o `.ao` tem os mesmos |
+| Email `contacto@livrariaadventista.ao` | Decidido: Cloudflare Email Routing → Gmail. Ainda por activar no painel (Email → Email Routing) |
+
+### O que falta, no painel
+
+1. Cloudflare, zona `livrariaadventista.com` → Rules → Redirect Rules → *Create rule*:
+   - quando: hostname é `livrariaadventista.com` ou `www.livrariaadventista.com`;
+   - URL de destino dinâmico `concat("https://livrariaadventista.ao", http.request.uri.path)`, 301, manter a query string.
+   (Ou dar ao token do repositório *Single Redirect: Edit* também na zona `.com`.)
+2. Supabase → Authentication → URL Configuration: **Site URL** = `https://livrariaadventista.ao`.
+   Os Redirect URLs já incluem o `.ao` e mantêm o `.com`.
+3. Search Console: *Alteração de endereço* do `.com` para o `.ao` e enviar `https://livrariaadventista.ao/sitemap.xml`.
+4. Email Routing do `contacto@livrariaadventista.ao` (ver as notas de 2026-11-06 abaixo).
+5. Manter o `.com` registado e a redireccionar pelo menos um ano.
+
+## Histórico (2026-11-05 e 06)
 
 | O quê | Estado |
 |-------|--------|
