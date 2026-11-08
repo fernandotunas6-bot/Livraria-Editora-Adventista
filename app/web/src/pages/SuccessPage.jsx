@@ -279,7 +279,7 @@ const SuccessPage = () => {
               <div className="space-y-4">
                 {nextSteps.map(({ step, title: stepTitle, desc }) => (
                   <div key={step} className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-marca/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-marca/10 flex items-center justify-center text-primary font-semibold text-sm">{step}</div>
                     <div>
                       <h3 className="text-base font-semibold mb-1">{stepTitle}</h3>
                       <p className="text-sm text-muted-foreground">{desc}</p>
@@ -301,7 +301,7 @@ const SuccessPage = () => {
               </Button>
               {isAuthed ? (
                 <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
-                  <Link to="/profile" state={{ tab: 'orders' }}>
+                  <Link to="/profile?tab=orders">
                     <User className="mr-2 h-5 w-5" aria-hidden="true" /> Ver {isWhatsApp ? 'Pedidos' : 'Compras'}
                   </Link>
                 </Button>

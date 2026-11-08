@@ -77,6 +77,11 @@ import {
 } from "./payments.ts";
 import { parseGatewayEvent, providerCode, verifyWebhookSignature } from "./paymentWebhook.ts";
 import { floatingPagesFrom } from "./floatingPages.ts";
+import { cleanCancelReason, customerCancelBlock } from "./customerCancel.ts";
+import {
+  RELEASE_PUSH_BATCH, RELEASE_PUSH_CONCURRENCY, mapLimit, nextReleaseBatch, pushFailure, releasePushAlive, releasePushPayload,
+} from "./releasePush.ts";
+import { type PaidMaterial, digitalBooksFor } from "./digitalBooks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -838,9 +843,24 @@ async function scheduleThankYouEmail(order: Row, settings: Row) {
 }
 
 /** Avisa o cliente de que o pagamento ficou confirmado. */
-async function sendPaymentConfirmedEmail(order: Row, settings: Row | null) {
+/**
+ * Os livros digitais que esta encomenda dá (materiais pagos e publicados dos seus produtos). Sem a
+ * tabela, sem materiais ou com um erro: nenhum — o email sai como sempre.
+ */
+async function orderDigitalBooks(order: Row) {
+  const none = { titles: [] as string[], onlyDigital: false };
+  const ids = [...new Set((Array.isArray(order?.items) ? order.items : [])
+    .map((i: Row) => String(i?.book_id || "")).filter(Boolean))];
+  if (!ids.length) return none;
+  const { data, error } = await db.from("downloads").select("id, title, book_id, variant")
+    .eq("access", "paid").eq("published", true).neq("file_path", "").in("book_id", ids);
+  if (error || !data?.length) return none;
+  return digitalBooksFor(order.items, data as PaidMaterial[]);
+}
+
+async function sendPaymentConfirmedEmail(order: Row, settings: Row | null, digital?: { titles: string[]; onlyDigital: boolean }) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
-  const letter = paymentConfirmedLetter(emailBrand(settings), order);
+  const letter = paymentConfirmedLetter(emailBrand(settings), order, digital);
   return sendLetter(settings, order.customer_email, letter, {
     context: "payment",
     customer_name: order.customer_name,
@@ -983,13 +1003,16 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
   // `key` é a chave de idempotência de cada canal: um aviso por pagamento, não por encomenda.
   const key = opts.key || step;
   const reason = String(event?.reason || "");
+  // Pago: os livros digitais da encomenda abriram (a base de dados abre-os sozinha); a carta, o
+  // WhatsApp e o push dizem que estão na biblioteca.
+  const digital = step === "paid" ? await orderDigitalBooks(order).catch(() => ({ titles: [] as string[], onlyDigital: false })) : null;
   const paymentLetter = step === "payment_partial" ? paymentPartialLetter(brand, order)
     : step === "payment_rejected" ? paymentRejectedLetter(brand, order, reason)
     : step === "refunded" ? refundLetter(brand, order)
     : null;
   try {
     result.email = step === "paid"
-      ? await sendPaymentConfirmedEmail(order, settings)
+      ? await sendPaymentConfirmedEmail(order, settings, digital || undefined)
       : step === "refunded"
         ? await sendRefundEmail(order, settings, key)
         : paymentLetter
@@ -998,7 +1021,7 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
   } catch (err) {
     console.log(`notifyOrderStep email ${step}:`, (err as Error)?.message || err);
   }
-  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : paymentLetter || orderStatusLetter(brand, order, step, event);
+  const letter = step === "paid" ? paymentConfirmedLetter(brand, order, digital || undefined) : paymentLetter || orderStatusLetter(brand, order, step, event);
   if (!letter) return result;
   const ref = String(order.order_number || order.id || "");
   const site = brand.siteUrl.replace(/\/$/, "");
@@ -1009,6 +1032,7 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
       `*${title}* — ${ref}`, "", subtitle,
       event?.description ? String(event.description) : "",
       reason ? `Motivo: ${reason}` : "",
+      digital?.titles.length && site ? `\nOs seus livros digitais: ${site}/profile?tab=biblioteca` : "",
       site ? `\nAcompanhe: ${site}/track` : "",
       `\n${settings?.site_name || "Livraria Adventista"}`,
     ].filter(Boolean).join("\n"));
@@ -1016,7 +1040,9 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
     console.log(`notifyOrderStep whatsapp ${step}:`, (err as Error)?.message || err);
   }
   try {
-    result.push = await sendOrderPush(order, settings, { title: `${title} — ${ref}`, body: subtitle, url: "/profile?tab=orders" });
+    result.push = await sendOrderPush(order, settings, {
+      title: `${title} — ${ref}`, body: subtitle, url: digital?.titles.length ? "/profile?tab=biblioteca" : "/profile?tab=orders",
+    });
   } catch (err) {
     console.log(`notifyOrderStep push ${step}:`, (err as Error)?.message || err);
   }
@@ -1050,29 +1076,108 @@ async function sendOrderPush(order: Row, settings: Row | null, payload: { title:
   return await sendUserPush(order.customer_id, settings, payload);
 }
 
-/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
-async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
-  if (!userId || !settings?.push_enabled) return 0;
+/** As chaves VAPID das configurações, ou null sem push ligado. */
+function pushKeys(settings: Row | null) {
+  if (!settings?.push_enabled) return null;
   const publicKey = String(settings.vapid_public_key || "");
   const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || String(settings.vapid_private_key || "");
-  if (!publicKey || !privateKey) return 0;
+  return publicKey && privateKey ? { publicKey, privateKey } : null;
+}
+
+/** O `web-push` pronto a enviar (chaves e contacto VAPID), ou null sem push ligado. */
+async function pushSender(settings: Row | null) {
+  const keys = pushKeys(settings);
+  if (!keys) return null;
+  const webpush = (await import("npm:web-push@3.6.7")).default;
+  const contact = settings!.contact_email ? `mailto:${settings!.contact_email}` : "mailto:contacto@livrariaadventista.ao";
+  webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
+  return webpush;
+}
+
+type PushSender = NonNullable<Awaited<ReturnType<typeof pushSender>>>;
+
+/** Um push para uma subscrição: 'sent', ou 'gone' (apagada: o aparelho já não existe) ou 'failed'. */
+async function pushToSubscription(webpush: PushSender, sub: Row, payload: Row): Promise<"sent" | "gone" | "failed"> {
+  try {
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
+    return "sent";
+  } catch (err) {
+    const outcome = pushFailure(err);
+    if (outcome === "gone") await db.from("push_subscriptions").delete().eq("id", sub.id);
+    else console.log("push:", (err as Row)?.statusCode, (err as Error)?.message);
+    return outcome;
+  }
+}
+
+/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
+async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
+  if (!userId || !pushKeys(settings)) return 0;
   const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", userId).limit(10);
   if (!subs?.length) return 0;
-  const webpush = (await import("npm:web-push@3.6.7")).default;
-  const contact = settings.contact_email ? `mailto:${settings.contact_email}` : "mailto:contacto@livrariaadventista.ao";
-  webpush.setVapidDetails(contact, publicKey, privateKey);
+  const webpush = await pushSender(settings);
+  if (!webpush) return 0;
   let sent = 0;
   for (const sub of subs) {
-    try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
-      sent++;
-    } catch (err) {
-      const code = (err as Row)?.statusCode;
-      if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", sub.id);
-      else console.log("push:", code, (err as Error)?.message);
-    }
+    if (await pushToSubscription(webpush, sub, payload) === "sent") sent++;
   }
   return sent;
+}
+
+/**
+ * Novidades da app por push a todos os aparelhos que as aceitam (releasePush.ts): um lote de
+ * cada vez, com o lote reservado antes de enviar. Chamado logo que a equipa pede o envio e,
+ * até acabar, pelo agendador "avisos-equipa".
+ */
+async function dispatchReleasePush(batch = RELEASE_PUSH_BATCH) {
+  const { data: release, error } = await db.from("app_releases")
+    .select("id, title, push_cursor, push_requested_at")
+    .not("push_requested_at", "is", null).is("push_finished_at", null)
+    .order("push_requested_at", { ascending: true }).limit(1).maybeSingle();
+  if (error) {
+    // Sem a tabela (migração por aplicar): nada a enviar.
+    if (!/does not exist|Could not find/i.test(error.message || "")) console.log("dispatchReleasePush:", error.message);
+    return { pending: 0, sent: 0 };
+  }
+  if (!release) return { pending: 0, sent: 0 };
+  const finish = (extra: Row = {}) => db.from("app_releases").update({ push_finished_at: nowISO(), ...extra })
+    .eq("id", release.id).is("push_finished_at", null);
+  if (!releasePushAlive(release.push_requested_at)) {
+    await finish();
+    return { pending: 1, sent: 0, stopped: "antigo" };
+  }
+  const settings = await getSettings();
+  const webpush = await pushSender(settings);
+  if (!webpush) {
+    // Push desligado entretanto: o envio fica dado por acabado, sem mandar nada.
+    await finish();
+    return { pending: 1, sent: 0, stopped: "push desligado" };
+  }
+
+  let query = db.from("push_subscriptions").select("id, endpoint, keys").eq("app_updates", true)
+    .order("id", { ascending: true }).limit(batch);
+  if (release.push_cursor) query = query.gt("id", release.push_cursor);
+  const { data: subs, error: subsError } = await query;
+  if (subsError) {
+    console.log("dispatchReleasePush (subscrições):", subsError.message);
+    return { pending: 1, sent: 0 };
+  }
+  const list = (subs || []) as Row[];
+  const { cursor, done } = nextReleaseBatch(list.map((s) => String(s.id)), release.push_cursor || null, batch);
+
+  // Reservar o lote: o cursor só avança se ainda for o que se leu.
+  let claim = db.from("app_releases")
+    .update({ push_cursor: cursor, ...(done ? { push_finished_at: nowISO() } : {}) })
+    .eq("id", release.id).is("push_finished_at", null);
+  claim = release.push_cursor ? claim.eq("push_cursor", release.push_cursor) : claim.is("push_cursor", null);
+  const { data: claimed } = await claim.select("id");
+  if (!claimed?.length) return { pending: 1, sent: 0, skipped: "lote já reservado" };
+
+  const payload = releasePushPayload(release as { id: string; title: string });
+  const outcomes = await mapLimit(list, RELEASE_PUSH_CONCURRENCY, (sub) => pushToSubscription(webpush, sub, payload));
+  const sent = outcomes.filter((o) => o === "sent").length;
+  const failed = outcomes.length - sent;
+  if (outcomes.length) await db.rpc("app_release_push_progress", { p_id: release.id, p_sent: sent, p_failed: failed });
+  return { pending: 1, sent, failed, done };
 }
 
 function sanitizeIntegrationConfig(code: string, config: Row) {
@@ -1562,6 +1667,8 @@ route("POST", "/track", async ({ body, ip }) => {
     estimated_delivery: order.estimated_delivery || "", payment_status: order.payment_status || "pending",
     timeline: order.delivery_timeline || [], created: order.created,
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
+    // O cliente ainda a pode cancelar sozinho (rota /order/cancel; regras em customerCancel.ts).
+    can_cancel: customerCancelBlock(order) === null,
   });
 });
 
@@ -2816,9 +2923,51 @@ route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
     : {};
   const rec: Row = { endpoint, keys, user_agent: String(body.user_agent || "").slice(0, 300) };
   if (auth?.id) rec.user = auth.id;
+  // "Novidades da app" no perfil: cada aparelho escolhe (as encomendas e a comunidade não mudam).
+  if (typeof body.app_updates === "boolean") rec.app_updates = body.app_updates;
   const { error } = await db.from("push_subscriptions").upsert(rec, { onConflict: "endpoint" });
   if (error) throw error;
   return json({ message: "Subscrição push registada." });
+});
+
+/**
+ * Avisar por push todos os aparelhos das novidades de uma versão (painel → Versões da app).
+ * Uma só vez por novidade e só depois de publicada; o envio continua em lotes (dispatchReleasePush).
+ */
+route("POST", "/admin/releases/notify", async ({ auth, body }) => {
+  const staff = requirePermission(auth, "manage_settings");
+  const id = String(body.id || "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw bad("Novidade inválida.");
+  const { data: release } = await db.from("app_releases")
+    .select("id, title, published_at, push_requested_at").eq("id", id).maybeSingle();
+  if (!release) throw new HttpError(404, "Novidade não encontrada.");
+  if (!release.published_at || new Date(release.published_at).getTime() > Date.now()) {
+    throw bad("Publique as novidades antes de avisar: o aviso abre a página das novidades.");
+  }
+  if (!pushKeys(await getSettings(true))) {
+    throw bad("As notificações push não estão ligadas (Configurações → Email, push e chat).");
+  }
+  const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true);
+  if (release.push_requested_at) {
+    return json({ message: "O aviso destas novidades já foi pedido.", already: true, devices: count || 0 });
+  }
+  // `x-actor-id`: o registo de segurança fica a saber quem pediu o aviso a todos.
+  const { data: marked, error } = await db.from("app_releases").update({ push_requested_at: nowISO() })
+    .eq("id", id).is("push_requested_at", null).select("id").setHeader("x-actor-id", staff.id);
+  if (error) throw error;
+  if (!marked?.length) return json({ message: "O aviso destas novidades já foi pedido.", already: true, devices: count || 0 });
+  runAfterResponse("Novidades da app (push)", () => dispatchReleasePush());
+  return json({ message: `A avisar ${count || 0} aparelho(s). O envio leva alguns minutos.`, devices: count || 0 });
+});
+
+/** Quantos aparelhos recebem as novidades (o painel mostra antes de pedir o aviso). */
+route("GET", "/admin/releases/devices", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  const [all, updates] = await Promise.all([
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }),
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true),
+  ]);
+  return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: !!pushKeys(await getSettings()) });
 });
 
 route("POST", "/contact-message", async ({ body, ip }) => {
@@ -3695,14 +3844,14 @@ route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
-  const [staff, customers, community, colporteurs] = await Promise.all([
+  const [staff, customers, community, colporteurs, releases] = await Promise.all([
     dispatchStaffNotifications(), dispatchCustomerSupportNotifications(), dispatchCommunityNotifications(),
-    dispatchColporteurNotifications(),
+    dispatchColporteurNotifications(), dispatchReleasePush(),
   ]);
-  if (staff.pending || customers.pending || community.pending || colporteurs.pending) {
-    console.log("Avisos (cron):", JSON.stringify({ staff, customers, community, colporteurs }));
+  if (staff.pending || customers.pending || community.pending || colporteurs.pending || releases.pending) {
+    console.log("Avisos (cron):", JSON.stringify({ staff, customers, community, colporteurs, releases }));
   }
-  return json({ ...staff, customers, community, colporteurs });
+  return json({ ...staff, customers, community, colporteurs, releases });
 });
 
 const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];
@@ -4087,6 +4236,193 @@ route("POST", "/account/password-changed-notice", async ({ auth }) => {
     customer_name: profile?.name || "",
   });
   return json({ ok: true, notified: sent });
+});
+
+/** A encomenda é da conta da sessão: a mesma regra do RLS das encomendas (conta ou email da conta). */
+const sessionOwnsOrder = (auth: Auth, order: Row | null) =>
+  !!auth?.id && !!order && (order.customer_id === auth.id ||
+    (!!auth.email && normalizeEmail(order.customer_email || "") === normalizeEmail(auth.email)));
+
+/**
+ * O cliente cancela uma encomenda sua enquanto não está paga nem saiu da fila de preparação.
+ *
+ * Antes não podia: a mensagem do checkout ("Já tem 3 encomendas por pagar. Pague ou cancele
+ * uma…") mandava-o cancelar sem lhe dar maneira, e o contacto da loja era o único caminho.
+ * Com sessão, a encomenda tem de ser da conta; sem sessão, identifica-se como no rastreio
+ * (número e email). Quem decide é public.order_cancel_by_customer, com a linha bloqueada: o
+ * stock volta pelo gatilho da base (como num cancelamento no painel), a equipa é avisada para
+ * não a preparar e o cliente recebe o aviso do costume.
+ */
+route("POST", "/order/cancel", async ({ body, ip, auth }) => {
+  if (!await checkRateLimit("order-cancel", auth?.id || ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const orderNumber = String(body.orderNumber || "").trim().slice(0, 60);
+  const email = normalizeEmail(body.email || "");
+  if (!orderNumber) throw bad("Indique o número da encomenda.");
+
+  let order: Row | null = null;
+  if (auth?.id) {
+    const { data } = await db.from("orders").select("*")
+      .or(`order_number.eq.${JSON.stringify(orderNumber)},id.eq.${JSON.stringify(orderNumber)}`).limit(1);
+    if (sessionOwnsOrder(auth, data?.[0] || null)) order = data![0];
+  }
+  if (!order && email) order = await findOrderByNumberAndEmail(orderNumber, email);
+  // A mesma resposta para número inexistente e encomenda de outra pessoa.
+  if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
+  const block = customerCancelBlock(order);
+  if (block) throw bad(block);
+
+  const reason = cleanCancelReason(body.reason);
+  const { data: result, error } = await db.rpc("order_cancel_by_customer", { p_order_id: order.id, p_reason: reason });
+  if (error) throw bad(error.message);
+  const ref = String(result?.order_number || order.order_number || order.id);
+
+  // A equipa que recebe as encomendas novas (por loja, no levantamento) deixa de a preparar.
+  const storeId = await orderStoreId(order);
+  await notifyDuty({
+    duty: "new_order", storeId, kind: "order_cancelled", severity: "normal", orderId: order.id,
+    title: `Cancelada pelo cliente — ${ref}`,
+    body: `${order.customer_name || "O cliente"} cancelou a encomenda (${kwanza(order.total)}).`
+      + `${reason ? ` Motivo: ${reason}.` : ""} O stock voltou ao catálogo: não é para preparar.`,
+  });
+  runAfterResponse("Avisos à equipa (cancelada pelo cliente)", () => dispatchStaffNotifications());
+  const { data: saved } = await db.from("orders").select("*").eq("id", order.id).maybeSingle();
+  if (saved) {
+    try {
+      await notifyOrderStep(saved, "cancelled", {
+        description: `Cancelou a encomenda${reason ? ` (${reason})` : ""}. Não há nada a pagar. Se mudar de ideias, é só voltar a encomendar.`,
+      });
+    } catch (err) {
+      console.log("Aviso de cancelamento pelo cliente:", err);
+    }
+  }
+  return json({ ok: true, order_number: ref, message: "Encomenda cancelada. Não há nada a pagar." });
+});
+
+/**
+ * A loja da encomenda para escolher a equipa: a do levantamento (pelo id ou pelo nome, as
+ * activas primeiro), ou nenhuma na entrega. A mesma regra de private.order_store_id.
+ */
+async function orderStoreId(order: Row): Promise<string | null> {
+  const pickup = String(order.pickup_store || "").trim();
+  if (order.shipping_method !== "pickup" || !pickup) return null;
+  const { data } = await db.from("physical_stores").select("id, name, active").limit(200);
+  const match = (data || [])
+    .filter((st: Row) => String(st.id) === pickup || String(st.name || "").trim().toLowerCase() === pickup.toLowerCase())
+    .sort((a: Row, b: Row) => Number(b.active !== false) - Number(a.active !== false))[0];
+  return match ? String(match.id) : null;
+}
+
+/**
+ * Os dados da conta, para o próprio cliente descarregar (direito de acesso, Lei n.º 22/11).
+ * Lê com a chave de serviço o que é da conta — perfil, encomendas, pagamentos, lista de
+ * desejos, avaliações, comunidade, avisos, conversas de apoio, aparelhos e subscrições — sem o
+ * que é da equipa: notas internas das conversas, quem tratou cada encomenda e as imagens das
+ * assinaturas (só se diz se existem).
+ */
+route("GET", "/account/export", async ({ auth }) => {
+  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("account-export", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const email = normalizeEmail(auth.email || "");
+  const listOr = <T>(p: PromiseLike<{ data: T[] | null; error: unknown }>) => Promise.resolve(p).then((r) => r.data || []).catch(() => []);
+  const ORDER_EXPORT_COLUMNS = "id, order_number, created, updated, status, payment_status, delivery_status, items, total, shipping_cost, "
+    + "amount_paid, amount_refunded, paid_at, payment_method_name, payment_reference, shipping_method, pickup_store, "
+    + "customer_name, customer_email, phone, address, city, delivery_province, delivery_municipality, delivery_locality, "
+    + "delivery_street, delivery_reference, delivery_address_full, delivery_relative_name, delivery_relative_phone, "
+    + "notes, tracking_number, carrier, estimated_delivery, delivery_confirmed_at, delivery_recipient_name, "
+    + "checkout_signature_at, customer_feedback, customer_confirmed_at, delivery_timeline, customer_code, "
+    + "delivery_signature_data, checkout_signature_data";
+  // As encomendas da conta e as do email da conta (a regra do RLS), em duas leituras: o email num
+  // `or(...)` passaria por outro analisador, e o escape do `_` do LIKE podia perder-se pelo
+  // caminho — um email com `_` apanharia encomendas de outro parecido.
+  const [{ data: userData }, { data: profile }, byAccount, byEmail] = await Promise.all([
+    db.auth.admin.getUserById(auth.id),
+    db.from("profiles").select("name, email, phone, avatar, customer_code, staff_code, role, reader_key, community_notify, created, updated").eq("id", auth.id).maybeSingle(),
+    listOr(db.from("orders").select(ORDER_EXPORT_COLUMNS).eq("customer_id", auth.id).limit(1000)),
+    email ? listOr(db.from("orders").select(ORDER_EXPORT_COLUMNS).ilike("customer_email", likeExact(email)).limit(1000)) : [],
+  ]);
+  const orders = [...new Map([...byAccount, ...byEmail].map((o: Row) => [o.id, o])).values()]
+    .sort((a: Row, b: Row) => String(b.created).localeCompare(String(a.created)));
+  const orderIds = orders.map((o: Row) => o.id);
+  const [payments, wishlist, reviews, posts, likes, notices, threads, devices, newsletter, contacts, pushes] = await Promise.all([
+    orderIds.length
+      ? listOr(db.from("order_payments").select("order_id, kind, status, amount, method_name, reference, created, decided_at, decision_reason").in("order_id", orderIds).limit(2000))
+      : [],
+    listOr(db.from("wishlists").select("created, book_id, stock_books (title, book_code)").eq("user_id", auth.id).limit(1000)),
+    listOr(db.from("book_reviews").select("book_id, rating, comment, user_name, is_verified, created, updated").eq("user_id", auth.id).limit(1000)),
+    listOr(db.from("community_posts").select("id, parent_id, book_id, topic, kind, body, quote, quote_page, links, hidden, created, updated").eq("user_id", auth.id).limit(2000)),
+    listOr(db.from("community_likes").select("post_id, created").eq("user_id", auth.id).limit(5000)),
+    listOr(db.from("customer_notifications").select("kind, title, body, href, created_at, read_at").eq("customer_id", auth.id).order("created_at", { ascending: false }).limit(1000)),
+    listOr(db.from("support_threads").select("id, ticket_number, subject, status, channel, category, created_at, closed_at, csat_score, csat_comment").eq("customer_id", auth.id).limit(500)),
+    listOr(db.from("account_devices").select("description, first_seen, last_seen").eq("user_id", auth.id).limit(200)),
+    email ? listOr(db.from("newsletter").select("email, created").ilike("email", likeExact(email)).limit(5)) : [],
+    email ? listOr(db.from("contacts").select("name, email, phone, source, tags, created, marketing_opt_out_at").ilike("email", likeExact(email)).limit(20)) : [],
+    listOr(db.from("push_subscriptions").select("user_agent, created").eq("user", auth.id).limit(50)),
+  ]);
+  const threadIds = threads.map((t: Row) => t.id);
+  // As notas internas da equipa ("note") não são do cliente: ficam de fora, como no site.
+  const messages = threadIds.length
+    ? await listOr(db.from("support_messages").select("thread_id, author_kind, body, created_at").in("thread_id", threadIds).neq("author_kind", "note").order("created_at").limit(5000))
+    : [];
+  const user = (userData?.user || {}) as Row;
+  const ordersOut = orders.map((o: Row) => {
+    const { delivery_signature_data, checkout_signature_data, ...rest } = o;
+    return {
+      ...rest,
+      checkout_signature_present: !!checkout_signature_data,
+      delivery_signature_present: !!delivery_signature_data,
+      payments: payments.filter((p: Row) => p.order_id === o.id).map(({ order_id: _o, ...p }: Row) => p),
+    };
+  });
+  return json({
+    gerado_em: nowISO(),
+    explicacao: "Os dados da sua conta na Livraria Adventista. As imagens das assinaturas não vão neste ficheiro (só se diz se existem); pode pedi-las à loja. A política de privacidade está em /privacidade.",
+    conta: {
+      email: user.email || auth.email, criada_em: user.created_at || null, ultima_entrada: user.last_sign_in_at || null,
+      email_confirmado_em: user.email_confirmed_at || null, entrada_com: user.app_metadata?.providers || [],
+      verificacao_em_dois_passos: Array.isArray(user.factors) && user.factors.some((f: Row) => f.status === "verified"),
+    },
+    perfil: profile || null,
+    encomendas: ordersOut,
+    lista_de_desejos: wishlist,
+    avaliacoes: reviews,
+    comunidade: { publicacoes: posts, gostos: likes },
+    avisos: notices,
+    atendimento: threads.map((t: Row) => ({ ...t, mensagens: messages.filter((m: Row) => m.thread_id === t.id).map(({ thread_id: _t, ...m }: Row) => m) })),
+    aparelhos: devices,
+    notificacoes_push: pushes,
+    newsletter,
+    contactos_de_marketing: contacts,
+  });
+});
+
+/**
+ * O cliente apaga a sua conta (direito ao apagamento, Lei n.º 22/11). Pede o email da conta
+ * escrito à mão, como confirmação. Vale o mesmo que apagar no painel: saem o perfil, a lista
+ * de desejos, as publicações e gostos da comunidade e os avisos; as encomendas ficam (estão
+ * ligadas ao email e a lei fiscal obriga a guardá-las) e continuam a poder ser rastreadas.
+ * As contas da equipa e dos colportores apagam-se pela administração, que trata do que está
+ * pendurado nelas (permissões, guias, comissões).
+ */
+route("POST", "/account/delete", async ({ auth, body }) => {
+  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+  if (!await checkRateLimit("account-delete", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const { data: profile } = await db.from("profiles").select("name, role").eq("id", auth.id).maybeSingle();
+  if (profile?.role === "admin" || profile?.role === "manager" || isStaff(auth)) {
+    throw bad("As contas da equipa são apagadas por um administrador, no painel (Utilizadores).");
+  }
+  const { data: colporteur } = await db.from("colporteurs").select("code").eq("profile_id", auth.id).limit(1);
+  if (colporteur?.length) {
+    throw bad(`A sua conta está ligada à colportagem${colporteur[0].code ? ` (${colporteur[0].code})` : ""}: para a apagar, fale com a coordenação.`);
+  }
+  if (normalizeEmail(String(body.confirmEmail || "")) !== normalizeEmail(auth.email || "")) {
+    throw bad("Escreva o email da sua conta para confirmar.");
+  }
+  const { error } = await db.auth.admin.deleteUser(auth.id);
+  if (error) throw bad(`Não foi possível apagar a conta: ${error.message}`);
+  await recordSecurity(auth, { rowId: auth.id, action: "delete", summary: `Conta apagada pelo próprio cliente: ${auth.email || auth.id}` });
+  // Depois de apagada, como no painel: um aviso de encerramento de uma conta que ficou seria pior.
+  const emailSent = await notifyAccount(auth.email || "", profile?.name || "", (b) => accountClosedLetter(b, profile?.name || ""));
+  return json({ ok: true, email_sent: emailSent });
 });
 
 /** Envia um aviso de conta sem deixar que uma falha de email desfaça a operação já feita. */

@@ -21,10 +21,18 @@ const LoginPage = () => {
   // ?modo=registo abre já no registo (links de campanhas, do email de boas-vindas, etc.).
   const [mode, setMode] = useState(() => (new URLSearchParams(location.search).get('modo') === 'registo' ? 'signup' : 'login'));
   const { ready, isAuthed, user } = useAuth();
-  // O último email escrito nesta sessão, ou o da última conta que entrou neste navegador.
+  // A última conta que entrou neste navegador (para a identificar: "Bem-vindo de volta, Maria")
+  // e o último email escrito nesta sessão.
+  const [remembered] = useState(() => {
+    try {
+      return readHadAccount(localStorage.getItem(HAD_ACCOUNT_KEY));
+    } catch {
+      return null;
+    }
+  });
   const [defaultEmail] = useState(() => {
     try {
-      return sessionStorage.getItem('livraria_login_email') || readHadAccount(localStorage.getItem(HAD_ACCOUNT_KEY))?.email || '';
+      return sessionStorage.getItem('livraria_login_email') || remembered?.email || '';
     } catch {
       return '';
     }
@@ -65,7 +73,7 @@ const LoginPage = () => {
       <div className="min-h-screen grid lg:grid-cols-2 bg-background">
         <div className="relative hidden lg:block">
           <img src={bgImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0c4a6e]/95 via-[#0c4a6e]/50 to-[#0c4a6e]/20" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#0c4a6e]/95 via-[#0c4a6e]/50 to-[#0c4a6e]/20" />
           <div className="absolute bottom-12 left-12 right-12 text-white">
             <BrandLogo linkTo="/" variant="light" className="mb-6" />
             <h2 className="text-3xl font-bold mb-3">{settings.site_name}</h2>
@@ -77,7 +85,7 @@ const LoginPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-center p-6 sm:p-10 bg-gradient-to-b from-muted/30 to-background">
+        <div className="flex items-center justify-center p-6 sm:p-10 bg-linear-to-b from-muted/30 to-background">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -85,7 +93,7 @@ const LoginPage = () => {
           >
             <div className="mb-6 lg:hidden flex justify-center"><BrandLogo /></div>
 
-            <div className="rounded-2xl border bg-card/80 backdrop-blur-sm shadow-xl p-6 sm:p-8">
+            <div className="rounded-2xl border bg-card/80 backdrop-blur-xs shadow-xl p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h1 className="text-2xl font-bold">{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
@@ -98,6 +106,8 @@ const LoginPage = () => {
               <AuthForm
                 initialMode={mode}
                 defaultEmail={defaultEmail}
+                remembered={remembered}
+                autoFocus
                 returnPath={redirectTo || '/profile'}
                 onModeChange={setMode}
                 onDone={afterAuthNavigate}

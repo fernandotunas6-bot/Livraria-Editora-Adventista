@@ -11,6 +11,8 @@ import {
   deleteDownload, getDownloadUrl, isMissingTable, loadAllDownloads, removePdf, saveDownload, uploadPdf,
 } from '@/lib/downloadsApi';
 import { DOWNLOAD_KINDS, downloadKindLabel, formatFileSize, pdfFileError, variantLabel } from '@/lib/downloads';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import DigitalAccessPanel from '@/components/admin/DigitalAccessPanel';
 
 const EMPTY = {
   title: '', description: '', kind: 'revista', edition: '', cover: '', file_path: '', file_name: '', file_size: 0,
@@ -19,11 +21,27 @@ const EMPTY = {
 const selectClass = 'h-10 w-full rounded-md border bg-background px-3 text-sm';
 
 /**
- * Painel → Catálogo → Materiais: PDFs para descarregar. Gratuitos (qualquer visitante) ou pagos
- * (quem comprou o produto, ou a variante, numa encomenda paga, entregue ou confirmada).
+ * Painel → Catálogo → Materiais (PDF), com duas vistas:
+ *   * Materiais: os PDFs. Gratuitos (qualquer visitante) ou pagos (quem comprou o produto, ou a
+ *     variante "Edição digital", numa encomenda PAGA — migração livros_digitais).
+ *   * Acessos e pagamentos: quem comprou cada livro digital, o pagamento e o acesso.
  * Os ficheiros vão para o bucket privado `downloads`; a regra de acesso é da base de dados.
  */
 export default function DownloadsTab({ books = [] }) {
+  // As vistas vêm do registo do painel (lib/adminSections.js) e a aberta do endereço.
+  const sv = useSectionView('downloads');
+  return (
+    <div className="space-y-4">
+      <AdminViewNav state={sv} className="mb-0" />
+      <div className="pt-2">
+        {sv.view === 'acessos' ? <DigitalAccessPanel /> : <MaterialsPanel books={books} />}
+      </div>
+    </div>
+  );
+}
+
+/** Os PDFs: carregar, publicar, gratuitos ou para quem comprou. */
+function MaterialsPanel({ books = [] }) {
   const { toast } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,7 +278,7 @@ export default function DownloadsTab({ books = [] }) {
                 value={form.cover}
                 onChange={(v) => set('cover', v)}
                 aspect="3:4"
-                previewClassName="h-24 w-[4.5rem]"
+                previewClassName="h-24 w-18"
                 showDrive={false}
                 hint="Imagem da capa · 3:4"
                 uploadFolder="stock_books"
@@ -298,7 +316,7 @@ export default function DownloadsTab({ books = [] }) {
               </div>
               {form.access === 'paid' && (
                 <p className="text-xs text-muted-foreground">
-                  Para vender só o PDF, crie no produto uma variante "Edição digital (PDF)" e escolha-a aqui. O checkout continua a pedir levantamento ou entrega.
+                  Abre a quem comprou, só depois de o pagamento da encomenda estar confirmado (e fecha com o reembolso). Para vender só o PDF, crie no produto uma variante "Edição digital (PDF)" e escolha-a aqui. O checkout continua a pedir levantamento ou entrega.
                 </p>
               )}
 

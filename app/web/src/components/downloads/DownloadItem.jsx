@@ -39,9 +39,9 @@ export default function DownloadItem({ item, product = null, compact = false }) 
     <li className={`flex gap-3 rounded-xl border bg-card ${compact ? 'p-3' : 'p-4'}`}>
       {!compact && (
         item.cover ? (
-          <img src={item.cover} alt="" loading="lazy" className="h-24 w-[4.5rem] shrink-0 rounded-md border object-cover" />
+          <img src={item.cover} alt="" loading="lazy" className="h-24 w-18 shrink-0 rounded-md border object-cover" />
         ) : (
-          <div className="flex h-24 w-[4.5rem] shrink-0 items-center justify-center rounded-md border bg-muted/40" aria-hidden="true">
+          <div className="flex h-24 w-18 shrink-0 items-center justify-center rounded-md border bg-muted/40" aria-hidden="true">
             <FileText className="h-8 w-8 text-muted-foreground" />
           </div>
         )
@@ -84,9 +84,15 @@ export default function DownloadItem({ item, product = null, compact = false }) 
                 : 'Vem com a compra deste produto, depois de paga.'}
             </p>
           ) : (
-            <Button size="sm" variant="outline" asChild disabled={!item.book_id}>
-              <Link to={`/product/${item.book_id}`}><ShoppingBag className="mr-1.5 h-4 w-4" />{action.label}</Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button size="sm" variant="outline" asChild disabled={!item.book_id}>
+                <Link to={`/product/${item.book_id}`}><ShoppingBag className="mr-1.5 h-4 w-4" />{action.label}</Link>
+              </Button>
+              {/* Quem já o comprou e ainda não pagou vê na biblioteca o que falta para abrir. */}
+              {isAuthed && (
+                <Link to="/profile?tab=biblioteca" className="text-xs font-medium text-primary hover:underline">Já comprou? Veja na sua biblioteca</Link>
+              )}
+            </div>
           ))}
         </div>
       </div>

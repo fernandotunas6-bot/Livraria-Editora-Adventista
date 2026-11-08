@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import SafeLink from '@/components/SafeLink.jsx';
-import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3, Bell, FileDown, ShieldCheck } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, Library, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useHeaderReveal } from '@/hooks/useHeaderReveal';
@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthDialog } from '@/hooks/useAuthDialog';
+import { useColporteurMe } from '@/hooks/useColporteurMe';
+import { adminPermissions } from '@/lib/adminSections';
+import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import MegaMenu from '@/components/header/MegaMenu';
@@ -46,13 +49,15 @@ const Header = ({ onCartOpen, pinned = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartItems } = useCart();
-  const { user, isAuthed, isAdmin, canAccessAdmin, logout } = useAuth();
+  const { user, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
   const { openAuth } = useAuthDialog();
   const { settings } = useSiteSettings();
   const { notice, dismiss: dismissNotice } = useSiteNotice();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // "Área do colportor" no menu do telemóvel: pergunta-se quando o menu abre.
+  const colporteur = useColporteurMe(user?.id, { enabled: isAuthed && mobileOpen });
   const [hasFocus, setHasFocus] = useState(false);
   const [searchCatalog, setSearchCatalog] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
@@ -214,7 +219,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
       {!pinned && !revealed && (
         <div
           className={cn(
-            'inset-x-0 z-30 bg-gradient-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base',
+            'inset-x-0 z-30 bg-linear-to-b from-black/50 via-black/25 to-transparent animate-in fade-in duration-base',
             notice ? 'absolute' : 'safe-top fixed top-0',
           )}
           style={notice ? { top: 'var(--notice-offset, 0px)' } : undefined}
@@ -264,7 +269,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
           baixo sem se ver), e o deslizar não passa para a página. */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-[48] touch-none bg-black/40 animate-in fade-in duration-base lg:hidden"
+          className="fixed inset-0 z-48 touch-none bg-black/40 animate-in fade-in duration-base lg:hidden"
           onClick={closeMobile}
           aria-hidden="true"
         />
@@ -276,9 +281,9 @@ const Header = ({ onCartOpen, pinned = false }) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
       }}
       className={cn(
-        'safe-top top-0 border-b border-border shadow-sm glass-topbar text-white',
+        'safe-top top-0 border-b border-border shadow-xs glass-topbar text-white',
         // Com o menu aberto, acima do véu e dos botões flutuantes (o chat está em z-45).
-        mobileOpen ? 'z-[49]' : 'z-40',
+        mobileOpen ? 'z-49' : 'z-40',
         // Onde a página abre com imagem de largura inteira, o cabeçalho sai do fluxo para
         // a poder descobrir: em `sticky` continuava a ocupar lugar, e escondê-lo deixava
         // uma faixa vazia por cima dela — exactamente o que se queria tirar.
@@ -455,7 +460,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                     key={term}
                     type="button"
                     onClick={() => searchRecent(term)}
-                    className="inline-flex min-h-9 max-w-[12rem] items-center truncate rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white/90 hover:bg-white/15"
+                    className="inline-flex min-h-9 max-w-48 items-center truncate rounded-full border border-white/15 bg-white/10 px-3 text-xs text-white/90 hover:bg-white/15"
                   >
                     {term}
                   </button>
@@ -555,8 +560,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <User className="h-4 w-4 text-[#22d3ee]" /> Minha Conta
                 </Link>
                 <Link
-                  to="/profile"
-                  state={{ tab: 'orders' }}
+                  to={accountHref('orders')}
                   onClick={closeMobile}
                   className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
@@ -572,13 +576,23 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <Bell className="h-4 w-4 text-[#22d3ee]" /> Notificações
                 </Link>
                 <Link
-                  to="/profile?tab=pdfs"
+                  to="/profile?tab=biblioteca"
                   onClick={closeMobile}
                   className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
                 >
-                  <FileDown className="h-4 w-4 text-[#22d3ee]" /> Os meus PDFs
+                  <Library className="h-4 w-4 text-[#22d3ee]" /> A minha biblioteca
                 </Link>
+                {colporteur && (
+                  <Link
+                    to={colporteurHref()}
+                    onClick={closeMobile}
+                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    tabIndex={mobileOpen ? 0 : -1}
+                  >
+                    <BadgeCheck className="h-4 w-4 text-[#22d3ee]" /> Área do colportor
+                  </Link>
+                )}
                 {canAccessAdmin && (
                   <Link
                     to="/admin"
@@ -586,19 +600,22 @@ const Header = ({ onCartOpen, pinned = false }) => {
                     className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
-                    <LayoutDashboard className="h-4 w-4 text-[#22d3ee]" /> Painel Admin
+                    <LayoutDashboard className="h-4 w-4 text-[#22d3ee]" /> Painel da equipa
                   </Link>
                 )}
-                {canAccessAdmin && (
+                {/* As secções do painel que esta pessoa pode abrir (antes: "Painel de Vendas" a
+                    toda a equipa, mesmo a quem não lhe tinha acesso). */}
+                {canAccessAdmin && staffShortcuts(adminPermissions({ isAdmin, hasPermission }), 3).map(({ id, to, label, icon: Icon }) => (
                   <Link
-                    to="/admin?tab=vendas-huambo"
+                    key={id}
+                    to={to}
                     onClick={closeMobile}
-                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    className="flex min-h-11 items-center gap-3 py-2.5 pl-10 pr-3 text-sm font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
-                    <BarChart3 className="h-4 w-4 text-[#22d3ee]" /> Painel de Vendas
+                    <Icon className="h-4 w-4 text-[#22d3ee]/80" aria-hidden="true" /> {label}
                   </Link>
-                )}
+                ))}
                 <button
                   type="button"
                   onClick={handleLogout}

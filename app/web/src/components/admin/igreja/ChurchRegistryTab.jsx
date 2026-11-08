@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Church, FileUp, LayoutDashboard, Map as MapIcon, RefreshCw, UserRound } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import { adminPermissions } from '@/lib/adminSections';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { indexRegistry, loadRegistry } from '@/lib/churchRegistryApi';
@@ -23,7 +24,11 @@ export default function ChurchRegistryTab() {
   const [reg, setReg] = useState(EMPTY_REG);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [tab, setTab] = useState('resumo');
+  // As vistas vêm do registo do painel (lib/adminSections.js); "Importar" só para quem edita.
+  const perms = useMemo(() => adminPermissions({ isAdmin, hasPermission }), [isAdmin, hasPermission]);
+  const sv = useSectionView('igreja', { perms });
+  const tab = sv.view;
+  const setTab = sv.setView;
 
   const reload = useCallback(async () => {
     try {
@@ -70,17 +75,18 @@ export default function ChurchRegistryTab() {
         <p className="text-sm text-muted-foreground">{canEdit ? 'Pode editar.' : 'Só leitura: para alterar, peça a quem gere o registo da Igreja.'}</p>
         <Button variant="ghost" size="sm" onClick={reload}><RefreshCw className="mr-1.5 h-4 w-4" />Actualizar</Button>
       </div>
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-4 h-auto flex-wrap">
-          <TabsTrigger value="resumo"><LayoutDashboard className="mr-1.5 h-4 w-4" />Resumo</TabsTrigger>
-          <TabsTrigger value="distritos"><MapIcon className="mr-1.5 h-4 w-4" />Distritos ({reg.districts.length})</TabsTrigger>
-          <TabsTrigger value="igrejas"><Church className="mr-1.5 h-4 w-4" />Igrejas ({reg.churches.length})</TabsTrigger>
-          <TabsTrigger value="pastores"><UserRound className="mr-1.5 h-4 w-4" />Pastores ({reg.pastors.length})</TabsTrigger>
-          <TabsTrigger value="campos"><Building2 className="mr-1.5 h-4 w-4" />Campos ({reg.fields.length})</TabsTrigger>
-          {canEdit && <TabsTrigger value="importar"><FileUp className="mr-1.5 h-4 w-4" />Importar</TabsTrigger>}
-        </TabsList>
+      <AdminViewNav
+        state={sv}
+        badges={{
+          distritos: { count: reg.districts.length, tone: 'count' },
+          igrejas: { count: reg.churches.length, tone: 'count' },
+          pastores: { count: reg.pastors.length, tone: 'count' },
+          campos: { count: reg.fields.length, tone: 'count' },
+        }}
+      />
 
-        <TabsContent value="resumo">
+      {tab === 'resumo' && (
+        <div>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[['Distritos', summary.totals.districts], ['Igrejas', summary.totals.churches], ['Pastores activos', summary.totals.pastors], ['Províncias', summary.byProvince.length]].map(([l, n]) => (
               <div key={l} className="rounded-xl border border-border p-4"><p className="text-xs text-muted-foreground">{l}</p><p className="text-2xl font-bold tabular-nums">{n}</p></div>
@@ -110,13 +116,13 @@ export default function ChurchRegistryTab() {
               </tr>
             ))}
           </DataTable>
-        </TabsContent>
-        <TabsContent value="distritos"><DistrictsPanel {...props} /></TabsContent>
-        <TabsContent value="igrejas"><ChurchesPanel {...props} /></TabsContent>
-        <TabsContent value="pastores"><PastorsPanel {...props} /></TabsContent>
-        <TabsContent value="campos"><FieldsPanel {...props} /></TabsContent>
-        {canEdit && <TabsContent value="importar"><RegistryImport reg={reg} run={run} canEdit={canEdit} /></TabsContent>}
-      </Tabs>
+        </div>
+      )}
+      {tab === 'distritos' && <DistrictsPanel {...props} />}
+      {tab === 'igrejas' && <ChurchesPanel {...props} />}
+      {tab === 'pastores' && <PastorsPanel {...props} />}
+      {tab === 'campos' && <FieldsPanel {...props} />}
+      {canEdit && tab === 'importar' && <RegistryImport reg={reg} run={run} canEdit={canEdit} />}
     </div>
   );
 }

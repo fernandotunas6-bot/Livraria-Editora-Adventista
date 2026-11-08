@@ -35,7 +35,7 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
 
   if (readingMode) {
     return (
-      <div className="fixed inset-0 z-[60] bg-[#1a1a18] text-[#f5f0e8] flex flex-col">
+      <div className="fixed inset-0 z-60 bg-[#1a1a18] text-[#f5f0e8] flex flex-col">
         <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-widest text-white/50">Modo Leitura</p>

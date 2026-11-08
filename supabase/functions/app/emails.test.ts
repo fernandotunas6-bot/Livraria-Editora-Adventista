@@ -362,6 +362,25 @@ describe("paymentConfirmedLetter", () => {
     expect(l.subject).toBe("Pagamento confirmado — LA-2026-0042");
     expect(l.doc.tone).toBe("success");
     expect(l.doc.details?.some((d) => d.label === "Total pago" && d.value === "13.000,00 Kz")).toBe(true);
+    expect(l.doc.secondaryCta).toBeUndefined();
+  });
+
+  it("só livros digitais: estão na biblioteca, sem preparar nem enviar", () => {
+    const l = paymentConfirmedLetter(brand, { ...ORDER, payment_status: "paid" }, { titles: ["O Desejado (PDF)"], onlyDigital: true });
+    expect(l.doc.subtitle).toBe("O seu livro digital já está na sua biblioteca.");
+    expect(l.doc.lead?.join(" ")).toContain("O livro digital O Desejado (PDF) já está na sua biblioteca");
+    expect(l.doc.steps).toBeUndefined();
+    expect(l.doc.cta?.label).toBe("Abrir a biblioteca");
+    expect(l.doc.cta?.url).toMatch(/\/profile\?tab=biblioteca$/);
+  });
+
+  it("encomenda mista: os digitais na biblioteca e o resto a preparar, com os dois botões", () => {
+    const l = paymentConfirmedLetter(brand, { ...ORDER, payment_status: "paid" }, { titles: ["A", "B"], onlyDigital: false });
+    expect(l.doc.subtitle).toContain("o resto da encomenda vamos preparar");
+    expect(l.doc.lead?.join(" ")).toContain("Os livros digitais A e B já estão na sua biblioteca");
+    expect(l.doc.steps?.length).toBeGreaterThan(0);
+    expect(l.doc.cta?.label).toBe("Acompanhar a encomenda");
+    expect(l.doc.secondaryCta?.label).toBe("Abrir a biblioteca");
   });
 });
 

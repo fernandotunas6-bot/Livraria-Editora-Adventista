@@ -42,7 +42,7 @@ export default function SupportRating({ threadId, onRated, compact = false }) {
             onClick={() => setScore(n)}
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(0)}
-            className="rounded p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="rounded p-0.5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Star className={`h-6 w-6 ${n <= shown ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'}`} />
           </button>

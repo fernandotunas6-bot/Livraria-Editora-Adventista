@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Save, Palette, Smartphone, Truck, MessageSquare, LayoutTemplate, Store, Mail, Bell, Sparkles, RotateCcw, Image as ImageIcon, Phone, Brush, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, Mail, Bell, Sparkles, RotateCcw } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
 import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
@@ -12,7 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// As vistas (Marca, Envio, Rodapé…) vêm do registo do painel (lib/adminSections.js) e a aberta
+// do endereço (/admin?tab=settings&vista=shipping). `Tabs`/`TabsContent` aqui são os painéis das
+// vistas: só a aberta é montada, como nos separadores de antes.
+import { AdminViewNav, ViewPanel as TabsContent, ViewPanels as Tabs, useSectionView } from '@/components/admin/shell/AdminViewNav';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageField, { uploadImageToRecord, removeImageFromRecord, syncUploadedImageUrl } from '@/components/admin/ImageField';
 import { sanitizeImageUrlForSave } from '@/lib/imageUrl';
@@ -151,29 +154,8 @@ const clampInt = (value, min, max, fallback) => {
   return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
 };
 
-const SETTINGS_SECTIONS = [
-  { label: 'Identidade', items: [
-    { value: 'brand', label: 'Marca', icon: Palette },
-    { value: 'images', label: 'Imagens', icon: ImageIcon },
-    { value: 'theme', label: 'Tema visual', icon: Brush },
-  ] },
-  { label: 'Loja', items: [
-    { value: 'shop', label: 'Catálogo e loja', icon: Store },
-    { value: 'shipping', label: 'Envio', icon: Truck },
-    { value: 'rules', label: 'Regras da loja', icon: ShieldCheck },
-  ] },
-  { label: 'Comunicação', items: [
-    { value: 'contact', label: 'Contacto', icon: Phone },
-    { value: 'messaging', label: 'Email, push e chat', icon: Mail },
-    { value: 'header', label: 'Barra superior', icon: MessageSquare },
-    { value: 'footer', label: 'Rodapé', icon: LayoutTemplate },
-  ] },
-  { label: 'Aplicação', items: [
-    { value: 'pwa', label: 'PWA / telemóvel', icon: Smartphone },
-  ] },
-];
-
 export default function SettingsTab() {
+  const sv = useSectionView('settings');
   const { toast } = useToast();
   const { refresh } = useSiteSettings();
   const { driveImageConfig } = useIntegrations();
@@ -505,25 +487,8 @@ export default function SettingsTab() {
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <Tabs defaultValue="brand" orientation="vertical" className="grid lg:grid-cols-[220px_minmax(0,1fr)] gap-6 items-start">
-        <aside className="lg:sticky lg:top-24 rounded-xl border border-border bg-background p-2 space-y-3">
-          {SETTINGS_SECTIONS.map((group) => (
-            <div key={group.label}>
-              <p className="px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{group.label}</p>
-              <TabsList className="flex flex-row flex-wrap lg:flex-col lg:items-stretch h-auto w-full gap-0.5 bg-transparent p-0">
-                {group.items.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger
-                    key={value}
-                    value={value}
-                    className="justify-start gap-2 px-2.5 py-2 data-[state=active]:bg-marca/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                  >
-                    <Icon className="h-4 w-4" />{label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
-          ))}
-        </aside>
+      <Tabs value={sv.view} className={sv.localNav ? 'grid lg:grid-cols-[220px_minmax(0,1fr)] gap-6 items-start' : ''}>
+        <AdminViewNav state={sv} variant="aside" />
         <div className="min-w-0 rounded-xl border border-border bg-background p-5 md:p-6">
 
         <TabsContent value="brand" className="space-y-4 max-w-xl">
@@ -635,7 +600,7 @@ export default function SettingsTab() {
               ) : (
                 <div className="space-y-4">
                   {(form.about_team || []).map((member, i) => (
-                    <div key={i} className="grid gap-3 sm:grid-cols-[auto,1fr] items-start border-t pt-4 first:border-t-0 first:pt-0">
+                    <div key={i} className="grid gap-3 sm:grid-cols-[auto_1fr] items-start border-t pt-4 first:border-t-0 first:pt-0">
                       <div className="w-32">
                         <ImageField
                           label="Fotografia"
@@ -1234,7 +1199,7 @@ export default function SettingsTab() {
         </div>
       </Tabs>
 
-      <div className={`sticky bottom-4 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur transition-colors ${dirty ? 'border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/80' : 'border-border bg-background/95'}`}>
+      <div className={`sticky bottom-4 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm transition-colors ${dirty ? 'border-amber-400/60 bg-amber-50/95 dark:bg-amber-950/80' : 'border-border bg-background/95'}`}>
         <p className={`text-sm ${dirty ? 'text-amber-900 dark:text-amber-200 font-medium' : 'text-muted-foreground'}`}>
           {dirty ? 'Há alterações por gravar.' : 'Tudo gravado.'}
         </p>

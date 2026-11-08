@@ -68,7 +68,7 @@ export default function OrderFeedbackPage() {
 
       <main className="section-spacing bg-background">
         <div className="container-custom max-w-xl">
-          <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm sm:p-10">
+          <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-xs sm:p-10">
             {invalid && (
               <>
                 <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-amber-500" aria-hidden />

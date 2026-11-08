@@ -63,11 +63,11 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
 
   if (readingMode && product) {
     return (
-      <div className="fixed inset-0 z-[60] bg-[#faf8f5] text-[#1c1917] flex flex-col">
-        <header className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0 bg-white/80 backdrop-blur">
+      <div className="fixed inset-0 z-60 bg-[#faf8f5] text-[#1c1917] flex flex-col">
+        <header className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0 bg-white/80 backdrop-blur-sm">
           <div className="min-w-0 pr-4">
             <p className="text-xs uppercase tracking-widest text-primary font-medium">Modo Leitura</p>
-            <h2 className="font-serif text-xl md:text-2xl font-bold leading-tight">{product.title}</h2>
+            <h2 className="font-serif text-xl md:text-2xl/8 font-bold leading-tight">{product.title}</h2>
             {product.subtitle && <p className="text-stone-500 text-sm mt-0.5">{product.subtitle}</p>}
           </div>
           <Button variant="outline" size="sm" onClick={() => setReadingMode(false)}>
@@ -129,17 +129,17 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-0 overflow-y-auto flex-1">
-                <div className="bg-muted aspect-[3/4] sm:aspect-auto sm:min-h-[320px] relative">
+                <div className="bg-muted aspect-3/4 sm:aspect-auto sm:min-h-[320px] relative">
                   <img src={product.image || PLACEHOLDER} alt={product.title} className="w-full h-full object-cover" />
                   {product.book_code && (
-                    <span className="absolute bottom-3 left-3 text-[10px] font-mono px-2 py-1 rounded-full bg-black/60 text-white backdrop-blur">
+                    <span className="absolute bottom-3 left-3 text-[10px] font-mono px-2 py-1 rounded-full bg-black/60 text-white backdrop-blur-sm">
                       {product.book_code}
                     </span>
                   )}
                 </div>
                 <div className="p-5 sm:p-6 flex flex-col">
                   {product.marketing_hook && <p className="text-sm text-primary font-medium mb-1">{product.marketing_hook}</p>}
-                  <h2 className="text-lg sm:text-xl font-bold mb-1 leading-snug">{product.title}</h2>
+                  <h2 className="text-lg sm:text-xl/7 font-bold mb-1 leading-snug">{product.title}</h2>
                   {product.subtitle && <p className="text-muted-foreground text-sm mb-3">{product.subtitle}</p>}
 
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs mb-4 p-3 rounded-xl bg-muted/40 border">

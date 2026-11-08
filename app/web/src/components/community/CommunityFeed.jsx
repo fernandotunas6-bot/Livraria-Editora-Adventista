@@ -9,6 +9,10 @@ import PostComposer from '@/components/community/PostComposer';
 import ComposerSheet from '@/components/community/ComposerSheet';
 import PostCard from '@/components/community/PostCard';
 import PostSkeleton from '@/components/community/PostSkeleton';
+import ReaderGate from '@/components/community/ReaderGate';
+import { useReaderStatus } from '@/hooks/useReader';
+import { canPublish } from '@/lib/readerLevels';
+import { useSignal } from '@/hooks/useSignal';
 import { PAGE_SIZE } from '@/lib/communityApi';
 import { draftStorageKey } from '@/lib/composerDraft';
 import { plural } from '@/lib/communityStyle';
@@ -60,6 +64,12 @@ export default function CommunityFeed({
   const userKey = user?.reader_key || user?.id || '';
   const author = { name: user?.name || user?.email || 'Leitor', key: user?.reader_key || user?.id };
   const draftKey = draftStorageKey(userKey, book ? `livro:${book.id}` : 'feed');
+  // Criar publicações é para a Comunidade de Leitores (e a equipa); responder e gostar, para
+  // todos. Enquanto o nível chega, mostra-se a caixa (o servidor recusa na mesma).
+  const reader = useReaderStatus();
+  const staff = user?.role === 'admin' || user?.role === 'manager';
+  const mayPublish = !reader || canPublish({ level: reader.level, staff: staff || reader.staff });
+  const gateRef = useRef(null);
 
   // Ao chegar ao fim da lista carrega a página seguinte; o botão fica para o teclado. Depois de
   // uma falha pára: com a rede em baixo, o sentinel continuava à vista e pedia sem parar.
@@ -71,14 +81,20 @@ export default function CommunityFeed({
     return () => io.disconnect();
   }, [hasMore, loadMore, loadMoreFailed]);
 
-  // "Há publicações novas": pergunta de minuto a minuto com a página à vista, e ao voltar a ela.
+  // "Há publicações novas": na hora, pelo sinal público da comunidade (sem dados, só que há
+  // novidades); e de minuto a minuto com a página à vista (de 5 em 5 com o sinal ligado), e ao
+  // voltar a ela.
+  const watchNew = !book && f.sort === 'recentes';
+  const live = useSignal('comunidade', 'publicacoes', () => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') checkNew();
+  }, { enabled: watchNew, isPrivate: false, debounceMs: 1500 });
   useEffect(() => {
-    if (book || f.sort !== 'recentes' || typeof document === 'undefined') return undefined;
+    if (!watchNew || typeof document === 'undefined') return undefined;
     const tick = () => { if (document.visibilityState === 'visible') checkNew(); };
-    const timer = setInterval(tick, NEW_POSTS_EVERY_MS);
+    const timer = setInterval(tick, live ? 5 * NEW_POSTS_EVERY_MS : NEW_POSTS_EVERY_MS);
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
-  }, [book, f.sort, checkNew]);
+  }, [watchNew, checkNew, live]);
 
   const showNew = () => {
     listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -96,13 +112,20 @@ export default function CommunityFeed({
 
   const write = () => {
     if (!signedIn) { needAuth(); return; }
+    if (!mayPublish) {
+      gateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      gateRef.current?.focus({ preventScroll: true });
+      return;
+    }
     onWrite?.();
   };
 
   return (
     <div className="space-y-4">
       {!book && <FeedPlace ready={!loading && posts.length > 0} />}
-      {signedIn ? (
+      {signedIn && !mayPublish ? (
+        <ReaderGate ref={gateRef} status={reader} />
+      ) : signedIn ? (
         <PostComposer
           collapsible
           book={book}
@@ -125,7 +148,7 @@ export default function CommunityFeed({
         </div>
       )}
 
-      {signedIn && onSheetOpenChange && (
+      {signedIn && mayPublish && onSheetOpenChange && (
         <ComposerSheet
           open={sheetOpen} onOpenChange={onSheetOpenChange}
           book={book} allowBook={!book} topics={topics} defaultTopic={f.topic} author={author}

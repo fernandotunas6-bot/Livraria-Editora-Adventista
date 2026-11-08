@@ -341,7 +341,7 @@ export default function StoresTab() {
                     </div>
                   )}
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur">{s.province}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur-sm">{s.province}</span>
                     {!hasCoords(s) && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem GPS</span>}
                     {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem telefone</span>}
                   </div>
@@ -477,7 +477,7 @@ export default function StoresTab() {
                 Usar a minha localização actual
               </Button>
               {previewEmbed ? (
-                <div className="rounded-lg overflow-hidden border aspect-[16/9]">
+                <div className="rounded-lg overflow-hidden border aspect-video">
                   <iframe title="Pré-visualização do mapa" src={previewEmbed} className="w-full h-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
                 </div>
               ) : (

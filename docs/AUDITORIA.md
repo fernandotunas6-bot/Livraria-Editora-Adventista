@@ -1684,3 +1684,197 @@ Ficaram de fora, de propósito: os PRs do Dependabot (#30–#33) — o #33 (Tail
 (tailwind-merge 2 → 3, que é para o Tailwind 4) são mudanças de versão maior que partem o CSS do
 site, e o #31 junta 36 actualizações de uma vez; cada um pede o seu teste. E os #3 e #4, que
 apontam para outro ramo (`claude/tender-archimedes-gq0s8m`), não para o `main`.
+
+## 9.16 Análise crítica e estética por perfil: visitante, cliente, funcionário e gestor (2026-11-08)
+
+Pedido do dono: "análise crítica e de estética em todo o sistema e adicionar o que falta na óptica
+do utilizador e gestor e cliente funcionário". Os perfis olhados um a um: o **visitante** (loja sem
+conta), o **cliente** (conta, encomendas, rastreio), o **funcionário** (gestor só com "Gerir
+encomendas": a fila do dia a dia) e o **gestor** (catálogo, encomendas, utilizadores, pagamentos e
+marketing: quem acompanha os números).
+
+**Como foi verificado — pela primeira vez com a pilha inteira a correr nesta sessão.** A rede não
+chega a produção nem ao projecto Supabase (como nas passagens 9.12–9.15), e não há Docker para o
+`supabase start`. Em vez da API simulada com respostas fixas (9.14), montou-se uma réplica fora do
+repositório: **Postgres 16 real** com as 99 migrações (a nova incluída) e o mínimo do Supabase de
+`scripts/pglite/base.mjs`; um **emulador do PostgREST** sobre ele (papéis, RLS, claims do JWT,
+funções RPC, recursos embutidos), um **Auth simulado** (palavra-passe, refresh, API de administração)
+e a **Edge Function `app` verdadeira a correr em Deno 2.9** contra ele. O site (Vite) falou com
+essa pilha. Dados: os 98 livros com títulos, capas e descrições reais do repositório, colecções,
+3 lojas, 4 métodos de pagamento e quatro contas (administradora, gestor, funcionária e cliente); as
+encomendas foram feitas pelo **checkout real** (`/checkout` → `place_order`) e avançadas como a
+equipa faria (`/admin/orders/payments/record`). O próprio limite de "3 encomendas por pagar por
+contacto" travou a semente — foi aí que apareceu o achado 118. Capturas a 1280 e 390 px de cada
+perfil; fluxos clicados no browser (Playwright) com 0 erros na consola.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 118 | Cliente | **O cliente não podia cancelar uma encomenda.** Ao chegar ao limite de encomendas por pagar, o checkout respondia "Pague ou cancele uma antes de fazer outra, ou fale connosco pelo WhatsApp" — sem botão de cancelar em lado nenhum, e com o WhatsApp da loja vazio em produção (achado 109). Um beco sem saída, também para quem se enganou na morada ou no livro. | Alta | ✅ `POST /order/cancel` + `order_cancel_by_customer`: na conta e no rastreio (com número e email, sem conta), enquanto não está paga nem em preparação; stock reposto, motivo na linha do tempo, aviso à equipa |
+| 119 | Cliente | **A conta mostrava as etiquetas da equipa:** "Pendente" ao lado de "Recebida" (para quem compra, "recebida" é "já a recebi"); numa encomenda cancelada, o pagamento continuava "Pendente"; "1 item · 2 items"; "Tracking:". Sem capas, sem dizer o que falta fazer. | Média | ✅ `lib/customerOrders.js`: estado em palavras simples (Registada, Falta pagar, Pagamento em verificação, A preparar, A caminho, Pronta para levantar, Entregue/Levantada, Cancelada — "não há nada a pagar"), o passo seguinte, barra de 4 passos, capas, "Em curso / Todas" |
+| 120 | Cliente | **Sem forma de descarregar os dados nem de apagar a conta** (direitos de acesso e apagamento, Lei n.º 22/11). A política mandava pedir pelos contactos — que hoje não recebem email (107) nem têm telefone (109). | Média (legal) | ✅ `GET /account/export` (JSON com perfil, encomendas e pagamentos, lista de desejos, avaliações, comunidade, avisos, conversas de apoio sem as notas internas, aparelhos; sem as imagens das assinaturas) e `POST /account/delete` (escrever o email para confirmar; recusa contas da equipa e de colportores; as encomendas ficam); política de privacidade actualizada |
+| 121 | Cliente | O cliente não via o seu código `CLI-`, que a equipa usa para o encontrar (ficou como "decisão tua" no HANDOFF de 2026-11-06). | Baixa | ✅ no cabeçalho da conta, com "copiar" |
+| 122 | Cliente | Lista de desejos: "Adicionado em" era sempre **a data de hoje** (lia `addedAt.seconds`, formato do Firestore; a coluna é uma data ISO); sem "Juntar ao carrinho"; preço "3 500 Kz" num formato diferente do resto da loja. | Baixa | ✅ |
+| 123 | Cliente | Segurança: "Alterar Password", "Password Actual" — o resto do site diz "palavra-passe" (achado 65); os campos não diziam ao navegador o que são (`autocomplete`), e os gestores de palavras-passe não os preenchiam. | Baixa | ✅ |
+| 124 | Cliente | **No telemóvel, o cartão do perfil e três atalhos ocupavam o primeiro ecrã** e as encomendas começavam abaixo da dobra; "Sair" em largura total; três atalhos numa grelha de quatro (um buraco à direita no computador). | Média (telemóvel) | ✅ cabeçalho compacto, resumo 2×2 que diz o que precisa de si ("2 por pagar"), uma capa por encomenda e o passo actual por extenso no telemóvel |
+| 125 | Cliente | Rastreio: três etiquetas da equipa ("Pendente · Recebida · Pendente"), "Tracking", e o primeiro passo "Recebida". | Baixa | ✅ o mesmo estado da conta; "Registada"; "Número de seguimento" |
+| 126 | Funcionário | **Avisos "Nova encomenda — assumir" que nunca se fechavam.** Só o botão "Assumir" (`order_acknowledge`) os marcava como lidos. Mudar o estado, o pagamento ou a entrega assume a encomenda (`orders_implicit_acknowledge`), mas deixava os avisos — e o mesmo no cancelamento automático por falta de pagamento. Na réplica, 3 dos 7 avisos de cada pessoa eram de encomendas já enviadas, entregues ou canceladas; a barra pedia para "assumir" uma encomenda cancelada. | Alta | ✅ migração `conta_do_cliente`: trigger `orders_assumida_fecha_avisos` (AFTER com WHEN — um `UPDATE OF acknowledged_at` não dispararia, porque quem muda a coluna é outro trigger) e correcção dos avisos já nesse estado |
+| 127 | Funcionário | **Barra de avisos a tapar o painel.** É fixa no topo e mostrava até quatro avisos de três linhas mais o botão do som em largura inteira: no telemóvel ocupava o ecrã todo, em todas as páginas. | Média | ✅ resumo numa linha ("4 avisos por tratar · 4 encomendas por assumir"), dois avisos à vista (um no telemóvel), "Ver todos (N)", som num botão pequeno |
+| 128 | Funcionário | **"Encomendas" começava pelos relatórios:** filtros, oito cartões de totais, dois gráficos e duas tabelas antes da primeira encomenda, a ~1 900 px do topo. Quem abre o separador vai tratar a fila. | Média | ✅ a lista vem primeiro; os relatórios ficam numa secção no fim, fechada por omissão (o navegador lembra-se), e os gráficos só carregam quando se abre |
+| 129 | Funcionário | Cartão da encomenda na lista: "Kz 7500.00" (`toFixed`), "1 itens", sem o pagamento nem a forma de entrega (era preciso abrir cada uma); o cabeçalho abria-se só com o rato (um `div` com `onClick`); dois estados "sem encomendas" ao mesmo tempo. A tabela de produtos também escrevia "Kz 7500.00". | Média | ✅ "Por pagar / Paga / …" e "Entrega · Cidade Baixa, Huambo" ou "Levantamento · <loja>" no cartão, "1 artigo", teclado (`role="button"`, Enter/Espaço, `aria-expanded`) |
+| 130 | Funcionário | A equipa não tinha como saber que o cliente desistiu (até 118 não podia). | — | ✅ aviso `order_cancelled` ("Cancelada pelo cliente — ENC-…, motivo, não é para preparar") à equipa das encomendas novas, por push |
+| 131 | Funcionário / Gestor | Um gestor não via em lado nenhum que era da equipa: a etiqueta e o botão "Admin" do perfil e do menu eram só para administradores (o gestor chegava ao painel pelo menu "Gestão"). | Baixa | ✅ "Equipa · Gestor", o código `FUN-` e o botão "Painel" para quem tem acesso |
+| 132 | Gestor | Relatórios de vendas: **ticket médio "Kz 14 316,667"** (sem máximo de casas decimais), "**Novembro De 2026**" (`capitalize` do CSS), "1 pedidos", "1 cancelados", os títulos do gráfico dos mais vendidos **sobrepostos** (eixo de 100 px para títulos de 60 caracteres), zeros a laranja como se fossem alertas, e "Recebido" repetido duas vezes no mesmo ecrã. | Média | ✅ |
+| 133 | Gestor | **O Início não dizia como corre o mês.** O único número de negócio era "Vendas (30 dias)", que somava as encomendas por pagar e não se comparava com nada. | Média | ✅ "Encomendado (30 dias)" com o recebido ao lado, e o mês até hoje (encomendas, encomendado, recebido, ticket médio, canceladas) comparado com **os mesmos dias** do mês anterior, mais os 5 mais vendidos em 30 dias (`lib/managerSummary.js`) |
+| 134 | Todos | **Parágrafos "centrados" desviados para a esquerda.** O estilo base dá a todos os `<p>` `max-w-prose` (65 caracteres) sem margem automática: num bloco centrado, o texto centrava dentro de uma caixa encostada à esquerda — "Ainda não tem encomendas." aparecia desviado do ícone e do botão. Afectava os estados vazios de todo o site. | Média (visual) | ✅ `.text-center > p { margin-inline: auto }` na camada base (qualquer `mx-*` explícito continua a mandar) |
+| 135 | Todos | **Dinheiro em quatro formatos:** "Kz 7500.00", "Kz 14 316,667", "68 900 Kz" e "Kz 68 900,00". | Baixa | ✅ `lib/money.js` (`kwanza`), com um teste que o obriga a ser igual ao `formatCurrency` da loja; aplicado no painel (encomendas, produtos, relatórios, Início) e na conta. Ficam com "x Kz" a colportagem e os utilizadores, que são módulos à parte |
+
+### Verificado sem problemas
+
+- **Visitante:** 15 páginas no telemóvel (início, loja, ficha, rastreio, lojas, contacto, sobre,
+  FAQ, comunidade, entrar, colecções, materiais, sugestões, envios, privacidade): 0 erros na
+  consola, sem scroll horizontal, um `h1` por página. A loja já tinha recebido as passagens
+  anteriores e está em bom estado; as melhorias desta passagem foram para dentro da conta e do painel.
+- **Regras do cancelamento** (35 cenários em PGlite, `scripts/pglite/conta.mjs`): cancela por
+  pagar e confirmada; recusa a preparar, a caminho, entregue, já cancelada, com referência
+  indicada e com pagamento em parte; o stock volta; a linha do tempo diz quem e porquê; fica no
+  registo de segurança; o cliente e o visitante não chamam a função directamente; os avisos
+  "assumir" fecham-se pelos três caminhos (assumir, mudar a entrega, cancelar no painel) e os das
+  outras encomendas ficam.
+- **Rotas, ponta a ponta na réplica:** cancelar a própria encomenda com sessão; 404 para a de
+  outra pessoa com a minha sessão, para o visitante sem email e com o email errado; o visitante
+  cancela com número e email; recusa a encomenda a caminho; `can_cancel` no `/track`. A
+  exportação não leva as imagens das assinaturas nem quem tratou a encomenda. Apagar a conta:
+  recusa contas da equipa e o email errado; apaga a conta, o perfil desaparece, a entrada passa a
+  ser recusada e fica no registo de segurança; o limite de 3 pedidos por minuto trava.
+- **No browser:** cancelar na conta (diálogo, motivo, aviso, estado "Cancelada · Não há nada a
+  pagar"); "Comprar de novo" junta ao carrinho e abre-o; descarregar os dados; o botão de apagar só
+  activa com o email certo; cancelar no rastreio sem conta. Os relatórios abertos: "Kz 14 316,67",
+  "Novembro de 2026", gráfico legível.
+- As suites que já existiam continuam certas: `pagamentos.mjs` (91) e `entregas.mjs` (44).
+- `npm test` (1223, eram 1195), `npm run lint`, `npm run build`, `deno check`, scanner de segredos.
+
+### Ordem de publicação
+
+A migração `20261108120000_conta_do_cliente` e a Edge Function vão juntas com o merge (o workflow
+do Supabase aplica e publica). O site novo funciona com a função antiga durante a janela entre os
+dois deploys: sem `/order/cancel`, o botão "Cancelar" responde com a mensagem de erro da função
+(nada se cancela), e sem `can_cancel` o rastreio simplesmente não mostra a caixa.
+
+### Por fazer (dono)
+
+1. Decidir se quer **pedir confirmação por email** antes de apagar uma conta. Hoje basta escrever o
+   email da conta com a sessão aberta (como o painel, que apaga sem pedir nada ao cliente). Com o
+   SMTP do Auth ligado (achado 106), pode passar a usar a reautenticação do Supabase.
+2. Os pontos das passagens anteriores continuam: email (105–107), WhatsApp (108), telefones (109).
+   Sem eles, o cliente que cancela ou apaga a conta não recebe a confirmação por email — fica com o
+   aviso no ecrã e, na conta, com o aviso no sino.
+
+## 9.17 Telemóvel: entrar ao abrir a app, identificar a conta e avisar das versões (2026-11-08)
+
+Pedido do dono: "focar no mobile, refinamento: auto login quando o aplicativo é aberto, identificar
+a conta registada a preencher, notificações push de actualização de versões". Olhado do lado de
+quem usa a app instalada no telemóvel, com a rede de Angola: aberta e fechada muitas vezes por dia,
+semanas em segundo plano, rede que vai e vem. Detalhe técnico em
+[AUTENTICACAO_E_EMAILS.md](AUTENTICACAO_E_EMAILS.md), secção 1 ("No telemóvel…").
+
+**Como foi verificado.** A rede desta sessão não chega a produção. O site publicado (build de
+produção, `vite preview`) correu num Chromium com o perfil de um Pixel 7 (Playwright), com o
+Supabase simulado ao nível da rede: palavra-passe certa e errada, renovação do token com e sem
+rede (`internetdisconnected`), registo de um email que já tem conta (utilizador sem identidades),
+o `authorize` da Google e a função das novidades. 20 verificações certas, entre elas abrir o
+perfil sem rede com o token expirado há 2 h e esperar os 35 s em que o supabase-js insiste. A base
+de dados: 39 cenários novos em PGlite com as 103 migrações (`scripts/pglite/versoes.mjs`), e as
+suites que já existiam continuam certas (91 + 44 + 35 + 46, já com o `main` do PR #44). `npm test`
+(1386, eram 1255), `npm run lint`, `npm run build` e `deno check`.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 136 | Cliente (telemóvel) | **Abrir a app sem rede tirava a pessoa da conta.** Mais de uma hora depois da última vez, o token já expirou; sem rede, a renovação falha e o supabase-js avisa `INITIAL_SESSION` sem sessão — mas guarda a sessão para tentar de novo. O `dataClient` tratava o aviso como "saiu": o perfil mandava para `/login` e o perfil em cache era apagado (na abertura seguinte sem rede, nem a conta em cache aparecia). | Alta | ✅ `authEventAction` (`keep`): a conta continua à vista enquanto a sessão estiver guardada; só um `SIGNED_OUT` (o servidor recusou a renovação) a tira |
+| 137 | Cliente (telemóvel) | Com a sessão guardada e rede fraca, abrir a app na conta ficava até **8 s em "A verificar a sua sessão…"** (o supabase-js insiste na renovação até meio minuto antes de responder; o recurso de 8 s soltava a página). | Média | ✅ sessão e perfil da mesma conta guardados: a conta fica pronta logo (413 ms no teste, sem rede), excepto com o regresso de uma entrada no endereço (`authReturnInUrl`) |
+| 138 | Cliente | **Com a rede de volta, a sessão podia ficar um minuto por renovar:** o supabase-js guarda a última falha de renovação 60 s e responde com ela; entretanto os pedidos seguiam sem sessão e o perfil mostrava as encomendas vazias. | Média | ✅ ao voltar a rede (`online`) ou à app, a falha guardada esquece-se e a renovação é tentada logo (como o supabase-js já faz quando outro separador renova) |
+| 139 | Cliente | **Registo com um email que já tem conta:** "Enviámos um link de confirmação" — mas, com a confirmação de email activa, o Supabase devolve um utilizador sem identidades e não envia nada. A pessoa esperava por um email que nunca vinha. | Média | ✅ `alreadyRegistered`: o formulário passa a "Entrar", com "… já tem conta" e a palavra-passe escrita. Não revela nada que o erro "Já existe uma conta" (confirmação desligada) não revelasse |
+| 140 | Cliente | Os gestores de palavras-passe não sabiam que conta preencher: o email da entrada era `autocomplete="email"`, sem `name`; e numa página que não muda de endereço ao entrar, o Chrome nem sempre oferecia "Guardar palavra-passe?". | Baixa | ✅ `username` / `current-password` / `new-password` e `name`; `navigator.credentials.store` depois de entrar, criar conta, mudar ou recuperar a palavra-passe |
+| 141 | Cliente | **O ecrã de entrada não identificava quem volta:** só preenchia o email; a quem entrou com a Google mostrava a palavra-passe primeiro, e a Google abria na lista de contas do telemóvel. | Baixa | ✅ "Bem-vindo de volta, Maria" com o email; o caminho com que entrou da última vez (palavra-passe com o cursor nela, ou a Google com `login_hint`); "Não é Maria? Usar outra conta" esquece a conta no aparelho |
+| 142 | Cliente | **Não havia entrada automática:** com a sessão perdida (dados do site apagados pelo telemóvel sem espaço, aparelho novo com as palavras-passe sincronizadas), era sempre escrever tudo. | Baixa | ✅ Credential Management (`mediation: 'silent'`), uma vez por arranque; nunca depois de "Sair" nem de a sessão ser terminada pelo servidor (`preventSilentAccess`); `storage.persist()` na app instalada |
+| 143 | Cliente | Uma sessão terminada noutro aparelho (ou pela mudança de palavra-passe) tirava a pessoa da conta sem dizer nada. | Baixa | ✅ "A sua sessão terminou neste aparelho" com "Entrar" já na conta; distingue-se do "Sair" da própria pessoa, também noutro separador (`livraria_saida`) |
+| 144 | Todos (telemóvel) | **A app aberta ficava na versão antiga.** Com publicações várias vezes por dia e a app semanas em segundo plano, só um erro ao mudar de página (`staleChunkReload`) a fazia recarregar. | Média | ✅ `version.json` em cada build (`scripts/app-version.mjs`, sem cache no Cloudflare nem no service worker); a app compara ao abrir, ao voltar ao ecrã e de 30 em 30 min: "Nova versão da app disponível — Actualizar"; depois, "App actualizada" com "Ver novidades" |
+| 145 | Gestor | Não havia forma de dizer aos clientes o que mudou nem de os avisar todos: o push só servia encomendas, atendimento e comunidade, a uma pessoa de cada vez. | — | ✅ Sistema → **Versões da app** (`manage_settings`): escrever, publicar em `/novidades` e "Avisar todos por push" (uma vez por novidade, só publicada); envio em lotes pela Edge Function; cada aparelho pode desligar só as novidades (perfil) |
+
+### Verificado sem problemas
+
+- **Base de dados** (`versoes.mjs`, 39): só quem tem "Configurações" escreve; o cliente, o anónimo e
+  quem só gere encomendas não; as colunas do envio (`push_*`) e o autor não se escrevem pela API;
+  título, notas e versão validados e limpos; o público só lê as publicadas, pela função
+  `app_releases_published` (sem o progresso do envio nem quem escreveu), no máximo 50; as agendadas
+  só aparecem na data; anunciada por push, não volta a rascunho nem se apaga, mas o texto corrige-se;
+  sem publicar não se anuncia (nem o servidor); o pedido de aviso fica no registo de segurança com
+  quem pediu; o progresso soma os lotes; o agendador acorda a Edge Function enquanto um envio não
+  acaba, e não por um parado há mais de 2 dias.
+- **Envio por push** (`releasePush.ts`, com testes): lotes de 150 por ordem do `id` das
+  subscrições, 10 em paralelo; o lote é reservado antes de enviar (o cursor só avança se ainda for
+  o que se leu), por isso o botão e o agendador ao mesmo tempo não enviam o mesmo lote duas vezes;
+  aparelhos que já não existem (404/410) são apagados. O primeiro lote sai logo, os seguintes de 2
+  em 2 minutos (cerca de 75 aparelhos por minuto).
+
+### Limites que ficam
+
+- Safari (iPhone) e Firefox não têm a Credential Management API: lá não há entrada automática com
+  a palavra-passe guardada (fica a sessão, que já não cai, e o preenchimento do teclado).
+- No iPhone, a app instalada no ecrã inicial tem armazenamento próprio: na primeira vez que se abre
+  a app instalada, entra-se uma vez. Push no iPhone só com a app instalada (iOS 16.4+).
+- Quem entra com a Google não tem entrada silenciosa (seria um redireccionamento à Google ao abrir).
+- Um lote interrompido a meio (a função parada pelo limite de tempo) não é repetido: os aparelhos
+  que faltavam desse lote ficam sem o aviso. Preferiu-se nunca enviar duas vezes.
+- `lastRefreshFailure` é interno do auth-js 2.11x: se mudar de nome, fica a tentativa normal do
+  supabase-js, de minuto a minuto (o resto não depende dele).
+
+### Ordem de publicação
+
+A migração `20261108150000_versoes_da_app` e a Edge Function vão juntas com o merge. O site novo
+funciona antes delas: a página `/novidades` diz que ainda não há novidades, o painel explica que
+falta a migração, e o aviso de versão nova não precisa de nada do servidor (só do `version.json`
+do próprio build).
+
+## 9.18 Livros digitais: só abrem pagos, biblioteca e acessos (2026-11-08)
+
+Pedido do dono: "cada livro digital só pode ser descarregado se for pago; criar painel de abrir e
+ligar com o pagamento; tudo bem organizado, como os outros sistemas fazem". Guia e comparação com
+outras lojas em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md).
+
+**Como foi verificado.** 59 cenários novos em PGlite com as 104 migrações
+(`scripts/pglite/digitais.mjs`), com os pagamentos registados e confirmados pelas funções reais
+(`order_payment_report`, `order_payment_record`, `order_refund_record`); as suites que já existiam
+continuam certas (91 + 44 + 35 + 46 + 39). No browser, o build de produção com o Supabase simulado
+(Playwright, telemóvel e computador): a biblioteca, o "Descarregar" a pedir o acesso e o link
+temporário, o painel com os filtros, "Confirmar o pagamento" e o bloqueio — 11 verificações certas.
+`npm test` (1417), `npm run lint`, `npm run build` e `deno check`.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 146 | Loja | **Um livro digital pago abria sem pagamento.** A regra (`private.bought_product`) aceitava a encomenda paga, **ou entregue, ou com a recepção confirmada pelo cliente**. Uma encomenda entregue e por pagar — como a de 245 000 Kz da passagem dos pagamentos — dava os PDFs. | Alta | ✅ só `payment_status = 'paid'` (pagamentos confirmados pelo gateway ou por quem tem «Confirmar pagamentos»); fecha com o reembolso e o cancelamento |
+| 147 | Cliente | O separador "PDFs" só mostrava os livros já abertos: quem comprou e ainda não pagou não via a compra nem o que faltava para abrir. | Média | ✅ Perfil → Biblioteca com todos os livros comprados e o estado de cada um (por pagar, por confirmar, pago em parte com o que falta, disponível, reembolsado, bloqueado) e o caminho para pagar |
+| 148 | Cliente | Nada dizia ao cliente que o livro tinha aberto. | Baixa | ✅ aviso na conta "Livro digital disponível"; o email, o WhatsApp e o push de "Pagamento confirmado" dizem que está na biblioteca, com "Abrir a biblioteca" |
+| 149 | Equipa | A equipa não via quem tinha acesso a cada livro pago, nem o pagamento de cada compra, nem podia retirar um acesso. | Média | ✅ Catálogo → Materiais (PDF) → Acessos e pagamentos: compradores, pagamento, estado, downloads, filtros e procura; "Confirmar o pagamento" abre a encomenda; bloquear com motivo e desbloquear, no registo de segurança |
+| 150 | Equipa | Os downloads só tinham um contador geral por material: não se sabia quem abria nem quantas vezes. | Baixa | ✅ `download_events`: cada abertura e download de um livro pago, por pessoa |
+
+### Limites que ficam
+
+- O checkout ainda pede levantamento ou entrega para a edição digital (a fase seguinte, por decidir:
+  edições digitais sem envio, concluídas ao pagar; mexe em mais de 20 sítios do circuito da
+  encomenda).
+- Sem limite de downloads nem marca d'água com o nome do comprador (por decidir; o registo e o
+  bloqueio cobrem o abuso).
+- Um link temporário vale 2 minutos para quem o tiver (como antes).
+
+### Ordem de publicação
+
+A migração `20261108160000_livros_digitais` e a Edge Function vão juntas com o merge. Na janela entre
+o site novo e a migração, a Biblioteca aparece vazia e o painel explica que falta a migração; o
+download continua pela função antiga (com a regra antiga) até a migração entrar. A função
+`start_download` passa a ter um segundo argumento opcional, por isso o site antigo continua a chamá-la.

@@ -130,7 +130,7 @@ export default function SecurityLogTab() {
                   <li key={row.id} className={`rounded-xl border bg-card p-3 ${row.alerted ? 'border-amber-400/70' : ''}`}>
                     <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
                       {row.alerted && <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-label="Avisado aos administradores" />}
-                      <p className="min-w-0 flex-1 break-words font-medium">{row.summary}</p>
+                      <p className="min-w-0 flex-1 wrap-break-word font-medium">{row.summary}</p>
                       <span className="shrink-0 text-xs text-muted-foreground">{when(row.at)}</span>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -145,7 +145,7 @@ export default function SecurityLogTab() {
                           {changes.map((c) => (
                             <div key={c.field} className="grid gap-1 rounded-lg bg-muted/40 p-2 sm:grid-cols-[160px_1fr]">
                               <dt className="text-xs font-medium text-muted-foreground">{c.label}</dt>
-                              <dd className="min-w-0 break-words text-xs">
+                              <dd className="min-w-0 wrap-break-word text-xs">
                                 <span className="line-through opacity-70">{c.from}</span>
                                 <span aria-hidden="true"> → </span>
                                 <span className="sr-only"> passou a </span>

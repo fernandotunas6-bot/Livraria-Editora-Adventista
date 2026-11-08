@@ -83,7 +83,7 @@ export default function PayLaterBox({
 
       {accountInfo && (
         <div className="rounded-lg bg-background border border-border p-3 space-y-2">
-          <p className="tabular-nums tracking-wide text-sm break-words text-foreground">{accountInfo}</p>
+          <p className="tabular-nums tracking-wide text-sm wrap-break-word text-foreground">{accountInfo}</p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => copy(accountInfo, 'dados')}>
               <Copy className="h-3.5 w-3.5 mr-1.5" /> {copied === 'dados' ? 'Copiado' : 'Copiar dados'}

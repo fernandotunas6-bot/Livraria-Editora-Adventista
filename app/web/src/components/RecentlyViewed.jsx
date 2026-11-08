@@ -47,14 +47,14 @@ export default function RecentlyViewed({ currentId = null, title = 'Vistos há p
         {/* Fila que desliza com o dedo. `snap` para cada capa parar alinhada em vez de ficar
             cortada a meio, e `-mx-4 px-4` para a primeira e a última encostarem à margem da
             página em vez de ficarem presas dentro do contentor. */}
-        <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin]">
+        <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 scrollbar-thin">
           {itens.map((item) => (
             <li key={item.id} className="w-28 shrink-0 snap-start sm:w-32">
               <Link
                 to={`/product/${item.id}`}
                 className="surface-raise block overflow-hidden rounded-xl border border-border bg-card"
               >
-                <div className="aspect-[3/4] overflow-hidden bg-muted">
+                <div className="aspect-3/4 overflow-hidden bg-muted">
                   <img
                     src={item.image || PLACEHOLDER}
                     alt={item.title}

@@ -1,6 +1,92 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Livros digitais: só abrem pagos, biblioteca e acessos (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** "cada livro digital só pode ser descarregado se for pago; painel de abrir
+  ligado ao pagamento; tudo bem organizado, como os outros sistemas fazem". Guia completo, com o passo
+  a passo de venda e a comparação com outras lojas, em [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md);
+  achados 146–150 em [AUDITORIA.md](AUDITORIA.md), secção **9.18**.
+- **Regra:** um PDF pago abre só com a encomenda **paga** (pagamentos confirmados pelo gateway ou por
+  quem tem «Confirmar pagamentos») e fecha com o reembolso, o cancelamento ou um bloqueio. Antes
+  também abria com a encomenda "entregue" ou com a recepção confirmada pelo cliente, sem pagamento.
+  Uma só função decide (`private.can_download`).
+- **Cliente:** Perfil → **Biblioteca** (`?tab=biblioteca`; `?tab=pdfs` continua a abrir) com cada
+  livro comprado e o estado ligado ao pagamento: disponível (abrir/descarregar), pagamento por
+  confirmar, por pagar e pago em parte (com o caminho para pagar), reembolsado, bloqueado. Aviso na
+  conta "Livro digital disponível" quando a encomenda fica paga; o email, o WhatsApp e o push de
+  "Pagamento confirmado" dizem que o livro está na biblioteca.
+- **Equipa:** Catálogo → Materiais (PDF) → **Acessos e pagamentos**: quem comprou, o pagamento e o
+  acesso, com filtros e procura; "Confirmar o pagamento" abre a encomenda; bloquear (com motivo) e
+  desbloquear, no registo de segurança; cada download fica registado.
+- **Base de dados:** migração `20261108160000_livros_digitais`, **por aplicar** (vai no merge, com a
+  Edge Function). Cenários: `scripts/pglite/digitais.mjs` (59).
+- **Fase seguinte (por decidir com o dono):** vender a edição digital sem pedir entrega nem
+  levantamento no checkout, concluída ao pagar. Mexe em mais de 20 sítios do circuito da encomenda
+  (checkout, `place_order`, avisos à equipa, vigilância, recibo, rastreio): ficou fora desta passagem
+  de propósito. Também por decidir: limite de downloads e marca d'água com o nome do comprador.
+
+## Telemóvel: entrar ao abrir a app, conta identificada e versões (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** "focar no mobile: auto login quando o aplicativo é aberto, identificar a conta
+  registada a preencher, notificações push de actualização de versões". Achados 136–145 em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.17**; o funcionamento da entrada em
+  [AUTENTICACAO_E_EMAILS.md](AUTENTICACAO_E_EMAILS.md), secção 1 ("No telemóvel…").
+- **Entrar ao abrir a app:** a sessão já ficava guardada, mas abrir a app **sem rede** mais de uma
+  hora depois tirava a pessoa da conta (achado 136) e, com rede fraca, a conta ficava 8 s a
+  "verificar a sessão". Agora a conta aparece logo e só sai quando o servidor recusa a sessão. No
+  Chrome/Android, a app pede ao navegador que guarde a palavra-passe e, sem sessão, entra sozinha
+  com ela (uma vez por arranque; nunca depois de "Sair" nem de "Terminar em todos os aparelhos").
+  Regras em `lib/authSession.js` e `lib/savedCredentials.js`; ligação em `lib/dataClient.js` e
+  `hooks/useAuth.jsx`.
+- **Conta identificada:** "Bem-vindo de volta, Maria" no `/login` e no modal, com o caminho com que
+  entrou da última vez (palavra-passe com o gestor do navegador a preencher, ou a Google já na
+  conta certa); "Não é Maria?" esquece-a. Registo com um email que já tem conta passa a "Entrar"
+  (antes: "enviámos um link" que nunca chegava).
+- **Versões:** cada build escreve `/version.json` (`scripts/app-version.mjs`); a app aberta avisa
+  "Nova versão da app disponível — Actualizar" (ao abrir, ao voltar ao ecrã, de 30 em 30 min).
+  Painel → Sistema → **Versões da app**: escrever o que mudou, publicar em `/novidades` e, se valer a
+  pena, **avisar todos os aparelhos por push** (uma vez por novidade; a Edge Function envia em lotes
+  e o agendador `avisos-equipa` continua). No perfil, cada aparelho pode desligar só as novidades.
+- **Base de dados:** migração `20261108150000_versoes_da_app`, **por aplicar** (vai no merge, com a
+  Edge Function: rotas `/admin/releases/notify` e `/admin/releases/devices`, `app_updates` no
+  `/push/subscribe`, novidades no `/cron/staff-dispatch`). Cenários: `scripts/pglite/versoes.mjs` (39).
+- **Como se testou:** build de produção num Chromium com perfil de telemóvel (Playwright), Supabase
+  simulado na rede (20 verificações, entre elas abrir o perfil sem rede com o token expirado);
+  PGlite com as 103 migrações (já com o `main` do PR #44); `npm test` (1386), lint, build, `deno check`.
+- **Para o dono:** nada obrigatório. Para anunciar uma versão: painel → Versões da app → "Novas
+  novidades" → Publicar → "Avisar todos por push" (precisa do push ligado, como já está). Guardar o
+  push para mudanças que interessam aos clientes: cada aviso chega a todos.
+
+## Análise por perfil: visitante, cliente, funcionário e gestor (2026-11-08, ramo `claude/nifty-archimedes-44rw4k`)
+
+- **Pedido do dono:** "análise crítica e de estética em todo o sistema e adicionar o que falta na
+  óptica do utilizador e gestor e cliente funcionário". Detalhe e verificação em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.16** (achados 118–135).
+- **Cliente:** cancela sozinho uma encomenda por pagar que ainda não está em preparação (na conta e
+  no rastreio, sem conta) — a mensagem do checkout mandava cancelar e não havia como; a conta mostra
+  o estado em palavras simples, com o passo seguinte, barra de progresso e capas, "Comprar de novo",
+  o código `CLI-`; descarrega os seus dados e apaga a conta (Lei 22/11; a política de privacidade
+  diz agora onde); lista de desejos com "Juntar ao carrinho" e a data certa; "palavra-passe" em vez
+  de "Password". Regras em `lib/customerOrders.js`, `supabase/functions/app/customerCancel.ts` e
+  `public.order_cancel_by_customer` (as três têm de dizer o mesmo; há teste).
+- **Funcionário:** os avisos "Nova encomenda — assumir" fecham-se quando a encomenda fica assumida por
+  qualquer caminho (antes, só o botão; encomendas enviadas, entregues e canceladas continuavam a
+  pedir "assumir"); barra de avisos compacta (no telemóvel tapava o ecrã); "Encomendas" abre na
+  lista, com os relatórios dobrados no fim; cartões com pagamento e forma de entrega; aviso
+  "Cancelada pelo cliente".
+- **Gestor:** o Início diz como corre o mês, comparado com os mesmos dias do mês anterior, e o que se
+  vende mais; relatórios sem "Kz 14 316,667", "Novembro De 2026", "1 pedidos" nem títulos
+  sobrepostos no gráfico. Dinheiro sempre "Kz 14 500,00" (`lib/money.js`).
+- **Base de dados:** migração `20261108120000_conta_do_cliente`, **por aplicar** (vai no merge, com a
+  Edge Function). Cenários: `scripts/pglite/conta.mjs` (35; ver `docs/PAGAMENTOS.md`, "Testes").
+- **Como se testou:** réplica local com Postgres 16 real, as migrações todas, um emulador do
+  PostgREST, Auth simulado e a Edge Function verdadeira em Deno — a pilha inteira, sem Docker e sem
+  tocar em produção (a rede da sessão não chega lá). Os scripts ficaram fora do repositório; a
+  descrição está na AUDITORIA 9.16 para quem quiser repetir.
+- **Por decidir (dono):** confirmação por email antes de apagar a conta (hoje: escrever o email da
+  conta com a sessão aberta); os pontos de email, WhatsApp e telefones das passagens anteriores.
 
 ## Pagamentos registados e gateway (2026-11-07, ramo `claude/pagamentos-premium`)
 
@@ -35,7 +121,7 @@ Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegu
   - o compromisso de avisar em caso de falha de segurança;
   - os prazos de conservação das encomendas, que remetem para "o que a lei fiscal e comercial exige".
   - A referência legal é a Lei n.º 22/11 (Protecção de Dados Pessoais) e a autoridade de controlo é a APD.
-- **Ainda não há** forma de o cliente apagar a conta ou descarregar os seus dados sozinho: os pedidos chegam pelos contactos e a equipa apaga a conta no painel (Utilizadores). Apagar a conta apaga publicações, respostas e gostos da comunidade.
+- ~~**Ainda não há** forma de o cliente apagar a conta ou descarregar os seus dados sozinho~~: desde 2026-11-08, em Perfil → Segurança e privacidade (secção acima). Apagar a conta apaga publicações, respostas e gostos da comunidade; as encomendas ficam.
 
 ## Comunidade literária premium (2026-11-07, ramo `claude/quirky-hypatia-wnid2g`)
 
@@ -76,7 +162,7 @@ Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegu
 
 - **Pedido do dono:** PDFs e revistas para descarregar. Escolhas: **gratuitos e pagos**; os gratuitos para **qualquer visitante**, sem conta; numa **página própria** e **na ficha do produto**.
 - **Feito:** página `/materiais` (filtros por tipo e por gratuito/com compra, link "Materiais" no menu e no sitemap), caixa "PDFs deste produto" na ficha, separador **PDFs** no perfil (os pagos que a conta já pode descarregar) e painel → Catálogo → **Materiais (PDF)** (carregar o PDF, capa, tipo, edição, gratuito ou pago, produto e variante, publicar, contagem de downloads).
-- **Regra dos pagos:** ligados a um produto e, se quiser, a uma variante (ex.: "Edição digital · PDF"). Descarrega quem tem sessão e comprou esse produto numa encomenda não cancelada e já paga, entregue ou confirmada (a regra da compra verificada). A encomenda é da conta pelo `customer_id`, ou pelo email da conta **só se estiver confirmado**.
+- **Regra dos pagos:** ligados a um produto e, se quiser, a uma variante (ex.: "Edição digital · PDF"). Descarrega quem tem sessão e comprou esse produto numa encomenda não cancelada e já paga, entregue ou confirmada (a regra da compra verificada). **Desde 2026-11-08, só paga** — ver [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md). A encomenda é da conta pelo `customer_id`, ou pelo email da conta **só se estiver confirmado**.
 - **Segurança:** os PDFs ficam no bucket **privado** `downloads` (só `application/pdf`, até 50 MB). O site chama `start_download` (confirma o acesso, conta) e pede um link temporário de 2 minutos; o Storage só o passa a quem `private.can_download` deixa. A lista pública é a função `downloads_list` (até à migração `leituras_publicas_por_funcoes`, a vista `downloads_public`), sem o caminho do ficheiro; o download tem limite de 30 por hora por conta ou por IP. A tabela só a lê e escreve quem tem `manage_catalog`.
 - **Migração `20261106200000_materiais_para_descarregar`, ainda não aplicada** (vai no merge, com as outras). Testada num Supabase local completo (`supabase start`, com API e Storage): o visitante descarrega o gratuito e recebe "Object not found" no pago; o comprador com a encomenda por pagar é recusado e, depois de paga, descarrega; a encomenda cancelada tira o acesso; outra conta e o email por confirmar são recusados; o cliente não envia ficheiros; HTML recusado pelo bucket; rascunhos só para a equipa; o contador não se edita à mão. No browser: download real pelo botão, painel a criar um material com o PDF enviado.
 - **Limites que ficam:** vender **só** o PDF faz-se com uma variante "Edição digital" no produto, mas o checkout continua a pedir levantamento ou entrega (não há encomenda só digital). A variante é guardada pelo índice: reordenar as variantes do produto muda qual dá acesso. Um link temporário, enquanto dura (2 min), abre para quem o tiver. Não há email "o seu PDF está pronto".
@@ -95,7 +181,7 @@ Estado em 2026-11-07. Ponto de partida para o próximo agente ou pessoa que pegu
 - **Teste de ponta a ponta** (transacção revertida): compra sem conta → `CLI-000002`; ao criar conta, o mesmo código; ao passar a gestor, mantém `CLI-` e recebe `FUN-004`; a pesquisa encontra a conta pelo código.
 - **Produtos:** revistos, sem alterações. Os 9 tipos têm prefixo e contador, e `normalize_product_code` (SQL) e `normalizeProductCode` (JS) usam a mesma expressão.
 - **Interface:** código mostrado na lista e na ficha de Utilizadores; a pesquisa aceita o código. A Edge Function não mudou: a rota `/admin/users` devolve a listagem tal como vem da base de dados.
-- **Por fazer (decisão tua):** mostrar ao próprio cliente o seu `CLI-` no perfil da loja; e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
+- **Por fazer (decisão tua):** ~~mostrar ao próprio cliente o seu `CLI-` no perfil da loja~~ (feito a 2026-11-08); e se o funcionário sem login (ex.: vendedor de loja física) deve ter código, o que exige uma tabela própria.
 
 ## Análise crítica e correcções do checkout (2026-11-06)
 

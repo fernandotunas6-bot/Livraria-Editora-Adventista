@@ -537,7 +537,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
               </ol>
             )}
 
-            <div className="flex-grow overflow-y-auto overscroll-contain relative" ref={cartScrollRef}>
+            <div className="grow overflow-y-auto overscroll-contain relative" ref={cartScrollRef}>
               {step === 'cart' && (
                 <div className="p-5 space-y-4">
                   {cartItems.length === 0 ? (
@@ -587,7 +587,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           className="w-16 h-20 object-cover rounded-lg shrink-0 bg-muted"
                           onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="80" fill="%23e5e7eb"%3E%3Crect width="100%25" height="100%25"/%3E%3C/svg%3E'; }}
                         />
-                        <div className="flex-grow min-w-0">
+                        <div className="grow min-w-0">
                           <h3 className="font-semibold text-sm line-clamp-2">{item.product.title}</h3>
                           {/* A variante (tamanho, edição): M e L do mesmo uniforme eram duas linhas iguais. */}
                           {cartVariantLabel(item.variant) && (
@@ -716,7 +716,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     )}
                     {form.shippingMethod !== 'pickup' && (
                       <>
-                        <div id="checkout-morada" tabIndex={-1} className="space-y-2 focus:outline-none">
+                        <div id="checkout-morada" tabIndex={-1} className="space-y-2 focus:outline-hidden">
                           <AngolaAddressSelector value={deliveryAddress} onChange={(v) => { setDeliveryAddress(v); clearError('address'); }} />
                           {errors.address && <p id="checkout-morada-erro" className="text-xs font-medium text-destructive" role="alert">{errors.address}</p>}
                         </div>
@@ -764,7 +764,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           <div
                             role="presentation"
                             onClick={() => setForm({ ...form, paymentMethod: m.code, paymentReference: '' })}
-                            className={`flex items-start gap-2 p-3 rounded-lg border transition-colors cursor-pointer ${form.paymentMethod === m.code ? 'border-[var(--brand-primary)] bg-[rgb(var(--brand-primary-rgb)/0.05)]' : 'hover:bg-muted/50'}`}
+                            className={`flex items-start gap-2 p-3 rounded-lg border transition-colors cursor-pointer ${form.paymentMethod === m.code ? 'border-(--brand-primary) bg-[rgb(var(--brand-primary-rgb)/0.05)]' : 'hover:bg-muted/50'}`}
                           >
                             <RadioGroupItem value={m.code} id={`pagamento-${m.code}`} className="mt-1" />
                             <Label htmlFor={`pagamento-${m.code}`} className="cursor-pointer flex-1">
@@ -776,7 +776,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                               </span>
                               {m.account_info && (
                                 // Fonte normal (Inter), não monoespaçada: nesta o "O" de AO06 e o zero eram iguais.
-                                <span className="block text-xs text-foreground/80 tabular-nums tracking-wide mt-0.5 break-words">{m.account_info}</span>
+                                <span className="block text-xs text-foreground/80 tabular-nums tracking-wide mt-0.5 wrap-break-word">{m.account_info}</span>
                               )}
                               {form.paymentMethod === m.code && m.instructions && (
                                 <p className="text-xs text-muted-foreground mt-2 p-2 rounded-md bg-muted/50 whitespace-pre-wrap">{m.instructions}</p>

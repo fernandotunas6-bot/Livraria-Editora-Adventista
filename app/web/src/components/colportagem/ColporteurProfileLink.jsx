@@ -1,19 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, ChevronRight } from 'lucide-react';
-import { colporteurMe } from '@/lib/colporteurApi';
+import { useAuth } from '@/hooks/useAuth';
+import { useColporteurMe } from '@/hooks/useColporteurMe';
 
 /**
  * Atalho para a área do colportor no perfil, só para quem é colportor (conta ligada a uma ficha).
  * Sem a migração, ou para quem não é colportor, não mostra nada.
  */
 export default function ColporteurProfileLink() {
-  const [me, setMe] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    colporteurMe().then((r) => { if (alive) setMe(r || null); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  // A mesma pergunta que os menus do site fazem, uma vez por visita (hooks/useColporteurMe.js).
+  const { user } = useAuth();
+  const me = useColporteurMe(user?.id);
   if (!me) return null;
   return (
     <Link to="/colportor" className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:border-marca/40 transition-colors group">

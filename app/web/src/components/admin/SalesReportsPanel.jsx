@@ -7,6 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { exportOrdersToExcel, exportSalesReportSummary, computeSalesReport } from '@/lib/orderExport';
 import { getOrderStatusLabel } from '@/lib/orderUtils';
+import { kwanza } from '@/lib/money';
+
+/** "novembro de 2026" → "Novembro de 2026" (o `capitalize` do CSS escrevia "Novembro De 2026"). */
+export const monthLabel = (month) => String(month || '').charAt(0).toUpperCase() + String(month || '').slice(1);
+/** "1 pedido", "4 pedidos". */
+export const ordersLabel = (n) => `${n} ${Number(n) === 1 ? 'pedido' : 'pedidos'}`;
+/** Títulos longos no eixo do gráfico: cortados, com o título inteiro na dica. */
+export const shortTitle = (title, max = 28) => (String(title || '').length > max ? `${String(title).slice(0, max - 1).trimEnd()}…` : String(title || ''));
 
 function filterOrders(orders, { search, channel, dateFrom, dateTo, status }) {
   return orders.filter((o) => {
@@ -48,7 +56,8 @@ export default function SalesReportsPanel({ orders }) {
 
   const report = useMemo(() => computeSalesReport(filtered), [filtered]);
 
-  const fmt = (n) => `Kz ${Number(n).toLocaleString('pt-AO', { minimumFractionDigits: 2 })}`;
+  // Sempre "Kz 14 316,67": sem máximo de casas, o ticket médio saía "Kz 14 316,667".
+  const fmt = kwanza;
 
   const clearFilters = () => {
     setSearch('');
@@ -154,7 +163,7 @@ export default function SalesReportsPanel({ orders }) {
         <div className="bg-card border rounded-xl p-4">
           <p className="text-xs text-muted-foreground">Ticket Médio</p>
           <p className="text-2xl font-bold mt-1">{fmt(report.averageOrder)}</p>
-          <p className="text-xs text-muted-foreground">{report.cancelledOrders} cancelados</p>
+          <p className="text-xs text-muted-foreground">{report.cancelledOrders} {report.cancelledOrders === 1 ? 'cancelado' : 'cancelados'}</p>
         </div>
       </div>
 
@@ -170,7 +179,7 @@ export default function SalesReportsPanel({ orders }) {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v) => [`Kz ${Number(v).toLocaleString('pt-AO')}`, 'Receita']} labelFormatter={(l) => l} />
+                  <Tooltip formatter={(v) => [kwanza(v), 'Receita']} labelFormatter={(l) => l} />
                   <Bar dataKey="revenue" fill="#0ea5c9" radius={[4, 4, 0, 0]} name="Receita" />
                 </BarChart>
               </ResponsiveContainer>
@@ -179,15 +188,17 @@ export default function SalesReportsPanel({ orders }) {
 
           <div className="bg-card border rounded-xl p-4">
             <h4 className="font-semibold text-sm mb-4 flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-primary" /> Livros mais vendidos
+              <BookOpen className="h-4 w-4 text-primary" /> Mais vendidos
             </h4>
             {report.topBooks?.length > 0 ? (
-              <div className="h-64">
+              // Uma linha por livro, com altura para o nome: com 100 px de eixo e altura fixa, os
+              // títulos partiam em várias linhas e sobrepunham-se uns aos outros.
+              <div style={{ height: Math.max(160, report.topBooks.length * 36 + 40) }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={report.topBooks} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <YAxis type="category" dataKey="title" width={100} tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="title" width={180} interval={0} tick={{ fontSize: 11 }} tickFormatter={(t) => shortTitle(t)} />
                     <Tooltip formatter={(v) => [v, 'Unidades']} />
                     <Bar dataKey="quantity" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Unidades" />
                   </BarChart>
@@ -214,7 +225,7 @@ export default function SalesReportsPanel({ orders }) {
             <tbody className="divide-y">
               {Object.entries(report.byMonth).map(([month, data]) => (
                 <tr key={month}>
-                  <td className="p-3 capitalize">{month}</td>
+                  <td className="p-3">{monthLabel(month)}</td>
                   <td className="p-3">{data.count}</td>
                   <td className="p-3 text-right font-medium text-primary">{fmt(data.total)}</td>
                 </tr>
@@ -230,7 +241,7 @@ export default function SalesReportsPanel({ orders }) {
           {Object.entries(report.byStatus).map(([st, data]) => (
             <div key={st} className="bg-card p-4">
               <p className="text-xs text-muted-foreground">{getOrderStatusLabel(st)}</p>
-              <p className="font-bold">{data.count} pedidos</p>
+              <p className="font-bold">{ordersLabel(data.count)}</p>
               <p className="text-sm text-primary">{fmt(data.total)}</p>
             </div>
           ))}

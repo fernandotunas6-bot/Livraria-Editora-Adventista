@@ -65,7 +65,7 @@ export function BookPicker({ value, onChange }) {
         {searching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />}
       </div>
       {results.length > 0 && (
-        <ul className="max-h-60 overflow-y-auto rounded-xl border border-editorial-filete bg-editorial-papel text-sm shadow-sm" aria-label="Livros encontrados">
+        <ul className="max-h-60 overflow-y-auto rounded-xl border border-editorial-filete bg-editorial-papel text-sm shadow-xs" aria-label="Livros encontrados">
           {results.map((p) => (
             <li key={p.id}>
               <button
@@ -188,7 +188,7 @@ export default function PostComposer({
 
   if (collapsible && !open) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-3 shadow-sm sm:p-4">
+      <div className="flex items-center gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-3 shadow-xs sm:p-4">
         {author && <Monogram name={author.name} authorKey={author.key} />}
         <button
           type="button"
@@ -203,11 +203,11 @@ export default function PostComposer({
   }
 
   const actionsClass = stickyActions
-    ? 'sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-editorial-filete bg-editorial-papel/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-sm'
+    ? 'sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-editorial-filete bg-editorial-papel/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-xs'
     : 'flex flex-wrap items-center justify-end gap-2';
 
   return (
-    <form onSubmit={submit} className={compact ? 'space-y-2' : stickyActions ? 'space-y-4' : 'space-y-4 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 shadow-sm sm:p-5'}>
+    <form onSubmit={submit} className={compact ? 'space-y-2' : stickyActions ? 'space-y-4' : 'space-y-4 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 shadow-xs sm:p-5'}>
       {draftNotice && !isEmptyDraft({ body, quote, links }) && (
         <p className="flex flex-wrap items-center gap-2 rounded-xl bg-editorial-tela px-3 py-2 text-xs text-editorial-tinta" role="status">
           Recuperámos o rascunho que estava a escrever.

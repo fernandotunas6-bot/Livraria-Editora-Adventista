@@ -89,6 +89,7 @@ describe("canais e horário dos avisos", () => {
     expect(channelsFor("new_order", "high")).toEqual(["push", "whatsapp", "email"]);
     expect(channelsFor("support", "normal")).toEqual(["push"]);
     expect(channelsFor("order_confirmed", "normal")).toEqual([]);
+    expect(channelsFor("order_cancelled", "normal")).toEqual(["push"]);
     expect(channelsFor("order_stuck", "critical")).toEqual(["email", "whatsapp", "push"]);
   });
 

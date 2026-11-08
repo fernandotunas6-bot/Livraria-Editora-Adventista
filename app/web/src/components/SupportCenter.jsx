@@ -12,6 +12,9 @@ import { getDeliveryStatusLabel, getOrderStatusLabel, getPaymentStatusLabel } fr
 import SupportRating from '@/components/assistant/SupportRating';
 import SupportReport from '@/components/admin/SupportReport';
 import { suggestSupportReply } from '@/lib/opsApi';
+import { adminHref } from '@/lib/adminSections';
+import { accountTopic } from '@/lib/realtimeSignals';
+import { useSignal } from '@/hooks/useSignal';
 import {
   addSupportNote,
   createSupportThread,
@@ -35,6 +38,9 @@ import {
   sendSupportMessage,
   updateSupportThread,
 } from '@/lib/supportApi';
+
+// Avisos da colportagem para a equipa → a vista da Colportagem onde se tratam.
+const COLPORTEUR_NOTICE_VIEW = { colporteur_application: 'candidaturas', colporteur_report: 'relatorios' };
 
 const STATUS_LABELS = {
   bot: 'Com o assistente',
@@ -90,6 +96,8 @@ const NOTIFICATION_KINDS = {
   ops_test: 'Teste de avisos',
   colporteur_application: 'Candidatura a colportor',
   colporteur_report: 'Relatório de colportor',
+  colporteur_delivery: 'Entrega por colportor',
+  order_cancelled: 'Cancelada pelo cliente',
 };
 
 // Avisos da vigilância: levam ao Acompanhamento, onde se assume e trata.
@@ -169,11 +177,21 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
     }
   }, [staff, user?.id, threadStatusFilter]);
 
+  // Tempo real: uma mensagem nova ou uma conversa mudada (estado, responsável) chegam na hora —
+  // a equipa ouve o painel, o cliente o canal da sua conta. A consulta fica de reserva, mais
+  // espaçada com o canal ligado.
+  const loadMessagesRef = useRef(null);
+  const live = useSignal(staff ? 'painel' : accountTopic(user?.id), 'atendimento', (event, payload) => {
+    refresh();
+    const open = selectedIdRef.current;
+    if (open && (!payload?.thread || payload.thread === open)) loadMessagesRef.current?.(open);
+  }, { enabled: !!user?.id });
+
   useEffect(() => {
     refresh();
-    const timer = window.setInterval(refresh, 30000);
+    const timer = window.setInterval(refresh, live ? 120_000 : 30_000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, live]);
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
@@ -218,6 +236,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   }, []);
 
   useEffect(() => {
+    loadMessagesRef.current = loadMessages;
     loadMessages(selectedId);
   }, [loadMessages, selectedId]);
 
@@ -230,9 +249,9 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       } catch (err) {
         setError(err.message || 'Não foi possível actualizar a conversa.');
       }
-    }, 10000);
+    }, live ? 60_000 : 10_000);
     return () => window.clearInterval(timer);
-  }, [loadMessages, selectedId]);
+  }, [loadMessages, selectedId, live]);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
   const unreadMessages = threads.filter((thread) => unreadThread(thread, staff, user?.id)).length;
@@ -275,7 +294,8 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
       } else if (staff && String(notification.kind).startsWith('colporteur_')) {
-        navigate('/admin?tab=colportagem');
+        // Directo à vista que o aviso pede: a candidatura nova ou o relatório por validar.
+        navigate(adminHref('colportagem', COLPORTEUR_NOTICE_VIEW[notification.kind] || null));
       } else if (notification.href?.startsWith('/')) {
         navigate(notification.href);
       }
@@ -626,7 +646,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                 <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-amber-800">
                   <Lock className="h-3 w-3" /> Nota interna · {staffName(message.sender_id)} · só a equipa vê
                 </p>
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                <p className="whitespace-pre-wrap wrap-break-word">{message.body}</p>
                 <time className="mt-1 block text-[10px] text-amber-800/70" dateTime={message.created_at}>{when}</time>
               </div>
             );
@@ -647,7 +667,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
                 <p className={`mb-0.5 flex items-center gap-1 text-[10px] font-semibold ${mine ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                   {author === 'assistant' && <Sparkles className="h-3 w-3" />} {label}
                 </p>
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                <p className="whitespace-pre-wrap wrap-break-word">{message.body}</p>
                 <time className={`mt-1 block text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} dateTime={message.created_at}>
                   {when}
                 </time>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { History, Mail, PackageSearch, Pencil, Phone, ShoppingBag } from 'lucide-react';
 import { detectQuery } from '@/lib/adminSearch';
-import { findSection } from '@/lib/adminSections';
+import { findSection, flattenViews } from '@/lib/adminSections';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import AdminNavBadge from '@/components/admin/shell/AdminNavBadge';
@@ -10,6 +10,9 @@ import AdminNavBadge from '@/components/admin/shell/AdminNavBadge';
  * Procurar no painel (Ctrl+K ou ⌘K, ou o campo do topo): ir para qualquer secção pelo nome,
  * e procurar logo uma encomenda (número, cliente, telefone) ou um produto (título, código).
  * Com 22 secções em 7 grupos, é o caminho mais curto — e o mesmo nas duas disposições.
+ *
+ * Com alguma coisa escrita, encontra também as vistas de cada secção ("contas colportagem",
+ * "envio", "pastores") e abre a secção já nessa vista. Só as que a pessoa pode abrir.
  */
 export default function AdminCommandPalette({
   open, onOpenChange, nav, onNavigate, onSearchOrders, onSearchProducts, recents = [], findProduct, onEditProduct,
@@ -45,7 +48,7 @@ export default function AdminCommandPalette({
         <DialogTitle className="sr-only">Procurar no painel</DialogTitle>
         <DialogDescription className="sr-only">Escreva o nome de uma secção, um número de encomenda ou um produto.</DialogDescription>
         <Command
-          className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:py-2.5"
+          className="**:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-input]]:h-12 **:[[cmdk-item]]:py-2.5"
           filter={(value, search, keywords) => {
             const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
             if (value.startsWith('acao:')) return 1;
@@ -133,6 +136,27 @@ export default function AdminCommandPalette({
                 })}
               </CommandGroup>
             ))}
+            {term && (
+              <CommandGroup heading="Dentro das secções">
+                {flattenViews(nav).map((v) => {
+                  const Icon = v.icon || v.sectionIcon;
+                  return (
+                    <CommandItem
+                      key={`vista-${v.section}-${v.id}`}
+                      value={`${v.sectionLabel} ${v.label}`}
+                      keywords={[v.description, v.groupLabel, v.group, v.keywords]}
+                      onSelect={() => run(() => onNavigate(v.section, { view: v.id }))}
+                    >
+                      <Icon className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <span className="flex-1 truncate">
+                        <span className="text-muted-foreground">{v.sectionLabel} › </span>{v.label}
+                      </span>
+                      <AdminNavBadge badge={v.badge && v.badge.tone !== 'count' ? v.badge : null} />
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </DialogContent>

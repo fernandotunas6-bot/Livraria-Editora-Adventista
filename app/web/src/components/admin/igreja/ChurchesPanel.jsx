@@ -58,7 +58,7 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
     <div>
       <Toolbar>
         <SearchBox value={query} onChange={setQuery} placeholder="Nº, igreja, distrito, delegado…" />
-        <NativeSelect value={districtFilter} onChange={setDistrictFilter} className="w-auto max-w-[14rem]">
+        <NativeSelect value={districtFilter} onChange={setDistrictFilter} className="w-auto max-w-56">
           <option value="">Todos os distritos</option>
           <option value="__none">Sem distrito</option>
           {districtOptions.map((d) => <option key={d.id} value={d.id}>{d.name} · {idx.provinceName(d.province_id)}</option>)}
