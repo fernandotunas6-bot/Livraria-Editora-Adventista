@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, Clock, ExternalLink, Info, MessageCircle, PackageSearch, PanelTop, Plus,
+  AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Clock, ExternalLink, Info, MessageCircle, PackageSearch, PanelTop, Plus,
   ShoppingBag, Siren, Wallet,
 } from 'lucide-react';
 import { attentionItems } from '@/lib/adminAttention';
+import { monthSummary, topProducts } from '@/lib/managerSummary';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { formatOrderNumber, getOrderStatusColor, getOrderStatusLabel } from '@/lib/orderUtils';
@@ -114,6 +115,91 @@ function Panel({ title, action, children }) {
   );
 }
 
+/** "+12%" verde, "−5%" vermelho; sem base de comparação, um traço. Para os cancelamentos, descer é bom. */
+function Delta({ value, inverse = false }) {
+  if (value === null || value === undefined) return <span className="text-xs text-muted-foreground">—</span>;
+  if (value === 0) return <span className="text-xs text-muted-foreground">igual</span>;
+  const up = value > 0;
+  const good = inverse ? !up : up;
+  const Icon = up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className={cn('inline-flex items-center gap-0.5 text-xs font-medium', good ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="sr-only">{up ? 'subiu' : 'desceu'} </span>{Math.abs(value)}%
+    </span>
+  );
+}
+
+/**
+ * O mês até hoje, para quem gere: quanto se encomendou e quanto entrou, comparado com os mesmos
+ * dias do mês anterior, e o que se vende mais. Antes o Início só tinha um "Vendas (30 dias)" que
+ * somava encomendas por pagar, sem comparação nenhuma.
+ */
+function MonthPanel({ orders, onNavigate }) {
+  const s = useMemo(() => monthSummary(orders), [orders]);
+  const top = useMemo(() => topProducts(orders), [orders]);
+  const prevName = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() - 1, 1).toLocaleDateString('pt-PT', { month: 'long' });
+  }, []);
+  const metrics = [
+    { label: 'Encomendas', value: s.current.orders, delta: s.deltas.orders },
+    { label: 'Encomendado', value: kz(s.current.ordered), delta: s.deltas.ordered },
+    { label: 'Recebido', value: kz(s.current.received), delta: s.deltas.received },
+    { label: 'Ticket médio', value: kz(s.current.average), delta: s.deltas.average },
+  ];
+  return (
+    // `grid-cols-1` é minmax(0, 1fr): sem ele, no telemóvel a coluna crescia até à largura dos
+    // valores ("Kz 68 900,00" lado a lado) e a página ganhava scroll horizontal.
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="min-w-0 xl:col-span-2">
+        <Panel
+          title={s.label}
+          action={(
+            <Button variant="ghost" size="sm" className="h-8 text-primary" onClick={() => onNavigate('vendas-huambo')}>
+              Relatórios <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          )}
+        >
+          <dl className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
+            {metrics.map((m) => (
+              <div key={m.label} className="min-w-0 bg-card px-3 py-3 sm:px-4">
+                <dt className="text-xs text-muted-foreground">{m.label}</dt>
+                <dd className="mt-1 truncate text-base font-semibold tabular-nums text-foreground sm:text-lg" title={String(m.value)}>{m.value}</dd>
+                <dd className="mt-0.5"><Delta value={m.delta} /></dd>
+              </div>
+            ))}
+          </dl>
+          <p className="max-w-none border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+            Comparado com os mesmos dias de {prevName}.
+            {' '}Canceladas: {s.current.cancelled}
+            {s.current.cancelled > 0 && ` (${Math.round(s.current.cancelledShare * 100)}% das encomendas)`}.
+            {' '}O recebido é o dinheiro já registado destas encomendas.
+          </p>
+        </Panel>
+      </div>
+      <Panel title="Mais vendidos (30 dias)">
+        {top.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">Ainda sem vendas no período.</p>
+        ) : (
+          <ol className="divide-y divide-border">
+            {top.map((p, i) => (
+              <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="w-4 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-foreground" title={p.title}>{p.title}</span>
+                  {p.code && <span className="block font-mono text-[11px] text-muted-foreground">{p.code}</span>}
+                </span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums">{p.units} un.</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 /**
  * Início do painel: o que precisa de atenção, para quem entra. Mostra só o que a pessoa pode
  * tratar (sem permissão de encomendas, não vê encomendas). Cada número leva ao sítio onde se
@@ -134,6 +220,7 @@ export default function AdminOverview({
   const since = Date.now() - 30 * 24 * 3600 * 1000;
   const month = active.filter((o) => Date.parse(o.created) >= since);
   const monthTotal = month.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const monthReceived = month.reduce((s, o) => s + Math.max(0, (Number(o.amount_paid) || 0) - (Number(o.amount_refunded) || 0)), 0);
   const recent = orders.slice(0, 6);
   const attention = useMemo(() => attentionItems({ orders, books, perms }), [orders, books, perms]);
   const act = (action) => {
@@ -168,12 +255,15 @@ export default function AdminOverview({
             onClick={() => onOpenOrders({ status: 'confirmed' })}
           />
           <StatCard
-            icon={CheckCircle2} label="Vendas (30 dias)" tone="success"
-            value={loading ? '…' : kz(monthTotal)} hint={`${month.length} encomenda${month.length === 1 ? '' : 's'}`}
+            icon={CheckCircle2} label="Encomendado (30 dias)" tone="success"
+            value={loading ? '…' : kz(monthTotal)}
+            hint={`${month.length} encomenda${month.length === 1 ? '' : 's'} · ${kz(monthReceived)} recebido${monthReceived === 0 ? '' : 's'}`}
             onClick={() => onNavigate('vendas-huambo')}
           />
         </div>
       )}
+
+      {perms.orders && !loading && <MonthPanel orders={orders} onNavigate={onNavigate} />}
 
       <div className="grid gap-6 xl:grid-cols-3">
         {perms.orders && (

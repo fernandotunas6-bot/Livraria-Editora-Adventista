@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthDialog } from '@/hooks/useAuthDialog';
 import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
+import { ROLES } from '@/lib/permissions';
 
 export function UserMenu({ compact = false, className }) {
   const { user, isAdmin, canAccessAdmin, logout } = useAuth();
@@ -60,9 +61,11 @@ export function UserMenu({ compact = false, className }) {
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{getUserDisplayName(user)}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              {isAdmin && (
+              {/* Quem é da equipa vê-o (o gestor também, não só o administrador), com o código FUN-. */}
+              {(isAdmin || user?.role === 'manager') && (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-primary">
-                  <Shield className="h-3 w-3" /> Administrador
+                  <Shield className="h-3 w-3" aria-hidden="true" /> {ROLES[user?.role]?.label || 'Equipa'}
+                  {user?.staff_code && <span className="font-mono text-muted-foreground">· {user.staff_code}</span>}
                 </span>
               )}
             </div>
