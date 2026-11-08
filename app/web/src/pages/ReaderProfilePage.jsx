@@ -13,12 +13,16 @@ import { PAGE_SIZE, isMissingTable, loadReader, loadReaderPosts } from '@/lib/co
 import { plural, postKind, postPath, readerSince } from '@/lib/communityStyle';
 import { relativeTime } from '@/lib/communityText';
 import { pageTitle } from '@/lib/brand';
+import { useReaderLevel } from '@/hooks/useReader';
+import ReaderBadge from '@/components/community/ReaderBadge';
 
 /** Perfil público de um leitor: nome, desde quando, actividade e publicações. Sem email nem foto. */
 export default function ReaderProfilePage() {
   const { key } = useParams();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [reader, setReader] = useState(null);
+  // O distintivo do nível de leitor (Leitor, assíduo, de honra), pela chave pública.
+  const readerLevel = useReaderLevel(reader && !reader.is_staff ? reader.author_key : null);
   const [posts, setPosts] = useState([]);
   const [status, setStatus] = useState('loading');
   const [attempt, setAttempt] = useState(0);
@@ -103,6 +107,7 @@ export default function ReaderProfilePage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {reader.is_staff && <span className="inline-flex items-center gap-1 rounded-full bg-editorial-tela px-2.5 py-1 text-xs font-semibold text-editorial-ouro-texto"><BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> Equipa da Livraria</span>}
                     {reader.is_founder && <span className="inline-flex items-center gap-1 rounded-full bg-editorial-tela px-2.5 py-1 text-xs font-semibold text-editorial-ouro-texto"><Award className="h-3.5 w-3.5" aria-hidden="true" /> Membro fundador</span>}
+                    {!reader.is_staff && <ReaderBadge level={readerLevel} size="md" className="px-2.5 py-1" />}
                   </div>
                   <GoldRule className="my-4" />
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
