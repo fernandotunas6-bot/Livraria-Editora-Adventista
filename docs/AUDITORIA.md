@@ -1655,9 +1655,9 @@ leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
    ligado à base de produção com um build antigo; e fechar o email do `.com` (`MX 0 .`,
    `v=spf1 -all`, DMARC `p=reject`), que não envia nada e pode ser usado para falsificar a loja.
 
-### Integração dos PRs abertos #21, #24, #26 e #27 (2026-11-08)
+### Integração dos PRs abertos #21, #24, #26, #27 e #35 (2026-11-08)
 
-Pedido do dono: integrar os PRs abertos e publicar. O #27 já trazia o #21 (com os conflitos
+Pedido do dono: integrar os PRs abertos e publicar (o #35, aberto entretanto, a pedido à parte: só o texto do quadro da assinatura, com o CI verde). O #27 já trazia o #21 (com os conflitos
 dele resolvidos) e o `main` até ao #29; o #24 e o #26 juntaram-se sem conflitos de texto.
 
 **O que a integração apanhou: a migração do #26 partia o deploy.** `20261107110000_colportagem_avisos`
