@@ -16,6 +16,10 @@ import {
 } from "./chatEngine.ts";
 import { buildKnowledge, knowledgeText, kz } from "./chatKnowledge.ts";
 import { STAGE_LABELS, orderAlerts, watchSummary, type OrderAlert } from "./orderWatch.ts";
+import {
+  OTP_MINUTES, type SmsResult, isAngolaMobile, isVerifyService, maskedNumber, smsE164, smsErrorText, smsNotice, smsNumber, smsSender,
+  twilioRequest, verifyCheck, verifyOutcome, verifySend,
+} from "./sms.ts";
 import { communityPushPlan, communityPushUrl, type CommunityNotice } from "./communityPush.ts";
 import {
   DUTY_OF_ALERT, dispatchPlan, hoursFromRow, isOpenAt, openMinutesBetween, staffPrefs, ticketSlaBreach,
@@ -175,7 +179,8 @@ type NotifyMeta = { context?: string; customer_name?: string; order_number?: str
 /** Regista o resultado real de cada envio em notification_logs (visível no admin → Integrações). */
 async function logNotification(entry: Row) {
   // Emails de conta levam um link de acesso pessoal: não ficam guardados no registo, que toda a equipa lê.
-  const content = entry.context === "account" ? "(conteúdo omitido: contém um link de acesso pessoal)" : entry.content;
+  const content = entry.context === "otp" ? "(conteúdo omitido: contém o código de confirmação)"
+    : entry.context === "account" ? "(conteúdo omitido: contém um link de acesso pessoal)" : entry.content;
   const { error } = await db.from("notification_logs").insert({
     ...entry,
     content: String(content || "").slice(0, 20000),
@@ -984,6 +989,79 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
 }
 
 // ---------------------------------------------------------------------------
+// SMS (Twilio). Guia em docs/SMS.md.
+// ---------------------------------------------------------------------------
+/** As credenciais, dos segredos da função: não ficam na base de dados nem chegam ao browser. */
+function twilioCredentials() {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
+  const token = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
+  return sid && token ? { sid, token } : null;
+}
+
+/** As opções da integração (Integrações → Twilio), ou null se estiver desligada ou sem credenciais. */
+async function getSmsConfig(fresh = false): Promise<Row | null> {
+  const rec = await getIntegration("twilio", fresh);
+  if (!rec?.enabled || !twilioCredentials()) return null;
+  const cfg = rec.config || {};
+  return {
+    // Angola aceita um nome como remetente, sem registo prévio. Até 11 caracteres.
+    sender: clipText(cfg.sender, 40) || "LivrariaAdv",
+    // Os códigos vão pela Twilio Verify: sem o serviço (VA…), não há códigos.
+    verify_service: isVerifyService(cfg.verify_service) ? String(cfg.verify_service) : "",
+    otp: cfg.otp !== false && isVerifyService(cfg.verify_service),
+    orders: !!cfg.orders,
+    colporteurs: !!cfg.colporteurs,
+    staff: !!cfg.staff,
+    daily_limit: clampInt(cfg.daily_limit, 1, 5000, 50),
+  };
+}
+
+/** O teto diário da loja, para avisos e códigos. Sem o conseguir confirmar na base de dados, não se envia. */
+async function smsBudgetLeft(config: Row) {
+  const { data, error } = await db.rpc("check_rate_limit_daily", {
+    p_bucket: "sms-por-dia", p_client: "toda-a-loja", p_max: config.daily_limit,
+  });
+  return !error && data !== false;
+}
+
+/**
+ * Envia uma SMS e regista o resultado. Cada SMS custa dinheiro: há um teto por dia, e sem conseguir
+ * confirmá-lo na base de dados não se envia. Nunca lança.
+ */
+async function sendSms(phone: unknown, text: string, config: Row, meta: NotifyMeta & { subject?: string } = {}): Promise<SmsResult> {
+  const number = smsNumber(phone);
+  const base = {
+    type: "sms", context: meta.context || "order", recipient: number || String(phone || ""), provider: "twilio",
+    customer_name: meta.customer_name || "", order_number: meta.order_number || "", subject: meta.subject || "", content: text,
+    ...(meta.dedupe ? { dedupe_key: meta.dedupe } : {}),
+  };
+  const refuse = async (code: string, error: string): Promise<SmsResult> => {
+    await logNotification({ ...base, status: "skipped", detail: error });
+    return { ok: false, code, error };
+  };
+  if (!number) return refuse("invalid_phone", "Número inválido para SMS.");
+  if (meta.dedupe && await alreadySent(meta.dedupe)) return { ok: false, code: "already_sent", error: "Já enviada." };
+  if (!await smsBudgetLeft(config)) {
+    return refuse("daily_limit", `Teto diário de ${config.daily_limit} SMS atingido (Integrações → Twilio).`);
+  }
+  const credentials = twilioCredentials();
+  if (!credentials) return refuse("missing_credentials", "Faltam os segredos da Twilio.");
+  const res = await twilioRequest(credentials, "/Messages.json", { To: smsE164(number), Body: text, ...smsSender(String(config.sender)) });
+  await logNotification({
+    ...base,
+    status: res.ok ? "sent" : "failed",
+    // "Aceite": a Twilio ainda vai tentar entregar. Se a operadora recusar depois, não se fica a saber aqui.
+    detail: res.ok
+      ? `Aceite pela Twilio (${res.status || "em fila"})${res.parts ? ` · ${res.parts} parte(s)` : ""}${res.id ? ` · ${res.id}` : ""}`
+      : `${res.code}: ${smsErrorText(res.code, res.error)}`,
+  });
+  return res;
+}
+
+/** Os passos da encomenda que vão por SMS, quando o WhatsApp não foi. */
+const SMS_ORDER_STEPS = new Set(["paid", "shipped", "out_for_delivery"]);
+
+// ---------------------------------------------------------------------------
 // Cada passo da encomenda, em todos os canais
 // ---------------------------------------------------------------------------
 
@@ -998,7 +1076,7 @@ async function sendOrderWhatsAppConfirmation(order: Row, settings: Row | null) {
  */
 async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { key?: string } = {}) {
   const settings = await getSettings();
-  const result = { email: false, whatsapp: false, push: 0 };
+  const result = { email: false, whatsapp: false, sms: false, push: 0 };
   const brand = emailBrand(settings);
   // Passos de pagamento (pagamentos registados): recebido em parte, não encontrado, reembolso.
   // `key` é a chave de idempotência de cada canal: um aviso por pagamento, não por encomenda.
@@ -1039,6 +1117,21 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
     ].filter(Boolean).join("\n"));
   } catch (err) {
     console.log(`notifyOrderStep whatsapp ${step}:`, (err as Error)?.message || err);
+  }
+  // Sem WhatsApp, o que a pessoa está à espera de saber vai por SMS, se estiver ligado.
+  if (!result.whatsapp && order.phone && SMS_ORDER_STEPS.has(step)) {
+    try {
+      const sms = await getSmsConfig();
+      if (sms?.orders && !await alreadySent(`wa:order:${order.id}:${key}`)) {
+        const res = await sendSms(order.phone, smsNotice({ title: `${title} ${ref}`, link: site ? `${site}/track` : "" }), sms, {
+          context: "order_status", customer_name: order.customer_name || "", order_number: order.order_number || "",
+          dedupe: `sms:order:${order.id}:${key}`, subject: title,
+        });
+        result.sms = !!res.ok;
+      }
+    } catch (err) {
+      console.log(`notifyOrderStep sms ${step}:`, (err as Error)?.message || err);
+    }
   }
   try {
     result.push = await sendOrderPush(order, settings, {
@@ -2579,8 +2672,8 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
 });
 
 route("GET", "/messaging/status", async () => {
-  const [settings, waRec, waCfg] = await Promise.all([
-    getSettings(), getIntegration("whatsapp_business"), getWhatsAppConfig(),
+  const [settings, waRec, waCfg, smsCfg] = await Promise.all([
+    getSettings(), getIntegration("whatsapp_business"), getWhatsAppConfig(), getSmsConfig(),
   ]);
   return json({
     whatsapp: {
@@ -2591,6 +2684,7 @@ route("GET", "/messaging/status", async () => {
     },
     email: { enabled: !!settings?.order_email_enabled, provider: settings?.email_provider || "smtp" },
     push: { enabled: !!settings?.push_enabled, has_vapid: !!settings?.vapid_public_key },
+    sms: { otp: !!smsCfg?.otp },
   });
 });
 
@@ -2655,6 +2749,129 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
   const result = await sendWhatsAppMessage(phone, text, config, { bodyParams: ["Teste", "OK", "0 Kz"] }, { context: "test" });
   if (!result.ok) throw bad(`Falha Meta API (${result.status || ""}): ${result.error || "erro desconhecido"}`);
   return json({ message: `Mensagem de teste enviada para ${phone}.` });
+});
+
+/** O estado da Twilio para o painel: se há credenciais, se está ligada, o saldo e o tipo de conta. */
+route("GET", "/admin/sms/estado", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  const rec = await getIntegration("twilio", true);
+  const credentials = twilioCredentials();
+  if (!credentials) return json({ configured: false, enabled: !!rec?.enabled });
+  const [balance, account] = await Promise.all([
+    twilioRequest(credentials, "/Balance.json"),
+    twilioRequest(credentials, ".json"),
+  ]);
+  return json({
+    configured: true,
+    enabled: !!rec?.enabled,
+    ok: account.ok,
+    error: account.ok ? "" : smsErrorText(account.code, account.error),
+    account_type: account.body?.type ?? "",
+    account_status: account.body?.status ?? "",
+    balance: balance.ok ? balance.body?.balance ?? null : null,
+    currency: balance.ok ? balance.body?.currency ?? "" : "",
+  });
+});
+
+route("POST", "/admin/sms/teste", async ({ auth, body, ip }) => {
+  requirePermission(auth, "manage_settings");
+  if (!await checkRateLimit("sms-teste", ip, 5)) throw tooMany("Demasiados testes seguidos. Aguarde um minuto.");
+  const config = await getSmsConfig(true);
+  if (!config) throw bad("A Twilio não está ligada, ou faltam os segredos TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN.");
+  if (!smsNumber(body.phone)) throw bad("Indique um número válido.");
+  const res = await sendSms(body.phone, "Teste - Livraria Adventista. A integracao de SMS esta a funcionar.", config, { context: "test", subject: "Teste" });
+  if (!res.ok) throw bad(smsErrorText(res.code, res.error));
+  return json({ message: `SMS de teste aceite pela Twilio para ${maskedNumber(smsNumber(body.phone))}.` });
+});
+
+/**
+ * Confirmar o telefone da conta por código, pela Twilio Verify, que gera o código, o guarda e conta
+ * as tentativas. O número fica preso à conta na base de dados (phone_verifications), e a verificação
+ * usa sempre esse número, nunca um que venha do browser.
+ *
+ * Só telemóveis de Angola: um formulário destes aberto a qualquer país é o alvo clássico da fraude
+ * com SMS internacionais pagas. Limites por IP, conta e número, além do teto diário; sem os conseguir
+ * confirmar na base de dados, não se envia.
+ */
+const OTP_PER_DAY = { conta: 5, numero: 5, ip: 20 };
+
+async function otpAllowedToday(userId: string, number: string, ip: string) {
+  const buckets: [string, string, number][] = [
+    ["otp-conta", userId, OTP_PER_DAY.conta], ["otp-numero", number, OTP_PER_DAY.numero], ["otp-ip", ip, OTP_PER_DAY.ip],
+  ];
+  for (const [p_bucket, p_client, p_max] of buckets) {
+    const { data, error } = await db.rpc("check_rate_limit_daily", { p_bucket, p_client, p_max });
+    if (error || data === false) return false;
+  }
+  return true;
+}
+
+route("POST", "/conta/telefone/enviar", async ({ auth, body, ip }) => {
+  if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
+  if (!await checkRateLimit("otp-envio", ip, 5)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const config = await getSmsConfig();
+  const credentials = twilioCredentials();
+  if (!config?.otp || !credentials) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
+  const number = smsNumber(body.phone);
+  if (!isAngolaMobile(number)) throw bad("Indique um telemóvel de Angola: +244 9XX XXX XXX.");
+
+  // Primeiro a espera de 60 segundos: carregar outra vez no botão não gasta o limite do dia.
+  const { data: wait, error } = await db.rpc("phone_verification_start", { p_user: auth.id, p_phone: number, p_minutes: OTP_MINUTES });
+  if (error) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
+  if (Number(wait) > 0) throw new HttpError(429, `Já enviámos um código. Pode pedir outro daqui a ${wait} segundos.`, { "Retry-After": String(wait) });
+
+  const cancel = () => db.rpc("phone_verification_cancel", { p_user: auth.id });
+  if (!await otpAllowedToday(auth.id, number, ip)) {
+    await cancel();
+    throw tooMany("Já pediu muitos códigos hoje. Tente amanhã, ou fale connosco.");
+  }
+  const logged = { type: "sms", context: "otp", recipient: number, provider: "twilio-verify", subject: "Código de confirmação" };
+  if (!await smsBudgetLeft(config)) {
+    await cancel();
+    await logNotification({ ...logged, status: "skipped", detail: `Teto diário de ${config.daily_limit} SMS atingido (Integrações → Twilio).` });
+    throw new HttpError(503, "Não foi possível enviar a SMS agora. Tente mais tarde.");
+  }
+  const res = await verifySend(credentials, config.verify_service, smsE164(number));
+  await logNotification({
+    ...logged,
+    status: res.ok ? "sent" : "failed",
+    detail: res.ok ? `Aceite pela Twilio Verify (${res.status || "em fila"})${res.id ? ` · ${res.id}` : ""}` : `${res.code}: ${smsErrorText(res.code, res.error)}`,
+  });
+  if (!res.ok) {
+    await cancel();
+    console.log("SMS do código:", res.code, res.error);
+    if (res.code === "60203" || res.code === "60212") throw tooMany(smsErrorText(res.code));
+    throw new HttpError(503, "Não foi possível enviar a SMS agora. Tente daqui a pouco.");
+  }
+  return json({ message: `Enviámos um código para ${maskedNumber(number)}.`, expires_minutes: OTP_MINUTES, retry_after: 60 });
+});
+
+route("POST", "/conta/telefone/confirmar", async ({ auth, body, ip }) => {
+  if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
+  if (!await checkRateLimit("otp-confirma", ip, 20)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const code = String(body.code || "").trim();
+  if (!/^\d{4,10}$/.test(code)) throw bad("Escreva o código que recebeu por SMS.");
+  const config = await getSmsConfig();
+  const credentials = twilioCredentials();
+  if (!config?.otp || !credentials) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
+  const { data: number } = await db.rpc("phone_verification_pending", { p_user: auth.id });
+  if (!number) throw bad("Peça um código novo.");
+
+  const outcome = verifyOutcome(await verifyCheck(credentials, config.verify_service, smsE164(String(number)), code));
+  if (outcome === "unavailable") throw new HttpError(503, "Não foi possível confirmar agora. Tente daqui a pouco.");
+  if (outcome === "approved") {
+    const { data, error } = await db.rpc("phone_verification_confirm", { p_user: auth.id });
+    const r = data as Row;
+    if (error || !r?.ok) throw new HttpError(503, "Não foi possível confirmar agora. Peça um código novo.");
+    return json({ message: "Telefone confirmado.", phone: r.phone });
+  }
+  if (outcome === "wrong") {
+    const { data: left } = await db.rpc("phone_verification_failed", { p_user: auth.id });
+    if (Number(left) > 0) throw bad(`Código errado. ${Number(left) === 1 ? "Resta 1 tentativa." : `Restam ${left} tentativas.`}`);
+    throw bad("Demasiadas tentativas. Peça um código novo.");
+  }
+  await db.rpc("phone_verification_cancel", { p_user: auth.id });
+  throw bad(outcome === "attempts" ? "Demasiadas tentativas. Peça um código novo." : "O código expirou. Peça um novo.");
 });
 
 /** Lista dos modelos que o painel pode pré-visualizar. */
@@ -3215,6 +3432,16 @@ async function dispatchColporteurNotifications(limit = 50) {
           detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
         });
         ok = !!res?.ok;
+      }
+      // A oferta tem prazo: sem WhatsApp, vai por SMS, se estiver ligado.
+      if (!ok && c?.phone) {
+        const sms = await getSmsConfig();
+        if (sms?.colporteurs) {
+          const res = await sendSms(c.phone, smsNotice({
+            title: String(n.title || "Colportagem"), detail: String(n.body || ""), link: site ? `${site}${n.href || "/colportor?tab=entregas"}` : "",
+          }), sms, { context: "colportagem", customer_name: c.full_name || "", dedupe: `sms:colportor:${n.id}`, subject: String(n.title || "") });
+          ok = !!res.ok;
+        }
       }
       const pushed = await sendUserPush(String(n.customer_id), settings, {
         title: String(n.title || "Colportagem"), body: clipText(String(n.body || ""), 160), url: String(n.href || "/colportor?tab=entregas"),
@@ -3865,6 +4092,16 @@ async function dispatchStaffNotifications(limit = 100) {
               subject: n.title, detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
             });
             result.whatsapp = !!res?.ok;
+          }
+        }
+        // Avisos importantes, quando o WhatsApp não foi: por SMS, se estiver ligado.
+        if (channel === "whatsapp" && !result.whatsapp && p!.phone && ["high", "critical"].includes(String(n.severity))) {
+          const sms = await getSmsConfig();
+          if (sms?.staff) {
+            const res = await sendSms(p!.phone, smsNotice({ title: n.title, detail: n.body, link: site ? `${site}${path}` : "" }), sms, {
+              context: "staff_alert", customer_name: p!.name || "", dedupe: `staff:${n.id}:sms`, subject: n.title,
+            });
+            result.sms = !!res.ok;
           }
         }
         if (channel === "push") result.push = await sendUserPush(String(p!.id), settings, { title: n.title, body: n.body, url: path });
