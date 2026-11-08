@@ -36,7 +36,8 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   const buyAria = mustChoose ? `${variantNames(product.product_type).pick} de ${product.title}` : undefined;
 
   const variant = product.variants?.[0];
-  const inStock = product.purchasable && (variant?.inventory_quantity ?? 0) > 0;
+  // Com a edição digital à venda, o livro esgotado em papel não está esgotado (lib/digitalEditions.js).
+  const inStock = product.purchasable && ((variant?.inventory_quantity ?? 0) > 0 || !!product.has_digital);
   const qty = variant?.inventory_quantity ?? 0;
   // A marca vem da base de dados, com o limite definido em Configurações → Regras da loja.
   const isLowStock = inStock && !!product.stock_low;
@@ -367,7 +368,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             {originalPrice && <span className="text-xs text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
           </div>
           <p className={`text-xs font-medium ${!inStock ? 'text-muted-foreground' : isLowStock ? 'text-orange-700 dark:text-orange-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-            {!inStock ? 'Esgotado' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
+            {!inStock ? 'Esgotado' : product.digital_only ? 'Edição digital' : product.has_digital && qty <= 0 ? 'Edição digital disponível' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
           </p>
         </Link>
 

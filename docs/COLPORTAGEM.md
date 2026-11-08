@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) , `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo) e `20261108210000_entregas_loja_e_robustez.sql` (a loja de levantamento e o pagamento protegido).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) , `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo) e `20261108220000_entregas_loja_e_robustez.sql` (a loja de levantamento e o pagamento protegido).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão, ou porque o total baixou e o que já foi pago chega. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 

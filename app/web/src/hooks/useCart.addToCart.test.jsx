@@ -130,3 +130,28 @@ describe('addToCart — o que recusa', () => {
     expect(carrinho.cartItems).toHaveLength(2);
   });
 });
+
+describe('addToCart — edição digital', () => {
+  it('entra com quantidade 1 e não soma: já está no carrinho', async () => {
+    const v = variante('liv1-v1', { digital: true, manage_inventory: false, inventory_quantity: 1 });
+    const p = produto({ versions: [{ label: 'Impresso' }, { label: 'Edição digital', digital: true }] });
+    await juntar(p, v, 3);
+    expect(carrinho.cartItems).toHaveLength(1);
+    expect(carrinho.cartItems[0].quantity).toBe(1);
+    expect(toasts.at(-1).description).toContain('fica na sua biblioteca');
+    await juntar(p, v, 1);
+    expect(carrinho.cartItems[0].quantity).toBe(1);
+    expect(toasts.at(-1)).toMatchObject({ tipo: 'info' });
+    expect(toasts.at(-1).titulo).toContain('já está no carrinho');
+    await act(async () => carrinho.updateQuantity('liv1-v1', 4));
+    expect(carrinho.cartItems[0].quantity).toBe(1);
+    expect(carrinho.cartDigital).toMatchObject({ all: true, any: true, physicalCents: 0 });
+  });
+
+  it('com um impresso: misto, e os portes contam só o impresso', async () => {
+    const p = produto({ versions: [{ label: 'Impresso' }, { label: 'Edição digital', digital: true }] });
+    await juntar(p, variante('liv1-v1', { digital: true, manage_inventory: false, inventory_quantity: 1 }));
+    await juntar(produto({ id: 'bib', title: 'Bíblia' }), variante('bib-default'), 2);
+    expect(carrinho.cartDigital).toMatchObject({ all: false, any: true, physicalCents: 200_000 });
+  });
+});

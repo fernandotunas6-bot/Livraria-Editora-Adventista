@@ -296,6 +296,18 @@ describe("cartão da encomenda", async () => {
     expect(off.steps.some((s) => s.done || s.current)).toBe(false);
   });
 
+  it("edição digital: recebida, paga, na biblioteca — sem envio", () => {
+    const base = { ...ORDER, shipping_method: "digital", tracking_number: "", carrier: "", estimated_delivery: null };
+    const porPagar = orderCard({ ...base, payment_status: "pending", delivery_status: "received", status: "pending" });
+    expect(porPagar.digital).toBe(true);
+    expect(porPagar.steps.map((s) => s.label)).toEqual(["Recebida", "Paga", "Na biblioteca"]);
+    expect(porPagar.steps.map((s) => [s.done, s.current])).toEqual([[false, true], [false, false], [false, false]]);
+    expect(porPagar.stage_label).toContain("a edição digital abre quando for confirmado");
+    const paga = orderCard({ ...base, payment_status: "paid", delivery_status: "delivered", status: "delivered" });
+    expect(paga.steps.every((s) => s.done && !s.current)).toBe(true);
+    expect(paga.stage_label).toBe("concluída — a edição digital está na sua biblioteca");
+  });
+
   it("a resposta sobre uma encomenda leva o cartão", () => {
     expect(ruleReply(ctx("A minha encomenda", { loggedIn: true, orders: [ORDER] })).order_card?.number).toBe("ENC-K3J9XA4F2");
     expect(ruleReply(ctx("Formas de pagamento", { loggedIn: true, orders: [ORDER] })).order_card).toBeUndefined();

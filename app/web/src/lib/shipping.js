@@ -1,4 +1,4 @@
-import { Truck, MapPin, Zap } from 'lucide-react';
+import { Truck, MapPin, Zap, Library } from 'lucide-react';
 
 export const SHIPPING_METHODS = {
   delivery: {
@@ -19,6 +19,17 @@ export const SHIPPING_METHODS = {
     description: 'Prioridade — 24-48h em Luanda',
     icon: Zap,
   },
+};
+
+/**
+ * Envio da encomenda só de edições digitais (migração edicoes_digitais). Não entra na lista de
+ * escolha: o carrinho passa a ele sozinho quando só tem edições digitais.
+ */
+export const DIGITAL_SHIPPING = {
+  id: 'digital',
+  label: 'Edição digital (sem envio)',
+  description: 'Fica na sua biblioteca quando o pagamento for confirmado',
+  icon: Library,
 };
 
 /**
@@ -44,14 +55,19 @@ export function shippingRules(settings = {}) {
   return { freeThresholdCents, standardCents, expressCents };
 }
 
+/**
+ * Portes em cêntimos. `subtotalCents` é o do que se envia: as edições digitais não contam, nem
+ * para os portes grátis (como o `place_order`).
+ */
 export function calcShippingCents(method, subtotalCents, settings = {}) {
   const { freeThresholdCents, standardCents, expressCents } = shippingRules(settings);
-  if (method === 'pickup') return 0;
+  if (method === 'pickup' || method === 'digital') return 0;
   if (method === 'express') return expressCents;
   if (subtotalCents >= freeThresholdCents) return 0;
   return standardCents;
 }
 
 export function getShippingLabel(method) {
+  if (method === 'digital') return DIGITAL_SHIPPING.label;
   return SHIPPING_METHODS[method]?.label || 'Entrega';
 }

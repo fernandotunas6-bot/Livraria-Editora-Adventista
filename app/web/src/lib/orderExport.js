@@ -43,7 +43,7 @@ function orderRow(o) {
     o.phone || '',
     orderDeliveryAddress(o),
     isPickupOrder(o) ? '' : (o.delivery_municipality || o.city || ''),
-    o.shipping_method === 'pickup' ? 'Levantamento' : o.shipping_method === 'express' ? 'Expressa' : 'Domicílio',
+    o.shipping_method === 'pickup' ? 'Levantamento' : o.shipping_method === 'express' ? 'Expressa' : o.shipping_method === 'digital' ? 'Digital (sem envio)' : 'Domicílio',
     orderPickupStore(o),
     subtotal.toFixed(2),
     shipping.toFixed(2),

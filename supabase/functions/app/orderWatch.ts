@@ -87,6 +87,8 @@ const time = (v: unknown) => {
 };
 
 const isPickup = (o: Row) => String(o.shipping_method || "") === "pickup";
+/** Só edições digitais (migração edicoes_digitais): nada a preparar nem a entregar. */
+const isDigital = (o: Row) => String(o.shipping_method || "") === "digital";
 const isCancelled = (o: Row) => o.status === "cancelled" || o.delivery_status === "cancelled";
 
 /**
@@ -164,8 +166,9 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
   if (stage === "cancelled" || stage === "delivered") return out;
 
   // Encomenda nova que ninguém assumiu, contada só em horário de funcionamento: é crítica
-  // (sobe logo aos responsáveis e às urgências), porque ninguém está a tratar dela.
-  if (opts.ackMinutes && !o.acknowledged_at && (stage === "awaiting_payment" || stage === "paid")) {
+  // (sobe logo aos responsáveis e às urgências), porque ninguém está a tratar dela. A edição
+  // digital não se assume: o que falta é confirmar o pagamento (os alertas do pagamento dizem-no).
+  if (opts.ackMinutes && !o.acknowledged_at && !isDigital(o) && (stage === "awaiting_payment" || stage === "paid")) {
     const limit = opts.ackMinutes(o);
     const minutes = openMinutesBetween(time(o.created), now, opts.hours || DEFAULT_HOURS);
     if (minutes >= limit) {
@@ -189,7 +192,7 @@ export function alertsForOrder(o: Row, now = Date.now(), opts: WatchOptions = {}
   };
   switch (stage) {
     case "awaiting_payment": rule(o.payment_status === "awaiting_confirmation" ? "payment_to_confirm" : "payment_pending"); break;
-    case "paid": rule("not_prepared"); break;
+    case "paid": if (!isDigital(o)) rule("not_prepared"); break;
     case "preparing": rule("preparing_too_long"); break;
     case "shipped":
     case "in_transit": rule(isPickup(o) ? "pickup_waiting" : "in_transit_too_long"); break;

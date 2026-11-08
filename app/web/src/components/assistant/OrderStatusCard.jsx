@@ -22,6 +22,7 @@ export default function OrderStatusCard({ card, authed = false }) {
   const rows = [
     card.payment && ['Pagamento', `${card.payment.charAt(0).toUpperCase()}${card.payment.slice(1)}${card.payment_method ? ` · ${card.payment_method}` : ''}`],
     card.pickup_store && ['Levantamento', card.pickup_store],
+    card.digital && ['Entrega', 'Edição digital, na sua biblioteca'],
     card.eta && ['Previsão', card.eta],
     card.items && ['Livros', card.items],
     card.total && ['Total', card.total],

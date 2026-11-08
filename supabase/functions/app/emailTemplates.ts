@@ -48,6 +48,9 @@ const orderRef = (order: Row) => String(order.order_number || order.id || "").tr
 
 const isPickup = (order: Row) => String(order.shipping_method || "") === "pickup";
 
+/** Encomenda só de edições digitais (migração edicoes_digitais): sem envio, abre na biblioteca. */
+const isDigitalOrder = (order: Row) => String(order.shipping_method || "") === "digital";
+
 /** Link de rastreio da encomenda. `/track` pede o número e o email, por isso é seguro. */
 const trackUrl = (siteUrl: string) => (siteUrl ? `${siteUrl.replace(/\/$/, "")}/track` : "");
 const ordersUrl = (siteUrl: string) => (siteUrl ? `${siteUrl.replace(/\/$/, "")}/profile?tab=orders` : "");
@@ -79,7 +82,9 @@ function orderItems(order: Row) {
 function orderTotals(order: Row) {
   const totals = [];
   const shipping = Number(order.shipping_cost) || 0;
-  totals.push({ label: isPickup(order) ? "Levantamento na loja" : "Envio", value: shipping ? money(shipping) : "Grátis" });
+  if (!isDigitalOrder(order)) {
+    totals.push({ label: isPickup(order) ? "Levantamento na loja" : "Envio", value: shipping ? money(shipping) : "Grátis" });
+  }
   totals.push({ label: "Total", value: money(order.total), strong: true });
   return totals;
 }
@@ -89,7 +94,9 @@ function deliveryDetails(order: Row) {
   if (order.created) details.push({ label: "Data", value: dateLong(order.created) });
   const payment = paymentLabel(order);
   if (payment) details.push({ label: "Pagamento", value: payment });
-  if (isPickup(order)) {
+  if (isDigitalOrder(order)) {
+    details.push({ label: "Entrega", value: "Edição digital, na biblioteca da sua conta" });
+  } else if (isPickup(order)) {
     const store = pickupStoreName(order);
     if (store) details.push({ label: "Levantamento", value: store });
   } else {
@@ -107,7 +114,14 @@ function deliveryDetails(order: Row) {
  */
 export function orderSteps(order: Row, status: string): Step[] {
   const pickup = isPickup(order);
-  const sequence = pickup
+  // A edição digital não tem envio: está na biblioteca quando o pagamento é confirmado.
+  const sequence = isDigitalOrder(order)
+    ? [
+        { key: "received", label: "Encomenda recebida" },
+        { key: "confirmed", label: "Pagamento confirmado" },
+        { key: "delivered", label: "Na biblioteca" },
+      ]
+    : pickup
     ? [
         { key: "received", label: "Encomenda recebida" },
         { key: "confirmed", label: "Pagamento confirmado" },
@@ -370,6 +384,7 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = "", o
   const paid = String(order.payment_status) === "paid";
   const payLater = !paid && (opts.payLater ?? !!paymentLink);
   const pickup = order.shipping_method === "pickup";
+  const digital = isDigitalOrder(order);
   const track = trackUrl(brand.siteUrl);
   // O endereço de rastreio já vai num botão; aqui basta dizer o que é preciso para o usar.
   const notes = ["Pode acompanhar a encomenda a qualquer momento com o número acima e o email desta compra."];
@@ -377,7 +392,9 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = "", o
     const reference = String(order.payment_reference || "").trim();
     notes.unshift(reference
       ? `Recebemos a referência ${reference}. Confirmamos o pagamento e avisamo-lo.`
-      : `Pague com o número ${orderRef(order)} no descritivo e indique a referência do pagamento em Rastrear encomenda. Preparamos a encomenda quando o pagamento for confirmado.`);
+      : `Pague com o número ${orderRef(order)} no descritivo e indique a referência do pagamento em Rastrear encomenda. ${digital
+        ? "A edição digital abre na sua biblioteca quando o pagamento for confirmado."
+        : "Preparamos a encomenda quando o pagamento for confirmado."}`);
   }
   const indicar = track ? { label: "Indicar o pagamento", url: track } : undefined;
   const acompanhar = track ? { label: "Acompanhar a encomenda", url: track } : undefined;
@@ -390,7 +407,9 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = "", o
       tone: paid ? "success" : "brand",
       title: paid ? "Encomenda confirmada!" : "Recebemos a sua encomenda",
       subtitle: paid
-        ? "O pagamento está confirmado e vamos preparar a sua encomenda."
+        ? (digital ? "O pagamento está confirmado: a edição digital está na sua biblioteca." : "O pagamento está confirmado e vamos preparar a sua encomenda.")
+        : digital
+          ? "Falta só o pagamento: a edição digital abre na sua biblioteca quando for confirmado."
         : payLater
           ? "Falta só o pagamento para a prepararmos."
           : pickup
@@ -426,7 +445,9 @@ export function paymentConfirmedLetter(
   digital: { titles: string[]; onlyDigital: boolean } = { titles: [], onlyDigital: false },
 ): Letter {
   const titles = (digital?.titles || []).filter(Boolean);
-  const library = titles.length && brand.siteUrl ? `${brand.siteUrl.replace(/\/$/, "")}/profile?tab=biblioteca` : "";
+  // Encomenda 'digital': não há nada para preparar, mesmo que os títulos não tenham vindo.
+  digital = { titles, onlyDigital: !!digital?.onlyDigital || isDigitalOrder(order) };
+  const library = (titles.length || digital.onlyDigital) && brand.siteUrl ? `${brand.siteUrl.replace(/\/$/, "")}/profile?tab=biblioteca` : "";
   const books = titles.length === 1 ? `O livro digital ${titles[0]} já está` : `Os livros digitais ${titleList(titles)} já estão`;
   return {
     key: "payment_confirmed",
@@ -436,8 +457,8 @@ export function paymentConfirmedLetter(
       symbol: "✓",
       tone: "success",
       title: "Pagamento confirmado!",
-      subtitle: titles.length && digital.onlyDigital
-        ? (titles.length === 1 ? "O seu livro digital já está na sua biblioteca." : "Os seus livros digitais já estão na sua biblioteca.")
+      subtitle: digital.onlyDigital
+        ? (titles.length > 1 ? "Os seus livros digitais já estão na sua biblioteca." : "O seu livro digital já está na sua biblioteca.")
         : titles.length
           ? "Os livros digitais já estão na sua biblioteca; o resto da encomenda vamos preparar."
           : isPickup(order)
@@ -452,7 +473,7 @@ export function paymentConfirmedLetter(
         ...deliveryDetails(order),
         { label: "Total pago", value: money(Number(order.amount_paid) > 0 ? order.amount_paid : order.total) },
       ],
-      ...(digital?.onlyDigital && titles.length ? {} : { stepsTitle: "Estado da encomenda", steps: orderSteps(order, "confirmed") }),
+      ...(digital.onlyDigital ? {} : { stepsTitle: "Estado da encomenda", steps: orderSteps(order, "confirmed") }),
       cta: library && digital?.onlyDigital
         ? { label: "Abrir a biblioteca", url: library }
         : trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined,

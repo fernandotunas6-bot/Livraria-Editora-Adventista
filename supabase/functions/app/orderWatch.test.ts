@@ -29,6 +29,15 @@ describe("orderWatch", () => {
     expect(alertsForOrder({ ...o, shipping_method: "delivery" }, NOW)[0].kind).toBe("in_transit_too_long");
   });
 
+  it("edição digital: o pagamento por confirmar alerta; assumir e preparar não", () => {
+    const o = { id: "dg", order_number: "ENC-D1", shipping_method: "digital", payment_status: "pending", delivery_status: "received", created: hoursAgo(50) };
+    const opts = { ackMinutes: () => 30 };
+    expect(alertsForOrder(o, NOW, opts).map((a) => a.kind)).toEqual(["payment_pending"]);
+    expect(alertsForOrder({ ...o, delivery_status: "confirmed", payment_status: "paid" }, NOW, opts)).toEqual([]);
+    // A mesma encomenda com entrega ao domicílio pede quem a assuma.
+    expect(alertsForOrder({ ...o, shipping_method: "delivery" }, NOW, opts).map((a) => a.kind)).toContain("new_unacknowledged");
+  });
+
   it("entregues e canceladas não alertam, excepto um problema do cliente por resolver", () => {
     const entregue = { id: "d", delivery_status: "delivered", created: hoursAgo(500) };
     expect(alertsForOrder(entregue, NOW)).toEqual([]);

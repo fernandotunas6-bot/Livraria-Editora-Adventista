@@ -72,7 +72,7 @@ export function attentionItems({ orders = [], books = [], perms = {}, now = Date
 
     const shipped = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
     const toShip = active
-      .filter((o) => o.status === 'confirmed' && o.shipping_method !== 'pickup' && !shipped.includes(o.delivery_status)
+      .filter((o) => o.status === 'confirmed' && o.shipping_method !== 'pickup' && o.shipping_method !== 'digital' && !shipped.includes(o.delivery_status)
         && now - time(o) > rules.shipAfterDays * DAY)
       .sort((a, b) => time(a) - time(b));
     if (toShip.length) {

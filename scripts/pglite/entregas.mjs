@@ -397,6 +397,58 @@ await pagar(o26);
 const d26 = await activa(o26);
 check('com os livros consigo recebe a oferta, sem loja', d26?.colporteur_id === B && d26?.has_stock === true && d26?.pickup_store_id === null, d26);
 
+// 6h. Encomenda com impressos e edição digital: o colportor só leva os impressos ----------------------
+const [revista] = await q(`insert into public.stock_books (title, price, stock, digital) values ('Revista em PDF', 1200, 0, true) returning id`);
+await q(`insert into public.downloads (title, access, book_id, file_path, file_name, published) values ('Revista', 'paid', $1, 'r.pdf', 'r.pdf', true)`, [revista.id]);
+const mista = await svc(`select public.place_order($1::jsonb, $2::jsonb, $3::jsonb) as o`, [JSON.stringify({
+  order_number: 'ENC-MISTA', customer_email: 'cliente@exemplo.ao', customer_name: 'Cliente Teste', customer_id: cliente, phone: '923000000',
+  payment_method_code: 'transferencia', payment_method_name: 'Transferência', delivery_status: 'received', status: 'pending', shipping_method: 'delivery',
+  delivery_province_id: 'luanda', delivery_province: 'Luanda', delivery_municipality_id: 'viana', delivery_municipality: 'Viana', delivery_locality: 'Zango',
+  delivery_street: 'Rua 1', delivery_address_full: 'Rua 1, Zango, Viana, Luanda', delivery_gps_lat: -8.90, delivery_gps_lng: 13.37,
+}), JSON.stringify([{ book_id: livro.id, quantity: 2 }, { book_id: revista.id, quantity: 1 }]), JSON.stringify({ method: 'delivery', free_threshold: 20000, cost: 1500, express_cost: 0 })]);
+const o27 = mista[0].o;
+await pagar(o27);
+const d27 = await activa(o27);
+check('encomenda mista: o digital não conta para ter os livros', d27?.has_stock === true, d27);
+const c27 = d27 && await codigo(d27.colporteur_id);
+const meus27 = d27 && (await asUser(perfil[c27], `select public.colporteur_my_deliveries() b`))[0].b.deliveries.find((x) => x.id === d27.id);
+check('o colportor só vê os impressos para entregar', meus27?.items.length === 1 && meus27.items[0].title === 'Livro A', meus27?.items);
+const quadro27 = (await asUser(admin, `select public.colporteur_deliveries_board(30) b`))[0].b.active.find((x) => x.id === d27?.id);
+check('o quadro conta só os impressos', quadro27?.items === 2, quadro27?.items);
+if (d27) {
+  await respond(d27, c27, true);
+  const antes27 = (await q(`select private.colporteur_in_hand($1, $2) n`, [d27.colporteur_id, livro.id]))[0].n;
+  const fonte27 = (await q(`select source from public.colporteur_deliveries where id = $1`, [d27.id]))[0].source;
+  if (fonte27 === 'loja') await svc(`select public.colporteur_delivery_handover($1::uuid)`, [d27.id], admin);
+  await step(d27, c27, 'delivered', { name: 'Maria', sig: 'data:image/png;base64,AAAA' });
+  const fim27 = (await q(`select status from public.colporteur_deliveries where id = $1`, [d27.id]))[0].status;
+  check('entrega do stock dele com um digital à mistura: conclui', fim27 === 'delivered' && fonte27 === 'stock', { fim27, fonte27 });
+  check('a guia só devolve os impressos', Number((await q(`select private.colporteur_in_hand($1, $2) n`, [d27.colporteur_id, livro.id]))[0].n) === Number(antes27) - 2 && Number((await q(`select stock from public.stock_books where id = $1`, [revista.id]))[0].stock) === 0);
+}
+
+// 6i. A posição de quem entrega pára quando a entrega deixa de ser dele ------------------------------
+const posicao = async (o) => (await q(`select stopped_at from public.delivery_positions where order_id = $1`, [o.id]))[0];
+const emCaminho = async () => {
+  const o = await encomenda();
+  await pagar(o);
+  const d = await activa(o);
+  const c = await codigo(d.colporteur_id);
+  await respond(d, c, true);
+  const fonte = (await q(`select source from public.colporteur_deliveries where id = $1`, [d.id]))[0].source;
+  if (fonte === 'loja') await svc(`select public.colporteur_delivery_handover($1::uuid)`, [d.id], admin);
+  await step(d, c, 'out_for_delivery');
+  await asUser(perfil[c], `select public.delivery_share_position($1, -8.9, 13.37, 10)`, [o.id]);
+  return { o, d, c };
+};
+const p1 = await emCaminho();
+check('a caminho: a posição é partilhada', (await posicao(p1.o))?.stopped_at === null, await posicao(p1.o));
+await devolver(p1.o, Number(p1.o.total), `DEV-${p1.o.order_number}`);
+check('reembolsada: a partilha pára', !!(await posicao(p1.o))?.stopped_at, await posicao(p1.o));
+const p2 = await emCaminho();
+await estado(p2.d.colporteur_id, 'suspenso');
+check('suspenso: a partilha pára', !!(await posicao(p2.o))?.stopped_at, await posicao(p2.o));
+await volta(p2.d.colporteur_id);
+
 // 7. Segurança, localização e prazo em horário de funcionamento ----------------------------------------
 const d8 = await activa(o8);
 await raises('o colportor não chama a função directamente', () => asUser(perfil['CPT-0002'], `select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d8.id, perfil['CPT-0002']]), /permission denied/);

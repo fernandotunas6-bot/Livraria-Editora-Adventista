@@ -65,15 +65,18 @@ export function orderPaymentLabel(order) {
 
 export const isPickupOrder = (order) => String(order?.shipping_method || '') === 'pickup';
 
+/** Encomenda só de edições digitais (migração edicoes_digitais): sem envio, abre na biblioteca. */
+export const isDigitalOrder = (order) => String(order?.shipping_method || '') === 'digital';
+
 /** Loja do levantamento. As encomendas antigas só a tinham em `address` ("Levantamento: …"). */
 export function orderPickupStore(order) {
   if (!isPickupOrder(order)) return '';
   return String(order?.pickup_store || String(order?.address || '').replace(/^Levantamento:\s*/i, '') || '');
 }
 
-/** Morada de entrega numa linha; vazia nos levantamentos. */
+/** Morada de entrega numa linha; vazia nos levantamentos e nas edições digitais. */
 export function orderDeliveryAddress(order) {
-  if (!order || isPickupOrder(order)) return '';
+  if (!order || isPickupOrder(order) || isDigitalOrder(order)) return '';
   if (order.delivery_address_full) return String(order.delivery_address_full);
   return [order.address, order.city].filter(Boolean).join(', ');
 }

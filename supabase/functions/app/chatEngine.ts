@@ -73,6 +73,8 @@ export type OrderCard = {
   stage_label: string;
   cancelled: boolean;
   pickup: boolean;
+  /** Encomenda só de edições digitais: sem envio, conclui-se ao pagar (migração edicoes_digitais). */
+  digital: boolean;
   steps: { key: string; label: string; done: boolean; current: boolean }[];
   payment: string;
   payment_method: string;
@@ -272,6 +274,10 @@ export function stageText(o: Row): string {
   const stage = orderStage(o);
   if (stage === "awaiting_payment" && o.payment_status === "awaiting_confirmation") return "a aguardar a confirmação do pagamento";
   if (stage === "shipped" && o.shipping_method === "pickup") return "pronta para levantamento";
+  if (o.shipping_method === "digital") {
+    if (stage === "delivered") return "concluída — a edição digital está na sua biblioteca";
+    if (stage === "awaiting_payment") return "a aguardar pagamento — a edição digital abre quando for confirmado";
+  }
   return STAGE_TEXT[stage] || "em processamento";
 }
 
@@ -294,6 +300,7 @@ export function describeOrder(o: Row): string {
     const method = String(o.payment_method_name || "").trim();
     parts.push(`Pagamento: ${pay}${method ? ` (${method})` : ""}.`);
     if (o.shipping_method === "pickup" && o.pickup_store) parts.push(`Levantamento na loja: ${o.pickup_store}.`);
+    if (o.shipping_method === "digital") parts.push("Edição digital, sem envio: abre-se em Perfil → Biblioteca.");
     if (o.tracking_number) parts.push(`Código de rastreio${o.carrier ? ` (${o.carrier})` : ""}: ${o.tracking_number}.`);
     if (o.estimated_delivery && orderStage(o) !== "delivered") {
       const eta = dateAO(o.estimated_delivery);
@@ -313,6 +320,8 @@ const CARD_STEPS = {
     ["awaiting_payment", "Recebida"], ["paid", "Paga"], ["preparing", "Em preparação"],
     ["shipped", "Pronta a levantar"], ["delivered", "Levantada"],
   ],
+  // Sem envio: paga, está na biblioteca.
+  digital: [["awaiting_payment", "Recebida"], ["paid", "Paga"], ["delivered", "Na biblioteca"]],
 } as const;
 const STAGE_ORDER: Record<string, number> = {
   awaiting_payment: 0, paid: 1, preparing: 2, shipped: 3, in_transit: 3, out_for_delivery: 3, delivered: 4,
@@ -322,9 +331,11 @@ const STAGE_ORDER: Record<string, number> = {
 export function orderCard(o: Row): OrderCard {
   const stage = orderStage(o);
   const pickup = o.shipping_method === "pickup";
+  const digital = o.shipping_method === "digital";
   const cancelled = stage === "cancelled";
-  const at = STAGE_ORDER[stage] ?? 0;
-  const steps = (pickup ? CARD_STEPS.pickup : CARD_STEPS.delivery).map(([key, label], i) => ({
+  const at = digital ? (stage === "delivered" ? 2 : stage === "awaiting_payment" ? 0 : 1) : STAGE_ORDER[stage] ?? 0;
+  const sequence = digital ? CARD_STEPS.digital : pickup ? CARD_STEPS.pickup : CARD_STEPS.delivery;
+  const steps = sequence.map(([key, label], i) => ({
     key,
     // Em trânsito e a sair para entrega ficam no 4.º passo, com o nome do estado real.
     label: i === 3 && !pickup && stage === "in_transit" ? "Em trânsito"
@@ -339,6 +350,7 @@ export function orderCard(o: Row): OrderCard {
     stage_label: stageText(o),
     cancelled,
     pickup,
+    digital,
     steps,
     payment: cancelled ? "" : PAYMENT_TEXT[String(o.payment_status || "pending")] || "pendente",
     payment_method: String(o.payment_method_name || "").trim(),
@@ -678,7 +690,9 @@ function orderForAi(o: Row, withItems = true) {
     estado: stageText(o),
     pagamento: PAYMENT_TEXT[String(o.payment_status || "pending")] || "pendente",
     metodo_pagamento: String(o.payment_method_name || "") || undefined,
-    entrega: o.shipping_method === "pickup" ? `levantamento na loja ${o.pickup_store || ""}`.trim() : (o.shipping_method === "express" ? "expressa" : "domicílio"),
+    entrega: o.shipping_method === "pickup" ? `levantamento na loja ${o.pickup_store || ""}`.trim()
+      : o.shipping_method === "digital" ? "edição digital, sem envio (abre na biblioteca da conta quando o pagamento é confirmado)"
+      : (o.shipping_method === "express" ? "expressa" : "domicílio"),
     rastreio: o.tracking_number ? `${o.carrier ? `${o.carrier} ` : ""}${o.tracking_number}` : undefined,
     previsao: o.estimated_delivery ? dateAO(o.estimated_delivery) : undefined,
     total: o.total ? kz(Number(o.total)) : undefined,

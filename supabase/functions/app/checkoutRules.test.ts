@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
-  saleChannelFrom, settingNumber, successPath, unpaidOrdersToCancel,
+  saleChannelFrom, settingNumber, shippingPhrase, successPath, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
 describe("settingNumber", () => {
@@ -43,6 +43,29 @@ describe("paymentAllowedForShipping", () => {
     expect(paymentAllowedForShipping(balcao, "pickup")).toBe(true);
     expect(paymentAllowedForShipping(balcao, "delivery")).toBe(false);
     expect(paymentAllowedForShipping(balcao, "express")).toBe(false);
+    expect(paymentAllowedForShipping(balcao, "digital")).toBe(false);
+  });
+  it("edição digital sem lista: só o que se paga antes ou pelo gateway", () => {
+    expect(paymentAllowedForShipping({ type: "transfer" }, "digital")).toBe(true);
+    expect(paymentAllowedForShipping({ type: "p2p", shipping_methods: [] }, "digital")).toBe(true);
+    expect(paymentAllowedForShipping({ type: "offline", gateway_provider: "proxypay" }, "digital")).toBe(true);
+    // "Pagamento na entrega" não tem entrega; o livro só abre com o pagamento confirmado.
+    expect(paymentAllowedForShipping({ type: "offline" }, "digital")).toBe(false);
+    expect(paymentAllowedForShipping({ type: "offline", gateway_provider: "  " }, "digital")).toBe(false);
+    expect(paymentAllowedForShipping(null, "digital")).toBe(false);
+  });
+  it("edição digital com 'digital' marcado: o método escolhido pela loja, mesmo no balcão", () => {
+    expect(paymentAllowedForShipping({ type: "offline", shipping_methods: ["pickup", "digital"] }, "digital")).toBe(true);
+    expect(paymentAllowedForShipping({ type: "transfer", shipping_methods: ["delivery"] }, "digital")).toBe(false);
+  });
+});
+
+describe("shippingPhrase", () => {
+  it("diz o envio como o cliente o lê", () => {
+    expect(shippingPhrase("pickup")).toBe("levantamento na loja");
+    expect(shippingPhrase("digital")).toBe("a edição digital");
+    expect(shippingPhrase("express")).toBe("entrega expressa");
+    expect(shippingPhrase("delivery")).toBe("entrega ao domicílio");
   });
 });
 

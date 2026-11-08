@@ -24,3 +24,12 @@ describe('recibo ou nota de encomenda', () => {
     expect(buildReceiptHtml(order)).toContain('<title>Recibo ENC-2</title>');
   });
 });
+
+describe('recibo da edição digital', () => {
+  it('diz que a entrega é a biblioteca, sem morada', () => {
+    const r = receiptFromOrder({ order_number: 'ENC-D1', shipping_method: 'digital', total: 3000, items: [{ title: 'O Desejado', quantity: 1, price: 3000, digital: true }], payment_status: 'paid' });
+    const html = buildReceiptHtml(r, {});
+    expect(html).toContain('Edição digital, na biblioteca da conta');
+    expect(html).not.toContain('Levantamento');
+  });
+});

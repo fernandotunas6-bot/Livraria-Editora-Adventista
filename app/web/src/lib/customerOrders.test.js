@@ -54,6 +54,29 @@ describe('customerOrderStage', () => {
   });
 });
 
+describe('customerOrderStage — edição digital', () => {
+  const D = { shipping_method: 'digital', status: 'pending', delivery_status: 'received', payment_status: 'pending', total: 3000 };
+  it('por pagar: falta pagar, e diz que abre na biblioteca', () => {
+    const s = customerOrderStage(D);
+    expect(s.key).toBe('to_pay');
+    expect(s.hint).toContain('o livro abre na sua biblioteca');
+    expect(s.step).toBe(0);
+  });
+  it('pagamento indicado: em verificação, no passo do pagamento', () => {
+    const s = customerOrderStage({ ...D, payment_status: 'awaiting_confirmation' });
+    expect(s.key).toBe('verifying');
+    expect(s.step).toBe(1);
+  });
+  it('paga: na biblioteca; reembolsada: fechou', () => {
+    expect(customerOrderStage({ ...D, status: 'delivered', delivery_status: 'delivered', payment_status: 'paid' }))
+      .toMatchObject({ label: 'Na biblioteca', step: 2 });
+    expect(customerOrderStage({ ...D, status: 'delivered', delivery_status: 'delivered', payment_status: 'refunded' }).label).toBe('Reembolsada');
+  });
+  it('três passos, sem envio', () => {
+    expect(stageSteps(D)).toEqual(['Registada', 'Pagamento', 'Na biblioteca']);
+  });
+});
+
 describe('outras ajudas', () => {
   it('em curso ou terminada', () => {
     expect(isOrderFinished(order())).toBe(false);

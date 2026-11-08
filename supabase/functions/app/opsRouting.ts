@@ -90,7 +90,8 @@ const isLuanda = (o: Row) => /\bluanda\b/i.test(`${o?.delivery_province || ""} $
  * Levantamentos não têm prazo de entrega (têm o alerta de "pronta e não levantada").
  */
 export function deliveryDeadline(o: Row): { deadline: number; basis: "estimated" | "policy" } | null {
-  if (!o || o.shipping_method === "pickup") return null;
+  // A edição digital também não: não há entrega (conclui-se ao pagar).
+  if (!o || o.shipping_method === "pickup" || o.shipping_method === "digital") return null;
   const estimated = time(o.estimated_delivery);
   if (estimated) return { deadline: estimated, basis: "estimated" };
   const start = deliveryStart(o);

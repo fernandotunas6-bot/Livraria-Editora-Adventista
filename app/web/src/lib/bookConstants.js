@@ -81,6 +81,8 @@ export function bookToForm(record) {
     author_photo: record.author_photo || '',
     sample_pages: record.sample_pages || [],
     versions: record.versions || [],
+    // Produto digital sem variantes (migração edicoes_digitais).
+    digital: record.digital === true,
     video_url: record.video_url || '',
     active: record.active !== false,
     sale_price: record.sale_price ?? '',
