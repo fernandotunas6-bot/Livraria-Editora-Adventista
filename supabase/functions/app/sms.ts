@@ -1,13 +1,20 @@
 /**
- * SMS pela Twilio (https://www.twilio.com/docs/messaging/api/message-resource). Guia em docs/SMS.md.
+ * SMS pela PRO2SMS (https://pro2sms.ao/api/) e pela Twilio
+ * (https://www.twilio.com/docs/messaging/api/message-resource). Guia em docs/SMS.md.
  *
- * Funções puras, mais o pedido à API com o `fetch` injectável, para serem testadas sem rede. O
+ * Funções puras, mais os pedidos às API com o `fetch` injectável, para serem testadas sem rede. O
  * que usa a base de dados (registo, limites, códigos) fica em index.ts.
  *
- * As credenciais vêm dos segredos TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN, e o token vai só no
- * cabeçalho: os endereços ficam nos registos dos servidores.
+ * As credenciais vêm dos segredos PRO2SMS_API_KEY, TWILIO_ACCOUNT_SID e TWILIO_AUTH_TOKEN, e vão só
+ * nos cabeçalhos: os endereços ficam nos registos dos servidores.
  */
 
+export type SmsProvider = "pro2sms" | "twilio";
+export const SMS_PROVIDER_NAME: Record<SmsProvider, string> = { pro2sms: "PRO2SMS", twilio: "Twilio" };
+export const smsProvider = (value: unknown, fallback: SmsProvider): SmsProvider =>
+  value === "pro2sms" || value === "twilio" ? value : fallback;
+
+export const PRO2SMS_API = "https://pro2sms.ao/wp-json/pro2sms/v2";
 export const TWILIO_API = "https://api.twilio.com/2010-04-01";
 export const VERIFY_API = "https://verify.twilio.com/v2";
 
@@ -95,8 +102,30 @@ export function smsNotice(parts: { title: string; detail?: string; link?: string
   return link ? `${fitted}\n${link}` : fitted;
 }
 
-/** Quanto tempo vale um código da Twilio Verify. */
+/** Quanto tempo vale um código. Na Twilio Verify é assim; na PRO2SMS, somos nós que o contamos. */
 export const OTP_MINUTES = 10;
+
+/** Um código de 6 dígitos, sem o desvio de usar o resto da divisão. Só para a PRO2SMS. */
+export function otpCode(): string {
+  const limit = Math.floor(0xffffffff / 1_000_000) * 1_000_000;
+  const buffer = new Uint32Array(1);
+  do crypto.getRandomValues(buffer); while (buffer[0] >= limit);
+  return String(buffer[0] % 1_000_000).padStart(6, "0");
+}
+
+export function otpMessage(siteName: string, code: string): string {
+  return clipSms(smsText(`${siteName}: o seu codigo e ${code}. Valido ${OTP_MINUTES} minutos. Nao o partilhe com ninguem.`));
+}
+
+/**
+ * O código da PRO2SMS guarda-se só como este resumo, ligado à conta e ao número: não serve noutra
+ * conta nem noutro número. O `pepper` fica fora da base de dados, porque 6 dígitos sem ele descobrem-se.
+ */
+export async function otpHash(userId: string, number: string, code: string, pepper: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pepper), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${userId}:${number}:${code}`));
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 export const isVerifyService = (sid: unknown) => /^VA[0-9a-f]{32}$/i.test(String(sid ?? ""));
 
@@ -140,8 +169,63 @@ export function smsErrorText(code: string | undefined, fallback = ""): string {
     60410: "A Twilio bloqueou o envio para este prefixo, por suspeita de fraude. O bloqueio dura 12 horas; veja em Verify → Fraud Guard.",
     invalid_phone: "Número inválido.",
     daily_limit: "Teto diário de SMS atingido.",
+    insufficient_balance: "Sem saldo na PRO2SMS: carregue a conta.",
+    missing_api_key: "Falta a chave da PRO2SMS (segredo PRO2SMS_API_KEY).",
+    invalid_api_key: "Chave da PRO2SMS inválida ou revogada: gere outra e actualize o segredo PRO2SMS_API_KEY.",
+    permission_denied: "A chave da PRO2SMS não tem esta permissão: veja em API & Integrações, na PRO2SMS.",
+    account_not_approved: "A conta da PRO2SMS ainda não está aprovada para produção.",
+    ip_not_allowed: "O servidor está fora da lista de IP permitidos desta chave: retire a lista, na PRO2SMS.",
+    sender_not_authorized: "O remetente não está aprovado na PRO2SMS.",
+    sender_override_disabled: "Esta chave não deixa escolher o remetente: deixe o campo vazio ou active a opção, na PRO2SMS.",
+    rate_limit_exceeded: "Limite de pedidos da PRO2SMS excedido.",
+    api_disabled: "A API da PRO2SMS está temporariamente indisponível.",
   };
   return (code && known[code]) || fallback || "Não foi possível enviar a SMS.";
+}
+
+/**
+ * A resposta da PRO2SMS. Sucesso: `{ sms_id, status, cost }` ou `{ message_id, status, parts, charged }`.
+ * Erro: `{ code, message }` ou `{ success: false, error, message }`.
+ */
+export function parsePro2smsResponse(httpStatus: number, body: Row | null): SmsResult {
+  if (httpStatus >= 200 && httpStatus < 300 && body?.success !== false) {
+    const parts = Number(body?.parts);
+    return {
+      ok: true,
+      id: String(body?.sms_id ?? body?.message_id ?? ""),
+      status: String(body?.status ?? ""),
+      ...(parts > 0 ? { parts } : {}),
+    };
+  }
+  return {
+    ok: false,
+    code: String(body?.code ?? body?.error ?? (httpStatus ? `http_${httpStatus}` : "sem_resposta")),
+    error: String(body?.message ?? "A PRO2SMS recusou o pedido."),
+  };
+}
+
+/** Sem chavetas: a PRO2SMS trata {nome} como uma etiqueta e substitui-a por dados do contacto. */
+export const pro2smsText = (text: string) => text.replace(/[{}]/g, "");
+
+/** Pedido à API da PRO2SMS. Nunca lança: a falha volta como `{ ok: false }`, com o corpo se o houver. */
+export async function pro2smsRequest(
+  key: string,
+  path: string,
+  body?: Row,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SmsResult & { body?: Row }> {
+  try {
+    const res = await fetchImpl(`${PRO2SMS_API}${path}`, {
+      method: body ? "POST" : "GET",
+      headers: { "Content-Type": "application/json", "X-PRO2SMS-Key": key },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const out = await res.json().catch(() => null) as Row | null;
+    return { ...parsePro2smsResponse(res.status, out), ...(out ? { body: out } : {}) };
+  } catch (err) {
+    return { ok: false, code: "sem_resposta", error: `Sem resposta da PRO2SMS: ${(err as Error)?.message || err}` };
+  }
 }
 
 /** MG… é um serviço de mensagens da Twilio; o resto (número ou nome até 11 caracteres) é o `From`. */

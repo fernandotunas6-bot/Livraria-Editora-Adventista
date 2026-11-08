@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  clipSms, isAngolaMobile, isVerifyService, maskedNumber, parseSmsResponse, smsE164, smsErrorText, smsNotice, smsNumber,
-  smsParts, smsSender, smsText, twilioRequest, verifyCheck, verifyOutcome, verifySend,
+  clipSms, isAngolaMobile, isVerifyService, maskedNumber, otpCode, otpHash, otpMessage, parsePro2smsResponse, parseSmsResponse, pro2smsRequest,
+  pro2smsText, smsE164, smsErrorText, smsNotice, smsNumber, smsParts, smsProvider, smsSender, smsText, twilioRequest, verifyCheck, verifyOutcome,
+  verifySend,
 } from "./sms.ts";
 
 describe("números", () => {
@@ -182,5 +183,90 @@ describe("pedido à API", () => {
   it("uma resposta que não é JSON é um erro", async () => {
     const fake = vi.fn(async () => new Response("<html>", { status: 502 }));
     expect(await twilioRequest(cred, "/Messages.json", {}, fake as unknown as typeof fetch)).toMatchObject({ ok: false, code: "http_502" });
+  });
+});
+
+describe("escolher o serviço", () => {
+  it("aceita os dois, e o resto vale o de omissão", () => {
+    expect(smsProvider("twilio", "pro2sms")).toBe("twilio");
+    expect(smsProvider("pro2sms", "twilio")).toBe("pro2sms");
+    for (const v of ["", "outro", null, undefined]) expect(smsProvider(v, "pro2sms")).toBe("pro2sms");
+  });
+});
+
+describe("códigos pela PRO2SMS", () => {
+  it("6 dígitos", () => {
+    for (let i = 0; i < 50; i++) expect(otpCode()).toMatch(/^\d{6}$/);
+  });
+  it("a mensagem cabe numa SMS e não leva acentos", () => {
+    const m = otpMessage("Livraria Adventista", "123456");
+    expect(m).toContain("123456");
+    expect(smsParts(m)).toBe(1);
+    expect(m).toMatch(/^[\x20-\x7e]*$/);
+  });
+  it("o resumo fica preso à conta, ao número e ao segredo", async () => {
+    const a = await otpHash("u1", "244923000000", "123456", "segredo");
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(await otpHash("u1", "244923000000", "123456", "segredo")).toBe(a);
+    expect(await otpHash("u2", "244923000000", "123456", "segredo")).not.toBe(a);
+    expect(await otpHash("u1", "244923000001", "123456", "segredo")).not.toBe(a);
+    expect(await otpHash("u1", "244923000000", "123457", "segredo")).not.toBe(a);
+    expect(await otpHash("u1", "244923000000", "123456", "outro")).not.toBe(a);
+  });
+});
+
+describe("respostas da PRO2SMS", () => {
+  it("as duas formas de sucesso", () => {
+    expect(parsePro2smsResponse(200, { success: true, sms_id: "SMS-1", status: "queued", cost: 1 }))
+      .toEqual({ ok: true, id: "SMS-1", status: "queued" });
+    expect(parsePro2smsResponse(200, { success: true, message_id: "P2S-1", status: "sent", parts: 2, charged: 19.98 }))
+      .toEqual({ ok: true, id: "P2S-1", status: "sent", parts: 2 });
+  });
+  it("as duas formas de erro", () => {
+    expect(parsePro2smsResponse(403, { code: "permission_denied", message: "Sem permissão", data: { status: 403 } }))
+      .toEqual({ ok: false, code: "permission_denied", error: "Sem permissão" });
+    expect(parsePro2smsResponse(403, { success: false, error: "sender_not_authorized", message: "Não aprovado" }))
+      .toEqual({ ok: false, code: "sender_not_authorized", error: "Não aprovado" });
+    expect(parsePro2smsResponse(200, { success: false, error: "x" }).ok).toBe(false);
+    expect(parsePro2smsResponse(500, null).code).toBe("http_500");
+  });
+  it("explica os erros em português", () => {
+    expect(smsErrorText("insufficient_balance")).toContain("Sem saldo na PRO2SMS");
+    expect(smsErrorText("invalid_api_key")).toContain("PRO2SMS_API_KEY");
+  });
+  it("tira as chavetas: a PRO2SMS substituía {nome} por dados do contacto", () => {
+    expect(pro2smsText("Ola {primeiro_nome}")).toBe("Ola primeiro_nome");
+  });
+});
+
+describe("pedido à PRO2SMS", () => {
+  const resposta = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+
+  it("a chave vai no cabeçalho e nunca no endereço", async () => {
+    const fake = vi.fn(async () => resposta(200, { success: true, sms_id: "S" }));
+    const r = await pro2smsRequest("CHAVE-SECRETA", "/send", { to: "244923000000", message: "ola" }, fake as unknown as typeof fetch);
+    expect(r.ok).toBe(true);
+    const [url, init] = fake.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://pro2sms.ao/wp-json/pro2sms/v2/send");
+    expect(url).not.toContain("CHAVE-SECRETA");
+    expect((init.headers as Record<string, string>)["X-PRO2SMS-Key"]).toBe("CHAVE-SECRETA");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ to: "244923000000", message: "ola" });
+  });
+  it("sem corpo é GET", async () => {
+    const fake = vi.fn(async () => resposta(200, { success: true, balance: 0 }));
+    const r = await pro2smsRequest("k", "/balance", undefined, fake as unknown as typeof fetch);
+    expect((fake.mock.calls[0] as unknown as [string, RequestInit])[1].method).toBe("GET");
+    expect(r.body?.balance).toBe(0);
+  });
+  it("a falha de rede não lança, nem mostra a chave", async () => {
+    const fake = vi.fn(async () => { throw new Error("rede em baixo"); });
+    const r = await pro2smsRequest("CHAVE-SECRETA", "/send", {}, fake as unknown as typeof fetch);
+    expect(r).toMatchObject({ ok: false, code: "sem_resposta" });
+    expect(JSON.stringify(r)).not.toContain("CHAVE-SECRETA");
+  });
+  it("uma resposta que não é JSON é um erro", async () => {
+    const fake = vi.fn(async () => new Response("<html>", { status: 502 }));
+    expect(await pro2smsRequest("k", "/send", {}, fake as unknown as typeof fetch)).toMatchObject({ ok: false, code: "http_502" });
   });
 });

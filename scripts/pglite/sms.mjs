@@ -36,7 +36,10 @@ const user = async (email, role = 'member') => {
 };
 const perfil = async (id) => (await q(`select phone, phone_verified_at from public.profiles where id = $1`, [id]))[0];
 const start = async (id, phone) => (await svc(`select public.phone_verification_start($1::uuid, $2) as r`, [id, phone]))[0].r;
-const pending = async (id) => (await svc(`select public.phone_verification_pending($1::uuid) as r`, [id]))[0].r;
+const info = async (id) => (await svc(`select public.phone_verification_info($1::uuid) as r`, [id]))[0].r;
+const pending = async (id) => (await info(id))?.phone ?? null;
+const startPro2sms = async (id, phone, hash) => (await svc(`select public.phone_verification_start($1::uuid, $2, 10, 'pro2sms', $3) as r`, [id, phone, hash]))[0].r;
+const codeOk = async (id, hash) => (await svc(`select public.phone_verification_code_ok($1::uuid, $2) as r`, [id, hash]))[0].r;
 const failed = async (id) => (await svc(`select public.phone_verification_failed($1::uuid) as r`, [id]))[0].r;
 const confirm = async (id) => (await svc(`select public.phone_verification_confirm($1::uuid) as r`, [id]))[0].r;
 const cancel = (id) => svc(`select public.phone_verification_cancel($1::uuid)`, [id]);
@@ -89,6 +92,32 @@ await q(`update public.phone_verifications set expires_at = now() - interval '1 
 check('depois do prazo não há número à espera', (await pending(bento)) === null);
 check('nem confirma, mesmo que a Twilio dissesse que sim', (await confirm(bento)).ok === false && (await perfil(bento)).phone_verified_at === null);
 
+// 4b. Código da PRO2SMS: só o resumo fica guardado, e verifica-se aqui ----------------------------------
+const dina = await user('dina@exemplo.ao');
+check('o pedido fica guardado', (await startPro2sms(dina, '244923000777', 'resumo-certo')) === 0);
+let i4 = await info(dina);
+check('diz o número e o serviço, sem o resumo', i4.phone === '244923000777' && i4.provider === 'pro2sms' && !('code_hash' in i4), i4);
+check('o código errado não passa', (await codeOk(dina, 'resumo-errado')) === false);
+check('o certo passa', (await codeOk(dina, 'resumo-certo')) === true);
+check('sem a confirmação, o perfil não muda', (await perfil(dina)).phone_verified_at === null);
+for (let k = 0; k < 5; k++) await failed(dina);
+check('à quinta errada, o código certo já não entra', (await codeOk(dina, 'resumo-certo')) === false && (await info(dina)) === null);
+await startPro2sms(dina, '244923000777', 'r2');
+await q(`update public.phone_verifications set expires_at = now() - interval '1 second' where user_id = $1`, [dina]);
+check('depois do prazo, o código certo não entra', (await codeOk(dina, 'r2')) === false);
+await cancel(dina);
+await start(dina, '244923000777');
+check('um pedido da Twilio não passa por aqui', (await info(dina)).provider === 'twilio' && (await codeOk(dina, null)) === false && (await codeOk(dina, 'r2')) === false);
+await passaMinuto(dina);
+await startPro2sms(dina, '244923000777', 'r3');
+check('o serviço muda com o pedido novo', (await info(dina)).provider === 'pro2sms' && (await codeOk(dina, 'r3')) === true);
+await passaMinuto(dina);
+await start(dina, '244923000777');
+check('e um pedido novo pela Twilio apaga o resumo', (await q(`select code_hash from public.phone_verifications where user_id = $1`, [dina]))[0].code_hash === null);
+await raises('um pedido da PRO2SMS sem resumo é recusado', async () => { await cancel(dina); await startPro2sms(dina, '244923000777', null); }, /phone_verifications_provider_check/);
+await raises('e um serviço desconhecido também', async () => { await cancel(dina); await svc(`select public.phone_verification_start($1::uuid, '244923000777', 10, 'outro', 'x')`, [dina]); }, /phone_verifications_provider_check/);
+await cancel(dina);
+
 // 5. Um número, uma conta confirmada -------------------------------------------------------------------
 await start(bento, NUMERO);
 check('o Bento prova que tem o número', (await confirm(bento)).ok === true);
@@ -118,7 +147,8 @@ for (const [nome, sql] of [
   ['start', `select public.phone_verification_start($1::uuid, '244923000666')`],
   ['confirm', `select public.phone_verification_confirm($1::uuid)`],
   ['failed', `select public.phone_verification_failed($1::uuid)`],
-  ['pending', `select public.phone_verification_pending($1::uuid)`],
+  ['info', `select public.phone_verification_info($1::uuid)`],
+  ['code_ok', `select public.phone_verification_code_ok($1::uuid, 'x')`],
   ['cancel', `select public.phone_verification_cancel($1::uuid)`],
 ]) {
   await raises(`quem usa o site não chama ${nome}`, () => asUser(ana, sql, [ana]), /permission denied/);
