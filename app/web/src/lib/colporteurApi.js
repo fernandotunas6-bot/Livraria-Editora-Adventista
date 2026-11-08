@@ -231,6 +231,9 @@ export const setAcceptsDeliveries = (on) => rpc('colporteur_set_accepts_deliveri
 /** No painel: a quem foi oferecida uma encomenda e o que cada colportor fez. */
 export const loadOrderDeliveries = (orderId) => rpc('order_colporteur_deliveries', { p_order_id: orderId });
 
+/** No painel: o quadro das entregas (em curso, com a equipa e por colportor nos últimos `days` dias). */
+export const loadDeliveriesBoard = (days = 30) => rpc('colporteur_deliveries_board', { p_days: days });
+
 /** No painel: os livros que o colportor levanta na loja foram-lhe entregues. */
 export const handoverDelivery = (deliveryId) =>
   pb.send('/admin/colportores/entregas/entregue-ao-colportor', { method: 'POST', body: { deliveryId } });

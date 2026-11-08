@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, ClipboardList, Inbox, Link2, Percent, RefreshCw, Scale, Settings2, TrendingUp, Truck, Users } from 'lucide-react';
+import { BarChart3, Bike, ClipboardList, Inbox, Link2, Percent, RefreshCw, Scale, Settings2, TrendingUp, Truck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,7 @@ import ReportsPanel from './ReportsPanel';
 import GuidesPanel from './GuidesPanel';
 import { AccountsPanel, ReclassPanel } from './AccountsPanel';
 import SummaryPanel from './SummaryPanel';
+import DeliveriesPanel from './DeliveriesPanel';
 
 const EMPTY_REG = { fields: [], districts: [], churches: [], pastors: [], assignments: [], provinces: [], municipalities: [] };
 
@@ -92,6 +93,7 @@ export default function ColportagemTab() {
           <TabsTrigger value="candidaturas"><Inbox className="mr-1.5 h-4 w-4" />Candidaturas{pending > 0 && <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{pending}</span>}</TabsTrigger>
           <TabsTrigger value="colportores"><Users className="mr-1.5 h-4 w-4" />Colportores ({active})</TabsTrigger>
           <TabsTrigger value="relatorios"><ClipboardList className="mr-1.5 h-4 w-4" />Relatórios{toValidate > 0 && <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">{toValidate}</span>}</TabsTrigger>
+          <TabsTrigger value="entregas"><Bike className="mr-1.5 h-4 w-4" />Entregas</TabsTrigger>
           <TabsTrigger value="guias"><Truck className="mr-1.5 h-4 w-4" />Guias e stock</TabsTrigger>
           <TabsTrigger value="contas"><Scale className="mr-1.5 h-4 w-4" />Contas</TabsTrigger>
           <TabsTrigger value="reclassificacao"><TrendingUp className="mr-1.5 h-4 w-4" />Reclassificação</TabsTrigger>
@@ -103,6 +105,7 @@ export default function ColportagemTab() {
         <TabsContent value="candidaturas"><ColporteursPanel mode="candidaturas" {...props} /></TabsContent>
         <TabsContent value="colportores"><ColporteursPanel mode="colportores" {...props} /></TabsContent>
         <TabsContent value="relatorios">{needsOps(<ReportsPanel {...opsProps} />)}</TabsContent>
+        <TabsContent value="entregas"><DeliveriesPanel /></TabsContent>
         <TabsContent value="guias">{needsOps(<GuidesPanel {...opsProps} />)}</TabsContent>
         <TabsContent value="contas">{needsOps(<AccountsPanel {...opsProps} />)}</TabsContent>
         <TabsContent value="reclassificacao">{needsOps(<ReclassPanel {...opsProps} />)}</TabsContent>

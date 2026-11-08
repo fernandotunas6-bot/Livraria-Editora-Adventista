@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108110000_entregas_refinamento.sql` (mínimo por entrega e entrega dada por outra pessoa).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108110000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa e o quadro da equipa).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 
@@ -228,6 +228,11 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 
 **Onde se vê:**
 - área do colportor → Entregas: «Aceito fazer entregas», a localização («Registar a minha localização», só dentro de Angola), as ofertas com o tempo que falta, as entregas aceites e os últimos 30 dias;
+- painel → Colportagem → **Entregas**: o quadro da equipa.
+  - Em curso, por esta ordem: primeiro as que é preciso preparar na loja (com «Entregue ao colportor» ali mesmo), depois as ofertas à espera, com o prazo, depois as que estão com o colportor.
+  - As encomendas que ficaram com a equipa, com o motivo.
+  - Por colportor, no período escolhido (7, 30, 90 ou 365 dias): oferecidas, entregues, recusadas, sem resposta, devolvidas, em curso e quanto ganhou. Exporta para Excel.
+  - Não mostra dados do cliente além da zona: para o resto, abre-se a encomenda.
 - painel → cada encomenda ao domicílio: a quem foi oferecida, quem aceitou e as acções;
 - painel → Colportagem → Definições: ligar e desligar, o prazo, as distâncias e o mínimo por entrega;
 - ficha de cada colportor: «Recebe entregas» e a data da localização.
@@ -237,10 +242,10 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 - `orders.delivery_route` e `orders.delivery_colporteur_id`;
 - `private.delivery_candidates`, `private.offer_next_delivery` e o gatilho `orders_entrega_colportor`;
 - `private.colporteur_delivery_complete` (a guia, os portes e o fecho, usada pelo colportor e pelo gatilho; o passo do colportor liga `app.colporteur_step` para o gatilho não fechar a entrega duas vezes);
-- funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
+- funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_deliveries_board` (o quadro; «Gerir encomendas» ou «Gerir colportores»), `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
 - rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
-- testes: 50 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx`.
+- testes: 60 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
 ## Técnico
 
