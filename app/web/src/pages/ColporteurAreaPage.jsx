@@ -13,6 +13,9 @@ import { claimInvite, colporteurMe } from '@/lib/colporteurApi';
 import { CATEGORIES, SALE_MODES, STATUSES } from '@/lib/colporteurCommission';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import ColporteurWorkspace from '@/components/colportagem/ColporteurWorkspace';
+import AreaBreadcrumb from '@/components/AreaBreadcrumb';
+import { forgetColporteurMe } from '@/hooks/useColporteurMe';
+import { COLPORTEUR_VIEWS, resolveColporteurView } from '@/lib/siteAreas';
 
 const EVENT_TEXT = {
   candidatura: () => 'Candidatura enviada',
@@ -29,7 +32,7 @@ const EVENT_TEXT = {
  * o código, a categoria, as percentagens, o relatório semanal, os livros em mão e a conta.
  */
 export default function ColporteurAreaPage() {
-  const { ready, isAuthed } = useAuth();
+  const { ready, isAuthed, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -47,6 +50,8 @@ export default function ColporteurAreaPage() {
         if (invite && !claimed.current) {
           claimed.current = true;
           const r = await claimInvite(invite);
+          // Os menus do site passam a mostrar a "Área do colportor".
+          forgetColporteurMe(user?.id);
           toast({ title: r?.already ? 'A conta já estava ligada.' : `Bem-vindo! O seu código é ${r?.code}.` });
           setParams({}, { replace: true });
         }
@@ -57,8 +62,10 @@ export default function ColporteurAreaPage() {
       }
     })();
     return () => { alive = false; };
-  }, [ready, isAuthed, invite, setParams, toast]);
+  }, [ready, isAuthed, invite, setParams, toast, user?.id]);
 
+  // A vista aberta (Relatório, Entregas…) no caminho e no título, só com a área à vista.
+  const viewLabel = me ? COLPORTEUR_VIEWS.find((v) => v.id === resolveColporteurView(params.get('tab')))?.label : '';
   const loginPath = `/login?redirect=${encodeURIComponent(`/colportor${invite ? `?convite=${encodeURIComponent(invite)}` : ''}`)}`;
   const copy = async (text, label) => {
     try { await navigator.clipboard.writeText(text); toast({ title: `${label} copiado.` }); } catch { /* sem acesso à área de transferência */ }
@@ -142,10 +149,13 @@ export default function ColporteurAreaPage() {
 
   return (
     <>
-      <Helmet><title>{pageTitle('Área do colportor')}</title><meta name="robots" content="noindex" /></Helmet>
+      <Helmet><title>{pageTitle(`${viewLabel ? `${viewLabel} · ` : ''}Área do colportor`)}</title><meta name="robots" content="noindex" /></Helmet>
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
-      <main className="container mx-auto max-w-3xl px-4 py-10">{body}</main>
+      <main className="container mx-auto max-w-3xl px-4 py-10">
+        <AreaBreadcrumb items={[{ label: 'Área do colportor', to: '/colportor' }, viewLabel && { label: viewLabel }]} />
+        {body}
+      </main>
       <Footer />
     </>
   );

@@ -117,7 +117,7 @@ export default function TrackOrderPage() {
                 <User className="h-3.5 w-3.5" />
                 Sessão iniciada como <strong>{user.email}</strong>
                 {' · '}
-                <Link to="/profile" state={{ tab: 'orders' }} className="text-primary hover:underline">Ver todas as encomendas</Link>
+                <Link to="/profile?tab=orders" className="text-primary hover:underline">Ver todas as encomendas</Link>
               </p>
             )}
 

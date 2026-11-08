@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PERMISSIONS, ROLES, MANAGER_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/permissions';
+import { ROLES, MANAGER_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/permissions';
+import { PermissionMenuPreview, PermissionSwitches } from './PermissionAreas';
 import { createUser, updateUser } from '@/lib/usersApi';
 import PhoneInput from '@/components/PhoneInput';
 import { isValidAngolaPhone, localDigits, normalizeAngolaPhone } from '@/lib/angolaPhone';
@@ -156,21 +156,15 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
             )}
 
             {isAdmin && form.role === 'manager' && (
-              <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Permissões do gestor</p>
-                {Object.entries(PERMISSIONS).map(([key, p]) => (
-                  <label key={key} className="flex items-start gap-3 cursor-pointer">
-                    <Switch
-                      checked={!!form.permissions[key]}
-                      disabled={!canEditRole && isEdit}
-                      onCheckedChange={(v) => set({ permissions: { ...form.permissions, [key]: v } })}
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">{p.label}</span>
-                      <span className="block text-xs text-muted-foreground">{p.description}</span>
-                    </span>
-                  </label>
-                ))}
+                {/* Por área, como a navegação do painel, com o que cada uma abre. */}
+                <PermissionSwitches
+                  value={form.permissions}
+                  disabled={!canEditRole && isEdit}
+                  onChange={(permissions) => set({ permissions })}
+                />
+                <PermissionMenuPreview role={form.role} permissions={form.permissions} className="border-t pt-3" />
               </div>
             )}
           </div>

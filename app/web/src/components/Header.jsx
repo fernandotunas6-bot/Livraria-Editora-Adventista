@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import SafeLink from '@/components/SafeLink.jsx';
-import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, BarChart3, Bell, FileDown, ShieldCheck } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, FileDown, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useHeaderReveal } from '@/hooks/useHeaderReveal';
@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthDialog } from '@/hooks/useAuthDialog';
+import { useColporteurMe } from '@/hooks/useColporteurMe';
+import { adminPermissions } from '@/lib/adminSections';
+import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import MegaMenu from '@/components/header/MegaMenu';
@@ -46,13 +49,15 @@ const Header = ({ onCartOpen, pinned = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartItems } = useCart();
-  const { user, isAuthed, isAdmin, canAccessAdmin, logout } = useAuth();
+  const { user, isAuthed, isAdmin, canAccessAdmin, hasPermission, logout } = useAuth();
   const { openAuth } = useAuthDialog();
   const { settings } = useSiteSettings();
   const { notice, dismiss: dismissNotice } = useSiteNotice();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // "Área do colportor" no menu do telemóvel: pergunta-se quando o menu abre.
+  const colporteur = useColporteurMe(user?.id, { enabled: isAuthed && mobileOpen });
   const [hasFocus, setHasFocus] = useState(false);
   const [searchCatalog, setSearchCatalog] = useState([]);
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
@@ -555,8 +560,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   <User className="h-4 w-4 text-[#22d3ee]" /> Minha Conta
                 </Link>
                 <Link
-                  to="/profile"
-                  state={{ tab: 'orders' }}
+                  to={accountHref('orders')}
                   onClick={closeMobile}
                   className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                   tabIndex={mobileOpen ? 0 : -1}
@@ -579,6 +583,16 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 >
                   <FileDown className="h-4 w-4 text-[#22d3ee]" /> Os meus PDFs
                 </Link>
+                {colporteur && (
+                  <Link
+                    to={colporteurHref()}
+                    onClick={closeMobile}
+                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    tabIndex={mobileOpen ? 0 : -1}
+                  >
+                    <BadgeCheck className="h-4 w-4 text-[#22d3ee]" /> Área do colportor
+                  </Link>
+                )}
                 {canAccessAdmin && (
                   <Link
                     to="/admin"
@@ -586,19 +600,22 @@ const Header = ({ onCartOpen, pinned = false }) => {
                     className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
-                    <LayoutDashboard className="h-4 w-4 text-[#22d3ee]" /> Painel Admin
+                    <LayoutDashboard className="h-4 w-4 text-[#22d3ee]" /> Painel da equipa
                   </Link>
                 )}
-                {canAccessAdmin && (
+                {/* As secções do painel que esta pessoa pode abrir (antes: "Painel de Vendas" a
+                    toda a equipa, mesmo a quem não lhe tinha acesso). */}
+                {canAccessAdmin && staffShortcuts(adminPermissions({ isAdmin, hasPermission }), 3).map(({ id, to, label, icon: Icon }) => (
                   <Link
-                    to="/admin?tab=vendas-huambo"
+                    key={id}
+                    to={to}
                     onClick={closeMobile}
-                    className="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+                    className="flex min-h-11 items-center gap-3 py-2.5 pl-10 pr-3 text-sm font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
                     tabIndex={mobileOpen ? 0 : -1}
                   >
-                    <BarChart3 className="h-4 w-4 text-[#22d3ee]" /> Painel de Vendas
+                    <Icon className="h-4 w-4 text-[#22d3ee]/80" aria-hidden="true" /> {label}
                   </Link>
-                )}
+                ))}
                 <button
                   type="button"
                   onClick={handleLogout}
