@@ -13,6 +13,7 @@ import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
+import ReaderActivity from '@/components/ReaderActivity.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
@@ -181,6 +182,7 @@ function GlobalWidgets() {
       <PwaInstallBanner />
       {showAssistant && <LivrariaAssistant />}
       <MobileBottomNav />
+      <ReaderActivity />
     </Suspense>
   );
 }

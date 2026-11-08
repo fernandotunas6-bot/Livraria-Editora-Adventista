@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BellRing, Check, ChevronDown, ChevronUp, Loader2, Siren, Volume2, X } from 'lucide-react';
 import { acknowledgeOrder, dismissAlert, listActionAlerts } from '@/lib/opsApi';
+import { useSignal } from '@/hooks/useSignal';
 import { cn } from '@/lib/utils';
 
 /** "3 avisos por tratar · 2 encomendas por assumir · 1 crítico" */
@@ -89,16 +90,20 @@ export default function StaffAlertBar({ onOpen }) {
     }
   }, [soundOn]);
 
+  // Tempo real: um alerta novo, uma encomenda nova ou uma mensagem chegam na hora; a consulta
+  // fica de reserva, de 2 em 2 minutos com o canal ligado (de 20 em 20 segundos sem ele).
+  const live = useSignal('painel', ['alertas', 'orders', 'atendimento'], () => poll());
+
   useEffect(() => {
     poll();
-    const timer = window.setInterval(poll, POLL_MS);
+    const timer = window.setInterval(poll, live ? 120_000 : POLL_MS);
     const onVisible = () => { if (!document.hidden) poll(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [poll]);
+  }, [poll, live]);
 
   const enableSound = async () => {
     // O som e as notificações precisam de um clique (regra dos browsers).

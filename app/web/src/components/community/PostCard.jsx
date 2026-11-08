@@ -15,6 +15,8 @@ import Monogram from '@/components/community/Monogram';
 import TopicIcon from '@/components/community/TopicIcon';
 import PostComposer from '@/components/community/PostComposer';
 import { useMinuteTick } from '@/hooks/useMinuteTick';
+import { useReaderLevel } from '@/hooks/useReader';
+import ReaderBadge from '@/components/community/ReaderBadge';
 
 const REPORT_REASONS = ['Spam ou publicidade', 'Link suspeito', 'Ofensivo ou desrespeitoso', 'Outro motivo'];
 // Links de utilizadores: sem passar autoridade de pesquisa, sem dar acesso à página de origem.
@@ -47,6 +49,8 @@ function Body({ text, clamp = true }) {
 
 function Author({ post, small = false, linkToPost = true }) {
   const now = useMinuteTick();
+  // O distintivo do leitor (Leitor, assíduo, de honra), pedido em lote pela chave pública.
+  const level = useReaderLevel(post.author_is_staff ? null : post.author_key);
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <Monogram name={post.author_name} authorKey={post.author_key} size={small ? 'sm' : 'md'} staff={post.author_is_staff} />
@@ -60,6 +64,7 @@ function Author({ post, small = false, linkToPost = true }) {
               <BadgeCheck className="h-3 w-3" aria-hidden="true" /> Equipa da Livraria
             </span>
           )}
+          {!post.author_is_staff && !small && <ReaderBadge level={level} />}
         </p>
         <p className="text-xs text-editorial-tinta-suave">
           {linkToPost && !post.parent_id ? (

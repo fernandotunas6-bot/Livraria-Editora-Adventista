@@ -13,6 +13,8 @@ import SupportRating from '@/components/assistant/SupportRating';
 import SupportReport from '@/components/admin/SupportReport';
 import { suggestSupportReply } from '@/lib/opsApi';
 import { adminHref } from '@/lib/adminSections';
+import { accountTopic } from '@/lib/realtimeSignals';
+import { useSignal } from '@/hooks/useSignal';
 import {
   addSupportNote,
   createSupportThread,
@@ -175,11 +177,21 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
     }
   }, [staff, user?.id, threadStatusFilter]);
 
+  // Tempo real: uma mensagem nova ou uma conversa mudada (estado, responsável) chegam na hora —
+  // a equipa ouve o painel, o cliente o canal da sua conta. A consulta fica de reserva, mais
+  // espaçada com o canal ligado.
+  const loadMessagesRef = useRef(null);
+  const live = useSignal(staff ? 'painel' : accountTopic(user?.id), 'atendimento', (event, payload) => {
+    refresh();
+    const open = selectedIdRef.current;
+    if (open && (!payload?.thread || payload.thread === open)) loadMessagesRef.current?.(open);
+  }, { enabled: !!user?.id });
+
   useEffect(() => {
     refresh();
-    const timer = window.setInterval(refresh, 30000);
+    const timer = window.setInterval(refresh, live ? 120_000 : 30_000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, live]);
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
@@ -224,6 +236,7 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   }, []);
 
   useEffect(() => {
+    loadMessagesRef.current = loadMessages;
     loadMessages(selectedId);
   }, [loadMessages, selectedId]);
 
@@ -236,9 +249,9 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       } catch (err) {
         setError(err.message || 'Não foi possível actualizar a conversa.');
       }
-    }, 10000);
+    }, live ? 60_000 : 10_000);
     return () => window.clearInterval(timer);
-  }, [loadMessages, selectedId]);
+  }, [loadMessages, selectedId, live]);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
   const unreadMessages = threads.filter((thread) => unreadThread(thread, staff, user?.id)).length;
