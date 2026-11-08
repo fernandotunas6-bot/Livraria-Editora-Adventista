@@ -17,7 +17,7 @@ afterEach(() => { act(() => root?.unmount()); host?.remove(); });
 
 describe('permissões por área', () => {
   it('arrumadas pela ordem das áreas do painel', () => {
-    expect(permissionsByArea().map((g) => g.label)).toEqual(['Catálogo', 'Vendas', 'Relatórios', 'Clientes', 'Igreja', 'Sistema']);
+    expect(permissionsByArea().map((g) => g.label)).toEqual(['Catálogo', 'Editora', 'Vendas', 'Relatórios', 'Clientes', 'Pessoal', 'Igreja', 'Sistema']);
   });
 
   it('cada permissão diz o que abre, calculado do registo das secções', () => {

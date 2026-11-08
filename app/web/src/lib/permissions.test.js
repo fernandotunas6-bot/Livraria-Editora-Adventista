@@ -52,4 +52,11 @@ describe('getUserPermissions', () => {
     expect(getUserPermissions({ role: 'manager', permissions: { manage_orders: true } }).view_reports).toBe(false);
     expect(getUserPermissions({ role: 'admin' }).view_reports).toBe(true);
   });
+
+  it('produção, funcionários e finanças: só o administrador as tem sem as receber', () => {
+    expect(getUserPermissions({ role: 'admin' })).toMatchObject({ manage_production: true, manage_staff: true, manage_finance: true });
+    expect(getUserPermissions({ role: 'manager', permissions: { manage_production: true } }))
+      .toMatchObject({ manage_production: true, manage_staff: false, manage_finance: false });
+    expect(getUserPermissions({ role: 'member', permissions: { manage_finance: true } }).manage_finance).toBe(false);
+  });
 });

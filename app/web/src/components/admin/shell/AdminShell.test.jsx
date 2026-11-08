@@ -76,7 +76,7 @@ describe('AdminShell', () => {
     const el = await mount(shell({ layout: 'sidebar', active: 'books' }));
     const side = el.querySelector('nav[aria-label="Secções do painel"]');
     expect(side).not.toBeNull();
-    expect(side.querySelectorAll('button[data-sidebar="menu-button"]').length).toBe(23);
+    expect(side.querySelectorAll('button[data-sidebar="menu-button"]').length).toBe(26);
     expect(side.querySelector('[aria-current="page"]').textContent).toContain('Produtos');
     expect(side.textContent).toContain('4');
     expect(el.querySelector('nav[aria-label="Grupos do painel"]')).toBeNull();
@@ -127,7 +127,7 @@ describe('navegação por contexto (vistas)', () => {
     const el = await mount(colp({ layout: 'sidebar' }));
     const sub = el.querySelector('ul[aria-label="Vistas de Colportagem"]');
     expect(sub).not.toBeNull();
-    expect(sub.querySelectorAll('button').length).toBe(10);
+    expect(sub.querySelectorAll('button').length).toBe(11);
     expect(sub.querySelector('[aria-current="page"]').textContent).toContain('Contas');
     // só a secção aberta se desdobra
     expect(el.querySelectorAll('[data-sidebar="menu-sub"]').length).toBe(1);
@@ -182,5 +182,36 @@ describe('navegação por contexto (vistas)', () => {
     const contas = [...el.querySelectorAll('nav button')].find((b) => b.textContent.includes('Contas'));
     act(() => contas.click());
     expect(el.querySelector('[data-vista]').dataset.vista).toBe('contas');
+  });
+});
+
+describe('barra do topo: o estado da sincronização', () => {
+  const sync = (extra) => ({ online: true, syncing: false, lastSync: Date.now() - 120_000, refreshNow: () => {}, ...extra });
+  const botao = () => [...host.querySelectorAll('header button')].find((b) => /Actualizar agora/.test(b.getAttribute('aria-label') || ''));
+
+  it('com o tempo real ligado diz "Em tempo real" (e a dica explica), com o ícone de actualizar', async () => {
+    await mount(shell({ sync: sync({ realtime: 'live' }) }));
+    expect(botao().getAttribute('aria-label')).toBe('Em tempo real. Actualizar agora');
+    expect(botao().getAttribute('title')).toMatch(/aparece sozinho/);
+    const icon = botao().querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon.getAttribute('class')).not.toMatch(/animate-spin/);
+  });
+
+  it('o ícone roda enquanto actualiza, também em tempo real (e o texto fica)', async () => {
+    await mount(shell({ sync: sync({ realtime: 'live', syncing: true }) }));
+    expect(botao().getAttribute('aria-label')).toBe('Em tempo real. Actualizar agora');
+    expect(botao().querySelector('svg').getAttribute('class')).toMatch(/animate-spin/);
+  });
+
+  it('sem tempo real fica como antes: "Actualizado há 2 min", de minuto a minuto', async () => {
+    await mount(shell({ sync: sync({ realtime: 'off' }) }));
+    expect(botao().getAttribute('aria-label')).toBe('Actualizado há 2 min. Actualizar agora');
+    expect(botao().getAttribute('title')).toMatch(/minuto a minuto/);
+  });
+
+  it('sem rede: "Sem ligação", com ou sem tempo real', async () => {
+    await mount(shell({ sync: sync({ realtime: 'live', online: false }) }));
+    expect(host.querySelector('header [role="status"]').textContent).toMatch(/Sem ligação/);
   });
 });

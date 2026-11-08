@@ -277,8 +277,8 @@ const ProfilePage = () => {
   useEffect(() => { loadOrders(); }, [loadOrders]);
   // Tempo real: uma encomenda que muda (pagamento confirmado, enviada, entregue) ou um aviso novo
   // aparecem na hora — e com eles o nível de leitor, que sobe com o pagamento do livro.
-  useSignal(accountTopic(user?.id), ['orders', 'avisos'], (event) => {
-    if (event === 'orders') loadOrders();
+  useSignal(accountTopic(user?.id), ['orders', 'avisos'], (_event, _payload, signals) => {
+    if (signals.some((s) => s.event === 'orders')) loadOrders();
     setReaderTick((n) => n + 1);
   }, { enabled: !!user?.id, debounceMs: 500 });
 

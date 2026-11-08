@@ -181,10 +181,11 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
   // a equipa ouve o painel, o cliente o canal da sua conta. A consulta fica de reserva, mais
   // espaçada com o canal ligado.
   const loadMessagesRef = useRef(null);
-  const live = useSignal(staff ? 'painel' : accountTopic(user?.id), 'atendimento', (event, payload) => {
+  const live = useSignal(staff ? 'painel' : accountTopic(user?.id), 'atendimento', (_event, _payload, signals) => {
     refresh();
+    // Mensagens de duas conversas na mesma rajada: basta uma ser a aberta.
     const open = selectedIdRef.current;
-    if (open && (!payload?.thread || payload.thread === open)) loadMessagesRef.current?.(open);
+    if (open && signals.some(({ payload }) => !payload?.thread || payload.thread === open)) loadMessagesRef.current?.(open);
   }, { enabled: !!user?.id });
 
   useEffect(() => {
@@ -289,6 +290,12 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       // ao separador Segurança do painel. Nunca traz encomenda.
       if (staff && notification.kind === 'security' && !notification.order_id) {
         navigate('/admin?tab=seguranca');
+        return;
+      }
+      // Preparar os livros, ou entrega que ficou com a equipa: o quadro das entregas mostra as duas.
+      // Quem não vê a Colportagem abre a encomenda na lista, como os outros avisos.
+      if (staff && notification.kind === 'colporteur_delivery' && (isAdmin || hasPermission('manage_colporteurs'))) {
+        navigate(adminHref('colportagem', 'entregas'));
         return;
       }
       if (notification.order_id) {

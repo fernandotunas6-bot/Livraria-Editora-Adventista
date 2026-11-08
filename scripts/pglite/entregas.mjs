@@ -193,6 +193,39 @@ await q(`update public.colporteur_settings set deliveries_enabled = true where i
 await q(`select private.colporteur_deliveries_tick()`);
 check('voltou a ligar: o agendador oferece as pagas que ficaram para trás', !!(await activa(o8)));
 
+// 6b. Mínimo por entrega, cliente que confirma antes do colportor, equipa que marca entregue ------------
+await q(`update public.colporteur_settings set delivery_min_fee = 1000 where id = 1`);
+const o9 = await encomenda({}, 5); // 25 000 Kz: envio grátis
+await pagar(o9);
+d = await activa(o9);
+check('envio grátis com mínimo: a oferta leva o mínimo', Number(d.fee) === 1000, d);
+check('o aviso diz quanto ganha', (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and body like '%Ganha 1 000 Kz%'`, [o9.id]))[0].n === 1);
+await q(`update public.colporteur_settings set delivery_min_fee = 0 where id = 1`);
+// O colportor (com os livros na mão) entrega; o cliente confirma no site antes de ele marcar.
+await q(`insert into public.colporteur_stock_moves (colporteur_id, book_id, qty, kind, unit_price) values ($1, $2, 10, 'entrega', 5000)`, [d.colporteur_id, livro.id]);
+const quem = Object.keys(perfil).find((k) => k === d.code);
+r = await respond(d, quem, true);
+check('aceite com os livros dele', r.source === 'stock', r);
+await svc(`update public.orders set delivery_status = 'delivered', delivery_confirmed_at = now(), delivery_recipient_name = 'Cliente' where id = $1`, [o9.id]);
+const d9 = (await q(`select * from public.colporteur_deliveries where id = $1`, [d.id]))[0];
+check('o cliente confirmou primeiro: conta como entrega dele, com portes e guia', d9.status === 'delivered' && d9.document_id && d9.ledger_id, d9);
+check('e ele é avisado', (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and title like 'Entrega confirmada%'`, [o9.id]))[0].n === 1);
+// Oferecida mas não aceite, e a equipa marca entregue: a oferta fecha e o colportor é avisado.
+const o10 = await encomenda();
+await pagar(o10);
+d = await activa(o10);
+await svc(`update public.orders set delivery_status = 'delivered' where id = $1`, [o10.id]);
+check('a equipa entregou: a oferta fecha', (await q(`select status from public.colporteur_deliveries where id = $1`, [d.id]))[0].status === 'released'
+  && (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and title like 'Entrega fechada%'`, [o10.id]))[0].n === 1);
+
+// O total baixa (a equipa tira os portes) e a encomenda fica paga sem pagamento novo: o estado muda
+// dentro do gatilho dos pagamentos, sem a coluna no SET, e mesmo assim tem de ir a um colportor.
+const o11 = await encomenda();
+await svc(`select public.order_payment_record($1, $2::numeric, 'transferencia', $3)`, [o11.id, 10000, `TRF-${o11.order_number}`], admin);
+check('paga em parte: nada oferecido', (await order(o11.id)).payment_status === 'partially_paid' && (await ofertas(o11)).length === 0, (await order(o11.id)).payment_status);
+await svc(`update public.orders set shipping_cost = 0 where id = $1`, [o11.id]);
+check('o total baixou e ficou paga: vai a um colportor', (await order(o11.id)).payment_status === 'paid' && !!(await activa(o11)), { p: (await order(o11.id)).payment_status, r: (await order(o11.id)).delivery_route });
+
 // 7. Segurança, localização e prazo em horário de funcionamento ----------------------------------------
 const d8 = await activa(o8);
 await raises('o colportor não chama a função directamente', () => asUser(perfil['CPT-0002'], `select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d8.id, perfil['CPT-0002']]), /permission denied/);
@@ -208,6 +241,44 @@ const prazo = (await q(`select to_char(private.business_deadline('2026-11-06 17:
 check('prazo: sexta 17h50 + 2 h de funcionamento = sábado 9h50', prazo === '2026-11-07 09:50', prazo);
 const prazo2 = (await q(`select to_char(private.business_deadline('2026-11-07 17:00:00+01', 120) at time zone 'Africa/Luanda', 'YYYY-MM-DD HH24:MI') p`))[0].p;
 check('prazo: sábado 17h + 2 h, domingo fechado = segunda 9h', prazo2 === '2026-11-09 09:00', prazo2);
+
+// 8. Quadro das entregas para a equipa ----------------------------------------------------------------
+const quadro = (await asUser(admin, `select public.colporteur_deliveries_board(30) b`))[0].b;
+const emCurso = (await q(`select count(*)::int n from public.colporteur_deliveries where status in ('offered', 'accepted')`))[0].n;
+check('quadro: todas as entregas em curso', quadro.active.length === emCurso && emCurso > 0, { quadro: quadro.active.length, emCurso });
+const ordem = quadro.active.map((x) => x.sort[0]).join('');
+check('quadro: primeiro as por preparar, depois as à espera, depois as que estão com o colportor', ordem === [...ordem].sort().join(''), ordem);
+const comEquipa = (await q(`select count(*)::int n from public.orders where delivery_route = 'loja'
+  and coalesce(status, '') not in ('cancelled', 'delivered') and coalesce(delivery_status, '') not in ('cancelled', 'delivered')`))[0].n;
+check('quadro: as encomendas que ficaram com a equipa', quadro.to_team.length === comEquipa && comEquipa > 0, { comEquipa, n: quadro.to_team.length });
+check('quadro: com o motivo de terem ficado com a equipa', quadro.to_team.some((x) => x.reason), quadro.to_team);
+const feitas = (await q(`select count(*)::int n, coalesce(sum(fee), 0)::float s from public.colporteur_deliveries where status = 'delivered'`))[0];
+check('quadro: entregas e ganhos do período', quadro.totals.delivered === feitas.n && Number(quadro.totals.fees) === feitas.s && feitas.n > 0, { t: quadro.totals, feitas });
+check('quadro: por colportor soma o total', quadro.by_colporteur.reduce((s, x) => s + x.delivered, 0) === quadro.totals.delivered
+  && quadro.by_colporteur.reduce((s, x) => s + x.offered, 0) === quadro.totals.offered);
+check('quadro: sem os dados do cliente', !quadro.active.some((x) => x.customer) && !JSON.stringify(quadro).includes('923000000'));
+const vazio = (await asUser(admin, `select public.colporteur_deliveries_board(0) b`))[0].b;
+check('quadro: o período fica entre 1 e 366 dias', vazio.days === 1 && (await asUser(admin, `select public.colporteur_deliveries_board(9999) b`))[0].b.days === 366);
+await raises('quadro: o cliente não vê', () => asUser(cliente, `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
+await raises('quadro: o colportor não vê', () => asUser(perfil['CPT-0002'], `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
+
+// 9. Sinais em tempo real: ao painel e à conta do colportor, sem dados --------------------------------
+await db.exec(`create schema if not exists realtime;
+  create table public._sinais (topic text, event text, payload jsonb);
+  create function realtime.send(p_payload jsonb, p_event text, p_topic text, p_private boolean default true) returns void
+    language sql as $$ insert into public._sinais values (p_topic, p_event, p_payload) $$;`);
+const o12 = await encomenda();
+await pagar(o12);
+const d12 = await activa(o12);
+const dono12 = (await q(`select profile_id from public.colporteurs where id = $1`, [d12.colporteur_id]))[0].profile_id;
+const sinais = async () => (await q(`select topic, payload from public._sinais where event = 'entregas'`));
+let s12 = await sinais();
+check('oferta nova: sinal ao painel e à conta do colportor', s12.some((x) => x.topic === 'painel') && s12.some((x) => x.topic === `conta:${dono12}`), s12);
+check('o sinal não leva dados', s12.every((x) => JSON.stringify(x.payload) === '{}'), s12);
+await q(`delete from public._sinais`);
+await svc(`select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d12.id, dono12]);
+s12 = await sinais();
+check('resposta do colportor: novo sinal', s12.some((x) => x.topic === 'painel') && s12.some((x) => x.topic === `conta:${dono12}`), s12);
 
 console.log(`\n${ok} cenários certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);
