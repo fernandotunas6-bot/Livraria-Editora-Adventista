@@ -20,6 +20,13 @@ const NUM = [
   ['invite_days', 'Validade do convite (dias)', ''],
 ];
 
+// Entregas por colportor (migração entregas_por_colportor).
+const DELIVERY = [
+  ['delivery_offer_minutes', 'Prazo para aceitar uma entrega (minutos)', 'Contados em horário de funcionamento. Depois passa ao colportor seguinte.'],
+  ['delivery_near_km', 'Muito perto, por GPS (km)', 'Até esta distância, ganha a quem está no mesmo município sem localização.'],
+  ['delivery_max_km', 'Distância máxima por GPS (km)', 'Mais longe do que isto, só se for da mesma província.'],
+];
+
 export function SettingsPanel({ data, run }) {
   const [form, setForm] = useState(data.settings);
   useEffect(() => setForm(data.settings), [data.settings]);
@@ -34,12 +41,28 @@ export function SettingsPanel({ data, run }) {
         ))}
       </div>
       <label className="flex items-center gap-2 text-sm"><Switch checked={!!form.applications_open} onCheckedChange={(v) => setForm({ ...form, applications_open: v })} />Candidaturas abertas</label>
+      {'deliveries_enabled' in form && (
+        <div className="space-y-3 rounded-xl border border-border p-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={!!form.deliveries_enabled} onCheckedChange={(v) => setForm({ ...form, deliveries_enabled: v })} />
+            Entregas por colportor: as encomendas pagas para entrega ao domicílio vão primeiro ao colportor mais próximo
+          </label>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {DELIVERY.map(([k, label, hint]) => (
+              <FormField key={k} label={label} hint={hint}>
+                <Input type="number" min={1} step="1" value={form[k] ?? ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+              </FormField>
+            ))}
+          </div>
+        </div>
+      )}
       <FormField label="Nota no formulário de candidatura" hint="Aparece no topo do formulário (ou no lugar dele, se as candidaturas estiverem fechadas).">
         <Textarea value={form.application_note || ''} onChange={(e) => setForm({ ...form, application_note: e.target.value })} rows={2} maxLength={1000} />
       </FormField>
       <Button onClick={() => run(async () => {
         const body = { ...form };
         for (const [k] of NUM) body[k] = Number(body[k] || 0);
+        if ('deliveries_enabled' in body) for (const [k] of DELIVERY) body[k] = Math.round(Number(body[k] || 0));
         if (body.base_pct < 0 || body.base_pct > 100) throw new Error('A percentagem base tem de estar entre 0 e 100.');
         await saveColporteurSettings(body);
       }, 'Definições guardadas.')}>Guardar</Button>

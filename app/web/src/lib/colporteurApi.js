@@ -3,6 +3,7 @@
  * de 20261107101000_colportores.sql) e a área do próprio colportor.
  */
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
+import pb from '@/lib/dataClient';
 import { registryError } from '@/lib/churchRegistryApi';
 
 const MIGRATION = 'A colportagem ainda não está na base de dados (migração 20261107101000_colportores por aplicar).';
@@ -86,7 +87,7 @@ export async function loadColporteurAdmin() {
 /** Campos que a equipa edita directamente na ficha (o resto vai pelas funções). */
 const EDITABLE = ['full_name', 'phone', 'email', 'church_id', 'church_other', 'province_id', 'municipality_id', 'territory',
   'requested_category', 'weekly_hours', 'is_student', 'school', 'recommended_by_pastor_id', 'recommended_by_name',
-  'recommendation_ok', 'credit_limit', 'notes'];
+  'recommendation_ok', 'credit_limit', 'notes', 'accepts_deliveries'];
 
 export async function saveColporteur(row) {
   const body = Object.fromEntries(EDITABLE.filter((k) => k in row).map((k) => {
@@ -205,3 +206,46 @@ export async function assignOrderToColporteur(orderNumber, code) {
   if (!data[0].colporteur_id) throw new Error('A base de dados não aceitou o código (colportor inactivo, ou é a conta do próprio colportor).');
   return data[0];
 }
+
+// --- Entregas por colportor (migração 20261108100000_entregas_por_colportor) -----------------
+// A base de dados oferece a encomenda paga ao colportor mais próximo (GPS, município,
+// província). As acções passam pela Edge Function, que avisa o cliente de cada passo.
+
+/** As entregas do próprio colportor: ofertas, as que aceitou e as dos últimos 30 dias. */
+export const loadMyDeliveries = () => rpc('colporteur_my_deliveries');
+
+/** Aceitar ou recusar uma entrega oferecida. */
+export const respondDelivery = (deliveryId, accept, reason = '') =>
+  pb.send('/colportores/entregas/responder', { method: 'POST', body: { deliveryId, accept, reason } });
+
+/** Saiu para entrega, entregue (com quem recebeu e a assinatura) ou desistir. */
+export const deliveryStep = (deliveryId, step, { recipientName = '', recipientId = '', signature = '', reason = '' } = {}) =>
+  pb.send('/colportores/entregas/passo', { method: 'POST', body: { deliveryId, step, recipientName, recipientId, signature, reason } });
+
+/** Onde o colportor está, para as entregas por distância (só dentro de Angola). */
+export const setMyLocation = (lat, lng) => rpc('colporteur_set_location', { p_lat: lat, p_lng: lng });
+
+/** O colportor aceita, ou deixa de aceitar, entregas. */
+export const setAcceptsDeliveries = (on) => rpc('colporteur_set_accepts_deliveries', { p_on: !!on });
+
+/** No painel: a quem foi oferecida uma encomenda e o que cada colportor fez. */
+export const loadOrderDeliveries = (orderId) => rpc('order_colporteur_deliveries', { p_order_id: orderId });
+
+/** No painel: os livros que o colportor levanta na loja foram-lhe entregues. */
+export const handoverDelivery = (deliveryId) =>
+  pb.send('/admin/colportores/entregas/entregue-ao-colportor', { method: 'POST', body: { deliveryId } });
+
+/** No painel: a equipa tira a entrega ao colportor e faz ela a entrega. */
+export const takeBackDelivery = (deliveryId, reason) =>
+  pb.send('/admin/colportores/entregas/retirar', { method: 'POST', body: { deliveryId, reason } });
+
+/** Estado de uma entrega por colportor, em português. */
+export const DELIVERY_OFFER_STATUS = {
+  offered: { label: 'À espera de resposta', tone: 'amber' },
+  accepted: { label: 'Aceite', tone: 'blue' },
+  declined: { label: 'Recusada', tone: 'muted' },
+  expired: { label: 'Sem resposta no prazo', tone: 'muted' },
+  delivered: { label: 'Entregue', tone: 'green' },
+  released: { label: 'Devolvida', tone: 'muted' },
+  cancelled: { label: 'Cancelada', tone: 'muted' },
+};

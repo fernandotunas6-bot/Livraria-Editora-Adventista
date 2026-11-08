@@ -103,6 +103,8 @@ export const LEDGER_KINDS = {
   pagamento_recebido: 'Pagamento recebido',
   pagamento_feito: 'Pagamento ao colportor',
   ajuste: 'Correcção',
+  // Portes das entregas que o colportor fez (migração entregas_por_colportor): a Livraria deve-lhos.
+  taxa_entrega: 'Portes de entrega',
 };
 
 export const REPORT_STATUSES = {
