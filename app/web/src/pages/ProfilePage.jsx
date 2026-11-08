@@ -7,7 +7,7 @@ import {
   Heart, Trash2, Bell, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,
 } from 'lucide-react';
 import { toast as notify } from 'sonner';
-import MyDownloads from '@/components/downloads/MyDownloads';
+import DigitalLibrary from '@/components/downloads/DigitalLibrary';
 import NotificationsTab from '@/components/community/NotificationsTab';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -19,7 +19,7 @@ import { useSignal } from '@/hooks/useSignal';
 import { accountTopic } from '@/lib/realtimeSignals';
 import { useColporteurMe } from '@/hooks/useColporteurMe';
 import { adminPermissions, buildAdminNav, navAreas } from '@/lib/adminSections';
-import { DEFAULT_ACCOUNT_VIEW, accountViews, colporteurHref, resolveAccountView } from '@/lib/siteAreas';
+import { ACCOUNT_VIEW_ALIASES, DEFAULT_ACCOUNT_VIEW, accountViews, colporteurHref, resolveAccountView } from '@/lib/siteAreas';
 import ShoppingCart from '@/components/ShoppingCart';
 import CustomerOrders from '@/components/account/CustomerOrders';
 import AccountPrivacy from '@/components/account/AccountPrivacy';
@@ -136,7 +136,9 @@ const ProfilePage = () => {
   // As vistas da conta vêm de lib/siteAreas.js; as da equipa (Workspace, CRM) só para quem pode.
   const views = accountViews({ canAccessAdmin, canManageContacts });
   const PROFILE_TABS = views.map((v) => v.id);
-  const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
+  // `?tab=pdfs` (ligações antigas) abre a Biblioteca.
+  const requestedTab = ACCOUNT_VIEW_ALIASES[searchParams.get('tab')] || searchParams.get('tab') || '';
+  const tabFromUrl = PROFILE_TABS.includes(requestedTab) ? requestedTab : '';
   // O separador vem sempre do endereço: o «voltar» do navegador regressa ao anterior.
   const activeTab = resolveAccountView(tabFromUrl || location.state?.tab || DEFAULT_ACCOUNT_VIEW, { canAccessAdmin, canManageContacts });
   const activeView = views.find((v) => v.id === activeTab);
@@ -674,8 +676,8 @@ const ProfilePage = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent value="pdfs">
-                {activeTab === 'pdfs' && <MyDownloads userId={user?.id} />}
+              <TabsContent value="biblioteca">
+                {activeTab === 'biblioteca' && <DigitalLibrary userId={user?.id} />}
               </TabsContent>
 
               <TabsContent value="wishlist">

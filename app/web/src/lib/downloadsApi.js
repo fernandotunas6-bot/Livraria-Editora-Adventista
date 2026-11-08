@@ -28,14 +28,17 @@ export async function loadDownloads({ bookId = null } = {}) {
 }
 
 /**
- * Confirma o acesso, conta o download e pede ao Storage um link temporário que já traz o nome
- * do ficheiro. Devolve o URL; quem chama abre-o.
+ * Confirma o acesso, conta (e, nos pagos, regista) e pede ao Storage um link temporário. Devolve o
+ * URL; quem chama abre-o. `mode`: 'download' traz o nome do ficheiro e descarrega; 'open' mostra o
+ * PDF no navegador. Aceita um material (`id`) ou uma linha da biblioteca (`download_id`).
  */
-export async function getDownloadUrl(item) {
-  const { data, error } = await supabase.rpc('start_download', { p_id: item.id });
+export async function getDownloadUrl(item, { mode = 'download' } = {}) {
+  const id = item.download_id || item.id;
+  const { data, error } = await supabase.rpc('start_download', { p_id: id, p_mode: mode === 'open' ? 'open' : 'download' });
   raise(error);
+  const options = mode === 'open' ? undefined : { download: downloadFileName(item.title, data.file_name) };
   const { data: link, error: linkError } = await supabase.storage.from('downloads')
-    .createSignedUrl(data.path, LINK_SECONDS, { download: downloadFileName(item.title, data.file_name) });
+    .createSignedUrl(data.path, LINK_SECONDS, options);
   if (linkError) throw new Error('Não foi possível preparar o download. Tente outra vez.');
   return link.signedUrl;
 }
