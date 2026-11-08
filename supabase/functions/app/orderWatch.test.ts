@@ -54,6 +54,14 @@ describe("orderWatch", () => {
     expect(orderStage({ status: "cancelled", delivery_status: "shipped" })).toBe("cancelled");
   });
 
+  it("com um colportor, o alerta diz que é com ele", () => {
+    const base = { id: "k", order_number: "ENC-K", payment_status: "paid", delivery_status: "confirmed", shipping_method: "delivery", created: hoursAgo(50), paid_at: hoursAgo(50), updated: hoursAgo(50) };
+    const com = alertsForOrder({ ...base, delivery_route: "colportor" }, NOW).find((a) => a.kind === "not_prepared");
+    expect(com?.detail).toBe("com um colportor: ver Colportagem → Entregas");
+    const sem = alertsForOrder({ ...base, delivery_route: "loja" }, NOW).find((a) => a.kind === "not_prepared");
+    expect(sem?.detail).toBe("");
+  });
+
   describe("encomendas pagas no fim (na entrega ou no balcão)", () => {
     const balcao = { id: "b", order_number: "ENC-B", payment_status: "pending", payment_method_code: "balcao", shipping_method: "pickup", created: hoursAgo(30) };
     const payLater = (o: Record<string, unknown>) => o.payment_method_code === "balcao";

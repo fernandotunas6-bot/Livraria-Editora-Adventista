@@ -23,7 +23,7 @@ vi.mock('@/hooks/useSignal', () => ({
   useSignal: (topic, events, cb) => { signals.byTopic[topic] = { events, fire: cb }; return false; },
 }));
 
-const { default: ColporteurDeliveries } = await import('./ColporteurDeliveries');
+const { default: ColporteurDeliveries, locationIsOld } = await import('./ColporteurDeliveries');
 const { default: OrderColporteurDelivery } = await import('@/components/admin/OrderColporteurDelivery');
 const { kz } = await import('@/lib/colporteurCommission');
 
@@ -88,6 +88,42 @@ describe('área do colportor: entregas', () => {
     expect(api.deliveryStep).not.toHaveBeenCalled(); // sem assinatura não segue
   });
 
+  it('a loja de levantamento: na oferta e depois de aceitar, com morada, horário e mapa', async () => {
+    const pickup_store = { name: 'Loja Lubango', address: 'Rua da Sé', hours: '8h-17h', phone: '923444555', whatsapp: '', maps_url: 'https://maps.example/lubango' };
+    api.loadMyDeliveries.mockResolvedValue({ ...MINE, deliveries: [
+      { ...MINE.deliveries[0], has_stock: false, pickup_store },
+      { ...MINE.deliveries[1], pickup_store },
+    ] });
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.textContent).toContain('Os livros levantam-se nesta loja:');
+    expect(el.textContent).toContain('Levante os livros nesta loja:');
+    expect(el.textContent.match(/Loja Lubango/g)).toHaveLength(2);
+    expect(el.textContent).toContain('Rua da Sé');
+    expect(el.textContent).toContain('8h-17h');
+    expect(el.querySelector('a[href="tel:923444555"]')).toBeTruthy();
+    expect(el.querySelector('a[href="https://maps.example/lubango"]')).toBeTruthy();
+  });
+
+  it('uma ligação de mapa perigosa não aparece', async () => {
+    api.loadMyDeliveries.mockResolvedValue({ ...MINE, deliveries: [
+      { ...MINE.deliveries[1], pickup_store: { name: 'Loja', address: 'Rua', maps_url: 'javascript:alert(1)' } },
+    ] });
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.textContent).toContain('Loja');
+    expect(el.textContent).not.toContain('Ver no mapa');
+  });
+
+  it('localização com mais de 30 dias: pede para a actualizar', async () => {
+    const velha = new Date(Date.now() - 40 * 86400000).toISOString();
+    api.loadMyDeliveries.mockResolvedValue({ ...MINE, latitude: -8.9, longitude: 13.3, location_updated_at: velha, deliveries: [] });
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.textContent).toContain('Tem mais de 30 dias');
+    const agora = Date.parse('2026-11-08T12:00:00Z');
+    expect(locationIsOld('2026-10-20T12:00:00Z', agora)).toBe(false);
+    expect(locationIsOld('2026-10-01T12:00:00Z', agora)).toBe(true);
+    expect(locationIsOld(null, agora)).toBe(false);
+  });
+
   it('no histórico, diz porque é que a entrega fechou', async () => {
     api.loadMyDeliveries.mockResolvedValue({ ...MINE, deliveries: [
       { id: 'h2', status: 'cancelled', order_number: 'ENC-7', place: 'Viana', fee: 1500, reason: 'A encomenda deixou de estar paga.' },
@@ -144,6 +180,7 @@ describe('painel: entrega por colportor da encomenda', () => {
     api.handoverDelivery.mockResolvedValue({});
     const el = await mount(<OrderColporteurDelivery order={{ id: 'x', payment_status: 'paid', delivery_status: 'confirmed' }} />);
     expect(el.textContent).toContain('Entrega com Bento (CPT-0002)');
+    expect(el.textContent).toContain('Levanta os livros na loja');
     await act(async () => button(el, 'Entregue ao colportor').click());
     expect(api.handoverDelivery).toHaveBeenCalledWith('d1');
   });

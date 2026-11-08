@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import SignaturePad from '@/components/SignaturePad';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import { kz } from '@/lib/colporteurCommission';
+import { safeLinkUrl } from '@/lib/safeLink';
 import { accountTopic } from '@/lib/realtimeSignals';
 import {
   DELIVERY_OFFER_STATUS, deliveryStep, loadMyDeliveries, respondDelivery, setAcceptsDeliveries, setMyLocation,
@@ -39,6 +40,28 @@ function Items({ items }) {
         <li key={i}>{it.qty}× {it.title}{it.variant ? ` (${it.variant})` : ''}{it.code ? <span className="ml-1 font-mono text-xs text-muted-foreground">{it.code}</span> : null}</li>
       ))}
     </ul>
+  );
+}
+
+/** A localização serve para escolher o colportor mais perto: com mais de 30 dias, pede-se que a confirme. */
+export const locationIsOld = (iso, now = Date.now()) => !!iso && now - new Date(iso).getTime() > 30 * 86400000;
+
+/** A loja onde levantar os livros: morada, horário, contacto e mapa. */
+function PickupStore({ store }) {
+  const maps = safeLinkUrl(store.maps_url);
+  return (
+    <div className="rounded-lg bg-muted/40 p-3 text-sm space-y-0.5">
+      <p className="font-medium">{store.name}</p>
+      {store.address && <p>{store.address}</p>}
+      {store.hours && <p className="text-muted-foreground">{store.hours}</p>}
+      {(store.phone || store.whatsapp || maps) && (
+        <p className="flex flex-wrap gap-3 pt-0.5">
+          {store.phone && <a className="text-primary inline-flex items-center gap-1" href={`tel:${store.phone}`}><Phone className="h-3.5 w-3.5" />{store.phone}</a>}
+          {store.whatsapp && waLink(store.whatsapp) && <a className="text-primary inline-flex items-center gap-1" href={waLink(store.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</a>}
+          {maps && <a className="text-primary inline-flex items-center gap-1" href={maps} target="_blank" rel="noreferrer"><MapPin className="h-3.5 w-3.5" />Ver no mapa</a>}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -139,6 +162,9 @@ export default function ColporteurDeliveries({ onChanged }) {
             {data.latitude != null
               ? `Localização registada a ${when(data.location_updated_at)}. Recebe as entregas mais perto daqui.`
               : 'Sem localização: recebe só as entregas do seu município e da sua província.'}
+            {locationIsOld(data.location_updated_at) && (
+              <strong className="mt-1 block font-medium text-amber-700 dark:text-amber-400">Tem mais de 30 dias: actualize-a se mudou de sítio.</strong>
+            )}
           </span>
           <Button size="sm" variant="outline" onClick={locate} disabled={locating || busy === 'local'}>
             {locating || busy === 'local' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Navigation className="mr-1.5 h-4 w-4" />}
@@ -159,8 +185,9 @@ export default function ColporteurDeliveries({ onChanged }) {
               <p className="text-sm text-muted-foreground">
                 {d.distance_km != null ? `A ${Number(d.distance_km).toLocaleString('pt-AO')} km de si. ` : ''}
                 {Number(d.fee) > 0 ? `Ganha ${kz(d.fee)} por esta entrega. ` : 'Envio grátis para o cliente: esta entrega não tem portes. '}
-                {d.has_stock ? 'Tem estes livros consigo.' : 'Os livros levantam-se na loja.'}
+                {d.has_stock ? 'Tem estes livros consigo.' : d.pickup_store ? 'Os livros levantam-se nesta loja:' : 'Os livros levantam-se na loja.'}
               </p>
+              {!d.has_stock && d.pickup_store && <PickupStore store={d.pickup_store} />}
               <Items items={d.items} />
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button size="sm" disabled={!!busy} onClick={() => run(`a-${d.id}`, () => respondDelivery(d.id, true), (r) => (r?.status === 'expired' ? 'O prazo já tinha acabado' : 'Entrega aceite'))}>
@@ -207,10 +234,11 @@ export default function ColporteurDeliveries({ onChanged }) {
                   )}
                 </div>
                 <Items items={d.items} />
+                {d.pickup_store && <PickupStore store={d.pickup_store} />}
                 <p className="text-xs text-muted-foreground">
                   {d.source === 'stock' ? 'Entrega com os livros que tem consigo: saem da sua conta à consignação quando marcar "Entregue".'
                     : d.picked_up_at ? `A equipa entregou-lhe os livros a ${when(d.picked_up_at)}.`
-                      : 'Levante os livros na loja: a equipa marca quando lhos entregar, e só depois pode sair.'}
+                      : `Levante os livros ${d.pickup_store ? 'nesta loja' : 'na loja'}: a equipa marca quando lhos entregar, e só depois pode sair.`}
                   {Number(d.fee) > 0 ? ` Para si: ${kz(d.fee)}.` : ''}
                 </p>
 

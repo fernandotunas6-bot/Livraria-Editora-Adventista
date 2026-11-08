@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) e `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) , `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo) e `20261108210000_entregas_loja_e_robustez.sql` (a loja de levantamento e o pagamento protegido).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão, ou porque o total baixou e o que já foi pago chega. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 
@@ -207,6 +207,8 @@ Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colport
 2. depois, o do mesmo município de entrega;
 3. depois, perto por GPS (até `delivery_max_km`, 50 km);
 4. por fim, o da mesma província.
+
+**Quem não tem os livros nem loja ao alcance não recebe a oferta**: não a podia cumprir, e o cliente perdia o prazo de cada oferta. Por exemplo, em Luanda ainda não há loja, por isso só recebe quem tiver todos os livros à consignação; sem ninguém, a encomenda vai logo para a equipa. Sem lojas registadas não há esta regra.
 
 Em cada nível, primeiro quem tem todos os livros à consignação, depois o mais perto, o menos ocupado e quem recebeu uma oferta há mais tempo. A mesma encomenda nunca é oferecida duas vezes ao mesmo colportor, nem ao próprio cliente.
 
@@ -217,7 +219,7 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 **Depois de aceitar:**
 - O colportor passa a ver o nome, o telefone, a morada, o contacto próximo, a nota e a localização do cliente. Antes de aceitar vê só a zona e os livros.
 - **Livros do stock dele** (tem todos à consignação): sai logo. Quando marca «Entregue», o sistema faz sozinho uma guia de devolução (GUI-). Os livros saem do stock dele e voltam ao da loja, que já os tinha descontado ao encomendar, e deixam de lhe ser cobrados na conta corrente.
-- **Livros da loja** (não tem todos): a equipa recebe «Preparar para o colportor», prepara o pacote e marca **«Entregue ao colportor»** na encomenda. A encomenda fica «expedida» e só então ele pode sair.
+- **Livros da loja** (não tem todos): a oferta já diz em que loja se levantam, e o colportor vê a morada, o horário, o contacto e o mapa. A equipa dessa loja recebe «Preparar para o colportor», prepara o pacote e marca **«Entregue ao colportor»** na encomenda. A encomenda fica «expedida» e só então ele pode sair. A loja é a da província dele; depois, a mais perto por GPS (até `delivery_max_km`); depois, a da província do cliente. Fica decidida na oferta, mesmo que ele mude de localização.
 - O colportor marca «Saiu para entrega» e «Entregue», com o nome e a assinatura de quem recebe («Assine como está no Bilhete») e, se quiser, o número do Bilhete. O cliente é avisado de cada passo, como quando a equipa os marca.
 - **Quanto ganha:** os portes da encomenda, nunca menos do que o **mínimo por entrega** (`delivery_min_fee`, em Definições; 0 por omissão). Entra na conta corrente dele como «Portes de entrega» (a Livraria deve-lho). Com envio grátis e o mínimo a 0, a entrega não lhe rende nada: a diferença entre os portes e o mínimo paga-a a Livraria.
 - **Se outra pessoa marcar «Entregue»** (o cliente a confirmar a recepção, ou a equipa no painel) com a entrega ainda com o colportor:
@@ -225,6 +227,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
   - se ainda não os tinha, a entrega dele fecha como «libertada», sem ganho, e é avisado para falar com a equipa se a fez.
   - Se a guia não se puder fazer (por exemplo, já não tem os livros à consignação), fica também «libertada», e a equipa resolve à mão.
 - «Não posso entregar» (antes de levantar os livros na loja) devolve a entrega, que passa ao seguinte. A equipa pode **«Retirar ao colportor»** a qualquer momento, com o motivo, e passa a ser ela a entregar. Cancelar a encomenda cancela a entrega e avisa o colportor.
+
+**Se a equipa expedir a encomenda com uma oferta à espera**, a oferta fecha, o colportor é avisado e a encomenda fica com a equipa. Assim não há duas entregas.
+
+**Uma falha a oferecer nunca trava o pagamento**, que pode vir do webhook do gateway: o pagamento fica registado e o agendador volta a tentar de 5 em 5 minutos. Uma encomenda com problema também não pára as outras.
+
+**Nos alertas de encomendas paradas**, uma encomenda com um colportor diz «com um colportor: ver Colportagem → Entregas».
 
 **Se a encomenda deixar de estar paga** (reembolso) com a entrega em curso, a entrega fecha como «Cancelada», sem portes, e o colportor e a equipa são avisados. Se ele já tinha os livros da loja, ou a encomenda já saiu, o aviso à equipa é urgente e a encomenda fica com ela. Se voltar a ficar paga antes de sair, vai ao colportor seguinte. Uma entrega já feita não muda.
 
@@ -244,12 +252,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 **Técnico:**
 - tabela `colporteur_deliveries` (uma oferta activa por encomenda; RLS: a equipa e o próprio);
 - `orders.delivery_route` e `orders.delivery_colporteur_id`;
-- `private.delivery_candidates`, `private.offer_next_delivery` e os gatilhos `orders_entrega_colportor`, `orders_entrega_sem_pagamento` e `colporteurs_entregas_fecham`;
+- `private.delivery_candidates`, `private.offer_next_delivery` e os gatilhos `orders_entrega_colportor`, `orders_entrega_sem_pagamento`, `orders_entrega_equipa_expediu` e `colporteurs_entregas_fecham`; `private.delivery_pickup_store` e `colporteur_deliveries.pickup_store_id` (a loja);
 - `private.colporteur_delivery_complete` (a guia, os portes e o fecho, usada pelo colportor e pelo gatilho; o passo do colportor liga `app.colporteur_step` para o gatilho não fechar a entrega duas vezes);
 - funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_deliveries_board` (o quadro; «Gerir encomendas» ou «Gerir colportores»), `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
 - rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
-- testes: 87 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
+- testes: 103 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
 ## Técnico
 

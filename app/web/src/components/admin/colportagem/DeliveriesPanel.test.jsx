@@ -63,6 +63,10 @@ describe('em que ponto está cada entrega', () => {
     expect(since('2026-11-05T12:00:00Z', agora)).toBe('há 3 dias');
     expect(since(null)).toBe('');
   });
+
+  it('diz em que loja se levantam os livros', () => {
+    expect(deliveryStage({ status: 'accepted', source: 'loja', pickup_store: 'Loja Lubango' }).detail).toBe('levanta os livros em Loja Lubango');
+  });
 });
 
 describe('painel → Colportagem → Entregas', () => {

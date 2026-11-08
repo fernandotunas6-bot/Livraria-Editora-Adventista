@@ -27,7 +27,7 @@ export function since(iso, now = Date.now()) {
 export function deliveryStage(d) {
   if (d.status === 'offered') return { key: 'waiting', tone: 'amber', label: 'À espera de resposta', detail: d.expires_at ? `até ${when(d.expires_at)}` : '' };
   const accepted = d.responded_at ? ` · aceite ${since(d.responded_at)}` : '';
-  if (d.source === 'loja' && !d.picked_up_at) return { key: 'prepare', tone: 'red', label: 'Preparar na loja', detail: `levanta os livros na loja${accepted}` };
+  if (d.source === 'loja' && !d.picked_up_at) return { key: 'prepare', tone: 'red', label: 'Preparar na loja', detail: `levanta os livros ${d.pickup_store ? `em ${d.pickup_store}` : 'na loja'}${accepted}` };
   const label = d.delivery_status === 'out_for_delivery' ? 'A caminho do cliente' : 'Com o colportor';
   if (d.source === 'stock') return { key: 'out', tone: 'blue', label, detail: `com livros à consignação${accepted}` };
   return { key: 'out', tone: 'blue', label, detail: `livros entregues a ${when(d.picked_up_at)}` };
