@@ -193,6 +193,31 @@ await q(`update public.colporteur_settings set deliveries_enabled = true where i
 await q(`select private.colporteur_deliveries_tick()`);
 check('voltou a ligar: o agendador oferece as pagas que ficaram para trás', !!(await activa(o8)));
 
+// 6b. Mínimo por entrega, cliente que confirma antes do colportor, equipa que marca entregue ------------
+await q(`update public.colporteur_settings set delivery_min_fee = 1000 where id = 1`);
+const o9 = await encomenda({}, 5); // 25 000 Kz: envio grátis
+await pagar(o9);
+d = await activa(o9);
+check('envio grátis com mínimo: a oferta leva o mínimo', Number(d.fee) === 1000, d);
+check('o aviso diz quanto ganha', (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and body like '%Ganha 1 000 Kz%'`, [o9.id]))[0].n === 1);
+await q(`update public.colporteur_settings set delivery_min_fee = 0 where id = 1`);
+// O colportor (com os livros na mão) entrega; o cliente confirma no site antes de ele marcar.
+await q(`insert into public.colporteur_stock_moves (colporteur_id, book_id, qty, kind, unit_price) values ($1, $2, 10, 'entrega', 5000)`, [d.colporteur_id, livro.id]);
+const quem = Object.keys(perfil).find((k) => k === d.code);
+r = await respond(d, quem, true);
+check('aceite com os livros dele', r.source === 'stock', r);
+await svc(`update public.orders set delivery_status = 'delivered', delivery_confirmed_at = now(), delivery_recipient_name = 'Cliente' where id = $1`, [o9.id]);
+const d9 = (await q(`select * from public.colporteur_deliveries where id = $1`, [d.id]))[0];
+check('o cliente confirmou primeiro: conta como entrega dele, com portes e guia', d9.status === 'delivered' && d9.document_id && d9.ledger_id, d9);
+check('e ele é avisado', (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and title like 'Entrega confirmada%'`, [o9.id]))[0].n === 1);
+// Oferecida mas não aceite, e a equipa marca entregue: a oferta fecha e o colportor é avisado.
+const o10 = await encomenda();
+await pagar(o10);
+d = await activa(o10);
+await svc(`update public.orders set delivery_status = 'delivered' where id = $1`, [o10.id]);
+check('a equipa entregou: a oferta fecha', (await q(`select status from public.colporteur_deliveries where id = $1`, [d.id]))[0].status === 'released'
+  && (await q(`select count(*)::int n from public.customer_notifications where order_id = $1 and title like 'Entrega fechada%'`, [o10.id]))[0].n === 1);
+
 // 7. Segurança, localização e prazo em horário de funcionamento ----------------------------------------
 const d8 = await activa(o8);
 await raises('o colportor não chama a função directamente', () => asUser(perfil['CPT-0002'], `select public.colporteur_delivery_respond($1::uuid, $2::uuid, true)`, [d8.id, perfil['CPT-0002']]), /permission denied/);
