@@ -81,6 +81,7 @@ import { cleanCancelReason, customerCancelBlock } from "./customerCancel.ts";
 import {
   RELEASE_PUSH_BATCH, RELEASE_PUSH_CONCURRENCY, mapLimit, nextReleaseBatch, pushFailure, releasePushAlive, releasePushPayload,
 } from "./releasePush.ts";
+import { type PaidMaterial, digitalBooksFor } from "./digitalBooks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -842,9 +843,24 @@ async function scheduleThankYouEmail(order: Row, settings: Row) {
 }
 
 /** Avisa o cliente de que o pagamento ficou confirmado. */
-async function sendPaymentConfirmedEmail(order: Row, settings: Row | null) {
+/**
+ * Os livros digitais que esta encomenda dá (materiais pagos e publicados dos seus produtos). Sem a
+ * tabela, sem materiais ou com um erro: nenhum — o email sai como sempre.
+ */
+async function orderDigitalBooks(order: Row) {
+  const none = { titles: [] as string[], onlyDigital: false };
+  const ids = [...new Set((Array.isArray(order?.items) ? order.items : [])
+    .map((i: Row) => String(i?.book_id || "")).filter(Boolean))];
+  if (!ids.length) return none;
+  const { data, error } = await db.from("downloads").select("id, title, book_id, variant")
+    .eq("access", "paid").eq("published", true).neq("file_path", "").in("book_id", ids);
+  if (error || !data?.length) return none;
+  return digitalBooksFor(order.items, data as PaidMaterial[]);
+}
+
+async function sendPaymentConfirmedEmail(order: Row, settings: Row | null, digital?: { titles: string[]; onlyDigital: boolean }) {
   if (!settings?.order_email_enabled || !order.customer_email) return false;
-  const letter = paymentConfirmedLetter(emailBrand(settings), order);
+  const letter = paymentConfirmedLetter(emailBrand(settings), order, digital);
   return sendLetter(settings, order.customer_email, letter, {
     context: "payment",
     customer_name: order.customer_name,
@@ -987,13 +1003,16 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
   // `key` é a chave de idempotência de cada canal: um aviso por pagamento, não por encomenda.
   const key = opts.key || step;
   const reason = String(event?.reason || "");
+  // Pago: os livros digitais da encomenda abriram (a base de dados abre-os sozinha); a carta, o
+  // WhatsApp e o push dizem que estão na biblioteca.
+  const digital = step === "paid" ? await orderDigitalBooks(order).catch(() => ({ titles: [] as string[], onlyDigital: false })) : null;
   const paymentLetter = step === "payment_partial" ? paymentPartialLetter(brand, order)
     : step === "payment_rejected" ? paymentRejectedLetter(brand, order, reason)
     : step === "refunded" ? refundLetter(brand, order)
     : null;
   try {
     result.email = step === "paid"
-      ? await sendPaymentConfirmedEmail(order, settings)
+      ? await sendPaymentConfirmedEmail(order, settings, digital || undefined)
       : step === "refunded"
         ? await sendRefundEmail(order, settings, key)
         : paymentLetter
@@ -1002,7 +1021,7 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
   } catch (err) {
     console.log(`notifyOrderStep email ${step}:`, (err as Error)?.message || err);
   }
-  const letter = step === "paid" ? paymentConfirmedLetter(brand, order) : paymentLetter || orderStatusLetter(brand, order, step, event);
+  const letter = step === "paid" ? paymentConfirmedLetter(brand, order, digital || undefined) : paymentLetter || orderStatusLetter(brand, order, step, event);
   if (!letter) return result;
   const ref = String(order.order_number || order.id || "");
   const site = brand.siteUrl.replace(/\/$/, "");
@@ -1013,6 +1032,7 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
       `*${title}* — ${ref}`, "", subtitle,
       event?.description ? String(event.description) : "",
       reason ? `Motivo: ${reason}` : "",
+      digital?.titles.length && site ? `\nOs seus livros digitais: ${site}/profile?tab=biblioteca` : "",
       site ? `\nAcompanhe: ${site}/track` : "",
       `\n${settings?.site_name || "Livraria Adventista"}`,
     ].filter(Boolean).join("\n"));
@@ -1020,7 +1040,9 @@ async function notifyOrderStep(order: Row, step: string, event?: Row, opts: { ke
     console.log(`notifyOrderStep whatsapp ${step}:`, (err as Error)?.message || err);
   }
   try {
-    result.push = await sendOrderPush(order, settings, { title: `${title} — ${ref}`, body: subtitle, url: "/profile?tab=orders" });
+    result.push = await sendOrderPush(order, settings, {
+      title: `${title} — ${ref}`, body: subtitle, url: digital?.titles.length ? "/profile?tab=biblioteca" : "/profile?tab=orders",
+    });
   } catch (err) {
     console.log(`notifyOrderStep push ${step}:`, (err as Error)?.message || err);
   }

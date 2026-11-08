@@ -11,6 +11,7 @@
  */
 import { deliveryAddressLine, paymentLabel, pickupStoreName } from "./orderFields.ts";
 import { formatKz, type Brand, type EmailDoc, type SafeSymbol, type Step } from "./emails.ts";
+import { titleList } from "./digitalBooks.ts";
 import { type OpsReport, fmtDuration } from "./opsReport.ts";
 
 type Row = Record<string, any>;
@@ -414,7 +415,19 @@ export function orderCreatedLetter(brand: Brand, order: Row, paymentLink = "", o
   };
 }
 
-export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
+/**
+ * `digital`: os livros digitais que a encomenda dá (digitalBooks.ts). Com eles, a carta diz que já
+ * estão na biblioteca e leva o botão para lá; se a encomenda for só de edições digitais, não fala
+ * de preparar nem de enviar.
+ */
+export function paymentConfirmedLetter(
+  brand: Brand,
+  order: Row,
+  digital: { titles: string[]; onlyDigital: boolean } = { titles: [], onlyDigital: false },
+): Letter {
+  const titles = (digital?.titles || []).filter(Boolean);
+  const library = titles.length && brand.siteUrl ? `${brand.siteUrl.replace(/\/$/, "")}/profile?tab=biblioteca` : "";
+  const books = titles.length === 1 ? `O livro digital ${titles[0]} já está` : `Os livros digitais ${titleList(titles)} já estão`;
   return {
     key: "payment_confirmed",
     vars: orderVars(brand, order),
@@ -423,20 +436,27 @@ export function paymentConfirmedLetter(brand: Brand, order: Row): Letter {
       symbol: "✓",
       tone: "success",
       title: "Pagamento confirmado!",
-      subtitle: isPickup(order)
-        ? "Vamos preparar a sua encomenda para levantamento."
-        : "Vamos preparar a sua encomenda para envio.",
+      subtitle: titles.length && digital.onlyDigital
+        ? (titles.length === 1 ? "O seu livro digital já está na sua biblioteca." : "Os seus livros digitais já estão na sua biblioteca.")
+        : titles.length
+          ? "Os livros digitais já estão na sua biblioteca; o resto da encomenda vamos preparar."
+          : isPickup(order)
+            ? "Vamos preparar a sua encomenda para levantamento."
+            : "Vamos preparar a sua encomenda para envio.",
       lead: [
         `Olá${firstName(order.customer_name) ? `, ${firstName(order.customer_name)}` : ""}! Recebemos o pagamento da sua encomenda.`,
+        ...(titles.length ? [`${books} na sua biblioteca: entre na sua conta e abra ou descarregue quando quiser.`] : []),
       ],
       detailsTitle: "Detalhes da compra",
       details: [
         ...deliveryDetails(order),
         { label: "Total pago", value: money(Number(order.amount_paid) > 0 ? order.amount_paid : order.total) },
       ],
-      stepsTitle: "Estado da encomenda",
-      steps: orderSteps(order, "confirmed"),
-      cta: trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined,
+      ...(digital?.onlyDigital && titles.length ? {} : { stepsTitle: "Estado da encomenda", steps: orderSteps(order, "confirmed") }),
+      cta: library && digital?.onlyDigital
+        ? { label: "Abrir a biblioteca", url: library }
+        : trackUrl(brand.siteUrl) ? { label: "Acompanhar a encomenda", url: trackUrl(brand.siteUrl) } : undefined,
+      ...(library && !digital?.onlyDigital ? { secondaryCta: { label: "Abrir a biblioteca", url: library } } : {}),
       reason: REASON_ORDER,
     },
   };
