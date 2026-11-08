@@ -161,7 +161,7 @@ Agora:
 | Peça | Onde | O que faz |
 |------|------|-----------|
 | `createReadyGate()` | `lib/authSession.js` | Sinal de uma só passagem, com recurso de 8 s para falhas de rede |
-| `pb.authStore.isReady` / `.onReady()` | `lib/dataClient.js` | Resolve no primeiro evento de autenticação |
+| `pb.authStore.isReady` / `.onReady()` | `lib/dataClient.js` | Resolve no primeiro evento de autenticação — ou logo no arranque, se a sessão e o perfil da mesma conta já estão guardados neste aparelho e o endereço não traz o regresso de uma entrada (`authReturnInUrl`) |
 | `ready` | `hooks/useAuth.jsx` | O mesmo sinal, como estado de React |
 | `sessionDecision()` | `lib/authSession.js` | `wait` → `login` → `forbidden` → `allow`, por esta ordem |
 | `<SessionGate />` | `components/SessionGate.jsx` | Ecrã "A verificar a sua sessão…" enquanto é `wait` |
@@ -202,8 +202,85 @@ na terceira ficha de livro vista nesta sessão, quatro segundos depois de a abri
 cima de outro painel. Abre uma vez por sessão. Depois de fechado, volta passados 7 dias; depois
 de fechado 3 vezes, passados 60. Não abre nas páginas de entrada, recuperação, painel, perfil,
 rastreio, sucesso, confirmação da encomenda nem cancelamento de subscrição. Quem já entrou
-neste navegador vê "Bem-vindo de volta" e o email preenchido. Guarda-se só o email, e isso não
-é sessão.
+neste navegador vê "Bem-vindo de volta" e a conta identificada (secção seguinte). Guarda-se o
+email, o nome e como entrou, e isso não é sessão.
+
+### No telemóvel: a sessão não cai, a conta é lembrada e a app entra sozinha (2026-11-08)
+
+**A sessão não cai sem rede.** Ao abrir a app mais de uma hora depois, o token de acesso já
+expirou e o supabase-js tem de o renovar. Sem rede (ou com rede fraca), a renovação falha e ele
+avisa `INITIAL_SESSION` sem sessão — mas guarda-a, para tentar de novo. O `dataClient` tratava
+esse aviso como "saiu": a pessoa via o ecrã de entrada e o perfil em cache era apagado. Agora
+(`authEventAction` em `lib/authSession.js`):
+
+| Aviso do supabase-js | Sessão guardada | O que a app faz |
+|---|---|---|
+| com sessão | — | `signed-in`: carrega o perfil |
+| `INITIAL_SESSION` sem sessão | ainda lá, com `refresh_token` | `keep`: a conta continua à vista (`pb.authStore.offline`) |
+| `SIGNED_OUT` (o servidor recusou a renovação) ou nada guardado | — | `signed-out`: sai |
+
+Com a sessão e o perfil da mesma conta guardados, a conta aparece logo, sem esperar pela rede
+(antes, até 8 s em "A verificar a sua sessão…"). Quando a rede volta (`online`) ou a pessoa volta
+à app, a renovação é tentada logo: o supabase-js guarda a última falha durante um minuto e
+respondia com ela, e o perfil mostrava as encomendas vazias com a rede já de volta.
+
+**A sessão terminou sem a pessoa sair.** Um `SIGNED_OUT` com a conta à vista e sem "Sair" nos
+últimos 30 s (marca `livraria_saida`, partilhada pelos separadores) é o servidor a terminá-la:
+"Terminar sessão em todos os aparelhos" noutro sítio, palavra-passe mudada, conta suspensa. A
+app diz "A sua sessão terminou neste aparelho", com "Entrar" já na conta
+(`pb.authStore.onSessionEnded`, no `AuthDialogProvider`).
+
+**A conta lembrada** (`livraria_teve_conta`, `readHadAccount`/`hadAccountValue` em
+`lib/authPrompt.js`): o email, o nome e como entrou da última vez (`email` ou `google`, lido do
+`amr` do token por `sessionMethod`). Nada disto dá acesso. O formulário (`AuthForm`) mostra
+"Bem-vindo de volta, Maria" com o email em vez do campo, e:
+- conta de palavra-passe: o cursor vai para a palavra-passe na página `/login` (no modal não, que
+  também abre sozinho), e o email segue num campo `autocomplete="username"` escondido — é por ele
+  que o gestor de palavras-passe do Chrome, do iCloud ou da Samsung sabe que conta preencher;
+- conta da Google: "Continuar com Google" dentro do cartão, com `login_hint` (a Google abre já
+  nessa conta, em vez da lista de contas do telemóvel); a palavra-passe fica atrás de "Entrar com
+  a palavra-passe";
+- "Não é Maria? Usar outra conta" esquece a conta neste aparelho (num telemóvel partilhado, o
+  próximo não vê o nome de quem entrou antes).
+
+Fora do cartão, o campo do email é `autocomplete="username"` a entrar e `email` no registo, e os
+campos têm `name`. Uma palavra-passe errada com a Google ligada acrescenta "Se criou a conta com a
+Google, use «Continuar com Google»".
+
+**Registo com um email que já tem conta.** Com a confirmação de email activa, o Supabase não dá
+erro (para não revelar quem tem conta) e devolve um utilizador sem identidades, sem enviar email.
+A app dizia "Enviámos um link de confirmação" e a pessoa esperava por um email que não vinha.
+Agora (`createUser` → `alreadyRegistered`) o formulário passa a "Entrar", com "maria@… já tem
+conta" e a palavra-passe escrita (muitas vezes é a mesma). Já antes, com a confirmação desligada,
+o erro "Já existe uma conta com este email" dizia o mesmo: não se revela nada de novo.
+
+**Entrada automática** (`lib/savedCredentials.js`, Credential Management API — Chrome, Edge,
+Samsung Internet e a app instalada no Android):
+- depois de entrar, criar conta, mudar ou recuperar a palavra-passe, a app pede ao navegador que
+  guarde a conta (`navigator.credentials.store`): é o "Guardar palavra-passe?", que numa página que
+  não muda de endereço nem sempre aparecia;
+- ao abrir a app sem sessão, uma vez por arranque, pede em silêncio a conta guardada
+  (`mediation: 'silent'`) e entra com ela: "Bem-vindo de volta, Maria — entrou automaticamente com
+  a conta guardada neste aparelho". O navegador só a entrega se houver uma só conta guardada para
+  o site e a pessoa não tiver saído;
+- nunca depois de "Sair" nem depois de o servidor terminar a sessão (a marca `livraria_saida` só se
+  apaga quando a pessoa volta a entrar), nem na recuperação de palavra-passe ou no regresso de uma
+  entrada falhada; e nesses casos a app pede também ao navegador que não volte a entrar sozinho
+  (`preventSilentAccess`). Sem isto, "Terminar sessão em todos os aparelhos" para um telemóvel
+  perdido não serviria de nada, se lá estivesse a palavra-passe guardada;
+- palavra-passe guardada já errada: o navegador deixa de a oferecer; sem rede: tenta-se no próximo
+  arranque.
+
+Safari (iPhone) e Firefox não têm esta API: lá fica a sessão guardada (que não cai, como acima) e
+o teclado preenche a palavra-passe. Na app instalada, os dados do site (e a sessão) pedem para
+não ser apagados quando o telemóvel fica sem espaço (`navigator.storage.persist`, sem pergunta
+no Chrome e no Safari; num separador normal não se pede).
+
+**Limites:** no iPhone, a app instalada no ecrã inicial tem armazenamento próprio, separado do
+Safari — na primeira vez que se abre a app instalada, entra-se uma vez. Quem entra com a Google não
+tem entrada silenciosa (seria um redireccionamento para a Google ao abrir a app): fica a sessão
+guardada e o `login_hint`. `lastRefreshFailure` é um campo interno do auth-js 2.11x; se mudar de
+nome numa versão futura, fica a tentativa normal do supabase-js, de minuto a minuto.
 
 **A confirmação por email não chega aos clientes (verificado a 2026-11-05).** No Auth,
 `mailer_autoconfirm` está `false` e não há SMTP próprio. O correio do Supabase só entrega a

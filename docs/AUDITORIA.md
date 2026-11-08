@@ -1770,3 +1770,71 @@ dois deploys: sem `/order/cancel`, o botão "Cancelar" responde com a mensagem d
 2. Os pontos das passagens anteriores continuam: email (105–107), WhatsApp (108), telefones (109).
    Sem eles, o cliente que cancela ou apaga a conta não recebe a confirmação por email — fica com o
    aviso no ecrã e, na conta, com o aviso no sino.
+
+## 9.17 Telemóvel: entrar ao abrir a app, identificar a conta e avisar das versões (2026-11-08)
+
+Pedido do dono: "focar no mobile, refinamento: auto login quando o aplicativo é aberto, identificar
+a conta registada a preencher, notificações push de actualização de versões". Olhado do lado de
+quem usa a app instalada no telemóvel, com a rede de Angola: aberta e fechada muitas vezes por dia,
+semanas em segundo plano, rede que vai e vem. Detalhe técnico em
+[AUTENTICACAO_E_EMAILS.md](AUTENTICACAO_E_EMAILS.md), secção 1 ("No telemóvel…").
+
+**Como foi verificado.** A rede desta sessão não chega a produção. O site publicado (build de
+produção, `vite preview`) correu num Chromium com o perfil de um Pixel 7 (Playwright), com o
+Supabase simulado ao nível da rede: palavra-passe certa e errada, renovação do token com e sem
+rede (`internetdisconnected`), registo de um email que já tem conta (utilizador sem identidades),
+o `authorize` da Google e a função das novidades. 20 verificações certas, entre elas abrir o
+perfil sem rede com o token expirado há 2 h e esperar os 35 s em que o supabase-js insiste. A base
+de dados: 39 cenários novos em PGlite com as 100 migrações (`scripts/pglite/versoes.mjs`), e as
+suites que já existiam continuam certas (91 + 44 + 35). `npm test` (1368, eram 1255), `npm run
+lint`, `npm run build` e `deno check`.
+
+### Achados
+
+| # | Perfil | Achado | Gravidade | Estado |
+|---|---|---|---|---|
+| 136 | Cliente (telemóvel) | **Abrir a app sem rede tirava a pessoa da conta.** Mais de uma hora depois da última vez, o token já expirou; sem rede, a renovação falha e o supabase-js avisa `INITIAL_SESSION` sem sessão — mas guarda a sessão para tentar de novo. O `dataClient` tratava o aviso como "saiu": o perfil mandava para `/login` e o perfil em cache era apagado (na abertura seguinte sem rede, nem a conta em cache aparecia). | Alta | ✅ `authEventAction` (`keep`): a conta continua à vista enquanto a sessão estiver guardada; só um `SIGNED_OUT` (o servidor recusou a renovação) a tira |
+| 137 | Cliente (telemóvel) | Com a sessão guardada e rede fraca, abrir a app na conta ficava até **8 s em "A verificar a sua sessão…"** (o supabase-js insiste na renovação até meio minuto antes de responder; o recurso de 8 s soltava a página). | Média | ✅ sessão e perfil da mesma conta guardados: a conta fica pronta logo (413 ms no teste, sem rede), excepto com o regresso de uma entrada no endereço (`authReturnInUrl`) |
+| 138 | Cliente | **Com a rede de volta, a sessão podia ficar um minuto por renovar:** o supabase-js guarda a última falha de renovação 60 s e responde com ela; entretanto os pedidos seguiam sem sessão e o perfil mostrava as encomendas vazias. | Média | ✅ ao voltar a rede (`online`) ou à app, a falha guardada esquece-se e a renovação é tentada logo (como o supabase-js já faz quando outro separador renova) |
+| 139 | Cliente | **Registo com um email que já tem conta:** "Enviámos um link de confirmação" — mas, com a confirmação de email activa, o Supabase devolve um utilizador sem identidades e não envia nada. A pessoa esperava por um email que nunca vinha. | Média | ✅ `alreadyRegistered`: o formulário passa a "Entrar", com "… já tem conta" e a palavra-passe escrita. Não revela nada que o erro "Já existe uma conta" (confirmação desligada) não revelasse |
+| 140 | Cliente | Os gestores de palavras-passe não sabiam que conta preencher: o email da entrada era `autocomplete="email"`, sem `name`; e numa página que não muda de endereço ao entrar, o Chrome nem sempre oferecia "Guardar palavra-passe?". | Baixa | ✅ `username` / `current-password` / `new-password` e `name`; `navigator.credentials.store` depois de entrar, criar conta, mudar ou recuperar a palavra-passe |
+| 141 | Cliente | **O ecrã de entrada não identificava quem volta:** só preenchia o email; a quem entrou com a Google mostrava a palavra-passe primeiro, e a Google abria na lista de contas do telemóvel. | Baixa | ✅ "Bem-vindo de volta, Maria" com o email; o caminho com que entrou da última vez (palavra-passe com o cursor nela, ou a Google com `login_hint`); "Não é Maria? Usar outra conta" esquece a conta no aparelho |
+| 142 | Cliente | **Não havia entrada automática:** com a sessão perdida (dados do site apagados pelo telemóvel sem espaço, aparelho novo com as palavras-passe sincronizadas), era sempre escrever tudo. | Baixa | ✅ Credential Management (`mediation: 'silent'`), uma vez por arranque; nunca depois de "Sair" nem de a sessão ser terminada pelo servidor (`preventSilentAccess`); `storage.persist()` na app instalada |
+| 143 | Cliente | Uma sessão terminada noutro aparelho (ou pela mudança de palavra-passe) tirava a pessoa da conta sem dizer nada. | Baixa | ✅ "A sua sessão terminou neste aparelho" com "Entrar" já na conta; distingue-se do "Sair" da própria pessoa, também noutro separador (`livraria_saida`) |
+| 144 | Todos (telemóvel) | **A app aberta ficava na versão antiga.** Com publicações várias vezes por dia e a app semanas em segundo plano, só um erro ao mudar de página (`staleChunkReload`) a fazia recarregar. | Média | ✅ `version.json` em cada build (`scripts/app-version.mjs`, sem cache no Cloudflare nem no service worker); a app compara ao abrir, ao voltar ao ecrã e de 30 em 30 min: "Nova versão da app disponível — Actualizar"; depois, "App actualizada" com "Ver novidades" |
+| 145 | Gestor | Não havia forma de dizer aos clientes o que mudou nem de os avisar todos: o push só servia encomendas, atendimento e comunidade, a uma pessoa de cada vez. | — | ✅ Sistema → **Versões da app** (`manage_settings`): escrever, publicar em `/novidades` e "Avisar todos por push" (uma vez por novidade, só publicada); envio em lotes pela Edge Function; cada aparelho pode desligar só as novidades (perfil) |
+
+### Verificado sem problemas
+
+- **Base de dados** (`versoes.mjs`, 39): só quem tem "Configurações" escreve; o cliente, o anónimo e
+  quem só gere encomendas não; as colunas do envio (`push_*`) e o autor não se escrevem pela API;
+  título, notas e versão validados e limpos; o público só lê as publicadas, pela função
+  `app_releases_published` (sem o progresso do envio nem quem escreveu), no máximo 50; as agendadas
+  só aparecem na data; anunciada por push, não volta a rascunho nem se apaga, mas o texto corrige-se;
+  sem publicar não se anuncia (nem o servidor); o pedido de aviso fica no registo de segurança com
+  quem pediu; o progresso soma os lotes; o agendador acorda a Edge Function enquanto um envio não
+  acaba, e não por um parado há mais de 2 dias.
+- **Envio por push** (`releasePush.ts`, com testes): lotes de 150 por ordem do `id` das
+  subscrições, 10 em paralelo; o lote é reservado antes de enviar (o cursor só avança se ainda for
+  o que se leu), por isso o botão e o agendador ao mesmo tempo não enviam o mesmo lote duas vezes;
+  aparelhos que já não existem (404/410) são apagados. O primeiro lote sai logo, os seguintes de 2
+  em 2 minutos (cerca de 75 aparelhos por minuto).
+
+### Limites que ficam
+
+- Safari (iPhone) e Firefox não têm a Credential Management API: lá não há entrada automática com
+  a palavra-passe guardada (fica a sessão, que já não cai, e o preenchimento do teclado).
+- No iPhone, a app instalada no ecrã inicial tem armazenamento próprio: na primeira vez que se abre
+  a app instalada, entra-se uma vez. Push no iPhone só com a app instalada (iOS 16.4+).
+- Quem entra com a Google não tem entrada silenciosa (seria um redireccionamento à Google ao abrir).
+- Um lote interrompido a meio (a função parada pelo limite de tempo) não é repetido: os aparelhos
+  que faltavam desse lote ficam sem o aviso. Preferiu-se nunca enviar duas vezes.
+- `lastRefreshFailure` é interno do auth-js 2.11x: se mudar de nome, fica a tentativa normal do
+  supabase-js, de minuto a minuto (o resto não depende dele).
+
+### Ordem de publicação
+
+A migração `20261108150000_versoes_da_app` e a Edge Function vão juntas com o merge. O site novo
+funciona antes delas: a página `/novidades` diz que ainda não há novidades, o painel explica que
+falta a migração, e o aviso de versão nova não precisa de nada do servidor (só do `version.json`
+do próprio build).

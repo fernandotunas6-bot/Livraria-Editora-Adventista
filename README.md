@@ -229,6 +229,7 @@ Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 | `/chat`, `/chat/config` | POST/GET | Assistente (Gemini/DeepSeek ou FAQ) |
 | `/contacts/*` | — | CRM: sincronização, notificações e campanhas (staff) |
 | `/admin/users*` | GET/POST | Utilizadores e clientes: listar, criar, editar, suspender, link de acesso, apagar (permissão `manage_users`) |
+| `/admin/releases/notify`, `/admin/releases/devices` | POST/GET | Versões da app: avisar por push todos os aparelhos das novidades publicadas (permissão `manage_settings`) |
 
 O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), implementada sobre o Supabase em `app/web/src/lib/dataClient.js`.
 
@@ -245,6 +246,7 @@ O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), i
 - **Selector geográfico** — províncias, municípios e localidades de Angola (com fallback offline)
 - **Tema da loja** — cores de marca, glass morphism e fundos gradiente/imagem/vídeo/slides
 - **PWA** — instalável no telemóvel com manifest e service worker
+- **Telemóvel** — a sessão não cai ao abrir sem rede, a app entra sozinha com a palavra-passe guardada no navegador (Chrome/Android), o ecrã de entrada identifica a conta lembrada, e a app avisa quando há uma versão nova; as novidades de cada versão ficam em `/novidades` e podem ser anunciadas por push a todos os aparelhos (painel → Versões da app)
 - **Permissões** — roles `admin`, `manager` e `member` com controlo granular no admin
 
 ---

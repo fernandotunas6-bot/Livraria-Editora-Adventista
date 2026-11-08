@@ -2,6 +2,38 @@
 
 Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Telemóvel: entrar ao abrir a app, conta identificada e versões (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
+
+- **Pedido do dono:** "focar no mobile: auto login quando o aplicativo é aberto, identificar a conta
+  registada a preencher, notificações push de actualização de versões". Achados 136–145 em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.17**; o funcionamento da entrada em
+  [AUTENTICACAO_E_EMAILS.md](AUTENTICACAO_E_EMAILS.md), secção 1 ("No telemóvel…").
+- **Entrar ao abrir a app:** a sessão já ficava guardada, mas abrir a app **sem rede** mais de uma
+  hora depois tirava a pessoa da conta (achado 136) e, com rede fraca, a conta ficava 8 s a
+  "verificar a sessão". Agora a conta aparece logo e só sai quando o servidor recusa a sessão. No
+  Chrome/Android, a app pede ao navegador que guarde a palavra-passe e, sem sessão, entra sozinha
+  com ela (uma vez por arranque; nunca depois de "Sair" nem de "Terminar em todos os aparelhos").
+  Regras em `lib/authSession.js` e `lib/savedCredentials.js`; ligação em `lib/dataClient.js` e
+  `hooks/useAuth.jsx`.
+- **Conta identificada:** "Bem-vindo de volta, Maria" no `/login` e no modal, com o caminho com que
+  entrou da última vez (palavra-passe com o gestor do navegador a preencher, ou a Google já na
+  conta certa); "Não é Maria?" esquece-a. Registo com um email que já tem conta passa a "Entrar"
+  (antes: "enviámos um link" que nunca chegava).
+- **Versões:** cada build escreve `/version.json` (`scripts/app-version.mjs`); a app aberta avisa
+  "Nova versão da app disponível — Actualizar" (ao abrir, ao voltar ao ecrã, de 30 em 30 min).
+  Painel → Sistema → **Versões da app**: escrever o que mudou, publicar em `/novidades` e, se valer a
+  pena, **avisar todos os aparelhos por push** (uma vez por novidade; a Edge Function envia em lotes
+  e o agendador `avisos-equipa` continua). No perfil, cada aparelho pode desligar só as novidades.
+- **Base de dados:** migração `20261108150000_versoes_da_app`, **por aplicar** (vai no merge, com a
+  Edge Function: rotas `/admin/releases/notify` e `/admin/releases/devices`, `app_updates` no
+  `/push/subscribe`, novidades no `/cron/staff-dispatch`). Cenários: `scripts/pglite/versoes.mjs` (39).
+- **Como se testou:** build de produção num Chromium com perfil de telemóvel (Playwright), Supabase
+  simulado na rede (20 verificações, entre elas abrir o perfil sem rede com o token expirado);
+  PGlite com as 100 migrações; `npm test` (1368), lint, build, `deno check`.
+- **Para o dono:** nada obrigatório. Para anunciar uma versão: painel → Versões da app → "Novas
+  novidades" → Publicar → "Avisar todos por push" (precisa do push ligado, como já está). Guardar o
+  push para mudanças que interessam aos clientes: cada aviso chega a todos.
+
 ## Análise por perfil: visitante, cliente, funcionário e gestor (2026-11-08, ramo `claude/nifty-archimedes-44rw4k`)
 
 - **Pedido do dono:** "análise crítica e de estética em todo o sistema e adicionar o que falta na
