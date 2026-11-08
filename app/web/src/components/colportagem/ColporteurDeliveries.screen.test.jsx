@@ -88,6 +88,15 @@ describe('área do colportor: entregas', () => {
     expect(api.deliveryStep).not.toHaveBeenCalled(); // sem assinatura não segue
   });
 
+  it('no histórico, diz porque é que a entrega fechou', async () => {
+    api.loadMyDeliveries.mockResolvedValue({ ...MINE, deliveries: [
+      { id: 'h2', status: 'cancelled', order_number: 'ENC-7', place: 'Viana', fee: 1500, reason: 'A encomenda deixou de estar paga.' },
+    ] });
+    const el = await mount(<ColporteurDeliveries />);
+    expect(el.textContent).toContain('A encomenda deixou de estar paga.');
+    expect(el.textContent).not.toContain(`+${kz(1500)}`);
+  });
+
   it('sem localização, explica e oferece registá-la; histórico com o ganho', async () => {
     api.loadMyDeliveries.mockResolvedValue(MINE);
     const el = await mount(<ColporteurDeliveries />);
