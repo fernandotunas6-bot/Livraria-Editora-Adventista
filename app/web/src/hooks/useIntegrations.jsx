@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import pb from '@/lib/dataClient';
 import { APP_API_URL } from '@/lib/supabaseClient';
+import { DAY_MS, readCache, writeCache } from '@/lib/localCache';
+
+// As integrações activas (públicas: que botões e serviços o site mostra) da última visita, até 7
+// dias: quem volta não espera pela Edge Function para ver o botão do WhatsApp, por exemplo.
+const CACHE_KEY = 'integracoes:v1';
 
 const IntegrationsContext = createContext({
   integrations: {},
@@ -11,7 +16,7 @@ const IntegrationsContext = createContext({
 
 
 export function IntegrationsProvider({ children }) {
-  const [integrations, setIntegrations] = useState({});
+  const [integrations, setIntegrations] = useState(() => readCache(CACHE_KEY, 7 * DAY_MS) || {});
   const [driveImageConfig, setDriveImageConfig] = useState({ enabled: false });
   const [loading, setLoading] = useState(true);
 
@@ -20,8 +25,11 @@ export function IntegrationsProvider({ children }) {
   const refresh = useCallback(async ({ fresh = false } = {}) => {
     try {
       const res = await fetch(`${APP_API_URL}/integrations`, fresh ? { cache: 'no-cache' } : undefined);
-      const data = res.ok ? await res.json() : {};
-      setIntegrations(data.integrations || {});
+      const data = res.ok ? await res.json() : null;
+      if (data) {
+        setIntegrations(data.integrations || {});
+        writeCache(CACHE_KEY, data.integrations || {});
+      }
 
       // Só a equipa usa a configuração do Drive (e só a ela a rota responde): um cliente com
       // sessão fazia um pedido a mais em cada página, sempre recusado.
@@ -40,7 +48,7 @@ export function IntegrationsProvider({ children }) {
         setDriveImageConfig({ enabled: false });
       }
     } catch {
-      setIntegrations({});
+      // Sem rede: fica a cópia guardada (ou nada).
       setDriveImageConfig({ enabled: false });
     } finally {
       setLoading(false);
