@@ -234,5 +234,25 @@ check('prazo: sexta 17h50 + 2 h de funcionamento = sábado 9h50', prazo === '202
 const prazo2 = (await q(`select to_char(private.business_deadline('2026-11-07 17:00:00+01', 120) at time zone 'Africa/Luanda', 'YYYY-MM-DD HH24:MI') p`))[0].p;
 check('prazo: sábado 17h + 2 h, domingo fechado = segunda 9h', prazo2 === '2026-11-09 09:00', prazo2);
 
+// 8. Quadro das entregas para a equipa ----------------------------------------------------------------
+const quadro = (await asUser(admin, `select public.colporteur_deliveries_board(30) b`))[0].b;
+const emCurso = (await q(`select count(*)::int n from public.colporteur_deliveries where status in ('offered', 'accepted')`))[0].n;
+check('quadro: todas as entregas em curso', quadro.active.length === emCurso && emCurso > 0, { quadro: quadro.active.length, emCurso });
+const ordem = quadro.active.map((x) => x.sort[0]).join('');
+check('quadro: primeiro as por preparar, depois as à espera, depois as que estão com o colportor', ordem === [...ordem].sort().join(''), ordem);
+const comEquipa = (await q(`select count(*)::int n from public.orders where delivery_route = 'loja'
+  and coalesce(status, '') not in ('cancelled', 'delivered') and coalesce(delivery_status, '') not in ('cancelled', 'delivered')`))[0].n;
+check('quadro: as encomendas que ficaram com a equipa', quadro.to_team.length === comEquipa && comEquipa > 0, { comEquipa, n: quadro.to_team.length });
+check('quadro: com o motivo de terem ficado com a equipa', quadro.to_team.some((x) => x.reason), quadro.to_team);
+const feitas = (await q(`select count(*)::int n, coalesce(sum(fee), 0)::float s from public.colporteur_deliveries where status = 'delivered'`))[0];
+check('quadro: entregas e ganhos do período', quadro.totals.delivered === feitas.n && Number(quadro.totals.fees) === feitas.s && feitas.n > 0, { t: quadro.totals, feitas });
+check('quadro: por colportor soma o total', quadro.by_colporteur.reduce((s, x) => s + x.delivered, 0) === quadro.totals.delivered
+  && quadro.by_colporteur.reduce((s, x) => s + x.offered, 0) === quadro.totals.offered);
+check('quadro: sem os dados do cliente', !quadro.active.some((x) => x.customer) && !JSON.stringify(quadro).includes('923000000'));
+const vazio = (await asUser(admin, `select public.colporteur_deliveries_board(0) b`))[0].b;
+check('quadro: o período fica entre 1 e 366 dias', vazio.days === 1 && (await asUser(admin, `select public.colporteur_deliveries_board(9999) b`))[0].b.days === 366);
+await raises('quadro: o cliente não vê', () => asUser(cliente, `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
+await raises('quadro: o colportor não vê', () => asUser(perfil['CPT-0002'], `select public.colporteur_deliveries_board(30)`), /Sem acesso/);
+
 console.log(`\n${ok} cenários certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);

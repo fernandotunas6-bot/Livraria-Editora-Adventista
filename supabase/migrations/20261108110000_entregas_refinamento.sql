@@ -246,3 +246,102 @@ begin
   return jsonb_build_object('order_id', v_o.id, 'step', p_step, 'next', v_next, 'document_id', v_doc, 'ledger_id', v_ledger);
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Quadro das entregas para a equipa (painel → Colportagem → Entregas).
+-- Antes só se viam encomenda a encomenda. Agora há:
+--   - 'active': as ofertas à espera e as entregas aceites, por esta ordem: primeiro as que a equipa
+--     tem de preparar (livros da loja ainda por entregar ao colportor), depois as à espera de
+--     resposta, depois as que estão com o colportor;
+--   - 'to_team': as encomendas que ficaram com a equipa (ninguém aceitou, ou foram retiradas) e
+--     ainda não estão entregues;
+--   - 'by_colporteur' e 'totals': nos últimos p_days dias, ofertas, entregas, recusas, sem
+--     resposta, devolvidas e o que cada um ganhou.
+-- Sem dados do cliente além da zona: para o resto, abre-se a encomenda.
+-- ---------------------------------------------------------------------------
+create or replace function public.colporteur_deliveries_board(p_days integer default 30)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_days integer := least(greatest(coalesce(p_days, 30), 1), 366);
+  v_since timestamptz := now() - make_interval(days => least(greatest(coalesce(p_days, 30), 1), 366));
+begin
+  if not (private.has_permission('manage_orders') or private.can_manage_colporteurs()) then
+    raise exception 'Sem acesso.' using errcode = '42501';
+  end if;
+  return jsonb_build_object(
+    'days', v_days,
+    'active', coalesce((
+      select jsonb_agg(x order by x ->> 'sort') from (
+        select jsonb_build_object(
+          'sort', case when d.status = 'accepted' and d.source = 'loja' and d.picked_up_at is null then '0'
+                       when d.status = 'offered' then '1' else '2' end || to_char(d.offered_at, 'YYYYMMDDHH24MISS'),
+          'id', d.id, 'status', d.status, 'source', d.source, 'has_stock', d.has_stock, 'fee', d.fee,
+          'distance_km', d.distance_km, 'match_level', d.match_level, 'offered_at', d.offered_at,
+          'expires_at', d.expires_at, 'responded_at', d.responded_at, 'picked_up_at', d.picked_up_at,
+          'order_id', o.id, 'order_number', coalesce(nullif(o.order_number, ''), o.id),
+          'delivery_status', o.delivery_status, 'place', private.order_place(o),
+          'items', (select coalesce(sum(greatest(coalesce((it ->> 'quantity')::int, 1), 0)), 0)::int
+                    from jsonb_array_elements(case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end) it),
+          'colporteur', jsonb_build_object('id', c.id, 'name', c.full_name, 'code', c.code, 'phone', c.phone)
+        ) as x
+        from public.colporteur_deliveries d
+        join public.orders o on o.id = d.order_id
+        join public.colporteurs c on c.id = d.colporteur_id
+        where d.status in ('offered', 'accepted')
+      ) s), '[]'::jsonb),
+    'to_team', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'order_id', o.id, 'order_number', coalesce(nullif(o.order_number, ''), o.id),
+          'delivery_status', o.delivery_status, 'place', private.order_place(o),
+          'reason', (select d.reason from public.colporteur_deliveries d where d.order_id = o.id
+                     order by coalesce(d.closed_at, d.offered_at) desc limit 1)
+        ) order by o.created)
+      from (
+        select * from public.orders o
+        where o.delivery_route = 'loja'
+          and coalesce(o.status, '') not in ('cancelled', 'delivered')
+          and coalesce(o.delivery_status, '') not in ('cancelled', 'delivered')
+        order by o.created
+        limit 100
+      ) o), '[]'::jsonb),
+    'by_colporteur', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'id', s.id, 'name', s.full_name, 'code', s.code, 'offered', s.offered, 'delivered', s.delivered,
+          'declined', s.declined, 'expired', s.expired, 'released', s.released, 'active', s.active, 'fees', s.fees
+        ) order by s.delivered desc, s.offered desc, s.full_name)
+      from (
+        select c.id, c.full_name, c.code,
+          count(*) filter (where d.offered_at >= v_since)::int as offered,
+          count(*) filter (where d.status = 'delivered' and d.delivered_at >= v_since)::int as delivered,
+          count(*) filter (where d.status = 'declined' and d.offered_at >= v_since)::int as declined,
+          count(*) filter (where d.status = 'expired' and d.offered_at >= v_since)::int as expired,
+          count(*) filter (where d.status = 'released' and d.offered_at >= v_since)::int as released,
+          count(*) filter (where d.status in ('offered', 'accepted'))::int as active,
+          coalesce(sum(d.fee) filter (where d.status = 'delivered' and d.delivered_at >= v_since), 0) as fees
+        from public.colporteur_deliveries d
+        join public.colporteurs c on c.id = d.colporteur_id
+        where d.offered_at >= v_since or d.delivered_at >= v_since or d.status in ('offered', 'accepted')
+        group by c.id, c.full_name, c.code
+      ) s), '[]'::jsonb),
+    'totals', (
+      select jsonb_build_object(
+        'offered', count(*) filter (where d.offered_at >= v_since),
+        'delivered', count(*) filter (where d.status = 'delivered' and d.delivered_at >= v_since),
+        'declined', count(*) filter (where d.status = 'declined' and d.offered_at >= v_since),
+        'expired', count(*) filter (where d.status = 'expired' and d.offered_at >= v_since),
+        'released', count(*) filter (where d.status = 'released' and d.offered_at >= v_since),
+        'fees', coalesce(sum(d.fee) filter (where d.status = 'delivered' and d.delivered_at >= v_since), 0),
+        -- Encomendas (não ofertas) que foram a um colportor e acabaram entregues por um.
+        'orders_offered', count(distinct d.order_id) filter (where d.offered_at >= v_since),
+        'orders_by_colporteur', count(distinct d.order_id) filter (where d.status = 'delivered' and d.delivered_at >= v_since))
+      from public.colporteur_deliveries d)
+  );
+end;
+$$;
+revoke all on function public.colporteur_deliveries_board(integer) from public, anon;
+grant execute on function public.colporteur_deliveries_board(integer) to authenticated;
