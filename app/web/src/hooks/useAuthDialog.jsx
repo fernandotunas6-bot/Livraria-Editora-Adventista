@@ -1,10 +1,12 @@
 import React, { Suspense, createContext, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import pb from '@/lib/dataClient';
 import { currentPathWithQuery, safeInternalPath } from '@/lib/authSession';
 import {
   HAD_ACCOUNT_KEY, NUDGE_KEY, NUDGE_SESSION_KEY, VIEWS_SESSION_KEY,
-  dismissNudge, nudgeMode, readHadAccount, readNudgeState, safeStorage, shouldNudge,
+  dismissNudge, hadAccountValue, isExcludedPath, nudgeMode, readHadAccount, readNudgeState, safeStorage, shouldNudge,
 } from '@/lib/authPrompt';
 
 // O modal só é descarregado na primeira vez que abre: quem entra para ver um livro não paga
@@ -54,6 +56,8 @@ export function AuthDialogProvider({ children }) {
       reason: opts.reason || '',
       defaultEmail: opts.defaultEmail || remembered?.email || '',
       defaultName: opts.defaultName || '',
+      // O formulário só a mostra se for a conta do email pedido (AuthForm).
+      remembered,
       source: opts.source || 'manual',
       key: Date.now(),
     });
@@ -70,12 +74,30 @@ export function AuthDialogProvider({ children }) {
     setRequest(null);
   }, [local]);
 
-  // Lembrar que este navegador já teve conta, para da próxima vez dizer "Entrar" e preencher
-  // o email. Só o email: nada que dê acesso.
+  // Lembrar a conta que entrou neste navegador, para da próxima vez a identificar: o email, o
+  // nome e como entrou (palavra-passe ou Google). Nada que dê acesso (lib/authPrompt.js).
   useEffect(() => {
     if (!user?.email || !local) return;
-    local.setItem(HAD_ACCOUNT_KEY, JSON.stringify({ email: String(user.email).toLowerCase() }));
-  }, [user?.email, local]);
+    const value = hadAccountValue(
+      { email: user.email, name: user.name || '', provider: pb.authStore.method },
+      local.getItem(HAD_ACCOUNT_KEY),
+    );
+    if (value) local.setItem(HAD_ACCOUNT_KEY, value);
+  }, [user?.email, user?.name, local]);
+
+  // A sessão terminou sem a pessoa sair (noutro aparelho, palavra-passe mudada): dizer-lhe, com
+  // "Entrar" já na conta dela. Antes ficava sem sessão sem perceber porquê.
+  useEffect(() => pb.authStore.onSessionEnded((shown) => {
+    toast('A sua sessão terminou neste aparelho', {
+      id: 'sessao-terminou',
+      description: 'Entre de novo para continuar.',
+      duration: 12000,
+      // No perfil, no painel e na entrada a própria página já pede para entrar.
+      action: isExcludedPath(window.location.pathname)
+        ? undefined
+        : { label: 'Entrar', onClick: () => openAuth({ mode: 'login', reason: 'session-ended', defaultEmail: shown?.email || '' }) },
+    });
+  }), [openAuth]);
 
   // Com sessão, o modal não tem razão de estar aberto (ex.: voltou da Google noutro separador).
   useEffect(() => {

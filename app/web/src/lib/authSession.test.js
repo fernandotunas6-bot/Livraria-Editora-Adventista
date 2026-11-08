@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createReadyGate, currentPathWithQuery, safeInternalPath, sessionDecision } from '@/lib/authSession';
+import {
+  authEventAction, authReturnInUrl, createReadyGate, currentPathWithQuery, readSignOut, safeInternalPath, sessionDecision, sessionMethod, signOutReason,
+} from '@/lib/authSession';
 
 describe('createReadyGate', () => {
   const noTimer = () => {};
@@ -131,5 +133,96 @@ describe('sessionDecision', () => {
     expect(sessionDecision({ ready: true, isAuthed: true, allowed: true })).toBe('allow');
     // Sem `allowed`, a página só exige sessão (é o caso de `/profile`).
     expect(sessionDecision({ ready: true, isAuthed: true })).toBe('allow');
+  });
+});
+
+describe('authEventAction', () => {
+  const stored = { access_token: 'velho', refresh_token: 'r1', user: { id: 'u1' } };
+
+  it('com sessão no aviso, entra', () => {
+    expect(authEventAction('INITIAL_SESSION', { user: { id: 'u1' } }, stored)).toBe('signed-in');
+    expect(authEventAction('TOKEN_REFRESHED', { user: { id: 'u1' } }, null)).toBe('signed-in');
+  });
+
+  it('ao abrir sem rede, com a sessão ainda guardada, mantém a conta à vista', () => {
+    // O supabase-js avisa INITIAL_SESSION sem sessão quando a renovação falha por falta de rede,
+    // mas deixa a sessão guardada para tentar de novo.
+    expect(authEventAction('INITIAL_SESSION', null, stored)).toBe('keep');
+  });
+
+  it('sem nada guardado, ou quando o servidor termina a sessão, sai', () => {
+    expect(authEventAction('INITIAL_SESSION', null, null)).toBe('signed-out');
+    expect(authEventAction('INITIAL_SESSION', null, { access_token: 'x', user: { id: 'u1' } })).toBe('signed-out');
+    // SIGNED_OUT só chega depois de o supabase-js apagar a sessão: nunca se mantém.
+    expect(authEventAction('SIGNED_OUT', null, stored)).toBe('signed-out');
+  });
+});
+
+describe('sessionMethod', () => {
+  const token = (payload) => {
+    const b64 = (o) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o))))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `${b64({ alg: 'HS256' })}.${b64(payload)}.assinatura`;
+  };
+
+  it('lê como se entrou do `amr` do token', () => {
+    expect(sessionMethod(token({ amr: [{ method: 'password', timestamp: 1 }] }))).toBe('email');
+    expect(sessionMethod(token({ amr: [{ method: 'oauth', timestamp: 1 }] }))).toBe('google');
+    expect(sessionMethod(token({ amr: [{ method: 'recovery', timestamp: 1 }] }))).toBe('email');
+  });
+
+  it('a verificação em dois passos não esconde o método principal', () => {
+    expect(sessionMethod(token({ amr: [{ method: 'totp', timestamp: 9 }, { method: 'oauth', timestamp: 5 }] }))).toBe('google');
+  });
+
+  it('o mais recente ganha', () => {
+    expect(sessionMethod(token({ amr: [{ method: 'oauth', timestamp: 1 }, { method: 'password', timestamp: 2 }] }))).toBe('email');
+  });
+
+  it('nomes com acentos no token não estragam a leitura', () => {
+    expect(sessionMethod(token({ user_metadata: { name: 'Conceição Lôbo' }, amr: [{ method: 'password', timestamp: 1 }] }))).toBe('email');
+  });
+
+  it('sem token, token estragado ou método desconhecido, não sabe', () => {
+    for (const t of ['', null, 'abc', 'a.b.c', token({}), token({ amr: [{ method: 'magiclink', timestamp: 1 }] })]) {
+      expect(sessionMethod(t), String(t)).toBe('');
+    }
+  });
+});
+
+describe('signOutReason', () => {
+  const NOW = 1_000_000;
+
+  it('um "Sair" de há poucos segundos foi da pessoa (este ou outro separador)', () => {
+    expect(signOutReason(JSON.stringify({ reason: 'user', at: NOW - 2000 }), NOW)).toBe('user');
+  });
+
+  it('sem "Sair" recente, foi o servidor que terminou a sessão', () => {
+    expect(signOutReason(null, NOW)).toBe('ended');
+    expect(signOutReason(JSON.stringify({ reason: 'user', at: NOW - 5 * 60_000 }), NOW)).toBe('ended');
+    expect(signOutReason(JSON.stringify({ reason: 'ended', at: NOW }), NOW)).toBe('ended');
+    expect(signOutReason('lixo', NOW)).toBe('ended');
+  });
+
+  it('readSignOut só aceita as duas razões', () => {
+    expect(readSignOut('{"reason":"user","at":5}')).toEqual({ reason: 'user', at: 5 });
+    expect(readSignOut('{"reason":"outra"}')).toBeNull();
+    expect(readSignOut(null)).toBeNull();
+  });
+});
+
+describe('authReturnInUrl', () => {
+  it('reconhece o regresso de uma entrada', () => {
+    expect(authReturnInUrl('https://loja.ao/profile#access_token=a&refresh_token=b&type=bearer')).toBe(true);
+    expect(authReturnInUrl('https://loja.ao/profile?code=abc')).toBe(true);
+    expect(authReturnInUrl('https://loja.ao/reset-password#type=recovery&x=1')).toBe(true);
+    expect(authReturnInUrl('https://loja.ao/login#error=access_denied&error_code=otp_expired')).toBe(true);
+  });
+
+  it('um endereço normal não é regresso de entrada', () => {
+    expect(authReturnInUrl('https://loja.ao/profile?tab=orders')).toBe(false);
+    expect(authReturnInUrl('https://loja.ao/shop?c=CPT-0007#topo')).toBe(false);
+    expect(authReturnInUrl('https://loja.ao/shop?barcode=123')).toBe(false);
+    expect(authReturnInUrl('não é endereço')).toBe(false);
   });
 });

@@ -53,6 +53,7 @@ export default function AuthDialog({ request, returnPath, onOpenChange, onDone }
               initialMode={request.mode}
               defaultEmail={request.defaultEmail}
               defaultName={request.defaultName}
+              remembered={request.remembered}
               returnPath={returnPath}
               onModeChange={setMode}
               onDone={onDone}

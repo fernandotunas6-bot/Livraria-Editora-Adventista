@@ -21,10 +21,18 @@ const LoginPage = () => {
   // ?modo=registo abre já no registo (links de campanhas, do email de boas-vindas, etc.).
   const [mode, setMode] = useState(() => (new URLSearchParams(location.search).get('modo') === 'registo' ? 'signup' : 'login'));
   const { ready, isAuthed, user } = useAuth();
-  // O último email escrito nesta sessão, ou o da última conta que entrou neste navegador.
+  // A última conta que entrou neste navegador (para a identificar: "Bem-vindo de volta, Maria")
+  // e o último email escrito nesta sessão.
+  const [remembered] = useState(() => {
+    try {
+      return readHadAccount(localStorage.getItem(HAD_ACCOUNT_KEY));
+    } catch {
+      return null;
+    }
+  });
   const [defaultEmail] = useState(() => {
     try {
-      return sessionStorage.getItem('livraria_login_email') || readHadAccount(localStorage.getItem(HAD_ACCOUNT_KEY))?.email || '';
+      return sessionStorage.getItem('livraria_login_email') || remembered?.email || '';
     } catch {
       return '';
     }
@@ -98,6 +106,8 @@ const LoginPage = () => {
               <AuthForm
                 initialMode={mode}
                 defaultEmail={defaultEmail}
+                remembered={remembered}
+                autoFocus
                 returnPath={redirectTo || '/profile'}
                 onModeChange={setMode}
                 onDone={afterAuthNavigate}
