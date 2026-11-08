@@ -49,8 +49,11 @@ const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
 const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
 const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx'));
 const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
+const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
+// "Nova versão disponível — Actualizar" e "App actualizada" (lib/appVersion.js).
+const AppUpdateNotice = lazy(() => import('@/components/AppUpdateNotice.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
 
 function PageLoader() {
@@ -179,6 +182,7 @@ function GlobalWidgets() {
 
   return (
     <Suspense fallback={null}>
+      <AppUpdateNotice />
       <PwaInstallBanner />
       {showAssistant && <LivrariaAssistant />}
       <MobileBottomNav />
@@ -239,6 +243,8 @@ function App() {
               <Route path="/comunidade/p/:id" element={<CommunityPostPage />} />
               <Route path="/comunidade/leitor/:key" element={<ReaderProfilePage />} />
               <Route path="/materiais" element={<MaterialsPage />} />
+              <Route path="/novidades" element={<NovidadesPage />} />
+              <Route path="/versoes" element={<Navigate to="/novidades" replace />} />
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />

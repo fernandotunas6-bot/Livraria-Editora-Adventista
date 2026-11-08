@@ -47,7 +47,7 @@ import { Switch } from '@/components/ui/switch';
 import { getPaymentMethods } from '@/api/PlatformApi';
 import { getProduct } from '@/api/EcommerceApi';
 import { isPaidUpfront } from '@/lib/paymentMethods';
-import { isPushSupported, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
+import { appUpdatesWanted, isPushSupported, setAppUpdatesPush, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
 import { ROLES } from '@/lib/permissions';
 import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
 import { kwanza } from '@/lib/money';
@@ -179,6 +179,18 @@ const ProfilePage = () => {
     () => typeof Notification !== 'undefined' && Notification.permission === 'granted'
   );
   const [movingToCart, setMovingToCart] = useState('');
+  const [appUpdates, setAppUpdates] = useState(() => appUpdatesWanted());
+
+  const handleAppUpdatesToggle = async (enabled) => {
+    setAppUpdates(enabled);
+    try {
+      await setAppUpdatesPush(settings?.vapid_public_key, enabled);
+      toast({ title: enabled ? 'Novidades da app ligadas' : 'Novidades da app desligadas', description: enabled ? undefined : 'Os avisos das encomendas continuam.' });
+    } catch (err) {
+      setAppUpdates(!enabled);
+      toast({ variant: 'destructive', title: 'Erro', description: err.message });
+    }
+  };
 
   const handlePushToggle = async (enabled) => {
     if (!isPushSupported()) {
@@ -591,6 +603,21 @@ const ProfilePage = () => {
                           disabled={pushLoading || !settings?.push_enabled}
                           onCheckedChange={handlePushToggle}
                           aria-label="Activar notificações neste aparelho"
+                        />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border p-3">
+                        <div>
+                          <p className="text-sm font-medium">Novidades da app</p>
+                          <p className="text-xs text-muted-foreground">
+                            Um aviso quando sai uma versão nova com novidades.{' '}
+                            <Link to="/novidades" className="font-medium text-primary hover:underline">Ver as novidades</Link>
+                          </p>
+                        </div>
+                        <Switch
+                          checked={pushEnabled && appUpdates}
+                          disabled={pushLoading || !pushEnabled}
+                          onCheckedChange={handleAppUpdatesToggle}
+                          aria-label="Receber as novidades da app neste aparelho"
                         />
                       </div>
                     </div>

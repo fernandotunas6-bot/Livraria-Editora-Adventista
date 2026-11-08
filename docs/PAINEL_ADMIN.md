@@ -183,6 +183,7 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | | Registo da Igreja (`igreja`) | `manage_church_registry` ou `manage_colporteurs` |
 | Sistema | Configurações (`settings`) | `manage_settings` |
 | | Faixa de aviso (`notices`) | `manage_settings` ou `manage_marketing` |
+| | Versões da app (`versoes`): as novidades em `/novidades` e o aviso por push a todos os aparelhos | `manage_settings` |
 | | Integrações (`apps`), Registo de segurança (`seguranca`) | administrador |
 
 ### 3.1 Números ao lado das secções

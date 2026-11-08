@@ -1,13 +1,15 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff, MailCheck } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff, MailCheck, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import UserAvatar from '@/components/UserAvatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { validateAuthForm } from '@/lib/authPrompt';
+import { HAD_ACCOUNT_KEY, rememberedFirstName, validateAuthForm } from '@/lib/authPrompt';
+import { normalizeLoginEmail } from '@/lib/pbAuth';
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 mr-2 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -25,21 +27,34 @@ const GoogleIcon = () => (
  * a divergir. Quem usa decide o que acontece a seguir em `onDone(record)`: a página navega, o
  * modal fecha e a pessoa fica onde estava.
  *
+ * Com uma conta lembrada neste aparelho (`remembered`, de `lib/authPrompt.js`), a entrada
+ * identifica-a: em vez do campo de email aparece "Bem-vindo de volta, Maria" com o email, e o
+ * caminho com que ela entrou da última vez — a palavra-passe (o gestor do navegador preenche-a,
+ * porque o email segue num campo `username` escondido) ou a Google, já na conta certa
+ * (`login_hint`). "Não é você?" esquece a conta neste aparelho e mostra o formulário de sempre.
+ *
  * @param {object} p
  * @param {'login'|'signup'} [p.initialMode]
  * @param {string} [p.defaultEmail]
  * @param {string} [p.defaultName]
+ * @param {{ email: string, name: string, provider: string } | null} [p.remembered]
+ * @param {boolean} [p.autoFocus]  pôr o cursor no campo certo ao abrir (a página /login)
  * @param {string} p.returnPath  para onde a Google devolve a pessoa
  * @param {(record: object) => void} p.onDone
  * @param {(mode: string) => void} [p.onModeChange]
  * @param {() => void} [p.onNavigateAway]  ao seguir um link (ex.: "Esqueceu?")
  */
 export default function AuthForm({
-  initialMode = 'login', defaultEmail = '', defaultName = '', returnPath, onDone, onModeChange, onNavigateAway,
+  initialMode = 'login', defaultEmail = '', defaultName = '', remembered = null, autoFocus = false,
+  returnPath, onDone, onModeChange, onNavigateAway,
 }) {
   const ids = useId();
   const [mode, setModeState] = useState(initialMode);
-  const [email, setEmail] = useState(defaultEmail);
+  // A conta lembrada só conta se for a do email pedido (o pós-compra pede o email da encomenda).
+  const [account, setAccount] = useState(() => (
+    remembered?.email && (!defaultEmail || normalizeLoginEmail(defaultEmail) === remembered.email) ? remembered : null
+  ));
+  const [email, setEmail] = useState(defaultEmail || account?.email || '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState(defaultName);
   const [showPass, setShowPass] = useState(false);
@@ -47,8 +62,28 @@ export default function AuthForm({
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState('');
+  // O registo encontrou uma conta com este email: passa-se a entrar, com o aviso.
+  const [knownAccount, setKnownAccount] = useState('');
+  // Conta da Google: a palavra-passe fica escondida até a pessoa a pedir.
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const passwordRef = useRef(null);
+  const emailRef = useRef(null);
   const { login, signup, loginWithGoogle } = useAuth();
   const { settings } = useSiteSettings();
+
+  const usingAccount = mode === 'login' && !!account;
+  const googleFirst = usingAccount && account.provider === 'google' && !!settings.google_oauth_enabled;
+  const showPasswordForm = !googleFirst || passwordOpen;
+
+  // A página /login põe o cursor onde a pessoa vai escrever: na palavra-passe, se a conta já é
+  // conhecida (e o teclado do telemóvel oferece logo a palavra-passe guardada), senão no email.
+  // No modal não: abre-se também sozinho, e o teclado a saltar por cima da página assusta.
+  useEffect(() => {
+    if (!autoFocus || googleFirst) return;
+    (usingAccount ? passwordRef : emailRef).current?.focus();
+    // Só ao abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const errors = validateAuthForm({ mode, name, email, password });
   const show = (field) => (submitted || touched[field]) && errors[field];
@@ -57,9 +92,23 @@ export default function AuthForm({
   const setMode = (next) => {
     setModeState(next);
     setPendingConfirmation('');
+    setKnownAccount('');
     setSubmitted(false);
     setTouched({});
     onModeChange?.(next);
+  };
+
+  // "Não é você?": esquece a conta neste aparelho (num telemóvel partilhado, o próximo não vê o
+  // nome de quem entrou antes) e volta ao formulário de sempre.
+  const forgetAccount = () => {
+    try { localStorage.removeItem(HAD_ACCOUNT_KEY); } catch { /* sem armazenamento */ }
+    setAccount(null);
+    setEmail('');
+    setPassword('');
+    setPasswordOpen(false);
+    setTouched({});
+    setSubmitted(false);
+    setTimeout(() => emailRef.current?.focus(), 0);
   };
 
   const handleSubmit = async (e) => {
@@ -71,6 +120,17 @@ export default function AuthForm({
     try {
       try { sessionStorage.setItem('livraria_login_email', email.trim()); } catch { /* sem armazenamento */ }
       const authData = mode === 'login' ? await login(email, password) : await signup(email, password, name);
+      if (authData?.alreadyRegistered) {
+        // Este email já tem conta: entrar, com o email preenchido. A palavra-passe escrita no
+        // registo fica — muitas vezes é a mesma.
+        setModeState('login');
+        onModeChange?.('login');
+        setKnownAccount(authData.email);
+        setSubmitted(false);
+        setTouched({});
+        setTimeout(() => passwordRef.current?.focus(), 0);
+        return;
+      }
       if (authData?.needsConfirmation) {
         setPendingConfirmation(authData.email);
         setModeState('login');
@@ -84,8 +144,13 @@ export default function AuthForm({
       }
       onDone?.(authData.record);
     } catch (err) {
+      // Quem criou a conta com a Google não tem palavra-passe: dizer-lhe por onde entrar.
+      const wrong = /incorrect/i.test(err.message || '');
+      const hint = mode === 'login' && wrong && settings.google_oauth_enabled
+        ? ' Se criou a conta com a Google, use «Continuar com Google».'
+        : '';
       toast.error(mode === 'login' ? 'Não foi possível entrar' : 'Não foi possível criar a conta', {
-        description: err.message || 'Verifique o email e a palavra-passe.',
+        description: `${err.message || 'Verifique o email e a palavra-passe.'}${hint}`,
       });
     } finally {
       setLoading(false);
@@ -96,7 +161,7 @@ export default function AuthForm({
     setLoading(true);
     try {
       // Sai para a Google e volta já com a sessão, à página onde a pessoa estava.
-      await loginWithGoogle(returnPath || '/profile');
+      await loginWithGoogle(returnPath || '/profile', { loginHint: usingAccount ? account.email : '' });
     } catch (err) {
       toast.error('Google não disponível', {
         description: err?.message || 'Tente com o email e a palavra-passe.',
@@ -107,6 +172,19 @@ export default function AuthForm({
 
   const field = (key) => `${ids}-${key}`;
   const errorId = (key) => `${ids}-${key}-erro`;
+
+  const googleButton = (label) => (
+    <Button
+      type="button"
+      variant="outline"
+      className="w-full py-6 border-2 hover:bg-muted/50"
+      onClick={handleGoogle}
+      disabled={loading}
+    >
+      <GoogleIcon />
+      {label}
+    </Button>
+  );
 
   return (
     <div>
@@ -120,29 +198,61 @@ export default function AuthForm({
         </div>
       )}
 
-      {settings.google_oauth_enabled && (
-        <>
-          <Button
+      {knownAccount && (
+        <div className="mb-4 flex gap-2 text-xs text-sky-900 dark:text-sky-200 bg-sky-500/10 border border-sky-500/30 rounded-lg p-3" role="status">
+          <UserCheck className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <p>
+            <strong>{knownAccount}</strong> já tem conta. Entre com a palavra-passe
+            {settings.google_oauth_enabled ? ' ou com a Google, se foi assim que a criou' : ''}. Se não se lembra, use "Esqueceu?".
+          </p>
+        </div>
+      )}
+
+      {usingAccount && (
+        <div className="mb-5 rounded-xl border bg-muted/40 p-3" data-conta-lembrada="">
+          <div className="flex items-center gap-3">
+            <UserAvatar user={{ name: account.name, email: account.email }} size="lg" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Bem-vindo de volta, {rememberedFirstName(account)}</p>
+              <p className="truncate text-xs text-muted-foreground">{account.email}</p>
+            </div>
+          </div>
+          {googleFirst && <div className="mt-3">{googleButton('Continuar com Google')}</div>}
+          <button
             type="button"
-            variant="outline"
-            className="w-full py-6 border-2 hover:bg-muted/50"
-            onClick={handleGoogle}
-            disabled={loading}
+            onClick={forgetAccount}
+            className="mt-2 block py-1 text-xs font-medium text-primary hover:underline"
           >
-            <GoogleIcon />
-            Continuar com Google
-          </Button>
+            Não é {rememberedFirstName(account)}? Usar outra conta
+          </button>
+        </div>
+      )}
+
+      {settings.google_oauth_enabled && !googleFirst && (
+        <>
+          {googleButton('Continuar com Google')}
           {mode === 'signup' && (
             <p className="mt-2 text-center text-[11px] text-muted-foreground">O mais rápido: sem palavra-passe nova e sem esperar por email.</p>
           )}
 
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">ou com email</span></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">{usingAccount ? 'ou com a palavra-passe' : 'ou com email'}</span></div>
           </div>
         </>
       )}
 
+      {googleFirst && !passwordOpen && (
+        <button
+          type="button"
+          onClick={() => { setPasswordOpen(true); setTimeout(() => passwordRef.current?.focus(), 0); }}
+          className="mb-1 block w-full py-2 text-center text-xs text-muted-foreground hover:text-foreground"
+        >
+          Entrar com a palavra-passe
+        </button>
+      )}
+
+      {showPasswordForm && (
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {mode === 'signup' && (
           <div className="space-y-1.5">
@@ -151,6 +261,7 @@ export default function AuthForm({
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 id={field('nome')}
+                name="name"
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -165,15 +276,27 @@ export default function AuthForm({
           </div>
         )}
 
+        {usingAccount ? (
+          // O email da conta lembrada segue num campo escondido: é por ele que o gestor de
+          // palavras-passe do navegador sabe de que conta é a palavra-passe que vai preencher.
+          <input type="email" name="email" autoComplete="username" value={account.email} readOnly hidden />
+        ) : (
         <div className="space-y-1.5">
           <Label htmlFor={field('email')}>Email</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Input
+              ref={emailRef}
               id={field('email')}
+              name="email"
               type="email"
               inputMode="email"
-              autoComplete="email"
+              // A entrar, `username`: é o que os gestores de palavras-passe (Chrome, iCloud,
+              // Samsung) procuram para saber que conta preencher. No registo, `email`, para o
+              // teclado sugerir o endereço da pessoa.
+              autoComplete={mode === 'login' ? 'username' : 'email'}
+              autoCapitalize="none"
+              spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={touch('email')}
@@ -185,6 +308,7 @@ export default function AuthForm({
           </div>
           {show('email') && <p id={errorId('email')} className="text-xs text-destructive">{errors.email}</p>}
         </div>
+        )}
 
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
@@ -196,7 +320,9 @@ export default function AuthForm({
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Input
+              ref={passwordRef}
               id={field('senha')}
+              name="password"
               type={showPass ? 'text' : 'password'}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               value={password}
@@ -232,6 +358,7 @@ export default function AuthForm({
           </p>
         )}
       </form>
+      )}
 
       <p className="text-center text-sm text-muted-foreground mt-5">
         {mode === 'login' ? 'Ainda não tem conta?' : 'Já tem conta?'}{' '}

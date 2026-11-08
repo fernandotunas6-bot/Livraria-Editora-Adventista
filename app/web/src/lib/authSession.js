@@ -104,6 +104,110 @@ export function sessionDecision({ ready, isAuthed, allowed = true }) {
   return 'allow';
 }
 
+/**
+ * O que fazer com cada aviso do Supabase Auth (`onAuthStateChange`).
+ *
+ * - `signed-in`  — há sessão: carregar o perfil e mostrar a conta
+ * - `signed-out` — já não há sessão: limpar
+ * - `keep`       — o aviso vem sem sessão, mas a sessão continua guardada: manter a conta à vista
+ *
+ * O `keep` é o caso de quem abre a app no telemóvel com rede fraca ou sem rede, mais de uma hora
+ * depois da última vez. O token de acesso já expirou, a renovação falha por falta de rede, e o
+ * supabase-js avisa `INITIAL_SESSION` sem sessão — mas guarda a sessão, para tentar de novo
+ * quando a rede voltar (só a apaga, e avisa `SIGNED_OUT`, quando o servidor recusa a renovação).
+ * Tratado como "sem sessão", isto tirava a pessoa da conta a cada arranque sem rede: o perfil
+ * mandava para `/login` e o perfil em cache era apagado.
+ *
+ * `stored` é a sessão no armazenamento do navegador, lida no momento do aviso.
+ */
+export function authEventAction(event, session, stored) {
+  if (session?.user) return 'signed-in';
+  if (event === 'INITIAL_SESSION' && stored?.refresh_token && stored?.user?.id) return 'keep';
+  return 'signed-out';
+}
+
+/**
+ * O endereço traz o regresso de uma entrada (a sessão da Google no `#access_token=…`, o código
+ * de um link de email, um erro)? Nesse caso a sessão guardada pode não ser a que vai ficar, e
+ * espera-se pelo supabase-js antes de mostrar a conta.
+ */
+export function authReturnInUrl(href = '') {
+  try {
+    const url = new URL(String(href));
+    const params = `${url.hash.replace(/^#/, '&')}&${url.search.replace(/^\?/, '')}`;
+    return /(^|&)(access_token|refresh_token|code|token_hash|error|error_code)=/.test(params) || /(^|&)type=recovery(&|$)/.test(params);
+  } catch {
+    return false;
+  }
+}
+
+// Métodos de entrada no `amr` do token do Supabase. Os da verificação em dois passos (`totp`,
+// `mfa/…`) vêm depois do principal e não dizem como a pessoa entrou.
+const EMAIL_METHODS = new Set(['password', 'recovery', 'invite', 'email/signup']);
+
+/** Lê o conteúdo de um JWT sem o validar (só para mostrar coisas; quem valida é o servidor). */
+function jwtPayload(token) {
+  const part = String(token || '').split('.')[1];
+  if (!part) return null;
+  const b64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=');
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/**
+ * Como se entrou nesta sessão: `'email'` (palavra-passe), `'google'` ou `''` (não se sabe).
+ * Serve para, da próxima vez, o ecrã de entrada mostrar logo o caminho certo à pessoa.
+ */
+export function sessionMethod(token) {
+  try {
+    const amr = jwtPayload(token)?.amr;
+    if (!Array.isArray(amr)) return '';
+    const primary = amr
+      .filter((a) => a && (a.method === 'oauth' || EMAIL_METHODS.has(a.method)))
+      .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))[0];
+    if (!primary) return '';
+    return primary.method === 'oauth' ? 'google' : 'email';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Como acabou a última sessão neste aparelho: `{ reason: 'user' | 'ended', at }`.
+ *
+ * - `user`  — a pessoa carregou em "Sair" (aqui ou noutro separador);
+ * - `ended` — o servidor terminou-a: "Terminar sessão em todos os aparelhos" noutro sítio,
+ *   palavra-passe mudada, conta suspensa ou apagada.
+ *
+ * Enquanto houver esta marca, a app não entra sozinha com a palavra-passe guardada (ver
+ * `lib/savedCredentials.js`): sair tem de ser sair. Apaga-se quando volta a haver sessão.
+ */
+export const SIGN_OUT_KEY = 'livraria_saida';
+
+/** Uma saída pedida pela pessoa conta como dela durante este tempo (os outros separadores
+ *  recebem o `SIGNED_OUT` pelo canal do supabase-js uns instantes depois). */
+export const USER_SIGN_OUT_WINDOW_MS = 30_000;
+
+export function readSignOut(raw) {
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!v || (v.reason !== 'user' && v.reason !== 'ended')) return null;
+    return { reason: v.reason, at: Number(v.at) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Um `SIGNED_OUT` que chega com a conta à vista foi pedido pela pessoa ou veio do servidor?
+ * Sem uma saída da pessoa nos últimos segundos, foi o servidor que terminou a sessão.
+ */
+export function signOutReason(previous, now = Date.now()) {
+  const last = readSignOut(previous);
+  if (last?.reason === 'user' && now - last.at >= 0 && now - last.at < USER_SIGN_OUT_WINDOW_MS) return 'user';
+  return 'ended';
+}
+
 /** Contas a que já se pediu o email de boas-vindas neste navegador. */
 const WELCOME_KEY = 'livraria_welcome_sent';
 

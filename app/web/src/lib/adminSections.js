@@ -15,7 +15,7 @@ import {
   Activity, Award, Ban, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
   FileUp, Flag, Hash, Image, Inbox, LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
-  Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
+  Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
   UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
 } from 'lucide-react';
 
@@ -29,7 +29,7 @@ export const ADMIN_GROUPS = [
   { id: 'relatorios', label: 'Relatórios', sections: ['vendas-huambo', 'pagamentos-caixa'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
-  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'apps', 'seguranca'] },
+  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'apps', 'seguranca'] },
 ];
 
 /**
@@ -217,6 +217,12 @@ export const ADMIN_SECTIONS = {
     keywords: 'banner faixa aviso promocao topo',
     description: 'Um aviso curto no topo de todas as páginas da loja: urgente, promoção ou informação.',
     allowed: (p) => p.settings || p.marketing,
+  },
+  versoes: {
+    label: 'Versões da app', title: 'Versões da app', icon: Rocket,
+    keywords: 'versao novidades actualizacao atualizacao app telemovel lancamento push todos',
+    description: 'O que mudou em cada versão da app (em /novidades) e o aviso por push a todos os telemóveis.',
+    allowed: (p) => p.settings,
   },
   apps: {
     label: 'Integrações', title: 'Integrações', icon: Plug,

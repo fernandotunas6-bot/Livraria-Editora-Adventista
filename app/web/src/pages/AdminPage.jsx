@@ -57,6 +57,7 @@ const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
 const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
 const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
+const ReleasesTab = lazy(() => import('@/components/admin/ReleasesTab'));
 const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
@@ -633,6 +634,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="notices">
                 <Suspense fallback={spinner}>
                   <NoticesTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canManageSettings && (
+              <AdminSection active={activeTab} value="versoes">
+                <Suspense fallback={spinner}>
+                  <ReleasesTab />
                 </Suspense>
               </AdminSection>
             )}

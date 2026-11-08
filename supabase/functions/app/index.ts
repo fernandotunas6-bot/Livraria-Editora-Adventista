@@ -78,6 +78,9 @@ import {
 import { parseGatewayEvent, providerCode, verifyWebhookSignature } from "./paymentWebhook.ts";
 import { floatingPagesFrom } from "./floatingPages.ts";
 import { cleanCancelReason, customerCancelBlock } from "./customerCancel.ts";
+import {
+  RELEASE_PUSH_BATCH, RELEASE_PUSH_CONCURRENCY, mapLimit, nextReleaseBatch, pushFailure, releasePushAlive, releasePushPayload,
+} from "./releasePush.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1051,29 +1054,108 @@ async function sendOrderPush(order: Row, settings: Row | null, payload: { title:
   return await sendUserPush(order.customer_id, settings, payload);
 }
 
-/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
-async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
-  if (!userId || !settings?.push_enabled) return 0;
+/** As chaves VAPID das configurações, ou null sem push ligado. */
+function pushKeys(settings: Row | null) {
+  if (!settings?.push_enabled) return null;
   const publicKey = String(settings.vapid_public_key || "");
   const privateKey = Deno.env.get("VAPID_PRIVATE_KEY") || String(settings.vapid_private_key || "");
-  if (!publicKey || !privateKey) return 0;
+  return publicKey && privateKey ? { publicKey, privateKey } : null;
+}
+
+/** O `web-push` pronto a enviar (chaves e contacto VAPID), ou null sem push ligado. */
+async function pushSender(settings: Row | null) {
+  const keys = pushKeys(settings);
+  if (!keys) return null;
+  const webpush = (await import("npm:web-push@3.6.7")).default;
+  const contact = settings!.contact_email ? `mailto:${settings!.contact_email}` : "mailto:contacto@livrariaadventista.ao";
+  webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
+  return webpush;
+}
+
+type PushSender = NonNullable<Awaited<ReturnType<typeof pushSender>>>;
+
+/** Um push para uma subscrição: 'sent', ou 'gone' (apagada: o aparelho já não existe) ou 'failed'. */
+async function pushToSubscription(webpush: PushSender, sub: Row, payload: Row): Promise<"sent" | "gone" | "failed"> {
+  try {
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
+    return "sent";
+  } catch (err) {
+    const outcome = pushFailure(err);
+    if (outcome === "gone") await db.from("push_subscriptions").delete().eq("id", sub.id);
+    else console.log("push:", (err as Row)?.statusCode, (err as Error)?.message);
+    return outcome;
+  }
+}
+
+/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
+async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
+  if (!userId || !pushKeys(settings)) return 0;
   const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", userId).limit(10);
   if (!subs?.length) return 0;
-  const webpush = (await import("npm:web-push@3.6.7")).default;
-  const contact = settings.contact_email ? `mailto:${settings.contact_email}` : "mailto:contacto@livrariaadventista.ao";
-  webpush.setVapidDetails(contact, publicKey, privateKey);
+  const webpush = await pushSender(settings);
+  if (!webpush) return 0;
   let sent = 0;
   for (const sub of subs) {
-    try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
-      sent++;
-    } catch (err) {
-      const code = (err as Row)?.statusCode;
-      if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", sub.id);
-      else console.log("push:", code, (err as Error)?.message);
-    }
+    if (await pushToSubscription(webpush, sub, payload) === "sent") sent++;
   }
   return sent;
+}
+
+/**
+ * Novidades da app por push a todos os aparelhos que as aceitam (releasePush.ts): um lote de
+ * cada vez, com o lote reservado antes de enviar. Chamado logo que a equipa pede o envio e,
+ * até acabar, pelo agendador "avisos-equipa".
+ */
+async function dispatchReleasePush(batch = RELEASE_PUSH_BATCH) {
+  const { data: release, error } = await db.from("app_releases")
+    .select("id, title, push_cursor, push_requested_at")
+    .not("push_requested_at", "is", null).is("push_finished_at", null)
+    .order("push_requested_at", { ascending: true }).limit(1).maybeSingle();
+  if (error) {
+    // Sem a tabela (migração por aplicar): nada a enviar.
+    if (!/does not exist|Could not find/i.test(error.message || "")) console.log("dispatchReleasePush:", error.message);
+    return { pending: 0, sent: 0 };
+  }
+  if (!release) return { pending: 0, sent: 0 };
+  const finish = (extra: Row = {}) => db.from("app_releases").update({ push_finished_at: nowISO(), ...extra })
+    .eq("id", release.id).is("push_finished_at", null);
+  if (!releasePushAlive(release.push_requested_at)) {
+    await finish();
+    return { pending: 1, sent: 0, stopped: "antigo" };
+  }
+  const settings = await getSettings();
+  const webpush = await pushSender(settings);
+  if (!webpush) {
+    // Push desligado entretanto: o envio fica dado por acabado, sem mandar nada.
+    await finish();
+    return { pending: 1, sent: 0, stopped: "push desligado" };
+  }
+
+  let query = db.from("push_subscriptions").select("id, endpoint, keys").eq("app_updates", true)
+    .order("id", { ascending: true }).limit(batch);
+  if (release.push_cursor) query = query.gt("id", release.push_cursor);
+  const { data: subs, error: subsError } = await query;
+  if (subsError) {
+    console.log("dispatchReleasePush (subscrições):", subsError.message);
+    return { pending: 1, sent: 0 };
+  }
+  const list = (subs || []) as Row[];
+  const { cursor, done } = nextReleaseBatch(list.map((s) => String(s.id)), release.push_cursor || null, batch);
+
+  // Reservar o lote: o cursor só avança se ainda for o que se leu.
+  let claim = db.from("app_releases")
+    .update({ push_cursor: cursor, ...(done ? { push_finished_at: nowISO() } : {}) })
+    .eq("id", release.id).is("push_finished_at", null);
+  claim = release.push_cursor ? claim.eq("push_cursor", release.push_cursor) : claim.is("push_cursor", null);
+  const { data: claimed } = await claim.select("id");
+  if (!claimed?.length) return { pending: 1, sent: 0, skipped: "lote já reservado" };
+
+  const payload = releasePushPayload(release as { id: string; title: string });
+  const outcomes = await mapLimit(list, RELEASE_PUSH_CONCURRENCY, (sub) => pushToSubscription(webpush, sub, payload));
+  const sent = outcomes.filter((o) => o === "sent").length;
+  const failed = outcomes.length - sent;
+  if (outcomes.length) await db.rpc("app_release_push_progress", { p_id: release.id, p_sent: sent, p_failed: failed });
+  return { pending: 1, sent, failed, done };
 }
 
 function sanitizeIntegrationConfig(code: string, config: Row) {
@@ -2819,9 +2901,51 @@ route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
     : {};
   const rec: Row = { endpoint, keys, user_agent: String(body.user_agent || "").slice(0, 300) };
   if (auth?.id) rec.user = auth.id;
+  // "Novidades da app" no perfil: cada aparelho escolhe (as encomendas e a comunidade não mudam).
+  if (typeof body.app_updates === "boolean") rec.app_updates = body.app_updates;
   const { error } = await db.from("push_subscriptions").upsert(rec, { onConflict: "endpoint" });
   if (error) throw error;
   return json({ message: "Subscrição push registada." });
+});
+
+/**
+ * Avisar por push todos os aparelhos das novidades de uma versão (painel → Versões da app).
+ * Uma só vez por novidade e só depois de publicada; o envio continua em lotes (dispatchReleasePush).
+ */
+route("POST", "/admin/releases/notify", async ({ auth, body }) => {
+  const staff = requirePermission(auth, "manage_settings");
+  const id = String(body.id || "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw bad("Novidade inválida.");
+  const { data: release } = await db.from("app_releases")
+    .select("id, title, published_at, push_requested_at").eq("id", id).maybeSingle();
+  if (!release) throw new HttpError(404, "Novidade não encontrada.");
+  if (!release.published_at || new Date(release.published_at).getTime() > Date.now()) {
+    throw bad("Publique as novidades antes de avisar: o aviso abre a página das novidades.");
+  }
+  if (!pushKeys(await getSettings(true))) {
+    throw bad("As notificações push não estão ligadas (Configurações → Email, push e chat).");
+  }
+  const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true);
+  if (release.push_requested_at) {
+    return json({ message: "O aviso destas novidades já foi pedido.", already: true, devices: count || 0 });
+  }
+  // `x-actor-id`: o registo de segurança fica a saber quem pediu o aviso a todos.
+  const { data: marked, error } = await db.from("app_releases").update({ push_requested_at: nowISO() })
+    .eq("id", id).is("push_requested_at", null).select("id").setHeader("x-actor-id", staff.id);
+  if (error) throw error;
+  if (!marked?.length) return json({ message: "O aviso destas novidades já foi pedido.", already: true, devices: count || 0 });
+  runAfterResponse("Novidades da app (push)", () => dispatchReleasePush());
+  return json({ message: `A avisar ${count || 0} aparelho(s). O envio leva alguns minutos.`, devices: count || 0 });
+});
+
+/** Quantos aparelhos recebem as novidades (o painel mostra antes de pedir o aviso). */
+route("GET", "/admin/releases/devices", async ({ auth }) => {
+  requirePermission(auth, "manage_settings");
+  const [all, updates] = await Promise.all([
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }),
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true),
+  ]);
+  return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: !!pushKeys(await getSettings()) });
 });
 
 route("POST", "/contact-message", async ({ body, ip }) => {
@@ -3698,14 +3822,14 @@ route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
-  const [staff, customers, community, colporteurs] = await Promise.all([
+  const [staff, customers, community, colporteurs, releases] = await Promise.all([
     dispatchStaffNotifications(), dispatchCustomerSupportNotifications(), dispatchCommunityNotifications(),
-    dispatchColporteurNotifications(),
+    dispatchColporteurNotifications(), dispatchReleasePush(),
   ]);
-  if (staff.pending || customers.pending || community.pending || colporteurs.pending) {
-    console.log("Avisos (cron):", JSON.stringify({ staff, customers, community, colporteurs }));
+  if (staff.pending || customers.pending || community.pending || colporteurs.pending || releases.pending) {
+    console.log("Avisos (cron):", JSON.stringify({ staff, customers, community, colporteurs, releases }));
   }
-  return json({ ...staff, customers, community, colporteurs });
+  return json({ ...staff, customers, community, colporteurs, releases });
 });
 
 const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];

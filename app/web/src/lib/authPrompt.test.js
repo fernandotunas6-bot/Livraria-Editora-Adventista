@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   COOLDOWN_MS, DAY_MS, LONG_COOLDOWN_MS, MAX_DISMISSALS, VIEWS_BEFORE_NUDGE,
-  authDialogCopy, dismissNudge, inCooldown, isExcludedPath, nudgeMode, readHadAccount, readNudgeState, shouldNudge, validateAuthForm,
+  authDialogCopy, dismissNudge, hadAccountValue, inCooldown, isExcludedPath, nudgeMode, readHadAccount, readNudgeState, rememberedFirstName,
+  shouldNudge, validateAuthForm,
 } from '@/lib/authPrompt';
 
 const NOW = Date.parse('2026-11-05T12:00:00Z');
@@ -70,10 +71,49 @@ describe('quem já teve conta', () => {
   });
 
   it('o email lembrado só serve se for um email', () => {
-    expect(readHadAccount('{"email":" Maria@Exemplo.ao "}')).toEqual({ email: 'maria@exemplo.ao' });
+    // As contas lembradas antes de 2026-11-08 só tinham o email.
+    expect(readHadAccount('{"email":" Maria@Exemplo.ao "}')).toEqual({ email: 'maria@exemplo.ao', name: '', provider: '' });
     expect(readHadAccount('{"email":"nao-e-email"}')).toBeNull();
     expect(readHadAccount('lixo')).toBeNull();
     expect(readHadAccount(null)).toBeNull();
+  });
+
+  it('lembra também o nome e como entrou, limpos', () => {
+    expect(readHadAccount({ email: 'maria@exemplo.ao', name: '  Maria \n Lopes ', provider: 'google' }))
+      .toEqual({ email: 'maria@exemplo.ao', name: 'Maria Lopes', provider: 'google' });
+    expect(readHadAccount({ email: 'maria@exemplo.ao', name: 'x'.repeat(200), provider: 'facebook' }))
+      .toEqual({ email: 'maria@exemplo.ao', name: 'x'.repeat(80), provider: '' });
+  });
+});
+
+describe('hadAccountValue', () => {
+  it('guarda o email, o nome e como entrou — nada que dê acesso', () => {
+    const v = JSON.parse(hadAccountValue({ email: 'Maria@Exemplo.ao', name: 'Maria Lopes', provider: 'email' }));
+    expect(v).toEqual({ email: 'maria@exemplo.ao', name: 'Maria Lopes', provider: 'email' });
+  });
+
+  it('uma sessão que não diz como entrou mantém o que já se sabia da mesma conta', () => {
+    const prev = JSON.stringify({ email: 'maria@exemplo.ao', name: 'Maria', provider: 'google' });
+    expect(JSON.parse(hadAccountValue({ email: 'maria@exemplo.ao', name: 'Maria', provider: '' }, prev)).provider).toBe('google');
+    // Outra conta não herda nada.
+    expect(JSON.parse(hadAccountValue({ email: 'joao@exemplo.ao', name: 'João' }, prev)).provider).toBe('');
+  });
+
+  it('email inválido não se guarda', () => {
+    expect(hadAccountValue({ email: 'nao-e-email' })).toBeNull();
+  });
+
+  it('rememberedFirstName: o primeiro nome, ou o início do email', () => {
+    expect(rememberedFirstName({ name: 'Maria Lopes', email: 'm@x.ao' })).toBe('Maria');
+    expect(rememberedFirstName({ name: '', email: 'joao.silva@x.ao' })).toBe('joao.silva');
+  });
+});
+
+describe('authDialogCopy (sessão terminada)', () => {
+  it('explica porque se pede para entrar de novo', () => {
+    const c = authDialogCopy('session-ended', 'login');
+    expect(c.title).toBe('A sua sessão terminou');
+    expect(c.description).toMatch(/carrinho/);
   });
 });
 
