@@ -51,11 +51,20 @@ export default function MobileCategoriesSheet({ open, onOpenChange }) {
             Coleções <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </Link>
           <div className="mt-3 border-t pt-3">
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ajuda e informações</p>
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mais na livraria</p>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                ['/comunidade', 'Comunidade'], ['/materiais', 'Materiais para descarregar'],
+              ].map(([to, label]) => (
+                <Link key={to} to={to} className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted">{label}</Link>
+              ))}
+            </div>
+            <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ajuda e informações</p>
             <div className="grid grid-cols-2 gap-1">
               {[
                 ['/track', 'Seguir encomenda'], ['/lojas', 'Lojas'], ['/shipping-returns', 'Envios e devoluções'],
                 ['/faq', 'Perguntas frequentes'], ['/contact', 'Contactos'], ['/about', 'Sobre nós'],
+                ['/privacidade', 'Privacidade'],
               ].map(([to, label]) => (
                 <Link key={to} to={to} className="rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{label}</Link>
               ))}

@@ -10,6 +10,7 @@ import { MOTION } from '@/lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 import { inStock, sortProducts } from '@/lib/productSort';
+import { useSwipe } from '@/hooks/useSwipe';
 
 const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
@@ -44,6 +45,12 @@ export default function DestaquesSemana({ onCartOpen }) {
     }, 6000);
     return () => clearInterval(timerRef.current);
   }, [books.length, paused]);
+
+  // Antes das saídas antecipadas (as regras dos hooks): deslizar muda de destaque.
+  const swipe = useSwipe({
+    onNext: () => setCurrentIndex((prev) => (prev + 1) % Math.max(books.length, 1)),
+    onPrev: () => setCurrentIndex((prev) => (prev - 1 + books.length) % Math.max(books.length, 1)),
+  });
 
   if (loading) {
     return (
@@ -89,6 +96,7 @@ export default function DestaquesSemana({ onCartOpen }) {
     <>
     <section
       className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-slate-950 to-background text-white py-16 md:py-24 border-b border-border"
+      {...(books.length > 1 ? swipe : {})}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -215,13 +223,13 @@ export default function DestaquesSemana({ onCartOpen }) {
             o mínimo que a WCAG 2.5.8 pede em AA. O intervalo sai do contentor porque o
             preenchimento de cada botão já afasta os pontos — somados, davam alvos
             encostados a nada e uma fila larga de mais. */}
-        <div className="flex justify-center mt-12">
+        <div className="mt-10 flex justify-center sm:mt-12">
           {books.map((_, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setCurrentIndex(i)}
-              className="group grid h-6 place-items-center px-2"
+              className="group grid h-11 place-items-center px-2 sm:h-6"
               aria-label={`Ir para destaque ${i + 1}`}
             >
               <span className={`block h-2 rounded-full transition-all duration-base ${

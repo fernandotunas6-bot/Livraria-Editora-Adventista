@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { getHeroSlides } from '@/api/EcommerceApi';
 import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransitions';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { useSwipe } from '@/hooks/useSwipe';
 
 // Imagens feitas com as capas reais do catálogo (public/images/site); usadas só se não houver slides na base de dados.
 const FALLBACK_SLIDES = [
@@ -186,6 +187,7 @@ const HeroSlider = () => {
 
   const next = useCallback(() => goTo(current + 1), [current, goTo]);
   const prev = useCallback(() => goTo(current - 1), [current, goTo]);
+  const swipe = useSwipe({ onNext: next, onPrev: prev });
 
   useEffect(() => {
     if (slides.length <= 1 || paused) return undefined;
@@ -200,7 +202,8 @@ const HeroSlider = () => {
 
   return (
     <section
-      className="relative h-[85vh] min-h-[520px] max-h-[900px] overflow-hidden bg-foreground"
+      className="hero-height relative min-h-[520px] max-h-[900px] overflow-hidden bg-foreground"
+      {...(slides.length > 1 ? swipe : {})}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -250,13 +253,13 @@ const HeroSlider = () => {
               o mínimo que a WCAG 2.5.8 pede em AA. O intervalo sai do contentor porque o
               preenchimento de cada botão já afasta os pontos — somados, davam alvos
               encostados a nada e uma fila larga de mais. */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex">
+          <div className="absolute bottom-[22px] left-1/2 -translate-x-1/2 z-20 flex sm:bottom-8">
             {slides.map((s, i) => (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => goTo(i)}
-                className="group grid h-6 place-items-center px-2"
+                className="group grid h-11 place-items-center px-2 sm:h-6"
                 aria-label={`Ir para slide ${i + 1}${s.is_primary ? ' (principal)' : ''}`}
               >
                 <span className={`block h-2 rounded-full transition-all duration-base ${i === current ? 'w-8 bg-white' : 'w-2 bg-white/40 group-hover:bg-white/60'}`} />

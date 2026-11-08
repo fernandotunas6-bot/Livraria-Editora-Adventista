@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, ArrowRight, Package, User, MessageCircle, Download, Receipt } from 'lucide-react';
+import { CheckCircle, ArrowRight, Package, PackageSearch, User, MessageCircle, Download, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
@@ -150,7 +150,7 @@ const SuccessPage = () => {
               </span>
             )}
 
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">{title}</h1>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-balance">{title}</h1>
             <p className="text-muted-foreground text-lg mb-8">{subtitle}</p>
 
             {hasOrder && (
@@ -221,7 +221,7 @@ const SuccessPage = () => {
                   >
                     <MessageCircle className="h-6 w-6" />
                     <span className="font-semibold">Receber por WhatsApp</span>
-                    <span className="text-xs font-normal opacity-80">Envia o recibo para o seu chat</span>
+                    <span className="text-xs font-normal">Envia o recibo para o seu chat</span>
                   </Button>
                   <Button
                     variant={receiptChoice === 'download' ? 'default' : 'outline'}
@@ -230,7 +230,7 @@ const SuccessPage = () => {
                   >
                     <Download className="h-6 w-6" />
                     <span className="font-semibold">Descarregar Recibo</span>
-                    <span className="text-xs font-normal opacity-80">Ficheiro HTML para imprimir ou guardar</span>
+                    <span className="text-xs font-normal">Ficheiro HTML para imprimir ou guardar</span>
                   </Button>
                 </div>
                 {receiptChoice && (
@@ -290,25 +290,33 @@ const SuccessPage = () => {
             </div>
             )}
 
+            {/* O botão é o próprio link (`asChild`): um botão dentro de um link não é HTML
+                válido e os leitores de ecrã anunciavam duas coisas para um só toque. */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/shop">
-                <Button size="lg" className="btn-primary w-full sm:w-auto">
+              <Button asChild size="lg" className="btn-primary w-full sm:w-auto">
+                <Link to="/shop">
                   Continuar a Comprar
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
+                  <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
+                </Link>
+              </Button>
               {isAuthed ? (
-                <Link to="/profile" state={{ tab: 'orders' }}>
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
-                    <User className="mr-2 h-5 w-5" /> Ver {isWhatsApp ? 'Pedidos' : 'Compras'}
-                  </Button>
-                </Link>
+                <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
+                  <Link to="/profile" state={{ tab: 'orders' }}>
+                    <User className="mr-2 h-5 w-5" aria-hidden="true" /> Ver {isWhatsApp ? 'Pedidos' : 'Compras'}
+                  </Link>
+                </Button>
+              ) : hasOrder && (orderNumber || orderData?.orderNumber) ? (
+                // Sem conta, acompanhar a encomenda já aberta (número e email desta compra),
+                // em vez de ter de os copiar para o rastreio.
+                <Button asChild size="lg" variant="outline" className="w-full sm:w-auto border-marca text-primary">
+                  <Link to="/track" state={{ orderNumber: orderNumber || orderData.orderNumber, email: orderData?.email || '' }}>
+                    <PackageSearch className="mr-2 h-5 w-5" aria-hidden="true" /> Acompanhar a encomenda
+                  </Link>
+                </Button>
               ) : (
-                <Link to="/contact">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    Contactar Apoio
-                  </Button>
-                </Link>
+                <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+                  <Link to="/contact">Contactar Apoio</Link>
+                </Button>
               )}
             </div>
           </motion.div>

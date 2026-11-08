@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { orderItemTitle } from '@/lib/productTypes';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -65,7 +65,10 @@ const ProfilePage = () => {
   const tabFromUrl = PROFILE_TABS.includes(searchParams.get('tab') || '') ? searchParams.get('tab') : '';
   const [activeTab, setActiveTab] = useState(tabFromUrl || location.state?.tab || 'orders');
 
+  const tabsRef = useRef(null);
+  const tabClicked = useRef(false);
   const changeTab = (tab) => {
+    tabClicked.current = true;
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     if (tab === 'orders') next.delete('tab');
@@ -137,6 +140,16 @@ const ProfilePage = () => {
   useEffect(() => {
     if (tabFromUrl) setActiveTab(tabFromUrl);
     else if (location.state?.tab) setActiveTab(location.state.tab);
+    // Chegou por um link para um separador (menu, sino, rodapé): no telemóvel o cartão do
+    // perfil ocupa o ecrã todo e o separador ficava escondido lá em baixo; desce até ele.
+    // Um clique nos próprios separadores não mexe no scroll.
+    const wanted = tabFromUrl || location.state?.tab;
+    if (wanted && !tabClicked.current && window.matchMedia?.('(max-width: 767px)').matches) {
+      const t = setTimeout(() => tabsRef.current?.scrollIntoView({ block: 'start' }), 150);
+      return () => clearTimeout(t);
+    }
+    tabClicked.current = false;
+    return undefined;
   }, [tabFromUrl, location.state?.tab]);
 
   useEffect(() => {
@@ -337,8 +350,8 @@ const ProfilePage = () => {
             </div>
 
             {/* Tabs principais */}
-            <Tabs value={activeTab} onValueChange={changeTab} className="w-full">
-              <TabsList className="mb-6 flex flex-wrap gap-2">
+            <Tabs ref={tabsRef} value={activeTab} onValueChange={changeTab} className="w-full scroll-mt-20">
+              <TabsList className="mb-6 flex h-auto flex-wrap gap-2 [&>button]:min-h-10">
                 <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Encomendas</TabsTrigger>
                 <TabsTrigger value="pdfs"><FileDown className="h-4 w-4 mr-2" />PDFs</TabsTrigger>
                 <TabsTrigger value="notifications"><Bell className="h-4 w-4 mr-2" />Notificações</TabsTrigger>

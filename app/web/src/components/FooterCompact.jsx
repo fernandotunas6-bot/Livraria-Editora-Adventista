@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CreditCard, MapPin, MessageCircle, PackageSearch, ShieldCheck, Truck } from 'lucide-react';
+import { CreditCard, Facebook, Instagram, MapPin, MessageCircle, PackageSearch, ShieldCheck, Truck, Youtube } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { BRAND } from '@/lib/brand';
+import { safeLinkUrl } from '@/lib/safeLink';
 
 /**
- * Rodapé do telemóvel para as páginas de catálogo.
+ * Rodapé do telemóvel (todas as páginas: o `Footer` escolhe este abaixo de 768 px).
  *
- * A página inicial, a loja, as categorias e as colecções escondem o rodapé no telemóvel
+ * A página inicial, a loja, as categorias e as colecções escondiam o rodapé no telemóvel
  * (`hidden md:block`), com o argumento de que a barra inferior leva às mesmas páginas. Leva a
  * algumas — Início, Categorias, Pesquisar, Carrinho, Conta — e a mais nenhuma. Tudo o resto
  * só existia no rodapé, e num mercado em que quase todo o tráfego entra pelo telemóvel isso
@@ -31,16 +32,29 @@ export default function FooterCompact() {
   const copyright = settings.footer_copyright
     || `© ${new Date().getFullYear()} ${settings.site_name || BRAND.name}`;
 
-  const atalho = 'flex items-center gap-2 rounded-xl border border-background/15 bg-background/5 px-3 py-2.5 text-sm text-background/85 transition-colors active:bg-background/15';
+  const atalho = 'flex min-h-11 items-center gap-2 rounded-xl border border-background/15 bg-background/5 px-3 py-2.5 text-sm text-background/85 transition-colors active:bg-background/15';
+  const redes = [
+    { href: safeLinkUrl(settings.facebook), label: 'Página de Facebook da livraria', Icon: Facebook },
+    { href: safeLinkUrl(settings.instagram), label: 'Instagram da livraria', Icon: Instagram },
+    { href: safeLinkUrl(settings.youtube), label: 'Canal do YouTube da livraria', Icon: Youtube },
+  ].filter((r) => r.href);
+  const pe = 'inline-flex min-h-11 items-center text-xs text-background/70 underline underline-offset-2';
 
   return (
-    // O espaço no fim é a barra de navegação inferior: sem ele, os últimos links ficavam
-    // debaixo dela e não se conseguia tocar neles.
+    // O espaço da barra de navegação inferior já está reservado no fim do `body`
+    // (index.css). Aqui o rodapé desce por cima dele (margem negativa e o mesmo espaço por
+    // dentro): o fundo escuro chega ao fundo do ecrã — sem a faixa clara que aparecia quando a
+    // barra se esconde — e a página não fica com o espaço a dobrar.
     <footer
       className="bg-foreground text-background md:hidden"
-      style={{ paddingBottom: 'var(--barra-navegacao-total, 0px)' }}
+      style={{
+        paddingBottom: 'var(--barra-navegacao-total, 0px)',
+        marginBottom: 'calc(-1 * var(--barra-navegacao-total, 0px))',
+      }}
     >
-      <div className="container-custom py-8">
+      {/* Em baixo, espaço para os botões flutuantes (chat e voltar ao topo): no fim da página
+          ficavam por cima da privacidade e das perguntas frequentes. */}
+      <div className="container-custom pb-24 pt-8">
         <ul className="mb-5 space-y-2 text-sm text-background/75">
           <li className="flex gap-2.5">
             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-[#22d3ee]" aria-hidden="true" />
@@ -81,12 +95,22 @@ export default function FooterCompact() {
           </Link>
         </nav>
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-background/20 pt-4 text-center">
-          <p className="text-xs text-background/70">{copyright}</p>
-          <Link to="/privacidade" className="text-xs text-background/70 underline underline-offset-2">
+        {redes.length > 0 && (
+          <div className="mt-4 flex justify-center gap-2">
+            {redes.map(({ href, label, Icon }) => (
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className="flex h-11 w-11 items-center justify-center rounded-full text-background/70 transition-colors active:bg-background/15">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 border-t border-background/20 pt-3 text-center">
+          <p className="w-full py-1 text-xs text-background/70">{copyright}</p>
+          <Link to="/privacidade" className={pe}>
             Política de privacidade
           </Link>
-          <Link to="/faq" className="text-xs text-background/70 underline underline-offset-2">
+          <Link to="/faq" className={pe}>
             Perguntas frequentes
           </Link>
         </div>

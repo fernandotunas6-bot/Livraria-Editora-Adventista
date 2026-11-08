@@ -18,6 +18,9 @@ export function useChatPosition() {
     // 16 px do canto: o botão (48 px) acaba nos 64 px e cabe na margem do conteúdo em 1366 px
     // (75 px). A 24 px tocava na capa do livro e nas grelhas.
     left: 'calc(16px + env(safe-area-inset-left, 0px))',
+    // Desce e sobe com a barra de baixo (que se esconde ao descer a página), ao mesmo ritmo
+    // dela e do "Voltar ao topo", em vez de saltar.
+    transition: 'bottom 300ms ease-out',
   };
 
   return { fixedStyle };

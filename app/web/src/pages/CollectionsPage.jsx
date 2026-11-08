@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Layers, ChevronRight, BookOpen, Filter, X } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import FooterCompact from '@/components/FooterCompact.jsx';
 import ShoppingCart from '@/components/ShoppingCart';
 import ProductCard from '@/components/ProductCard';
 import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';
@@ -246,7 +245,7 @@ export default function CollectionsPage() {
                     onClick={() => setMobileFilterOpen(true)}
                     className="rounded-full text-xs"
                   >
-                    Filtrar ({selectedCategory === 'all' ? 'Todos' : selectedCategory === 'educational' ? 'Educativo' : selectedCategory === 'inspirational' ? 'Inspirational' : 'Infantil'})
+                    Filtrar ({selectedCategory === 'all' ? 'Todos' : selectedCategory === 'educational' ? 'Educativo' : selectedCategory === 'inspirational' ? 'Inspiracional' : 'Infantil'})
                   </Button>
                 </div>
 
@@ -376,13 +375,8 @@ export default function CollectionsPage() {
         onCartOpen={() => setIsCartOpen(true)} 
       />
 
-      {/* Rodapé completo no computador; no telemóvel a versão curta, com o essencial que a
-          barra inferior não tem (privacidade, rastreio, lojas, devoluções). Ver
-          components/FooterCompact.jsx. */}
-      <div className="hidden md:block">
-        <Footer />
-      </div>
-      <FooterCompact />
+      {/* No telemóvel o rodapé curto, no computador o completo (ver components/Footer.jsx). */}
+      <Footer />
     </>
   );
 }
