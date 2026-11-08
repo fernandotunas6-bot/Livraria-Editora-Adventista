@@ -31,6 +31,9 @@ export const PERMISSION_KEYS = [
   // Confirmar, rejeitar e anular pagamentos e registar reembolsos (migração pagamentos_registados).
   // Separada de "Pagamentos" (métodos, IBAN, links): quem confirma dinheiro não muda para onde ele vai.
   "confirm_payments",
+  // A facturação (vendas por loja, caixa, números do mês), separada de "Gerir encomendas"
+  // (migração cargos_e_ver_relatorios): o atendimento trata encomendas sem ver a facturação.
+  "view_reports",
   "manage_marketing",
   "manage_church_registry",
   "manage_colporteurs",

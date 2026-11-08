@@ -1785,9 +1785,9 @@ Supabase simulado ao nível da rede: palavra-passe certa e errada, renovação d
 rede (`internetdisconnected`), registo de um email que já tem conta (utilizador sem identidades),
 o `authorize` da Google e a função das novidades. 20 verificações certas, entre elas abrir o
 perfil sem rede com o token expirado há 2 h e esperar os 35 s em que o supabase-js insiste. A base
-de dados: 39 cenários novos em PGlite com as 100 migrações (`scripts/pglite/versoes.mjs`), e as
-suites que já existiam continuam certas (91 + 44 + 35). `npm test` (1368, eram 1255), `npm run
-lint`, `npm run build` e `deno check`.
+de dados: 39 cenários novos em PGlite com as 103 migrações (`scripts/pglite/versoes.mjs`), e as
+suites que já existiam continuam certas (91 + 44 + 35 + 46, já com o `main` do PR #44). `npm test`
+(1386, eram 1255), `npm run lint`, `npm run build` e `deno check`.
 
 ### Achados
 

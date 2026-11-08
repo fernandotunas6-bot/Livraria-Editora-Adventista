@@ -29,6 +29,8 @@ import AdminShell from '@/components/admin/shell/AdminShell';
 import AdminOverview from '@/components/admin/AdminOverview';
 import { adminPermissions, buildAdminNav, findView, resolveSection, resolveView } from '@/lib/adminSections';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
+import { useSignal } from '@/hooks/useSignal';
+import { mergeOrders, newestUpdated } from '@/lib/ordersSync';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusLabel, getOrderStatusColor, formatOrderNumber, ORDER_STATUS, PAYMENT_STATUS, getPaymentStatusLabel, getPaymentStatusColor, getDeliveryStatusLabel, getDeliveryStatusColor, orderPaymentLabel, orderDeliveryAddress, orderPickupStore, orderLocality } from '@/lib/orderUtils';
@@ -176,31 +178,59 @@ const AdminPage = () => {
   // Só a primeira carga mostra a espera; as seguintes (depois de gravar, ou a actualização
   // automática) trocam os dados por baixo, sem a lista piscar nem perder o lugar.
   const loadedOnce = useRef(false);
+  // A data de actualização mais recente das encomendas que o painel já tem (relógio do servidor):
+  // a partir dela, cada actualização pede só as que mudaram.
+  const ordersSince = useRef(null);
+  const loadOrders = useCallback(async ({ incremental = false } = {}) => {
+    if (!canManageOrders) return [];
+    const since = incremental ? ordersSince.current : null;
+    const list = await pb.collection('orders').getFullList({
+      sort: '-created', fields: ORDER_LIST_FIELDS.join(','),
+      ...(since ? { filter: `updated >= "${since}"` } : {}),
+    });
+    ordersSince.current = newestUpdated(list, ordersSince.current);
+    if (since) setOrders((prev) => mergeOrders(prev, list));
+    else setOrders(list);
+    return list;
+  }, [canManageOrders]);
+
+  const loadCatalog = useCallback(async () => {
+    const [booksList, lowStock] = await Promise.all([
+      pb.collection('stock_books').getFullList({ sort: '-featured,title' }),
+      canManageCatalog ? getLowStockBooks() : [],
+    ]);
+    setBooks(booksList);
+    setLowStockBooks(lowStock);
+  }, [canManageCatalog]);
+
   const loadAll = useCallback(async () => {
     if (!loadedOnce.current) setLoading(true);
     try {
       // Os slides carrega-os o próprio separador (SlidesTab); aqui só serviam para o número no
       // nome do separador, que saiu.
-      const [booksList, ordersList, lowStock] = await Promise.all([
-        pb.collection('stock_books').getFullList({ sort: '-featured,title' }),
-        canManageOrders ? pb.collection('orders').getFullList({ sort: '-created', fields: ORDER_LIST_FIELDS.join(',') }).catch(() => []) : [],
-        canManageCatalog ? getLowStockBooks() : [],
-      ]);
-      setBooks(booksList);
-      setOrders(ordersList);
-      setLowStockBooks(lowStock);
+      await Promise.all([loadCatalog(), loadOrders().catch(() => setOrders([]))]);
     } catch (err) {
       console.error(err);
     } finally {
       loadedOnce.current = true;
       setLoading(false);
     }
-  }, [canManageOrders, canManageCatalog]);
+  }, [loadCatalog, loadOrders]);
 
-  // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos (de minuto a minuto com o
-  // painel à vista, ao voltar a ele, e quando a rede volta). Os números ao lado das secções e o
-  // Início acompanham, sem recarregar a página.
-  const sync = useAutoRefresh(loadAll, { intervalMs: 60_000, enabled: access === 'allow' });
+  // Tempo real: a base de dados avisa quando mudam encomendas ou o catálogo, e o painel pede só
+  // isso — as encomendas que mudaram desde a última vez, ou o catálogo. Ver lib/realtimeSignals.js.
+  const syncRef = useRef(null);
+  const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
+    const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
+    run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
+  }, { enabled: access === 'allow' && (canManageOrders || canManageCatalog) });
+
+  // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
+  // tempo real; e por consulta completa de 5 em 5 minutos com o canal ligado (de minuto a minuto
+  // sem ele), ao voltar ao painel e quando a rede volta. Os números ao lado das secções e o Início
+  // acompanham, sem recarregar a página.
+  const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
+  syncRef.current = sync;
   const { markSynced } = sync;
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
@@ -635,7 +665,7 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
-            {(canManageOrders || canConfirmPayments) && (
+            {(perms.reports || canConfirmPayments) && (
               <AdminSection active={activeTab} value="pagamentos-caixa">
                 <Suspense fallback={spinner}>
                   <PaymentsReportTab canConfirm={canConfirmPayments} currentUserName={user?.name || user?.email || ''} />
@@ -1234,7 +1264,8 @@ const AdminPage = () => {
                       </div>
                     ))}
                   </div>
-                  <OrdersReportSection orders={orders} />
+                  {/* Totais e produtos mais vendidos: facturação, só com «Ver relatórios». */}
+                  {perms.reports && <OrdersReportSection orders={orders} />}
                 </AdminSection>
                 )}
               </>

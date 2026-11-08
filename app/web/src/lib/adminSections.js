@@ -12,11 +12,11 @@
 // avisos, nos emails e noutras páginas do site.
 
 import {
-  Activity, Ban, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
+  Activity, Award, Ban, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
   FileUp, Flag, Hash, Image, Inbox, LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
-  UserPlus, UserRound, Users, UsersRound, Wallet,
+  UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
 } from 'lucide-react';
 
 export const DEFAULT_SECTION = 'inicio';
@@ -109,13 +109,13 @@ export const ADMIN_SECTIONS = {
     label: 'Vendas por loja', title: 'Vendas por loja', icon: BarChart3,
     keywords: 'faturacao facturacao relatorio vendas lojas',
     description: 'Facturação de cada loja, por período, com os produtos mais vendidos.',
-    allowed: (p) => p.orders,
+    allowed: (p) => p.reports,
   },
   'pagamentos-caixa': {
     label: 'Pagamentos e caixa', title: 'Pagamentos e caixa', icon: Wallet,
     keywords: 'caixa recebimentos reembolsos dinheiro fecho',
     description: 'Pagamentos recebidos e por confirmar, reembolsos e o fecho de caixa.',
-    allowed: (p) => p.orders || p.confirmPayments,
+    allowed: (p) => p.reports || p.confirmPayments,
   },
   users: {
     label: 'Utilizadores', title: 'Utilizadores e clientes', icon: Users,
@@ -125,6 +125,7 @@ export const ADMIN_SECTIONS = {
     views: [
       { id: 'customers', label: 'Clientes', icon: Users, keywords: 'compradores contas suspensas convidados', description: 'Quem compra na loja: com conta ou só com encomendas, e as contas suspensas.' },
       { id: 'team', label: 'Equipa', icon: UserCheck, keywords: 'funcionarios gestores administradores papeis permissoes', description: 'Quem trabalha no painel, o papel de cada um e as permissões. Só um administrador as altera.' },
+      { id: 'cargos', label: 'Cargos', icon: UserCog, keywords: 'funcoes caixa atendimento gerente perfis de acesso', description: 'Caixa, Atendimento, Gerente de loja…: as permissões de cada cargo. Mudar um cargo muda logo toda a gente que o tem.', allowed: (p) => p.isAdmin },
     ],
   },
   contacts: {
@@ -156,6 +157,7 @@ export const ADMIN_SECTIONS = {
       { id: 'temas', label: 'Temas', icon: Hash, keywords: 'categorias assuntos', description: 'Os temas da comunidade: nome, endereço, descrição, ordem e se estão visíveis.' },
       { id: 'clube', label: 'Clube do livro', icon: BookOpen, keywords: 'leitura livro do mes', description: 'Um livro por mês, em destaque no topo da comunidade, com a discussão desse livro.' },
       { id: 'sites', label: 'Sites bloqueados', icon: Ban, keywords: 'ligacoes dominios spam encurtadores', description: 'Os sites que não podem aparecer nas ligações da comunidade.' },
+      { id: 'niveis', label: 'Níveis dos leitores', icon: Award, keywords: 'leitor assiduo honra distintivos fidelizacao comunidade de leitores', description: 'Conta nova → Leitor (1.º livro, ou participação) → Leitor assíduo → Leitor de honra: as regras e quantos há em cada nível.' },
     ],
   },
   colportagem: {
@@ -252,6 +254,8 @@ export function adminPermissions({ isAdmin = false, hasPermission = () => false 
     users: has('manage_users'),
     payments: has('manage_payments'),
     confirmPayments: has('confirm_payments'),
+    // A facturação (vendas por loja, caixa, números do mês): separada das encomendas.
+    reports: has('view_reports'),
     marketing: has('manage_marketing'),
     // Quem gere colportores também vê as igrejas e os pastores (só leitura).
     churchRegistry: has('manage_church_registry') || has('manage_colporteurs'),

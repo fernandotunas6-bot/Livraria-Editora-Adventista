@@ -9,6 +9,7 @@ import { relativeTime } from '@/lib/communityText';
 import BlockedDomainsPanel from '@/components/admin/BlockedDomainsPanel';
 import { ClubsPanel, PostsPanel, TopicsPanel } from '@/components/admin/CommunityStaffPanels';
 import { AdminViewNav, useSectionView } from '@/components/admin/shell/AdminViewNav';
+import ReaderLevelsPanel from '@/components/admin/ReaderLevelsPanel';
 
 /**
  * Moderação da comunidade: publicações denunciadas ou ocultas. À terceira denúncia a base de
@@ -131,6 +132,7 @@ export default function CommunityTab() {
         {view === 'temas' && <TopicsPanel />}
         {view === 'clube' && <ClubsPanel />}
         {view === 'sites' && <BlockedDomainsPanel />}
+        {view === 'niveis' && <ReaderLevelsPanel />}
       </div>
     </div>
   );

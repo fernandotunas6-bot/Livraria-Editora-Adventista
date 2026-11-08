@@ -6,7 +6,9 @@ import { createPainelApi, detectMultiStore, listStores } from '@/painel-vendas/a
 import { mountPainel } from '@/painel-vendas/painel.js';
 import css from '@/painel-vendas/painel.css?inline';
 import markup from '@/painel-vendas/painel.html?raw';
-import logoUrl from '@/painel-vendas/logo-ministerio-publicacoes.png';
+// O logotipo oficial (o mesmo de public/logo.png, mais leve): no ecrã, nas imagens e nos PDFs
+// que o painel exporta. Antes era o do Ministério de Publicações.
+import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
 
 const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:wght@600;700&display=swap';
 const STORE_KEY = 'painel-vendas:loja';

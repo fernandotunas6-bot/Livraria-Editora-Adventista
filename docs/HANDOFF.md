@@ -29,7 +29,7 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   `/push/subscribe`, novidades no `/cron/staff-dispatch`). Cenários: `scripts/pglite/versoes.mjs` (39).
 - **Como se testou:** build de produção num Chromium com perfil de telemóvel (Playwright), Supabase
   simulado na rede (20 verificações, entre elas abrir o perfil sem rede com o token expirado);
-  PGlite com as 100 migrações; `npm test` (1368), lint, build, `deno check`.
+  PGlite com as 103 migrações (já com o `main` do PR #44); `npm test` (1386), lint, build, `deno check`.
 - **Para o dono:** nada obrigatório. Para anunciar uma versão: painel → Versões da app → "Novas
   novidades" → Publicar → "Avisar todos por push" (precisa do push ligado, como já está). Guardar o
   push para mudanças que interessam aos clientes: cada aviso chega a todos.
