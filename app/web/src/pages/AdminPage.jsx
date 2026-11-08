@@ -221,11 +221,22 @@ const AdminPage = () => {
   }, [loadCatalog, loadOrders]);
 
   // Tempo real: a base de dados avisa quando mudam encomendas ou o catálogo, e o painel pede só
-  // isso — as encomendas que mudaram desde a última vez, ou o catálogo. Ver lib/realtimeSignals.js.
+  // isso — as encomendas que mudaram desde a última vez e/ou o catálogo (uma encomenda nova manda
+  // os dois sinais quase juntos: o stock desceu). Ver lib/realtimeSignals.js. Enquanto actualiza,
+  // o ícone da barra do topo roda, pelo menos 0,7 s para se ver.
   const syncRef = useRef(null);
-  const live = useSignal('painel', ['orders', 'catalogo'], (event) => {
-    const run = event === 'catalogo' ? loadCatalog() : loadOrders({ incremental: true });
-    run.then(() => syncRef.current?.markSynced()).catch((err) => console.error(err));
+  const [signalLoads, setSignalLoads] = useState(0);
+  const live = useSignal('painel', ['orders', 'catalogo'], (_event, _payload, signals) => {
+    const events = new Set(signals.map((s) => s.event));
+    const started = Date.now();
+    setSignalLoads((n) => n + 1);
+    Promise.all([
+      events.has('catalogo') ? loadCatalog() : null,
+      events.has('orders') ? loadOrders({ incremental: true }) : null,
+    ])
+      .then(() => syncRef.current?.markSynced())
+      .catch((err) => console.error(err))
+      .finally(() => setTimeout(() => setSignalLoads((n) => Math.max(0, n - 1)), Math.max(0, 700 - (Date.now() - started))));
   }, { enabled: access === 'allow' });
 
   // Sincronizado: encomendas, produtos e stock actualizam-se sozinhos — na hora, pelos sinais em
@@ -235,8 +246,9 @@ const AdminPage = () => {
   const sync = useAutoRefresh(loadAll, { intervalMs: live ? 5 * 60_000 : 60_000, enabled: access === 'allow' });
   syncRef.current = sync;
   const { markSynced } = sync;
-  // A barra do topo diz «Em tempo real» com o canal do painel ligado.
-  const syncState = { ...sync, realtime: live ? 'live' : 'off' };
+  // A barra do topo diz «Em tempo real» com o canal do painel ligado, e o ícone roda enquanto
+  // actualiza (pela consulta ou por um sinal).
+  const syncState = { ...sync, syncing: sync.syncing || signalLoads > 0, realtime: live ? 'live' : 'off' };
   useEffect(() => { loadAll().then(markSynced); }, [loadAll, markSynced]);
 
   const handleSaveBook = async (data) => {

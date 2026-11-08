@@ -25,9 +25,9 @@ export function realtimeLabel(realtime) {
 }
 
 /**
- * Estado da sincronização: "Em tempo real" (ponto verde) com o canal ligado; senão "Actualizado
- * há 2 min" (carregar actualiza já), a rodar enquanto actualiza, e "Sem ligação" quando a rede
- * cai — aí o que se gravar pode não chegar.
+ * Estado da sincronização: o ícone de actualizar, a rodar enquanto actualiza, com "Em tempo real"
+ * (a verde) quando o canal está ligado ou "Actualizado há 2 min" sem ele — carregar actualiza já
+ * — e "Sem ligação" quando a rede cai: aí o que se gravar pode não chegar.
  */
 function SyncStatus({ sync }) {
   const [now, setNow] = useState(() => Date.now());
@@ -53,13 +53,12 @@ function SyncStatus({ sync }) {
       title={rt.title}
       aria-label={`${label}. Actualizar agora`}
     >
-      {/* Um ponto fixo, sem pulsar: o painel fica aberto o dia inteiro e uma animação contínua
-          distrai (e gasta bateria no portátil da loja). */}
-      {live ? (
-        <span className="mx-[3px] inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" aria-hidden="true" />
-      ) : (
-        <RefreshCw className={cn('h-4 w-4', sync.syncing && 'animate-spin')} aria-hidden="true" />
-      )}
+      {/* Roda só enquanto actualiza (um sinal, a consulta ou o clique), nunca sem parar: o painel
+          fica aberto o dia inteiro e uma animação contínua distrai. */}
+      <RefreshCw
+        className={cn('h-4 w-4', sync.syncing && 'animate-spin', live && 'text-emerald-600 dark:text-emerald-400')}
+        aria-hidden="true" data-syncing={sync.syncing ? 'true' : undefined}
+      />
       <span className={cn('hidden xl:inline', live && 'text-emerald-700 dark:text-emerald-400')}>{label}</span>
     </Button>
   );

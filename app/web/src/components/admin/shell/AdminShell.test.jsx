@@ -189,10 +189,19 @@ describe('barra do topo: o estado da sincronização', () => {
   const sync = (extra) => ({ online: true, syncing: false, lastSync: Date.now() - 120_000, refreshNow: () => {}, ...extra });
   const botao = () => [...host.querySelectorAll('header button')].find((b) => /Actualizar agora/.test(b.getAttribute('aria-label') || ''));
 
-  it('com o tempo real ligado diz "Em tempo real" (e a dica explica)', async () => {
+  it('com o tempo real ligado diz "Em tempo real" (e a dica explica), com o ícone de actualizar', async () => {
     await mount(shell({ sync: sync({ realtime: 'live' }) }));
     expect(botao().getAttribute('aria-label')).toBe('Em tempo real. Actualizar agora');
     expect(botao().getAttribute('title')).toMatch(/aparece sozinho/);
+    const icon = botao().querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon.getAttribute('class')).not.toMatch(/animate-spin/);
+  });
+
+  it('o ícone roda enquanto actualiza, também em tempo real (e o texto fica)', async () => {
+    await mount(shell({ sync: sync({ realtime: 'live', syncing: true }) }));
+    expect(botao().getAttribute('aria-label')).toBe('Em tempo real. Actualizar agora');
+    expect(botao().querySelector('svg').getAttribute('class')).toMatch(/animate-spin/);
   });
 
   it('sem tempo real fica como antes: "Actualizado há 2 min", de minuto a minuto', async () => {

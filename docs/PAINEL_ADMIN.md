@@ -112,8 +112,16 @@ Um pedido de cada vez; sem rede não tenta. Só a primeira carga mostra a espera
 (incluindo depois de gravar) trocam os dados por baixo, sem a lista piscar. Os números da navegação,
 o Início e o título do separador do navegador acompanham.
 
-A barra do topo diz **Em tempo real** (ponto verde, fixo) com o canal ligado; sem ele, "Actualizado
-há 2 min". Carregar actualiza já, nos dois casos. O canal liga-se para toda a equipa.
+A barra do topo mostra o ícone de actualizar com **Em tempo real** (a verde) quando o canal está
+ligado; sem ele, "Actualizado há 2 min". O ícone roda enquanto actualiza — também quando a
+actualização vem de um sinal (pelo menos 0,7 s, para se ver) — e carregar actualiza já, nos dois
+casos. O canal liga-se para toda a equipa.
+
+Uma rajada de sinais dá uma só leitura, mas com todos os sinais da rajada (`useSignal` passa a lista
+em terceiro argumento): uma encomenda nova manda «catalogo» (o stock desceu) e «orders» quase juntos,
+e o painel lê os dois. Antes ficava só o último, e o stock vendido só aparecia na consulta de 5 em
+5 minutos; o mesmo no perfil do cliente («orders» e «avisos») e no atendimento (mensagens de duas
+conversas).
 
 O mesmo canal acorda os **alertas da equipa** (antes de 20 em 20 s; agora na hora, e de reserva de
 2 em 2 min), o **atendimento** (antes de 30 em 30 s) e a **Produção**, os **Funcionários** e as

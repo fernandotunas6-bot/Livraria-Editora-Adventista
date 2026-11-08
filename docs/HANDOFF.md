@@ -43,9 +43,14 @@ Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegu
   - **Métodos de pagamento:** no topo, a lista do que falta para os clientes pagarem (nome legal e
     NIF no recibo, telefone ou WhatsApp, prazo das encomendas por pagar, métodos sem dados,
     gateway). Em produção faltam os três primeiros: são dados do dono, não de código.
-  - **Barra do topo:** «Em tempo real» (ponto verde) com o canal do painel ligado, em vez de
-    "Actualizado há…"; o canal liga-se para toda a equipa, não só para quem gere encomendas ou o
-    catálogo.
+  - **Barra do topo:** «Em tempo real» com o canal do painel ligado, em vez de "Actualizado
+    há…". O ícone continua o de actualizar (pedido do dono: "só muda o ícone… aquele círculo a
+    girar quando estiver a actualizar") e roda também quando a actualização vem de um sinal. O
+    canal liga-se para toda a equipa, não só para quem gere encomendas ou o catálogo.
+  - **Defeito do main corrigido no site:** o `useSignal` ficava só com o último sinal de uma
+    rajada. Uma encomenda nova manda «catalogo» e «orders» quase juntos, e o stock vendido não se
+    via até à consulta de 5 em 5 minutos (o mesmo no perfil do cliente e no atendimento). Agora a
+    chamada leva todos os sinais da rajada; teste no browser e uma mutação confirmaram.
   - **De passagem:** os números "0" a laranja nas vistas (a Colportagem também os mostrava), e os
     motivos da colportagem no histórico do stock, que apareciam como "Ajuste manual".
 - **Testes:**

@@ -126,7 +126,8 @@ Também `catalogo` (o stock que a produção põe ao concluir) faz a Produção 
 em silêncio não apaga o que se está a escrever: as partes iguais ficam com o mesmo objecto
 (`lib/keepUnchanged.js`) e cada salário só se volta a montar quando muda. Sem o canal ligado (rede
 fraca, serviço em baixo), os ecrãs voltam a ler de minuto a minuto; com ele, de 5 em 5 minutos. A
-barra do topo diz **Em tempo real** (ponto verde) com o canal ligado.
+barra do topo diz **Em tempo real** com o canal ligado, e o ícone de actualizar roda enquanto
+actualiza.
 
 - **Um sinal por instrução** (`private.painel_realtime_signal`, gatilhos `for each statement`):
   uma ordem nova com as suas etapas são dois sinais, não um por etapa.
