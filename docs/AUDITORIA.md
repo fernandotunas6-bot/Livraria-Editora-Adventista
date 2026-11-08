@@ -1956,3 +1956,31 @@ A migração `20261108211000_trajeto_gps` e a Edge Function vão juntas com o me
 site novo e a migração, o rastreio mostra só o ponto de entrega (a leitura das posições falha e é
 ignorada) e o bloco de quem entrega não aparece (a função ainda não existe).
 
+## 9.21 O que a produção mostrou: registos e avisos do Supabase (2026-11-08)
+
+Vistos com leitura apenas: os erros da base de dados e os pedidos falhados das últimas 24 horas, e os avisos de segurança e de desempenho.
+
+### Corrigido
+
+- **Criar ou mudar o email de um contacto pelo painel falhava sempre**, desde a migração `20261102150000` (`POST /rest/v1/contacts` → 403, «permission denied for function new_unsubscribe_token»). O gatilho `private.set_unsubscribe_token` corria como quem chama, e a função que gera o token está fechada a quem usa o site. Sem email não falhava, e por isso o CRM parecia estar bem. A função continua fechada; o gatilho passou a `security definer`.
+- Os 20 avisos `unindexed_foreign_keys` e o aviso `auth_rls_initplan` de `delivery_positions`.
+
+### Protecções novas
+
+- **Os cenários em PGlite passam a correr em cada PR** (job «Cenários da base de dados»). Até aqui só corriam à mão, e foram eles que apanharam os erros das entregas.
+- **`scripts/pglite/seguranca.mjs`** verifica a base de dados inteira: gatilhos que correm como quem chama e usam uma função fechada; funções `security definer` abertas sem nenhuma verificação; tabelas sem RLS; chaves estrangeiras sem índice.
+- **Versões de migração repetidas** param num teste (`scripts/migracoes.test.mjs`) e, no deploy, antes de tocar em produção. Dois PRs verdes com a mesma versão não dão conflito no git (os nomes são diferentes), e o `db push` falharia a meio. Aconteceu com a `20261108210000` (#51 e #52), apanhada antes do merge.
+
+### Verificado, sem nada a corrigir
+
+- As 96 funções `security definer` abertas pela API (avisos 0028 e 0029): só 7 não têm verificação, e todas são leituras públicas sem dados pessoais, ou delegam numa função que verifica. É uma procura de palavras: mostra o que falta, não prova que as outras estejam certas.
+- `rls_enabled_no_policy`: 11 tabelas sem políticas de propósito, só acessíveis pelo servidor ou por funções.
+- `unused_index`: 84 índices sem uso, normal com tão pouco tráfego. Não apagar já.
+- A foto de quem entra com Google (`/media/users/<id>/https:%2F%2Flh3...` → 400): um único pedido, às 07h11. Já está corrigida em `lib/avatar.js`, no main desde as 04h45 desse dia; provavelmente veio de uma versão do site em cache. Essa função só aceita endereços da Google, de propósito: não mudar `files.getUrl` para aceitar endereços completos.
+- O único erro de `realtime.messages` («no partition») foi um, logo a seguir ao deploy dos sinais, e a função `realtime_signal` apanha-o: perde-se o sinal, não a escrita.
+
+### Para o dono decidir
+
+- **Protecção contra palavras-passe roubadas** (`auth_leaked_password_protection`): desligada. Liga-se em Authentication → Sign In / Providers → Email, no painel do Supabase; não há migração para isto.
+- **`POST /auth/v1/signup` → 429** (3 vezes a 2026-11-08): o limite de emails do serviço de email incluído no Supabase. Enquanto não houver SMTP próprio, os registos por email podem falhar assim.
+

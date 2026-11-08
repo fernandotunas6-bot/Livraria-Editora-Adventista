@@ -42,6 +42,16 @@ jobs:
       - name: Ligar ao projecto
         run: supabase link --project-ref "$PROJECT_REF"
 
+      # Dois PRs verdes podem trazer a mesma versão com nomes diferentes (não dá conflito no git), e
+      # o `db push` só falharia a meio. Aqui pára antes de tocar em produção.
+      - name: Confirmar que as versões das migrações não se repetem
+        run: |
+          repetidas=$(ls supabase/migrations/*.sql | xargs -n1 basename | cut -c1-14 | sort | uniq -d)
+          if [ -n "$repetidas" ]; then
+            echo "::error::Versões de migração repetidas: $repetidas"
+            exit 1
+          fi
+
       # `--include-all`: há PRs em paralelo com migrações do mesmo dia. Sem isto, quando um PR
       # com migrações mais antigas entra depois de outro com mais recentes, o `db push` recusa-as
       # ("inserted before the last migration on remote") e a publicação pára aqui.

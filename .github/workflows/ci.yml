@@ -63,6 +63,40 @@ jobs:
         working-directory: supabase/functions/app
         run: deno check --node-modules-dir=auto index.ts
 
+  # Os cenários das regras da base de dados (pagamentos, entregas, permissões…), com as migrações
+  # reais em PGlite. Apanham o que o site e a Edge Function não vêem: uma migração de um PR que
+  # desfaz a regra de outro, um gatilho que falha para quem usa o site, uma tabela sem RLS.
+  # Instruções em scripts/pglite/base.mjs.
+  cenarios:
+    name: Cenários da base de dados
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Instalar o PGlite
+        run: npm install --prefix "$RUNNER_TEMP/pglite" --no-audit --no-fund @electric-sql/pglite@0.2.17
+
+      - name: Correr os cenários
+        run: |
+          export PGLITE_MODULE="$RUNNER_TEMP/pglite/node_modules/@electric-sql/pglite/dist/index.js"
+          falhou=""
+          for f in scripts/pglite/*.mjs; do
+            nome=$(basename "$f" .mjs)
+            [ "$nome" = base ] && continue
+            echo "::group::$nome"
+            node "$f" supabase/migrations || falhou="$falhou $nome"
+            echo "::endgroup::"
+          done
+          if [ -n "$falhou" ]; then
+            echo "::error::Cenários com falhas:$falhou"
+            exit 1
+          fi
+
   # Uma migração com erro só aparecia no merge, ao ser aplicada em produção pelo
   # deploy-supabase.yml. Aqui todas as migrações são aplicadas do zero num Postgres local,
   # antes do merge: se uma falhar, o PR fica vermelho e produção não é tocada.
