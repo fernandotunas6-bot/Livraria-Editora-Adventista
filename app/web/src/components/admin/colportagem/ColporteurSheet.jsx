@@ -141,6 +141,20 @@ export default function ColporteurSheet({ colporteur: c, data, reg, idx, run, on
           <ProvinceMunicipality provinces={reg.provinces} municipalities={reg.municipalities} provinceId={form.province_id || ''} municipalityId={form.municipality_id || ''}
             onChange={(geo) => set(geo)} />
           <FormField label="Território" hint="Bairros ou localidades onde trabalha."><Input value={form.territory} onChange={(e) => set({ territory: e.target.value })} maxLength={300} /></FormField>
+          {/* Entregas por colportor: a localização é ele que a regista, na sua área. */}
+          {'accepts_deliveries' in form && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-2 text-sm">
+              <label className="flex items-center gap-2">
+                <Switch checked={!!form.accepts_deliveries} onCheckedChange={(v) => set({ accepts_deliveries: v })} />
+                Recebe entregas de encomendas pagas perto dele
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {form.latitude != null
+                  ? `Localização registada a ${new Date(form.location_updated_at).toLocaleDateString('pt-AO')}`
+                  : 'Sem localização: entregas só pelo município e pela província'}
+              </span>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-3">
             <FormField label="Horas por semana"><Input type="number" min={0} max={80} value={form.weekly_hours ?? ''} onChange={(e) => set({ weekly_hours: e.target.value === '' ? '' : Number(e.target.value) })} /></FormField>
             <FormField label="Limite em consignação (Kz)" hint={`Vazio = ${Number(data.settings.default_credit_limit || 0).toLocaleString('pt-AO')} Kz`}>

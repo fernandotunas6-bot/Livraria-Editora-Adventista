@@ -62,6 +62,26 @@ export type EngineReply = {
   intent: Intent;
   unresolved: boolean;
   order_id?: string;
+  /** Dados da encomenda para o cartão do chat (passos, pagamento, rastreio, previsão). */
+  order_card?: OrderCard;
+};
+
+export type OrderCard = {
+  number: string;
+  made: string;
+  stage: string;
+  stage_label: string;
+  cancelled: boolean;
+  pickup: boolean;
+  steps: { key: string; label: string; done: boolean; current: boolean }[];
+  payment: string;
+  payment_method: string;
+  tracking: string;
+  carrier: string;
+  eta: string;
+  pickup_store: string;
+  items: string;
+  total: string;
 };
 
 export const STARTERS = ["A minha encomenda", "Envio grátis?", "Formas de pagamento", "Falar com a equipa"];
@@ -283,6 +303,54 @@ export function describeOrder(o: Row): string {
   return parts.join(" ");
 }
 
+// Passos mostrados no cartão, pela ordem da operação ("awaiting_payment" = encomenda recebida).
+const CARD_STEPS = {
+  delivery: [
+    ["awaiting_payment", "Recebida"], ["paid", "Paga"], ["preparing", "Em preparação"],
+    ["shipped", "Expedida"], ["delivered", "Entregue"],
+  ],
+  pickup: [
+    ["awaiting_payment", "Recebida"], ["paid", "Paga"], ["preparing", "Em preparação"],
+    ["shipped", "Pronta a levantar"], ["delivered", "Levantada"],
+  ],
+} as const;
+const STAGE_ORDER: Record<string, number> = {
+  awaiting_payment: 0, paid: 1, preparing: 2, shipped: 3, in_transit: 3, out_for_delivery: 3, delivered: 4,
+};
+
+/** O cartão da encomenda: só o que a pessoa já tem direito a ver (o mesmo que describeOrder). */
+export function orderCard(o: Row): OrderCard {
+  const stage = orderStage(o);
+  const pickup = o.shipping_method === "pickup";
+  const cancelled = stage === "cancelled";
+  const at = STAGE_ORDER[stage] ?? 0;
+  const steps = (pickup ? CARD_STEPS.pickup : CARD_STEPS.delivery).map(([key, label], i) => ({
+    key,
+    // Em trânsito e a sair para entrega ficam no 4.º passo, com o nome do estado real.
+    label: i === 3 && !pickup && stage === "in_transit" ? "Em trânsito"
+      : i === 3 && !pickup && stage === "out_for_delivery" ? "Saiu para entrega" : label,
+    done: !cancelled && (i < at || (i === at && stage === "delivered")),
+    current: !cancelled && i === at && stage !== "delivered",
+  }));
+  return {
+    number: orderNumber(o),
+    made: dateAO(o.created),
+    stage,
+    stage_label: stageText(o),
+    cancelled,
+    pickup,
+    steps,
+    payment: cancelled ? "" : PAYMENT_TEXT[String(o.payment_status || "pending")] || "pendente",
+    payment_method: String(o.payment_method_name || "").trim(),
+    tracking: cancelled ? "" : String(o.tracking_number || ""),
+    carrier: String(o.carrier || ""),
+    eta: !cancelled && o.estimated_delivery && stage !== "delivered" ? dateAO(o.estimated_delivery) : "",
+    pickup_store: pickup ? String(o.pickup_store || "") : "",
+    items: itemsText(o),
+    total: o.total ? kz(Number(o.total)) : "",
+  };
+}
+
 /**
  * A encomenda de que se fala: a que o cliente nomeou; sem número, a mais recente. Com um número
  * que não é de nenhuma destas encomendas devolve null — descrever outra como se fosse a pedida
@@ -328,7 +396,10 @@ export function ruleReply(ctx: ChatContext): EngineReply {
 
     case "order_status": {
       if (order) {
+        // O texto completo fica na conversa (é o que a IA e o histórico lêem); o site mostra-o
+        // como cartão, com os passos, o pagamento, o rastreio e a previsão.
         out.reply = describeOrder(order);
+        out.order_card = orderCard(order);
         if (loggedIn && ctx.orders.length > 1 && !ctx.orderRefs.length) {
           out.reply += ` Tem ${ctx.orders.length} encomendas recentes; diga-me o número se quiser outra.`;
         }
@@ -701,6 +772,7 @@ export function sanitizeAi(parsed: Row | null, ctx: ChatContext): EngineReply | 
   };
   const order = conversationOrder(ctx);
   if (order && ["order_status", "cancel_change", "return_refund", "payment_problem", "invoice"].includes(primary)) out.order_id = String(order.id);
+  if (order && primary === "order_status") out.order_card = orderCard(order);
   return applySignals(out, ctx);
 }
 

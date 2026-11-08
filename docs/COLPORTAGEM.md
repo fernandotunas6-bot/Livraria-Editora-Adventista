@@ -190,6 +190,53 @@ O separador **Resumo** tem:
 
 O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
+### Avisos e atalhos
+
+- **Avisos à equipa:** uma candidatura nova e cada relatório enviado geram um aviso no sino do painel para os administradores e para os gestores com a permissão "Colportagem". Saem também por email, WhatsApp ou push, conforme a equipa de cada pessoa em "Equipas e alertas". Abrir o aviso leva ao separador Colportagem.
+- **Rodapé do site:** "Ser colportor", na coluna "Comprar", leva à candidatura.
+- **Perfil:** quem é colportor vê o atalho "Área do colportor" no seu perfil.
+
+## 5. Entregas por colportor
+
+Decisões do dono (2026-11-08). Migração `20261108100000_entregas_por_colportor.sql`.
+
+**Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
+
+**Quem recebe a oferta.** O colportor activo mais próximo do cliente, com conta ligada e com «Recebe entregas» ligado:
+1. muito perto por GPS (até `delivery_near_km`, 15 km por omissão), quando o cliente partilhou a localização no checkout e o colportor registou a dele;
+2. depois, o do mesmo município de entrega;
+3. depois, perto por GPS (até `delivery_max_km`, 50 km);
+4. por fim, o da mesma província.
+
+Em cada nível, primeiro quem tem todos os livros à consignação, depois o mais perto, o menos ocupado e quem recebeu uma oferta há mais tempo. A mesma encomenda nunca é oferecida duas vezes ao mesmo colportor, nem ao próprio cliente.
+
+**Prazo.** O colportor tem 2 horas (`delivery_offer_minutes`), contadas em horário de funcionamento (Equipas e alertas → horário), para aceitar ou recusar. Por exemplo, uma oferta feita às 17h50 de sexta acaba às 9h50 de sábado. Recusa, ou o prazo esgotado (o agendador `entregas-colportores` corre de 5 em 5 minutos), passa a oferta ao seguinte. Sem mais ninguém, a encomenda fica com a equipa (`orders.delivery_route = 'loja'`) e a equipa de entregas é avisada.
+
+**Os avisos ao colportor** chegam ao sino da área do colportor, por WhatsApp para o telefone dele e por push. O texto diz onde é a entrega, a distância, os portes que ganha, se tem os livros consigo e o prazo.
+
+**Depois de aceitar:**
+- O colportor passa a ver o nome, o telefone, a morada, o contacto próximo, a nota e a localização do cliente. Antes de aceitar vê só a zona e os livros.
+- **Livros do stock dele** (tem todos à consignação): sai logo. Quando marca «Entregue», o sistema faz sozinho uma guia de devolução (GUI-). Os livros saem do stock dele e voltam ao da loja, que já os tinha descontado ao encomendar, e deixam de lhe ser cobrados na conta corrente.
+- **Livros da loja** (não tem todos): a equipa recebe «Preparar para o colportor», prepara o pacote e marca **«Entregue ao colportor»** na encomenda. A encomenda fica «expedida» e só então ele pode sair.
+- O colportor marca «Saiu para entrega» e «Entregue», com o nome e a assinatura de quem recebe («Assine como está no Bilhete») e, se quiser, o número do Bilhete. O cliente é avisado de cada passo, como quando a equipa os marca.
+- **Portes:** o valor dos portes da encomenda entra na conta corrente dele como «Portes de entrega» (a Livraria deve-lhos). Uma encomenda com envio grátis não tem portes, e então a entrega não lhe rende nada.
+- «Não posso entregar» (antes de levantar os livros na loja) devolve a entrega, que passa ao seguinte. A equipa pode **«Retirar ao colportor»** a qualquer momento, com o motivo, e passa a ser ela a entregar. Cancelar a encomenda cancela a entrega e avisa o colportor.
+
+**Onde se vê:**
+- área do colportor → Entregas: «Aceito fazer entregas», a localização («Registar a minha localização», só dentro de Angola), as ofertas com o tempo que falta, as entregas aceites e os últimos 30 dias;
+- painel → cada encomenda ao domicílio: a quem foi oferecida, quem aceitou e as acções;
+- painel → Colportagem → Definições: ligar e desligar, o prazo e as distâncias;
+- ficha de cada colportor: «Recebe entregas» e a data da localização.
+
+**Técnico:**
+- tabela `colporteur_deliveries` (uma oferta activa por encomenda; RLS: a equipa e o próprio);
+- `orders.delivery_route` e `orders.delivery_colporteur_id`;
+- `private.delivery_candidates`, `private.offer_next_delivery` e o gatilho `orders_entrega_colportor`;
+- funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
+- rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
+- avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
+- testes: 44 cenários em PGlite, em `scripts/pglite/entregas.mjs`.
+
 ## Técnico
 
 - Migração `supabase/migrations/20261107100000_registo_igreja.sql`:
@@ -215,3 +262,4 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
   - o trigger `orders_colportor_comissao` mete a comissão (paga e entregue) ou a anulação (cancelada ou reembolsada) na conta corrente, uma vez por encomenda;
   - `colporteur_overview` passa a trazer as vendas no site.
 - O checkout (`POST /checkout`) aceita `colporteurCode`. Sem a migração, o `place_order` ignora a coluna, e por isso a Edge Function pode ser publicada antes.
+- Migração `20261107110000_colportagem_avisos.sql`: tipos `colporteur_application` e `colporteur_report` em `staff_notifications`, avisados por triggers em `colporteurs` (inserção) e `colporteur_reports` (passagem a enviado).

@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, X } from 'lucide-react';
+import { BookOpen, Feather, X } from 'lucide-react';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import CommunityFeed from '@/components/community/CommunityFeed';
-import { ClubBanner, CommunityHero, CommunitySidebar, FeedToolbar, TopicNav } from '@/components/community/CommunityParts';
+import UnreadNotices from '@/components/community/UnreadNotices';
+import { ClubBanner, CommunityHero, CommunitySidebar, FeedToolbar, MobileHighlights, TopicNav } from '@/components/community/CommunityParts';
 import { loadCurrentClub, loadSidebar, loadTopics } from '@/lib/communityApi';
 import { filtersFromSearch, searchFromFilters } from '@/lib/communityStyle';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthDialog } from '@/hooks/useAuthDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { pageTitle } from '@/lib/brand';
 
 /**
@@ -27,6 +29,8 @@ export default function CommunityPage() {
   const [club, setClub] = useState(null);
   const { isAuthed } = useAuth();
   const { openAuth } = useAuthDialog();
+  const isMobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const feedRef = useRef(null);
 
   useEffect(() => {
@@ -53,7 +57,9 @@ export default function CommunityPage() {
 
   const write = () => {
     if (!isAuthed) { openAuth({ mode: 'login' }); return; }
-    // Vai ao editor fechado do feed e abre-o (o foco passa para o texto).
+    // No telemóvel, a folha de baixo: abre por cima do feed, sem o empurrar nem saltar.
+    if (isMobile) { setSheetOpen(true); return; }
+    // No computador, vai ao editor fechado do feed e abre-o (o foco passa para o texto).
     const bar = feedRef.current?.querySelector('[data-composer-open]');
     if (!bar) { feedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -73,13 +79,17 @@ export default function CommunityPage() {
       <main className="bg-editorial-tela">
         <CommunityHero stats={sidebar} onWrite={write} />
         <div className="container-custom py-8">
-          <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)_18rem] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
-            <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          {/* No telemóvel uma coluna flexível (a grelha só no computador): numa célula de grelha a
+              fila de temas não tinha espaço para ficar colada ao topo enquanto se desce o feed. */}
+          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)_18rem] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+            <div className="sticky top-[var(--header-offset,0px)] z-20 -mx-4 min-w-0 bg-editorial-tela/95 px-4 py-2 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:top-24 lg:mx-0 lg:self-start lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
               <TopicNav topics={topics} active={filters.topic} counts={counts} onChange={(topic) => change({ topic })} />
             </div>
 
             <div className="min-w-0 space-y-4" ref={feedRef}>
+              <UnreadNotices />
               <ClubBanner club={!filters.book && !filters.topic ? club : null} />
+              {!filters.book && !filters.topic && !filters.query && <MobileHighlights sidebar={sidebar} />}
               {activeTopic && (
                 <div className="rounded-2xl border border-editorial-filete bg-editorial-papel p-4">
                   <h2 className="text-2xl font-semibold text-editorial-tinta">{activeTopic.name}</h2>
@@ -96,15 +106,30 @@ export default function CommunityPage() {
                 </div>
               )}
               <FeedToolbar filters={filters} onChange={change} />
-              <CommunityFeed filters={filters} topics={topics} />
+              <CommunityFeed
+                filters={filters} topics={topics}
+                onWrite={write} composerInSheet={isMobile}
+                sheetOpen={sheetOpen} onSheetOpenChange={setSheetOpen}
+                onClearFilters={() => setParams(new URLSearchParams(), { replace: false })}
+              />
             </div>
 
-            <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+            <div className="hidden min-w-0 lg:sticky lg:top-24 lg:block lg:self-start">
               <CommunitySidebar sidebar={sidebar} />
             </div>
           </div>
         </div>
       </main>
+      {/* Escrever a qualquer altura do feed (no telemóvel), por cima da barra de navegação. */}
+      {isMobile && !sheetOpen && (
+        <button
+          type="button" onClick={write}
+          className="fixed right-4 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-editorial-marinho px-5 text-sm font-semibold text-white shadow-[0_8px_24px_-6px_rgba(12,30,58,0.55)] transition-[bottom] duration-300 active:scale-95 md:hidden"
+          style={{ bottom: 'calc(1rem + var(--barra-navegacao, 0px) + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <Feather className="h-4 w-4 text-[#e2c27d]" aria-hidden="true" /> Escrever
+        </button>
+      )}
       <Footer />
     </>
   );

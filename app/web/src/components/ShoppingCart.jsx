@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { initializeCheckout } from '@/api/EcommerceApi';
 import { nextCheckoutAttempt } from '@/lib/checkoutIdempotency';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +33,18 @@ import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
 import { MOTION } from '@/lib/motion';
 import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
+import { checkoutMemoryKey, checkoutMemoryOff, readCheckoutMemory, saveCheckoutMemory, setCheckoutMemoryEnabled } from '@/lib/checkoutMemory';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Ordem em que se procura o primeiro erro, para o mostrar (de cima para baixo no formulário).
+const ERROR_ORDER = ['pickupStore', 'name', 'email', 'phone', 'address'];
+const ERROR_TARGET = {
+  pickupStore: 'checkout-loja',
+  name: 'checkout-nome',
+  email: 'checkout-email',
+  phone: 'checkout-telefone',
+  address: 'checkout-morada',
+};
 
 const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const { toast } = useToast();
@@ -92,6 +105,54 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     relativeName: '',
     relativePhone: '',
   });
+  // Erros por campo, ditos junto de cada um (antes só um aviso genérico, sem dizer qual).
+  const [errors, setErrors] = useState({});
+  const clearError = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  const fieldError = (key) => (errors[key]
+    ? { 'aria-invalid': true, 'aria-describedby': `${ERROR_TARGET[key]}-erro` }
+    : {});
+
+  // Os dados da última compra neste aparelho (lib/checkoutMemory.js): voltam preenchidos e
+  // guardam-se à medida que se escrevem. Por conta; ao sair da conta, o formulário esvazia.
+  const memoryKey = checkoutMemoryKey(user?.id);
+  const [remember, setRemember] = useState(() => !checkoutMemoryOff());
+  const memoryKeyRef = useRef('');
+  useEffect(() => {
+    const previous = memoryKeyRef.current;
+    if (previous === memoryKey) return;
+    memoryKeyRef.current = memoryKey;
+    const leftAccount = previous && !previous.endsWith(':convidado') && memoryKey.endsWith(':convidado');
+    if (leftAccount) {
+      setForm((f) => ({ ...f, name: '', email: '', phone: '', pickupStore: '' }));
+      setDeliveryAddress((d) => ({ ...d, street: '', reference: '', phone: '', relativeName: '', relativePhone: '', localityCustom: '' }));
+    }
+    const mem = readCheckoutMemory(memoryKey);
+    if (!mem) return;
+    setForm((f) => ({
+      ...f,
+      name: f.name || mem.form.name,
+      email: f.email || mem.form.email,
+      phone: f.phone || mem.form.phone,
+      shippingMethod: SHIPPING_METHODS[mem.form.shippingMethod] ? mem.form.shippingMethod : f.shippingMethod,
+      pickupStore: f.pickupStore || mem.form.pickupStore,
+    }));
+    // A morada só se a pessoa ainda não começou a escrever outra.
+    setDeliveryAddress((d) => (d.street.trim() || d.reference.trim() || d.municipalityName
+      ? d
+      : { ...d, ...Object.fromEntries(Object.entries(mem.address).filter(([, v]) => v)) }));
+  }, [memoryKey]);
+
+  useEffect(() => {
+    if (!remember) return undefined;
+    const timer = setTimeout(() => saveCheckoutMemory(memoryKey, { form, address: deliveryAddress }), 500);
+    return () => clearTimeout(timer);
+  }, [form, deliveryAddress, memoryKey, remember]);
+
+  const toggleRemember = (on) => {
+    setRemember(on);
+    setCheckoutMemoryEnabled(on);
+    if (on) saveCheckoutMemory(memoryKey, { form, address: deliveryAddress });
+  };
 
   // A barra inferior do telemóvel é global e o carrinho é de cada página: ela pede, e o
   // carrinho montado abre-se (e diz que respondeu).
@@ -112,6 +173,17 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     window.addEventListener('keydown', aoTeclar);
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [isCartOpen, setIsCartOpen]);
+
+  // No telemóvel, com o carrinho aberto a página de trás fica quieta: o dedo que deslizava até
+  // ao fim da lista passava a deslocar a loja por baixo do véu. No computador não se prende
+  // (a barra de deslocamento desaparecia e a página saltava para o lado).
+  useEffect(() => {
+    if (!isCartOpen || !window.matchMedia?.('(max-width: 767px)').matches) return undefined;
+    const body = document.body;
+    const prev = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => { body.style.overflow = prev; };
+  }, [isCartOpen]);
 
   useEffect(() => {
     if (!isCartOpen) return;
@@ -241,25 +313,33 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     // Levantamento na loja: basta saber quem vem buscar e como lhe ligar.
     // Entrega ao domicílio: email e morada. Não exige conta: o cliente acompanha a encomenda com
     // o número e o email (Rastrear encomenda), e o registo por email depende do SMTP do Auth.
-    if (!form.name.trim() || !effectivePhone || (needsAddress && !form.email.trim())) {
-      toast({ variant: 'destructive', title: 'Preencha todos os campos obrigatórios' });
-      return;
-    }
-    if (!isValidAngolaPhone(effectivePhone)) {
-      toast({ variant: 'destructive', title: 'Telefone inválido', description: 'Use o formato +244 9XX XXX XXX.' });
-      return;
-    }
+    //
+    // Cada falta fica dita junto do campo, e o formulário desce até à primeira: num telemóvel,
+    // "Preencha todos os campos obrigatórios" num aviso deixava a pessoa à procura de qual.
+    const found = {};
+    if (form.shippingMethod === 'pickup' && physicalStores.length > 0 && !form.pickupStore) found.pickupStore = 'Escolha a loja onde vai levantar.';
+    if (!form.name.trim()) found.name = 'Escreva o seu nome.';
+    if (needsAddress && !form.email.trim()) found.email = 'O email serve para acompanhar a encomenda.';
+    else if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) found.email = 'Este email parece incompleto.';
     if (needsAddress) {
       const addrErr = validateAngolaAddress(deliveryAddress, { requireDelivery: true });
-      if (addrErr) {
-        toast({ variant: 'destructive', title: 'Morada incompleta', description: addrErr });
-        return;
-      }
+      if (addrErr) found.address = addrErr;
+    } else if (!effectivePhone) {
+      found.phone = 'Indique um telefone para o avisarmos.';
+    } else if (!isValidAngolaPhone(effectivePhone)) {
+      found.phone = 'Use o formato +244 9XX XXX XXX.';
     }
-    if (form.shippingMethod === 'pickup' && physicalStores.length > 0 && !form.pickupStore) {
-      toast({ variant: 'destructive', title: 'Seleccione a loja de levantamento' });
+    const first = ERROR_ORDER.find((k) => found[k]);
+    if (first) {
+      setErrors(found);
+      const target = document.getElementById(ERROR_TARGET[first]);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (target?.matches?.('input, textarea, button')) target.focus({ preventScroll: true });
+      // Sem aviso flutuante: a mensagem está junto do campo (e é anunciada), e o aviso tapava
+      // o total e o botão de confirmar no fundo do painel.
       return;
     }
+    setErrors({});
 
     // Transferência e Multicaixa: paga-se depois de encomendar, com o número da encomenda; a
     // referência indica-se na página seguinte (ou no rastreio). Já não se pede aqui.
@@ -419,12 +499,16 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
             aria-modal="true"
             aria-labelledby="titulo-carrinho"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-border">
+            {/* Cabeçalho. No telemóvel com a app instalada, o painel começa no topo do ecrã:
+                a área segura de cima afasta o título e o fechar da barra de estado. */}
+            <div
+              className="flex items-center justify-between p-5 border-b border-border"
+              style={{ paddingTop: 'calc(1.25rem + env(safe-area-inset-top, 0px))' }}
+            >
               <div className="flex items-center gap-2">
                 {step === 'checkout' && (
-                  <Button variant="ghost" size="icon" onClick={() => setStep('cart')} className="h-11 w-11 sm:h-8 sm:w-8">
-                    <ChevronLeft className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => setStep('cart')} className="h-11 w-11 sm:h-8 sm:w-8" aria-label="Voltar ao carrinho">
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 )}
                 <div>
@@ -436,14 +520,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   )}
                 </div>
               </div>
-              <Button onClick={() => setIsCartOpen(false)} variant="ghost" size="icon">
-                <X />
+              <Button onClick={() => setIsCartOpen(false)} variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10" aria-label="Fechar o carrinho">
+                <X aria-hidden="true" />
               </Button>
             </div>
 
             {/* Steps indicator */}
             {cartItems.length > 0 && (
-              <ol className="flex gap-2 px-5 py-2.5 border-b border-border bg-muted/30 text-[11px] font-medium" aria-label="Passos da compra">
+              <ol className="flex gap-2 px-5 py-2.5 border-b border-border bg-muted/30 text-xs font-medium" aria-label="Passos da compra">
                 {[['cart', '1. Carrinho'], ['checkout', '2. Dados e pagamento']].map(([id, label]) => (
                   <li key={id} className="flex-1 space-y-1" aria-current={step === id ? 'step' : undefined}>
                     <span className={step === id ? 'text-primary' : 'text-muted-foreground'}>{label}</span>
@@ -453,7 +537,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
               </ol>
             )}
 
-            <div className="flex-grow overflow-y-auto relative" ref={cartScrollRef}>
+            <div className="flex-grow overflow-y-auto overscroll-contain relative" ref={cartScrollRef}>
               {step === 'cart' && (
                 <div className="p-5 space-y-4">
                   {cartItems.length === 0 ? (
@@ -465,7 +549,37 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       </Button>
                     </div>
                   ) : (
-                    cartItems.map((item) => (
+                    <>
+                    {/* Quanto falta para os portes grátis, à vista logo no carrinho: no telemóvel
+                        ficava dentro do resumo recolhido, e era aqui que fazia diferença — quando
+                        ainda se pode juntar mais um livro. */}
+                    {form.shippingMethod === 'delivery' && FREE_SHIPPING_THRESHOLD > 0 && subtotalCents > 0 && (
+                      <div className="rounded-xl border border-marca/20 bg-marca/5 p-3">
+                        {freeShippingRemaining > 0 ? (
+                          <>
+                            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                              <Truck className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              Faltam {formatCurrency(freeShippingRemaining)} para os portes grátis
+                            </p>
+                            <div
+                              className="h-1.5 overflow-hidden rounded-full bg-muted"
+                              role="progressbar" aria-label="Caminho até aos portes grátis"
+                              aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(freeShippingProgress)}
+                            >
+                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${freeShippingProgress}%` }} />
+                            </div>
+                            <Link to="/shop" onClick={() => setIsCartOpen(false)} className="mt-1 inline-flex min-h-9 items-center text-xs font-semibold text-primary hover:underline">
+                              Juntar mais livros
+                            </Link>
+                          </>
+                        ) : (
+                          <p className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400">
+                            <Truck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Portes grátis nesta encomenda
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {cartItems.map((item) => (
                       <div key={item.variant.id} className="flex gap-3 bg-muted/30 border border-border p-3 rounded-xl">
                         <img
                           src={item.product.image}
@@ -503,7 +617,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           </Button>
                         </div>
                       </div>
-                    ))
+                    ))}
+                    </>
                   )}
                 </div>
               )}
@@ -542,9 +657,15 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       })}
                     </RadioGroup>
                     {form.shippingMethod === 'pickup' && physicalStores.length > 0 && (
-                      <div className="space-y-2 ml-1">
-                        <Label>Loja de levantamento *</Label>
-                        <RadioGroup value={form.pickupStore} onValueChange={(v) => setForm({ ...form, pickupStore: v })}>
+                      <div className="space-y-2 ml-1" id="checkout-loja" tabIndex={-1}>
+                        <Label id="checkout-loja-rotulo">Loja de levantamento *</Label>
+                        {errors.pickupStore && <p id="checkout-loja-erro" className="text-xs font-medium text-destructive" role="alert">{errors.pickupStore}</p>}
+                        <RadioGroup
+                          value={form.pickupStore}
+                          onValueChange={(v) => { setForm({ ...form, pickupStore: v }); clearError('pickupStore'); }}
+                          aria-labelledby="checkout-loja-rotulo"
+                          {...fieldError('pickupStore')}
+                        >
                           {physicalStores.map((store) => (
                             <div key={store.id} className="flex items-center space-x-2 p-2 rounded-lg border text-sm">
                               <RadioGroupItem value={store.name} id={`store-${store.id}`} />
@@ -565,7 +686,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-nome">Nome completo *</Label>
-                      <Input id="checkout-nome" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="O seu nome" />
+                      <Input id="checkout-nome" autoComplete="name" enterKeyHint="next" value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); clearError('name'); }} placeholder="O seu nome" {...fieldError('name')} />
+                      {errors.name && <p id="checkout-nome-erro" className="text-xs font-medium text-destructive" role="alert">{errors.name}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-email">
@@ -573,23 +695,30 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           ? <span className="text-muted-foreground font-normal">(opcional — para receber o recibo)</span>
                           : <>* <span className="text-muted-foreground font-normal">(para acompanhar a encomenda)</span></>}
                       </Label>
-                      <Input id="checkout-email" type="email" autoComplete="email" inputMode="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" />
+                      <Input id="checkout-email" type="email" autoComplete="email" inputMode="email" enterKeyHint="next" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); clearError('email'); }} placeholder="email@exemplo.com" {...fieldError('email')} />
+                      {errors.email && <p id="checkout-email-erro" className="text-xs font-medium text-destructive" role="alert">{errors.email}</p>}
                     </div>
                     {form.shippingMethod === 'pickup' && (
                       <div className="space-y-2">
                         <Label htmlFor="checkout-telefone">Telefone *</Label>
-                        <PhoneInput id="checkout-telefone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
+                        <PhoneInput id="checkout-telefone" value={form.phone} onChange={(phone) => { setForm({ ...form, phone }); clearError('phone'); }} />
+                        {errors.phone && <p id="checkout-telefone-erro" className="text-xs font-medium text-destructive" role="alert">{errors.phone}</p>}
                       </div>
                     )}
                     {form.shippingMethod !== 'pickup' && (
                       <>
-                        <AngolaAddressSelector value={deliveryAddress} onChange={setDeliveryAddress} />
+                        <div id="checkout-morada" tabIndex={-1} className="space-y-2 focus:outline-none">
+                          <AngolaAddressSelector value={deliveryAddress} onChange={(v) => { setDeliveryAddress(v); clearError('address'); }} />
+                          {errors.address && <p id="checkout-morada-erro" className="text-xs font-medium text-destructive" role="alert">{errors.address}</p>}
+                        </div>
                         {/* O ponto no mapa, como na página das lojas. A morada em Angola é
                             muitas vezes uma referência; isto dá ao estafeta o sítio exacto. */}
                         <div className="rounded-lg border border-border p-3 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs text-muted-foreground">
-                              {gps ? 'Localização guardada para o estafeta' : 'Ajuda o estafeta a encontrar a morada'}
+                              {gps
+                                ? 'Localização guardada: a entrega vai a quem estiver mais perto de si'
+                                : 'Partilhe a localização: a entrega vai ao colportor mais perto de si e ele encontra a morada'}
                             </span>
                             <Button type="button" size="sm" variant={gps ? 'secondary' : 'outline'} onClick={locate} disabled={locating}>
                               {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
@@ -597,7 +726,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                             </Button>
                           </div>
                           {gps && (
-                            <p className="text-[11px] text-muted-foreground font-mono">
+                            <p className="text-xs text-muted-foreground font-mono">
                               {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
                             </p>
                           )}
@@ -605,6 +734,14 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       </>
                     )}
                   </div>
+
+                  <label htmlFor="checkout-lembrar" className="flex min-h-11 cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    <Checkbox id="checkout-lembrar" checked={remember} onCheckedChange={(v) => toggleRemember(v === true)} className="mt-0.5" />
+                    <span>
+                      <span className="block font-medium text-foreground">Lembrar estes dados neste aparelho</span>
+                      Na próxima compra, o nome, o contacto e a morada já vêm preenchidos. Desligue num aparelho partilhado.
+                    </span>
+                  </label>
 
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-primary">
@@ -626,7 +763,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                                 {m.icon && <span>{m.icon}</span>}
                                 {m.name}
                                 {/* "p2p"/"offline" é jargão nosso; o cliente precisa é de saber quando paga. */}
-                                <span className="text-[10px] text-muted-foreground font-normal">{paymentMoment(m, form.shippingMethod)}</span>
+                                <span className="text-xs text-muted-foreground font-normal">{paymentMoment(m, form.shippingMethod)}</span>
                               </span>
                               {m.account_info && (
                                 // Fonte normal (Inter), não monoespaçada: nesta o "O" de AO06 e o zero eram iguais.
@@ -691,7 +828,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     <SignaturePad
                       ref={signatureRef}
                       label="Assinatura do comprador"
-                      hint="Desenhe a sua assinatura com o dedo ou rato, se quiser."
+                      hint="Desenhe a assinatura do seu Bilhete de Identidade, com o dedo ou o rato, se quiser."
                     />
                   </div>
                   )}
@@ -706,7 +843,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
             </div>
 
             {cartItems.length > 0 && (
-              <div className="p-4 sm:p-5 border-t border-border bg-muted/20 space-y-3">
+              // A área segura de baixo: sem ela, o "Confirmar compra" ficava em cima da barra de
+              // gestos do iPhone, onde o toque vai para o sistema.
+              <div
+                className="p-4 sm:p-5 border-t border-border bg-muted/20 space-y-3"
+                style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+              >
                 {/* Avisos fora do resumo recolhível: no telemóvel o resumo vem fechado, e o aviso
                     ficava escondido — o cliente via o botão e não sabia o que lhe faltava. */}
                 {maintenanceMode && (
@@ -740,15 +882,15 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 </button>
 
                 <div className={`${summaryOpen ? 'block' : 'hidden'} sm:block space-y-3`}>
-                <div className="flex gap-3 text-[10px] text-muted-foreground justify-center pb-1">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground justify-center pb-1">
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-green-600" /> Compra segura</span>
                   <span className="flex items-center gap-1"><Lock className="h-3 w-3 text-green-600" /> Dados protegidos</span>
                   <span className="flex items-center gap-1"><Truck className="h-3 w-3 text-primary" /> Entrega nacional</span>
                 </div>
                 <div className="space-y-1.5 text-sm">
-                  {form.shippingMethod === 'delivery' && freeShippingRemaining > 0 && subtotalCents > 0 && (
+                  {step === 'checkout' && form.shippingMethod === 'delivery' && freeShippingRemaining > 0 && subtotalCents > 0 && (
                     <div className="rounded-lg border border-marca/20 bg-marca/5 p-2.5 mb-2">
-                      <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
                         <span>Envio grátis</span>
                         <span>Faltam {formatCurrency(freeShippingRemaining)}</span>
                       </div>
@@ -799,12 +941,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         );
                       })}
                       {form.shippingMethod === 'delivery' && shippingCents > 0 && (
-                        <p className="text-[10px] text-muted-foreground px-2 pt-1">
+                        <p className="text-xs text-muted-foreground px-2 pt-1">
                           Envio grátis acima de {formatCurrency(FREE_SHIPPING_THRESHOLD)}
                         </p>
                       )}
                       {step === 'cart' && (
-                        <p className="text-[10px] text-primary px-2">Continue para checkout para seleccionar loja de levantamento</p>
+                        <p className="text-xs text-primary px-2">Continue para escolher a loja de levantamento</p>
                       )}
                     </div>
                   )}
@@ -853,7 +995,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         {waApiActive ? 'Confirmar e receber no WhatsApp' : 'Finalizar via WhatsApp'}
                       </Button>
                     )}
-                    <p className="hidden sm:block text-[10px] text-center text-muted-foreground">
+                    <p className="hidden sm:block text-xs text-center text-muted-foreground">
                       <strong>Compra online</strong> — pagamento e entrega pela loja.{' '}
                       {waApiActive ? (
                         <><strong>WhatsApp</strong> — confirmação automática enviada para o seu número.</>

@@ -109,3 +109,27 @@ externas, só livros do catálogo e as regras de passagem à equipa aplicam-se s
 - **Sugerir resposta** (com uma chave de IA nas Configurações): rascunho escrito com a conversa,
   as encomendas do cliente e as regras da loja. É só um rascunho: lê-se, corrige-se e envia-se.
   As notas internas entram no contexto mas a IA está instruída a não as revelar.
+
+## O chat por dentro (visual)
+
+- **Início:** saudação com o nome de quem tem sessão e quatro atalhos (a minha encomenda, envios
+  e prazos, formas de pagamento, falar com a equipa); desaparece quando a conversa começa.
+- **Mensagens em blocos:** separador do dia ("Hoje", "Ontem"), avatar no início de cada bloco do
+  mesmo autor (o logótipo para o assistente, a inicial para quem da equipa responde) e a hora
+  no fim do bloco.
+- **Cartão da encomenda:** quando o assistente fala de uma encomenda, mostra os passos (recebida,
+  paga, em preparação, expedida/em trânsito, entregue — ou pronta e levantada, nos
+  levantamentos), o pagamento, o rastreio (com botão para copiar), a previsão e os livros.
+- **Caixa de escrita:** cresce até cinco linhas; Enter envia e Shift+Enter muda de linha; mostra
+  os caracteres restantes perto do limite (800).
+- **"Nova mensagem":** se o cliente estiver a ler mais acima quando chega uma resposta, a
+  conversa não salta; aparece um botão para descer. As respostas são anunciadas aos leitores de
+  ecrã.
+- **Horário da equipa:** o atalho "Falar com a equipa" e o cartão de passagem dizem se a equipa
+  está disponível agora ou quando volta ("Volta na segunda-feira às 08h"), com o horário de
+  Equipas e alertas. Fora de horas, o cliente sabe que o pedido fica guardado. Num pedido à espera
+  da equipa, uma nota por baixo da última mensagem diz quando respondem e que pode fechar o chat;
+  o ponto do cabeçalho fica cinzento fora de horas. O servidor envia o horário em
+  `/chat/config` e o site calcula "agora" (`lib/teamHours.js`), para a cache não o desactualizar.
+- **Endereços clicáveis:** links e emails escritos pela equipa abrem (os links num separador
+  novo); nas respostas do assistente só os emails, porque as ligações externas são filtradas.

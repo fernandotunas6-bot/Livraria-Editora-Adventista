@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link, useParams } from 'react-router-dom';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import PostSkeleton from '@/components/community/PostSkeleton';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
@@ -23,7 +25,17 @@ export default function CommunityPostPage() {
   const [related, setRelated] = useState([]);
   const { canAccessAdmin } = useAuth();
   const { openAuth } = useAuthDialog();
-  const { post, replies, liked, status, signedIn, publish, toggleLike, report, remove, pin, markOfficial, hide } = useCommunityThread(id);
+  const { post, replies, liked, status, signedIn, reload, publish, toggleLike, report, remove, pin, markOfficial, hide } = useCommunityThread(id);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Veio do feed (dentro do site)? Então "Comunidade" volta atrás: o feed reaparece com as
+  // mesmas publicações e no mesmo sítio. Por link de fora, abre o feed do início.
+  const cameFromSite = location.key !== 'default' && typeof window !== 'undefined' && window.history.length > 1;
+  const backToFeed = (e) => {
+    if (!cameFromSite) return;
+    e.preventDefault();
+    navigate(-1);
+  };
   const topicsBySlug = useMemo(() => Object.fromEntries(topics.map((t) => [t.slug, t])), [topics]);
   const topic = post?.topic ? topicsBySlug[post.topic] : null;
 
@@ -52,7 +64,9 @@ export default function CommunityPostPage() {
       <main className="min-h-[60vh] bg-editorial-tela py-8">
         <div className="mx-auto w-full max-w-3xl px-4">
           <nav aria-label="Caminho" className="mb-4 flex flex-wrap items-center gap-1 text-sm text-editorial-tinta-suave">
-            <Link to="/comunidade" className="hover:underline">Comunidade</Link>
+            <Link to="/comunidade" onClick={backToFeed} className="-ml-2 inline-flex min-h-10 items-center gap-0.5 rounded-full px-2 font-medium text-editorial-petroleo hover:underline">
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Comunidade
+            </Link>
             {topic && (
               <>
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -61,8 +75,15 @@ export default function CommunityPostPage() {
             )}
           </nav>
 
-          {status === 'loading' && (
-            <div className="flex justify-center py-16" role="status" aria-label="A carregar a publicação"><Loader2 className="h-6 w-6 animate-spin text-editorial-tinta-suave" aria-hidden="true" /></div>
+          {status === 'loading' && <PostSkeleton count={1} />}
+          {status === 'error' && (
+            <div className="rounded-2xl border border-dashed border-editorial-filete bg-editorial-papel p-10 text-center" role="alert">
+              <h1 className="text-2xl font-semibold text-editorial-tinta">Não foi possível abrir a publicação</h1>
+              <p className="mt-2 text-sm text-editorial-tinta-suave">Verifique a ligação à internet e tente outra vez.</p>
+              <Button type="button" variant="outline" onClick={() => reload()} className="mt-4 border-editorial-filete bg-editorial-papel">
+                <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" /> Tentar outra vez
+              </Button>
+            </div>
           )}
           {status === 'missing' && (
             <div className="rounded-2xl border border-dashed border-editorial-filete bg-editorial-papel p-10 text-center">
@@ -90,10 +111,13 @@ export default function CommunityPostPage() {
                   <ul className="grid gap-3 sm:grid-cols-2">
                     {related.map((r) => (
                       <li key={r.id}>
-                        <Link to={postPath(r.id)} className="block h-full rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(r.kind).label}</p>
-                          <p className="mt-1 line-clamp-3 text-sm text-editorial-tinta">{r.body}</p>
-                          <p className="mt-2 text-xs text-editorial-tinta-suave">{r.author_name} · {relativeTime(r.created)} · {plural(r.replies_count || 0, 'resposta', 'respostas')}</p>
+                        <Link to={postPath(r.id)} className="flex h-full gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
+                          {r.book_cover && <img src={r.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />}
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(r.kind).label}</span>
+                            <span className="mt-1 line-clamp-3 block text-sm text-editorial-tinta">{r.body}</span>
+                            <span className="mt-2 block text-xs text-editorial-tinta-suave">{r.author_name} · {relativeTime(r.created)} · {plural(r.replies_count || 0, 'resposta', 'respostas')}</span>
+                          </span>
                         </Link>
                       </li>
                     ))}

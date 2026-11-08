@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, ClipboardList, Copy, Globe, Loader2, MessageCircle, Printer, Scale, Send } from 'lucide-react';
+import { BookOpen, ClipboardList, Copy, Globe, Loader2, MessageCircle, Printer, Scale, Send, Truck } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ import { referralLink } from '@/lib/colporteurReferral';
 import { getDeliveryStatusLabel, getPaymentStatusLabel } from '@/lib/orderUtils';
 import { Pill } from '@/components/admin/igreja/registryUi';
 import ReportForm, { EMPTY_REPORT, reportPayload, reportToForm } from './ReportForm';
+import ColporteurDeliveries from './ColporteurDeliveries';
 
 const DRAFT_KEY = (id) => `livraria_colportor_rascunho_${id}`;
 const readDraft = (id) => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY(id)) || 'null'); } catch { return null; } };
@@ -28,6 +30,9 @@ export function pickWeek(reports, weeks) {
  * rascunho guardado no telemóvel e na base de dados), os relatórios enviados e a conta corrente.
  */
 export default function ColporteurWorkspace({ me }) {
+  // Os avisos de entrega abrem /colportor?tab=entregas.
+  const [params] = useSearchParams();
+  const startTab = ['relatorio', 'entregas', 'livros', 'historico', 'site', 'conta'].includes(params.get('tab')) ? params.get('tab') : 'relatorio';
   const { toast } = useToast();
   const [ops, setOps] = useState(null);
   const [books, setBooks] = useState([]);
@@ -125,9 +130,10 @@ export default function ColporteurWorkspace({ me }) {
         ))}
       </div>
 
-      <Tabs defaultValue="relatorio">
+      <Tabs defaultValue={startTab}>
         <TabsList className="h-auto w-full flex-wrap justify-start">
           <TabsTrigger value="relatorio"><Send className="mr-1.5 h-4 w-4" />Relatório</TabsTrigger>
+          <TabsTrigger value="entregas"><Truck className="mr-1.5 h-4 w-4" />Entregas</TabsTrigger>
           <TabsTrigger value="livros"><BookOpen className="mr-1.5 h-4 w-4" />Livros ({ov.in_hand.reduce((s, b) => s + b.qty, 0)})</TabsTrigger>
           <TabsTrigger value="historico"><ClipboardList className="mr-1.5 h-4 w-4" />Relatórios</TabsTrigger>
           <TabsTrigger value="site"><Globe className="mr-1.5 h-4 w-4" />No site ({siteSales.length})</TabsTrigger>
@@ -155,6 +161,10 @@ export default function ColporteurWorkspace({ me }) {
               <p className="mt-2 text-xs text-muted-foreground">O que escreve fica guardado neste telemóvel enquanto não envia. Depois de enviado, só a equipa o pode devolver para corrigir.</p>
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="entregas" className="rounded-2xl border border-border p-4">
+          <ColporteurDeliveries onChanged={load} />
         </TabsContent>
 
         <TabsContent value="livros" className="rounded-2xl border border-border p-4">

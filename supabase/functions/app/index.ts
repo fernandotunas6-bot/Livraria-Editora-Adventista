@@ -1848,6 +1848,9 @@ async function afterPaymentAction(action: PaymentAction, result: PaymentResult &
   const { data: before } = await db.from("orders").select("delivery_status").eq("id", orderId).maybeSingle();
   const step = String(before?.delivery_status || "received");
   const becamePaid = result.payment_status === "paid" && result.previous_status !== "paid";
+  // Paga para entrega ao domicílio: a base de dados já ofereceu a entrega ao colportor mais
+  // próximo (migração entregas_por_colportor). O aviso sai já, sem esperar pelo agendador.
+  if (becamePaid) runAfterResponse("Avisos aos colportores", async () => { await dispatchColporteurNotifications(); });
   if (action === "confirm" || action === "record") {
     // O pagamento confirmado fica na linha do tempo com o passo "paid": é daí que conta o prazo
     // de entrega prometido (opsRouting.deliveryStart), que a vigilância usa para os atrasos.
@@ -2835,6 +2838,157 @@ route("POST", "/contact-message", async ({ body, ip }) => {
 // registo por email ainda não entrega a confirmação. A validação a sério está na função da
 // base de dados (`colporteur_apply`, só service role); aqui ficam o limite por IP, o campo
 // isco para robôs e os tamanhos.
+// ---------------------------------------------------------------------------
+// Entregas por colportor (migração 20261108100000_entregas_por_colportor, docs/COLPORTAGEM.md)
+// ---------------------------------------------------------------------------
+// A encomenda paga para entrega ao domicílio vai ao colportor mais próximo (a base de dados
+// escolhe e oferece). Estas rotas são as acções: o colportor aceita, recusa, sai, entrega ou
+// desiste; a equipa marca os livros como entregues a ele, ou retira-lhe a entrega. As funções
+// da base só aceitam a service role: aqui identifica-se quem pede e avisa-se o cliente de cada
+// passo (email, WhatsApp, push), como quando a equipa os marca no painel.
+
+async function colporteurRpc(fn: string, args: Row, actorId: string | null): Promise<Row> {
+  const call = db.rpc(fn, args);
+  const { data, error } = await (actorId ? call.setHeader("x-actor-id", actorId) : call);
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    if (error.code === "42501") throw new HttpError(403, error.message);
+    throw error;
+  }
+  return (data || {}) as Row;
+}
+
+/** O cliente é avisado de cada passo da entrega feita pelo colportor. */
+async function notifyCustomerDeliveryStep(orderId: string, step: string, description = "") {
+  try {
+    const { data: order } = await db.from("orders").select("*").eq("id", orderId).maybeSingle();
+    if (order) await notifyOrderStep(order, step, description ? { description } : undefined);
+  } catch (err) {
+    console.log(`Entrega por colportor (${step}):`, (err as Error)?.message || err);
+  }
+}
+
+const requireColporteurLogin = (auth: Auth) => {
+  if (!auth?.id) throw new HttpError(401, "Entre na sua conta de colportor.");
+};
+
+/** Depois de qualquer acção: os avisos que a base escreveu (equipa e colportores) saem já. */
+function dispatchDeliveryNotices() {
+  runAfterResponse("Avisos (entregas por colportor)", async () => {
+    await Promise.all([dispatchStaffNotifications(), dispatchColporteurNotifications()]);
+  });
+}
+
+route("POST", "/colportores/entregas/responder", async ({ auth, body, ip }) => {
+  requireColporteurLogin(auth);
+  if (!await checkRateLimit("colporteur-delivery", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const result = await colporteurRpc("colporteur_delivery_respond", {
+    p_delivery: clipText(body.deliveryId, 60), p_profile: auth!.id, p_accept: body.accept === true,
+    p_reason: clipText(body.reason, 300),
+  }, auth!.id);
+  if (result.status === "accepted" && ["", "received"].includes(String(result.previous_delivery_status || ""))) {
+    runAfterResponse("Entrega aceite pelo colportor", () =>
+      notifyCustomerDeliveryStep(String(result.order_id), "confirmed", "Um colportor da Livraria perto de si vai fazer a entrega."));
+  }
+  dispatchDeliveryNotices();
+  return json(result);
+});
+
+route("POST", "/colportores/entregas/passo", async ({ auth, body, ip }) => {
+  requireColporteurLogin(auth);
+  if (!await checkRateLimit("colporteur-delivery", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const step = String(body.step || "");
+  if (!["out_for_delivery", "delivered", "release"].includes(step)) throw bad("Passo inválido.");
+  // Só a imagem PNG do quadro, como na confirmação de entrega pelo cliente.
+  const signature = typeof body.signature === "string" ? body.signature : "";
+  if (step === "delivered" && !isPngSignature(signature, 300_000)) {
+    throw bad("Falta a assinatura de quem recebeu, como está no Bilhete.");
+  }
+  const name = clipText(body.recipientName, 120);
+  const result = await colporteurRpc("colporteur_delivery_step", {
+    p_delivery: clipText(body.deliveryId, 60), p_profile: auth!.id, p_step: step,
+    p_recipient_name: name, p_recipient_id: clipText(body.recipientId, 60),
+    p_signature: step === "delivered" ? signature : "", p_reason: clipText(body.reason, 300),
+  }, auth!.id);
+  const orderId = String(result.order_id || "");
+  if (step === "out_for_delivery") runAfterResponse("Saiu para entrega (colportor)", () => notifyCustomerDeliveryStep(orderId, "out_for_delivery"));
+  if (step === "delivered") runAfterResponse("Entregue (colportor)", () => notifyCustomerDeliveryStep(orderId, "delivered", `Recebido por ${name}.`));
+  dispatchDeliveryNotices();
+  return json(result);
+});
+
+const canManageDeliveries = (auth: Auth) => can(auth, "manage_orders") || can(auth, "manage_colporteurs");
+
+/** A equipa entregou ao colportor os livros que ele levanta na loja: a encomenda fica expedida. */
+route("POST", "/admin/colportores/entregas/entregue-ao-colportor", async ({ auth, body }) => {
+  if (!canManageDeliveries(auth)) throw new HttpError(403, "Sem permissão.");
+  const result = await colporteurRpc("colporteur_delivery_handover", { p_delivery: clipText(body.deliveryId, 60) }, auth!.id);
+  if (["", "received", "confirmed", "preparing"].includes(String(result.previous_delivery_status || ""))) {
+    runAfterResponse("Livros entregues ao colportor", () => notifyCustomerDeliveryStep(String(result.order_id), "shipped"));
+  }
+  dispatchDeliveryNotices();
+  return json(result);
+});
+
+/** A equipa tira a entrega ao colportor (ou a oferta ainda por aceitar) e faz ela a entrega. */
+route("POST", "/admin/colportores/entregas/retirar", async ({ auth, body }) => {
+  if (!canManageDeliveries(auth)) throw new HttpError(403, "Sem permissão.");
+  const result = await colporteurRpc("colporteur_delivery_take_back", {
+    p_delivery: clipText(body.deliveryId, 60), p_reason: clipText(body.reason, 280),
+  }, auth!.id);
+  dispatchDeliveryNotices();
+  return json(result);
+});
+
+/**
+ * Avisos aos colportores (entrega oferecida, livros entregues, entrega retirada ou cancelada):
+ * WhatsApp para o telefone dele e push para a conta, a qualquer hora — a oferta tem prazo. O
+ * aviso dentro do site foi escrito pela base de dados (customer_notifications, tipo
+ * 'colportagem'); aqui só os outros canais, uma vez cada.
+ */
+async function dispatchColporteurNotifications(limit = 50) {
+  const { data: pending, error } = await db.from("customer_notifications")
+    .select("id, customer_id, title, body, href, created_at")
+    .is("dispatched_at", null).eq("kind", "colportagem").order("created_at", { ascending: true }).limit(limit);
+  if (error) {
+    console.log("dispatchColporteurNotifications:", error.message);
+    return { pending: 0, sent: 0 };
+  }
+  if (!pending?.length) return { pending: 0, sent: 0 };
+  const [settings, whatsapp] = await Promise.all([getSettings(), getWhatsAppConfig()]);
+  const site = String(emailBrand(settings).siteUrl || "").replace(/\/$/, "");
+  let sent = 0;
+  for (const n of pending as Row[]) {
+    const { data: claimed } = await db.from("customer_notifications").update({ dispatched_at: nowISO() })
+      .eq("id", n.id).is("dispatched_at", null).select("id");
+    if (!claimed?.length) continue;
+    let ok = false;
+    try {
+      const { data: c } = await db.from("colporteurs").select("phone, full_name").eq("profile_id", n.customer_id).maybeSingle();
+      const dedupe = `wa:colportor:${n.id}`;
+      if (whatsapp && c?.phone && !(await alreadySent(dedupe))) {
+        const text = [`*${n.title}*`, "", String(n.body || ""), site ? `\nAbrir: ${site}${n.href || "/colportor?tab=entregas"}` : ""]
+          .filter(Boolean).join("\n");
+        const res = await sendWhatsAppText(String(c.phone), text, whatsapp);
+        await logNotification({
+          type: "whatsapp", context: "colportagem", recipient: c.phone, customer_name: c.full_name || "", order_number: "",
+          content: text, provider: "meta", dedupe_key: dedupe, status: res?.ok ? "sent" : "failed", subject: String(n.title || ""),
+          detail: res?.ok ? "Aceite pela Meta Cloud API" : `${res?.status || ""} ${res?.error || ""}`.trim(),
+        });
+        ok = !!res?.ok;
+      }
+      const pushed = await sendUserPush(String(n.customer_id), settings, {
+        title: String(n.title || "Colportagem"), body: clipText(String(n.body || ""), 160), url: String(n.href || "/colportor?tab=entregas"),
+      });
+      ok = ok || pushed > 0;
+    } catch (err) {
+      console.log("aviso ao colportor:", (err as Error)?.message || err);
+    }
+    if (ok) sent++;
+  }
+  return { pending: pending.length, sent };
+}
+
 route("POST", "/colportores/candidatura", async ({ body, ip }) => {
   if (!await checkRateLimit("colportor", ip, 3)) throw tooMany("Demasiadas candidaturas seguidas. Aguarde um minuto.");
   // Campo escondido no formulário: uma pessoa não o preenche.
@@ -3541,11 +3695,14 @@ route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
   const given = (req.headers.get("x-queue-token") || "").trim();
   if (!secretsMatch(given, expected)) throw new HttpError(401, "Token inválido.");
-  const [staff, customers, community] = await Promise.all([
+  const [staff, customers, community, colporteurs] = await Promise.all([
     dispatchStaffNotifications(), dispatchCustomerSupportNotifications(), dispatchCommunityNotifications(),
+    dispatchColporteurNotifications(),
   ]);
-  if (staff.pending || customers.pending || community.pending) console.log("Avisos (cron):", JSON.stringify({ staff, customers, community }));
-  return json({ ...staff, customers, community });
+  if (staff.pending || customers.pending || community.pending || colporteurs.pending) {
+    console.log("Avisos (cron):", JSON.stringify({ staff, customers, community, colporteurs }));
+  }
+  return json({ ...staff, customers, community, colporteurs });
 });
 
 const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delivery", "support", "urgent"];
@@ -4183,7 +4340,7 @@ function chatProvider(settings: Row | null): { use: "gemini" | "deepseek"; key: 
 }
 
 route("GET", "/chat/config", async () => {
-  const settings = await getSettings();
+  const [settings, hours] = await Promise.all([getSettings(), opsHours()]);
   const ai = chatProvider(settings);
   // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
   return publicJson({
@@ -4191,6 +4348,9 @@ route("GET", "/chat/config", async () => {
     ai: !!ai, provider: ai?.use || "faq", welcome: settings?.chat_welcome || "",
     // O cliente sabe, antes de pedir, se a equipa responde por aqui (precisa de conta).
     handoff: true, whatsapp: settings?.whatsapp || "",
+    // Horário da equipa (Equipas e alertas), em hora de Luanda: o site diz "disponível agora" ou
+    // "volta amanhã às 08h". Vai o horário e não o "aberto agora", que a cache deixaria velho.
+    team_hours: { open_hour: hours.openHour, close_hour: hours.closeHour, open_days: hours.openDays },
   });
 });
 
@@ -4386,6 +4546,7 @@ async function presentMessages(rows: Row[]) {
     products: (Array.isArray(r.meta?.product_ids) ? r.meta.product_ids : []).map((pid: unknown) => byBook.get(String(pid))).filter(Boolean),
     offer_handoff: r.meta?.offer_handoff === true,
     handoff_reason: typeof r.meta?.handoff_reason === "string" ? r.meta.handoff_reason : undefined,
+    order_card: r.meta?.order_card && typeof r.meta.order_card === "object" ? r.meta.order_card : undefined,
     feedback: r.feedback ?? null,
     author: r.author_kind === "staff" ? (byStaff.get(r.sender_id) || "Equipa") : undefined,
   }));
@@ -4570,6 +4731,7 @@ route("POST", "/chat", async ({ body, ip, auth }) => {
   };
   if (reply.handoff_reason) meta.handoff_reason = reply.handoff_reason;
   if (reply.order_id) meta.order_id = reply.order_id;
+  if (reply.order_card) meta.order_card = reply.order_card;
   if (provider) meta.ai = provider;
   const { data: botRow, error: botError } = await db.from("support_messages").insert({
     thread_id: thread.id, sender_id: null, author_kind: "assistant", body: reply.reply.slice(0, 4000), meta,

@@ -53,7 +53,7 @@ export default function PrivacyPage() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nesta página</p>
             <ol className="space-y-1 text-sm">
               {sections.map((s) => (
-                <li key={s.id}><a href={`#${s.id}`} className="block rounded px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground">{s.title}</a></li>
+                <li key={s.id}><a href={`#${s.id}`} className="block rounded px-2 py-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:py-1">{s.title}</a></li>
               ))}
             </ol>
           </nav>

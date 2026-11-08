@@ -65,7 +65,7 @@ export default function SiteNoticeBar({ notice, onDismiss, preview = false }) {
             type="button"
             onClick={onDismiss}
             aria-label="Fechar aviso"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 opacity-80 transition-opacity hover:opacity-100 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+            className="tap-target absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 opacity-80 transition-opacity hover:opacity-100 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

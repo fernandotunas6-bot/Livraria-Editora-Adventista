@@ -76,7 +76,7 @@ const AboutPage = () => {
           <section className="section-spacing">
             <div className="container-custom">
               <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
-                <h2 className="text-4xl md:text-5xl font-bold mb-4">A Nossa Equipa</h2>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">A Nossa Equipa</h2>
                 <p className="text-muted-foreground text-lg">Quem o atende, na loja e nas entregas</p>
               </motion.div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -115,7 +115,7 @@ const AboutPage = () => {
         <section className="section-spacing bg-muted/30">
           <div className="container-custom">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold mb-4">Os Nossos Valores</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">Os Nossos Valores</h2>
               <p className="text-muted-foreground text-lg">O que nos move todos os dias</p>
             </motion.div>
             <div className="grid md:grid-cols-2 gap-8">

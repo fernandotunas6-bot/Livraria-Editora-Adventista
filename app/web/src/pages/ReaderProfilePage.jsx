@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
-import { Award, BadgeCheck, ChevronRight, Loader2 } from 'lucide-react';
+import { Award, BadgeCheck, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import PostSkeleton from '@/components/community/PostSkeleton';
 import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import Monogram from '@/components/community/Monogram';
 import { GoldRule } from '@/components/community/CommunityParts';
-import { isMissingTable, loadReader, loadReaderPosts } from '@/lib/communityApi';
+import { PAGE_SIZE, isMissingTable, loadReader, loadReaderPosts } from '@/lib/communityApi';
 import { plural, postKind, postPath, readerSince } from '@/lib/communityStyle';
 import { relativeTime } from '@/lib/communityText';
 import { pageTitle } from '@/lib/brand';
@@ -19,6 +21,9 @@ export default function ReaderProfilePage() {
   const [reader, setReader] = useState(null);
   const [posts, setPosts] = useState([]);
   const [status, setStatus] = useState('loading');
+  const [attempt, setAttempt] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [moreState, setMoreState] = useState('idle');
 
   useEffect(() => {
     let alive = true;
@@ -27,11 +32,27 @@ export default function ReaderProfilePage() {
       .then(([r, p]) => {
         if (!alive) return;
         if (!r) { setStatus('missing'); return; }
-        setReader(r); setPosts(p); setStatus('ready');
+        setReader(r); setPosts(p); setHasMore(p.length === PAGE_SIZE); setStatus('ready');
       })
-      .catch((e) => { if (alive) setStatus(isMissingTable(e) ? 'unavailable' : 'missing'); });
+      // Sem rede não é "leitor não encontrado": mostra-se o erro com "Tentar outra vez".
+      .catch((e) => { if (alive) setStatus(isMissingTable(e) ? 'unavailable' : 'error'); });
     return () => { alive = false; };
-  }, [key]);
+  }, [key, attempt]);
+
+  // As publicações seguintes, pela data da última mostrada (a função já aceitava `before`).
+  const loadMore = useCallback(async () => {
+    const last = posts.reduce((min, p) => (!min || p.created < min ? p.created : min), null);
+    if (!last) return;
+    setMoreState('loading');
+    try {
+      const page = await loadReaderPosts(key, last);
+      setPosts((prev) => [...prev, ...page.filter((p) => !prev.some((x) => x.id === p.id))]);
+      setHasMore(page.length === PAGE_SIZE);
+      setMoreState('idle');
+    } catch {
+      setMoreState('error');
+    }
+  }, [key, posts]);
 
   const stats = reader ? [
     ['Publicações', reader.posts_count], ['Respostas', reader.replies_count],
@@ -53,7 +74,16 @@ export default function ReaderProfilePage() {
             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /> <span>Leitor</span>
           </nav>
 
-          {status === 'loading' && <div className="flex justify-center py-16" role="status" aria-label="A carregar o perfil"><Loader2 className="h-6 w-6 animate-spin text-editorial-tinta-suave" aria-hidden="true" /></div>}
+          {status === 'loading' && <PostSkeleton count={2} />}
+          {status === 'error' && (
+            <div className="rounded-2xl border border-dashed border-editorial-filete bg-editorial-papel p-10 text-center" role="alert">
+              <h1 className="text-2xl font-semibold text-editorial-tinta">Não foi possível abrir o perfil</h1>
+              <p className="mt-2 text-sm text-editorial-tinta-suave">Verifique a ligação à internet e tente outra vez.</p>
+              <Button type="button" variant="outline" onClick={() => setAttempt((n) => n + 1)} className="mt-4 border-editorial-filete bg-editorial-papel">
+                <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" /> Tentar outra vez
+              </Button>
+            </div>
+          )}
           {status === 'missing' && (
             <div className="rounded-2xl border border-dashed border-editorial-filete bg-editorial-papel p-10 text-center">
               <h1 className="text-2xl font-semibold text-editorial-tinta">Leitor não encontrado</h1>
@@ -94,14 +124,26 @@ export default function ReaderProfilePage() {
                   <ul className="mt-4 space-y-3">
                     {posts.map((p) => (
                       <li key={p.id}>
-                        <Link to={postPath(p.id)} className="block rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(p.kind).label}{p.book_title ? ` · ${p.book_title}` : ''}</p>
-                          <p className="mt-1 line-clamp-3 text-[15px] text-editorial-tinta">{p.body}</p>
-                          <p className="mt-2 text-xs text-editorial-tinta-suave">{relativeTime(p.created)} · {plural(p.likes_count || 0, 'gosto', 'gostos')} · {plural(p.replies_count || 0, 'resposta', 'respostas')}</p>
+                        <Link to={postPath(p.id)} className="flex gap-3 rounded-2xl border border-editorial-filete bg-editorial-papel p-4 transition-shadow hover:shadow-md">
+                          {p.book_cover && <img src={p.book_cover} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover shadow-sm" />}
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold uppercase tracking-wide text-editorial-ouro-texto">{postKind(p.kind).label}{p.book_title ? ` · ${p.book_title}` : ''}</span>
+                            <span className="mt-1 line-clamp-3 block text-[15px] text-editorial-tinta">{p.body}</span>
+                            <span className="mt-2 block text-xs text-editorial-tinta-suave">{relativeTime(p.created)} · {plural(p.likes_count || 0, 'gosto', 'gostos')} · {plural(p.replies_count || 0, 'resposta', 'respostas')}</span>
+                          </span>
                         </Link>
                       </li>
                     ))}
                   </ul>
+                )}
+                {hasMore && (
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                    {moreState === 'error' && <p className="text-sm text-editorial-tinta" role="alert">Não foi possível carregar mais publicações.</p>}
+                    <Button type="button" variant="outline" onClick={loadMore} disabled={moreState === 'loading'} className="border-editorial-filete bg-editorial-papel">
+                      {moreState === 'loading' && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />}
+                      {moreState === 'error' ? 'Tentar outra vez' : 'Ver mais publicações'}
+                    </Button>
+                  </div>
                 )}
               </section>
             </>

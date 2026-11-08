@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,8 @@ const ContactPage = () => {
   const { settings } = useSiteSettings();
   const contactEmail = settings.contact_email || '';
   const contactPhone = settings.contact_phone || '';
+  const whatsappDigits = String(settings.whatsapp || settings.contact_phone || '').replace(/\D/g, '');
+  const telHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, '')}` : '';
   const contactAddress = settings.contact_address || BRAND.address;
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -85,6 +87,27 @@ const ContactPage = () => {
 
       <main className="section-spacing bg-background overflow-x-clip">
         <div className="container-custom">
+          {/* No telemóvel, falar já: ligar, WhatsApp e email a um toque, antes do formulário
+              (que fica para quem prefere escrever com calma). */}
+          {(telHref || whatsappDigits || contactEmail) && (
+            <nav aria-label="Contactar já" className="mx-auto mb-8 flex max-w-5xl gap-2 md:hidden">
+              {telHref && (
+                <a href={telHref} className="flex min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card text-sm font-medium text-foreground active:bg-muted">
+                  <Phone className="h-5 w-5 text-primary" aria-hidden="true" /> Ligar
+                </a>
+              )}
+              {whatsappDigits && (
+                <a href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noopener noreferrer" className="flex min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card text-sm font-medium text-foreground active:bg-muted">
+                  <MessageCircle className="h-5 w-5 text-green-600" aria-hidden="true" /> WhatsApp
+                </a>
+              )}
+              {contactEmail && (
+                <a href={`mailto:${contactEmail}`} className="flex min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card text-sm font-medium text-foreground active:bg-muted">
+                  <Mail className="h-5 w-5 text-primary" aria-hidden="true" /> Email
+                </a>
+              )}
+            </nav>
+          )}
           <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
             <motion.div
               initial={{ opacity: 0, x: -30 }}
@@ -99,6 +122,8 @@ const ContactPage = () => {
                     id="name"
                     name="name"
                     type="text"
+                    autoComplete="name"
+                    enterKeyHint="next"
                     value={formData.name}
                     onChange={handleChange}
                     required
@@ -112,6 +137,9 @@ const ContactPage = () => {
                     id="email"
                     name="email"
                     type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    enterKeyHint="next"
                     value={formData.email}
                     onChange={handleChange}
                     required
@@ -125,6 +153,9 @@ const ContactPage = () => {
                     id="phone"
                     name="phone"
                     type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
                     value={formData.phone}
                     onChange={handleChange}
                     className="mt-1 bg-input border-border text-foreground"
@@ -166,7 +197,7 @@ const ContactPage = () => {
                       </div>
                       <div>
                         <h3 className="text-base font-semibold mb-1 text-foreground">Email</h3>
-                        <p className="text-muted-foreground">{contactEmail}</p>
+                        <a href={`mailto:${contactEmail}`} className="break-all text-muted-foreground underline-offset-2 hover:text-primary hover:underline">{contactEmail}</a>
                       </div>
                     </div>
                   )}
@@ -178,7 +209,7 @@ const ContactPage = () => {
                       </div>
                       <div>
                         <h3 className="text-base font-semibold mb-1 text-foreground">Telefone</h3>
-                        <p className="text-muted-foreground">{displayAngolaPhone(contactPhone)}</p>
+                        <a href={telHref} className="text-muted-foreground tabular-nums underline-offset-2 hover:text-primary hover:underline">{displayAngolaPhone(contactPhone)}</a>
                       </div>
                     </div>
                   )}

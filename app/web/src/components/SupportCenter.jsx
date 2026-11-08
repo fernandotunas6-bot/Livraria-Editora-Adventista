@@ -88,6 +88,8 @@ const NOTIFICATION_KINDS = {
   ticket_sla: 'Prazo de pedido de ajuda',
   escalation: 'Escalada: ninguém assumiu',
   ops_test: 'Teste de avisos',
+  colporteur_application: 'Candidatura a colportor',
+  colporteur_report: 'Relatório de colportor',
 };
 
 // Avisos da vigilância: levam ao Acompanhamento, onde se assume e trata.
@@ -272,6 +274,8 @@ export default function SupportCenter({ compact = false, onOpenAssistant }) {
       }
       if (notification.order_id) {
         navigate(staff ? (WATCH_KINDS.has(notification.kind) ? '/admin?tab=acompanhamento' : '/admin?tab=orders') : notification.href || '/profile?tab=orders');
+      } else if (staff && String(notification.kind).startsWith('colporteur_')) {
+        navigate('/admin?tab=colportagem');
       } else if (notification.href?.startsWith('/')) {
         navigate(notification.href);
       }

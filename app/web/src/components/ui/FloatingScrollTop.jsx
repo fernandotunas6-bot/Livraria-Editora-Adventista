@@ -14,7 +14,7 @@ export function FloatingScrollTop({
   threshold = 300,
   label = 'Voltar ao Topo',
   className,
-  positionClass = 'fixed right-6 z-50 float-above-bar',
+  positionClass = 'fixed z-50 float-above-bar float-right-edge',
 }) {
   const [visible, setVisible] = useState(false);
 

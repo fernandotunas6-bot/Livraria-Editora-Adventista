@@ -1654,3 +1654,33 @@ leitura) e o GitHub Actions, mas não chega ao site nem ao DNS (a rede recusa
    contas da equipa; **apagar o projecto antigo `livraria-adventista.pages.dev`**, que continua
    ligado à base de produção com um build antigo; e fechar o email do `.com` (`MX 0 .`,
    `v=spf1 -all`, DMARC `p=reject`), que não envia nada e pode ser usado para falsificar a loja.
+
+### Integração dos PRs abertos #21, #24, #26, #27 e #35 (2026-11-08)
+
+Pedido do dono: integrar os PRs abertos e publicar (o #35, aberto entretanto, a pedido à parte: só o texto do quadro da assinatura, com o CI verde). O #27 já trazia o #21 (com os conflitos
+dele resolvidos) e o `main` até ao #29; o #24 e o #26 juntaram-se sem conflitos de texto.
+
+**O que a integração apanhou: a migração do #26 partia o deploy.** `20261107110000_colportagem_avisos`
+reescrevia a regra `staff_notifications_kind_check` com uma lista fixa, sem o tipo `security` do
+registo de segurança (`20261107130000`, já em produção). Com `--include-all`, o `db push` aplica-a
+depois dessa, e a produção já tem 3 avisos `security`: o `add constraint` falhava sobre essas
+linhas ("violated by some row"), o workflow parava antes de publicar a Edge Function, e o
+Cloudflare publicava o site novo à mesma. O CI não o via: aplica as migrações por ordem de nome,
+com a do #26 antes da de segurança e sem avisos gravados. É o cuidado do achado 110, a acontecer.
+
+- A migração passa a **juntar** os dois tipos à regra que existir (o padrão da `registo_de_seguranca`),
+  e muda de data para `20261108041000`: a ordem dos ficheiros volta a ser a ordem real em produção.
+- A do #27 (`comunidade_respostas_por_publicacao`) não colide com nenhuma posterior; muda de data
+  na mesma (`20261108041500`), pela mesma razão. O site tem recuo para a função antiga durante a
+  janela entre os dois deploys.
+
+Verificado em PGlite: a migração original falha na ordem de produção com avisos `security`
+gravados; a corrigida passa, mantém `security`, os tipos antigos e os da colportagem, e corre
+duas vezes sem mudar nada; uma candidatura nova avisa o administrador; as 97 migrações aplicam de
+raiz; os 91 cenários de `scripts/pglite/pagamentos.mjs` continuam certos. E: 1128 testes, lint,
+build, `deno check`, scanner de segredos, nenhuma rota duplicada na Edge Function.
+
+Ficaram de fora, de propósito: os PRs do Dependabot (#30–#33) — o #33 (Tailwind 3 → 4) e o #32
+(tailwind-merge 2 → 3, que é para o Tailwind 4) são mudanças de versão maior que partem o CSS do
+site, e o #31 junta 36 actualizações de uma vez; cada um pede o seu teste. E os #3 e #4, que
+apontam para outro ramo (`claude/tender-archimedes-gq0s8m`), não para o `main`.

@@ -361,12 +361,12 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground transition-colors [font-family:inherit] group-hover:text-primary sm:text-sm">
             {product.title}
           </h3>
-          <p className="mt-0.5 line-clamp-1 min-h-[1.4em] text-[11px] text-muted-foreground sm:text-xs">{product.subtitle || '\u00a0'}</p>
+          <p className="mt-0.5 line-clamp-1 min-h-[1.4em] text-xs text-muted-foreground">{product.subtitle || '\u00a0'}</p>
           <div className="mt-auto flex flex-wrap items-baseline gap-x-1.5 pt-1.5">
             <span className="text-[15px] font-bold text-brand-ink tabular-nums sm:text-base">{price}</span>
-            {originalPrice && <span className="text-[11px] text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
+            {originalPrice && <span className="text-xs text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
           </div>
-          <p className={`text-[11px] font-medium ${!inStock ? 'text-muted-foreground' : isLowStock ? 'text-orange-700 dark:text-orange-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+          <p className={`text-xs font-medium ${!inStock ? 'text-muted-foreground' : isLowStock ? 'text-orange-700 dark:text-orange-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
             {!inStock ? 'Esgotado' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
           </p>
         </Link>
