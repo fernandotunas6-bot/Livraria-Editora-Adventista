@@ -12,7 +12,7 @@
 // avisos, nos emails e noutras páginas do site.
 
 import {
-  Activity, Award, Ban, BarChart3, Bell, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
+  Activity, Award, Ban, BarChart3, Bell, Bike, BookHeart, BookOpen, Brush, Building2, Church, ClipboardList, CreditCard, FileDown,
   FileUp, Flag, Hash, Image, Inbox, KeyRound, LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
@@ -174,6 +174,7 @@ export const ADMIN_SECTIONS = {
       { id: 'candidaturas', label: 'Candidaturas', icon: Inbox, keywords: 'pedidos novos aprovar recusar', description: 'Quem se candidatou: aprovar, recusar ou pedir mais dados.' },
       { id: 'colportores', label: 'Colportores', icon: Users, keywords: 'fichas codigo cpt', description: 'As fichas dos colportores: código, categoria, igreja, zona e estado.' },
       { id: 'relatorios', label: 'Relatórios', icon: ClipboardList, keywords: 'semanais validar devolver', description: 'Relatórios semanais: validar ou devolver, ver quem falta e lançar por um colportor.' },
+      { id: 'entregas', label: 'Entregas', icon: Bike, keywords: 'domicilio ofertas preparar levantar loja', description: 'As entregas ao domicílio com colportores: o que preparar na loja, as ofertas à espera e quanto cada um fez e ganhou.' },
       { id: 'guias', label: 'Guias e stock', icon: Truck, keywords: 'consignacao entrega devolucao compra', description: 'Guias de entrega, devolução e compra, com o stock da loja e o do colportor.' },
       { id: 'contas', label: 'Contas', icon: Scale, keywords: 'conta corrente saldo extracto acertos pagamentos', description: 'O saldo de cada colportor, o extracto, os pagamentos e as correcções.' },
       { id: 'reclassificacao', label: 'Reclassificação', icon: TrendingUp, keywords: 'categoria anual subir', description: 'A sugestão anual de categoria de cada colportor; a equipa aplica uma a uma.' },
