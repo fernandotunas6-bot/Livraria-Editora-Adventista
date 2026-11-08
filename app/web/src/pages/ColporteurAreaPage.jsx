@@ -77,7 +77,7 @@ export default function ColporteurAreaPage() {
   } else if (!isAuthed) {
     body = (
       <div className="rounded-2xl border border-border p-6">
-        <h2 className="mb-2 text-xl font-bold">{invite ? 'Ligar a sua conta de colportor' : 'Área do colportor'}</h2>
+        <h1 className="mb-2 text-xl font-bold">{invite ? 'Ligar a sua conta de colportor' : 'Área do colportor'}</h1>
         <p className="mb-4 text-muted-foreground">
           {invite ? 'Entre (ou crie conta, por exemplo com o Google) para ligar a sua conta ao código de colportor que recebeu.' : 'Entre na conta ligada ao seu código de colportor.'}
         </p>
@@ -90,7 +90,7 @@ export default function ColporteurAreaPage() {
   } else if (!me) {
     body = (
       <div className="rounded-2xl border border-border p-6">
-        <h2 className="mb-2 text-xl font-bold">Esta conta não está ligada a um colportor</h2>
+        <h1 className="mb-2 text-xl font-bold">Esta conta não está ligada a um colportor</h1>
         {error && <p className="mb-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
         <p className="mb-4 text-muted-foreground">Se já foi aprovado, use o link do convite que recebeu no WhatsApp. Se ainda não se candidatou, faça-o aqui.</p>
         <Button asChild><Link to="/colportor/candidatura">Candidatar-me</Link></Button>
@@ -102,7 +102,7 @@ export default function ColporteurAreaPage() {
       <div className="space-y-6">
         <div className="rounded-2xl border border-border bg-linear-to-br from-primary/10 to-background p-6">
           <p className="text-sm text-muted-foreground">Colportor</p>
-          <h2 className="text-2xl font-bold">{me.full_name}</h2>
+          <h1 className="text-2xl font-bold">{me.full_name}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => copy(me.code, 'Código')} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 font-mono text-lg font-bold text-primary-foreground" title="Copiar código">
               <BadgeCheck className="h-5 w-5" />{me.code}<Copy className="h-4 w-4 opacity-70" />
