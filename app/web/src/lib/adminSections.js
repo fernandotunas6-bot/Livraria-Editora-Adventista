@@ -51,7 +51,7 @@ export const ADMIN_SECTIONS = {
   inicio: {
     label: 'Início', title: 'Início', icon: LayoutDashboard,
     keywords: 'resumo dashboard hoje painel principal',
-    description: 'O que precisa de atenção: encomendas, pagamentos por confirmar e stock.',
+    description: 'O que precisa de atenção no que cada um trata: encomendas, pagamentos, stock, produção e salários.',
     allowed: () => true,
   },
   books: {

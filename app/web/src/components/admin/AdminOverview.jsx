@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import {
-  AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CheckCircle2, Clock, ExternalLink, Info, MessageCircle, PackageSearch, PanelTop, Plus,
-  ShoppingBag, Siren, Wallet,
+  AlertTriangle, ArrowDownRight, ArrowLeftRight, ArrowRight, ArrowUpRight, CheckCircle2, Clock, ExternalLink, Factory, IdCard, Info,
+  MessageCircle, PackageSearch, PanelTop, Plus, ShoppingBag, Siren, Wallet,
 } from 'lucide-react';
 import { attentionItems } from '@/lib/adminAttention';
+import { mergeAttention } from '@/lib/editoraAttention';
 import { monthSummary, topProducts } from '@/lib/managerSummary';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/api/EcommerceApi';
@@ -66,12 +67,26 @@ const SEVERITY = {
  * por ordem de urgência, cada uma com o caminho para a resolver. Sem nenhuma, diz que está tudo
  * em dia — também é informação.
  */
-function AttentionList({ items, onAct, loading }) {
+/** "nas encomendas, nos pagamentos e na produção": o que esta pessoa vê, para o «tudo em dia». */
+export function upToDateAreas(perms = {}) {
+  const areas = [
+    perms.orders && 'nas encomendas',
+    perms.orders && 'nos pagamentos',
+    perms.catalog && 'no catálogo',
+    (perms.production || perms.finance) && 'na produção',
+    perms.finance && 'nos salários',
+  ].filter(Boolean);
+  if (areas.length < 2) return areas[0] || '';
+  return `${areas.slice(0, -1).join(', ')} nem ${areas[areas.length - 1]}`;
+}
+
+function AttentionList({ items, onAct, loading, perms }) {
   if (loading) return null;
   if (!items.length) {
+    const where = upToDateAreas(perms);
     return (
       <p className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200" role="status">
-        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> Tudo em dia: nada atrasado nas encomendas, nos pagamentos nem no catálogo.
+        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> Tudo em dia{where ? `: nada atrasado ${where}` : ''}.
       </p>
     );
   }
@@ -206,7 +221,7 @@ function MonthPanel({ orders, onNavigate }) {
  * resolve.
  */
 export default function AdminOverview({
-  userName, perms, orders = [], books = [], lowStockBooks = [], loading = false,
+  userName, perms, orders = [], books = [], lowStockBooks = [], extraAttention = [], loading = false,
   onNavigate, onOpenOrders, onEditBook, onAddProduct,
 }) {
   const firstName = String(userName || '').trim().split(/\s+/)[0];
@@ -222,10 +237,14 @@ export default function AdminOverview({
   const monthTotal = month.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const monthReceived = month.reduce((s, o) => s + Math.max(0, (Number(o.amount_paid) || 0) - (Number(o.amount_refunded) || 0)), 0);
   const recent = orders.slice(0, 6);
-  const attention = useMemo(() => attentionItems({ orders, books, perms }), [orders, books, perms]);
+  // Os avisos das encomendas e do catálogo com os da Editora e das finanças (lib/editoraAttention.js).
+  const attention = useMemo(
+    () => mergeAttention(attentionItems({ orders, books, perms }), extraAttention),
+    [orders, books, perms, extraAttention],
+  );
   const act = (action) => {
     if (action.section === 'orders') onOpenOrders({ status: action.status, payment: action.payment });
-    else onNavigate(action.section, { filter: action.filter });
+    else onNavigate(action.section, { filter: action.filter, view: action.view });
   };
 
   return (
@@ -235,7 +254,7 @@ export default function AdminOverview({
         {today}.
       </p>
 
-      <AttentionList items={attention} onAct={act} loading={loading} />
+      <AttentionList items={attention} onAct={act} loading={loading} perms={perms} />
 
       {perms.orders && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Indicadores">
@@ -268,9 +287,12 @@ export default function AdminOverview({
 
       {perms.orders && perms.reports && !loading && <MonthPanel orders={orders} onNavigate={onNavigate} />}
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      {/* grid-cols-1 (minmax(0, 1fr)): sem ele, a coluna crescia até ao texto inteiro de uma
+          encomenda com número e nome compridos, e no telemóvel a página passava a largura do
+          ecrã — o "…" do nome não chegava a cortar. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         {perms.orders && (
-          <div className="xl:col-span-2">
+          <div className="min-w-0 xl:col-span-2">
             <Panel
               title="Últimas encomendas"
               action={(
@@ -353,6 +375,9 @@ export default function AdminOverview({
                 <Shortcut icon={PackageSearch} label={`Produtos (${books.length})`} onClick={() => onNavigate('books')} />
               )}
               {perms.orders && <Shortcut icon={MessageCircle} label="Atendimento" onClick={() => onNavigate('support')} />}
+              {(perms.production || perms.finance) && <Shortcut icon={Factory} label="Produção da Editora" onClick={() => onNavigate('producao')} />}
+              {(perms.staff || perms.finance) && <Shortcut icon={IdCard} label="Funcionários" onClick={() => onNavigate('funcionarios')} />}
+              {perms.finance && <Shortcut icon={ArrowLeftRight} label="Entradas e saídas" onClick={() => onNavigate('financas')} />}
               {(perms.settings || perms.marketing) && <Shortcut icon={PanelTop} label="Faixa de aviso" onClick={() => onNavigate('notices')} />}
               <a
                 href="/" target="_blank" rel="noopener noreferrer"

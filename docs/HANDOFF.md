@@ -2,6 +2,36 @@
 
 Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Refinar: a Editora e as finanças no Início, e «Pagamentos e caixa» em tempo real (2026-11-08, ramo `claude/gracious-hamilton-kfrbg8`, depois do #48)
+
+- **Pedido do dono:** "continua a refinar", depois do deploy do #48 e da resolução dos PRs
+  pendentes. Entraram o #41 (entregas) e o #40 e o #46, cada um com o main junto e testado. O #4 e
+  o #3 foram fechados: o primeiro já estava todo no main, e o main já faz o que o segundo trazia.
+- **Início:** quem gere a produção ou as finanças passa a ver em **Precisa de atenção**:
+  - as etapas atrasadas, as ordens com o prazo passado e as que estão por concluir;
+  - os salários de meses fechados por pagar e o que se deve aos fornecedores.
+
+  Os números ficam ao lado da Produção e dos Funcionários, com atalhos para as três secções novas.
+  O "Tudo em dia" passa a dizer só as áreas que a pessoa vê. Tabela em PAINEL_ADMIN.md, §4.1.
+- **Pagamentos e caixa** em tempo real: a fila dos pagamentos por verificar recebe na hora o que
+  o cliente indica (sinais `financas` e `orders`).
+- **Telemóvel** (pedido do dono: "no mobile pode estar oculto"): o ícone de tempo real da barra
+  do topo fica escondido abaixo de 768 px; o aviso "Sem ligação" continua à vista.
+- **De passagem:**
+  - o Início passava a largura do ecrã no telemóvel com encomendas de número e nome compridos. A
+    grelha não tinha `grid-cols-1` e crescia até ao texto inteiro;
+  - a mensagem "migrações por aplicar" de `productionApi.js` ainda dizia os números antigos
+    (150000–152000).
+- **Testes:**
+  - `lib/editoraAttention.test.js` (datas fixas) e `AdminOverview.test.jsx`;
+  - vitest: 179 ficheiros, 1481 testes;
+  - no browser, contra a pilha local, 19 verificações:
+    - o Início da produção e das finanças, os números e o "Ver";
+    - uma etapa feita noutro lado que sai sozinha, e um pagamento indicado que aparece na fila sem
+      recarregar;
+    - o ícone escondido a 390 px e à vista a 768 e a 1440 px, com o "Sem ligação" à vista;
+    - o Início sem deslocamento horizontal em todos os tamanhos.
+
 ## Produção da Editora, funcionários e saídas de dinheiro (2026-11-08, ramo `claude/gracious-hamilton-kfrbg8`)
 
 - **Pedido do dono**, esclarecido por perguntas:

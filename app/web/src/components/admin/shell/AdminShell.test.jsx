@@ -210,6 +210,13 @@ describe('barra do topo: o estado da sincronização', () => {
     expect(botao().getAttribute('title')).toMatch(/minuto a minuto/);
   });
 
+  it('no telemóvel o ícone fica escondido (abaixo de 768 px); a partir daí aparece', async () => {
+    await mount(shell({ sync: sync({ realtime: 'live' }) }));
+    const cls = botao().getAttribute('class').split(/\s+/);
+    expect(cls).toContain('hidden');
+    expect(cls).toContain('md:inline-flex');
+  });
+
   it('sem rede: "Sem ligação", com ou sem tempo real', async () => {
     await mount(shell({ sync: sync({ realtime: 'live', online: false }) }));
     expect(host.querySelector('header [role="status"]').textContent).toMatch(/Sem ligação/);

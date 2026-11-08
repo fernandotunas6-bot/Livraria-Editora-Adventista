@@ -136,6 +136,17 @@ actualiza.
   visita a um livro fazia todos os painéis abertos voltar a pedir o catálogo. Agora só há sinal
   quando muda alguma coisa além das visitas e da data de alteração.
 
+## No Início e na navegação
+
+Quem gere a produção ou as finanças vê no Início, em **Precisa de atenção**, o que piora se
+ninguém fizer nada: as etapas atrasadas (a mais atrasada, com o responsável; urgente com mais de
+7 dias), as ordens com o prazo passado e as que têm as etapas todas feitas à espera de concluir;
+e, para as finanças, os salários de meses fechados por pagar (e os do mês, a partir do dia 25) e o
+que se deve aos fornecedores. "Ver" abre a vista certa. O número das etapas atrasadas aparece ao
+lado da Produção e o dos salários atrasados ao lado dos Funcionários. Tudo em
+`lib/editoraAttention.js` (testado com datas fixas) e `hooks/useEditoraAttention.js`, com os
+sinais em tempo real. A tabela completa está em PAINEL_ADMIN.md, §4.1.
+
 ## Testes
 
 - `scripts/pglite/producao.mjs`: 96 cenários, sem Docker (instruções em `scripts/pglite/base.mjs`).

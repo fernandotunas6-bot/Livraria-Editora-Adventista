@@ -28,6 +28,10 @@ export function realtimeLabel(realtime) {
  * Estado da sincronização: o ícone de actualizar, a rodar enquanto actualiza, com "Em tempo real"
  * (a verde) quando o canal está ligado ou "Actualizado há 2 min" sem ele — carregar actualiza já
  * — e "Sem ligação" quando a rede cai: aí o que se gravar pode não chegar.
+ *
+ * No telemóvel (abaixo de 768 px, o mesmo corte de hooks/use-mobile) o ícone fica escondido, a
+ * pedido do dono: a barra é estreita e os dados actualizam-se sozinhos na mesma. O "Sem ligação"
+ * continua à vista em todos os tamanhos — é um aviso, não um botão.
  */
 function SyncStatus({ sync }) {
   const [now, setNow] = useState(() => Date.now());
@@ -49,7 +53,7 @@ function SyncStatus({ sync }) {
   return (
     <Button
       type="button" variant="ghost" onClick={sync.refreshNow} disabled={sync.syncing}
-      className="h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground"
+      className="hidden h-9 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground md:inline-flex"
       title={rt.title}
       aria-label={`${label}. Actualizar agora`}
     >
