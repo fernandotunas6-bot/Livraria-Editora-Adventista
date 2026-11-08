@@ -4183,7 +4183,7 @@ function chatProvider(settings: Row | null): { use: "gemini" | "deepseek"; key: 
 }
 
 route("GET", "/chat/config", async () => {
-  const settings = await getSettings();
+  const [settings, hours] = await Promise.all([getSettings(), opsHours()]);
   const ai = chatProvider(settings);
   // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
   return publicJson({
@@ -4191,6 +4191,9 @@ route("GET", "/chat/config", async () => {
     ai: !!ai, provider: ai?.use || "faq", welcome: settings?.chat_welcome || "",
     // O cliente sabe, antes de pedir, se a equipa responde por aqui (precisa de conta).
     handoff: true, whatsapp: settings?.whatsapp || "",
+    // Horário da equipa (Equipas e alertas), em hora de Luanda: o site diz "disponível agora" ou
+    // "volta amanhã às 08h". Vai o horário e não o "aberto agora", que a cache deixaria velho.
+    team_hours: { open_hour: hours.openHour, close_hour: hours.closeHour, open_days: hours.openDays },
   });
 });
 
@@ -4386,6 +4389,7 @@ async function presentMessages(rows: Row[]) {
     products: (Array.isArray(r.meta?.product_ids) ? r.meta.product_ids : []).map((pid: unknown) => byBook.get(String(pid))).filter(Boolean),
     offer_handoff: r.meta?.offer_handoff === true,
     handoff_reason: typeof r.meta?.handoff_reason === "string" ? r.meta.handoff_reason : undefined,
+    order_card: r.meta?.order_card && typeof r.meta.order_card === "object" ? r.meta.order_card : undefined,
     feedback: r.feedback ?? null,
     author: r.author_kind === "staff" ? (byStaff.get(r.sender_id) || "Equipa") : undefined,
   }));
@@ -4570,6 +4574,7 @@ route("POST", "/chat", async ({ body, ip, auth }) => {
   };
   if (reply.handoff_reason) meta.handoff_reason = reply.handoff_reason;
   if (reply.order_id) meta.order_id = reply.order_id;
+  if (reply.order_card) meta.order_card = reply.order_card;
   if (provider) meta.ai = provider;
   const { data: botRow, error: botError } = await db.from("support_messages").insert({
     thread_id: thread.id, sender_id: null, author_kind: "assistant", body: reply.reply.slice(0, 4000), meta,

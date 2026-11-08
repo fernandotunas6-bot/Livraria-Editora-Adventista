@@ -274,3 +274,30 @@ describe("histórico para a IA", async () => {
     expect(ruleReply(ctx("ENC-ZZZZZZ999 outro@exemplo.ao", { loggedIn: true, orders: [ORDER], lookupFailed: true })).reply).toContain("Não encontrei a encomenda");
   });
 });
+
+describe("cartão da encomenda", async () => {
+  const { orderCard } = await import("./chatEngine.ts");
+  it("passos da entrega com o estado real, pagamento, rastreio e previsão", () => {
+    const c = orderCard(ORDER);
+    expect(c).toMatchObject({ number: "ENC-K3J9XA4F2", made: "03/11/2026", payment: "confirmado", tracking: "TRK123", carrier: "Correios", eta: "08/11/2026", cancelled: false });
+    expect(c.steps.map((s) => s.label)).toEqual(["Recebida", "Paga", "Em preparação", "Em trânsito", "Entregue"]);
+    expect(c.steps.map((s) => [s.done, s.current])).toEqual([[true, false], [true, false], [true, false], [false, true], [false, false]]);
+  });
+
+  it("levantamento: passos próprios; entregue: tudo feito e sem previsão; cancelada: sem pagamento nem rastreio", () => {
+    const pick = orderCard({ ...ORDER, shipping_method: "pickup", pickup_store: "Huambo", delivery_status: "shipped" });
+    expect(pick.steps[3]).toMatchObject({ label: "Pronta a levantar", current: true });
+    expect(pick.pickup_store).toBe("Huambo");
+    const done = orderCard({ ...ORDER, delivery_status: "delivered" });
+    expect(done.steps.every((s) => s.done && !s.current)).toBe(true);
+    expect(done.eta).toBe("");
+    const off = orderCard({ ...ORDER, status: "cancelled", delivery_status: "cancelled" });
+    expect(off).toMatchObject({ cancelled: true, payment: "", tracking: "" });
+    expect(off.steps.some((s) => s.done || s.current)).toBe(false);
+  });
+
+  it("a resposta sobre uma encomenda leva o cartão", () => {
+    expect(ruleReply(ctx("A minha encomenda", { loggedIn: true, orders: [ORDER] })).order_card?.number).toBe("ENC-K3J9XA4F2");
+    expect(ruleReply(ctx("Formas de pagamento", { loggedIn: true, orders: [ORDER] })).order_card).toBeUndefined();
+  });
+});
