@@ -198,7 +198,7 @@ O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
 ## 5. Entregas por colportor
 
-Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) , `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo) e `20261108220000_entregas_loja_e_robustez.sql` (a loja de levantamento e o pagamento protegido).
+Decisões do dono (2026-11-08). Migrações `20261108100000_entregas_por_colportor.sql` e `20261108170000_entregas_refinamento.sql` (mínimo por entrega, entrega dada por outra pessoa, o gatilho que compara valores, o quadro da equipa e os sinais em tempo real) , `20261108200000_entregas_casos_limite.sql` (reembolso e colportor que deixa de estar activo) e `20261108220000_entregas_loja_e_robustez.sql` (a loja de levantamento, o pagamento protegido, as encomendas com edição digital e a posição de quem entrega).
 
 **Que encomendas vão a um colportor.** Só as entregas ao domicílio (normal ou expressa) **já pagas**: por transferência confirmada, pelo gateway ou ao balcão, ou porque o total baixou e o que já foi pago chega. As de pagamento na entrega ficam com a loja, porque o colportor não recebe dinheiro dos clientes. Os levantamentos na loja nunca vão a colportores.
 
@@ -228,6 +228,10 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
   - Se a guia não se puder fazer (por exemplo, já não tem os livros à consignação), fica também «libertada», e a equipa resolve à mão.
 - «Não posso entregar» (antes de levantar os livros na loja) devolve a entrega, que passa ao seguinte. A equipa pode **«Retirar ao colportor»** a qualquer momento, com o motivo, e passa a ser ela a entregar. Cancelar a encomenda cancela a entrega e avisa o colportor.
 
+**Encomendas com impressos e edição digital:** o colportor só leva os impressos. A edição digital não conta para saber se ele tem os livros, não lhe aparece na lista e não entra na guia automática; fica na conta do cliente quando a encomenda é paga. Uma encomenda só digital nunca vai a um colportor.
+
+**A posição de quem entrega** (`docs/TRAJETO_GPS.md`) pára assim que a entrega deixa de ser dele: reembolso, suspensão, desistência ou entrega retirada. O cliente deixa de a ver.
+
 **Se a equipa expedir a encomenda com uma oferta à espera**, a oferta fecha, o colportor é avisado e a encomenda fica com a equipa. Assim não há duas entregas.
 
 **Uma falha a oferecer nunca trava o pagamento**, que pode vir do webhook do gateway: o pagamento fica registado e o agendador volta a tentar de 5 em 5 minutos. Uma encomenda com problema também não pára as outras.
@@ -252,12 +256,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 **Técnico:**
 - tabela `colporteur_deliveries` (uma oferta activa por encomenda; RLS: a equipa e o próprio);
 - `orders.delivery_route` e `orders.delivery_colporteur_id`;
-- `private.delivery_candidates`, `private.offer_next_delivery` e os gatilhos `orders_entrega_colportor`, `orders_entrega_sem_pagamento`, `orders_entrega_equipa_expediu` e `colporteurs_entregas_fecham`; `private.delivery_pickup_store` e `colporteur_deliveries.pickup_store_id` (a loja);
+- `private.delivery_candidates`, `private.offer_next_delivery` e os gatilhos `orders_entrega_colportor`, `orders_entrega_sem_pagamento`, `orders_entrega_equipa_expediu`, `colporteurs_entregas_fecham` e `colporteur_deliveries_trajeto_para`; `private.delivery_pickup_store` e `colporteur_deliveries.pickup_store_id` (a loja);
 - `private.colporteur_delivery_complete` (a guia, os portes e o fecho, usada pelo colportor e pelo gatilho; o passo do colportor liga `app.colporteur_step` para o gatilho não fechar a entrega duas vezes);
 - funções `colporteur_delivery_respond`, `colporteur_delivery_step`, `colporteur_delivery_handover` e `colporteur_delivery_take_back` (só service role) e `colporteur_my_deliveries`, `order_colporteur_deliveries`, `colporteur_deliveries_board` (o quadro; «Gerir encomendas» ou «Gerir colportores»), `colporteur_set_location` e `colporteur_set_accepts_deliveries`;
 - rotas `/colportores/entregas/responder`, `/colportores/entregas/passo`, `/admin/colportores/entregas/entregue-ao-colportor` e `/admin/colportores/entregas/retirar`;
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
-- testes: 103 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
+- testes: 111 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
 ## Técnico
 

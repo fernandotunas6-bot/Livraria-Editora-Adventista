@@ -12,10 +12,14 @@
 --    encomenda com problema já não pára o agendador. O agendador volta a tentar.
 -- 4. A equipa expede uma encomenda com uma oferta à espera: a oferta fecha e a encomenda fica com a
 --    equipa. Antes o colportor ainda a podia aceitar, e havia duas entregas.
+-- 5. Encomendas com impressos e edição digital (20261108210000): o colportor só leva os impressos.
+--    Antes o digital fazia parecer que ele não tinha os livros, e a guia automática recusava a entrega.
+-- 6. A posição de quem entrega (20261108211000) pára quando a entrega deixa de ser dele.
 --
--- Reverter: drop do gatilho orders_entrega_equipa_expediu e das funções
--- orders_entrega_equipa_expediu, delivery_pickup_store e plain_text; repor as outras funções da
--- 20261108100000 e da 20261108170000; drop da coluna colporteur_deliveries.pickup_store_id.
+-- Reverter: drop dos gatilhos orders_entrega_equipa_expediu e colporteur_deliveries_trajeto_para e
+-- das funções com o mesmo nome, delivery_pickup_store e plain_text; repor as outras funções da
+-- 20261108100000, da 20261108170000 e (colporteur_my_deliveries) da 20261108211000; drop da coluna
+-- colporteur_deliveries.pickup_store_id.
 
 alter table public.colporteur_deliveries
   add column if not exists pickup_store_id text references public.physical_stores (id) on delete set null;
@@ -375,7 +379,7 @@ begin
       select jsonb_agg(x order by x ->> 'sort' desc) from (
         select jsonb_build_object(
           'sort', case when d.status in ('offered', 'accepted') then '1' else '0' end || to_char(d.offered_at, 'YYYYMMDDHH24MISS'),
-          'id', d.id, 'status', d.status, 'source', d.source, 'has_stock', d.has_stock, 'fee', d.fee,
+          'id', d.id, 'order_id', o.id, 'status', d.status, 'source', d.source, 'has_stock', d.has_stock, 'fee', d.fee,
           'distance_km', d.distance_km, 'match_level', d.match_level, 'offered_at', d.offered_at, 'expires_at', d.expires_at,
           'picked_up_at', d.picked_up_at, 'delivered_at', d.delivered_at, 'reason', d.reason,
           'order_number', coalesce(nullif(o.order_number, ''), o.id), 'total', o.total, 'delivery_status', o.delivery_status,
@@ -388,14 +392,17 @@ begin
               from public.physical_stores s where s.id = d.pickup_store_id) end,
           'items', (select coalesce(jsonb_agg(jsonb_build_object('title', it ->> 'title', 'qty', (it ->> 'quantity')::int,
                                                                 'code', it ->> 'book_code', 'variant', it ->> 'variant_label')), '[]'::jsonb)
-                    from jsonb_array_elements(case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end) it),
+                    from jsonb_array_elements(case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end) it
+                    -- A edição digital fica na conta do cliente: não é para levar.
+                    where coalesce(it ->> 'digital', '') <> 'true'),
           'customer', case when d.status = 'accepted' then jsonb_build_object(
               'name', o.customer_name, 'phone', o.phone, 'address', o.delivery_address_full, 'street', o.delivery_street,
               'reference', o.delivery_reference, 'locality', o.delivery_locality, 'municipality', o.delivery_municipality,
               'province', o.delivery_province, 'relative_name', o.delivery_relative_name, 'relative_phone', o.delivery_relative_phone,
               'notes', o.notes,
               'gps', case when coalesce(o.delivery_gps_lat, 0) <> 0 or coalesce(o.delivery_gps_lng, 0) <> 0
-                          then jsonb_build_object('lat', o.delivery_gps_lat, 'lng', o.delivery_gps_lng) end)
+                          then jsonb_build_object('lat', o.delivery_gps_lat, 'lng', o.delivery_gps_lng,
+                                                  'accuracy', o.delivery_gps_accuracy, 'updated_at', o.delivery_gps_updated_at) end)
             end
         ) as x
         from public.colporteur_deliveries d join public.orders o on o.id = d.order_id
@@ -465,7 +472,8 @@ begin
           'delivery_status', o.delivery_status, 'place', private.order_place(o),
           'pickup_store', (select s.name from public.physical_stores s where s.id = d.pickup_store_id),
           'items', (select coalesce(sum(greatest(coalesce((it ->> 'quantity')::int, 1), 0)), 0)::int
-                    from jsonb_array_elements(case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end) it),
+                    from jsonb_array_elements(case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end) it
+                    where coalesce(it ->> 'digital', '') <> 'true'),
           'colporteur', jsonb_build_object('id', c.id, 'name', c.full_name, 'code', c.code, 'phone', c.phone)
         ) as x
         from public.colporteur_deliveries d
@@ -564,3 +572,98 @@ create trigger orders_entrega_equipa_expediu
     and new.delivery_status in ('shipped', 'in_transit', 'out_for_delivery')
   )
   execute function private.orders_entrega_equipa_expediu();
+
+-- ---------------------------------------------------------------------------
+-- 5. Encomendas com impressos e edição digital
+-- ---------------------------------------------------------------------------
+-- O colportor nunca tem «stock» de um artigo digital, e por isso uma encomenda mista parecia nunca
+-- estar com ele: não lhe chegava, ou a guia automática recusava a entrega. Só contam os impressos.
+create or replace function private.colporteur_has_items(p_colporteur uuid, p_items jsonb)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    jsonb_typeof(p_items) = 'array' and jsonb_array_length(p_items) > 0
+    and bool_and((it ->> 'variant') is null
+                 and private.colporteur_in_hand(p_colporteur, it ->> 'book_id') >= greatest(coalesce((it ->> 'quantity')::int, 1), 1)),
+    false)
+  from jsonb_array_elements(case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end) it
+  where coalesce(it ->> 'digital', '') <> 'true';
+$$;
+
+create or replace function private.colporteur_return_for_order(p_colporteur uuid, p_order public.orders, p_actor uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_it jsonb;
+  v_book public.stock_books;
+  v_qty integer;
+  v_price numeric;
+  v_lines jsonb := '[]'::jsonb;
+  v_total numeric := 0;
+  v_doc uuid;
+  v_number text;
+begin
+  v_number := private.formata_codigo('GUI-', private.codigo_seguinte('GUI-'));
+  insert into public.colporteur_documents (number, colporteur_id, kind, notes, created_by)
+  values (v_number, p_colporteur, 'devolucao',
+          'Entregue ao cliente na encomenda ' || coalesce(nullif(p_order.order_number, ''), p_order.id) || ' (automática).', p_actor)
+  returning id into v_doc;
+  perform set_config('app.stock_reason', 'devolucao_consignacao', true);
+  perform set_config('app.stock_ref', v_number, true);
+  for v_it in select * from jsonb_array_elements(p_order.items) loop
+    continue when coalesce(v_it ->> 'digital', '') = 'true';
+    v_qty := greatest(coalesce((v_it ->> 'quantity')::int, 1), 1);
+    select * into v_book from public.stock_books where id = v_it ->> 'book_id' for update;
+    if v_book.id is null then raise exception 'Produto da encomenda não encontrado.'; end if;
+    if private.colporteur_in_hand(p_colporteur, v_book.id) < v_qty then
+      raise exception 'Já não tem à consignação % de "%". Levante os livros na loja ou fale com a equipa.', v_qty, v_book.title;
+    end if;
+    v_price := round(coalesce(v_book.price, 0)::numeric, 2);
+    update public.stock_books set stock = coalesce(stock, 0) + v_qty where id = v_book.id;
+    insert into public.colporteur_stock_moves (colporteur_id, book_id, qty, kind, unit_price, document_id, actor)
+    values (p_colporteur, v_book.id, -v_qty, 'devolucao', v_price, v_doc, p_actor);
+    v_total := v_total + v_price * v_qty;
+    v_lines := v_lines || jsonb_build_object('book_id', v_book.id, 'book_code', v_book.book_code, 'title', v_book.title,
+      'qty', v_qty, 'unit_price', v_price, 'pct', null);
+  end loop;
+  perform set_config('app.stock_reason', '', true);
+  perform set_config('app.stock_ref', '', true);
+  update public.colporteur_documents set lines = v_lines, total_value = v_total, amount = -v_total where id = v_doc;
+  insert into public.colporteur_ledger (colporteur_id, kind, amount, description, document_id, actor)
+  values (p_colporteur, 'devolucao', -v_total, v_number || ' · entrega da encomenda ' || coalesce(nullif(p_order.order_number, ''), p_order.id), v_doc, p_actor);
+  return v_doc;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 6. A posição de quem entrega pára quando a entrega deixa de ser dele
+-- ---------------------------------------------------------------------------
+-- O gatilho orders_trajeto_para só vê a encomenda entregue ou cancelada. Reembolso, suspensão,
+-- desistência ou entrega retirada fecham a entrega com a encomenda ainda a caminho, e o cliente
+-- continuava a ver a última posição do colportor, que é um dado pessoal dele.
+create or replace function private.colporteur_deliveries_trajeto_para()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.delivery_positions set stopped_at = now()
+  where order_id = new.order_id and stopped_at is null;
+  return null;
+end;
+$$;
+revoke all on function private.colporteur_deliveries_trajeto_para() from public, anon, authenticated;
+
+drop trigger if exists colporteur_deliveries_trajeto_para on public.colporteur_deliveries;
+create trigger colporteur_deliveries_trajeto_para
+  after update on public.colporteur_deliveries
+  for each row when (old.status = 'accepted' and new.status <> 'accepted')
+  execute function private.colporteur_deliveries_trajeto_para();

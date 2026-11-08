@@ -399,7 +399,7 @@ check('com os livros consigo recebe a oferta, sem loja', d26?.colporteur_id === 
 
 // 6h. Encomenda com impressos e edição digital: o colportor só leva os impressos ----------------------
 const [revista] = await q(`insert into public.stock_books (title, price, stock, digital) values ('Revista em PDF', 1200, 0, true) returning id`);
-await q(`insert into public.downloads (title, access, book_id, file_path, file_name, published) values ('Revista', 'paid', $1, 'r.pdf', 'r.pdf', true)`, [revista.id]);
+await q(`insert into public.downloads (title, access, book_id, file_path, file_name, published) values ('Revista', 'paid', $1, 'files/r.pdf', 'r.pdf', true)`, [revista.id]);
 const mista = await svc(`select public.place_order($1::jsonb, $2::jsonb, $3::jsonb) as o`, [JSON.stringify({
   order_number: 'ENC-MISTA', customer_email: 'cliente@exemplo.ao', customer_name: 'Cliente Teste', customer_id: cliente, phone: '923000000',
   payment_method_code: 'transferencia', payment_method_name: 'Transferência', delivery_status: 'received', status: 'pending', shipping_method: 'delivery',
