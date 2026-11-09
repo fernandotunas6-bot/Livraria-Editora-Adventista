@@ -70,7 +70,9 @@ const LoginPage = () => {
   return (
     <>
       <Helmet><title>{pageTitle('Entrar')}</title></Helmet>
-      <div className="min-h-screen grid lg:grid-cols-2 bg-background">
+      {/* `minmax(0,1fr)`: sem isto, no telemóvel a coluna única media o conteúdo mais largo e,
+          a 320 px, passava 3 px da largura do ecrã (auditoria visual, A360-31). */}
+      <div className="min-h-screen grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 bg-background">
         <div className="relative hidden lg:block">
           <img src={bgImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-linear-to-t from-[#0c4a6e]/95 via-[#0c4a6e]/50 to-[#0c4a6e]/20" />
