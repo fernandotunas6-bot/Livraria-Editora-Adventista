@@ -1,0 +1,95 @@
+name: Auditoria visual (Playwright)
+
+# Capturas da loja publicada em cinco larguras (320 a 1440 px), LCP/CLS medidos com a rede e o
+# processador de um telemóvel, erros da consola e acessibilidade com o axe-core (WCAG 2.2 A/AA).
+# Script: scripts/auditoria-visual/capturar.mjs. Relatório da auditoria:
+# docs/audits/livraria-premium-360.md.
+#
+# Só lê o site: os pedidos que não são GET são cancelados no navegador.
+#
+# Os resultados ficam:
+#   - no resumo desta execução (página do Actions);
+#   - no artefacto "auditoria-visual" (14 dias);
+#   - no ramo `auditoria-visual`, substituído a cada execução — vê-se no GitHub, também no
+#     telemóvel, sem descarregar nada. O ramo é só disto: pode ser apagado quando quiser.
+#
+# Corre à mão (Actions → Auditoria visual → Run workflow) e nos PRs que mudam esta auditoria.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Endereço do site
+        default: https://livrariaadventista.ao
+      paginas:
+        description: Só estas páginas, separadas por vírgulas (vazio = todas)
+        default: ''
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/auditoria-visual.yml'
+      - 'scripts/auditoria-visual/**'
+
+concurrency:
+  group: auditoria-visual
+  cancel-in-progress: true
+
+permissions:
+  contents: write # só para o ramo `auditoria-visual`
+
+jobs:
+  capturas:
+    name: Capturas, medições e acessibilidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SITE_URL: ${{ inputs.url || 'https://livrariaadventista.ao' }}
+      PAGINAS: ${{ inputs.paginas || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # Numa pasta à parte, como o PGlite do ci.yml: nada entra no package-lock do site.
+      - name: Instalar o Playwright e o axe-core
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund playwright@1.63.0 axe-core@4.10.2
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Capturas e medições
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.mjs
+          AXE_PATH: ${{ runner.temp }}/pw/node_modules/axe-core/axe.min.js
+        run: node scripts/auditoria-visual/capturar.mjs "$SITE_URL" "$RUNNER_TEMP/auditoria"
+
+      - name: Resumo
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/auditoria/RESUMO.md" ]; then cat "$RUNNER_TEMP/auditoria/RESUMO.md" >> "$GITHUB_STEP_SUMMARY"; else echo "Sem resumo: a captura falhou." >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: auditoria-visual
+          path: ${{ runner.temp }}/auditoria
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Um só commit, sem histórico, forçado por cima do anterior: o ramo mostra sempre a última
+      # execução e não cresce. Nos PRs vindos de forks o token não pode escrever, e o passo salta.
+      - name: Publicar no ramo auditoria-visual
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/auditoria"
+          cp RESUMO.md README.md
+          git init -q -b auditoria-visual
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Auditoria visual de $SITE_URL ($(date -u '+%Y-%m-%d %H:%M UTC'), ${GITHUB_SHA::7})"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/auditoria-visual
+          echo "Resultados no ramo auditoria-visual: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/auditoria-visual" >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  OPTIONAL_CATEGORIES, SAFE_SYMBOLS, brandFromSettings, categoryStates, emailDocument,
+  OPTIONAL_CATEGORIES, SAFE_SYMBOLS, brandFromSettings, buttonLabelHtml, categoryStates, emailDocument,
   formatKz, isCategoryEnabled, isEmail, isRetriableFailure, retryDelaySeconds, secretsMatch, type Brand,
 } from "./emails.ts";
 import {
@@ -667,6 +667,31 @@ describe("cancelamento de subscrição", () => {
     });
     expect(html).not.toContain("javascript:");
     expect(html).not.toContain("Deixar de receber");
+  });
+});
+
+describe("buttonLabelHtml", () => {
+  it("a seta fica colada à última palavra, e as palavras com hífen não se partem", () => {
+    expect(buttonLabelHtml("Escolher nova palavra-passe")).toBe(
+      'Escolher nova <span style="white-space:nowrap">palavra-passe&nbsp;&rarr;</span>',
+    );
+    expect(buttonLabelHtml("Pagar com Multicaixa Express")).toBe(
+      'Pagar com Multicaixa <span style="white-space:nowrap">Express&nbsp;&rarr;</span>',
+    );
+    expect(buttonLabelHtml("Não fui eu — recuperar acesso")).toContain('<span style="white-space:nowrap">acesso&nbsp;&rarr;</span>');
+  });
+
+  it("escapa o texto", () => {
+    expect(buttonLabelHtml('Ver <b>"isto"</b>')).toBe('Ver <span style="white-space:nowrap">&lt;b&gt;&quot;isto&quot;&lt;/b&gt;&nbsp;&rarr;</span>');
+  });
+
+  it("os passos usam o mesmo tamanho de sinal: feito, agora e por fazer", () => {
+    const html = emailDocument(brandFromSettings(SETTINGS), {
+      title: "T",
+      steps: [{ label: "A", done: true }, { label: "B", done: false, current: true }, { label: "C", done: false }],
+    }).html;
+    expect(html).toContain(">●</td>");
+    expect(html).not.toContain(">•</td>");
   });
 });
 
