@@ -1,0 +1,2641 @@
+{
+ "gerado": "2026-11-09",
+ "ambiente": "build de produção (vite build) servido localmente com os cabeçalhos do _headers; API do Supabase simulada com os dados públicos de produção (catálogo, colecções, slides, lojas, métodos de pagamento, definições); latência da API no Lighthouse = mediana de produção (Edge Function 500 ms, REST 220 ms)",
+ "visual": [
+  {
+   "w": 320,
+   "pagina": "home",
+   "altura": 11067,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "shop",
+   "altura": 10774,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "categoria",
+   "altura": 7499,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "colecoes",
+   "altura": 2251,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "colecao",
+   "altura": 9573,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "produto",
+   "altura": 11450,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "produto-esgotado",
+   "altura": 10811,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "produto-sem-descricao",
+   "altura": 10749,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "sobre",
+   "altura": 3651,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "lojas",
+   "altura": 2044,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "contacto",
+   "altura": 1989,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "faq",
+   "altura": 1510,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "envios",
+   "altura": 2755,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "privacidade",
+   "altura": 11933,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "rastrear",
+   "altura": 1587,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "entrar",
+   "altura": 800,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "sugestoes",
+   "altura": 1095,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "comunidade",
+   "altura": 1667,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "materiais",
+   "altura": 917,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "novidades",
+   "altura": 1089,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "404",
+   "altura": 856,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "slide-colportagem",
+   "altura": 1708,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 320,
+   "pagina": "pesquisa-vazia",
+   "altura": 1708,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "home",
+   "altura": 11553,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "shop",
+   "altura": 11466,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "categoria",
+   "altura": 7931,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "colecoes",
+   "altura": 2191,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "colecao",
+   "altura": 10103,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "produto",
+   "altura": 11893,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "produto-esgotado",
+   "altura": 11362,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "produto-sem-descricao",
+   "altura": 11332,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "sobre",
+   "altura": 3531,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "lojas",
+   "altura": 1905,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "contacto",
+   "altura": 1933,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "faq",
+   "altura": 1433,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "envios",
+   "altura": 2603,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "privacidade",
+   "altura": 10840,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "rastrear",
+   "altura": 1567,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "entrar",
+   "altura": 800,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "sugestoes",
+   "altura": 1069,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "comunidade",
+   "altura": 1667,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "materiais",
+   "altura": 891,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "novidades",
+   "altura": 1069,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "404",
+   "altura": 856,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "slide-colportagem",
+   "altura": 1702,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 360,
+   "pagina": "pesquisa-vazia",
+   "altura": 1702,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "home",
+   "altura": 11925,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "shop",
+   "altura": 12006,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "categoria",
+   "altura": 8291,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "colecoes",
+   "altura": 2191,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "colecao",
+   "altura": 10575,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "produto",
+   "altura": 12309,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "produto-esgotado",
+   "altura": 11804,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "produto-sem-descricao",
+   "altura": 11763,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "sobre",
+   "altura": 3417,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "lojas",
+   "altura": 1911,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "contacto",
+   "altura": 1933,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "faq",
+   "altura": 1423,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "envios",
+   "altura": 2529,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "privacidade",
+   "altura": 10148,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "rastrear",
+   "altura": 1567,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "entrar",
+   "altura": 800,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "sugestoes",
+   "altura": 1069,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "comunidade",
+   "altura": 1619,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "materiais",
+   "altura": 865,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "novidades",
+   "altura": 1069,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "404",
+   "altura": 856,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "slide-colportagem",
+   "altura": 1702,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 390,
+   "pagina": "pesquisa-vazia",
+   "altura": 1702,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "home",
+   "altura": 12247,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "shop",
+   "altura": 12418,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "categoria",
+   "altura": 8535,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "colecoes",
+   "altura": 2171,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "colecao",
+   "altura": 10933,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "produto",
+   "altura": 12585,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "produto-esgotado",
+   "altura": 12106,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "produto-sem-descricao",
+   "altura": 12117,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "sobre",
+   "altura": 3343,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "lojas",
+   "altura": 1865,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "contacto",
+   "altura": 1913,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "faq",
+   "altura": 1403,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "envios",
+   "altura": 2433,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "privacidade",
+   "altura": 9698,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "rastrear",
+   "altura": 1547,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "entrar",
+   "altura": 800,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "sugestoes",
+   "altura": 1023,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "comunidade",
+   "altura": 1559,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "materiais",
+   "altura": 845,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "novidades",
+   "altura": 1049,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "404",
+   "altura": 856,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "slide-colportagem",
+   "altura": 1682,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 414,
+   "pagina": "pesquisa-vazia",
+   "altura": 1682,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "home",
+   "altura": 16699,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "shop",
+   "altura": 6946,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "categoria",
+   "altura": 8468,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "colecoes",
+   "altura": 3353,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "colecao",
+   "altura": 10066,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "produto",
+   "altura": 17315,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "produto-esgotado",
+   "altura": 17040,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "produto-sem-descricao",
+   "altura": 17236,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "sobre",
+   "altura": 4217,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "lojas",
+   "altura": 3633,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "contacto",
+   "altura": 3035,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "faq",
+   "altura": 3107,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "envios",
+   "altura": 3847,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "privacidade",
+   "altura": 8762,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "rastrear",
+   "altura": 3353,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "entrar",
+   "altura": 1024,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "sugestoes",
+   "altura": 2707,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "comunidade",
+   "altura": 3043,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "materiais",
+   "altura": 2411,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "novidades",
+   "altura": 2681,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "404",
+   "altura": 1024,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "slide-colportagem",
+   "altura": 3416,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 768,
+   "pagina": "pesquisa-vazia",
+   "altura": 3416,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 1,
+   "imagens_partidas": 0
+  },
+  {
+   "w": 1024,
+   "pagina": "home",
+   "altura": 13274,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Livros e Histórias — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "shop",
+   "altura": 4643,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "categoria",
+   "altura": 5483,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Fé & Doutrina — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "colecoes",
+   "altura": 2725,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Coleções — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "colecao",
+   "altura": 6653,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Essenciais da Fé — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "produto",
+   "altura": 15343,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Nisto Cremos - As 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "produto-esgotado",
+   "altura": 15041,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Apocalipse Verso por Verso — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "produto-sem-descricao",
+   "altura": 15312,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Mensageira do Senhor - O Ministério Profético de Ellen G. White — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "sobre",
+   "altura": 3609,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Sobre Nós — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "lojas",
+   "altura": 2725,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Lojas físicas — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "contacto",
+   "altura": 2563,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Contacto — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "faq",
+   "altura": 2635,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "FAQ — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "envios",
+   "altura": 3375,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Envios e Devoluções — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "privacidade",
+   "altura": 7798,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Política de privacidade — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "rastrear",
+   "altura": 2725,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Rastrear Encomenda — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "entrar",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0,
+   "titulo": "Entrar — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "sugestoes",
+   "altura": 2235,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Sugestões para si — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "comunidade",
+   "altura": 2535,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Comunidade de Leitores — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "materiais",
+   "altura": 1939,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Materiais para descarregar — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "novidades",
+   "altura": 2209,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Novidades da app — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "404",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0,
+   "titulo": "Página não encontrada — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "slide-colportagem",
+   "altura": 3000,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1024,
+   "pagina": "pesquisa-vazia",
+   "altura": 3000,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "home",
+   "altura": 13885,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Livros e Histórias — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "shop",
+   "altura": 4243,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "categoria",
+   "altura": 5110,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Fé & Doutrina — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "colecoes",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Coleções — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "colecao",
+   "altura": 5906,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Essenciais da Fé — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "produto",
+   "altura": 14267,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Nisto Cremos - As 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "produto-esgotado",
+   "altura": 14037,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Apocalipse Verso por Verso — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "produto-sem-descricao",
+   "altura": 14362,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Mensageira do Senhor - O Ministério Profético de Ellen G. White — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "sobre",
+   "altura": 3457,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Sobre Nós — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "lojas",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Lojas físicas — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "contacto",
+   "altura": 2437,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Contacto — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "faq",
+   "altura": 2509,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "FAQ — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "envios",
+   "altura": 3249,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Envios e Devoluções — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "privacidade",
+   "altura": 7672,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Política de privacidade — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "rastrear",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Rastrear Encomenda — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "entrar",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0,
+   "titulo": "Entrar — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "sugestoes",
+   "altura": 2109,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Sugestões para si — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "comunidade",
+   "altura": 2339,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Comunidade de Leitores — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "materiais",
+   "altura": 1813,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Materiais para descarregar — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "novidades",
+   "altura": 2083,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Novidades da app — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "404",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0,
+   "titulo": "Página não encontrada — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "slide-colportagem",
+   "altura": 2874,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1280,
+   "pagina": "pesquisa-vazia",
+   "altura": 2874,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "home",
+   "altura": 13885,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Livros e Histórias — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "shop",
+   "altura": 4243,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "categoria",
+   "altura": 5110,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 13,
+   "imagens_partidas": 0,
+   "titulo": "Fé & Doutrina — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "colecoes",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Coleções — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "colecao",
+   "altura": 5906,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Essenciais da Fé — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "produto",
+   "altura": 14267,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Nisto Cremos - As 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "produto-esgotado",
+   "altura": 14037,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 6,
+   "imagens_partidas": 0,
+   "titulo": "Apocalipse Verso por Verso — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "produto-sem-descricao",
+   "altura": 14362,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Mensageira do Senhor - O Ministério Profético de Ellen G. White — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "sobre",
+   "altura": 3457,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Sobre Nós — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "lojas",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Lojas físicas — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "contacto",
+   "altura": 2437,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Contacto — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "faq",
+   "altura": 2509,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "FAQ — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "envios",
+   "altura": 3249,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Envios e Devoluções — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "privacidade",
+   "altura": 7672,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 3,
+   "imagens_partidas": 0,
+   "titulo": "Política de privacidade — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "rastrear",
+   "altura": 2599,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Rastrear Encomenda — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "entrar",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 2,
+   "imagens_partidas": 0,
+   "titulo": "Entrar — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "sugestoes",
+   "altura": 2109,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Sugestões para si — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "comunidade",
+   "altura": 2339,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 1,
+   "alvos_menores_24px": 5,
+   "imagens_partidas": 0,
+   "titulo": "Comunidade de Leitores — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "materiais",
+   "altura": 1813,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Materiais para descarregar — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "novidades",
+   "altura": 2083,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 4,
+   "imagens_partidas": 0,
+   "titulo": "Novidades da app — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "404",
+   "altura": 900,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 0,
+   "imagens_partidas": 0,
+   "titulo": "Página não encontrada — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "slide-colportagem",
+   "altura": 2874,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  },
+  {
+   "w": 1440,
+   "pagina": "pesquisa-vazia",
+   "altura": 2874,
+   "transbordo": false,
+   "h1": 1,
+   "erros_consola": 0,
+   "alvos_menores_24px": 14,
+   "imagens_partidas": 0,
+   "titulo": "Todos os Livros — Livraria Adventista"
+  }
+ ],
+ "lighthouse": {
+  "desktop-home": {
+   "pontuacoes": {
+    "performance": 91,
+    "accessibility": 98,
+    "best-practices": 81,
+    "seo": 100
+   },
+   "FCP": "0.9 s",
+   "LCP": "1.5 s",
+   "TBT": "40 ms",
+   "CLS": "0.003",
+   "SI": "1.9 s",
+   "pedidos": 147,
+   "KB_transferidos": 2706
+  },
+  "desktop-product-pb57b6i7pc144ei": {
+   "pontuacoes": {
+    "performance": 87,
+    "accessibility": 96,
+    "best-practices": 81,
+    "seo": 100
+   },
+   "FCP": "1.0 s",
+   "LCP": "2.1 s",
+   "TBT": "20 ms",
+   "CLS": "0",
+   "SI": "1.6 s",
+   "pedidos": 140,
+   "KB_transferidos": 1773
+  },
+  "desktop-shop": {
+   "pontuacoes": {
+    "performance": 75,
+    "accessibility": 100,
+    "best-practices": 81,
+    "seo": 100
+   },
+   "FCP": "1.1 s",
+   "LCP": "1.9 s",
+   "TBT": "10 ms",
+   "CLS": "0.266",
+   "SI": "1.5 s",
+   "pedidos": 124,
+   "KB_transferidos": 1818
+  },
+  "mobile-home": {
+   "pontuacoes": {
+    "performance": 56,
+    "accessibility": 100,
+    "best-practices": 82,
+    "seo": 100
+   },
+   "FCP": "4.2 s",
+   "LCP": "6.8 s",
+   "TBT": "350 ms",
+   "CLS": "0",
+   "SI": "5.5 s",
+   "pedidos": 140,
+   "KB_transferidos": 2552
+  },
+  "mobile-product-pb57b6i7pc144ei": {
+   "pontuacoes": {
+    "performance": 59,
+    "accessibility": 99,
+    "best-practices": 82,
+    "seo": 100
+   },
+   "FCP": "4.4 s",
+   "LCP": "7.6 s",
+   "TBT": "250 ms",
+   "CLS": "0",
+   "SI": "5.0 s",
+   "pedidos": 123,
+   "KB_transferidos": 1306
+  },
+  "mobile-shop": {
+   "pontuacoes": {
+    "performance": 54,
+    "accessibility": 98,
+    "best-practices": 82,
+    "seo": 100
+   },
+   "FCP": "4.3 s",
+   "LCP": "9.2 s",
+   "TBT": "390 ms",
+   "CLS": "0.067",
+   "SI": "4.6 s",
+   "pedidos": 111,
+   "KB_transferidos": 1457
+  }
+ },
+ "axe_wcag22": {
+  "home@390": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "shop@390": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".sm\\:pt-2\\.5.px-2\\.5[href$=\"pb57b6i7pc144ei\"] > .line-clamp-2.min-h-\\[2\\.75em\\].text-\\[13px\\] ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 2,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks",
+     ".py-3 > .mr-1 ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "produto@390": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".mb-3.text-base ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".py-3 > .min-w-0.flex-1 ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "colecao@390": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".sm\\:pt-2\\.5.px-2\\.5[href$=\"pb57b6i7pc144ei\"] > .line-clamp-2.min-h-\\[2\\.75em\\].text-\\[13px\\] ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "landmark-complementary-is-top-level",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Aside should not be contained in another landmark",
+    "sample": [
+     "aside ::   The null landmark is contained in another landmark."
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "rastrear@390": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14.justify-between.gap-3 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "entrar@390": [
+   {
+    "id": "landmark-one-main",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Document should have one main landmark",
+    "sample": [
+     "html ::   Document does not have a main landmark"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 9,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".lg\\:hidden ::   Some page content is not contained by landmarks",
+     ".justify-between.mb-6.items-center ::   Some page content is not contained by landmarks",
+     ".my-5 ::   Some page content is not contained by landmarks"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "tags": "wcag22aa,wcag258",
+    "n": 1,
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "sample": [
+     ".tap-target ::   Target has insufficient size (16px by 16px, should be at least 24px by 24px)"
+    ]
+   }
+  ],
+  "contacto@390": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "lojas@390": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "faq@390": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "404@390": [],
+  "keyboard@390": [
+   {
+    "tag": "A",
+    "label": "Livraria Adventista — Início",
+    "outline": "auto 1px rgb(16, 16, 16)",
+    "ring": "",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Abrir pesquisa",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Carrinho com 0 itens",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Entrar ou criar conta",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "A",
+    "label": "Livraria Adventista — Início",
+    "outline": "auto 1px rgb(16, 16, 16)",
+    "ring": "",
+    "visible": false
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Abrir pesquisa",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": false
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Carrinho com 0 itens",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Entrar ou criar conta",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   }
+  ],
+  "home@1280": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".lg\\:col-span-2:nth-child(2) > h4 ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "shop@1280": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 2,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks",
+     ".mr-1.text-muted-foreground ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "produto@1280": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".mb-3.text-base ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "landmark-complementary-is-top-level",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Aside should not be contained in another landmark",
+    "sample": [
+     ".w-64 ::   The null landmark is contained in another landmark."
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "tags": "wcag22aa,wcag258",
+    "n": 3,
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "sample": [
+     "button[aria-label=\"Abrir menu Livros\"] ::   Target has insufficient size (22px by 30px, should be at least 24px by 24px)",
+     "button[aria-label=\"Abrir menu Coleções\"] ::   Target has insufficient size (22px by 30px, should be at least 24px by 24px)",
+     "button[aria-label=\"Abrir menu Ajuda\"] ::   Target has insufficient size (22px by 30px, should be at least 24px by 24px)"
+    ]
+   }
+  ],
+  "colecao@1280": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "tags": "wcag2aa,wcag143",
+    "n": 1,
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "sample": [
+     ".bg-primary\\/20 ::   Element has insufficient color contrast of 3.58 (foreground color: #0a748f, background color: #bbd8e0, font size: 7.5pt (10px), font weigh"
+    ]
+   },
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".p-5 > .uppercase.tracking-wider ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "landmark-complementary-is-top-level",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Aside should not be contained in another landmark",
+    "sample": [
+     "aside ::   The null landmark is contained in another landmark."
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90[aria-label=\"Livraria Adventista — Início\"][href=\"/\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "rastrear@1280": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".lg\\:col-span-2:nth-child(2) > .mb-4 ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14.justify-between.container-custom > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "entrar@1280": [
+   {
+    "id": "landmark-one-main",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Document should have one main landmark",
+    "sample": [
+     "html ::   Document does not have a main landmark"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 9,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".hidden ::   Some page content is not contained by landmarks",
+     ".justify-between.mb-6.items-center ::   Some page content is not contained by landmarks",
+     ".my-5 ::   Some page content is not contained by landmarks"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "tags": "wcag22aa,wcag258",
+    "n": 1,
+    "help": "All touch targets must be 24px large, or leave sufficient space",
+    "sample": [
+     ".tap-target ::   Target has insufficient size (16px by 16px, should be at least 24px by 24px)"
+    ]
+   }
+  ],
+  "contacto@1280": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "lojas@1280": [
+   {
+    "id": "heading-order",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "Heading levels should only increase by one",
+    "sample": [
+     ".lg\\:col-span-2:nth-child(2) > .mb-4 ::   Heading order invalid"
+    ]
+   },
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "faq@1280": [
+   {
+    "id": "region",
+    "impact": "moderate",
+    "tags": "",
+    "n": 1,
+    "help": "All page content should be contained by landmarks",
+    "sample": [
+     ".h-14 > .hover\\:opacity-90.transition-opacity[aria-label=\"Livraria Adventista — Início\"] ::   Some page content is not contained by landmarks"
+    ]
+   }
+  ],
+  "404@1280": [],
+  "keyboard@1280": [
+   {
+    "tag": "A",
+    "label": "Livraria Adventista — Início",
+    "outline": "auto 1px rgb(16, 16, 16)",
+    "ring": "",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Abrir pesquisa",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Carrinho com 0 itens",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "BUTTON",
+    "label": "Entrar ou criar conta",
+    "outline": "none",
+    "ring": "shadow",
+    "visible": true
+   },
+   {
+    "tag": "A",
+    "label": "Rastrear encomenda",
+    "outline": "auto 3px rgba(255, 255, 255, 0.9)",
+    "ring": "",
+    "visible": false
+   },
+   {
+    "tag": "A",
+    "label": "Livraria Adventista — Início",
+    "outline": "auto 1px rgb(16, 16, 16)",
+    "ring": "",
+    "visible": false
+   },
+   {
+    "tag": "A",
+    "label": "Início",
+    "outline": "auto 1px rgba(255, 255, 255, 0.8)",
+    "ring": "",
+    "visible": false
+   },
+   {
+    "tag": "A",
+    "label": "Livros",
+    "outline": "auto 1px rgb(34, 211, 238)",
+    "ring": "",
+    "visible": false
+   }
+  ]
+ },
+ "e2e": [
+  {
+   "name": "Pesquisa do cabeçalho mostra sugestões para \"nisto cre\"",
+   "pass": true,
+   "detail": "2 sugestões"
+  },
+  {
+   "name": "Pesquisa tolera falta de acentos (\"crencas\")",
+   "pass": true,
+   "detail": "1 sugestões"
+  },
+  {
+   "name": "Pesquisa tolera erro ortográfico (\"elen white\")",
+   "pass": false,
+   "detail": "0 sugestões"
+  },
+  {
+   "name": "Carrinho persiste no localStorage",
+   "pass": true,
+   "detail": "[[\"e-commerce-cart\",5601]]"
+  },
+  {
+   "name": "Carrinho reabre depois de recarregar com 2 artigos",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Total do carrinho visível",
+   "pass": true,
+   "detail": "Total Kz 39 620,00"
+  },
+  {
+   "name": "Checkout vazio mostra erros junto dos campos",
+   "pass": true,
+   "detail": "Escreva o seu nome. | O email serve para acompanhar a encomenda. | Seleccione o município de entrega."
+  },
+  {
+   "name": "Foco vai para o primeiro campo em erro",
+   "pass": true,
+   "detail": "checkout-nome"
+  },
+  {
+   "name": "Erro de stock do servidor é mostrado ao cliente",
+   "pass": true,
+   "detail": "Não foi possível finalizar a compra\nStock insuficiente: Nisto Cremos - As 28 Crenças Fundamentais (disponível: 1)."
+  },
+  {
+   "name": "Botão volta a ficar activo depois do erro",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Falha de rede no checkout mostra mensagem compreensível",
+   "pass": false,
+   "detail": ""
+  },
+  {
+   "name": "Botão fica bloqueado com indicador enquanto o pedido está em curso",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Duplo clique não envia duas encomendas",
+   "pass": true,
+   "detail": "1 pedido(s); chave=sim"
+  },
+  {
+   "name": "Pedido leva chave de idempotência",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "Pedido não envia preços (só id + quantidade)",
+   "pass": true,
+   "detail": "[{\"variant_id\":\"pb57b6i7pc144ei-default\",\"quantity\":2},{\"variant_id\":\"3jil1wu701pd6do-default\",\"quantity\":1}]"
+  },
+  {
+   "name": "Sucesso leva à página de confirmação com o número",
+   "pass": true,
+   "detail": "http://localhost:8744/success?orderId=ord_test_1&total=21680&type=purchase&orderNumber=ENC-TESTE0001"
+  },
+  {
+   "name": "Rastreio de encomenda inexistente mostra mensagem",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "name": "/admin sem sessão não mostra o painel",
+   "pass": true,
+   "detail": "http://localhost:8744/login"
+  },
+  {
+   "name": "/profile sem sessão pede para entrar",
+   "pass": true,
+   "detail": "http://localhost:8744/login"
+  },
+  {
+   "name": "Carrinho vazio tem mensagem e caminho de volta",
+   "pass": true,
+   "detail": ""
+  }
+ ],
+ "pedido_de_checkout_exemplo": {
+  "items": [
+   {
+    "variant_id": "pb57b6i7pc144ei-default",
+    "quantity": 2
+   },
+   {
+    "variant_id": "3jil1wu701pd6do-default",
+    "quantity": 1
+   }
+  ],
+  "successUrl": "http://localhost:8744/success",
+  "customerEmail": "teste@exemplo.ao",
+  "customerName": "Cliente de Teste",
+  "phone": "+244 923 456 789",
+  "address": "Levantamento: Livraria Adventista — Catumbela",
+  "city": "Livraria Adventista — Catumbela",
+  "paymentMethod": "entrega",
+  "paymentMethodCode": "entrega",
+  "paymentReference": "",
+  "notes": "",
+  "shippingCost": 0,
+  "saleChannel": "web_purchase",
+  "shippingMethod": "pickup",
+  "pickupStore": "Livraria Adventista — Catumbela",
+  "checkoutSignature": "",
+  "idempotencyKey": "68174c86-a06f-44f5-a6bf-cb137f58ff36"
+ }
+}
