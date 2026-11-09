@@ -28,15 +28,20 @@ todas as tabelas, permissões verificadas três vezes (base de dados, Edge Funct
 CSP sem scripts embutidos, ~1 500 testes, cenários da base de dados em cada PR e um painel que
 cobre do catálogo à produção editorial. Isto é raro numa loja com seis encomendas.
 
-O que a separa de um padrão premium **não é o código, é a operação**: a loja não envia um único
+O que a separa de um padrão premium **é sobretudo a operação**: a loja não envia um único
 email, não aceita um pagamento electrónico, não mostra um telefone, e o catálogo tem dados por
 completar. Um cliente consegue comprar — mas sai do checkout sem confirmação no email, paga por
 transferência ou em dinheiro, e não tem para onde ligar.
 
-**Classificação (provisória): 75/100 antes deste PR · 76/100 com ele — "Qualidade intermédia".**
-Confiança **média-baixa**: cerca de metade dos critérios tem evidência directa desta passagem; a
-parte visual e de desempenho apoia-se em medições anteriores (datadas abaixo) e não foi revista
-no navegador. Esta nota não é uma certificação; é um ponto de partida medido.
+E, do lado técnico, **o telemóvel**: a auditoria visual com o Playwright (perfil de telemóvel do
+Lighthouse) mede um LCP de **4,3 a 6,1 s em todas as páginas** — o dobro do objectivo —, contra
+0,4 a 1,4 s no computador. O visual está ao nível premium nas cinco larguras; a espera não.
+
+**Classificação (provisória): 74/100 antes deste PR · 76/100 com ele — "Qualidade intermédia".**
+Confiança **média**: cerca de dois terços dos critérios têm evidência directa desta passagem,
+incluindo capturas de 13 páginas em 5 larguras, medições de laboratório e o axe-core; faltam
+medições de campo a partir de Angola, o painel com sessão de equipa e o pagamento em sandbox.
+Esta nota não é uma certificação; é um ponto de partida medido.
 
 **Critérios de bloqueio.** Nenhum confirmado no código (sem vulnerabilidade crítica, sem falha de
 autorização com exposição de dados, sem perda de encomendas, compra possível). Dois pontos de
@@ -74,23 +79,25 @@ produção **aproximam-se** deles e têm de fechar antes de qualquer classifica�
 | Registos (24 h) | Edge Function (latência por rota), API REST (erros 4xx/5xx), Postgres, Auth |
 | CI | Últimas execuções (`gh run list`) |
 | Verificação das correcções | Testes dos scripts e do módulo novo (22 + 15), ESLint (regras do gate), esbuild em todos os ficheiros mudados, renderização no servidor do carrossel e do link de salto, pós-build de SEO corrido num build simulado |
+| **Loja publicada, com o Playwright** | Workflow novo `auditoria-visual.yml`, no GitHub (a rede desta sessão não chega ao domínio): 13 páginas × 5 larguras (320, 390, 768, 1280, 1440 px), LCP/CLS/FCP/TTFB com o perfil de telemóvel do Lighthouse (150 ms, 1,6 Mbit/s, CPU 4×) e no computador sem travões, axe-core WCAG 2.2 A/AA a 390 e 1280 px, consola, pedidos falhados, deslocamento horizontal, títulos, canonical e JSON-LD. Execução de 2026-11-09 08:04 UTC; resultados no ramo `auditoria-visual` |
+| Emails | Os 25 modelos desenhados e fotografados aqui com o Chromium a 320, 360, 375 e 700 px |
 
 | Não feito, e porquê | Consequência |
 |---|---|
-| ∅ Site publicado no navegador | A rede desta sessão não chega ao domínio, e nem o navegador da app nem o Claude in Chrome estavam disponíveis. Sem capturas novas, sem LCP/CLS/INP medidos hoje |
+| ∅ Medições de campo | As do Playwright são de laboratório, num servidor do GitHub com a rede travada: comparam versões, não substituem quem compra a partir de Angola. INP sem número (precisa de interacções reais) |
 | ∅ `npm ci` local | Instalações de pacotes bloqueadas nesta sessão. O `npm test`, o lint completo e o build correm no CI do PR |
 | ∅ Sessão de equipa | Os fluxos do painel foram lidos no código, não exercidos |
 | ∅ Pagamento em sandbox | Não há gateway contratado (A360-03) |
-| ∅ Emails nos clientes de email | Nenhum email é enviado (A360-01) |
+| ∅ Emails nos clientes de email | Nenhum email é enviado (A360-01); vistos no Chromium, não no Gmail/Outlook |
 
 **Evidência anterior reutilizada**, sempre com data: desempenho em
 [DESEMPENHO-BASELINE.md](../DESEMPENHO-BASELINE.md) (2026-11-02/03); axe-core em 7 páginas e 6
 larguras (AUDITORIA.md § 9.14, 2026-11-07); réplica Postgres 16 com as migrações (§ 9.16,
 2026-11-08); registos e avisos (§ 9.21, 2026-11-08).
 
-**Cobertura estimada**: ~50 % dos critérios com evidência directa desta passagem, ~27 % com
-evidência anterior datada, **~23 % por verificar** (sobretudo visual, telemóvel real, INP em campo,
-painel com sessão de equipa e pagamento em sandbox).
+**Cobertura estimada**: ~68 % dos critérios com evidência directa desta passagem, ~12 % com
+evidência anterior datada, **~20 % por verificar** (medições de campo e INP, telemóveis reais,
+painel com sessão de equipa, pagamento em sandbox, emails nos clientes de email).
 
 ---
 
@@ -133,23 +140,22 @@ administradores, 3 clientes), 0 avaliações, 2 publicações na comunidade, 0 c
 
 | Domínio | Peso | Antes | Com o PR | Confiança | Porquê |
 |---|---:|---:|---:|---|---|
-| Qualidade visual e design system | 15 % | 78 | 78 | baixa | Tokens, shadcn e padrões consistentes; passagens anteriores a 6 larguras. Não revisto hoje no navegador |
-| UX, navegação e acessibilidade | 15 % | 74 | 80 | média | axe 0 violações (§ 9.14); faltavam o salto para o conteúdo e o botão de parar o carrossel (nível A) e havia rótulos em inglês — corrigidos |
-| Experiência mobile | 10 % | 82 | 82 | baixa-média | Barra inferior, compra fixa, gestos, cauda infinita com memória de posição, PWA; LCP/CLS do `/shop` em telemóvel dentro dos objectivos a 2026-11-03 |
+| Qualidade visual e design system | 15 % | 82 | 82 | média | Capturas de 13 páginas em 5 larguras: tipografia, hierarquia e acabamento ao nível premium, sem deslocamentos horizontais (só 3 px no `/login` a 320 px); emails sólidos |
+| UX, navegação e acessibilidade | 15 % | 72 | 82 | média | axe-core em 13 páginas: só `target-size` (5 elementos). Faltavam o salto para o conteúdo e o botão de parar o carrossel (nível A); 9 das 13 páginas ficavam com o título genérico (2.4.2); rótulos em inglês — tudo corrigido |
+| Experiência mobile | 10 % | 80 | 80 | média | Barra inferior, compra fixa, gestos, cauda infinita, PWA, sem deslocamentos de 320 a 768 px; na loja, o primeiro livro só aparece aos ~740 px (A360-32) |
 | Catálogo, pesquisa e descoberta | 10 % | 70 | 70 | alta | Funcionalidade completa; dados fracos: 0 ISBN, 28 % em «Catálogo Geral», 76 % com 1–4 unidades |
 | Carrinho, checkout e pagamentos | 15 % | 62 | 62 | média | Engenharia exemplar; sem pagamento electrónico, sem email de confirmação, 5/6 entregues por pagar |
 | Administração e operações | 10 % | 85 | 85 | média | Painel muito completo; operação sem contactos nem MFA |
-| Desempenho | 10 % | 72 | 73 | baixa | Divisão de código e cache certas; API a 0,4–0,8 s p75 por pedido a partir de Angola; INP nunca medido em campo |
+| Desempenho | 10 % | 62 | 63 | média | Laboratório: LCP no telemóvel 4,3–6,1 s em todas as páginas (objectivo 2,5 s), ~410–460 KB de JS comprimido e 70–120 pedidos por página; computador 0,4–1,4 s; CLS ≤ 0,06 em todas; TTFB 30–70 ms |
 | Segurança e privacidade | 10 % | 84 | 84 | média-alta | RLS, CSP, segredos, auditoria; administradores sem segundo passo |
-| SEO, observabilidade e testes | 5 % | 70 | 78 | alta | Canonical e dados estruturados corrigidos; sem E2E, sem RUM, sem monitorização de erros |
-| **Total ponderado** | | **74,9** | **76,3** | média-baixa | |
+| SEO, observabilidade e testes | 5 % | 68 | 82 | alta | Canonical, títulos e dados estruturados corrigidos; auditoria visual automática nova; sem RUM nem monitorização de erros |
+| **Total ponderado** | | **73,9** | **76,2** | média | |
 
 Faixas internas (não são certificação): 95–100 excelência · 90–94 premium avançado · 80–89 bom
 nível profissional · **70–79 qualidade intermédia** · 50–69 modernização · 0–49 insuficiente.
 
-O caminho mais curto para **80+** não passa por código: fechar A360-01 a A360-05 e A360-07 vale,
-por si, ~4 pontos — o suficiente para passar os 80 (checkout e pagamentos para ~80, segurança
-para ~90).
+O caminho mais curto para **80+**: fechar A360-01 a A360-05 e A360-07 (operação, do dono) vale
+~4 pontos; o LCP do telemóvel abaixo de 2,5 s (A360-28, código) vale mais ~2. Juntos, ~82.
 
 ---
 
@@ -165,7 +171,7 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 | A360-03 | Pagamentos | ⚑ **Nenhum pagamento electrónico activo**: só transferência, entrega e balcão | `payment_methods`: `multicaixa` e `unitel_money` com `enabled = false`; nenhum com `gateway_provider` | **P1** | Vendas | Gateway por contratar | Contratar um agregador autorizado (Multicaixa Express/referências — p. ex. AppyPay); o webhook com HMAC já existe ([PAGAMENTOS.md § 3](../PAGAMENTOS.md)) | Pagamento em sandbox → webhook → encomenda `paid` sem intervenção; reenvio do webhook não duplica | 👤 |
 | A360-04 | Encomendas | ⚑ 5 de 6 encomendas `delivered` com `payment_status = pending` | Agregado de `orders` (sem dados pessoais) | **P1** | Operação, finanças | Encomendas de teste, ou dinheiro recebido não registado | Confirmar cada uma: registar o pagamento em «Confirmar pagamentos» ou cancelar/arquivar as de teste | Relatório de pagamentos: nenhuma entregue por pagar sem alerta aberto | 👤 |
 | A360-05 | Segurança | ⚑ Os **4 administradores não têm segundo passo**; o MFA é opcional | `auth.mfa_factors` verificados = 0; `MfaGate` só pede o código a quem o activou | **P1** | Segurança | MFA nunca exigido à equipa (ASVS V6, nível 2) | Activar nas 4 contas; depois exigir `aal2` a `admin`/`manager` em `private.has_permission` (com aviso prévio) | Sessão `aal1` de um administrador não consegue escrever | 👤 depois 📝 |
-| A360-06 | SEO | ⚑ **As páginas fixas declaravam a página inicial como a oficial**: `/shop`, `/colecoes`, `/lojas`, `/about`, `/contact`, `/faq`, `/materiais`, `/comunidade`, `/shipping-returns`, `/privacidade` estão no sitemap, mas eram servidas pelo `index.html`, com `<link rel="canonical" href="https://livrariaadventista.ao/">` | `public/_redirects` (`/* /index.html 200`), `index.html`, `seo-catalogo.mjs` só gerava livros e colecções | **P1** | Descoberta | SPA com um único HTML | O pós-build escreve `shop.html`, `faq.html`… com o canonical, o título e a descrição de cada página (como já fazia para os livros) | `curl -s https://livrariaadventista.ao/faq \| grep canonical` → `/faq`; Search Console → Inspecção de URL | ✅ |
+| A360-06 | SEO | ⚑ **As páginas fixas declaravam a página inicial como a oficial**: `/shop`, `/colecoes`, `/lojas`, `/about`, `/contact`, `/faq`, `/materiais`, `/comunidade`, `/shipping-returns`, `/privacidade` estão no sitemap, mas eram servidas pelo `index.html`, com `<link rel="canonical" href="https://livrariaadventista.ao/">` | Confirmado na loja publicada pela auditoria visual: canonical `/` em 11 das 13 páginas; `public/_redirects` (`/* /index.html 200`); `seo-catalogo.mjs` só gerava livros e colecções | **P1** | Descoberta | SPA com um único HTML | O pós-build escreve `shop.html`, `faq.html`… com o canonical, o título e a descrição de cada página (como já fazia para os livros) | `curl -s https://livrariaadventista.ao/faq \| grep canonical` → `/faq`; Search Console → Inspecção de URL | ✅ |
 | A360-07 | Confiança | ⚑ **A loja não tem telefone nem WhatsApp** em lado nenhum; as 3 lojas sem telefone, 2 sem coordenadas; denominação social vazia | `site_settings`: `contact_phone`/`whatsapp` vazios, `company_legal_name` vazio; `physical_stores` | **P1** | Vendas, confiança | Dados por preencher | Configurações → Contacto e Lojas; denominação social e NIF no rodapé e no recibo | Rodapé, página de lojas e recibo com os dados | 👤 |
 | A360-08 | SEO | Sem dados estruturados: preço, disponibilidade, autor e caminho nunca chegavam à Google | Nenhum `application/ld+json` no código | P2 | Descoberta | — | `Product`/`Book` + `Offer` (AOA) + `BreadcrumbList` na ficha; `Organization` + `WebSite` no `index.html` | [Rich Results Test](https://search.google.com/test/rich-results) numa ficha | ✅ |
 | A360-09 | Acessibilidade | Sem "Saltar para o conteúdo" na loja (WCAG 2.4.1, **nível A**); só o painel o tinha | `components/admin/shell/AdminShell.jsx` | P2 | Cliente | — | Link no início do cabeçalho que foca o `<main>` | Tab na página inicial → link visível → Enter → foco no conteúdo | ✅ |
@@ -187,6 +193,12 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 | A360-25 | Catálogo | Pesquisa e filtros correm no navegador sobre o catálogo inteiro: certo com 102 produtos, não com milhares | `useProductFilters.jsx` | P3 | Escala | Desenho inicial | Quando passar de ~1 000 produtos: pesquisa no servidor (`pg_trgm`/FTS) e paginação | — | 📝 |
 | A360-26 | WhatsApp | O único envio por WhatsApp falhou (token que não é da Meta, 2026-11-07) | `notification_logs` | P3 | Operação | Token errado | Token permanente de *System User* ou desligar a integração | Envio de teste com `sent` | 👤 |
 | A360-27 | Emails | ⚑ No telemóvel, o botão principal dos emails partia-se mal: a seta sozinha na segunda linha, ou "palavra-" / "passe →"; a etapa actual do seguimento usava "•", mais pequeno do que ✓ e ○ | Os 25 modelos desenhados aqui com o Chromium a 320, 360, 375 e 700 px | P3 | Marca | Espaço normal antes da seta | Palavras com hífen sem quebra e a seta colada à última palavra; "●" na etapa actual. Os 25 modelos: sem deslocamento horizontal, todas as imagens com `alt`, nenhum texto abaixo de 12 px | Modelos a 320 px sem quebras partidas | ✅ |
+| A360-28 | Desempenho | ⚑ **No telemóvel, o maior elemento demora 4,3 a 6,1 s a aparecer em todas as páginas** (objectivo 2,5 s); FCP 2,8–4,2 s. No computador, 0,4–1,4 s | Auditoria visual (perfil de telemóvel do Lighthouse): ~255–303 KB de `<script>` + ~158 KB de JS pré-carregado por página, 70–120 pedidos, 1,3 MB de imagens na inicial; o LCP é a imagem do herói ou do topo | **P1** | Cliente, vendas | Muito JavaScript antes do primeiro desenho; imagens de 1920–2880 px servidas a ecrãs de 390 px; várias leituras de arranque (A360-18) | Carregar o assistente, o aviso de instalação, a actividade de leitor e as notificações só quando o browser estiver livre; `srcset` com versões de 960 px das imagens do herói e do topo; `preconnect` ao Supabase; ver a secção «O que mais pesa» da próxima execução | Auditoria visual: LCP do telemóvel ≤ 2,5 s nas páginas principais | 📝 |
+| A360-29 | SEO, acessibilidade | ⚑ **9 das 13 páginas ficavam com o título genérico** "Livraria Adventista" no separador, no histórico e para a Google (WCAG 2.4.2): a resposta do `/settings` chega depois de a página pôr o seu e escrevia por cima | Auditoria visual: no computador (carga rápida) FAQ, loja, contactos… com "Livraria Adventista"; no telemóvel (carga lenta) com o título certo; `useSiteSettings.jsx` | P1 | Descoberta, cliente | `document.title = site_name` sem condição | O nome configurado só substitui o título genérico | Títulos certos na próxima auditoria visual, nas cinco larguras | ✅ |
+| A360-30 | Acessibilidade | Alvos de toque abaixo de 24 px (WCAG 2.5.8, AA): a seta de cada menu do cabeçalho (22 px de largura) e o olho da palavra-passe (16×16) | axe-core: `target-size`, 5 elementos (ficha do livro a 1280 px, entrada a 390 e 1280 px) | P2 | Cliente | Ícones sem área à volta | `min-w-6` na seta; `p-1` no olho (24×24, no mesmo sítio) | axe sem `target-size` | ✅ |
+| A360-31 | Telemóvel | `/login` a 320 px tem 3 px de deslocamento horizontal | Auditoria visual | P3 | Cliente | ? por identificar | A próxima execução diz que elemento passa da largura | 0 px a 320 px | 📝 |
+| A360-32 | Loja no telemóvel | Na loja, a 390 px, o primeiro livro só aparece aos ~740 px: herói, géneros, pesquisa e uma caixa de ferramentas de três linhas ocupam o primeiro ecrã inteiro | Captura `loja/telemovel-390` | P2 | Vendas | Herói e barra de ferramentas pensados para o computador | No telemóvel: herói mais baixo e uma só linha com «Filtros» e a ordenação (o resto dentro dos filtros) | Pelo menos uma fila de livros no primeiro ecrã a 390 px | 📝 |
+| A360-33 | Dados | Os 4 slides da página inicial têm as imagens gravadas no projecto antigo `livraria-adventista.pages.dev`; o site corrige o endereço ao mostrar (`lib/imageUrl.js`), mas outro uso dos dados (emails, partilhas) não | `hero_slides.image` | P3 | Operação | Dados da migração | Actualizar as 4 linhas para `/images/site/…` antes de apagar o projecto antigo | Nenhum `pages.dev` em `hero_slides` | 👤 |
 
 ---
 
@@ -196,9 +208,9 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 |---|---|---|---|---|---|---|
 | **1. Críticas** (esta semana, dono) | A360-01, A360-02 email; A360-04 reconciliação; A360-05 MFA nas 4 contas; A360-07 contactos | Acesso ao DNS e ao painel do Supabase | Baixo | 1 dia | Muito alto | Encomenda de teste com email recebido; 0 entregues por pagar; 4/4 administradores com segundo passo; telefone no rodapé |
 | **2. Comércio** | A360-03 gateway; A360-14 termos; A360-15 facturação | Contrato com o agregador; jurista; contabilidade | Médio | 2–4 semanas | Muito alto | Pagamento em sandbox confirmado por webhook; termos publicados; regra de facturação decidida |
-| **3. Usabilidade e dados** | A360-13 catálogo; A360-20 categorias; A360-19 sessão | — | Baixo | 1 semana | Alto | ISBN nos livros que o têm; «Catálogo Geral» < 10 %; 0 `401` em leituras públicas |
-| **4. Desempenho e medição** | A360-18 arranque; A360-16 RUM e erros | — | Baixo | 3–5 dias | Médio-alto | p75 de LCP < 2,5 s e INP < 200 ms **medidos em campo**, separados por telemóvel e computador |
-| **5. Refinamento e regressão** | A360-17 E2E e capturas; A360-24 movimento; A360-21 privilégios; A360-23 ensaio de restauro; passagem visual no navegador | Fase 4 (para medir) | Baixo | 1 semana | Médio | CI com E2E verde; capturas sem diferenças por explicar |
+| **3. Telemóvel rápido** (código) | A360-28 LCP do telemóvel; A360-18 arranque; A360-32 loja acima da dobra | Auditoria visual (já existe) para medir antes e depois | Médio | 1 semana | Alto | LCP do telemóvel ≤ 2,5 s nas páginas principais, no laboratório; uma fila de livros no primeiro ecrã |
+| **4. Usabilidade, dados e medição de campo** | A360-13 catálogo; A360-19 sessão; A360-31; A360-16 RUM e erros | — | Baixo | 1 semana | Médio-alto | ISBN nos livros que o têm; «Catálogo Geral» < 10 %; p75 de LCP < 2,5 s e INP < 200 ms **medidos em campo** |
+| **5. Refinamento e regressão** | A360-17 E2E; A360-24 movimento; A360-21 privilégios; A360-23 ensaio de restauro; A360-33 | Fase 3 | Baixo | 1 semana | Médio | CI com E2E verde; auditoria visual sem diferenças por explicar |
 
 ---
 
@@ -234,8 +246,10 @@ email/SMS (A360-01).
 | `ui/sheet.jsx`, `ui/spinner.jsx`, `ui/pagination.jsx` | Rótulos em português | A360-11 |
 | `AboutPage.jsx`, `ContactPage.jsx` | "a Livraria Adventista" | A360-12 |
 | `supabase/functions/app/emails.ts` | Botão principal: palavras com hífen sem quebra e a seta colada à última palavra (`buttonLabelHtml`); "●" na etapa actual | A360-27 |
-| `.github/workflows/auditoria-visual.yml`, `scripts/auditoria-visual/capturar.mjs` (novos) | Auditoria visual da loja publicada com o Playwright no GitHub: capturas a 320–1440 px, LCP/CLS com rede e processador de telemóvel, consola, axe-core; resultados no ramo `auditoria-visual` | Fase 2.2 |
-| Testes | `structuredData.test.js` (15), `SkipToContent.test.jsx` (4), `seo-paginas.test.mjs` (+6), `emails.test.ts` (+3) | — |
+| `.github/workflows/auditoria-visual.yml`, `scripts/auditoria-visual/capturar.mjs` (novos) | Auditoria visual com o Playwright no GitHub: capturas a 320–1440 px, LCP/CLS com rede e processador de telemóvel, consola, axe-core, o que mais pesa e quem passa da largura; resultados no ramo `auditoria-visual`. Num PR, constrói e serve o site do próprio PR; à mão, audita o endereço indicado (por omissão, a loja publicada) | Fase 2.2, A360-28 |
+| `app/web/src/hooks/useSiteSettings.jsx` | O nome configurado da loja só substitui o título genérico | A360-29 |
+| `components/header/MegaMenu.jsx`, `components/auth/AuthForm.jsx` | Seta dos menus com 24 px; olho da palavra-passe com 24×24 | A360-30 |
+| Testes | `structuredData.test.js` (15), `SkipToContent.test.jsx` (4), `seo-paginas.test.mjs` (+6), `emails.test.ts` (+3), `useSiteSettings.cache.test.jsx` (+2) | — |
 
 **Ordem de publicação.** Sem migrações. O merge publica o site pelo `deploy-cloudflare.yml` (o
 pós-build passa a escrever 10 ficheiros a mais) e volta a publicar a Edge Function pelo
@@ -249,9 +263,9 @@ conteúdo"; o carrossel pára com o botão no telemóvel.
 
 ## I. Por verificar na próxima passagem
 
-1. **Passagem visual no navegador** (assim que o navegador da app ou o Claude in Chrome estiver
-   ligado): capturas a 320, 360, 390, 768, 1024, 1280 e 1440 px das páginas principais; texto
-   cortado, sobreposições, estados de foco; axe-core nas páginas novas.
+1. **A auditoria visual depois do merge**, à loja publicada (Actions → Auditoria visual → Run
+   workflow): títulos e canonical certos nas 13 páginas, JSON-LD na ficha, "Saltar para o
+   conteúdo" no 1.º Tab, `target-size` resolvido.
 2. **Core Web Vitals em campo**, a partir de Angola, em rede móvel: LCP, INP e CLS p75 por página.
 3. **Painel com uma sessão de equipa** (conta de teste com `manager`): criar e editar produto,
    processar encomenda, confirmar pagamento, reembolso.

@@ -1991,9 +1991,15 @@ Relatório completo, com a pontuação por domínio, a matriz de achados (A360-0
 de melhoria: [audits/livraria-premium-360.md](audits/livraria-premium-360.md). Ramo
 `claude/auditoria-premium-360`.
 
-- **Classificação provisória**: 75/100 antes do PR, 76/100 com ele ("qualidade intermédia"),
-  confiança média-baixa — a parte visual não foi revista no navegador nesta passagem.
-- **Corrigido no PR**: o canonical das 10 páginas fixas (todas apontavam para a página inicial),
+- **Classificação provisória**: 74/100 antes do PR, 76/100 com ele ("qualidade intermédia"),
+  confiança média.
+- **Auditoria visual com o Playwright** (workflow novo `auditoria-visual.yml`, 13 páginas × 5
+  larguras, axe-core): visual ao nível premium, CLS ≤ 0,06 e axe quase limpo; mas **LCP no
+  telemóvel de 4,3 a 6,1 s em todas as páginas** (perfil de telemóvel do Lighthouse), e 9 das 13
+  páginas ficavam com o título genérico (corrigido no PR).
+- **Corrigido no PR**: o título das páginas (o `/settings` escrevia o nome da loja por cima), a
+  área de toque das setas dos menus e do olho da palavra-passe, o botão dos emails no telemóvel,
+  o canonical das 10 páginas fixas (todas apontavam para a página inicial),
   dados estruturados (`Product`/`Book`/`Offer`/`BreadcrumbList` e `Organization`/`WebSite`),
   "Saltar para o conteúdo" na loja, o carrossel que não se podia parar no telemóvel, rótulos em
   inglês, e "o Livraria" → "a Livraria" nas descrições.

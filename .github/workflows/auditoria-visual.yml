@@ -7,6 +7,10 @@ name: Auditoria visual (Playwright)
 #
 # Só lê o site: os pedidos que não são GET são cancelados no navegador.
 #
+# Num PR, a auditoria é ao site do próprio PR: constrói-o, corre o pós-build de SEO e serve-o
+# aqui (com os dados reais do Supabase, só leitura), para se ver antes do merge o que vai mudar.
+# À mão, é ao endereço indicado (por omissão, a loja publicada).
+#
 # Os resultados ficam:
 #   - no resumo desta execução (página do Actions);
 #   - no artefacto "auditoria-visual" (14 dias);
@@ -43,13 +47,41 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SITE_URL: ${{ inputs.url || 'https://livrariaadventista.ao' }}
       PAGINAS: ${{ inputs.paginas || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+          cache: npm
+
+      - name: Site a auditar (publicado)
+        if: github.event_name != 'pull_request'
+        env:
+          INPUT_URL: ${{ inputs.url }}
+        run: |
+          echo "SITE_URL=${INPUT_URL:-https://livrariaadventista.ao}" >> "$GITHUB_ENV"
+          echo "ROTULO=${INPUT_URL:-https://livrariaadventista.ao}" >> "$GITHUB_ENV"
+
+      # O mesmo build e o mesmo pós-build do deploy-cloudflare.yml, servidos como o Pages os serve:
+      # `/faq` a partir de `faq.html` e o resto pelo index.html.
+      - name: Site a auditar (o deste PR, construído e servido aqui)
+        if: github.event_name == 'pull_request'
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          node scripts/seo-catalogo.mjs dist/app/web https://livrariaadventista.ao
+          nohup npx --yes serve@14 -s dist/app/web -l 8744 > "$RUNNER_TEMP/serve.log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8744/ && break; sleep 1; done
+          curl -sf -o /dev/null http://127.0.0.1:8744/ || { cat "$RUNNER_TEMP/serve.log"; exit 1; }
+          echo "SITE_URL=http://127.0.0.1:8744" >> "$GITHUB_ENV"
+          echo "ROTULO=site do PR #${PR_NUMBER} (${HEAD_SHA::7}), servido no runner" >> "$GITHUB_ENV"
 
       # Numa pasta à parte, como o PGlite do ci.yml: nada entra no package-lock do site.
       - name: Instalar o Playwright e o axe-core
@@ -90,6 +122,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -qm "Auditoria visual de $SITE_URL ($(date -u '+%Y-%m-%d %H:%M UTC'), ${GITHUB_SHA::7})"
+          git commit -qm "Auditoria visual: $ROTULO ($(date -u '+%Y-%m-%d %H:%M UTC'))"
           git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/auditoria-visual
           echo "Resultados no ramo auditoria-visual: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/tree/auditoria-visual" >> "$GITHUB_STEP_SUMMARY"

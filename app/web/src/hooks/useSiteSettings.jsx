@@ -79,7 +79,11 @@ export function SiteSettingsProvider({ children }) {
       setSettings((prev) => ({ ...prev, ...merged }));
       applyShopTheme(merged);
       applyHead(data);
-      if (data.site_name) document.title = data.site_name;
+      // O nome da loja só substitui o título genérico. Cada página põe o seu (<Helmet>), e a
+      // resposta do /settings chega muitas vezes depois: escrever por cima deixava a FAQ, a
+      // loja, os contactos… com "Livraria Adventista" no separador, no histórico e na Google
+      // (medido pela auditoria visual: só escapava quem carregava mais devagar do que ela).
+      if (data.site_name && document.title === BRAND.name) document.title = data.site_name;
     } catch {
       // Sem resposta: fica a cópia guardada (se havia) ou as de omissão.
       setSettings((prev) => ({ ...THEME_DEFAULTS, ...prev }));

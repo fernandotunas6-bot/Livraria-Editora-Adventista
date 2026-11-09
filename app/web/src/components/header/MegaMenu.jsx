@@ -364,9 +364,11 @@ export default function MegaMenu() {
               >
                 {m.label}
               </Link>
+              {/* `min-w-6`: a seta media 22px de largura, abaixo dos 24 da WCAG 2.5.8 (o axe
+                  apanhou-o na ficha do livro, onde o cabeçalho está sempre à vista). */}
               <button
                 type="button"
-                className="pr-2 py-2 text-white/60 hover:text-[#22d3ee]"
+                className="inline-flex min-h-6 min-w-6 items-center justify-center pr-2 py-2 text-white/60 hover:text-[#22d3ee]"
                 aria-expanded={open === m.id}
                 aria-controls="mega-menu-panel"
                 aria-label={`${open === m.id ? 'Fechar' : 'Abrir'} menu ${m.label}`}

@@ -91,14 +91,17 @@ const COLLECT = () => {
   }
   const kb = { script: 0, css: 0, img: 0, font: 0, fetch: 0, outro: 0 };
   const resources = performance.getEntriesByType('resource');
-  for (const r of resources) {
-    const kind = r.initiatorType === 'script' ? 'script'
+  const kindOf = (r) => (r.initiatorType === 'script' || /\.m?js(\?|$)/.test(r.name) ? 'script'
       : r.initiatorType === 'link' && /\.css(\?|$)/.test(r.name) ? 'css'
       : r.initiatorType === 'img' || r.initiatorType === 'image' ? 'img'
       : /\.(woff2?|ttf|otf)(\?|$)/.test(r.name) ? 'font'
-      : r.initiatorType === 'fetch' || r.initiatorType === 'xmlhttprequest' ? 'fetch' : 'outro';
-    kb[kind] += (r.transferSize || 0) / 1024;
-  }
+      : r.initiatorType === 'fetch' || r.initiatorType === 'xmlhttprequest' ? 'fetch' : 'outro');
+  // O JavaScript pré-carregado (`modulepreload`) chega como `link`: conta como script.
+  for (const r of resources) kb[kindOf(r)] += (r.transferSize || 0) / 1024;
+  const maiores = [...resources]
+    .sort((a, b) => (b.transferSize || 0) - (a.transferSize || 0))
+    .slice(0, 12)
+    .map((r) => ({ kb: Math.round((r.transferSize || 0) / 1024), tipo: kindOf(r), url: r.name.replace(location.origin, '').slice(0, 120) }));
   const describe = (el) => {
     if (!el) return '';
     const id = el.id ? `#${el.id}` : '';
@@ -107,6 +110,13 @@ const COLLECT = () => {
   };
   const doc = document.documentElement;
   const canonical = document.querySelector('link[rel="canonical"]');
+  // Quem passa da largura do ecrã, quando há deslocamento horizontal.
+  const largos = doc.scrollWidth > doc.clientWidth
+    ? [...document.body.querySelectorAll('*')]
+      .filter((el) => el.getBoundingClientRect().right > doc.clientWidth + 0.5 && getComputedStyle(el).position !== 'fixed')
+      .slice(-3)
+      .map((el) => `${describe(el)} (até ${Math.round(el.getBoundingClientRect().right)} px)`)
+    : [];
   return {
     titulo: document.title,
     lang: doc.getAttribute('lang') || '',
@@ -128,6 +138,8 @@ const COLLECT = () => {
     tarefasLongasMs: Math.round(window.__auditoria?.longTaskMs ?? 0),
     pedidos: resources.length + 1,
     kb: Object.fromEntries(Object.entries(kb).map(([k, v]) => [k, Math.round(v)])),
+    maiores,
+    largos,
   };
 };
 
@@ -169,7 +181,10 @@ async function auditPage(browser, vp, nome, pagePath) {
   });
   const consola = [];
   const falhas = [];
-  page.on('console', (msg) => { if (msg.type() === 'error') consola.push(msg.text().slice(0, 300)); });
+  page.on('console', (msg) => {
+    // "Failed to load resource" dos pedidos que esta auditoria cancelou não são do site.
+    if (msg.type() === 'error' && !cancelled.has(msg.location()?.url)) consola.push(msg.text().slice(0, 300));
+  });
   page.on('pageerror', (err) => consola.push(`pageerror: ${String(err.message || err).slice(0, 300)}`));
   page.on('requestfailed', (req) => {
     if (!cancelled.has(req.url())) falhas.push(`${req.failure()?.errorText || 'falhou'} ${req.url().slice(0, 160)}`);
@@ -243,7 +258,7 @@ const clsFlag = (v) => (v == null ? '' : v <= 0.1 ? ' ✅' : v <= 0.25 ? ' ⚠�
 function summary(results, startedAt) {
   const by = (nome, vp) => results.find((r) => r.pagina === nome && r.largura === vp) || {};
   const lines = [
-    `# Auditoria visual — ${SITE}`,
+    `# Auditoria visual — ${process.env.ROTULO || SITE}`,
     '',
     `${startedAt.toISOString().replace('T', ' ').slice(0, 16)} UTC · ${PAGES.length} páginas × ${VIEWPORTS.length} larguras · capturas em \`capturas/<página>/<largura>.jpg\` (e \`-inteira.jpg\` a 390 e 1280 px)`,
     '',
@@ -264,7 +279,7 @@ function summary(results, startedAt) {
   for (const r of results) {
     const where = `${r.pagina} @ ${r.largura}`;
     if (r.erro) problems.push(`- **${where}**: não carregou — ${r.erro}`);
-    if (r.deslocamentoHorizontal > 0) problems.push(`- **${where}**: deslocamento horizontal de ${r.deslocamentoHorizontal} px`);
+    if (r.deslocamentoHorizontal > 0) problems.push(`- **${where}**: deslocamento horizontal de ${r.deslocamentoHorizontal} px${r.largos?.length ? ` — ${r.largos.join('; ')}` : ''}`);
     if (r.h1 !== undefined && r.h1 !== 1) problems.push(`- **${where}**: ${r.h1} títulos h1`);
     if (r.imagensSemAlt > 0) problems.push(`- **${where}**: ${r.imagensSemAlt} imagens sem alt`);
     if (r.canonicais > 1) problems.push(`- **${where}**: ${r.canonicais} links canonical`);
@@ -278,6 +293,11 @@ function summary(results, startedAt) {
     cur.paginas.add(`${r.pagina}@${r.largura.replace(/^.*-/, '')}`);
     cur.nos += v.nos;
     axeAll.set(key, cur);
+  }
+  const heavy = by('inicio', 'telemovel-390').maiores || [];
+  if (heavy.length) {
+    lines.push('', '## O que mais pesa na página inicial (telemóvel)', '', '| KB | Tipo | Recurso |', '|---:|---|---|');
+    for (const r of heavy) lines.push(`| ${r.kb} | ${r.tipo} | \`${r.url.replace(/\|/g, '/')}\` |`);
   }
   lines.push('', '## Acessibilidade (axe-core, WCAG 2.2 A/AA)', '');
   if (!axeAll.size) lines.push(AXE_PATH ? 'Sem violações nas páginas medidas.' : 'axe-core não instalado nesta execução.');

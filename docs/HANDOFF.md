@@ -13,8 +13,12 @@ Estado em 2026-11-09. Ponto de partida para o próximo agente ou pessoa que pegu
   no `index.html`; salto para o conteúdo; carrossel com Parar/Retomar e "reduzir movimento".
 - **Fica por fazer, e é do dono:** email (A360-01/02), gateway (A360-03), reconciliação das
   encomendas entregues por pagar (A360-04), MFA (A360-05), contactos da loja (A360-07).
-- **Não verificado nesta passagem:** o site no navegador (sem capturas nem LCP/INP de hoje), o
-  painel com sessão de equipa e o pagamento em sandbox.
+- **Auditoria visual:** `.github/workflows/auditoria-visual.yml` (Playwright + axe-core). Num PR
+  constrói e serve o site do PR; à mão (Run workflow) audita a loja publicada. Resultados no ramo
+  `auditoria-visual` (substituído a cada execução). Primeira medição: LCP do telemóvel 4,3–6,1 s
+  em todas as páginas — é o próximo trabalho de código (A360-28).
+- **Não verificado nesta passagem:** medições de campo (INP), o painel com sessão de equipa e o
+  pagamento em sandbox.
 
 ## Trajeto da encomenda com GPS dos dois lados (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 
