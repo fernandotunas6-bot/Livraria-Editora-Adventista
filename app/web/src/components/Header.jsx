@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import SafeLink from '@/components/SafeLink.jsx';
-import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, Library, ShieldCheck, BadgeCheck } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, User, ShoppingBag, LogOut, LayoutDashboard, Bell, Library, ShieldCheck, BadgeCheck, FileText } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useHeaderReveal } from '@/hooks/useHeaderReveal';
@@ -641,6 +641,14 @@ const Header = ({ onCartOpen, pinned = false }) => {
               tabIndex={mobileOpen ? 0 : -1}
             >
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Política de privacidade
+            </Link>
+            <Link
+              to="/termos"
+              onClick={closeMobile}
+              className="flex min-h-11 items-center gap-2 px-3 py-2.5 text-xs font-medium rounded-lg text-white/70 hover:bg-white/5 hover:text-white"
+              tabIndex={mobileOpen ? 0 : -1}
+            >
+              <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Termos e condições
             </Link>
           </nav>
         </div>

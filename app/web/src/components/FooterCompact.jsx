@@ -110,6 +110,9 @@ export default function FooterCompact() {
           <Link to="/privacidade" className={pe}>
             Política de privacidade
           </Link>
+          <Link to="/termos" className={pe}>
+            Termos e condições
+          </Link>
           <Link to="/faq" className={pe}>
             Perguntas frequentes
           </Link>

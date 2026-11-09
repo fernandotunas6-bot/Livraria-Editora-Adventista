@@ -1157,6 +1157,13 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         <><strong>WhatsApp</strong> — pedido registado e conversa directa com a equipa.</>
                       )}
                     </p>
+                    {/* Em todos os ecrãs, e num separador novo, para o carrinho não se perder a meio. */}
+                    <p className="text-xs text-center text-muted-foreground">
+                      Ao confirmar, aceita os{' '}
+                      <a href="/termos" target="_blank" rel="noopener" className="font-medium text-primary underline underline-offset-2">termos e condições</a>
+                      {' '}e a{' '}
+                      <a href="/privacidade" target="_blank" rel="noopener" className="font-medium text-primary underline underline-offset-2">política de privacidade</a>.
+                    </p>
                   </>
                 )}
               </div>

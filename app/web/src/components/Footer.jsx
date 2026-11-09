@@ -457,8 +457,9 @@ const Footer = () => {
 
         <div className="flex flex-col items-center gap-2 border-t border-background/20 pt-8 text-center sm:flex-row sm:justify-center sm:gap-4">
           <p className="text-sm text-background/70">{copyright}</p>
-          {/* Fora das colunas, que o painel pode mudar: a política fica sempre ligada. */}
+          {/* Fora das colunas, que o painel pode mudar: as páginas legais ficam sempre ligadas. */}
           <Link to="/privacidade" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Política de privacidade</Link>
+          <Link to="/termos" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Termos e condições</Link>
         </div>
       </div>
     </footer>
