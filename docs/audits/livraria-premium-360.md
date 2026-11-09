@@ -179,13 +179,14 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 | A360-17 | Testes | Sem testes de ponta a ponta no navegador nem regressão visual; os 10 cenários da Fase 12 não estão automatizados | Nenhum `playwright.config` nem `*.spec.*` | P2 | Qualidade | — | Playwright numa pré-visualização do Pages com dados de teste: pesquisa, carrinho, checkout (convidado), rastreio, acesso negado, painel; capturas a 360/768/1280 | Job novo no CI, verde | 📝 |
 | A360-18 | Desempenho | Cada visita faz 4 leituras de arranque à Edge Function (`/settings`, `/integrations`, `/chat/config`, `/payment-methods`), a **0,4–0,8 s p75 cada**, a partir de Angola (função em Paris, base em Estocolmo); `/admin/media-config` chamado 145 vezes em 24 h | Registos `function_edge_logs` de 24 h | P2 | Cliente | Uma rota por definição | Uma só rota pública de arranque, com `Cache-Control: s-maxage` e a cópia local com revalidação que já existe para as definições | ≤ 2 pedidos de arranque; p75 < 400 ms | 📝 |
 | A360-19 | Sessão | ? 12 pedidos `401` a `staff_notifications` e 1 ao catálogo em 24 h: um token caducado enviado quando a aba volta do segundo plano faz falhar até leituras públicas | Registos `edge_logs` | P3 | Cliente | Provável: pedido antes da renovação do token | Renovar a sessão em `visibilitychange` antes de consultar, ou repetir uma vez depois de `refreshSession()` | 0 `401` em leituras públicas | 📝 |
-| A360-20 | Categorias | As páginas de categoria (`/shop/:category`) continuam a herdar o canonical da página inicial: o pós-build não as gera, porque os nomes têm "&" e acentos | `CategoryPage.jsx`, `seo-catalogo.mjs` | P2 | Descoberta | Nomes de categoria como caminho | Slug por categoria (`/shop/fe-doutrina`) e página gerada no pós-build, como para as fixas | Canonical certo em `/shop/<slug>` | 📝 |
+| A360-20 | Categorias | ✔ Verificado, sem impacto: a navegação usa `/shop?category=…` (11 sítios), que agora herda o canonical da loja — o certo para filtros. `/shop/:category` só é usado pelo redireccionamento antigo de `/catalog/:category` | `App.jsx`, `MegaMenu.jsx` | — | — | — | Se um dia as categorias tiverem páginas próprias (texto, imagem), dar-lhes um slug e gerá-las no pós-build | — | ✔ |
 | A360-21 | Segurança | Privilégios por omissão do Supabase: `anon` e `authenticated` com `TRUNCATE`, `TRIGGER` e `REFERENCES` nas tabelas `public` (o PostgREST não os usa e o RLS não cobre o `TRUNCATE`) | `information_schema.role_table_grants` | P3 | Segurança | Padrão da plataforma | Migração que os revoga (defesa em profundidade) | Cenário PGlite: `anon` sem `TRUNCATE` | 📝 |
 | A360-22 | Segurança | Protecção contra palavras-passe vazadas desligada | Aviso `auth_leaked_password_protection` | P3 | Segurança | Só no plano Pro | Activar quando houver plano pago | Aviso desaparece | 👤 |
 | A360-23 | Continuidade | Plano Free sem recuperação pontual (PITR); o backup semanal cifrado corre (✔ 2026-11-08), mas falta um restauro de ensaio registado | `backup-base-dados.yml`, [BACKUPS.md](../BACKUPS.md) | P3 | Dados | Plano | Restaurar o último backup num projecto à parte, uma vez por trimestre, e anotar o tempo | Registo do ensaio em BACKUPS.md | 👤 |
 | A360-24 | Movimento | As animações do framer-motion (entradas da ficha, transições) não respeitam "reduzir movimento"; o CSS já respeita | Nenhum `MotionConfig` | P3 | Cliente | — | `<MotionConfig reducedMotion="user">` — mas no `App.jsx` puxa o bloco `vendor-motion` para o arranque de todas as páginas: medir antes, ou aplicar por página | LCP igual antes/depois | 📝 |
 | A360-25 | Catálogo | Pesquisa e filtros correm no navegador sobre o catálogo inteiro: certo com 102 produtos, não com milhares | `useProductFilters.jsx` | P3 | Escala | Desenho inicial | Quando passar de ~1 000 produtos: pesquisa no servidor (`pg_trgm`/FTS) e paginação | — | 📝 |
 | A360-26 | WhatsApp | O único envio por WhatsApp falhou (token que não é da Meta, 2026-11-07) | `notification_logs` | P3 | Operação | Token errado | Token permanente de *System User* ou desligar a integração | Envio de teste com `sent` | 👤 |
+| A360-27 | Emails | ⚑ No telemóvel, o botão principal dos emails partia-se mal: a seta sozinha na segunda linha, ou "palavra-" / "passe →"; a etapa actual do seguimento usava "•", mais pequeno do que ✓ e ○ | Os 25 modelos desenhados aqui com o Chromium a 320, 360, 375 e 700 px | P3 | Marca | Espaço normal antes da seta | Palavras com hífen sem quebra e a seta colada à última palavra; "●" na etapa actual. Os 25 modelos: sem deslocamento horizontal, todas as imagens com `alt`, nenhum texto abaixo de 12 px | Modelos a 320 px sem quebras partidas | ✅ |
 
 ---
 
@@ -232,11 +233,13 @@ email/SMS (A360-01).
 | `app/web/src/components/HeroSlider.jsx` | Parar/Retomar; começa parado com "reduzir movimento"; vídeo de fundo sem arranque automático nesse caso; `aria-roledescription`; 1.ª imagem com `fetchpriority="high"` | A360-10 |
 | `ui/sheet.jsx`, `ui/spinner.jsx`, `ui/pagination.jsx` | Rótulos em português | A360-11 |
 | `AboutPage.jsx`, `ContactPage.jsx` | "a Livraria Adventista" | A360-12 |
-| Testes | `structuredData.test.js` (15), `SkipToContent.test.jsx` (4), `seo-paginas.test.mjs` (+6) | — |
+| `supabase/functions/app/emails.ts` | Botão principal: palavras com hífen sem quebra e a seta colada à última palavra (`buttonLabelHtml`); "●" na etapa actual | A360-27 |
+| `.github/workflows/auditoria-visual.yml`, `scripts/auditoria-visual/capturar.mjs` (novos) | Auditoria visual da loja publicada com o Playwright no GitHub: capturas a 320–1440 px, LCP/CLS com rede e processador de telemóvel, consola, axe-core; resultados no ramo `auditoria-visual` | Fase 2.2 |
+| Testes | `structuredData.test.js` (15), `SkipToContent.test.jsx` (4), `seo-paginas.test.mjs` (+6), `emails.test.ts` (+3) | — |
 
-**Ordem de publicação.** Só frontend e scripts de build: sem migrações nem Edge Function. O
-merge publica o site pelo `deploy-cloudflare.yml`; o pós-build passa a escrever 10 ficheiros a
-mais. Rollback: reverter o merge.
+**Ordem de publicação.** Sem migrações. O merge publica o site pelo `deploy-cloudflare.yml` (o
+pós-build passa a escrever 10 ficheiros a mais) e volta a publicar a Edge Function pelo
+`deploy-supabase.yml`, só com a mudança do botão dos emails. Rollback: reverter o merge.
 
 **Depois do merge, verificar** (2 minutos): `/faq` e `/shop` com o canonical certo (ver o código
 da página); uma ficha no Rich Results Test; Tab na página inicial mostra "Saltar para o
