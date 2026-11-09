@@ -1997,7 +1997,7 @@ de melhoria: [audits/livraria-premium-360.md](audits/livraria-premium-360.md). R
   larguras, axe-core): visual ao nível premium, CLS ≤ 0,06 e axe quase limpo; mas **LCP no
   telemóvel de 4,3 a 6,1 s em todas as páginas** (perfil de telemóvel do Lighthouse), e 9 das 13
   páginas ficavam com o título genérico (corrigido no PR). Primeiro passo no PR para o telemóvel:
-  carrinho, assistente e pagamentos do rodapé adiados — LCP médio 4,68 → 4,26 s.
+  carrinho, assistente e pagamentos do rodapé adiados — LCP médio 4,68 → 4,26–4,32 s (duas medições).
 - **Corrigido no PR**: o título das páginas (o `/settings` escrevia o nome da loja por cima), a
   área de toque das setas dos menus e do olho da palavra-passe, o botão dos emails no telemóvel,
   o canonical das 10 páginas fixas (todas apontavam para a página inicial),

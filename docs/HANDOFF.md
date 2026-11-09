@@ -18,7 +18,7 @@ Estado em 2026-11-09. Ponto de partida para o próximo agente ou pessoa que pegu
   `auditoria-visual` (substituído a cada execução). Primeira medição: LCP do telemóvel 4,3–6,1 s
   em todas as páginas (A360-28). 1.º passo no PR: carrinho (agora `ShoppingCart.jsx` é um
   invólucro e o checkout está em `ShoppingCartPanel.jsx`), assistente e pagamentos do rodapé só
-  ao primeiro gesto ou 6 s depois do load (`hooks/useAfterLoad.js`) — LCP médio −9 %. Seguinte:
+  ao primeiro gesto ou 6 s depois do load (`hooks/useAfterLoad.js`) — LCP médio −8 a −9 % (duas medições). Seguinte:
   `srcset` no herói, a ficha do livro, o `vendor-motion` e os tipos de letra.
 - **Não verificado nesta passagem:** medições de campo (INP), o painel com sessão de equipa e o
   pagamento em sandbox.
