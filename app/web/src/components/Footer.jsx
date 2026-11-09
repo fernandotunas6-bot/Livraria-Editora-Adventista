@@ -141,7 +141,8 @@ const Footer = () => {
   }, [showStores]);
 
   // Os métodos de pagamento que o admin tem activos — os mesmos que o checkout aceita. Pedidos
-  // depois de a página carregar: o rodapé está no fim, e este pedido competia com a página.
+  // ao primeiro gesto ou uns segundos depois do load: o rodapé está no fim, e este pedido
+  // competia com a página.
   const afterLoad = useAfterLoad();
   useEffect(() => {
     if (!afterLoad) return;

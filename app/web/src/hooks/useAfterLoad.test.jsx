@@ -8,36 +8,49 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root;
 let host;
 let seen = [];
-function Probe() {
-  seen.push(useAfterLoad({ maxWaitMs: 50 }));
+function Probe({ delayMs }) {
+  seen.push(useAfterLoad({ delayMs }));
   return null;
 }
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
+  root = null;
   seen = [];
   delete window.requestIdleCallback;
 });
 
-async function mount() {
+async function mount(delayMs) {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  await act(async () => root.render(<Probe />));
+  await act(async () => root.render(<Probe delayMs={delayMs} />));
 }
 
+const wait = (ms) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+
 describe('useAfterLoad', () => {
-  it('começa a falso e passa a verdadeiro depois do load, sem requestIdleCallback', async () => {
-    await mount();
+  it('sem gesto, fica pronto depois do atraso (sem requestIdleCallback)', async () => {
+    await mount(40);
     expect(seen[0]).toBe(false);
-    await act(async () => { await new Promise((r) => setTimeout(r, 260)); });
+    await wait(10);
+    expect(seen.at(-1)).toBe(false);
+    await wait(80);
     expect(seen.at(-1)).toBe(true);
   });
 
-  it('usa o requestIdleCallback quando existe', async () => {
+  it('o primeiro gesto da pessoa adianta-o', async () => {
+    await mount(60_000);
+    expect(seen.at(-1)).toBe(false);
+    await act(async () => { window.dispatchEvent(new Event('pointerdown')); });
+    expect(seen.at(-1)).toBe(true);
+  });
+
+  it('depois do atraso, espera que o navegador fique livre', async () => {
     let pending = null;
     window.requestIdleCallback = (fn) => { pending = fn; return 1; };
-    await mount();
+    await mount(10);
+    await wait(40);
     expect(seen.at(-1)).toBe(false);
     await act(async () => { pending?.(); });
     expect(seen.at(-1)).toBe(true);

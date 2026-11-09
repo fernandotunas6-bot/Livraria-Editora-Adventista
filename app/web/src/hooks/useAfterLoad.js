@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
 
+const INTERACTION_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'wheel'];
+
 /**
- * `true` depois de a página acabar de carregar e de o navegador ficar livre — ou, no máximo,
- * `maxWaitMs` depois do `load`. Para o que não faz falta no primeiro ecrã (o assistente):
- * num telemóvel em rede lenta, cada pedido e cada script que entra antes da primeira pintura
- * atrasa-a (auditoria visual: LCP de 4,3 a 6,1 s no perfil de telemóvel).
+ * `true` quando a página já não precisa da rede só para si: ao primeiro gesto da pessoa (tocar,
+ * carregar numa tecla, deslizar) ou, sem gesto nenhum, `delayMs` depois do `load`, quando o
+ * navegador ficar livre. Para o que não faz falta no primeiro ecrã: o assistente, o painel do
+ * carrinho, os métodos de pagamento do rodapé.
+ *
+ * Porquê tão tarde: numa loja que desenha depois de ler os dados, a imagem maior (o LCP) chega
+ * muitas vezes depois do `load`. Carregar estas peças logo a seguir ao `load` melhorava a
+ * primeira pintura mas punha-as a disputar a rede com essa imagem — a auditoria visual mostrou
+ * o LCP do telemóvel igual ou pior. Depois do primeiro gesto, o LCP já não conta.
  */
-export function useAfterLoad({ maxWaitMs = 3000 } = {}) {
+export function useAfterLoad({ delayMs = 6000 } = {}) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -15,22 +22,29 @@ export function useAfterLoad({ maxWaitMs = 3000 } = {}) {
     let idleId = null;
     let timer = null;
     const go = () => { if (!cancelled) setReady(true); };
-    const schedule = () => {
-      if (typeof window.requestIdleCallback === 'function') {
-        idleId = window.requestIdleCallback(go, { timeout: maxWaitMs });
-      } else {
-        timer = window.setTimeout(go, 200);
-      }
+    const onInteraction = () => go();
+    for (const type of INTERACTION_EVENTS) {
+      window.addEventListener(type, onInteraction, { once: true, passive: true });
+    }
+    const afterDelay = () => {
+      timer = window.setTimeout(() => {
+        if (typeof window.requestIdleCallback === 'function') {
+          idleId = window.requestIdleCallback(go, { timeout: 2000 });
+        } else {
+          go();
+        }
+      }, delayMs);
     };
-    if (document.readyState === 'complete') schedule();
-    else window.addEventListener('load', schedule, { once: true });
+    if (document.readyState === 'complete') afterDelay();
+    else window.addEventListener('load', afterDelay, { once: true });
     return () => {
       cancelled = true;
-      window.removeEventListener('load', schedule);
-      if (idleId !== null) window.cancelIdleCallback?.(idleId);
+      for (const type of INTERACTION_EVENTS) window.removeEventListener(type, onInteraction);
+      window.removeEventListener('load', afterDelay);
       if (timer !== null) window.clearTimeout(timer);
+      if (idleId !== null) window.cancelIdleCallback?.(idleId);
     };
-  }, [ready, maxWaitMs]);
+  }, [ready, delayMs]);
 
   return ready;
 }

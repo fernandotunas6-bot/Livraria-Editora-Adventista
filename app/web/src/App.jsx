@@ -178,9 +178,9 @@ function ColporteurReferralCapture() {
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
-  // O assistente só entra depois de a página carregar (hooks/useAfterLoad.js): o código dele,
-  // a configuração do /chat/config e o canal em tempo real competiam com a página pela rede
-  // do telemóvel antes da primeira pintura.
+  // O assistente só entra ao primeiro gesto ou uns segundos depois do load
+  // (hooks/useAfterLoad.js): o código dele, o /chat/config e o canal em tempo real competiam
+  // com a página pela rede do telemóvel.
   const afterLoad = useAfterLoad();
   // Páginas sem o assistente: escolha do painel (lib/floatingButtons.js).
   const showAssistant = afterLoad && !isFloatingHidden('chat', pathname, settings);
