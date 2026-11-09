@@ -86,6 +86,39 @@ export function bookShareDescription(book) {
     : `${book?.title || 'Livro'}. À venda na ${SITE_NAME}, com entrega em Angola e levantamento nas lojas.`;
 }
 
+/**
+ * Páginas fixas do sitemap, cada uma com o seu HTML no build (`shop.html`, `faq.html`…).
+ *
+ * Sem isto, o Cloudflare Pages servia o `index.html` em todas — e o `index.html` diz
+ * `<link rel="canonical" href="https://livrariaadventista.ao/">`. Cada uma destas páginas
+ * estava no sitemap e, ao mesmo tempo, declarava a página inicial como a versão oficial: a
+ * Google junta-as à inicial e não as mostra nos resultados. Com o ficheiro próprio, o Pages
+ * serve `/faq` a partir de `faq.html` (como já faz com `product/<id>.html`), com o canonical,
+ * o título e a descrição certos, antes de correr qualquer JavaScript.
+ *
+ * Os títulos e as descrições são os do `<Helmet>` de cada página (mantê-los iguais). O caminho
+ * de cada uma tem de estar no `public/sitemap.xml` — há um teste para isso.
+ */
+export const FIXED_PAGES = [
+  { path: '/shop', title: 'Loja', description: 'O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.' },
+  { path: '/colecoes', title: 'Coleções', description: `Os livros da ${SITE_NAME} organizados em colecções.` },
+  { path: '/lojas', title: 'Lojas físicas', description: 'Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.' },
+  { path: '/about', title: 'Sobre Nós', description: `Conheça a ${SITE_NAME} — a nossa missão de difundir literatura cristã e educacional.` },
+  { path: '/contact', title: 'Contacto', description: `Entre em contacto com a ${SITE_NAME}. Estamos aqui para ajudar.` },
+  { path: '/faq', title: 'FAQ', description: 'Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.' },
+  { path: '/materiais', title: 'Materiais para descarregar', description: 'Revistas, lições e folhetos em PDF para descarregar.' },
+  { path: '/comunidade', title: 'Comunidade de Leitores', description: 'Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.' },
+  { path: '/shipping-returns', title: 'Envios e Devoluções', description: 'Prazos de entrega, custos de envio em Angola e como devolver um livro.' },
+  { path: '/privacidade', title: 'Política de privacidade', description: 'Que dados pessoais tratamos na loja, na comunidade de leitores e no atendimento, com quem os partilhamos e como exercer os seus direitos.' },
+];
+
+/** Nome do ficheiro de uma página fixa no build: `/shipping-returns` → `shipping-returns.html`. */
+export function fixedPageFile(pagePath) {
+  const name = String(pagePath || '').replace(/^\/+|\/+$/g, '');
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Error(`página fixa com caminho inválido: ${pagePath}`);
+  return `${name}.html`;
+}
+
 export function sitemapEntry(loc, lastmod, changefreq, priority) {
   return `  <url><loc>${escapeHtml(loc)}</loc>${lastmod ? `<lastmod>${String(lastmod).slice(0, 10)}</lastmod>` : ''}<changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
 }

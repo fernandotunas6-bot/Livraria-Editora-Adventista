@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  SOURCE_URL, bookShareDescription, escapeHtml, isSafeId, isSafeSlug, plainSummary, renderSharePage, rewriteSiteUrl,
+  FIXED_PAGES, SOURCE_URL, bookShareDescription, escapeHtml, fixedPageFile, isSafeId, isSafeSlug, plainSummary,
+  renderSharePage, rewriteSiteUrl,
 } from './seo-paginas.mjs';
 
 // O index.html real do site: se alguém mudar as etiquetas de partilha, estes testes dizem-no
@@ -90,6 +91,60 @@ describe('nomes de ficheiro', () => {
     expect(isSafeSlug('obras-ellen-white')).toBe(true);
     expect(isSafeSlug('-x')).toBe(false);
     expect(isSafeSlug('a/b')).toBe(false);
+  });
+});
+
+describe('dados estruturados do index.html', () => {
+  const blocks = [...INDEX.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+
+  it('um bloco JSON-LD válido, com a loja e o site no domínio oficial', () => {
+    expect(blocks).toHaveLength(1);
+    const data = JSON.parse(blocks[0]);
+    const types = data['@graph'].map((n) => n['@type']);
+    expect(types).toEqual(['Organization', 'WebSite']);
+    for (const node of data['@graph']) expect(node.url, node['@type']).toBe(`${SOURCE_URL}/`);
+  });
+
+  it('fica no <head>: as páginas de partilha levam-no, e o resto da página não muda', () => {
+    expect(INDEX.indexOf('application/ld+json')).toBeLessThan(INDEX.indexOf('</head>'));
+    const page = renderSharePage(INDEX, { title: 'T', description: 'D', url: `${SOURCE_URL}/faq` });
+    expect(page).toContain(blocks[0]);
+  });
+
+  it('numa pré-visualização, os endereços do bloco também mudam', () => {
+    const preview = rewriteSiteUrl(INDEX, 'https://abc.exemplo.pages.dev', 'index.html');
+    const block = preview.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1];
+    expect(JSON.parse(block)['@graph'][0].url).toBe('https://abc.exemplo.pages.dev/');
+  });
+});
+
+describe('páginas fixas do sitemap', () => {
+  const SITEMAP = readFileSync(path.resolve(__dirname, '../app/web/public/sitemap.xml'), 'utf8');
+  const fixedInSitemap = [...SITEMAP.matchAll(/<loc>([^<]+)<\/loc>/g)]
+    .map((m) => m[1].replace(SOURCE_URL, ''))
+    .filter((p) => p && p !== '/');
+
+  it('são exactamente as do sitemap, menos a inicial (que já é o index.html)', () => {
+    expect(FIXED_PAGES.map((p) => p.path).sort()).toEqual([...fixedInSitemap].sort());
+  });
+
+  it('cada uma tem o seu canonical, o seu título e a sua descrição', () => {
+    for (const p of FIXED_PAGES) {
+      const html = renderSharePage(INDEX, { title: p.title, description: p.description, url: `${SOURCE_URL}${p.path}` });
+      expect(html, p.path).toContain(`<link rel="canonical" href="${SOURCE_URL}${p.path}" />`);
+      expect(html, p.path).not.toContain(`<link rel="canonical" href="${SOURCE_URL}/" />`);
+      expect(html, p.path).toContain(`<title>${escapeHtml(p.title)} — Livraria Adventista</title>`);
+      expect(meta(html, 'name', 'description'), p.path).toBe(escapeHtml(p.description));
+      expect(p.description.length, p.path).toBeLessThanOrEqual(160);
+    }
+  });
+
+  it('o nome do ficheiro sai do caminho, e um caminho estranho recusa-se', () => {
+    expect(fixedPageFile('/shop')).toBe('shop.html');
+    expect(fixedPageFile('/shipping-returns')).toBe('shipping-returns.html');
+    expect(() => fixedPageFile('/../etc')).toThrow('inválido');
+    expect(() => fixedPageFile('/a/b')).toThrow('inválido');
+    expect(() => fixedPageFile('/')).toThrow('inválido');
   });
 });
 

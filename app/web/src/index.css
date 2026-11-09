@@ -449,6 +449,12 @@
     }
   }
 
+  /* O `<main>` recebe o foco pelo "Saltar para o conteúdo" (components/SkipToContent.jsx).
+     Não é um controlo: um anel à volta da página inteira só confundia. */
+  main[tabindex="-1"]:focus {
+    outline: none;
+  }
+
   /* ---------------------------------------------------------------------------
      Refinamento visual
      Ligado e desligado pelos atributos `data-ff-*` que `lib/featureFlags.js` põe no

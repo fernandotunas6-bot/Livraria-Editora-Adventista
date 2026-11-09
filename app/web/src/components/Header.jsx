@@ -24,6 +24,7 @@ import { getProducts } from '@/api/EcommerceApi';
 import { buildSearchSuggestions } from '@/lib/searchUtils';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '@/lib/recentSearches';
 import SiteNoticeBar from '@/components/SiteNoticeBar';
+import SkipToContent from '@/components/SkipToContent';
 import { useSiteNotice } from '@/hooks/useSiteNotice';
 
 // Menu do telemóvel: as mesmas secções do mega menu, em lista.
@@ -202,6 +203,8 @@ const Header = ({ onCartOpen, pinned = false }) => {
 
   return (
     <>
+      {/* Primeiro elemento focável da loja: salta o cabeçalho e vai ao conteúdo (WCAG 2.4.1). */}
+      <SkipToContent />
       {/* Faixa de aviso (painel → Sistema → Faixa de aviso), no fluxo da página: empurra o
           conteúdo em vez de o tapar e sobe com ele ao descer. */}
       <SiteNoticeBar notice={notice} onDismiss={dismissNotice} />

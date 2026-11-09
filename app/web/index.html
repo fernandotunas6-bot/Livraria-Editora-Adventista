@@ -37,6 +37,12 @@
 		<meta name="twitter:title" content="Livraria Adventista" />
 		<meta name="twitter:description" content="Literatura cristã, educação e inspiração. Compre online com entrega em todo o país." />
 		<meta name="twitter:image" content="https://livrariaadventista.ao/og-image.png" />
+
+		<!-- Quem é a loja, para os motores de busca (schema.org: o nome do site e o logótipo nos
+		     resultados). É um bloco de dados e não um script: o navegador não o executa, e o CSP
+		     (`script-src` sem 'unsafe-inline') não o bloqueia. A ficha de cada livro acrescenta o
+		     seu (lib/structuredData.js). Numa pré-visualização o pós-build troca os endereços. -->
+		<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://livrariaadventista.ao/#organizacao","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","logo":"https://livrariaadventista.ao/icons/icon-512.png"},{"@type":"WebSite","@id":"https://livrariaadventista.ao/#site","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","inLanguage":"pt-AO","publisher":{"@id":"https://livrariaadventista.ao/#organizacao"}}]}</script>
 	</head>
 	<body>
 		<div id="root"></div>

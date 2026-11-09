@@ -1984,3 +1984,19 @@ Vistos com leitura apenas: os erros da base de dados e os pedidos falhados das �
 - **Protecção contra palavras-passe roubadas** (`auth_leaked_password_protection`): desligada. Liga-se em Authentication → Sign In / Providers → Email, no painel do Supabase; não há migração para isto.
 - **`POST /auth/v1/signup` → 429** (3 vezes a 2026-11-08): o limite de emails do serviço de email incluído no Supabase. Enquanto não houver SMTP próprio, os registos por email podem falhar assim.
 
+
+## 9.22 Auditoria Premium 360° (2026-11-09)
+
+Relatório completo, com a pontuação por domínio, a matriz de achados (A360-01 a A360-26) e o plano
+de melhoria: [audits/livraria-premium-360.md](audits/livraria-premium-360.md). Ramo
+`claude/auditoria-premium-360`.
+
+- **Classificação provisória**: 75/100 antes do PR, 76/100 com ele ("qualidade intermédia"),
+  confiança média-baixa — a parte visual não foi revista no navegador nesta passagem.
+- **Corrigido no PR**: o canonical das 10 páginas fixas (todas apontavam para a página inicial),
+  dados estruturados (`Product`/`Book`/`Offer`/`BreadcrumbList` e `Organization`/`WebSite`),
+  "Saltar para o conteúdo" na loja, o carrossel que não se podia parar no telemóvel, rótulos em
+  inglês, e "o Livraria" → "a Livraria" nas descrições.
+- **Para o dono, por ordem**: email (nenhum dos 106 envios saiu), MFA nos 4 administradores, as 5
+  encomendas entregues com o pagamento por confirmar, telefone e WhatsApp da loja, e o gateway de
+  pagamento.

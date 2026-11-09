@@ -1,6 +1,20 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-09. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Auditoria Premium 360° (2026-11-09, ramo `claude/auditoria-premium-360`)
+
+- **Pedido do dono:** auditoria 360° com critérios verificáveis (WCAG 2.2 AA, OWASP ASVS 5.0,
+  Core Web Vitals, Baymard) e "melhorar onde puder". Relatório em
+  [audits/livraria-premium-360.md](audits/livraria-premium-360.md); resumo em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.22**.
+- **No PR:** só frontend e scripts de build (sem migrações nem Edge Function). O pós-build passa
+  a escrever `shop.html`, `faq.html`… (10 páginas fixas com o seu canonical); JSON-LD na ficha e
+  no `index.html`; salto para o conteúdo; carrossel com Parar/Retomar e "reduzir movimento".
+- **Fica por fazer, e é do dono:** email (A360-01/02), gateway (A360-03), reconciliação das
+  encomendas entregues por pagar (A360-04), MFA (A360-05), contactos da loja (A360-07).
+- **Não verificado nesta passagem:** o site no navegador (sem capturas nem LCP/INP de hoje), o
+  painel com sessão de equipa e o pagamento em sandbox.
 
 ## Trajeto da encomenda com GPS dos dois lados (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 
