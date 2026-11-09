@@ -46,3 +46,19 @@ describe('configurações entre visitas', () => {
     expect(localStorage.getItem('livraria:cache:definicoes:v1')).toBeNull();
   });
 });
+
+describe('título do separador', () => {
+  it('as definições que chegam depois não apagam o título da página', async () => {
+    document.title = 'Termos e condições — Livraria Adventista';
+    await mount();
+    await act(async () => resolveFetch.resolve({ site_name: 'livrariaadventista.com' }));
+    expect(document.title).toBe('Termos e condições — Livraria Adventista');
+  });
+
+  it('sem título próprio da página, fica o nome da loja', async () => {
+    document.title = 'Livraria Adventista';
+    await mount();
+    await act(async () => resolveFetch.resolve({ site_name: 'Livraria X' }));
+    expect(document.title).toBe('Livraria X');
+  });
+});

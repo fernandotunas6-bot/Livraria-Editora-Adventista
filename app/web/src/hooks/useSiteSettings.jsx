@@ -79,7 +79,11 @@ export function SiteSettingsProvider({ children }) {
       setSettings((prev) => ({ ...prev, ...merged }));
       applyShopTheme(merged);
       applyHead(data);
-      if (data.site_name) document.title = data.site_name;
+      // Só quando a página não pôs o seu: o Helmet de cada página usa pageTitle(), com « — » e
+      // o nome da loja. Sem esta condição, as definições que chegassem depois do Helmet apagavam
+      // o título da página aberta (em produção, a 2026-11-09, «Envios e Devoluções» aparecia
+      // como «livrariaadventista.com»), consoante a ordem das respostas.
+      if (data.site_name && !document.title.includes(' — ')) document.title = data.site_name;
     } catch {
       // Sem resposta: fica a cópia guardada (se havia) ou as de omissão.
       setSettings((prev) => ({ ...THEME_DEFAULTS, ...prev }));
