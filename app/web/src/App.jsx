@@ -17,6 +17,7 @@ import ReaderActivity from '@/components/ReaderActivity.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
+import { useAfterLoad } from '@/hooks/useAfterLoad';
 import { captureReferral } from '@/lib/colporteurReferral';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
@@ -177,8 +178,12 @@ function ColporteurReferralCapture() {
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
+  // O assistente só entra depois de a página carregar (hooks/useAfterLoad.js): o código dele,
+  // a configuração do /chat/config e o canal em tempo real competiam com a página pela rede
+  // do telemóvel antes da primeira pintura.
+  const afterLoad = useAfterLoad();
   // Páginas sem o assistente: escolha do painel (lib/floatingButtons.js).
-  const showAssistant = !isFloatingHidden('chat', pathname, settings);
+  const showAssistant = afterLoad && !isFloatingHidden('chat', pathname, settings);
 
   return (
     <Suspense fallback={null}>
