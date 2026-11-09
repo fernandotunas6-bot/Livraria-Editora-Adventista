@@ -23,6 +23,20 @@ describe('termsSections', () => {
     expect(text).toMatch(/\[Falar connosco\]\(\/contact\)/);
   });
 
+  it('diz que quem comprou sem conta também cancela sozinho, em Rastrear encomenda', () => {
+    expect(section('encomendas')).toMatch(/sem conta, em \[Rastrear encomenda\]\(\/track\)/);
+    expect(section('encomendas')).not.toMatch(/comprou sem conta, tratamos/);
+  });
+
+  it('não exige no levantamento um documento que o sistema não pede', () => {
+    expect(section('entrega')).not.toMatch(/traga .*documento/);
+  });
+
+  it('mostra a morada só quando está nas Configurações', () => {
+    expect(flat(termsSections({ contact_address: 'Rua X, Huambo' }))).toMatch(/Morada: Rua X, Huambo\./);
+    expect(flat(termsSections({}))).not.toMatch(/Morada:/);
+  });
+
   it('diz que o cliente não confirma o pagamento (docs/PAGAMENTOS.md)', () => {
     expect(section('pagamentos')).toMatch(/só fica confirmado pelo serviço de pagamentos ou pela nossa equipa/);
     expect(section('pagamentos')).toMatch(/não confirma o pagamento/);

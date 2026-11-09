@@ -62,8 +62,8 @@ export function termsSections(settings = {}) {
       blocks: [
         { p: 'Ao confirmar a compra, recebe o número da encomenda, com o qual a pode acompanhar em [Rastrear encomenda](/track).' },
         { list: [
-          '**Cancelar sozinho.** Com conta, pode cancelar em [Perfil → Encomendas](/profile?tab=orders) enquanto a encomenda não tiver nenhum pagamento registado ou indicado e não estiver em preparação.',
-          '**Nos outros casos, fale connosco.** Se já pagou ou indicou um pagamento, se a encomenda já está a ser preparada ou a caminho, ou se comprou sem conta, tratamos consigo do cancelamento e, se for o caso, do reembolso.',
+          '**Cancelar sozinho.** Pode cancelar em [Perfil → Encomendas](/profile?tab=orders) ou, sem conta, em [Rastrear encomenda](/track), enquanto a encomenda não tiver nenhum pagamento registado ou indicado e não estiver em preparação.',
+          '**Nos outros casos, fale connosco.** Se já pagou ou indicou um pagamento, ou se a encomenda já está a ser preparada ou a caminho, tratamos consigo do cancelamento e, se for o caso, do reembolso.',
           '**Falta de pagamento.** A loja pode definir um prazo para pagar. Passado esse prazo, uma encomenda por pagar, sem referência de pagamento e ainda não preparada pode ser cancelada, e avisamo-lo disso.',
         ] },
         { p: 'Podemos recusar ou cancelar uma encomenda, devolvendo sempre o que tiver sido pago, quando o artigo não estiver disponível, quando o preço estava errado e não aceitou o correcto, quando o pagamento não se confirmar, ou quando houver sinais claros de fraude ou de dados falsos.' },
@@ -90,8 +90,8 @@ export function termsSections(settings = {}) {
           'Os prazos são estimativas e contam depois de a encomenda ser confirmada. Se houver atraso, procuramos avisá-lo.',
           'Uma encomenda paga para entrega ao domicílio pode ser entregue pela nossa equipa, por uma transportadora ou por um colportor perto de si. [Saiba que dados vê o colportor](/privacidade#colportagem).',
           '**O colportor que lhe leva uma encomenda não cobra por ela:** essa encomenda já está paga. Se lhe pedirem dinheiro nessa entrega, não pague e fale connosco.',
-          'Na entrega, registamos o nome e a assinatura de quem recebe e, quando for pedido, o número do documento. Serve de prova de entrega. Verifique a embalagem e diga-nos logo se vier danificada.',
-          'Para levantar na loja, traga o número da encomenda e um documento de identificação. Se a encomenda ficar muito tempo por levantar, contactamo-lo antes de a cancelar e reembolsar.',
+          'Na entrega, registamos o nome e a assinatura de quem recebe e, se for indicado, o número do documento. Serve de prova de entrega. Verifique a embalagem e diga-nos logo se vier danificada.',
+          'Para levantar na loja, indique o número da encomenda. Se a encomenda ficar muito tempo por levantar, contactamo-lo antes de a cancelar e reembolsar.',
         ] },
       ],
     },
@@ -189,7 +189,7 @@ export function termsSections(settings = {}) {
       id: 'reclamacoes',
       title: 'Reclamações e lei aplicável',
       blocks: [
-        { p: `Se algo correr mal, fale connosco primeiro, com o número da encomenda: ${contactLine}.` },
+        { p: `Se algo correr mal, fale connosco primeiro, com o número da encomenda: ${contactLine}.${c.address ? ` Morada: ${c.address}.` : ''}` },
         { p: 'Se não ficar satisfeito com a nossa resposta, pode reclamar junto do Instituto Nacional de Defesa do Consumidor (INADEC).' },
         { p: 'Estes termos regem-se pela lei angolana. Os litígios são resolvidos no foro da comarca de Luanda, sem prejuízo das regras de protecção do consumidor que lhe sejam mais favoráveis.' },
       ],

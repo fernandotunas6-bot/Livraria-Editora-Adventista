@@ -1,0 +1,34 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const source = (file) => readFileSync(resolve(__dirname, file), 'utf8');
+
+describe('ligações legais', () => {
+  it.each([
+    'Footer.jsx',
+    'FooterCompact.jsx',
+    'MobileCategoriesSheet.jsx',
+    'Header.jsx',
+    'auth/AuthForm.jsx',
+    'ShoppingCart.jsx',
+    '../pages/ShippingReturnsPage.jsx',
+  ])('%s liga aos termos', (file) => {
+    // MobileCategoriesSheet tem as ligações numa lista: ['/termos', 'Termos e condições'].
+    expect(source(file)).toMatch(/(to|href)="\/termos"|\['\/termos',/);
+  });
+
+  it('o aviso do checkout aparece em todos os ecrãs e abre noutro separador', () => {
+    const aviso = source('ShoppingCart.jsx').match(/<p className="([^"]*)">\s*Ao confirmar, aceita os/);
+    expect(aviso).not.toBeNull();
+    expect(aviso[1]).not.toMatch(/hidden/);
+    expect(source('ShoppingCart.jsx')).toMatch(/href="\/termos" target="_blank"/);
+  });
+});
+
+describe('newsletter', () => {
+  it('não promete a oferta que o servidor nunca enviou', () => {
+    const footer = source('Footer.jsx');
+    expect(footer).not.toMatch(/cupão|-10%|10% de desconto|Premium|devocionais semanais/);
+  });
+});

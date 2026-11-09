@@ -16,6 +16,16 @@ function Inline({ text }) {
   });
 }
 
+function SectionIndex({ sections }) {
+  return (
+    <ol className="space-y-1 text-sm">
+      {sections.map((s) => (
+        <li key={s.id}><a href={`#${s.id}`} className="block rounded px-2 py-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:py-1">{s.title}</a></li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * Página legal (privacidade, termos): índice e secções, com os blocos de `{ p }` e `{ list }`.
  * O texto fica em lib/privacyPolicy.js e lib/termsPolicy.js.
@@ -49,13 +59,14 @@ export default function LegalDocument({ title, description, updated, sections })
 
       <main className="section-spacing bg-background">
         <div className="container-custom grid max-w-5xl gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]">
-          <nav aria-label="Nesta página" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          {/* No telemóvel, recolhido: aberto, o índice ocupava o ecrã inteiro antes do texto. */}
+          <details className="min-w-0 rounded-lg border border-border lg:hidden">
+            <summary className="cursor-pointer px-3 py-3 text-sm font-semibold text-foreground">Nesta página ({sections.length} secções)</summary>
+            <nav aria-label="Nesta página" className="px-1 pb-2"><SectionIndex sections={sections} /></nav>
+          </details>
+          <nav aria-label="Nesta página" className="hidden min-w-0 lg:sticky lg:top-24 lg:block lg:self-start">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nesta página</p>
-            <ol className="space-y-1 text-sm">
-              {sections.map((s) => (
-                <li key={s.id}><a href={`#${s.id}`} className="block rounded px-2 py-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:py-1">{s.title}</a></li>
-              ))}
-            </ol>
+            <SectionIndex sections={sections} />
           </nav>
 
           <article className="min-w-0 space-y-10 text-[15px] leading-relaxed text-foreground/85">

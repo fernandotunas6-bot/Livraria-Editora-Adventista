@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Truck, Package, RotateCcw, MapPin, Zap } from 'lucide-react';
 import Header from '@/components/Header.jsx';
@@ -127,6 +128,11 @@ const ShippingReturnsPage = () => {
                 </p>
               </div>
             </Seccao>
+
+            <p className="text-sm text-muted-foreground">
+              As regras completas, incluindo as das edições digitais, estão nos{' '}
+              <Link to="/termos" className="font-medium text-primary underline underline-offset-2">termos e condições</Link>.
+            </p>
           </div>
         </div>
       </main>
