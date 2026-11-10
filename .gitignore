@@ -37,3 +37,7 @@ scripts/gerado/
 # Importam-se pelo painel (Igreja → Registo da Igreja → Importar); não vão para o repositório.
 /churches.json
 /pastores.json
+
+# Fotografias originais dos produtos (52 MB; o levantamento está em docs/catalogo)
+Novos livros/
+livraria Adventista.jpeg
