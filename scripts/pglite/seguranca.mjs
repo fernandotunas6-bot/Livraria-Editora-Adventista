@@ -93,5 +93,24 @@ const semIndice = (await q(`
   order by 1, 2`));
 check('todas as chaves estrangeiras têm índice', semIndice.length === 0, semIndice);
 
+// 6. Privilégios que a API nunca usa (migração privilegios_minimos) -----------------------------------
+// O RLS não cobre o TRUNCATE: anon e authenticated não o têm em nenhuma tabela, nem nas que vierem.
+const PRIVILEGIOS_A_MAIS = `
+  select table_name as tabela, grantee as papel, privilege_type as privilegio
+  from information_schema.role_table_grants
+  where table_schema = 'public' and grantee in ('anon', 'authenticated')
+    and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')
+  order by 1, 2, 3`;
+const aMais = await q(PRIVILEGIOS_A_MAIS);
+check('anon e authenticated sem TRUNCATE, TRIGGER nem REFERENCES', aMais.length === 0, aMais.slice(0, 10));
+await db.exec('create table public.zz_tabela_nova (id int primary key)');
+const naNova = await q(PRIVILEGIOS_A_MAIS);
+check('uma tabela nova já nasce sem eles', naNova.length === 0, naNova);
+await db.exec('drop table public.zz_tabela_nova');
+await raises('authenticated não consegue esvaziar uma tabela', () => db.transaction(async (tx) => {
+  await tx.exec('set local role authenticated');
+  await tx.exec('truncate public.newsletter');
+}), /permission denied/);
+
 console.log(`\n${ok} certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);
