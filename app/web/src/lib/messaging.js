@@ -1,5 +1,6 @@
 
 import { APP_API_URL } from '@/lib/supabaseClient';
+import { authHeaders } from '@/lib/dataClient';
 
 let statusCache = null;
 let statusCacheAt = 0;
@@ -42,30 +43,26 @@ export async function sendReceiptViaWhatsAppApi({ phone, text, orderNumber, emai
   return data;
 }
 
-export async function testWhatsAppApi(phone, token) {
+// O segundo argumento (o token) já não se usa: vai o da sessão, renovado se for preciso.
+export async function testWhatsAppApi(phone) {
   const res = await fetch(`${APP_API_URL}/admin/whatsapp/test`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ phone }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Teste falhou');
   return data;
 }
 
-export async function testEmailApi(to, token) {
+// O segundo argumento (o token) já não se usa: vai o da sessão, renovado se for preciso.
+export async function testEmailApi(to) {
   const res = await fetch(`${APP_API_URL}/admin/email/test`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ to }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Teste falhou');
   return data;
 }

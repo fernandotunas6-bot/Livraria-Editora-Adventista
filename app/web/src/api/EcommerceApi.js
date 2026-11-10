@@ -1,7 +1,7 @@
-import pb from '@/lib/dataClient';
+import pb, { authHeaders } from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
-import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { escapeFilterValue } from '@/lib/filterValue';
 import { getSearchRelevance } from '@/lib/searchUtils';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
@@ -459,7 +459,15 @@ export async function initializeCheckout({
     }),
   });
 
-  const data = await res.json();
+  // Um 502/504 do gateway traz HTML ou nada. O `res.json()` lançava "Unexpected token '<'", e o
+  // cliente não sabia que a encomenda pode já ter ficado gravada — e repetia de outra página,
+  // com outra chave de idempotência.
+  const data = await res.json().catch(() => null);
+  if (!data) {
+    throw new Error(res.ok
+      ? 'A resposta do servidor chegou incompleta. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.'
+      : 'A ligação ao servidor falhou. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.');
+  }
   if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
   return {
     url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type,
@@ -506,15 +514,16 @@ export function trackBookView(bookId) {
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
   } catch { /* sem sessionStorage: conta na mesma */ }
-  fetch(`${APP_API_URL}/catalog/view`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-    },
-    body: JSON.stringify({ book_id: bookId }),
-    keepalive: true,
-  }).catch(() => {});
+  // O token válido da sessão (`authHeaders` renova-o se for preciso): com o guardado, caducado
+  // depois de uma hora parado, a visita contava como de um visitante e não entrava no histórico.
+  authHeaders()
+    .then((auth) => fetch(`${APP_API_URL}/catalog/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      body: JSON.stringify({ book_id: bookId }),
+      keepalive: true,
+    }))
+    .catch(() => {});
 }
 
 /** Lê livros visíveis pelos ids, pela ordem pedida. */
@@ -536,10 +545,7 @@ async function productsByIds(ids) {
 export async function getRecommendations() {
   const res = await fetch(`${APP_API_URL}/recommendations`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ viewed: getRecentlyViewed().map((e) => e.id).filter(Boolean).slice(0, 30) }),
   });
   const data = await res.json().catch(() => ({}));

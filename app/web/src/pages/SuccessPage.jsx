@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -17,6 +17,7 @@ import { loadLastOrder, downloadReceipt, sendReceiptViaWhatsApp, receiptBrand } 
 import { showLocalNotification, subscribeToPush, isPushSupported } from '@/lib/pushNotifications';
 import { isPaidUpfront } from '@/lib/paymentMethods';
 import PayLaterBox from '@/components/PayLaterBox';
+import { kwanza } from '@/lib/money';
 
 const SuccessPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -56,20 +57,42 @@ const SuccessPage = () => {
   // Paga antes do envio (transferência, Multicaixa) e ainda por pagar: a encomenda está
   // registada, não "confirmada" — dizê-lo antes do pagamento era prometer o que não está feito.
   const awaitsPayment = !isWhatsApp && isPaidUpfront(orderData?.paymentType);
+  // O aviso no telemóvel sai uma vez por encomenda, e só depois de se saber se falta pagar. Antes
+  // saía no primeiro desenho (sem os dados, "confirmada 🎉" mesmo numa transferência por pagar),
+  // outra vez quando os dados chegavam e a cada recarga da página.
+  const notifiedRef = useRef(false);
+  const pushTriedRef = useRef(false);
+  // null: ainda não se sabe; false: não houve aviso local (sem permissão) e vale a pena o push.
+  const [localShown, setLocalShown] = useState(null);
   useEffect(() => {
-    if (!hasOrder || isWhatsApp) return;
-    const notify = async () => {
-      const shown = await showLocalNotification({
-        title: awaitsPayment ? 'Encomenda registada — falta o pagamento' : 'Encomenda confirmada! 🎉',
+    if (!hasOrder || isWhatsApp || !orderData) return;
+    const key = `livraria-order-notified:${orderId || orderNumber}`;
+    if (!notifiedRef.current) {
+      notifiedRef.current = true;
+      let already = false;
+      try {
+        already = sessionStorage.getItem(key) === '1';
+        sessionStorage.setItem(key, '1');
+      } catch {
+        // sem sessionStorage: avisa nesta visita, como antes
+      }
+      if (already) { setLocalShown(true); return; }
+      const known = !!orderData.paymentType;
+      showLocalNotification({
+        title: awaitsPayment ? 'Encomenda registada — falta o pagamento' : known ? 'Encomenda confirmada! 🎉' : 'Encomenda registada',
         body: orderNumber ? `Pedido ${orderNumber} registado com sucesso.` : 'A sua compra foi registada.',
         url: '/profile',
-      });
-      if (!shown && settings.push_enabled && settings.vapid_public_key && isPushSupported()) {
-        try { await subscribeToPush(settings.vapid_public_key); } catch { /* ignore */ }
-      }
-    };
-    notify();
-  }, [hasOrder, isWhatsApp, orderNumber, awaitsPayment, settings.push_enabled, settings.vapid_public_key]);
+      }).then((shown) => setLocalShown(!!shown)).catch(() => setLocalShown(false));
+    }
+  }, [hasOrder, isWhatsApp, orderData, orderId, orderNumber, awaitsPayment]);
+
+  // Sem notificações locais, oferece-se o push uma vez, quando as definições chegam.
+  useEffect(() => {
+    if (!hasOrder || isWhatsApp || localShown !== false || pushTriedRef.current) return;
+    if (!settings.push_enabled || !settings.vapid_public_key || !isPushSupported()) return;
+    pushTriedRef.current = true;
+    subscribeToPush(settings.vapid_public_key).catch(() => {});
+  }, [hasOrder, isWhatsApp, localShown, settings.push_enabled, settings.vapid_public_key]);
 
   // Transferência e Multicaixa: paga-se agora, depois de encomendar. Até lá a compra não está
   // "confirmada": está registada e com o stock reservado.
@@ -168,7 +191,7 @@ const SuccessPage = () => {
                 {total && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total</span>
-                    <span className="font-bold">Kz {Number(total).toLocaleString('pt-AO', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold">{kwanza(total)}</span>
                   </div>
                 )}
               </div>

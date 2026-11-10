@@ -126,7 +126,8 @@ export async function trackOrder(orderNumber, email) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderNumber, email }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
+  if (!data) throw new Error('Não foi possível consultar a encomenda agora. Tente outra vez dentro de instantes.');
   if (!res.ok) throw new Error(data.message || 'Encomenda não encontrada');
   return data;
 }

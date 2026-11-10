@@ -1,4 +1,4 @@
-import pb from '@/lib/dataClient';
+import { authHeaders } from '@/lib/dataClient';
 import { APP_API_URL } from '@/lib/supabaseClient';
 
 // Código da conversa de quem ainda não tem sessão. É secreto (só o hash fica no servidor) e
@@ -60,10 +60,9 @@ async function post(url, payload = {}) {
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-      },
+      // O token válido da sessão: com o guardado (caducado ao voltar à app), o assistente
+      // respondia como a um visitante, sem as encomendas da conta.
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ ...payload, ...(token ? { token } : {}) }),
     });
   } catch {
