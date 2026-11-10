@@ -88,6 +88,7 @@ import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.
 import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
 import { publicContactFields } from "./crmContacts.ts";
 import { isPushEndpoint } from "./pushEndpoints.ts";
+import { cleanTelemetry } from "./telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -3260,6 +3261,23 @@ route("GET", "/admin/releases/devices", async ({ auth }) => {
     db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true),
   ]);
   return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: !!pushKeys(await getSettings()) });
+});
+
+/**
+ * Saúde do site (A360-16): erros de JavaScript e Core Web Vitals medidos em quem visita. Pública e
+ * sem sessão (vem do `sendBeacon` ao sair da página, como `text/plain`, sem pré-verificação CORS).
+ * Cada evento é cortado e conferido em telemetry.ts; uma falha a gravar não incomoda o visitante.
+ */
+route("POST", "/telemetria", async ({ body, ip }) => {
+  if (!await checkRateLimit("telemetria", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const events = cleanTelemetry(body);
+  if (!events.length) return json({ saved: 0 });
+  const { data, error } = await db.rpc("site_health_record", { p_events: events });
+  if (error) {
+    console.log("Telemetria:", error.message);
+    return json({ saved: 0 });
+  }
+  return json({ saved: Number(data) || 0 });
 });
 
 route("POST", "/contact-message", async ({ body, ip }) => {
