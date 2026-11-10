@@ -334,7 +334,9 @@ export default function AuthForm({
             />
             <button
               type="button"
-              className="tap-target absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              // `p-1`: 24×24 em vez de 16×16 (WCAG 2.5.8; o alvo de toque maior do `.tap-target`
+              // é um pseudo-elemento e não conta). `right-1` mantém o olho no mesmo sítio.
+              className="tap-target absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
               onClick={() => setShowPass((v) => !v)}
               aria-label={showPass ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
               aria-pressed={showPass}

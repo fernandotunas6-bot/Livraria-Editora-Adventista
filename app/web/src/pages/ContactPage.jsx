@@ -74,7 +74,7 @@ const ContactPage = () => {
     <>
       <Helmet>
         <title>{pageTitle('Contacto')}</title>
-        <meta name="description" content={`Entre em contacto com o ${BRAND.name}. Estamos aqui para ajudar.`} />
+        <meta name="description" content={`Entre em contacto com a ${BRAND.name}. Estamos aqui para ajudar.`} />
       </Helmet>
 
       <Header onCartOpen={() => setIsCartOpen(true)} />

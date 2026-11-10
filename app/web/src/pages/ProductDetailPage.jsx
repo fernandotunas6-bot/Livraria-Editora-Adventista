@@ -37,7 +37,8 @@ import StickyBuyBar from '@/components/StickyBuyBar.jsx';
 import { deliveryWindow, formatWindow } from '@/lib/deliveryEstimate';
 import { addRecentlyViewed } from '@/lib/recentlyViewed';
 import { MOTION } from '@/lib/motion';
-import { hasReadingSample, variantNames } from '@/lib/productTypes';
+import { hasReadingSample, productType, variantNames } from '@/lib/productTypes';
+import { breadcrumbJsonLd, jsonLdString, productJsonLd } from '@/lib/structuredData';
 import CommunityFeed from '@/components/community/CommunityFeed';
 import ProductDownloads from '@/components/downloads/ProductDownloads';
 import { variantIndexOf } from '@/lib/digitalEditions';
@@ -304,6 +305,20 @@ function ProductDetailPage() {
   const genre = product.type?.value || '';
   const discount = discountPercent(selectedVariant);
 
+  // Dados estruturados (lib/structuredData.js): o preço, a disponibilidade e o caminho da
+  // página, para a Google os poder mostrar nos resultados. Seguem a variante escolhida.
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const productUrl = `${origin}/product/${encodeURIComponent(product.id)}`;
+  const structuredData = jsonLdString([
+    productJsonLd(product, { origin, variant: selectedVariant, isBook: productType(product.product_type).isBook }),
+    breadcrumbJsonLd([
+      { name: 'Início', url: `${origin}/` },
+      { name: 'Loja', url: `${origin}/shop` },
+      genre && { name: genre, url: `${origin}/shop?category=${encodeURIComponent(genre)}` },
+      { name: product.title, url: productUrl },
+    ]),
+  ]);
+
   // Uma linha só sobre o stock, logo abaixo do preço, em vez dos três avisos soltos que
   // estavam espalhados pela coluna.
   const availability = isDigital
@@ -368,6 +383,7 @@ function ProductDetailPage() {
       <Helmet>
         <title>{pageTitle(product.title)}</title>
         <meta name="description" content={(product.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 160) || product.title} />
+        {structuredData && <script type="application/ld+json">{structuredData}</script>}
       </Helmet>
 
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
@@ -400,27 +416,33 @@ function ProductDetailPage() {
             transition={{ duration: MOTION.base }}
           >
             <div className="relative overflow-hidden rounded-2xl bg-muted aspect-3/4 max-h-[78vh] mx-auto w-full mb-4">
+              {/* A capa é o maior elemento da ficha (o LCP): pede-se antes das capas dos
+                  relacionados. Minúsculas de propósito: o React 18 não conhece `fetchPriority`
+                  e passa o atributo tal como está. */}
               <img
                 src={!currentImage?.url ? placeholderImage : currentImage.url}
                 alt={product.title}
+                fetchpriority="high"
                 className="w-full h-full object-contain p-3"
               />
 
               {hasMultipleImages && (
                 <>
                   <button
+                    type="button"
                     onClick={handlePrevImage}
                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground p-2 rounded-full transition-colors"
-                    aria-label="Previous image"
+                    aria-label="Imagem anterior"
                   >
-                    <ChevronLeft size={24} />
+                    <ChevronLeft size={24} aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={handleNextImage}
                     className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground p-2 rounded-full transition-colors"
-                    aria-label="Next image"
+                    aria-label="Imagem seguinte"
                   >
-                    <ChevronRight size={24} />
+                    <ChevronRight size={24} aria-hidden="true" />
                   </button>
                 </>
               )}
@@ -442,7 +464,10 @@ function ProductDetailPage() {
                 {product.images.map((image, index) => (
                   <button
                     key={index}
+                    type="button"
                     onClick={() => setCurrentImageIndex(index)}
+                    aria-label={`Ver imagem ${index + 1} de ${product.images.length}`}
+                    aria-current={index === currentImageIndex ? 'true' : undefined}
                     className={`shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
                       index === currentImageIndex ? 'border-primary' : 'border-border hover:border-primary/50'
                     }`}

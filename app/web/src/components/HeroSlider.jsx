@@ -3,11 +3,12 @@ import SafeLink from '@/components/SafeLink.jsx';
 import { playableVideoUrl } from '@/lib/videoUrl';
 import { safeLinkUrl } from '@/lib/safeLink';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight, Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getHeroSlides } from '@/api/EcommerceApi';
 import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransitions';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { prefersReducedMotion } from '@/lib/featureFlags';
 import { useSwipe } from '@/hooks/useSwipe';
 
 // Imagens feitas com as capas reais do catálogo (public/images/site); usadas só se não houver slides na base de dados.
@@ -48,7 +49,7 @@ const FALLBACK_SLIDES = [
   },
 ];
 
-function SlideMedia({ slide, eager }) {
+function SlideMedia({ slide, eager, still = false }) {
   // Só um ficheiro que a etiqueta `<video>` saiba tocar. Um link do YouTube colado no painel
   // dava um rectângulo preto, sem erro nem aviso (ver lib/videoUrl.js); agora cai na imagem.
   const videoSrc = slide.media_type === 'video' ? playableVideoUrl(slide.video_url) : '';
@@ -57,7 +58,8 @@ function SlideMedia({ slide, eager }) {
       <video
         src={videoSrc}
         className="w-full h-full object-cover"
-        autoPlay
+        // Quem pediu menos movimento no sistema vê a imagem de capa do vídeo, parada.
+        autoPlay={!still}
         muted
         loop
         playsInline
@@ -71,6 +73,9 @@ function SlideMedia({ slide, eager }) {
       alt={slide.title}
       className="w-full h-full object-cover"
       loading={eager ? 'eager' : 'lazy'}
+      // A primeira imagem é o maior elemento da página inicial (o LCP): pede-se antes das
+      // capas. Minúsculas de propósito: o React 18 não conhece `fetchPriority`.
+      fetchpriority={eager ? 'high' : undefined}
       // Imagem externa indisponível: fica só o fundo do slide, sem ícone de imagem partida.
       onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
     />
@@ -158,7 +163,25 @@ const HeroSlider = () => {
   const [slides, setSlides] = useState(FALLBACK_SLIDES);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [paused, setPaused] = useState(false);
+  // Duas razões para parar, separadas: o rato ou o foco por cima (volta sozinho ao sair) e o
+  // botão Parar (só volta quando a pessoa o pede). Juntas, sair com o rato desfazia o Parar.
+  // WCAG 2.2.2: conteúdo que passa sozinho mais de 5 s tem de se poder parar — no telemóvel
+  // não há rato por cima, e o botão era a única forma. Com "menos movimento" pedido no
+  // sistema, começa parado.
+  const [reduceMotion] = useState(() => prefersReducedMotion());
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(reduceMotion);
+  const paused = hoverPaused || userPaused;
+  // Retomar é uma ordem: anda logo, mesmo com o dedo (ou o foco) ainda no botão — sem isto, no
+  // telemóvel o "Retomar" parecia não fazer nada até se tocar noutro sítio.
+  const toggleAutoplay = () => {
+    if (userPaused) {
+      setUserPaused(false);
+      setHoverPaused(false);
+    } else {
+      setUserPaused(true);
+    }
+  };
   const [progressKey, setProgressKey] = useState(0);
   const timerRef = useRef(null);
 
@@ -203,17 +226,19 @@ const HeroSlider = () => {
   return (
     <section
       className="hero-height relative min-h-[520px] max-h-[900px] overflow-hidden bg-foreground"
+      aria-label="Destaques"
+      aria-roledescription="carrossel"
       {...(slides.length > 1 ? swipe : {})}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onMouseEnter={() => setHoverPaused(true)}
+      onMouseLeave={() => setHoverPaused(false)}
+      onFocus={() => setHoverPaused(true)}
+      onBlur={() => setHoverPaused(false)}
     >
       <AnimatePresence mode="wait">
         <motion.div key={`bg-${slide.id}-${current}`} className="absolute inset-0" {...transition.bg}>
           {!isSplit && (
             <>
-              <SlideMedia slide={slide} eager={current === 0} />
+              <SlideMedia slide={slide} eager={current === 0} still={reduceMotion} />
               {/* O véu é mais carregado no telemóvel: aí o texto atravessa o ecrã todo e a ponta
                   direita do subtítulo e do botão cai sobre a zona clara da imagem — em cima das
                   capas, que são o que há de mais claro. No computador o texto ocupa o terço
@@ -254,6 +279,19 @@ const HeroSlider = () => {
               preenchimento de cada botão já afasta os pontos — somados, davam alvos
               encostados a nada e uma fila larga de mais. */}
           <div className="absolute bottom-[22px] left-1/2 -translate-x-1/2 z-20 flex sm:bottom-8">
+            {/* Parar e retomar a passagem automática, ao lado dos pontos e da mesma altura. 36px
+                de largura no telemóvel (acima dos 24 da WCAG 2.5.8): com seis slides num ecrã
+                de 320px, a fila continua a caber entre as duas setas. */}
+            <button
+              type="button"
+              onClick={toggleAutoplay}
+              className="grid h-11 w-9 place-items-center text-white/80 transition-colors hover:text-white sm:h-6 sm:w-8"
+              aria-label={userPaused ? 'Retomar a passagem dos destaques' : 'Parar a passagem dos destaques'}
+            >
+              {userPaused
+                ? <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                : <Pause className="h-3.5 w-3.5 fill-current" aria-hidden="true" />}
+            </button>
             {slides.map((s, i) => (
               <button
                 key={s.id}
