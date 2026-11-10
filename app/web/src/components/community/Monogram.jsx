@@ -17,7 +17,7 @@ export default function Monogram({ name, authorKey, size = 'md', staff = false }
     <span
       aria-hidden="true"
       className={`${SIZES[size] || SIZES.md} grid shrink-0 place-items-center rounded-full font-semibold text-white ${staff ? 'ring-2 ring-editorial-ouro ring-offset-2 ring-offset-editorial-papel' : ''}`}
-      style={{ backgroundColor: monogramColor(authorKey || name), fontFamily: "'Fraunces', serif" }}
+      style={{ backgroundColor: monogramColor(authorKey || name), fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}
     >
       {initials(name)}
     </span>

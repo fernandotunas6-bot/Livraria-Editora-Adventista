@@ -3,6 +3,10 @@ import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App';
+// Os tipos de letra da loja, servidos daqui (antes vinham da Google; ver index.html). Os eixos
+// são os que o pedido à Google usava: Fraunces com tamanho óptico e peso, Inter com peso.
+import '@fontsource-variable/fraunces/opsz.css';
+import '@fontsource-variable/inter/wght.css';
 import '@/index.css';
 import { initFeatureFlags } from '@/lib/featureFlags';
 import { installStaleChunkReload } from '@/lib/staleChunkReload';

@@ -232,7 +232,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
 function PullQuote({ post }) {
   return (
     <figure className="relative rounded-r-xl border-l-[3px] border-editorial-ouro bg-editorial-tela/70 py-3 pl-4 pr-3">
-      <blockquote className="text-lg italic leading-snug text-editorial-tinta" style={{ fontFamily: "'Fraunces', serif" }}>
+      <blockquote className="text-lg italic leading-snug text-editorial-tinta" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>
         “{post.quote}”
       </blockquote>
       {(post.book_title || post.quote_page) && (
@@ -256,7 +256,7 @@ function BookCard({ post }) {
         <span className="grid h-16 w-11 shrink-0 place-items-center rounded bg-editorial-tela" aria-hidden="true"><BookOpen className="h-5 w-5 text-editorial-ouro" /></span>
       )}
       <span className="min-w-0">
-        <span className="block truncate text-sm font-semibold text-editorial-tinta" style={{ fontFamily: "'Fraunces', serif" }}>{post.book_title}</span>
+        <span className="block truncate text-sm font-semibold text-editorial-tinta" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>{post.book_title}</span>
         {post.book_author && <span className="block truncate text-xs text-editorial-tinta-suave">{post.book_author}</span>}
         <span className="mt-0.5 block text-xs font-semibold text-editorial-petroleo">Ver o livro</span>
       </span>
