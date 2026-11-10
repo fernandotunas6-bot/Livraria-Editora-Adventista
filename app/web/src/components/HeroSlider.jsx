@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { getHeroSlides } from '@/api/EcommerceApi';
 import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransitions';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { siteSrcSet } from '@/lib/imageUrl';
 import { prefersReducedMotion } from '@/lib/featureFlags';
 import { useSwipe } from '@/hooks/useSwipe';
 
@@ -67,9 +68,17 @@ function SlideMedia({ slide, eager, still = false }) {
       />
     );
   }
+  const srcSet = siteSrcSet(slide.image);
   return (
     <img
       src={slide.image}
+      // Os slides do site têm uma variante de 960 px: no telemóvel desciam 1920 px (até 150 KB)
+      // para um ecrã de 390, e era a imagem que mais demorava a aparecer (A360-28).
+      srcSet={srcSet || undefined}
+      sizes={srcSet ? '100vw' : undefined}
+      width={1920}
+      height={1080}
+      decoding="async"
       alt={slide.title}
       className="w-full h-full object-cover"
       loading={eager ? 'eager' : 'lazy'}
@@ -184,6 +193,11 @@ const HeroSlider = () => {
   };
   const [progressKey, setProgressKey] = useState(0);
   const timerRef = useRef(null);
+  // `true` depois de o carrossel avançar pela primeira vez: até lá, nada de animações de troca.
+  const [advanced, setAdvanced] = useState(false);
+  useEffect(() => {
+    if (current !== 0) setAdvanced(true);
+  }, [current]);
 
   useEffect(() => {
     getHeroSlides('home')
@@ -234,8 +248,12 @@ const HeroSlider = () => {
       onFocus={() => setHoverPaused(true)}
       onBlur={() => setHoverPaused(false)}
     >
-      <AnimatePresence mode="wait">
-        <motion.div key={`bg-${slide.id}-${current}`} className="absolute inset-0" {...transition.bg}>
+      {/* Sem animação no primeiro desenho nem quando os slides da base de dados substituem os de
+          recurso (a chave só muda quando o carrossel avança): antes, o primeiro slide aparecia
+          com um fade de 0,9 s e, quando a base de dados respondia, saía e entrava outro com mais
+          um — e a imagem do herói é o maior elemento da página inicial. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={advanced ? `bg-${slide.id}-${current}` : 'bg-inicial'} className="absolute inset-0" {...transition.bg}>
           {!isSplit && (
             <>
               <SlideMedia slide={slide} eager={current === 0} still={reduceMotion} />
@@ -253,7 +271,7 @@ const HeroSlider = () => {
       <div className="relative z-10 h-full flex items-center">
         <div className="container-custom w-full">
           <AnimatePresence mode="wait">
-            <motion.div key={`text-${slide.id}-${current}`} {...transition.text}>
+            <motion.div key={advanced ? `text-${slide.id}-${current}` : 'text-inicial'} {...transition.text}>
               <SlideContent slide={slide} />
             </motion.div>
           </AnimatePresence>
