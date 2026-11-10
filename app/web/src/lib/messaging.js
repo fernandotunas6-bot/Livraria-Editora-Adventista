@@ -38,7 +38,7 @@ export async function sendReceiptViaWhatsAppApi({ phone, text, orderNumber, emai
       email: email || '',
     }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Erro ao enviar recibo');
   return data;
 }

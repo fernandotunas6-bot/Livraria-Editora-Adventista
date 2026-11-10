@@ -15,7 +15,11 @@ const VISIBLE = 'active = true';
 const CURRENCY = { code: 'AOA', symbol: 'Kz' };
 
 function resolveBookCover(book) {
-  if (book.cover) return book.cover;
+  // As capas foram gravadas com o endereço completo do domínio antigo
+  // (`https://livrariaadventista.com/images/capas/…`). Na loja `.ao`, cada capa abria uma segunda
+  // ligação (DNS e TLS) a outro domínio — no telemóvel, centenas de milissegundos antes da capa
+  // da ficha aparecer. São ficheiros do próprio site: ficam como caminho relativo.
+  if (book.cover) return toSiteRelativeUrl(book.cover);
   if (book.cover_image) {
     try {
       return pb.files.getURL(book, book.cover_image);
@@ -296,7 +300,32 @@ export function variantStock(book, version) {
   return Number.isFinite(own) ? Math.max(0, Math.min(Math.floor(own), total)) : total;
 }
 
+// A ficha aberta directamente (de um link, da Google) pedia o livro só depois de o código da
+// página chegar: código → dados → capa, em série. O `main.jsx` pede os dados logo no arranque
+// (`prefetchProduct`), em paralelo com o código, e a página aproveita esse pedido.
+const PREFETCH_TTL_MS = 30_000;
+const productPrefetch = new Map(); // id → { promise, at }
+
+/** Começa já a leitura do livro; o próximo `getProduct(id)` (dentro de 30 s) aproveita-a. */
+export function prefetchProduct(id) {
+  if (!id || productPrefetch.has(id)) return;
+  const promise = loadProduct(id);
+  productPrefetch.set(id, { promise, at: Date.now() });
+  // Uma falha não fica guardada (e não aparece como erro por tratar na consola).
+  promise.catch(() => productPrefetch.delete(id));
+}
+
 export async function getProduct(id) {
+  const pre = productPrefetch.get(id);
+  if (pre) {
+    productPrefetch.delete(id); // uma vez só: a seguinte (voltar à ficha) lê dados frescos
+    // Se a leitura antecipada falhar, tenta-se outra vez, como se não tivesse havido.
+    if (Date.now() - pre.at < PREFETCH_TTL_MS) return pre.promise.catch(() => loadProduct(id));
+  }
+  return loadProduct(id);
+}
+
+async function loadProduct(id) {
   const book = await pb.collection('stock_books').getOne(id);
   const collectionsMap = await getCollectionsMap();
   const product = bookToProduct(book, collectionsMap);
@@ -485,7 +514,7 @@ export async function subscribeNewsletter(email) {
     body: JSON.stringify({ email }),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Erro na subscrição');
   return data;
 }

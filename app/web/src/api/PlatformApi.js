@@ -191,7 +191,7 @@ export async function deleteMyAccount(confirmEmail) {
 export async function getGeoProvinces() {
   const res = await fetch(`${APP_API_URL}/geo/provinces`);
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   return data.provinces || [];
 }
 
@@ -199,7 +199,7 @@ export async function getGeoMunicipalities(provinceId) {
   if (!provinceId) return [];
   const res = await fetch(`${APP_API_URL}/geo/municipalities?province=${encodeURIComponent(provinceId)}`);
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   return data.municipalities || [];
 }
 
@@ -207,7 +207,7 @@ export async function getGeoLocalities(municipalityId) {
   if (!municipalityId) return [];
   const res = await fetch(`${APP_API_URL}/geo/localities?municipality=${encodeURIComponent(municipalityId)}`);
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   return data.localities || [];
 }
 
@@ -223,7 +223,7 @@ export async function confirmDelivery({ orderNumber, email, recipientName, recip
       signature,
     }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Não foi possível confirmar a entrega');
   return data;
 }
@@ -237,7 +237,7 @@ export async function addDeliveryEvent(orderId, event, token) {
     },
     body: JSON.stringify({ orderId, ...event }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Erro');
   return data;
 }

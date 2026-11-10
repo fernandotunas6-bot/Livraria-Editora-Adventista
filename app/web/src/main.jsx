@@ -6,6 +6,7 @@ import App from '@/App';
 import '@/index.css';
 import { initFeatureFlags } from '@/lib/featureFlags';
 import { installStaleChunkReload } from '@/lib/staleChunkReload';
+import { prefetchProduct } from '@/api/EcommerceApi';
 
 // Antes de montar: os interruptores viram atributos no `<html>`, e o CSS já encontra o
 // estado certo na primeira pintura. Feito depois, os elementos apareciam um instante com
@@ -15,6 +16,11 @@ initFeatureFlags();
 // Depois de uma publicação, quem tinha o site aberto pede ficheiros que já não existem:
 // recarrega uma vez para a versão nova, em vez de cair em "Algo correu mal".
 installStaleChunkReload();
+
+// Ficha de um livro aberta directamente: os dados do livro começam a vir já, em paralelo com o
+// código da página (que é carregado a pedido). Antes, só eram pedidos depois de ele chegar.
+const fichaAberta = /^\/product\/([^/?#]+)/.exec(window.location.pathname);
+if (fichaAberta && !REDIRECTING_TO_CANONICAL) prefetchProduct(decodeURIComponent(fichaAberta[1]));
 
 if (!REDIRECTING_TO_CANONICAL) {
 	ReactDOM.createRoot(document.getElementById('root')).render(
