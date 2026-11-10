@@ -37,3 +37,7 @@ scripts/gerado/
 # Importam-se pelo painel (Igreja → Registo da Igreja → Importar); não vão para o repositório.
 /churches.json
 /pastores.json
+
+# Testes de ponta a ponta (Playwright): resultados, capturas e relatório de cada corrida
+app/web/test-results/
+app/web/playwright-report/
