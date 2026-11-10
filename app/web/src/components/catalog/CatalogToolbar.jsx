@@ -38,8 +38,12 @@ export default function CatalogToolbar({
   const mostraIntervalo = Number.isFinite(shownTo) && total > (shownCount ?? shownTo ?? 0);
 
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs ${className}`}>
-      <div className="flex flex-wrap items-center gap-2">
+    // No telemóvel, uma linha só (Filtros, contagem e ordenação): eram três, e com o herói e a
+    // pesquisa empurravam o primeiro livro para os ~690 px, tapado pela barra inferior. A troca
+    // grelha/lista e o "a mostrar 1–24" ficam do `sm` para cima; no telemóvel é a grelha, a vista
+    // por omissão. Num ecrã onde nem assim cabe (320 px), a ordenação desce para outra linha.
+    <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-wrap sm:gap-3 sm:p-4 ${className}`}>
+      <div className="flex min-w-0 items-center gap-2 sm:flex-wrap">
         {onOpenFilters && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -51,26 +55,28 @@ export default function CatalogToolbar({
             <TooltipContent side="top">Filtrar catálogo</TooltipContent>
           </Tooltip>
         )}
-        <p className="text-sm text-muted-foreground" aria-live="polite">
+        <p className="whitespace-nowrap text-sm text-muted-foreground" aria-live="polite">
           <strong className="text-foreground">{total}</strong>
           {` ${total === 1 ? noun : nounPlural}`}
-          {mostraIntervalo && ` · a mostrar ${shownFrom}–${shownTo}`}
+          {mostraIntervalo && <span className="hidden sm:inline">{` · a mostrar ${shownFrom}–${shownTo}`}</span>}
         </p>
       </div>
 
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+      <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:flex-wrap">
         {canGroup && onGroupedChange && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant={grouped ? 'secondary' : 'outline'}
                 size="sm"
-                className="h-11 sm:h-9"
+                className="h-11 w-11 px-0 sm:h-9 sm:w-auto sm:px-3"
                 onClick={() => onGroupedChange(!grouped)}
                 aria-pressed={grouped}
+                aria-label="Por tipo"
               >
-                <Layers className="mr-1 h-4 w-4" aria-hidden="true" />
-                Por tipo
+                <Layers className="h-4 w-4 sm:mr-1" aria-hidden="true" />
+                {/* No telemóvel só o ícone, para a barra caber numa linha; o nome fica no aria-label. */}
+                <span className="hidden sm:inline">Por tipo</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
@@ -80,7 +86,7 @@ export default function CatalogToolbar({
         )}
 
         {viewMode && onViewModeChange && (
-          <div className="flex overflow-hidden rounded-lg border">
+          <div className="hidden overflow-hidden rounded-lg border sm:flex">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -116,7 +122,7 @@ export default function CatalogToolbar({
 
         <label htmlFor={sortId} className="sr-only">Ordenar por</label>
         <Select value={sortBy} onValueChange={onSortChange}>
-          <SelectTrigger id={sortId} className="h-11 w-[170px] sm:h-9" aria-label="Ordenar por">
+          <SelectTrigger id={sortId} className="h-11 w-[132px] sm:h-9 sm:w-[170px]" aria-label="Ordenar por">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

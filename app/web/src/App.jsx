@@ -8,6 +8,7 @@ import { SiteSettingsProvider, useSiteSettings } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { MotionConfig } from 'framer-motion';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
@@ -199,6 +200,10 @@ function GlobalWidgets() {
 function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="livraria-theme">
+    {/* "Reduzir movimento" do sistema também nas animações do framer-motion (o CSS já o
+        respeitava): sem isto, as entradas e as transições corriam na mesma. Não custa bytes — o
+        vendor-motion já é pré-carregado em todas as páginas (FloatingScrollTop). */}
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
     <SiteSettingsProvider>
     <IntegrationsProvider>
@@ -287,6 +292,7 @@ function App() {
     </IntegrationsProvider>
     </SiteSettingsProvider>
     </TooltipProvider>
+    </MotionConfig>
     </ThemeProvider>
   );
 }
