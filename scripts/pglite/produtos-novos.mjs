@@ -123,5 +123,26 @@ await q(publicar);
 aVenda = await vendaveis();
 check('o vestuário com tamanhos já é publicado', aVenda.vestuario === 1 && aVenda.biblia === 23, aVenda);
 
+// 7. As descrições sem as avaliações nem o lixo do site da editora (20261110121000) ---------------------
+// Uma descrição já mudada no painel não se toca: simula-se com uma das 26.
+const LIMPEZA = '20261110121000_descricoes_sem_avaliacoes.sql';
+const SUJIDADE = `description ~ 'por: .{1,80} em: [0-9]' or description like '%viewItemGTM%'
+                  or description like '%CNPJ%' or description like '%","%'`;
+const sujasAntes = await q(`select title from public.stock_books where cover like '%/images/capas/novos/%' and (${SUJIDADE})`);
+check('antes da limpeza há descrições com avaliações ou código da página', sujasAntes.length >= 25, sujasAntes.length);
+const EDITADA = '<p>Texto escrito pela equipa no painel.</p>';
+await q(`update public.stock_books set description = $1 where title like 'Sonhe Alto%'`, [EDITADA]);
+const limpeza = migrationSql(readFileSync(join(dir, LIMPEZA), 'utf8'));
+await db.exec(limpeza);
+const sujas = await q(`select title from public.stock_books where ${SUJIDADE}`);
+check('depois da limpeza nenhuma descrição tem avaliações, CNPJ, scripts ou JSON', sujas.length === 0, sujas);
+const [editada] = await q(`select description from public.stock_books where title like 'Sonhe Alto%'`);
+check('a descrição editada no painel fica como está', editada?.description === EDITADA, editada);
+const [chuvas] = await q(`select description from public.stock_books where title like 'Chuvas de Bênçãos%'`);
+check('"Chuvas de Bênçãos" fica só com a sinopse', /^<p>Pessoas clamam/.test(chuvas.description) && chuvas.description.length < 600, chuvas.description.length);
+const antesDaSegunda = JSON.stringify(await novos());
+await db.exec(limpeza);
+check('a limpeza pode correr outra vez sem mudar nada', JSON.stringify(await novos()) === antesDaSegunda);
+
 console.log(`produtos-novos: ${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);
