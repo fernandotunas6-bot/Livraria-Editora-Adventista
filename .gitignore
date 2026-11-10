@@ -41,3 +41,7 @@ scripts/gerado/
 # Fotografias originais dos produtos (52 MB; o levantamento está em docs/catalogo)
 Novos livros/
 livraria Adventista.jpeg
+
+# Testes de ponta a ponta (Playwright): resultados, capturas e relatório de cada corrida
+app/web/test-results/
+app/web/playwright-report/
