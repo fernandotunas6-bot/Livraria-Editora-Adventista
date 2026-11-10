@@ -23,6 +23,12 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   termos, facturação) e a decisão sobre `/confirm-delivery` numa encomenda a pagar na entrega.
 - **Não verificado:** o painel com uma sessão de equipa real e a loja publicada (a rede desta
   sessão não chega ao domínio); a auditoria visual corre no PR.
+- **Continuação ("continua"), mesmo ramo:** herói com variantes de 960/1280 px e sem fades no
+  primeiro desenho; fontes servidas pela loja; capas na mesma origem; dados da ficha pedidos no
+  arranque. LCP da inicial no telemóvel 5,17 → 4,21 s (densidade 1). Medições e o que falta em
+  audits/livraria-premium-360.md, secção J. Ao juntar ou trocar um slide em
+  `public/images/site`, correr `python3 scripts/imagens/variantes.py`: sem isso o slide novo
+  funciona, mas sem `srcset` (o telemóvel desce os 1920 px).
 
 ## Auditoria Premium 360° (2026-11-09, ramo `claude/auditoria-premium-360`)
 
