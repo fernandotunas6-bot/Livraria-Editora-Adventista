@@ -209,6 +209,8 @@ Contas e papéis geram-se em **Admin → Utilizadores e Clientes**. Para dar ace
 | `npm run build` | Build de produção do frontend → `dist/app/web` |
 | `npm run start` | Preview do build de produção |
 | `npm run lint` | ESLint no frontend |
+| `npm test` | Testes unitários (Vitest) |
+| `npm run test:e2e` | Fluxo de compra num navegador (Playwright), contra um Supabase falso — ver [app/web/e2e](app/web/e2e/README.md) |
 
 ---
 

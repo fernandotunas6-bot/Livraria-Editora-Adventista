@@ -73,6 +73,6 @@ As migrações estão em `supabase/migrations/`. Cada ficheiro tem de ter **a me
 
 | O quê | Como |
 |-------|------|
-| Verificação de cada PR | `.github/workflows/ci.yml`: lint, build e `deno check` |
+| Verificação de cada PR | `.github/workflows/ci.yml`: lint, testes, build, `deno check`, cenários da base de dados, migrações do zero e o fluxo de compra num navegador ([app/web/e2e](../app/web/e2e/README.md)) |
 | Site | `.github/workflows/deploy-cloudflare.yml` em cada push para `main` |
 | Migrações e Edge Function | `.github/workflows/deploy-supabase.yml` quando `supabase/` muda no `main` |

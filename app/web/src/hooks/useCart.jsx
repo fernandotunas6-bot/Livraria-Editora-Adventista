@@ -240,6 +240,16 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = useCallback(() => {
     setCartItems([]);
+    // Gravado já, e não só no efeito acima: depois de uma compra o carrinho esvazia e a página
+    // muda logo para /success. O efeito corre depois do próximo desenho, e quando a página nova
+    // chegava primeiro, os livros acabados de comprar continuavam no carrinho — à vista no
+    // cabeçalho da página de sucesso, prontos para serem encomendados outra vez. Apanhado
+    // pelo teste de ponta a ponta (e2e/compra.spec.js).
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, '[]');
+    } catch {
+      // armazenamento bloqueado: não havia carrinho guardado para esvaziar
+    }
     toast.success('Carrinho limpo com sucesso.');
   }, []);
 

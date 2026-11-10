@@ -416,7 +416,7 @@ export async function initializeCheckout({
   deliveryProvince, deliveryProvinceId, deliveryMunicipality, deliveryMunicipalityId,
   deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
-  deliveryGpsLat, deliveryGpsLng,
+  deliveryGpsLat, deliveryGpsLng, deliveryGpsAccuracy,
   idempotencyKey,
   colporteurCode,
 }) {
@@ -447,6 +447,10 @@ export async function initializeCheckout({
       // O carrinho já mandava as coordenadas, mas esta função só reenviava os campos que
       // nomeia, e estes não estavam na lista: nenhuma encomenda chegou a ter GPS.
       deliveryGpsLat, deliveryGpsLng,
+      // A precisão teve o mesmo destino das coordenadas: o carrinho mandava-a, o servidor
+      // guardava-a (`delivery_gps_accuracy`), e ela ficava aqui. Quem entrega via o ponto sem
+      // saber se era de ±10 m ou de ±2 km.
+      ...(Number.isFinite(deliveryGpsAccuracy) ? { deliveryGpsAccuracy } : {}),
       // A mesma em cada repetição da mesma compra: o servidor devolve a encomenda já criada
       // em vez de fazer outra (ver lib/checkoutIdempotency.js).
       ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -457,7 +461,13 @@ export async function initializeCheckout({
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
-  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
+  return {
+    url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type,
+    // O carrinho lê o estado do pagamento para a nota de encomenda (lib/receipt.js), mas ele não
+    // saía daqui: ficava sempre "pending", mesmo com a referência indicada no checkout.
+    payment_status: data.payment_status,
+    email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent,
+  };
 }
 
 export async function subscribeNewsletter(email) {
