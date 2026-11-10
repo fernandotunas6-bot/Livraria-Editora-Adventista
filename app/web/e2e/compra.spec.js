@@ -342,3 +342,32 @@ test('o rastreio não abre com o email de outra pessoa', async ({ page, loja }) 
   await page.getByRole('button', { name: 'Rastrear' }).click();
   await expect(page.getByText(CLIENTE.nome)).toBeVisible();
 });
+
+test('rastreio pelo rodapé com o email mal escrito: corrige-se na página e encontra a encomenda', async ({ page, loja }, info) => {
+  test.skip(info.project.name === 'telemovel', 'o rodapé compacto do telemóvel não tem o atalho de rastreio');
+  await comprarLivro(page, 'livro-caminho');
+  const c = carrinho(page);
+  await c.getByRole('button', { name: 'Continuar para finalizar a compra' }).click();
+  await c.getByLabel('Nome completo *').fill(CLIENTE.nome);
+  await c.getByLabel(/^Email/).fill(CLIENTE.email);
+  await preencherMorada(page);
+  await c.getByRole('button', { name: /Confirmar Compra/ }).click();
+  await expect(page).toHaveURL(/\/success\?/);
+  const numero = loja.encomendas[0].order_number;
+
+  // O atalho do rodapé leva o número e o email à página de rastreio (pelo estado da navegação).
+  await page.goto('/');
+  const rodape = page.getByRole('contentinfo');
+  await rodape.getByLabel('Número da encomenda').fill(numero);
+  await rodape.getByLabel('Email usado na compra').fill('maria.santso@exemplo.invalid');
+  await rodape.getByRole('button', { name: 'Seguir' }).click();
+  await expect(page).toHaveURL(/\/track$/);
+  await expect(page.getByText('Encomenda não encontrada. Verifique o número e o email.')).toBeVisible();
+
+  // Antes, o campo voltava ao email do rodapé a cada tecla e não havia forma de o corrigir.
+  const email = page.getByRole('main').getByLabel('Email usado na compra');
+  await email.fill(CLIENTE.email);
+  await expect(email).toHaveValue(CLIENTE.email);
+  await page.getByRole('main').getByRole('button', { name: 'Rastrear' }).click();
+  await expect(page.getByText(CLIENTE.nome)).toBeVisible();
+});
