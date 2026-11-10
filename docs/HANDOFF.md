@@ -1,6 +1,28 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-09. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Análise geral e melhorias (2026-11-10, ramo `claude/clever-carson-ibv73h`)
+
+- **Pedido do dono:** "fazer uma análise em todo o sistema e melhorar onde for necessário".
+  Respostas às perguntas: incluir a migração dos privilégios e abrir PR. Achados e correcções em
+  [audits/livraria-premium-360.md](audits/livraria-premium-360.md), secção **J** (A360-34 a 41).
+- **Antes de mexer**, tudo verde: lint, 1 613 testes, build, `npm audit`, segredos, Playwright
+  18/18, os 12 grupos de cenários PGlite. Depois: 1 631 testes, Playwright 19 (+1 só no
+  computador), cenários com +8 verificações, `deno check` verde.
+- **O mais importante:** um gestor com `manage_users` conseguia entrar na conta de um cliente
+  sem conta criando-a ele próprio (A360-34). Agora só um administrador escolhe a palavra-passe.
+- **Base de dados:** `20261110120000_privilegios_minimos` e
+  `20261110121000_descricoes_sem_avaliacoes`, **por aplicar** (vão no merge, com a Edge
+  Function). A segunda tira as avaliações de clientes da CPB (com nomes) de 26 descrições dos
+  produtos novos, que estão ocultos.
+- **Site:** sessão (perfil perdido numa falha de rede, token caducado em 8 sítios), rastreio,
+  carrinho, sucesso, portes; loja no telemóvel com livros no 1.º ecrã; DOMPurify fora do arranque
+  (bloco principal −12 KB comprimidos); "reduzir movimento" no framer-motion.
+- **Fica para o dono** (sem mudança): os itens 👤 da auditoria (email, gateway, MFA, contactos,
+  termos, facturação) e a decisão sobre `/confirm-delivery` numa encomenda a pagar na entrega.
+- **Não verificado:** o painel com uma sessão de equipa real e a loja publicada (a rede desta
+  sessão não chega ao domínio); a auditoria visual corre no PR.
 
 ## Auditoria Premium 360° (2026-11-09, ramo `claude/auditoria-premium-360`)
 
