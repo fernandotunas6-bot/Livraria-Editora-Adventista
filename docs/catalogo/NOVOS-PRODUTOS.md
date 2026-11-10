@@ -23,26 +23,31 @@ Estado em 2026-11-10, para quem continuar o trabalho.
 - **Descrições**: 44 sinopses da CPB em [sinopses-cpb.json](sinopses-cpb.json).
 - **Migração** `supabase/migrations/20261110090000_produtos_novos_da_loja.sql`: insere os 93
   produtos **ocultos (active = false), com preço e stock a 0**. O código (LIV-/BIB-/MUS-/DBV-/VES-)
-  é dado pelo gatilho. Pode correr mais de uma vez. **Ainda não foi testada no PGlite** (ver abaixo).
+  é dado pelo gatilho. Pode correr mais de uma vez.
+- **Testada no PGlite** (`scripts/pglite/produtos-novos.mjs`, corre no CI com os outros cenários),
+  sobre um catálogo como o de produção (LIV-001…LIV-100, COL-001/002): entram ocultos e a zero,
+  os códigos continuam a numeração (LIV-101 em diante), um título já existente não entra outra
+  vez, correr duas vezes não muda nada, as 93 capas existem e batem com o mapa, e a consulta de
+  publicação só põe à venda o que tem preço (e o vestuário só com tamanhos).
 
 ## O que falta
 
-1. **Testar a migração** com o PGlite antes de integrar (instruções em `scripts/pglite/base.mjs`):
-   correr todas as migrações e confirmar `select count(*) from stock_books where cover like '%/capas/novos/%'` = 93
-   e que os códigos saem com o prefixo certo.
-2. **Preços e stock**: não há preços nas fotografias. O dono tem de os pôr no painel; só depois se
-   publicam (`update … set active = true where cover like '…/capas/novos/%' and price > 0`).
-3. **Materiais de Santa Ceia**: o dono falou neles, mas não há nenhum nas fotografias. Confirmar se
+1. **Preços e stock**: não há preços nas fotografias. O dono tem de os pôr no painel; só depois se
+   publicam com a consulta do cabeçalho da migração, que só publica o que tem preço.
+   **As 3 peças de vestuário entram sem tamanhos**: pôr os tamanhos (cada um com o seu stock) no
+   painel antes de as publicar. A consulta deixa-as de fora enquanto não os tiverem; sem eles, a
+   t-shirt comprava-se sem escolher o tamanho.
+2. **Materiais de Santa Ceia**: o dono falou neles, mas não há nenhum nas fotografias. Confirmar se
    faltam fotografias ou se quer que se acrescentem a partir de imagens da internet.
-4. **Emblemas oficiais**: os logótipos vectoriais dos Desbravadores/Aventureiros/JA estão em
+3. **Emblemas oficiais**: os logótipos vectoriais dos Desbravadores/Aventureiros/JA estão em
    `https://downloads.adventistas.org/pt/desbravadores/logomarcas/logos-abertos-desbravadores/`
    (ZIP em `deptos.adventistas.org`, que recusa descargas fora do navegador — 403). Os emblemas
    ficaram com a fotografia tratada; se se quiser arte limpa, descarregar o ZIP à mão.
-5. **Cinco contracapas sem frente** (não entraram): 026 (livro pequeno da LEA sobre Jesus Mestre),
+4. **Cinco contracapas sem frente** (não entraram): 026 (livro pequeno da LEA sobre Jesus Mestre),
    032 (livro laranja de evangelismo, esperanca.com.br), 037 (livro verde da CPB sobre
    administração/finanças, «Crede no Senhor»), 276 (Carol Cannon, capa amarela), 295 (Karl Haffner,
    alegoria de John Bunyan, CASA). Precisam de fotografia da frente ou de identificação.
-6. **Bíblia do Desbravador laranja** entrou só com a contracapa fotografada (170) e a capa da CPB —
+5. **Bíblia do Desbravador laranja** entrou só com a contracapa fotografada (170) e a capa da CPB —
    confirmar que existe em stock.
 7. Capas que ficaram aceitáveis mas não perfeitas (hinário castanho 027 com outro atrás, bíblias
    147/153/156 com um pouco de fundo): se se quiser, voltar a fotografar de frente, em fundo liso.

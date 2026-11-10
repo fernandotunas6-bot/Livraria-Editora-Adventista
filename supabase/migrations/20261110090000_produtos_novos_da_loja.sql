@@ -17,10 +17,13 @@
 -- 44 descrições vieram da sinopse da editora, limpas de rótulos promocionais e de ficha técnica.
 --
 -- PREÇO E STOCK FICAM A ZERO e os produtos entram OCULTOS (active = false): não há preços nas
--- fotografias. O dono põe o preço e o stock no painel e só então os publica. Para publicar todos
--- de uma vez, depois de preenchidos os preços:
+-- fotografias. O dono põe o preço e o stock no painel e só então os publica. As 3 peças de
+-- vestuário entram sem tamanhos: antes de as publicar, os tamanhos (S, M, L…, cada um com o seu
+-- stock) põem-se no painel, como variantes; sem eles, a t-shirt comprava-se sem escolher o
+-- tamanho. Para publicar todos de uma vez, depois de preenchidos os preços (e os tamanhos):
 --   update public.stock_books set active = true
---    where cover like 'https://livrariaadventista.com/images/capas/novos/%' and price > 0;
+--    where cover like 'https://livrariaadventista.com/images/capas/novos/%' and price > 0
+--      and (product_type <> 'vestuario' or jsonb_array_length(coalesce(versions, '[]'::jsonb)) > 0);
 --
 -- O book_code é atribuído pelo gatilho stock_books_before_save, com o prefixo do tipo
 -- (LIV-, BIB-, MUS-, DBV-, VES-), por isso não se fixam códigos aqui.
