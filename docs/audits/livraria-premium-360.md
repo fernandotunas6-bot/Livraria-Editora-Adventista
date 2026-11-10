@@ -183,7 +183,7 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 | A360-13 | Catálogo | Dados fracos para descoberta e para a Google: **0 de 102 com ISBN**; 29 (28 %) na categoria «Catálogo Geral»; 78 com 1–4 unidades e 5 esgotados; 0 promoções, 0 amostras de leitura, 0 variantes; 101 livros + 1 Bíblia, apesar de a plataforma aceitar 9 tipos de produto | `stock_books` (agregados) | P2 | Vendas | Conteúdo | ISBN-13 (entra no `gtin13`); redistribuir «Catálogo Geral»; conferir o stock real; amostras nos mais vendidos; outros tipos quando houver | Filtros por categoria sem «geral» dominante; Search Console com ISBN | 👤 |
 | A360-14 | Legal | Não há página de **Termos e Condições de venda** (há privacidade, envios e devoluções, FAQ) | Rotas em `App.jsx` | P2 | Confiança | — | Redigir com apoio jurídico: identificação da empresa, preços e pagamento, entrega, devolução, garantias, litígios; confirmar outras obrigações locais com um jurista | Página publicada e ligada no rodapé e no checkout | 👤 |
 | A360-15 | Facturação | ? O site emite um **recibo HTML, que não é uma factura**. O Decreto Presidencial n.º 71/25 torna a facturação electrónica com software validado pela AGT obrigatória por fases (grandes contribuintes desde 2026-01-01; os restantes dos regimes Geral e Simplificado do IVA a partir de 2027-01-01, segundo a [Cegid](https://www.cegid.com/ao/blog/obrigatoriedade-faturacao-eletronica-angola/)) | `lib/receipt.js`, rota `/whatsapp/receipt` | P2 | Legal, finanças | — | Confirmar com a contabilidade se as vendas do site entram no software certificado; se for preciso, integrar a emissão da factura (não é aconselhamento jurídico nem fiscal) | Cada venda paga com factura emitida no sistema certificado | 👤 |
-| A360-16 | Observabilidade | Sem monitorização de erros no navegador nem medição real (RUM): o **INP nunca foi medido em campo**, e um erro de JavaScript em casa de um cliente não chega a ninguém. Sem funil (vista → carrinho → checkout → pago) | Nenhum `onerror`/RUM no código; só o beacon do Cloudflare Web Analytics | P2 | Vendas, operação | — | `web-vitals` (LCP/INP/CLS) + `window.onerror`/`unhandledrejection` para uma rota da Edge Function com amostragem; eventos do funil no mesmo sítio | Painel com p75 por página e erros por versão | 📝 |
+| A360-16 | Observabilidade | Sem monitorização de erros no navegador nem medição real (RUM): o **INP nunca foi medido em campo**, e um erro de JavaScript em casa de um cliente não chega a ninguém. Sem funil (vista → carrinho → checkout → pago) | Nenhum `onerror`/RUM no código; só o beacon do Cloudflare Web Analytics | P2 | Vendas, operação | — | `web-vitals` (LCP/INP/CLS) + `window.onerror`/`unhandledrejection` para uma rota da Edge Function com amostragem; eventos do funil no mesmo sítio | Painel com p75 por página e erros por versão | ✅ 2.ª passagem |
 | A360-17 | Testes | Sem testes de ponta a ponta no navegador nem regressão visual; os 10 cenários da Fase 12 não estão automatizados | Nenhum `playwright.config` nem `*.spec.*` | P2 | Qualidade | — | Playwright numa pré-visualização do Pages com dados de teste: pesquisa, carrinho, checkout (convidado), rastreio, acesso negado, painel; capturas a 360/768/1280 | Job novo no CI, verde | 📝 |
 | A360-18 | Desempenho | Cada visita faz 4 leituras de arranque à Edge Function (`/settings`, `/integrations`, `/chat/config`, `/payment-methods`), a **0,4–0,8 s p75 cada**, a partir de Angola (função em Paris, base em Estocolmo); `/admin/media-config` chamado 145 vezes em 24 h | Registos `function_edge_logs` de 24 h | P2 | Cliente | Uma rota por definição | Uma só rota pública de arranque, com `Cache-Control: s-maxage` e a cópia local com revalidação que já existe para as definições | ≤ 2 pedidos de arranque; p75 < 400 ms | ⏸ adiado (ver J) |
 | A360-19 | Sessão | ? 12 pedidos `401` a `staff_notifications` e 1 ao catálogo em 24 h: um token caducado enviado quando a aba volta do segundo plano faz falhar até leituras públicas | Registos `edge_logs` | P3 | Cliente | Provável: pedido antes da renovação do token | Renovar a sessão em `visibilitychange` antes de consultar, ou repetir uma vez depois de `refreshSession()` | 0 `401` em leituras públicas | ✅ 2.ª passagem |
@@ -336,11 +336,39 @@ para fora; sem isso, o "antes" não pagava as fontes):
   mostra a capa depois dos dados. Medir em campo (A360-16) diz qual pesa mais nos telemóveis
   reais.
 
-**Ordem de publicação.** Duas migrações (`20261110120000_privilegios_minimos` e
-`20261110121000_descricoes_sem_avaliacoes`), aplicadas pelo `deploy-supabase.yml` no merge, que
+**Continuação: saúde do site medida em quem visita (A360-16).** O que faltava para decidir o resto
+do A360-28 com números de telemóveis reais, e para saber de um erro antes de o cliente ligar.
+
+- **Recolha** (`lib/telemetry.js`, ligado no `main.jsx`): os erros de JavaScript (`error` e
+  promessas rejeitadas; sem extensões, "Script error." nem pedidos cancelados; 5 por página, sem
+  repetir) e as Core Web Vitals (LCP, INP, CLS, FCP, TTFB) com o `web-vitals` 6, carregado depois
+  do load. As métricas são da página de entrada (como na Google), os erros da página onde
+  aconteceram. Vão ao esconder ou sair da página (`sendBeacon`, `text/plain`, sem pré-verificação
+  CORS); os erros vão 3 s depois. Custo: +1,4 KB comprimidos no bloco principal; o `web-vitals`
+  (3,4 KB) fica à parte.
+- **Servidor:** `POST /telemetria` (pública, 30 por minuto por IP; `telemetry.ts` corta e
+  confere: só métricas conhecidas com valores possíveis, a página sem ids — `/product/:id` —, sem
+  parâmetros nos endereços, no máximo 20 por pedido). Grava em `private.site_events` (fora da API)
+  pela `public.site_health_record`, que só o servidor chama.
+- **Painel:** Sistema → **Saúde do site** (`manage_settings`): o p75 de cada métrica por página
+  (com "Todas as páginas" calculado de uma vez, não a partir dos p75 de cada uma), telemóvel e
+  computador à parte, nas cores dos limites da Google; os erros agrupados pela mensagem, com as
+  páginas, a versão e o detalhe técnico.
+- **Privacidade:** sem IP, conta ou email; 30 dias (cron `saude-limpeza`); descrito na política
+  de privacidade (actualizada a 11 de Novembro).
+- **Verificado:** cenários PGlite (22), testes do recolhedor, da validação e do painel, e no
+  navegador: um erro provocado chega com a página e o aparelho; ao esconder a página chegam o
+  TTFB, o FCP e o CLS; o e2e falha se uma compra deixar um erro de JavaScript.
+- **Depois do merge:** os números aparecem à medida que as pessoas visitam. Com uma ou duas
+  semanas de dados, o p75 do LCP e do INP no telemóvel diz se o próximo passo é o JavaScript do
+  arranque ou a ficha do livro.
+
+**Ordem de publicação.** Três migrações (`20261110120000_privilegios_minimos`,
+`20261110121000_descricoes_sem_avaliacoes` e `20261111090000_saude_do_site`), aplicadas pelo `deploy-supabase.yml` no merge, que
 publica também a Edge Function; o site sai pelo `deploy-cloudflare.yml`. Rollback do código:
 reverter o merge. As migrações não precisam de rollback para o site funcionar (a primeira só
-retira privilégios que a API não usa; a segunda só muda texto de produtos ocultos).
+retira privilégios que a API não usa; a segunda só muda texto de produtos ocultos; a terceira só
+acrescenta uma tabela, três funções e um cron).
 
 ---
 

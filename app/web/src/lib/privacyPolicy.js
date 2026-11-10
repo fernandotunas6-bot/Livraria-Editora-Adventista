@@ -7,7 +7,7 @@
  * Blocos: { p: 'texto' } ou { list: ['…'] }. No texto, `[rótulo](/caminho)` vira link interno.
  */
 
-export const PRIVACY_UPDATED = '8 de Novembro de 2026';
+export const PRIVACY_UPDATED = '11 de Novembro de 2026';
 export const PRIVACY_PATH = '/privacidade';
 
 /** Contactos para pedidos sobre dados: o email e o telefone das Configurações, se existirem. */
@@ -56,6 +56,7 @@ export function privacySections(settings = {}) {
         { p: '**Newsletter e campanhas.** O email com que subscreve. Se nos deu o seu contacto, por exemplo numa loja, podemos enviar-lhe novidades por email ou WhatsApp. Cada email de novidades tem um link para deixar de receber, e pode pedir-nos que deixemos de o contactar a qualquer momento.' },
         { p: '**Notificações.** Se activar as notificações no navegador, guardamos o endereço técnico que o navegador nos dá para lhe enviar avisos de encomendas, de atendimento e da comunidade.' },
         { p: '**Segurança.** O endereço IP é usado durante pouco tempo para travar tentativas repetidas (por exemplo, palavras-passe erradas seguidas) e é apagado automaticamente.' },
+        { p: '**Funcionamento do site.** Para encontrarmos avarias e sabermos se o site está rápido, o navegador envia-nos quanto tempo cada página demorou a aparecer e a responder, e os erros técnicos que aconteçam, com a página (sem números de encomenda nem outros identificadores), o tipo de aparelho (telemóvel ou computador), o tipo de rede e a versão do site. Não vai nada que o identifique: nem a conta, nem o email, nem o endereço IP.' },
         { p: '**Localização na página das lojas.** Só é pedida quando carrega em "lojas perto de mim", e fica no seu navegador: serve para ordenar as lojas pela distância e não nos é enviada.' },
       ],
     },
@@ -126,6 +127,7 @@ export function privacySections(settings = {}) {
           'Candidaturas a colportor: enquanto estiverem em análise, ou até pedir que as apaguemos; fichas, relatórios e contas dos colportores: enquanto colaborar connosco e, depois, durante o tempo que a lei fiscal e comercial exige.',
           'Newsletter e campanhas: até deixar de as querer receber.',
           'Endereços IP para segurança: pouco tempo, apagados automaticamente.',
+          'Medições de velocidade e erros técnicos do site: 30 dias.',
         ] },
       ],
     },

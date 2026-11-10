@@ -29,6 +29,11 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   audits/livraria-premium-360.md, secção J. Ao juntar ou trocar um slide em
   `public/images/site`, correr `python3 scripts/imagens/variantes.py`: sem isso o slide novo
   funciona, mas sem `srcset` (o telemóvel desce os 1920 px).
+- **2.ª continuação: saúde do site (A360-16).** Erros de JavaScript e Core Web Vitals medidos em
+  quem visita (`lib/telemetry.js` → `POST /telemetria` → `private.site_events`), vistos em
+  Sistema → Saúde do site. Migração `20261111090000_saude_do_site`, **por aplicar** (vai no merge).
+  Política de privacidade actualizada. Com uma ou duas semanas de dados, o p75 do LCP e do INP no
+  telemóvel diz o próximo passo do A360-28.
 
 ## Auditoria Premium 360° (2026-11-09, ramo `claude/auditoria-premium-360`)
 

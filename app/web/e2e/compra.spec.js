@@ -19,6 +19,9 @@ const test = base.extend({
     // Uma rota nova no fluxo de compra tem de ser conhecida da loja falsa: sem isto, o site
     // recebia um 404 calado e o teste passava a provar outra coisa.
     expect(loja.rotasDesconhecidas, 'rotas da API pedidas que a loja falsa não conhece').toEqual([]);
+    // O site manda os erros de JavaScript para a saúde do site (lib/telemetry.js): uma compra não
+    // pode deixar nenhum para trás.
+    expect(loja.telemetria.filter((e) => e.kind === 'error'), 'erros de JavaScript durante o teste').toEqual([]);
   },
 });
 

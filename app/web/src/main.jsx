@@ -11,6 +11,7 @@ import '@/index.css';
 import { initFeatureFlags } from '@/lib/featureFlags';
 import { installStaleChunkReload } from '@/lib/staleChunkReload';
 import { prefetchProduct } from '@/api/EcommerceApi';
+import { installTelemetry } from '@/lib/telemetry';
 
 // Antes de montar: os interruptores viram atributos no `<html>`, e o CSS já encontra o
 // estado certo na primeira pintura. Feito depois, os elementos apareciam um instante com
@@ -20,6 +21,10 @@ initFeatureFlags();
 // Depois de uma publicação, quem tinha o site aberto pede ficheiros que já não existem:
 // recarrega uma vez para a versão nova, em vez de cair em "Algo correu mal".
 installStaleChunkReload();
+
+// Os erros de JavaScript e a velocidade medida em quem visita, para o painel (Sistema → Saúde do
+// site). Os erros desde já; as Core Web Vitals depois do load. Ver lib/telemetry.js.
+installTelemetry();
 
 // Ficha de um livro aberta directamente: os dados do livro começam a vir já, em paralelo com o
 // código da página (que é carregado a pedido). Antes, só eram pedidos depois de ele chegar.
