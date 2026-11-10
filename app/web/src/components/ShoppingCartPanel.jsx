@@ -89,6 +89,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   // O ponto no mapa, para o afinar (arrastar até à porta): migração trajeto_gps.
   const [gpsMapOpen, setGpsMapOpen] = useState(false);
   const locateWatch = useRef(null);
+  const locateTimer = useRef(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -308,6 +309,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   const stopLocate = useCallback(() => {
     if (locateWatch.current !== null) navigator.geolocation?.clearWatch(locateWatch.current);
     locateWatch.current = null;
+    // O limite de 15 s pertence a uma leitura: tocar outra vez em "localização" (ou fechar o
+    // painel) cancela-o. Antes ficava a correr e terminava a leitura seguinte antes do tempo,
+    // com "Localização guardada" sem a precisão que se estava a esperar.
+    clearTimeout(locateTimer.current);
+    locateTimer.current = null;
     setLocating(false);
   }, []);
   useEffect(() => stopLocate, [stopLocate]);
@@ -335,7 +341,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
-    setTimeout(() => { if (locateWatch.current !== null) done(); }, 15000);
+    locateTimer.current = setTimeout(() => { if (locateWatch.current !== null) done(); }, 15000);
   };
 
   const handleCheckout = useCallback(async (viaWhatsApp = false) => {

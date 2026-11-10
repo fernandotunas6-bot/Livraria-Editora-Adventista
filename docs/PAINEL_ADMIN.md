@@ -209,6 +209,7 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | Sistema | Configurações (`settings`) | `manage_settings` |
 | | Faixa de aviso (`notices`) | `manage_settings` ou `manage_marketing` |
 | | Versões da app (`versoes`): as novidades em `/novidades` e o aviso por push a todos os aparelhos | `manage_settings` |
+| | Saúde do site (`saude`): as Core Web Vitals medidas em quem visita (p75 por página, telemóvel e computador) e os erros no navegador, 30 dias | `manage_settings` |
 | | Integrações (`apps`), Registo de segurança (`seguranca`) | administrador |
 
 ### 3.1 Números ao lado das secções

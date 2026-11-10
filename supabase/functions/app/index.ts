@@ -86,6 +86,9 @@ import {
 } from "./releasePush.ts";
 import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.ts";
 import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
+import { publicContactFields } from "./crmContacts.ts";
+import { isPushEndpoint } from "./pushEndpoints.ts";
+import { cleanTelemetry } from "./telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -1314,7 +1317,12 @@ function mergeTags(existing: unknown, incoming: unknown) {
   return out;
 }
 
-async function upsertContact(item: Row, ownerId: string | null) {
+/**
+ * Cria ou actualiza um contacto do CRM. `publico`: quem escreve não é da equipa (formulário de
+ * contacto, checkout) e o contacto foi encontrado só pelo email que veio no pedido — um contacto
+ * existente só ganha o que lhe falta (ver crmContacts.ts).
+ */
+async function upsertContact(item: Row, ownerId: string | null, { publico = false } = {}) {
   const existing = await findContact(item.external_id, item.email, item.phone);
   const rec: Row = {};
   if (!existing) {
@@ -1322,15 +1330,19 @@ async function upsertContact(item: Row, ownerId: string | null) {
     rec.source = item.source || "manual";
     if (ownerId) rec.owner = ownerId;
   }
-  if (item.name) rec.name = item.name;
-  if (item.email) rec.email = normalizeEmail(item.email);
-  if (item.phone) rec.phone = item.phone;
-  if (item.photo_url) rec.photo_url = item.photo_url;
-  if (item.external_id) rec.external_id = item.external_id;
+  if (existing && publico) {
+    Object.assign(rec, publicContactFields(existing, item));
+  } else {
+    if (item.name) rec.name = item.name;
+    if (item.email) rec.email = normalizeEmail(item.email);
+    if (item.phone) rec.phone = item.phone;
+    if (item.photo_url) rec.photo_url = item.photo_url;
+    if (item.external_id) rec.external_id = item.external_id;
+    if (item.notes) rec.notes = item.notes;
+    if (item.metadata) rec.metadata = item.metadata;
+  }
   if (item.tags?.length) rec.tags = mergeTags(existing?.tags, item.tags);
-  if (item.notes) rec.notes = item.notes;
   if (item.is_buyer != null) rec.is_buyer = !!item.is_buyer || !!existing?.is_buyer;
-  if (item.metadata) rec.metadata = item.metadata;
   rec.last_synced_at = nowISO();
   rec.sync_status = "synced";
   if (existing) {
@@ -2157,7 +2169,9 @@ route("POST", "/webhooks/pagamentos", async ({ req, raw, body, ip }) => {
   const provider = gatewayProvider();
   const signature = req.headers.get("x-signature") || req.headers.get("x-webhook-signature") || "";
   if (!(await verifyWebhookSignature(raw, signature, secret))) {
-    await logGatewayRejection(provider, "Assinatura inválida.", body, ip);
+    // Sem o corpo: um pedido sem assinatura válida é de qualquer pessoa, e guardá-lo inteiro
+    // (até 20 000 caracteres por pedido, 300 por minuto) enchia a tabela com o que ela quisesse.
+    await logGatewayRejection(provider, "Assinatura inválida.", {}, ip);
     throw new HttpError(401, "Assinatura inválida.");
   }
   const event = parseGatewayEvent(body);
@@ -2396,12 +2410,20 @@ function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: 
   });
 }
 
+/** Linhas diferentes num carrinho (cada uma com quantidade até 99). */
+const MAX_CHECKOUT_LINES = 100;
+
 route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   const settings = await getSettings();
   const rules = storeRules(settings);
   if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw tooMany("Demasiadas tentativas de checkout. Aguarde um minuto.");
+  // Uma lista, e de tamanho de carrinho: `"abc"` dava 500 no `.map`, e 20 000 linhas seguiam
+  // para o `place_order`, que bloqueia o stock de cada uma.
+  if (data.items != null && !Array.isArray(data.items)) throw bad("Carrinho inválido.");
   const items: Row[] = data.items || [];
   if (!items.length) throw bad("Carrinho vazio.");
+  if (items.length > MAX_CHECKOUT_LINES) throw bad(`O carrinho tem demasiadas linhas (máximo ${MAX_CHECKOUT_LINES}). Divida a compra em mais de uma encomenda.`);
+  if (items.some((item) => !item || typeof item !== "object")) throw bad("Item inválido no carrinho.");
 
   // Textos com tamanho máximo, para ninguém encher a base de dados.
   const clip = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
@@ -2650,7 +2672,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
       tags: ["comprador", saleChannel || "web_purchase"],
       notes: `Encomenda ${orderNum} · ${fmtMoneyKz(saved.total)}`,
       metadata: { last_order_id: saved.id, last_order_number: orderNum },
-    }, await getDefaultOwnerId());
+    }, await getDefaultOwnerId(), { publico: true });
   });
   let whatsappSent = false;
   try {
@@ -3187,7 +3209,8 @@ route("GET", "/push/config", async () => {
 route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
   if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const endpoint = String(body.endpoint || "").trim();
-  if (!/^https:\/\/[^\s]{8,1000}$/.test(endpoint)) throw bad("Endpoint inválido.");
+  // Só os serviços de push dos navegadores: o servidor faz depois um POST para cada endereço.
+  if (!isPushEndpoint(endpoint)) throw bad("Endpoint inválido.");
   const keys = body.keys && typeof body.keys === "object"
     ? { p256dh: String(body.keys.p256dh || "").slice(0, 200), auth: String(body.keys.auth || "").slice(0, 100) }
     : {};
@@ -3240,6 +3263,23 @@ route("GET", "/admin/releases/devices", async ({ auth }) => {
   return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: !!pushKeys(await getSettings()) });
 });
 
+/**
+ * Saúde do site (A360-16): erros de JavaScript e Core Web Vitals medidos em quem visita. Pública e
+ * sem sessão (vem do `sendBeacon` ao sair da página, como `text/plain`, sem pré-verificação CORS).
+ * Cada evento é cortado e conferido em telemetry.ts; uma falha a gravar não incomoda o visitante.
+ */
+route("POST", "/telemetria", async ({ body, ip }) => {
+  if (!await checkRateLimit("telemetria", ip, 30)) throw tooMany("Demasiados pedidos.");
+  const events = cleanTelemetry(body);
+  if (!events.length) return json({ saved: 0 });
+  const { data, error } = await db.rpc("site_health_record", { p_events: events });
+  if (error) {
+    console.log("Telemetria:", error.message);
+    return json({ saved: 0 });
+  }
+  return json({ saved: Number(data) || 0 });
+});
+
 route("POST", "/contact-message", async ({ body, ip }) => {
   if (!await checkRateLimit("contact", ip, 8)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   // Rota pública que escreve no CRM: tamanhos limitados, como no checkout.
@@ -3249,7 +3289,7 @@ route("POST", "/contact-message", async ({ body, ip }) => {
   const phone = String(body.phone || "").trim().slice(0, 40);
   if (!name || !email || !message) throw bad("Nome, email e mensagem são obrigatórios.");
   if (!isDeliverableEmail(email)) throw bad("Email inválido.");
-  await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId());
+  await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId(), { publico: true });
   return json({ message: "Mensagem recebida! Entraremos em contacto em breve." });
 });
 
@@ -4577,7 +4617,12 @@ route("POST", "/order/cancel", async ({ body, ip, auth }) => {
 
   const reason = cleanCancelReason(body.reason);
   const { data: result, error } = await db.rpc("order_cancel_by_customer", { p_order_id: order.id, p_reason: reason });
-  if (error) throw bad(error.message);
+  // Só as mensagens escritas para o cliente (raise exception, P0001) saem como estão; outro erro
+  // do Postgres diria nomes de colunas e restrições a um visitante.
+  if (error) {
+    if (error.code === "P0001") throw bad(error.message);
+    throw error;
+  }
   const ref = String(result?.order_number || order.order_number || order.id);
 
   // A equipa que recebe as encomendas novas (por loja, no levantamento) deixa de a preparar.
@@ -4775,8 +4820,15 @@ route("POST", "/admin/users/create", async ({ auth, body }) => {
   const email = normalizeEmail(body.email);
   if (!isEmail(email)) throw bad("Indique um email válido.");
   const role = ROLES.includes(body.role) ? body.role : "member";
-  if (role !== "member" && auth!.role !== "admin") throw new HttpError(403, "Só administradores podem criar contas da equipa.");
+  const isAdmin = auth!.role === "admin";
+  if (role !== "member" && !isAdmin) throw new HttpError(403, "Só administradores podem criar contas da equipa.");
   const password = String(body.password || "");
+  // A conta nasce confirmada, e as encomendas de convidado com o mesmo email passam a ser dela
+  // (o RLS das encomendas casa pelo email): moradas, telefones, assinaturas. Um gestor com
+  // `manage_users` que escolhesse a palavra-passe, ou recebesse o link, entrava como o cliente
+  // num email que ainda não tinha conta — o que o /admin/users/access-link já não deixa. O gestor
+  // cria a conta e o convite segue para o email do próprio cliente.
+  if (password && !isAdmin) throw new HttpError(403, "Só administradores podem definir a palavra-passe de uma conta. A pessoa recebe um link para a definir.");
   if (password && password.length < 8) throw bad("A palavra-passe deve ter pelo menos 8 caracteres.");
   const name = cleanText(body.name) || email.split("@")[0];
 
@@ -4802,7 +4854,19 @@ route("POST", "/admin/users/create", async ({ auth, body }) => {
 
   let access = { link: "", emailSent: false };
   if (!password || body.send_link) access = await sendAccessLink(email, name, "invite", body.origin);
-  return json({ id, email, ...access });
+  // A mesma regra do access-link: o link só volta quando o email não saiu, e só a um administrador.
+  const canSeeLink = !!access.link && !access.emailSent && isAdmin;
+  await recordSecurity(auth, {
+    rowId: id,
+    action: "insert",
+    summary: `Conta criada para ${email} (${role})${canSeeLink ? " — link de acesso mostrado no painel, o email não saiu" : ""}`,
+    alert: canSeeLink || role !== "member",
+  });
+  return json({
+    id, email, emailSent: access.emailSent,
+    link: canSeeLink ? access.link : "",
+    link_withheld: !!access.link && !access.emailSent && !canSeeLink,
+  });
 });
 
 route("POST", "/admin/users/update", async ({ auth, body }) => {
@@ -5412,7 +5476,9 @@ route("POST", "/chat/escalate", async ({ body, ip, auth }) => {
   let order: Row | null = customer.orders.find((o) => o.id === wantedOrder) || null;
   if (wantedOrder && !order) {
     const { data } = await db.from("orders").select(CHAT_ORDER_COLS).eq("id", wantedOrder).maybeSingle();
-    const own = data && (data.customer_id === auth.id || normalizeEmail(data.customer_email) === customer.email);
+    // A mesma regra das outras rotas (sessionOwnsOrder): uma conta sem email não fica dona de
+    // todas as encomendas de levantamento sem email ("" === "").
+    const own = sessionOwnsOrder(auth, data);
     if (!own && typeof body.order_id === "string" && body.order_id) throw bad("A encomenda indicada não pertence à sua conta.");
     order = own ? data : null;
   }

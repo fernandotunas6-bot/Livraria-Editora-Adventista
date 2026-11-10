@@ -179,20 +179,24 @@ export const CartProvider = ({ children }) => {
     if (error) return [];
     const byId = Object.fromEntries((data || []).filter((b) => b.active !== false).map((b) => [b.id, b]));
     const changes = [];
-    const next = [];
+    // O resultado é por linha (id da variante) e aplica-se ao carrinho de AGORA, não ao de antes da
+    // leitura: com rede lenta, quem tirava um livro ou mudava a quantidade enquanto isto corria
+    // via o livro voltar, ou a quantidade antiga, quando a resposta chegava.
+    const updates = new Map(); // id da variante → null (sai) ou { variant, stock }
     let changed = false;
     for (const item of cartItems) {
       const book = byId[bookIdOf(item.variant.id)];
       const title = item.product.title;
-      if (!book) { changes.push(`"${title}" já não está disponível e saiu do carrinho.`); continue; }
+      if (!book) { changes.push(`"${title}" já não está disponível e saiu do carrinho.`); updates.set(item.variant.id, null); continue; }
       let stock = Math.max(0, Number(book.stock) || 0);
       const extra = /-v(\d+)$/.exec(item.variant.id);
       const version = extra && Array.isArray(book.versions) ? book.versions[Number(extra[1])] : null;
-      if (extra && !version) { changes.push(`A edição escolhida de "${title}" já não existe e saiu do carrinho.`); continue; }
+      if (extra && !version) { changes.push(`A edição escolhida de "${title}" já não existe e saiu do carrinho.`); updates.set(item.variant.id, null); continue; }
       // Entrou sem variante (pelo cartão, antes desta regra) num produto que passou a ter: o
       // servidor recusa-o, por isso sai já, com o aviso do que falta.
       if (!extra && needsVariantChoice(book)) {
         changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type).ask} na página do produto.`);
+        updates.set(item.variant.id, null);
         continue;
       }
       // Edição digital: sem stock e uma só (migração edicoes_digitais). Se o painel deixar de a
@@ -203,7 +207,7 @@ export const CartProvider = ({ children }) => {
         stock = Math.min(stock, Math.max(0, Math.floor(Number(version.stock))));
       }
       if (digital) stock = 1;
-      if (stock === 0) { changes.push(`"${title}" esgotou e saiu do carrinho.`); continue; }
+      if (stock === 0) { changes.push(`"${title}" esgotou e saiu do carrinho.`); updates.set(item.variant.id, null); continue; }
       const variant = { ...item.variant, inventory_quantity: stock, manage_inventory: !digital, digital };
       if (version) {
         const { price, sale } = variantPrices(book, version);
@@ -232,9 +236,16 @@ export const CartProvider = ({ children }) => {
       if (quantity < item.quantity && !digital) changes.push(`Só há ${stock} unidade(s) de "${title}"; a quantidade foi ajustada.`);
       // O painel marcou (ou desmarcou) a edição como digital: grava-se, mesmo sem aviso a dar.
       if (item.variant.digital !== digital) changed = true;
-      next.push({ ...item, variant, quantity });
+      updates.set(item.variant.id, { variant, stock });
     }
-    if (changes.length || changed) setCartItems(next);
+    if (changes.length || changed) {
+      setCartItems((prev) => prev.flatMap((item) => {
+        if (!updates.has(item.variant.id)) return [item]; // entrou depois da leitura: fica como está
+        const update = updates.get(item.variant.id);
+        if (!update) return [];
+        return [{ ...item, variant: update.variant, quantity: Math.min(item.quantity, update.stock) }];
+      }));
+    }
     return changes;
   }, [cartItems]);
 

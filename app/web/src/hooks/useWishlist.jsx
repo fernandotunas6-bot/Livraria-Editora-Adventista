@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase, mediaUrl } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
+import { toSiteRelativeUrl } from '@/lib/imageUrl';
 
 const LOCAL_KEY = 'local-wishlist';
 
@@ -26,9 +27,10 @@ function writeLocal(items) {
 
 function bookCoverOf(book) {
   if (!book) return '';
-  if (book.image) return book.image;
-  if (book.cover) return book.cover;
-  if (book.cover_url) return book.cover_url;
+  // Capas gravadas com o endereço do domínio antigo ficam como caminho do próprio site.
+  if (book.image) return toSiteRelativeUrl(book.image);
+  if (book.cover) return toSiteRelativeUrl(book.cover);
+  if (book.cover_url) return toSiteRelativeUrl(book.cover_url);
   if (book.cover_image) return mediaUrl('stock_books', book.id, book.cover_image);
   if (book.images?.length) return book.images[0].url || '';
   if (book.expand?.images?.length) return book.expand.images[0].url || '';

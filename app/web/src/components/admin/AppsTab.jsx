@@ -126,7 +126,7 @@ function WhatsAppBusinessConfigForm({ app, onSave }) {
     setTesting(true);
     try {
       await onSave(app, buildConfig());
-      await testWhatsAppApi(testPhone.trim(), pb.authStore.token);
+      await testWhatsAppApi(testPhone.trim());
       toast({ title: 'Teste enviado', description: `Mensagem enviada para ${testPhone}` });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Teste falhou', description: err.message });
@@ -379,8 +379,8 @@ export default function AppsTab() {
     setTestingType(type);
     try {
       const result = isEmail
-        ? await testEmailApi(target.trim(), pb.authStore.token)
-        : await testWhatsAppApi(target.trim(), pb.authStore.token);
+        ? await testEmailApi(target.trim())
+        : await testWhatsAppApi(target.trim());
       toast({ title: 'Teste enviado', description: result.message });
     } catch (err) {
       toast({ variant: 'destructive', title: 'Teste falhou', description: err.message });

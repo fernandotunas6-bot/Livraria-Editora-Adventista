@@ -183,23 +183,23 @@ Estado: ✅ corrigido neste PR · 👤 precisa do dono (configuração, contrato
 | A360-13 | Catálogo | Dados fracos para descoberta e para a Google: **0 de 102 com ISBN**; 29 (28 %) na categoria «Catálogo Geral»; 78 com 1–4 unidades e 5 esgotados; 0 promoções, 0 amostras de leitura, 0 variantes; 101 livros + 1 Bíblia, apesar de a plataforma aceitar 9 tipos de produto | `stock_books` (agregados) | P2 | Vendas | Conteúdo | ISBN-13 (entra no `gtin13`); redistribuir «Catálogo Geral»; conferir o stock real; amostras nos mais vendidos; outros tipos quando houver | Filtros por categoria sem «geral» dominante; Search Console com ISBN | 👤 |
 | A360-14 | Legal | Não há página de **Termos e Condições de venda** (há privacidade, envios e devoluções, FAQ) | Rotas em `App.jsx` | P2 | Confiança | — | Redigir com apoio jurídico: identificação da empresa, preços e pagamento, entrega, devolução, garantias, litígios; confirmar outras obrigações locais com um jurista | Página publicada e ligada no rodapé e no checkout | 👤 |
 | A360-15 | Facturação | ? O site emite um **recibo HTML, que não é uma factura**. O Decreto Presidencial n.º 71/25 torna a facturação electrónica com software validado pela AGT obrigatória por fases (grandes contribuintes desde 2026-01-01; os restantes dos regimes Geral e Simplificado do IVA a partir de 2027-01-01, segundo a [Cegid](https://www.cegid.com/ao/blog/obrigatoriedade-faturacao-eletronica-angola/)) | `lib/receipt.js`, rota `/whatsapp/receipt` | P2 | Legal, finanças | — | Confirmar com a contabilidade se as vendas do site entram no software certificado; se for preciso, integrar a emissão da factura (não é aconselhamento jurídico nem fiscal) | Cada venda paga com factura emitida no sistema certificado | 👤 |
-| A360-16 | Observabilidade | Sem monitorização de erros no navegador nem medição real (RUM): o **INP nunca foi medido em campo**, e um erro de JavaScript em casa de um cliente não chega a ninguém. Sem funil (vista → carrinho → checkout → pago) | Nenhum `onerror`/RUM no código; só o beacon do Cloudflare Web Analytics | P2 | Vendas, operação | — | `web-vitals` (LCP/INP/CLS) + `window.onerror`/`unhandledrejection` para uma rota da Edge Function com amostragem; eventos do funil no mesmo sítio | Painel com p75 por página e erros por versão | 📝 |
+| A360-16 | Observabilidade | Sem monitorização de erros no navegador nem medição real (RUM): o **INP nunca foi medido em campo**, e um erro de JavaScript em casa de um cliente não chega a ninguém. Sem funil (vista → carrinho → checkout → pago) | Nenhum `onerror`/RUM no código; só o beacon do Cloudflare Web Analytics | P2 | Vendas, operação | — | `web-vitals` (LCP/INP/CLS) + `window.onerror`/`unhandledrejection` para uma rota da Edge Function com amostragem; eventos do funil no mesmo sítio | Painel com p75 por página e erros por versão | ✅ 2.ª passagem |
 | A360-17 | Testes | Sem testes de ponta a ponta no navegador nem regressão visual; os 10 cenários da Fase 12 não estão automatizados | Nenhum `playwright.config` nem `*.spec.*` | P2 | Qualidade | — | Playwright numa pré-visualização do Pages com dados de teste: pesquisa, carrinho, checkout (convidado), rastreio, acesso negado, painel; capturas a 360/768/1280 | Job novo no CI, verde | 📝 |
-| A360-18 | Desempenho | Cada visita faz 4 leituras de arranque à Edge Function (`/settings`, `/integrations`, `/chat/config`, `/payment-methods`), a **0,4–0,8 s p75 cada**, a partir de Angola (função em Paris, base em Estocolmo); `/admin/media-config` chamado 145 vezes em 24 h | Registos `function_edge_logs` de 24 h | P2 | Cliente | Uma rota por definição | Uma só rota pública de arranque, com `Cache-Control: s-maxage` e a cópia local com revalidação que já existe para as definições | ≤ 2 pedidos de arranque; p75 < 400 ms | 📝 |
-| A360-19 | Sessão | ? 12 pedidos `401` a `staff_notifications` e 1 ao catálogo em 24 h: um token caducado enviado quando a aba volta do segundo plano faz falhar até leituras públicas | Registos `edge_logs` | P3 | Cliente | Provável: pedido antes da renovação do token | Renovar a sessão em `visibilitychange` antes de consultar, ou repetir uma vez depois de `refreshSession()` | 0 `401` em leituras públicas | 📝 |
+| A360-18 | Desempenho | Cada visita faz 4 leituras de arranque à Edge Function (`/settings`, `/integrations`, `/chat/config`, `/payment-methods`), a **0,4–0,8 s p75 cada**, a partir de Angola (função em Paris, base em Estocolmo); `/admin/media-config` chamado 145 vezes em 24 h | Registos `function_edge_logs` de 24 h | P2 | Cliente | Uma rota por definição | Uma só rota pública de arranque, com `Cache-Control: s-maxage` e a cópia local com revalidação que já existe para as definições | ≤ 2 pedidos de arranque; p75 < 400 ms | ⏸ adiado (ver J) |
+| A360-19 | Sessão | ? 12 pedidos `401` a `staff_notifications` e 1 ao catálogo em 24 h: um token caducado enviado quando a aba volta do segundo plano faz falhar até leituras públicas | Registos `edge_logs` | P3 | Cliente | Provável: pedido antes da renovação do token | Renovar a sessão em `visibilitychange` antes de consultar, ou repetir uma vez depois de `refreshSession()` | 0 `401` em leituras públicas | ✅ 2.ª passagem |
 | A360-20 | Categorias | ✔ Verificado, sem impacto: a navegação usa `/shop?category=…` (11 sítios), que agora herda o canonical da loja — o certo para filtros. `/shop/:category` só é usado pelo redireccionamento antigo de `/catalog/:category` | `App.jsx`, `MegaMenu.jsx` | — | — | — | Se um dia as categorias tiverem páginas próprias (texto, imagem), dar-lhes um slug e gerá-las no pós-build | — | ✔ |
-| A360-21 | Segurança | Privilégios por omissão do Supabase: `anon` e `authenticated` com `TRUNCATE`, `TRIGGER` e `REFERENCES` nas tabelas `public` (o PostgREST não os usa e o RLS não cobre o `TRUNCATE`) | `information_schema.role_table_grants` | P3 | Segurança | Padrão da plataforma | Migração que os revoga (defesa em profundidade) | Cenário PGlite: `anon` sem `TRUNCATE` | 📝 |
+| A360-21 | Segurança | Privilégios por omissão do Supabase: `anon` e `authenticated` com `TRUNCATE`, `TRIGGER` e `REFERENCES` nas tabelas `public` (o PostgREST não os usa e o RLS não cobre o `TRUNCATE`) | `information_schema.role_table_grants` | P3 | Segurança | Padrão da plataforma | Migração que os revoga (defesa em profundidade) | Cenário PGlite: `anon` sem `TRUNCATE` | ✅ 2.ª passagem |
 | A360-22 | Segurança | Protecção contra palavras-passe vazadas desligada | Aviso `auth_leaked_password_protection` | P3 | Segurança | Só no plano Pro | Activar quando houver plano pago | Aviso desaparece | 👤 |
 | A360-23 | Continuidade | Plano Free sem recuperação pontual (PITR); o backup semanal cifrado corre (✔ 2026-11-08), mas falta um restauro de ensaio registado | `backup-base-dados.yml`, [BACKUPS.md](../BACKUPS.md) | P3 | Dados | Plano | Restaurar o último backup num projecto à parte, uma vez por trimestre, e anotar o tempo | Registo do ensaio em BACKUPS.md | 👤 |
-| A360-24 | Movimento | As animações do framer-motion (entradas da ficha, transições) não respeitam "reduzir movimento"; o CSS já respeita | Nenhum `MotionConfig` | P3 | Cliente | — | `<MotionConfig reducedMotion="user">` — mas no `App.jsx` puxa o bloco `vendor-motion` para o arranque de todas as páginas: medir antes, ou aplicar por página | LCP igual antes/depois | 📝 |
+| A360-24 | Movimento | As animações do framer-motion (entradas da ficha, transições) não respeitam "reduzir movimento"; o CSS já respeita | Nenhum `MotionConfig` | P3 | Cliente | — | `<MotionConfig reducedMotion="user">` — mas no `App.jsx` puxa o bloco `vendor-motion` para o arranque de todas as páginas: medir antes, ou aplicar por página | LCP igual antes/depois | ✅ 2.ª passagem |
 | A360-25 | Catálogo | Pesquisa e filtros correm no navegador sobre o catálogo inteiro: certo com 102 produtos, não com milhares | `useProductFilters.jsx` | P3 | Escala | Desenho inicial | Quando passar de ~1 000 produtos: pesquisa no servidor (`pg_trgm`/FTS) e paginação | — | 📝 |
 | A360-26 | WhatsApp | O único envio por WhatsApp falhou (token que não é da Meta, 2026-11-07) | `notification_logs` | P3 | Operação | Token errado | Token permanente de *System User* ou desligar a integração | Envio de teste com `sent` | 👤 |
 | A360-27 | Emails | ⚑ No telemóvel, o botão principal dos emails partia-se mal: a seta sozinha na segunda linha, ou "palavra-" / "passe →"; a etapa actual do seguimento usava "•", mais pequeno do que ✓ e ○ | Os 25 modelos desenhados aqui com o Chromium a 320, 360, 375 e 700 px | P3 | Marca | Espaço normal antes da seta | Palavras com hífen sem quebra e a seta colada à última palavra; "●" na etapa actual. Os 25 modelos: sem deslocamento horizontal, todas as imagens com `alt`, nenhum texto abaixo de 12 px | Modelos a 320 px sem quebras partidas | ✅ |
-| A360-28 | Desempenho | ⚑ **No telemóvel, o maior elemento demora 4,3 a 6,1 s a aparecer em todas as páginas** (objectivo 2,5 s); FCP 2,8–4,2 s. No computador, 0,4–1,4 s | Auditoria visual (perfil de telemóvel do Lighthouse): ~400–465 KB de JS comprimido por página (`index` 93, `vendor-react` 59, `vendor-supabase` 58, `vendor-motion` 37…), 70–120 pedidos, 1,3 MB de imagens na inicial; o LCP é a imagem do herói, do topo ou a capa | **P1** | Cliente, vendas | Muito JavaScript antes do primeiro desenho; o checkout inteiro em todas as páginas; imagens de 1920–2880 px servidas a ecrãs de 390 px; dados lidos só depois do JS | **1.º passo, neste PR:** o painel do carrinho, o assistente e os métodos de pagamento do rodapé só ao primeiro gesto ou 6 s depois do load. Medido no site do PR (mesmo perfil, duas execuções): **LCP médio 4,68 → 4,26–4,32 s (−8 a −9 %)**; FAQ 4,62 → 3,76 s, contactos 4,57 → 3,86 s, colecções 4,88 → 4,22 s, inicial 6,34 → 5,65 s; JS antes do primeiro gesto −30 a −80 KB; 13 a 25 pedidos a menos. **Falta:** `srcset` de 960 px no herói e nos topos; a ficha do livro (6,2 s, a capa espera pelos dados); o `vendor-motion` em todas as páginas; tipos de letra servidos pela própria loja | Auditoria visual: LCP do telemóvel ≤ 2,5 s nas páginas principais | ✅ 1.º passo · 📝 resto |
+| A360-28 | Desempenho | ⚑ **No telemóvel, o maior elemento demora 4,3 a 6,1 s a aparecer em todas as páginas** (objectivo 2,5 s); FCP 2,8–4,2 s. No computador, 0,4–1,4 s | Auditoria visual (perfil de telemóvel do Lighthouse): ~400–465 KB de JS comprimido por página (`index` 93, `vendor-react` 59, `vendor-supabase` 58, `vendor-motion` 37…), 70–120 pedidos, 1,3 MB de imagens na inicial; o LCP é a imagem do herói, do topo ou a capa | **P1** | Cliente, vendas | Muito JavaScript antes do primeiro desenho; o checkout inteiro em todas as páginas; imagens de 1920–2880 px servidas a ecrãs de 390 px; dados lidos só depois do JS | **1.º passo, neste PR:** o painel do carrinho, o assistente e os métodos de pagamento do rodapé só ao primeiro gesto ou 6 s depois do load. Medido no site do PR (mesmo perfil, duas execuções): **LCP médio 4,68 → 4,26–4,32 s (−8 a −9 %)**; FAQ 4,62 → 3,76 s, contactos 4,57 → 3,86 s, colecções 4,88 → 4,22 s, inicial 6,34 → 5,65 s; JS antes do primeiro gesto −30 a −80 KB; 13 a 25 pedidos a menos. **Falta:** `srcset` de 960 px no herói e nos topos; a ficha do livro (6,2 s, a capa espera pelos dados); o `vendor-motion` em todas as páginas; tipos de letra servidos pela própria loja | Auditoria visual: LCP do telemóvel ≤ 2,5 s nas páginas principais | ✅ 3 passos · 📝 resto |
 | A360-29 | SEO, acessibilidade | ⚑ **9 das 13 páginas ficavam com o título genérico** "Livraria Adventista" no separador, no histórico e para a Google (WCAG 2.4.2): a resposta do `/settings` chega depois de a página pôr o seu e escrevia por cima | Auditoria visual: no computador (carga rápida) FAQ, loja, contactos… com "Livraria Adventista"; no telemóvel (carga lenta) com o título certo; `useSiteSettings.jsx` | P1 | Descoberta, cliente | `document.title = site_name` sem condição | O nome configurado só substitui o título genérico | Títulos certos na próxima auditoria visual, nas cinco larguras | ✅ |
 | A360-30 | Acessibilidade | Alvos de toque abaixo de 24 px (WCAG 2.5.8, AA): a seta de cada menu do cabeçalho (22 px de largura) e o olho da palavra-passe (16×16) | axe-core: `target-size`, 5 elementos (ficha do livro a 1280 px, entrada a 390 e 1280 px) | P2 | Cliente | Ícones sem área à volta | `min-w-6` na seta; `p-1` no olho (24×24, no mesmo sítio) | axe sem `target-size` | ✅ |
 | A360-31 | Telemóvel | `/login` a 320 px tinha 3 px de deslocamento horizontal | Auditoria visual: `div.flex.items-center` até 323 px — a coluna única da grelha media o conteúdo mais largo | P3 | Cliente | Grelha sem `minmax(0,1fr)` | `grid-cols-[minmax(0,1fr)]` no telemóvel | 0 px a 320 px na próxima auditoria visual | ✅ |
-| A360-32 | Loja no telemóvel | Na loja, a 390 px, o primeiro livro só aparece aos ~740 px: herói, géneros, pesquisa e uma caixa de ferramentas de três linhas ocupam o primeiro ecrã inteiro | Captura `loja/telemovel-390` | P2 | Vendas | Herói e barra de ferramentas pensados para o computador | No telemóvel: herói mais baixo e uma só linha com «Filtros» e a ordenação (o resto dentro dos filtros) | Pelo menos uma fila de livros no primeiro ecrã a 390 px | 📝 |
+| A360-32 | Loja no telemóvel | Na loja, a 390 px, o primeiro livro só aparece aos ~740 px: herói, géneros, pesquisa e uma caixa de ferramentas de três linhas ocupam o primeiro ecrã inteiro | Captura `loja/telemovel-390` | P2 | Vendas | Herói e barra de ferramentas pensados para o computador | No telemóvel: herói mais baixo e uma só linha com «Filtros» e a ordenação (o resto dentro dos filtros) | Pelo menos uma fila de livros no primeiro ecrã a 390 px | ✅ 2.ª passagem |
 | A360-33 | Dados | Os 4 slides da página inicial têm as imagens gravadas no projecto antigo `livraria-adventista.pages.dev`; o site corrige o endereço ao mostrar (`lib/imageUrl.js`), mas outro uso dos dados (emails, partilhas) não | `hero_slides.image` | P3 | Operação | Dados da migração | Actualizar as 4 linhas para `/images/site/…` antes de apagar o projecto antigo | Nenhum `pages.dev` em `hero_slides` | 👤 |
 
 ---
@@ -276,6 +276,101 @@ conteúdo"; o carrossel pára com o botão no telemóvel.
    processar encomenda, confirmar pagamento, reembolso.
 4. **Pagamento em sandbox**, quando houver gateway: sucesso, falha, cancelamento, reenvio do webhook.
 5. **Emails nos clientes de email** (Gmail, Outlook, Apple Mail, telemóvel), quando A360-01 fechar.
+
+## J. Segunda passagem (2026-11-10, ramo `claude/clever-carson-ibv73h`)
+
+Pedido do dono: "fazer uma análise em todo o sistema e melhorar onde for necessário". Base:
+`main` em `afb4954` (merge do #58). Antes de mexer, tudo verde nesta sessão: lint, 1 613 testes,
+build, `npm audit` (0), segredos, Playwright 18/18 e os 12 grupos de cenários PGlite. A análise
+leu o site e a Edge Function à procura de defeitos que os testes não apanham; cada achado foi
+confirmado no código antes de ser corrigido, e cada correcção tem um teste que falha sem ela.
+
+**Itens da matriz fechados:** A360-19 (token caducado), A360-21 (privilégios), A360-24
+(movimento), A360-32 (loja no telemóvel: primeiro livro de 686 → 544 px a 412×839) e o 2.º
+passo do A360-28 (DOMPurify fora do arranque: bloco principal 94,4 → 82,4 KB comprimidos).
+
+| ID | Módulo | Problema | Grav. | Correcção | Validação |
+|---|---|---|---|---|---|
+| A360-34 | Contas | ⚑ Um gestor com `manage_users` criava uma conta **já confirmada** para o email de um cliente ainda sem conta, com a palavra-passe que escolhesse, e recebia sempre o link de acesso: entrava como o cliente e via as encomendas de convidado desse email (moradas, telefones, assinaturas) | **P1** | `/admin/users/create`: só um administrador define a palavra-passe; o link só volta a um administrador e só se o email não saiu (a regra do access-link); registo de segurança | `deno check`; painel sem o campo para gestores |
+| A360-35 | CRM | ⚑ O formulário de contacto (público) e o checkout reescreviam nome, telefone e notas de um contacto existente, encontrado pelo email do pedido | P2 | Num contacto existente só se preenche o que falta; a nota acrescenta-se com data (`crmContacts.ts`) | 6 testes |
+| A360-36 | Push | `/push/subscribe` aceitava qualquer `https`, e o servidor faz POST para cada endereço | P2 | Só os serviços de push dos navegadores (`pushEndpoints.ts`) | 2 testes |
+| A360-37 | API | `/order/cancel` devolvia a mensagem do Postgres a visitantes; o webhook guardava o corpo de pedidos sem assinatura; `/checkout` aceitava `items` de qualquer tipo e tamanho; `/chat/escalate` casava contas sem email com encomendas sem email | P2–P3 | Padrão P0001; rejeição sem corpo; lista até 100 linhas; `sessionOwnsOrder` | `deno check` |
+| A360-38 | Catálogo | ⚑ 26 das 44 sinopses dos produtos novos traziam as **avaliações dos clientes da CPB com nome e data** e, numa, o código e o CNPJ da página (produtos ainda ocultos) | P1 | Migração `20261110121000_descricoes_sem_avaliacoes` (só onde a descrição ainda é a original); `sinopses-cpb.json` e `sinopses.py` | Cenário PGlite (+5) |
+| A360-39 | Sessão | ⚑ Uma falha de rede a ler o perfil (numa renovação do token) guardava "conta sem nome, papel `member`": a equipa ficava sem painel; "Sair" com o perfil a caminho devolvia a conta | P2 | O erro é lido, segunda tentativa, perfil anterior da mesma conta, mínimo fora da cache; número por aviso do Auth | 4 testes |
+| A360-40 | Rastreio | ⚑ Vindo do rodapé com o email mal escrito, o campo voltava ao email errado a cada tecla | P2 | Estado aplicado só quando chega; pesquisas numeradas; painéis com o email da encomenda à vista | e2e novo (falha na versão antiga) |
+| A360-41 | Carrinho e checkout | `refreshCart` desfazia o que se mudava durante a leitura; armazenamento bloqueado partia a ficha do livro; um 502 com HTML dava "Unexpected token"; notificação "confirmada 🎉" antes de saber se faltava pagar; portes em cêntimos não inteiros; temporizador do GPS por limpar | P2–P3 | Ver o commit "Sessão, carrinho, rastreio e sucesso" | 4 testes |
+
+**Ficam anotados, sem mudança:** `/confirm-delivery` deixa o cliente confirmar a recepção de
+uma encomenda a pagar na entrega ainda por pagar (decisão de negócio; o alerta "entregue por
+pagar" já existe); a procura de contactos por telefone olha só para 500 contactos (sem impacto
+com o CRM de hoje); o limite de 5 tentativas do código por SMS pode ser ultrapassado com pedidos
+em paralelo (risco baixo: 6 dígitos).
+
+**Continuação (2026-11-10, mesmo ramo): telemóvel mais rápido (3.º passo do A360-28).** Medido
+num build com o Supabase falso do e2e, a 390×844, rede 1,6 Mbit/s + 150 ms e CPU 4×, mediana de 3,
+com a Google Fonts simulada por dois servidores locais no "antes" (a loja falsa bloqueia pedidos
+para fora; sem isso, o "antes" não pagava as fontes):
+
+| Página | Densidade 1: antes → depois | Densidade 3: antes → depois |
+|---|---|---|
+| `/` | 5,17 → **4,21 s** | 5,16 → **4,52 s** |
+| `/shop` | 5,14 → 5,10 s | 5,04 → 4,43 s |
+| `/product/…` | 5,73 → 5,68 s | 5,72 → 5,66 s |
+| `/faq` | 3,82 → 3,85 s | 3,75 → 3,74 s |
+
+- **Herói:** variantes de 960 e 1280 px dos 20 slides (`scripts/imagens/variantes.py`) com
+  `srcset`; sem fades no primeiro desenho nem na troca para os slides da base de dados.
+- **Tipos de letra** servidos pela loja (`@fontsource-variable`), em vez de duas origens da
+  Google com um CSS que bloqueava o desenho. No laboratório as origens são `localhost` (sem DNS
+  nem TLS): o ganho real é maior do que o medido.
+- **Ficha do livro:** capas na mesma origem (estavam no `.com`) e dados pedidos no arranque, em
+  paralelo com o código da página. O laboratório não o mostra — a loja falsa responde sem
+  travões —, mas a partir de Angola cada pedido ao Supabase leva 0,4–0,8 s (A360-18) e a capa
+  deixa de abrir uma segunda ligação.
+- **A360-18 adiado:** só `/settings` e `/integrations` correm no arranque, ambos com cópia local
+  revalidada (a página não espera por eles numa 2.ª visita); `/chat/config` e `/payment-methods`
+  já esperam pelo 1.º gesto. Juntá-los poupa um pedido na 1.ª visita, a troco de mudar o
+  contrato da API, a loja falsa e os testes.
+- **Falta para os 2,5 s:** o JavaScript antes do primeiro desenho (o bloco principal tem 82 KB
+  comprimidos, mais `vendor-react`, `vendor-supabase` e `vendor-motion`) e a ficha, que só
+  mostra a capa depois dos dados. Medir em campo (A360-16) diz qual pesa mais nos telemóveis
+  reais.
+
+**Continuação: saúde do site medida em quem visita (A360-16).** O que faltava para decidir o resto
+do A360-28 com números de telemóveis reais, e para saber de um erro antes de o cliente ligar.
+
+- **Recolha** (`lib/telemetry.js`, ligado no `main.jsx`): os erros de JavaScript (`error` e
+  promessas rejeitadas; sem extensões, "Script error." nem pedidos cancelados; 5 por página, sem
+  repetir) e as Core Web Vitals (LCP, INP, CLS, FCP, TTFB) com o `web-vitals` 6, carregado depois
+  do load. As métricas são da página de entrada (como na Google), os erros da página onde
+  aconteceram. Vão ao esconder ou sair da página (`sendBeacon`, `text/plain`, sem pré-verificação
+  CORS); os erros vão 3 s depois. Custo: +1,4 KB comprimidos no bloco principal; o `web-vitals`
+  (3,4 KB) fica à parte.
+- **Servidor:** `POST /telemetria` (pública, 30 por minuto por IP; `telemetry.ts` corta e
+  confere: só métricas conhecidas com valores possíveis, a página sem ids — `/product/:id` —, sem
+  parâmetros nos endereços, no máximo 20 por pedido). Grava em `private.site_events` (fora da API)
+  pela `public.site_health_record`, que só o servidor chama.
+- **Painel:** Sistema → **Saúde do site** (`manage_settings`): o p75 de cada métrica por página
+  (com "Todas as páginas" calculado de uma vez, não a partir dos p75 de cada uma), telemóvel e
+  computador à parte, nas cores dos limites da Google; os erros agrupados pela mensagem, com as
+  páginas, a versão e o detalhe técnico.
+- **Privacidade:** sem IP, conta ou email; 30 dias (cron `saude-limpeza`); descrito na política
+  de privacidade (actualizada a 11 de Novembro).
+- **Verificado:** cenários PGlite (22), testes do recolhedor, da validação e do painel, e no
+  navegador: um erro provocado chega com a página e o aparelho; ao esconder a página chegam o
+  TTFB, o FCP e o CLS; o e2e falha se uma compra deixar um erro de JavaScript.
+- **Depois do merge:** os números aparecem à medida que as pessoas visitam. Com uma ou duas
+  semanas de dados, o p75 do LCP e do INP no telemóvel diz se o próximo passo é o JavaScript do
+  arranque ou a ficha do livro.
+
+**Ordem de publicação.** Três migrações (`20261110120000_privilegios_minimos`,
+`20261110121000_descricoes_sem_avaliacoes` e `20261111090000_saude_do_site`), aplicadas pelo `deploy-supabase.yml` no merge, que
+publica também a Edge Function; o site sai pelo `deploy-cloudflare.yml`. Rollback do código:
+reverter o merge. As migrações não precisam de rollback para o site funcionar (a primeira só
+retira privilégios que a API não usa; a segunda só muda texto de produtos ocultos; a terceira só
+acrescenta uma tabela, três funções e um cron).
+
+---
 
 ---
 

@@ -32,7 +32,7 @@ export const ADMIN_GROUPS = [
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
-  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'apps', 'seguranca'] },
+  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'saude', 'apps', 'seguranca'] },
 ];
 
 /**
@@ -259,6 +259,12 @@ export const ADMIN_SECTIONS = {
     label: 'Versões da app', title: 'Versões da app', icon: Rocket,
     keywords: 'versao novidades actualizacao atualizacao app telemovel lancamento push todos',
     description: 'O que mudou em cada versão da app (em /novidades) e o aviso por push a todos os telemóveis.',
+    allowed: (p) => p.settings,
+  },
+  saude: {
+    label: 'Saúde do site', title: 'Saúde do site', icon: Activity,
+    keywords: 'velocidade lento rapido erros javascript core web vitals lcp inp cls desempenho telemovel',
+    description: 'A velocidade medida nos aparelhos de quem visita (por página, telemóvel e computador) e os erros no navegador.',
     allowed: (p) => p.settings,
   },
   apps: {

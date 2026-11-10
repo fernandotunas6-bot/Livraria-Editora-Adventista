@@ -221,7 +221,7 @@ const ShopPage = () => {
               <span className="text-white">Loja</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">{heroTitle}</h1>
-            <p className="text-white/85 max-w-2xl text-lg mb-8">{heroSubtitle}</p>
+            <p className="text-white/85 max-w-2xl text-base mb-4 md:text-lg md:mb-8">{heroSubtitle}</p>
           </motion.div>
       </ShopHeroBackground>
 
@@ -276,9 +276,9 @@ const ShopPage = () => {
         </div>
       )}
 
-      <main className="container-custom py-10 min-h-screen">
+      <main className="container-custom py-6 md:py-10 min-h-screen">
         <AdvancedSearchPanel
-          className="mb-6"
+          className="mb-4 md:mb-6"
           activeFilters={activeFilters}
           updateFilter={updateFilter}
           onClear={clearFilters}

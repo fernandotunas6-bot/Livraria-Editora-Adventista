@@ -263,8 +263,18 @@ export default function UsersModule() {
   const onSaved = async (result, meta) => {
     await load();
     if (meta.created) {
-      toast({ title: 'Conta criada' });
-      if (result?.link) setAccessInfo({ name: meta.name, email: meta.email, phone: meta.phone, link: result.link, emailSent: result.emailSent });
+      if (result?.link) {
+        toast({ title: 'Conta criada' });
+        setAccessInfo({ name: meta.name, email: meta.email, phone: meta.phone, link: result.link, emailSent: result.emailSent });
+      } else if (result?.link_withheld) {
+        // Como no "Enviar link de acesso": o link só volta a um administrador.
+        toast({
+          title: 'Conta criada, mas o email não foi enviado',
+          description: 'O envio de emails não está a funcionar. Só um administrador pode obter o link para o enviar por outra via.',
+        });
+      } else {
+        toast({ title: 'Conta criada', description: result?.emailSent ? `${meta.email} recebe um email para definir a palavra-passe.` : undefined });
+      }
     } else {
       toast({ title: 'Alterações guardadas' });
       setDetail(null);

@@ -135,7 +135,9 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
             <DialogDescription>
               {isEdit
                 ? 'Altere os dados da conta. As encomendas continuam ligadas ao email.'
-                : 'A conta fica logo confirmada. Sem palavra-passe, a pessoa recebe um link para a definir.'}
+                : isAdmin
+                  ? 'A conta fica logo confirmada. Sem palavra-passe, a pessoa recebe um link para a definir.'
+                  : 'A conta fica logo confirmada e a pessoa recebe no seu email um link para definir a palavra-passe.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -156,7 +158,10 @@ export default function UserFormDialog({ open, onOpenChange, user, isAdmin, curr
               <PhoneInput id="uf-phone" value={form.phone} onChange={(phone) => set({ phone })} />
             </div>
 
-            {!isEdit && (
+            {/* Só um administrador escolhe a palavra-passe (o servidor recusa a um gestor): a conta
+                nasce confirmada e com as encomendas de convidado do mesmo email. Para os outros,
+                a pessoa recebe um link no próprio email. */}
+            {!isEdit && isAdmin && (
               <div className="grid gap-1.5">
                 <Label htmlFor="uf-password">Palavra-passe (opcional)</Label>
                 <Input id="uf-password" type="password" autoComplete="new-password" value={form.password} onChange={(e) => set({ password: e.target.value })} placeholder="Deixe vazio para enviar um link" />

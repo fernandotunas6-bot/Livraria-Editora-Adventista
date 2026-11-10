@@ -20,7 +20,11 @@ Estado em 2026-11-10, para quem continuar o trabalho.
   - 3 montagens de camisas (`scripts/catalogo/modelo_camisa.py`) com a estampa real extraída das
     fotografias (logótipo da Igreja e marca UmaVoz27).
   A lista produto → ficheiro → origem está em [mapa-novos-produtos.json](mapa-novos-produtos.json).
-- **Descrições**: 44 sinopses da CPB em [sinopses-cpb.json](sinopses-cpb.json).
+- **Descrições**: 44 sinopses da CPB em [sinopses-cpb.json](sinopses-cpb.json). Em 26 tinham
+  vindo também as avaliações dos clientes da CPB (com nome e data de cada pessoa) e, numa, o
+  código e o CNPJ da página: a migração `20261110121000_descricoes_sem_avaliacoes` tira-os (só
+  onde a descrição ainda não foi mudada no painel) e o `sinopses.py` passou a parar nas
+  avaliações.
 - **Migração** `supabase/migrations/20261110090000_produtos_novos_da_loja.sql`: insere os 93
   produtos **ocultos (active = false), com preço e stock a 0**. O código (LIV-/BIB-/MUS-/DBV-/VES-)
   é dado pelo gatilho. Pode correr mais de uma vez.

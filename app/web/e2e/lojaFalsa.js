@@ -115,6 +115,8 @@ export class LojaFalsa {
     this.pedidosParaFora = [];
     /** Rotas da API pedidas e que a loja falsa não conhece. */
     this.rotasDesconhecidas = [];
+    /** O que o site mandou para POST /telemetria (erros e Core Web Vitals). */
+    this.telemetria = [];
     /** Avarias a aplicar ao próximo checkout: 'resposta-perdida' (grava e a rede cai). */
     this.avarias = [];
     /**
@@ -206,6 +208,10 @@ export class LojaFalsa {
           : json({ message: 'Encomenda não encontrada.' }, 404);
       }
       case 'POST /confirm-delivery': return this.#confirmarRecepcao(corpo, json);
+      // Saúde do site (lib/telemetry.js): os erros e as medições que o site manda ficam aqui.
+      case 'POST /telemetria':
+        this.telemetria.push(...(Array.isArray(corpo.events) ? corpo.events : []));
+        return json({ saved: Array.isArray(corpo.events) ? corpo.events.length : 0 });
       default:
         this.rotasDesconhecidas.push(rota);
         return json({ message: 'Rota não encontrada.' }, 404);

@@ -151,3 +151,20 @@ describe('recentExcluding', () => {
     expect(recentExcluding(undefined, 'a1')).toEqual([]);
   });
 });
+
+describe('armazenamento bloqueado', () => {
+  it('ler e registar não lançam quando o localStorage lança SecurityError', () => {
+    const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new DOMException('bloqueado', 'SecurityError'); },
+    });
+    try {
+      expect(getRecentlyViewed()).toEqual([]);
+      expect(() => addRecentlyViewed(livro('b1'))).not.toThrow();
+      expect(clearRecentlyViewed()).toEqual([]);
+    } finally {
+      Object.defineProperty(window, 'localStorage', original);
+    }
+  });
+});

@@ -224,7 +224,7 @@ describe('permissões arrumadas pelas áreas do painel', () => {
     const labels = (key) => sectionsOpenedBy(key).map((s) => s.id);
     expect(labels('manage_catalog')).toEqual(['books', 'collections', 'slides', 'downloads', 'community']);
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
-    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes']);
+    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes', 'saude']);
     expect(labels('manage_settings')).not.toContain('apps');
     // Produção, funcionários e finanças (migrações funcionarios, producao e saidas).
     expect(labels('manage_production')).toEqual(['producao']);

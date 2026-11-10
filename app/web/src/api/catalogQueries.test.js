@@ -173,3 +173,50 @@ describe('cache do catálogo', () => {
     expect(descargas()).toBe(2);
   });
 });
+
+describe('capas e ficha do livro', () => {
+  const getOne = vi.fn();
+
+  it('a capa gravada com o domínio antigo fica como caminho do próprio site', async () => {
+    livros.push(
+      livro('a', { cover: 'https://livrariaadventista.com/images/capas/LIV-001.jpg' }),
+      livro('b', { cover: 'https://bggqkjjqbjhbjsckzopj.supabase.co/storage/v1/object/public/media/x.jpg' }),
+    );
+    const { products } = await getProducts({});
+    expect(products.find((p) => p.id === 'a').image).toBe('/images/capas/LIV-001.jpg');
+    // Uma imagem do Storage do Supabase não é do site: fica com o endereço completo.
+    expect(products.find((p) => p.id === 'b').image).toMatch(/^https:\/\/bggqkjjqbjhbjsckzopj\.supabase\.co\//);
+  });
+
+  it('a leitura antecipada da ficha é aproveitada uma vez, e um erro não fica guardado', async () => {
+    const { prefetchProduct, getProduct } = await import('./EcommerceApi');
+    const dataClient = (await import('@/lib/dataClient')).default;
+    const original = dataClient.collection;
+    dataClient.collection = (nome) => ({ ...original(nome), getOne: (...a) => getOne(nome, ...a) });
+    try {
+      getOne.mockReset();
+      getOne.mockImplementation(async (_nome, id) => livro(id));
+      prefetchProduct('x1');
+      prefetchProduct('x1'); // repetido: não pede outra vez
+      const um = await getProduct('x1');
+      expect(um.id).toBe('x1');
+      expect(getOne).toHaveBeenCalledTimes(1);
+      await getProduct('x1'); // a segunda vez lê de novo (dados frescos ao voltar à ficha)
+      expect(getOne).toHaveBeenCalledTimes(2);
+
+      // Leitura antecipada falhada: a página tenta outra vez em vez de mostrar o erro.
+      getOne.mockReset();
+      let falhar = true;
+      getOne.mockImplementation(async (_nome, id) => {
+        if (falhar) { falhar = false; throw new Error('rede'); }
+        return livro(id);
+      });
+      prefetchProduct('x2');
+      const dois = await getProduct('x2');
+      expect(dois.id).toBe('x2');
+      expect(getOne).toHaveBeenCalledTimes(2);
+    } finally {
+      dataClient.collection = original;
+    }
+  });
+});
