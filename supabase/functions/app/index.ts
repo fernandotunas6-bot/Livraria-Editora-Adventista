@@ -63,7 +63,10 @@ import { describeDevice, deviceKey } from "./devices.ts";
 import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
-import { type Auth, PERMISSION_KEYS, can, canCrm, isStaff } from "./permissions.ts";
+import { type Auth, PERMISSION_KEYS, can, isStaff } from "./permissions.ts";
+import {
+  type AcessoAberto, type AcessoComSessao, type Access, equipa, permissao, permissaoCom, publica, recusa, segredo, sessao,
+} from "./access.ts";
 import { createRateLimit } from "./rateLimit.ts";
 import { buildOpsReport } from "./opsReport.ts";
 import {
@@ -210,14 +213,11 @@ async function getAuth(req: Request): Promise<Auth> {
   return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
 }
 
-// Quem pode o quê está em `permissions.ts`, com testes. Aqui ficam só os guardas, que são a
-// parte HTTP da coisa: traduzir um "não pode" numa resposta 403.
+// Quem pode o quê está em `permissions.ts`; quem pode chamar cada rota, em `access.ts`, e é
+// declarado no registo dela. Isto fica para o que é mais fino do que a rota: os helpers que
+// conferem uma permissão antes de irem à base de dados (loadTarget).
 function requirePermission(auth: Auth, key: string) {
   if (!can(auth, key)) throw new HttpError(403, "Sem permissão para esta operação.");
-  return auth!;
-}
-function requireCrm(auth: Auth) {
-  if (!canCrm(auth)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
 }
 
@@ -1486,12 +1486,24 @@ async function notifyContact(contact: Row, opts: Row) {
 // Rotas
 // ---------------------------------------------------------------------------
 type Handler = (ctx: Ctx) => Promise<Response>;
-const routes: Record<string, Handler> = {};
-const route = (method: string, path: string, handler: Handler) => { routes[`${method} ${path}`] = handler; };
+/** O contexto de uma rota que exige sessão: a porta já conferiu que `auth` existe. */
+type CtxComSessao = Omit<Ctx, "auth"> & { auth: NonNullable<Auth> };
+// Cada rota declara quem a pode chamar (access.ts), e o encaminhamento confere-o antes de o
+// handler correr. Não há acesso por omissão: sem ele a rota não compila.
+const routes: Record<string, { access: Access; handler: Handler }> = {};
+function route(method: string, path: string, access: AcessoAberto, handler: Handler): void;
+function route(method: string, path: string, access: AcessoComSessao, handler: (ctx: CtxComSessao) => Promise<Response>): void;
+function route(method: string, path: string, access: Access, handler: Handler | ((ctx: CtxComSessao) => Promise<Response>)) {
+  const key = `${method} ${path}`;
+  if (routes[key]) throw new Error(`Rota registada duas vezes: ${key}`);
+  // O handler de uma rota com sessão só corre depois de `recusa()` a ter conferido no
+  // encaminhamento (Deno.serve, no fim do ficheiro): aí `auth` já não é nulo.
+  routes[key] = { access, handler: handler as Handler };
+}
 
-route("GET", "/health", async () => json({ message: "API is healthy.", code: 200 }));
+route("GET", "/health", publica("estado do serviço, sem dados"), async () => json({ message: "API is healthy.", code: 200 }));
 
-route("GET", "/settings", async () => {
+route("GET", "/settings", publica("configurações públicas do site; os segredos não saem daqui"), async () => {
   const rec = await getSettings();
   if (!rec) {
     return json({
@@ -1597,7 +1609,7 @@ route("GET", "/settings", async () => {
   });
 });
 
-route("GET", "/integrations", async () => {
+route("GET", "/integrations", publica("só o estado das integrações; a configuração passa por sanitizeIntegrationConfig"), async () => {
   const { data: records } = await db.from("app_integrations").select("*");
   const out: Row = {};
   for (const r of records || []) {
@@ -1618,8 +1630,7 @@ route("GET", "/integrations", async () => {
   return publicJson({ integrations: out });
 });
 
-route("GET", "/admin/media-config", async ({ auth }) => {
-  if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
+route("GET", "/admin/media-config", equipa("Acesso negado."), async ({ auth }) => {
   const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ google_drive: { enabled: false, config: {} } });
   const config = drive.config || {};
@@ -1645,8 +1656,7 @@ route("GET", "/admin/media-config", async ({ auth }) => {
  */
 const DRIVE_FOLDER_ID = /^[A-Za-z0-9_-]{3,200}$/;
 
-route("GET", "/admin/drive-images", async ({ auth, url }) => {
-  if (!isStaff(auth)) throw new HttpError(403, "Acesso negado.");
+route("GET", "/admin/drive-images", equipa("Acesso negado."), async ({ auth, url }) => {
   const drive = await getIntegration("google_drive", true);
   if (!drive?.enabled) return json({ files: [] });
   const config = drive.config || {};
@@ -1672,7 +1682,7 @@ route("GET", "/admin/drive-images", async ({ auth, url }) => {
   return json({ files });
 });
 
-route("GET", "/stores", async () => {
+route("GET", "/stores", publica("lojas activas, como na página das lojas"), async () => {
   const { data } = await db.from("physical_stores").select("*").eq("active", true).order("sort_order").order("name");
   return publicJson({
     stores: (data || []).map((r) => ({
@@ -1685,7 +1695,7 @@ route("GET", "/stores", async () => {
   });
 });
 
-route("GET", "/book-collections", async () => {
+route("GET", "/book-collections", publica("colecções activas do catálogo"), async () => {
   const { data } = await db.from("book_collections").select("*").eq("active", true).order("sort_order").order("created");
   return publicJson({
     collections: (data || []).map((r) => ({
@@ -1696,7 +1706,7 @@ route("GET", "/book-collections", async () => {
   });
 });
 
-route("GET", "/payment-methods", async () => {
+route("GET", "/payment-methods", publica("métodos activos, como no checkout"), async () => {
   const { data } = await db.from("payment_methods").select("*").eq("enabled", true).order("sort_order").limit(50);
   return publicJson({
     methods: (data || []).map((r) => ({
@@ -1719,7 +1729,7 @@ async function findOrderByNumberAndEmail(orderNumber: string, email: string) {
   return data?.[0] || null;
 }
 
-route("POST", "/track", async ({ body, ip }) => {
+route("POST", "/track", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1780,7 +1790,7 @@ route("POST", "/track", async ({ body, ip }) => {
 // Identifica-se como no rastreio: o número da encomenda e o email. A página pergunta de 15 em 15
 // segundos enquanto a encomenda vai a caminho; o limite por minuto dá para dois separadores.
 
-route("POST", "/track/live", async ({ body, ip }) => {
+route("POST", "/track/live", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("track_live", ip, 40)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1792,7 +1802,7 @@ route("POST", "/track/live", async ({ body, ip }) => {
   return json(liveTrackingView(order, position || null));
 });
 
-route("POST", "/track/destination", async ({ body, ip }) => {
+route("POST", "/track/destination", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("track_destination", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1822,7 +1832,7 @@ const phoneKey = (phone: unknown) => normalizePhone(String(phone || "")).slice(-
  * telefone (no levantamento o email é opcional). A encomenda fica "a aguardar confirmação" e a
  * equipa é avisada; quem confirma o pagamento é a equipa, no painel.
  */
-route("POST", "/order/payment-reference", async ({ body, ip }) => {
+route("POST", "/order/payment-reference", publica("só com o número da encomenda e o email ou o telefone dela; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("payment-reference", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim().slice(0, 60);
   const email = normalizeEmail(body.email || "");
@@ -1879,13 +1889,13 @@ route("POST", "/order/payment-reference", async ({ body, ip }) => {
   });
 });
 
-route("GET", "/geo/provinces", async () => {
+route("GET", "/geo/provinces", publica("divisão administrativa de Angola"), async () => {
   const { data } = await db.from("angola_provinces").select("id, name, slug, capital, sort_order").order("sort_order").limit(500);
   const provinces = data || [];
   return publicJson({ provinces, version: "RGPH-2024", count: provinces.length });
 });
 
-route("GET", "/geo/municipalities", async ({ url }) => {
+route("GET", "/geo/municipalities", publica("divisão administrativa de Angola"), async ({ url }) => {
   let provinceId = (url.searchParams.get("province") || "").trim();
   if (!provinceId) throw bad("Parâmetro province obrigatório.");
   const { data: bySlug } = await db.from("angola_provinces").select("id").eq("slug", provinceId).limit(1);
@@ -1896,7 +1906,7 @@ route("GET", "/geo/municipalities", async ({ url }) => {
   return publicJson({ municipalities, count: municipalities.length });
 });
 
-route("GET", "/geo/localities", async ({ url }) => {
+route("GET", "/geo/localities", publica("divisão administrativa de Angola"), async ({ url }) => {
   const municipalityId = (url.searchParams.get("municipality") || "").trim();
   if (!municipalityId) throw bad("Parâmetro municipality obrigatório.");
   const { data } = await db.from("angola_localities").select("id, name, type, sort_order, municipality")
@@ -1935,7 +1945,7 @@ async function feedbackAllowedToday(orderId: string) {
  * Responder outra vez substitui a resposta anterior (o cliente pode mudar de ideias), até
  * `FEEDBACK_PER_ORDER_PER_DAY` vezes por dia e por encomenda.
  */
-route("POST", "/order-feedback", async ({ body, ip }) => {
+route("POST", "/order-feedback", publica("só com o token do email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("order-feedback", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const id = String(body.order_id || "").trim().slice(0, 40);
   const token = String(body.token || "").trim();
@@ -1989,7 +1999,7 @@ route("POST", "/order-feedback", async ({ body, ip }) => {
   });
 });
 
-route("POST", "/confirm-delivery", async ({ body, ip }) => {
+route("POST", "/confirm-delivery", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   const confirmRate = Math.max(1, Math.floor(storeRules(await getSettings()).trackRate / 2));
   if (!await checkRateLimit("confirm-delivery", ip, confirmRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
@@ -2163,7 +2173,7 @@ async function logGatewayRejection(provider: string, detail: string, body: Row, 
   if (error) console.log("Registo do gateway:", error.message);
 }
 
-route("POST", "/webhooks/pagamentos", async ({ req, raw, body, ip }) => {
+route("POST", "/webhooks/pagamentos", segredo("assinatura do gateway (PAYMENT_WEBHOOK_SECRET), conferida no handler"), async ({ req, raw, body, ip }) => {
   const secret = Deno.env.get("PAYMENT_WEBHOOK_SECRET") || "";
   if (!secret) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("payment-webhook", ip, 300)) throw tooMany("Demasiados pedidos.");
@@ -2209,8 +2219,7 @@ route("POST", "/webhooks/pagamentos", async ({ req, raw, body, ip }) => {
 });
 
 /** O que o painel mostra do gateway: se está ligado, o endereço a dar ao fornecedor. */
-route("GET", "/admin/payments/gateway", async ({ auth }) => {
-  if (!can(auth, "manage_payments") && !can(auth, "confirm_payments")) throw new HttpError(403, "Sem permissão.");
+route("GET", "/admin/payments/gateway", permissaoCom("Sem permissão.", "manage_payments", "confirm_payments"), async ({ auth }) => {
   return json({
     configured: !!(Deno.env.get("PAYMENT_WEBHOOK_SECRET") || ""),
     provider: gatewayProvider(),
@@ -2223,14 +2232,12 @@ route("GET", "/admin/payments/gateway", async ({ auth }) => {
  * Mudava o estado do pagamento com um clique, sem valor nem data. O estado passou a resultar dos
  * pagamentos registados: um separador antigo do painel recebe esta mensagem em vez de gravar.
  */
-route("POST", "/admin/orders/payment-status", async ({ auth }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/payment-status", permissao("confirm_payments"), async ({ auth }) => {
   throw new HttpError(410, "O painel foi actualizado: recarregue a página para registar o pagamento com o valor recebido.");
 });
 
 /** Pagamento já verificado: dinheiro ou TPA no balcão, dinheiro da entrega, transferência no extracto. */
-route("POST", "/admin/orders/payments/record", async ({ auth, body }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/payments/record", permissao("confirm_payments"), async ({ auth, body }) => {
   const amount = amountOrNull(body.amount);
   if (amount === null) throw bad("Indique o valor recebido.");
   const result = await paymentRpc("order_payment_record", {
@@ -2242,8 +2249,7 @@ route("POST", "/admin/orders/payments/record", async ({ auth, body }) => {
 });
 
 /** Confirma um pagamento indicado (pelo cliente, ou por quem entregou), com o valor que entrou. */
-route("POST", "/admin/orders/payments/confirm", async ({ auth, body }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/payments/confirm", permissao("confirm_payments"), async ({ auth, body }) => {
   const result = await paymentRpc("order_payment_confirm", {
     p_payment_id: clipText(body.paymentId, 60), p_amount: amountOrNull(body.amount), p_received_at: isoOrNull(body.receivedAt),
     p_account: clipText(body.account, 120), p_notes: clipText(body.notes, 500), p_shared_reference_ok: body.sharedReferenceOk === true,
@@ -2252,8 +2258,7 @@ route("POST", "/admin/orders/payments/confirm", async ({ auth, body }) => {
 });
 
 /** Rejeita um pagamento indicado que não se encontrou; o motivo vai para o cliente. */
-route("POST", "/admin/orders/payments/reject", async ({ auth, body }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/payments/reject", permissao("confirm_payments"), async ({ auth, body }) => {
   const result = await paymentRpc("order_payment_reject", {
     p_payment_id: clipText(body.paymentId, 60), p_reason: clipText(body.reason, 300),
   }, auth!.id);
@@ -2261,8 +2266,7 @@ route("POST", "/admin/orders/payments/reject", async ({ auth, body }) => {
 });
 
 /** Anula um pagamento ou reembolso confirmado por engano (avisa os administradores). */
-route("POST", "/admin/orders/payments/void", async ({ auth, body }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/payments/void", permissao("confirm_payments"), async ({ auth, body }) => {
   const result = await paymentRpc("order_payment_void", {
     p_payment_id: clipText(body.paymentId, 60), p_reason: clipText(body.reason, 300),
   }, auth!.id);
@@ -2270,8 +2274,7 @@ route("POST", "/admin/orders/payments/void", async ({ auth, body }) => {
 });
 
 /** Reembolso: dinheiro devolvido ao cliente, no máximo o que ficou pago. */
-route("POST", "/admin/orders/refunds/record", async ({ auth, body }) => {
-  requirePermission(auth, "confirm_payments");
+route("POST", "/admin/orders/refunds/record", permissao("confirm_payments"), async ({ auth, body }) => {
   const amount = amountOrNull(body.amount);
   if (amount === null) throw bad("Indique o valor devolvido.");
   const result = await paymentRpc("order_refund_record", {
@@ -2289,8 +2292,7 @@ const DELIVERY_STATUSES = new Set([
   "received", "confirmed", "preparing", "shipped", "in_transit", "out_for_delivery", "delivered", "cancelled",
 ]);
 
-route("POST", "/delivery-event", async ({ auth, body }) => {
-  requirePermission(auth, "manage_orders");
+route("POST", "/delivery-event", permissao("manage_orders"), async ({ auth, body }) => {
   if (!body.orderId) throw bad("orderId obrigatório.");
   if (body.status && !DELIVERY_STATUSES.has(String(body.status))) throw bad("Estado de entrega inválido.");
   const { data: order } = await db.from("orders").select("*").eq("id", body.orderId).maybeSingle();
@@ -2414,7 +2416,7 @@ function checkoutResponse(saved: Row, successUrl: string, extra: { emailQueued: 
 /** Linhas diferentes num carrinho (cada uma com quantidade até 99). */
 const MAX_CHECKOUT_LINES = 100;
 
-route("POST", "/checkout", async ({ body: data, ip, auth }) => {
+route("POST", "/checkout", publica("comprar não exige conta; preços, stock e totais calculados no servidor; limite de pedidos"), async ({ body: data, ip, auth }) => {
   const settings = await getSettings();
   const rules = storeRules(settings);
   if (!await checkRateLimit("checkout", ip, rules.checkoutRate)) throw tooMany("Demasiadas tentativas de checkout. Aguarde um minuto.");
@@ -2685,7 +2687,7 @@ route("POST", "/checkout", async ({ body: data, ip, auth }) => {
   return checkoutResponse(saved, successUrl, { emailQueued, whatsappSent });
 });
 
-route("GET", "/messaging/status", async () => {
+route("GET", "/messaging/status", publica("só se o WhatsApp, o email, o push e o SMS estão ligados; nenhum segredo"), async () => {
   const [settings, waRec, waCfg, smsCfg] = await Promise.all([
     getSettings(), getIntegration("whatsapp_business"), getWhatsAppConfig(), getSmsConfig(),
   ]);
@@ -2725,7 +2727,7 @@ function buildReceiptText(order: Row, siteName: string, paymentLink = "", payLat
   return lines.join("\n");
 }
 
-route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
+route("POST", "/whatsapp/receipt", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("whatsapp_receipt", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.order_number || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -2753,8 +2755,7 @@ route("POST", "/whatsapp/receipt", async ({ body, ip }) => {
   });
 });
 
-route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/whatsapp/test", permissao("manage_settings"), async ({ auth, body }) => {
   const phone = String(body.phone || "").trim();
   if (!phone) throw bad("Indique um número de teste.");
   const config = await getWhatsAppConfig(true);
@@ -2766,8 +2767,7 @@ route("POST", "/admin/whatsapp/test", async ({ auth, body }) => {
 });
 
 /** O estado da PRO2SMS para o painel: se há chave, se está ligada e o saldo. */
-route("GET", "/admin/sms/estado", async ({ auth }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/sms/estado", permissao("manage_settings"), async ({ auth }) => {
   const rec = await getIntegration("pro2sms", true);
   if (!pro2smsKey()) return json({ configured: false, enabled: !!rec?.enabled });
   const res = await pro2smsRequest(pro2smsKey(), "/balance");
@@ -2783,8 +2783,7 @@ route("GET", "/admin/sms/estado", async ({ auth }) => {
   });
 });
 
-route("POST", "/admin/sms/teste", async ({ auth, body, ip }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/sms/teste", permissao("manage_settings"), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("sms-teste", ip, 5)) throw tooMany("Demasiados testes seguidos. Aguarde um minuto.");
   const config = await getSmsConfig(true);
   if (!config) throw bad("A PRO2SMS não está ligada, ou falta o segredo PRO2SMS_API_KEY.");
@@ -2817,8 +2816,7 @@ async function otpAllowedToday(userId: string, number: string, ip: string) {
   return true;
 }
 
-route("POST", "/conta/telefone/enviar", async ({ auth, body, ip }) => {
-  if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
+route("POST", "/conta/telefone/enviar", sessao("Entre na sua conta para confirmar o telefone."), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("otp-envio", ip, 5)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const config = await getSmsConfig();
   if (!config?.otp) throw new HttpError(503, "A confirmação por SMS não está disponível de momento.");
@@ -2851,8 +2849,7 @@ route("POST", "/conta/telefone/enviar", async ({ auth, body, ip }) => {
   return json({ message: `Enviámos um código para ${maskedNumber(number)}.`, expires_minutes: OTP_MINUTES, retry_after: 60 });
 });
 
-route("POST", "/conta/telefone/confirmar", async ({ auth, body, ip }) => {
-  if (!auth?.id) throw new HttpError(401, "Entre na sua conta para confirmar o telefone.");
+route("POST", "/conta/telefone/confirmar", sessao("Entre na sua conta para confirmar o telefone."), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("otp-confirma", ip, 20)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const code = String(body.code || "").trim();
   if (!/^\d{6}$/.test(code)) throw bad("O código tem 6 dígitos.");
@@ -2885,7 +2882,7 @@ route("POST", "/conta/telefone/confirmar", async ({ auth, body, ip }) => {
  * Responde sempre o mesmo com um token inválido: dizer "não existe" transformaria esta rota
  * num meio de confirmar se um token é de alguém.
  */
-route("POST", "/unsubscribe", async ({ body, url, ip }) => {
+route("POST", "/unsubscribe", publica("só com o token do email; limite de pedidos"), async ({ body, url, ip }) => {
   // Dois caminhos: a página do site manda `{ token }` em JSON; o botão "cancelar subscrição" do
   // cliente de email (RFC 8058) faz POST ao endereço do cabeçalho, com o token no endereço e o
   // corpo `List-Unsubscribe=One-Click` (formulário, não JSON — chega aqui como corpo vazio).
@@ -2920,7 +2917,7 @@ route("POST", "/unsubscribe", async ({ body, url, ip }) => {
  * clique", ou o link copiado) vai para a página de confirmação do site. Um GET nunca cancela:
  * os servidores de correio abrem os endereços das mensagens para os analisar.
  */
-route("GET", "/unsubscribe", async ({ url }) => {
+route("GET", "/unsubscribe", publica("redirecciona para a página do site, sem mexer em nada"), async ({ url }) => {
   const token = String(url.searchParams.get("t") || "").trim();
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   const target = /^[a-f0-9]{64}$/.test(token) ? `${site}/unsubscribe?t=${token}` : `${site}/unsubscribe`;
@@ -2928,13 +2925,11 @@ route("GET", "/unsubscribe", async ({ url }) => {
 });
 
 /** Categorias opcionais de email, para o painel ligar e desligar. */
-route("GET", "/admin/email/categories", async ({ auth }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/email/categories", permissao("manage_settings"), async ({ auth }) => {
   return json({ categories: categoryStates(await getSettings(true)) });
 });
 
-route("POST", "/admin/email/categories", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/categories", permissao("manage_settings"), async ({ auth, body }) => {
   const settings = await getSettings(true);
   if (!settings) throw bad("Configurações do site em falta.");
   // Só as chaves conhecidas entram: um valor qualquer vindo do pedido não pode ficar
@@ -2961,7 +2956,7 @@ route("POST", "/admin/email/categories", async ({ auth, body }) => {
  * Sem o segredo definido, responde 404 como qualquer caminho desconhecido — uma rota que
  * respondesse "falta configurar" anunciava a quem passasse que existe aqui algo por fechar.
  */
-route("POST", "/cron/email-queue", async ({ req, body, ip }) => {
+route("POST", "/cron/email-queue", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, body, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("cron-queue", ip, 30)) throw tooMany("Demasiados pedidos.");
@@ -2974,8 +2969,7 @@ route("POST", "/cron/email-queue", async ({ req, body, ip }) => {
 });
 
 /** Estado da fila de recuperação, para o painel. */
-route("GET", "/admin/email/queue", async ({ auth }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/email/queue", permissao("manage_settings"), async ({ auth }) => {
   const { data } = await db.from("email_queue")
     .select("id, recipient, subject, context, status, attempts, max_attempts, next_attempt_at, last_error, created")
     .order("created", { ascending: false })
@@ -3002,15 +2996,13 @@ route("GET", "/admin/email/queue", async ({ auth }) => {
  * tem de a chamar. Serve o botão do painel e também um agendador externo (pg_cron com
  * pg_net, ou uma tarefa agendada) quando houver um.
  */
-route("POST", "/admin/email/queue/run", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/queue/run", permissao("manage_settings"), async ({ auth, body }) => {
   const limit = Math.min(Math.max(Number(body.limit) || 10, 1), 50);
   return json(await processEmailQueue(limit));
 });
 
 /** Devolve uma mensagem desistida à fila, para nova tentativa à mão. */
-route("POST", "/admin/email/queue/retry", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/queue/retry", permissao("manage_settings"), async ({ auth, body }) => {
   const id = String(body.id || "").trim();
   if (!id) throw bad("id obrigatório.");
   const { data: job } = await db.from("email_queue").select("id, status").eq("id", id).maybeSingle();
@@ -3025,8 +3017,7 @@ route("POST", "/admin/email/queue/retry", async ({ auth, body }) => {
   return json({ message: "Mensagem devolvida à fila." });
 });
 
-route("GET", "/admin/email/templates", async ({ auth }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/email/templates", permissao("manage_settings"), async ({ auth }) => {
   const settings = await getSettings(true);
   const brand = emailBrand(settings);
   const overrides = await cached("email_text_overrides", SHORT_TTL_MS, loadTextOverrides, true);
@@ -3061,8 +3052,7 @@ route("GET", "/admin/email/templates", async ({ auth }) => {
 const previewContext = (key: string, group: string) =>
   group === "Conta" ? (key === "welcome" ? "welcome" : "account") : "order";
 
-route("GET", "/admin/email/preview", async ({ auth, url }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/email/preview", permissao("manage_settings"), async ({ auth, url }) => {
   const key = String(url.searchParams.get("template") || "");
   const template = PREVIEW_TEMPLATES[key];
   if (!template) throw bad("Modelo desconhecido.");
@@ -3090,8 +3080,7 @@ function editableTemplate(key: unknown) {
  * O texto de origem vem com os dados de exemplo já preenchidos — é o que mostra ao gestor
  * onde vão os marcadores. Para começar a editar, o painel usa o texto em vigor.
  */
-route("GET", "/admin/email/template", async ({ auth, url }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/email/template", permissao("manage_settings"), async ({ auth, url }) => {
   const { key, template } = editableTemplate(url.searchParams.get("key"));
   const brand = emailBrand(await getSettings(true));
   const { data, error } = await db.from("email_template_versions")
@@ -3114,8 +3103,7 @@ route("GET", "/admin/email/template", async ({ auth, url }) => {
 });
 
 /** Pré-visualiza um texto ainda por gravar, com os mesmos dados de exemplo. */
-route("POST", "/admin/email/template/preview", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/template/preview", permissao("manage_settings"), async ({ auth, body }) => {
   const { key, template } = editableTemplate(body.key);
   const brand = emailBrand(await getSettings(true));
   const letter = applyOverride(template.build(brand), cleanOverride(body.content));
@@ -3142,8 +3130,7 @@ async function saveTemplateVersion(auth: Auth, key: string, content: TextOverrid
  * Grava uma versão nova. `content` nulo ou vazio repõe o texto de origem — também como versão
  * nova, para a reposição ficar no histórico e se poder desfazer.
  */
-route("POST", "/admin/email/template/save", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/template/save", permissao("manage_settings"), async ({ auth, body }) => {
   const { key } = editableTemplate(body.key);
   const content = cleanOverride(body.content);
   const saved = await saveTemplateVersion(auth, key, content, String(body.note || (content ? "" : "Texto de origem reposto")));
@@ -3151,8 +3138,7 @@ route("POST", "/admin/email/template/save", async ({ auth, body }) => {
 });
 
 /** Volta a uma versão anterior, gravando-a como versão nova. */
-route("POST", "/admin/email/template/restore", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/template/restore", permissao("manage_settings"), async ({ auth, body }) => {
   const { key } = editableTemplate(body.key);
   const version = Number(body.version);
   if (!Number.isInteger(version) || version < 1) throw bad("Versão inválida.");
@@ -3171,8 +3157,7 @@ route("POST", "/admin/email/template/restore", async ({ auth, body }) => {
  * e o que se quer aqui é repetir a mensagem que falhou, não enviar outra diferente. Sem chave
  * de idempotência, porque um reenvio é precisamente um envio a mais, pedido à mão.
  */
-route("POST", "/admin/email/resend", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/resend", permissao("manage_settings"), async ({ auth, body }) => {
   const id = String(body.logId || "").trim();
   if (!id) throw bad("logId obrigatório.");
   const { data: log } = await db.from("notification_logs").select("*").eq("id", id).maybeSingle();
@@ -3191,8 +3176,7 @@ route("POST", "/admin/email/resend", async ({ auth, body }) => {
   return json({ message: `Mensagem reenviada para ${log.recipient}.` });
 });
 
-route("POST", "/admin/email/test", async ({ auth, body }) => {
-  requirePermission(auth, "manage_settings");
+route("POST", "/admin/email/test", permissao("manage_settings"), async ({ auth, body }) => {
   const to = normalizeEmail(body.to || auth?.email || "");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw bad("Indique um email de teste válido.");
   const settings = await getSettings(true);
@@ -3201,13 +3185,13 @@ route("POST", "/admin/email/test", async ({ auth, body }) => {
   return json({ message: `Email de teste enviado para ${to}.` });
 });
 
-route("GET", "/push/config", async () => {
+route("GET", "/push/config", publica("só a chave VAPID pública"), async () => {
   const rec = await getSettings();
   if (!rec?.push_enabled) return json({ enabled: false, publicKey: "" });
   return json({ enabled: true, publicKey: rec.vapid_public_key || "" });
 });
 
-route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
+route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const endpoint = String(body.endpoint || "").trim();
   // Só os serviços de push dos navegadores: o servidor faz depois um POST para cada endereço.
@@ -3228,8 +3212,8 @@ route("POST", "/push/subscribe", async ({ auth, body, ip }) => {
  * Avisar por push todos os aparelhos das novidades de uma versão (painel → Versões da app).
  * Uma só vez por novidade e só depois de publicada; o envio continua em lotes (dispatchReleasePush).
  */
-route("POST", "/admin/releases/notify", async ({ auth, body }) => {
-  const staff = requirePermission(auth, "manage_settings");
+route("POST", "/admin/releases/notify", permissao("manage_settings"), async ({ auth, body }) => {
+  const staff = auth;
   const id = String(body.id || "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw bad("Novidade inválida.");
   const { data: release } = await db.from("app_releases")
@@ -3255,8 +3239,7 @@ route("POST", "/admin/releases/notify", async ({ auth, body }) => {
 });
 
 /** Quantos aparelhos recebem as novidades (o painel mostra antes de pedir o aviso). */
-route("GET", "/admin/releases/devices", async ({ auth }) => {
-  requirePermission(auth, "manage_settings");
+route("GET", "/admin/releases/devices", permissao("manage_settings"), async ({ auth }) => {
   const [all, updates] = await Promise.all([
     db.from("push_subscriptions").select("id", { count: "exact", head: true }),
     db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true),
@@ -3269,7 +3252,7 @@ route("GET", "/admin/releases/devices", async ({ auth }) => {
  * sem sessão (vem do `sendBeacon` ao sair da página, como `text/plain`, sem pré-verificação CORS).
  * Cada evento é cortado e conferido em telemetry.ts; uma falha a gravar não incomoda o visitante.
  */
-route("POST", "/telemetria", async ({ body, ip }) => {
+route("POST", "/telemetria", publica("medições do navegador (sendBeacon, sem sessão); cortadas em telemetry.ts; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("telemetria", ip, 30)) throw tooMany("Demasiados pedidos.");
   const events = cleanTelemetry(body);
   if (!events.length) return json({ saved: 0 });
@@ -3281,7 +3264,7 @@ route("POST", "/telemetria", async ({ body, ip }) => {
   return json({ saved: Number(data) || 0 });
 });
 
-route("POST", "/contact-message", async ({ body, ip }) => {
+route("POST", "/contact-message", publica("formulário de contacto; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("contact", ip, 8)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   // Rota pública que escreve no CRM: tamanhos limitados, como no checkout.
   const name = String(body.name || "").trim().slice(0, 120);
@@ -3328,10 +3311,6 @@ async function notifyCustomerDeliveryStep(orderId: string, step: string, descrip
   }
 }
 
-const requireColporteurLogin = (auth: Auth) => {
-  if (!auth?.id) throw new HttpError(401, "Entre na sua conta de colportor.");
-};
-
 /** Depois de qualquer acção: os avisos que a base escreveu (equipa e colportores) saem já. */
 function dispatchDeliveryNotices() {
   runAfterResponse("Avisos (entregas por colportor)", async () => {
@@ -3339,8 +3318,7 @@ function dispatchDeliveryNotices() {
   });
 }
 
-route("POST", "/colportores/entregas/responder", async ({ auth, body, ip }) => {
-  requireColporteurLogin(auth);
+route("POST", "/colportores/entregas/responder", sessao("Entre na sua conta de colportor."), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("colporteur-delivery", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const result = await colporteurRpc("colporteur_delivery_respond", {
     p_delivery: clipText(body.deliveryId, 60), p_profile: auth!.id, p_accept: body.accept === true,
@@ -3354,8 +3332,7 @@ route("POST", "/colportores/entregas/responder", async ({ auth, body, ip }) => {
   return json(result);
 });
 
-route("POST", "/colportores/entregas/passo", async ({ auth, body, ip }) => {
-  requireColporteurLogin(auth);
+route("POST", "/colportores/entregas/passo", sessao("Entre na sua conta de colportor."), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("colporteur-delivery", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const step = String(body.step || "");
   if (!["out_for_delivery", "delivered", "release"].includes(step)) throw bad("Passo inválido.");
@@ -3377,11 +3354,8 @@ route("POST", "/colportores/entregas/passo", async ({ auth, body, ip }) => {
   return json(result);
 });
 
-const canManageDeliveries = (auth: Auth) => can(auth, "manage_orders") || can(auth, "manage_colporteurs");
-
 /** A equipa entregou ao colportor os livros que ele levanta na loja: a encomenda fica expedida. */
-route("POST", "/admin/colportores/entregas/entregue-ao-colportor", async ({ auth, body }) => {
-  if (!canManageDeliveries(auth)) throw new HttpError(403, "Sem permissão.");
+route("POST", "/admin/colportores/entregas/entregue-ao-colportor", permissaoCom("Sem permissão.", "manage_orders", "manage_colporteurs"), async ({ auth, body }) => {
   const result = await colporteurRpc("colporteur_delivery_handover", { p_delivery: clipText(body.deliveryId, 60) }, auth!.id);
   if (["", "received", "confirmed", "preparing"].includes(String(result.previous_delivery_status || ""))) {
     runAfterResponse("Livros entregues ao colportor", () => notifyCustomerDeliveryStep(String(result.order_id), "shipped"));
@@ -3391,8 +3365,7 @@ route("POST", "/admin/colportores/entregas/entregue-ao-colportor", async ({ auth
 });
 
 /** A equipa tira a entrega ao colportor (ou a oferta ainda por aceitar) e faz ela a entrega. */
-route("POST", "/admin/colportores/entregas/retirar", async ({ auth, body }) => {
-  if (!canManageDeliveries(auth)) throw new HttpError(403, "Sem permissão.");
+route("POST", "/admin/colportores/entregas/retirar", permissaoCom("Sem permissão.", "manage_orders", "manage_colporteurs"), async ({ auth, body }) => {
   const result = await colporteurRpc("colporteur_delivery_take_back", {
     p_delivery: clipText(body.deliveryId, 60), p_reason: clipText(body.reason, 280),
   }, auth!.id);
@@ -3473,7 +3446,7 @@ async function dispatchColporteurNotifications(limit = 50) {
   return { pending: pending.length, sent };
 }
 
-route("POST", "/colportores/candidatura", async ({ body, ip }) => {
+route("POST", "/colportores/candidatura", publica("formulário de candidatura; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("colportor", ip, 3)) throw tooMany("Demasiadas candidaturas seguidas. Aguarde um minuto.");
   // Campo escondido no formulário: uma pessoa não o preenche.
   if (String(body.website || "").trim()) return json({ message: "Candidatura recebida." });
@@ -3507,8 +3480,8 @@ route("POST", "/colportores/candidatura", async ({ body, ip }) => {
   return json({ message: "Candidatura recebida. A equipa da Livraria vai contactá-lo pelo telefone indicado.", id: (data as Row)?.id || null });
 });
 
-route("POST", "/contacts/sync-batch", async ({ auth, body }) => {
-  const staff = requireCrm(auth);
+route("POST", "/contacts/sync-batch", permissao("manage_users", "manage_marketing"), async ({ auth, body }) => {
+  const staff = auth;
   const items: Row[] = body.contacts || [];
   if (!items.length) throw bad("Lista de contactos vazia.");
   let created = 0, updated = 0, skipped = 0;
@@ -3520,8 +3493,8 @@ route("POST", "/contacts/sync-batch", async ({ auth, body }) => {
   return json({ message: "Sincronização concluída.", created, updated, skipped, total: items.length });
 });
 
-route("POST", "/contacts/import-sources", async ({ auth }) => {
-  const staff = requireCrm(auth);
+route("POST", "/contacts/import-sources", permissao("manage_users", "manage_marketing"), async ({ auth }) => {
+  const staff = auth;
   let created = 0, updated = 0;
   const { data: orders } = await db.from("orders").select("customer_email, phone, customer_name");
   for (const o of orders || []) {
@@ -3541,8 +3514,7 @@ route("POST", "/contacts/import-sources", async ({ auth }) => {
   return json({ message: "Importação concluída.", created, updated });
 });
 
-route("GET", "/contacts/stats", async ({ auth }) => {
-  requireCrm(auth);
+route("GET", "/contacts/stats", permissao("manage_users", "manage_marketing"), async ({ auth }) => {
   const settings = await getSettings();
   // O painel precisa de três coisas que não se vêem nas tabelas: se o agendador está mesmo a
   // correr, o que cada canal consegue entregar, e quantos membros de grupos ficaram órfãos.
@@ -3560,8 +3532,8 @@ route("GET", "/contacts/stats", async ({ auth }) => {
   });
 });
 
-route("POST", "/contacts/notify", async ({ auth, body }) => {
-  const staff = requireCrm(auth);
+route("POST", "/contacts/notify", permissao("manage_users", "manage_marketing"), async ({ auth, body }) => {
+  const staff = auth;
   const contactIds: string[] = Array.isArray(body.contact_ids) ? [...new Set(body.contact_ids.map(String))] : [];
   const channel = ["whatsapp", "email", "both"].includes(body.channel) ? body.channel : "whatsapp";
   const subject = clipText(body.subject || "Novidades — Livraria Adventista", 200);
@@ -3670,8 +3642,8 @@ async function runDueCampaigns(ownerId: string | null, agendado: boolean) {
   return { processed, notifications, skipped: saltadas, delivery: entrega };
 }
 
-route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
-  const staff = requireCrm(auth);
+route("POST", "/contacts/campaigns/run-due", permissao("manage_users", "manage_marketing"), async ({ auth }) => {
+  const staff = auth;
   const r = await runDueCampaigns(staff.id, false);
   return json({ message: "Campanhas processadas.", ...r });
 });
@@ -3683,7 +3655,7 @@ route("POST", "/contacts/campaigns/run-due", async ({ auth }) => {
  * disparar o agendador. Sem o token configurado responde **404** e não "falta configurar" —
  * uma rota que se anuncia diz a quem passa que há aqui algo por fechar.
  */
-route("POST", "/cron/contact-campaigns", async ({ req, ip }) => {
+route("POST", "/cron/contact-campaigns", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("cron-campaigns", ip, 30)) throw tooMany("Demasiados pedidos.");
@@ -4171,7 +4143,7 @@ async function sendDailySummary(orders: Row[], alerts: OrderAlert[], payLater?: 
 }
 
 /** Chamado pelo pg_cron (migração vigilancia_encomendas), com o token da fila. */
-route("POST", "/cron/order-watch", async ({ req, body, ip }) => {
+route("POST", "/cron/order-watch", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, body, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("cron-order-watch", ip, 30)) throw tooMany("Demasiados pedidos.");
@@ -4183,7 +4155,7 @@ route("POST", "/cron/order-watch", async ({ req, body, ip }) => {
 });
 
 /** Envio dos avisos à equipa por email/WhatsApp/push (pg_cron de 2 em 2 minutos, só quando há algum). */
-route("POST", "/cron/staff-dispatch", async ({ req, ip }) => {
+route("POST", "/cron/staff-dispatch", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("cron-staff-dispatch", ip, 60)) throw tooMany("Demasiados pedidos.");
@@ -4205,8 +4177,7 @@ const DUTIES: Duty[] = ["new_order", "payment", "preparation", "pickup", "delive
  * Quem recebe o quê, com a configuração actual das equipas: por função, para as encomendas
  * sem loja e para cada loja, e a quem sobe uma escalada. É a prova de que ninguém fica de fora.
  */
-route("GET", "/admin/ops/routing", async ({ auth }) => {
-  if (!can(auth, "manage_users") && !can(auth, "manage_orders")) throw new HttpError(403, "Sem permissão para esta operação.");
+route("GET", "/admin/ops/routing", permissao("manage_users", "manage_orders"), async ({ auth }) => {
   const { data: stores } = await db.from("physical_stores").select("id, name, active").order("sort_order");
   const { data: people } = await db.from("profiles").select("id, name, email, phone").in("role", ["admin", "manager"]);
   const nameOf = new Map<string, Row>((people || []).map((p: Row) => [String(p.id), p]));
@@ -4231,8 +4202,7 @@ route("GET", "/admin/ops/routing", async ({ auth }) => {
 });
 
 /** Aviso de teste a uma equipa: prova que os membros recebem no painel, email, WhatsApp e push. */
-route("POST", "/admin/ops/test", async ({ auth, body }) => {
-  if (!can(auth, "manage_users")) throw new HttpError(403, "Sem permissão para esta operação.");
+route("POST", "/admin/ops/test", permissao("manage_users"), async ({ auth, body }) => {
   const teamId = String(body.team_id || "").trim();
   const { data: team } = await db.from("staff_teams").select("id, name").eq("id", teamId).maybeSingle();
   if (!team) throw new HttpError(404, "Equipa não encontrada.");
@@ -4252,8 +4222,7 @@ route("POST", "/admin/ops/test", async ({ auth, body }) => {
 });
 
 /** Painel de acompanhamento: encomendas por passo, alertas e números do dia. */
-route("GET", "/admin/orders/watch", async ({ auth }) => {
-  requirePermission(auth, "manage_orders");
+route("GET", "/admin/orders/watch", permissao("manage_orders"), async ({ auth }) => {
   const [orders, hours, teams, storeOf, payLater] = await Promise.all([ordersForWatch(), opsHours(), opsTeams(), storeIdResolver(), payLaterCheck()]);
   const alerts = orderAlerts(orders, Date.now(), { ackMinutes: (o) => escalationMinutes(teams, "new_order", storeOf(o)), hours, payLater });
   const { data: since } = await db.from("order_alerts")
@@ -4285,14 +4254,12 @@ route("GET", "/admin/orders/watch", async ({ auth }) => {
 });
 
 /** Correr a vigilância já (botão no painel), sem esperar pela hora. Com `summary`, envia o resumo. */
-route("POST", "/admin/orders/watch/run", async ({ auth, body }) => {
-  requirePermission(auth, "manage_orders");
+route("POST", "/admin/orders/watch/run", permissao("manage_orders"), async ({ auth, body }) => {
   return json(await runOrderWatch(body?.summary === true));
 });
 
 /** Marca o problema reportado pelo cliente como resolvido (sai dos alertas). */
-route("POST", "/admin/orders/feedback-resolve", async ({ auth, body }) => {
-  requirePermission(auth, "manage_orders");
+route("POST", "/admin/orders/feedback-resolve", permissao("manage_orders"), async ({ auth, body }) => {
   const id = String(body.order_id || "").trim();
   const note = clipText(body.note, 500);
   const { data: order } = await db.from("orders").select("id, customer_feedback, delivery_timeline").eq("id", id).maybeSingle();
@@ -4308,7 +4275,7 @@ route("POST", "/admin/orders/feedback-resolve", async ({ auth, body }) => {
   return json({ ok: true });
 });
 
-route("POST", "/newsletter", async ({ body, ip }) => {
+route("POST", "/newsletter", publica("subscrição por email; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("newsletter", ip, 6)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const email = normalizeEmail(body.email || "");
   if (!email) throw bad("Email obrigatório.");
@@ -4322,8 +4289,7 @@ route("POST", "/newsletter", async ({ body, ip }) => {
 
 // Resumo do catálogo para a equipa. Era público e dizia a qualquer pessoa o stock e as vendas
 // de cada livro; nada no site o usa sem sessão.
-route("GET", "/catalog/summary", async ({ auth }) => {
-  requirePermission(auth, "manage_catalog");
+route("GET", "/catalog/summary", permissao("manage_catalog"), async ({ auth }) => {
   const { data: books } = await db.from("stock_books")
     .select("id, title, book_code, stock, stock_low, genre, featured, cover, cover_image, sales_count").eq("active", true).order("title").limit(500);
   const genres: Record<string, Row> = {};
@@ -4348,7 +4314,7 @@ route("GET", "/catalog/summary", async ({ auth }) => {
   });
 });
 
-route("POST", "/catalog/view", async ({ auth, body, ip }) => {
+route("POST", "/catalog/view", publica("só conta uma visualização; limite de pedidos"), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("catalog-view", ip, 60)) return json({ ok: true });
   const bookId = String(body.book_id || body.id || "").trim();
   if (!bookId) throw bad("book_id obrigatório.");
@@ -4370,7 +4336,7 @@ route("POST", "/catalog/view", async ({ auth, body, ip }) => {
  * usa os vistos que o browser guardou (`viewed`), que não saem dali para mais lado nenhum.
  * Devolve só ids: a página lê os livros com as regras de visibilidade que já usa.
  */
-route("POST", "/recommendations", async ({ auth, body, ip }) => {
+route("POST", "/recommendations", publica("sugestões; com sessão, só o histórico da própria conta; limite de pedidos"), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("recommendations", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const localViewed = Array.isArray(body.viewed) ? body.viewed.map((v: unknown) => String(v).slice(0, 40)).slice(0, 30) : [];
   const history = auth?.id ? await customerHistory(auth.id, auth.email) : { owned: [], wishlist: [], viewed: [] };
@@ -4486,7 +4452,7 @@ async function sendAccessLink(email: string, name: string, kind: "invite" | "res
  * conta) garante que só sai um email, por mais vezes que o pedido se repita. Vai sempre para
  * o email da sessão, nunca para um endereço vindo no corpo do pedido.
  */
-route("POST", "/account/welcome", async ({ auth }) => {
+route("POST", "/account/welcome", sessao(), async ({ auth }) => {
   if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
   const settings = await getSettings();
   const { data: profile } = await db.from("profiles").select("name").eq("id", auth.id).maybeSingle();
@@ -4510,7 +4476,7 @@ route("POST", "/account/welcome", async ({ auth }) => {
  * A primeira vez que uma conta usa isto só regista o aparelho: quem acabou de criar conta ou
  * entra pela primeira vez desde que o aviso existe não precisa de saber que entrou.
  */
-route("POST", "/account/session-notice", async ({ auth, req, ip }) => {
+route("POST", "/account/session-notice", sessao(), async ({ auth, req, ip }) => {
   if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
   if (!await checkRateLimit("session-notice", auth.id, 10)) return json({ ok: true, notified: false });
   const ua = req.headers.get("User-Agent") || "";
@@ -4550,7 +4516,7 @@ route("POST", "/account/session-notice", async ({ auth, req, ip }) => {
  * O Supabase guarda o endereço pedido em `new_email` até ser confirmado. O aviso vai para o
  * endereço da sessão (o antigo) e diz qual é o novo — os dois lidos da conta, não do pedido.
  */
-route("POST", "/account/email-change-notice", async ({ auth }) => {
+route("POST", "/account/email-change-notice", sessao(), async ({ auth }) => {
   if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
   const { data } = await db.auth.admin.getUserById(auth.id);
   const pending = normalizeEmail(String((data?.user as Row | undefined)?.new_email || ""));
@@ -4571,7 +4537,7 @@ route("POST", "/account/email-change-notice", async ({ auth }) => {
  * Vai sempre para o email da sessão. Quem o pedisse sem ter mudado nada só mandaria um aviso
  * a si próprio, e o limite por conta trava a repetição.
  */
-route("POST", "/account/password-changed-notice", async ({ auth }) => {
+route("POST", "/account/password-changed-notice", sessao(), async ({ auth }) => {
   if (!auth?.email) throw new HttpError(401, "Sessão necessária.");
   if (!await checkRateLimit("password-changed-notice", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const settings = await getSettings();
@@ -4598,7 +4564,7 @@ const sessionOwnsOrder = (auth: Auth, order: Row | null) =>
  * stock volta pelo gatilho da base (como num cancelamento no painel), a equipa é avisada para
  * não a preparar e o cliente recebe o aviso do costume.
  */
-route("POST", "/order/cancel", async ({ body, ip, auth }) => {
+route("POST", "/order/cancel", publica("número da encomenda e email, ou a conta dona dela (customerCancel.ts); limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("order-cancel", auth?.id || ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim().slice(0, 60);
   const email = normalizeEmail(body.email || "");
@@ -4669,8 +4635,7 @@ async function orderStoreId(order: Row): Promise<string | null> {
  * que é da equipa: notas internas das conversas, quem tratou cada encomenda e as imagens das
  * assinaturas (só se diz se existem).
  */
-route("GET", "/account/export", async ({ auth }) => {
-  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+route("GET", "/account/export", sessao(), async ({ auth }) => {
   if (!await checkRateLimit("account-export", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const email = normalizeEmail(auth.email || "");
   const listOr = <T>(p: PromiseLike<{ data: T[] | null; error: unknown }>) => Promise.resolve(p).then((r) => r.data || []).catch(() => []);
@@ -4753,8 +4718,7 @@ route("GET", "/account/export", async ({ auth }) => {
  * As contas da equipa e dos colportores apagam-se pela administração, que trata do que está
  * pendurado nelas (permissões, guias, comissões).
  */
-route("POST", "/account/delete", async ({ auth, body }) => {
-  if (!auth?.id) throw new HttpError(401, "Sessão necessária.");
+route("POST", "/account/delete", sessao(), async ({ auth, body }) => {
   if (!await checkRateLimit("account-delete", auth.id, 3)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const { data: profile } = await db.from("profiles").select("name, role").eq("id", auth.id).maybeSingle();
   if (profile?.role === "admin" || profile?.role === "manager" || isStaff(auth)) {
@@ -4787,8 +4751,7 @@ async function notifyAccount(email: string, name: string, letter: (brand: Brand)
   }
 }
 
-route("GET", "/admin/users", async ({ auth, url }) => {
-  requirePermission(auth, "manage_users");
+route("GET", "/admin/users", permissao("manage_users"), async ({ auth, url }) => {
   const perPage = Math.min(Math.max(Number(url.searchParams.get("per_page")) || 25, 1), 100);
   const page = Math.max(Number(url.searchParams.get("page")) || 1, 1);
   const scope = ["team", "customers", "all"].includes(url.searchParams.get("scope") || "") ? url.searchParams.get("scope") : "all";
@@ -4803,8 +4766,7 @@ route("GET", "/admin/users", async ({ auth, url }) => {
   return json({ ...data, page, per_page: perPage });
 });
 
-route("GET", "/admin/users/orders", async ({ auth, url }) => {
-  if (!can(auth, "manage_users") && !can(auth, "manage_orders")) throw new HttpError(403, "Sem permissão para esta operação.");
+route("GET", "/admin/users/orders", permissao("manage_users", "manage_orders"), async ({ auth, url }) => {
   const email = normalizeEmail(url.searchParams.get("email") || "");
   if (!isEmail(email)) throw bad("Email inválido.");
   const { data, error } = await db.from("orders")
@@ -4816,8 +4778,7 @@ route("GET", "/admin/users/orders", async ({ auth, url }) => {
   return json({ items: data || [] });
 });
 
-route("POST", "/admin/users/create", async ({ auth, body }) => {
-  requirePermission(auth, "manage_users");
+route("POST", "/admin/users/create", permissao("manage_users"), async ({ auth, body }) => {
   const email = normalizeEmail(body.email);
   if (!isEmail(email)) throw bad("Indique um email válido.");
   const role = ROLES.includes(body.role) ? body.role : "member";
@@ -4870,7 +4831,7 @@ route("POST", "/admin/users/create", async ({ auth, body }) => {
   });
 });
 
-route("POST", "/admin/users/update", async ({ auth, body }) => {
+route("POST", "/admin/users/update", permissao("manage_users"), async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   const patch: Row = {};
@@ -4925,7 +4886,7 @@ route("POST", "/admin/users/update", async ({ auth, body }) => {
   return json({ ok: true });
 });
 
-route("POST", "/admin/users/status", async ({ auth, body }) => {
+route("POST", "/admin/users/status", permissao("manage_users"), async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   const suspend = body.suspended === true;
@@ -4951,7 +4912,7 @@ route("POST", "/admin/users/status", async ({ auth, body }) => {
   return json({ ok: true, suspended: suspend, email_sent: emailSent });
 });
 
-route("POST", "/admin/users/access-link", async ({ auth, body }) => {
+route("POST", "/admin/users/access-link", permissao("manage_users"), async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   if (!target.email) throw bad("Esta conta não tem email.");
@@ -4972,7 +4933,7 @@ route("POST", "/admin/users/access-link", async ({ auth, body }) => {
   return json({ emailSent: access.emailSent, link: canSeeLink ? access.link : "", link_withheld: !access.emailSent && !canSeeLink });
 });
 
-route("POST", "/admin/users/delete", async ({ auth, body }) => {
+route("POST", "/admin/users/delete", permissao("manage_users"), async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   if (target.id === auth!.id) throw bad("Não pode apagar a sua própria conta.");
@@ -5004,7 +4965,7 @@ async function endSessions(userId: string) {
  * teve de voltar a entrar. Sem isso, termina em silêncio — para quando é o próprio cliente
  * a pedir por telefone, por exemplo, depois de perder o telemóvel.
  */
-route("POST", "/admin/users/end-sessions", async ({ auth, body }) => {
+route("POST", "/admin/users/end-sessions", permissao("manage_users"), async ({ auth, body }) => {
   const target = await loadTarget(auth, body.id);
   assertCanManage(auth, target);
   const ended = await endSessions(target.id);
@@ -5044,7 +5005,7 @@ function chatProvider(settings: Row | null): { use: "gemini" | "deepseek"; key: 
   return null;
 }
 
-route("GET", "/chat/config", async () => {
+route("GET", "/chat/config", publica("configuração pública do assistente"), async () => {
   const [settings, hours] = await Promise.all([getSettings(), opsHours()]);
   const ai = chatProvider(settings);
   // Pública e igual para todos, pedida em cada página com o assistente: mesma cache curta.
@@ -5303,7 +5264,7 @@ async function chatStores() {
 
 const ORDERISH: string[] = ["order_status", "cancel_change", "return_refund", "payment_problem", "invoice"];
 
-route("POST", "/chat/session", async ({ body, ip, auth }) => {
+route("POST", "/chat/session", publica("assistente para visitantes: a conversa é a da sessão ou do token do aparelho; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat_session", ip, 120)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const id = await chatIdentity(auth, body);
   const thread = await currentConversation(id);
@@ -5345,7 +5306,7 @@ async function aiQuotaAvailable(ip: string, settings: Row | null) {
   return await within("chat-ia-ip", ip, Math.min(60, total)) && await within("chat-ia", "loja", total);
 }
 
-route("POST", "/chat", async ({ body, ip, auth }) => {
+route("POST", "/chat", publica("assistente para visitantes: a conversa é a da sessão ou do token do aparelho; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat", ip, 20)) throw tooMany("Demasiadas mensagens. Aguarde um minuto.");
   const message = String(body.message || "").trim();
   const page = String(body.page || "/").slice(0, 120);
@@ -5458,9 +5419,8 @@ route("POST", "/chat", async ({ body, ip, auth }) => {
   });
 });
 
-route("POST", "/chat/escalate", async ({ body, ip, auth }) => {
+route("POST", "/chat/escalate", sessao("Entre na sua conta para a equipa lhe poder responder."), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat_escalate", ip, 5)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
-  if (!auth) throw new HttpError(401, "Entre na sua conta para a equipa lhe poder responder.");
   const id = await chatIdentity(auth, body);
   const thread = await currentConversation(id);
   if (!thread || thread.status !== "bot") throw bad("Não há nenhuma conversa com o assistente para passar à equipa.");
@@ -5504,7 +5464,7 @@ route("POST", "/chat/escalate", async ({ body, ip, auth }) => {
   return json({ conversation: publicThread(fresh), messages: await presentMessages(fresh ? await threadMessages(fresh.id) : []) });
 });
 
-route("POST", "/chat/new", async ({ body, ip, auth }) => {
+route("POST", "/chat/new", publica("assistente para visitantes: a conversa é a da sessão ou do token do aparelho; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat_session", ip, 120)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const id = await chatIdentity(auth, body);
   const thread = await currentConversation(id);
@@ -5523,7 +5483,7 @@ route("POST", "/chat/new", async ({ body, ip, auth }) => {
   return json({ conversation: null, messages: [] });
 });
 
-route("POST", "/chat/feedback", async ({ body, ip, auth }) => {
+route("POST", "/chat/feedback", publica("assistente para visitantes: a conversa é a da sessão ou do token do aparelho; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("chat_feedback", ip, 30)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const value = Number(body.value);
   const messageId = Number(body.message_id);
@@ -5560,14 +5520,13 @@ async function loadOpsReport(days = 7) {
   });
 }
 
-route("GET", "/admin/support/report", async ({ auth, url }) => {
-  requirePermission(auth, "manage_orders");
+route("GET", "/admin/support/report", permissao("manage_orders"), async ({ auth, url }) => {
   const days = clampInt(url.searchParams.get("days"), 1, 90, 7);
   return json(await loadOpsReport(days));
 });
 
 /** Relatório semanal por email aos responsáveis das equipas e aos administradores (pg_cron, segunda 07:35). */
-route("POST", "/cron/weekly-report", async ({ req, ip }) => {
+route("POST", "/cron/weekly-report", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);
   if (!await checkRateLimit("cron-weekly-report", ip, 10)) throw tooMany("Demasiados pedidos.");
@@ -5598,8 +5557,8 @@ route("POST", "/cron/weekly-report", async ({ req, ip }) => {
  * Sugestão de resposta para a equipa (IA), com a conversa, o conhecimento da loja e as
  * encomendas do cliente. É só um rascunho: quem atende lê, corrige e envia.
  */
-route("POST", "/admin/support/suggest-reply", async ({ auth, body, ip }) => {
-  const staff = requirePermission(auth, "manage_orders");
+route("POST", "/admin/support/suggest-reply", permissao("manage_orders"), async ({ auth, body, ip }) => {
+  const staff = auth;
   if (!await checkRateLimit("suggest-reply", `${ip}:${staff.id}`, 20)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const settings = await getSettings();
   const ai = chatProvider(settings);
@@ -5662,8 +5621,8 @@ Deno.serve(async (req) => {
   const requestId = /^[0-9a-f-]{36}$/i.test(given) ? given : crypto.randomUUID();
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/functions\/v1/, "").replace(/^\/app/, "").replace(/\/$/, "") || "/";
-  const handler = routes[`${req.method} ${path}`];
-  if (!handler) return json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
+  const entry = routes[`${req.method} ${path}`];
+  if (!entry) return json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
   let auth: Auth = null;
   try {
     let body: Row = {};
@@ -5688,7 +5647,10 @@ Deno.serve(async (req) => {
     // por isso o primeiro valor é fiável para os limites de pedidos.
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "anon";
     auth = await getAuth(req);
-    const res = await handler({ req, url, body, auth, ip, raw: rawBody });
+    // A porta da rota, antes de o handler tocar na base de dados.
+    const denied = recusa(entry.access, auth);
+    if (denied) throw new HttpError(denied.status, denied.message);
+    const res = await entry.handler({ req, url, body, auth, ip, raw: rawBody });
     res.headers.set("X-Request-Id", requestId);
     return res;
   } catch (err) {

@@ -58,7 +58,14 @@ Permissões dos gestores: `manage_catalog`, `manage_orders`, `manage_settings`, 
 A mesma regra é aplicada em três sítios:
 
 1. **Base de dados:** `private.has_permission(chave)` nas políticas RLS.
-2. **Edge Function:** `can()` e `requirePermission()`.
+2. **Edge Function:** cada rota declara quem a pode chamar no próprio registo, e o encaminhamento confere-o antes de o handler correr (`supabase/functions/app/access.ts`):
+
+   ```ts
+   route("GET", "/admin/users", permissao("manage_users"), async ({ auth, url }) => { … });
+   route("POST", "/track", publica("só com o número e o email da encomenda; limite de pedidos"), async (…) => { … });
+   ```
+
+   Os acessos são `publica(porquê)`, `segredo(porquê)` (agendador e gateway, que o handler confere), `sessao()`, `equipa()` e `permissao(chave, …)` (basta uma). Não há acesso por omissão: uma rota sem ele não compila, e o handler de uma rota com sessão recebe `auth` não nulo. O `access.test.ts` lista as rotas abertas a qualquer pessoa; abrir uma nova obriga a mudar essa lista. O que é mais fino do que a rota (ser dono da encomenda, poder gerir aquela conta) continua no handler.
 3. **Frontend:** `app/web/src/lib/permissions.js` (só para mostrar ou esconder; a segurança está nos dois primeiros).
 
 Outras regras:
