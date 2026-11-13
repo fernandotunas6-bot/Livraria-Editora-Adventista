@@ -1678,6 +1678,7 @@ route("GET", "/stores", async () => {
     stores: (data || []).map((r) => ({
       id: r.id, name: r.name, province: r.province, address: r.address, phone: r.phone || "",
       hours: r.hours || "", image_url: r.image_url || fileUrl("physical_stores", r, "image"),
+      gallery: Array.isArray(r.gallery) ? r.gallery : [],
       latitude: r.latitude, longitude: r.longitude, maps_url: r.maps_url || "",
       email: r.email || "", whatsapp: r.whatsapp || "", pickup_enabled: r.pickup_enabled !== false,
     })),

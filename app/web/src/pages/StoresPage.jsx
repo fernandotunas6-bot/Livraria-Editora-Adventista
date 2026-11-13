@@ -10,11 +10,14 @@ import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pageTitle } from '@/lib/brand';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
-import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink } from '@/lib/stores';
+import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink, storeGallery } from '@/lib/stores';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import StoreThumb from '@/components/StoreThumb';
+import StoreGallery from '@/components/StoreGallery';
 import useLocalizacaoAoVivo from '@/hooks/useLocalizacaoAoVivo';
 import { formatarDistancia, ordenarPorDistancia, precisaoLegivel } from '@/lib/localizacao';
+import { jsonLdString, storeJsonLd } from '@/lib/structuredData';
+import { CANONICAL_ORIGIN } from '@/lib/canonicalHost';
 
 export default function StoresPage() {
   const { settings } = useSiteSettings();
@@ -44,6 +47,17 @@ export default function StoresPage() {
 
   const selected = visible.find((s) => s.id === selectedId) || visible[0] || null;
   const embed = selected ? mapEmbedUrl(selected, settings.google_maps_embed_key) : '';
+  const fotos = useMemo(() => storeGallery(selected), [selected]);
+
+  // Cada loja para a Google: morada, telefone, coordenadas e fotografias (lib/structuredData.js).
+  // Vão todas as lojas, e não só a escolhida — a página é a mesma para quem procura qualquer
+  // uma delas. Sem lojas carregadas não se escreve bloco nenhum. Os endereços são os do domínio
+  // oficial, e não os do navegador: numa pré-visualização os dados continuam a falar da loja
+  // a sério, que é o que a Google indexa.
+  const dadosEstruturados = useMemo(
+    () => jsonLdString((stores || []).map((s) => storeJsonLd(s, { origin: CANONICAL_ORIGIN }))),
+    [stores],
+  );
 
   // A primeira leitura escolhe a loja mais perto. As seguintes não voltam a escolher: quem
   // já abriu outra loja na lista não quer ser arrastado de volta a cada passo que dá.
@@ -61,6 +75,7 @@ export default function StoresPage() {
       <Helmet>
         <title>{pageTitle('Lojas físicas')}</title>
         <meta name="description" content="Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola." />
+        {dadosEstruturados && <script type="application/ld+json">{dadosEstruturados}</script>}
       </Helmet>
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
@@ -206,32 +221,41 @@ export default function StoresPage() {
                   {!visible.length && <li className="text-center py-10 text-muted-foreground">Nenhuma loja corresponde à pesquisa.</li>}
                 </ul>
 
-                <div className="lg:sticky lg:top-28 rounded-2xl border border-border bg-background overflow-hidden">
-                  {embed ? (
-                    <iframe
-                      key={selected.id}
-                      title={`Mapa — ${selected.name}`}
-                      src={embed}
-                      className="w-full aspect-4/3 lg:aspect-auto lg:h-[560px] border-0"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                    />
-                  ) : (
-                    <div className="aspect-4/3 flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
-                      <MapPin className="h-10 w-10 text-primary/50" />
-                      <p className="text-sm max-w-xs">{selected ? 'Esta loja ainda não tem coordenadas GPS. Use «Como chegar» para abrir a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
-                    </div>
-                  )}
-                  {selected && (
-                    <div className="p-4 border-t border-border flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold truncate">{selected.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{selected.address}</p>
+                <div className="lg:sticky lg:top-28 space-y-4">
+                  <div className="rounded-2xl border border-border bg-background overflow-hidden">
+                    {embed ? (
+                      <iframe
+                        key={selected.id}
+                        title={`Mapa — ${selected.name}`}
+                        src={embed}
+                        className="w-full aspect-4/3 lg:aspect-auto lg:h-[560px] border-0"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    ) : (
+                      <div className="aspect-4/3 flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
+                        <MapPin className="h-10 w-10 text-primary/50" />
+                        <p className="text-sm max-w-xs">{selected ? 'Esta loja ainda não tem coordenadas GPS. Use «Como chegar» para abrir a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
                       </div>
-                      <Button asChild size="sm" variant="outline">
-                        <a href={directionsUrl(selected)} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-1.5" /> Direcções</a>
-                      </Button>
-                    </div>
+                    )}
+                    {selected && (
+                      <div className="p-4 border-t border-border flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{selected.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{selected.address}</p>
+                        </div>
+                        <Button asChild size="sm" variant="outline">
+                          <a href={directionsUrl(selected)} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-1.5" /> Direcções</a>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {selected && fotos.length > 0 && (
+                    <StoreGallery
+                      photos={fotos}
+                      storeName={selected.name}
+                      className="rounded-2xl border border-border bg-background p-4"
+                    />
                   )}
                 </div>
               </div>

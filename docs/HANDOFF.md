@@ -2,6 +2,73 @@
 
 Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Fotografias das lojas (2026-11-13, ramo `claude/beautiful-maxwell-1q8dks`)
+
+- **Pedido do dono:** as fotografias da loja do Huambo e os contactos dela; as das outras lojas
+  vêm a seguir. Resposta à pergunta dos dois números: o mesmo (923 428 459) para chamadas e para
+  WhatsApp.
+- **As fotografias** ficam no próprio site, em `app/web/public/images/lojas/`, em WebP de 1280 e
+  480 px geradas por `python3 scripts/imagens/lojas.py <slug> <foto...>`. Servidas pelo site, e
+  não por Storage, entram no CSP (`img-src 'self'`) sem excepções. Das cinco que a loja mandou
+  entraram quatro: a quinta repetia o balcão da primeira.
+- **Base de dados:** `20261113103000_fotografias_das_lojas`, **por aplicar** (vai no merge).
+  Junta `physical_stores.gallery` (jsonb, lista de `{url, caption}`, no máximo 24 e 4 KB) e põe
+  as do Huambo, a miniatura e o telefone — que estava vazio desde a limpeza dos números
+  provisórios. Só escreve onde o campo está vazio, por isso não desfaz nada que o painel tenha
+  entretanto guardado.
+- **Site:** a página das lojas mostra as fotografias da loja escolhida (`StoreGallery.jsx`, abre
+  em grande com legenda e setas) e a miniatura do cartão passa a pedir a variante de 480 px.
+- **Huíla (Lubango), a seguir:** as cinco fotografias que a loja mandou (fachada, equipa,
+  prateleiras, livros ao perto, balcão) e o horário que está escrito na porta — segunda a quinta
+  8h–17h30, sexta, domingo e feriados 8h–13h. Migração `20261113143000_fotografias_do_lubango`,
+  também **por aplicar**. Substitui o horário de omissão do painel («Seg–Sex 9h–18h, Sáb
+  9h–13h»), que punha a loja aberta ao sábado; um horário escrito à mão fica como está. Sem
+  telefone: a loja ainda não deu nenhum.
+- **A galeria passou para o painel** (Lojas → editar → «Fotografias da loja»,
+  `components/admin/StoreGalleryField.jsx`): juntar, remover, reordenar e legendar, com a
+  fotografia a ir para o Storage (pasta `physical_stores`, permissão «Configurações»). Até 12
+  fotografias e legendas de 80 caracteres, por folga sobre a restrição da coluna — o painel
+  avisa antes de a base de dados recusar, e não deixa guardar com um envio a meio. A lista das
+  lojas ganhou o número de fotografias e o filtro «Sem fotografias».
+- **Na Google:** `/lojas` passa a levar um bloco JSON-LD por loja (`Store`, em
+  `lib/structuredData.js`) com morada, telefone, coordenadas, mapa e fotografias, ligado à
+  `Organization` que o `index.html` declara. Quem procura «livraria adventista no Huambo» vê a
+  morada e uma fotografia, em vez de uma linha de texto. Os endereços são sempre os do domínio
+  oficial, mesmo numa pré-visualização. O horário fica de fora de propósito: o `openingHours`
+  do schema.org tem escrita própria e a ficha guarda uma frase em português.
+- **O que as fotografias custam a descarregar:** o rodapé (que está em todas as páginas) pedia
+  a fotografia da loja em tamanho grande e sem `lazy` — com lojas sem fotografia isso não custava
+  nada, com fotografias passava a custar. Leva agora `loading="lazy"` e a variante de 480 px,
+  como o menu grande. Playwright 21/21, com um teste novo que conta os pedidos à rede.
+- **Sem miniatura escolhida**, o cartão da loja passa a usar a primeira fotografia da galeria
+  (`fotoDaLoja`, em `lib/stores.js`): quem carrega quatro fotografias no painel não pensa que
+  ainda falta escolher uma «foto da loja», e o cartão ficava com as iniciais. O campo da
+  miniatura continua a mandar quando está preenchido, e o formulário continua a editar só esse
+  campo — mostrar-lhe a fotografia da galeria copiava-a para lá ao guardar.
+- **No checkout**, quem escolhe levantar na loja vê agora a fotografia e o horário de cada uma,
+  e não só o nome e a morada: é a porta a que vai bater e as horas a que a pode encontrar
+  aberta. O teste do levantamento passou a confirmar o horário.
+- **Catumbela (Benguela):** as cinco que a loja mandou — entrada, equipa, balcão, estante das
+  Bíblias e os lenços de Desbravadores e Aventureiros. Migração
+  `20261113163000_fotografias_de_catumbela`, **por aplicar**, sem miniatura escrita (usa a
+  primeira da galeria) e sem telefone nem horário, que a loja ainda não deu. As fotografias
+  trazem a marca de água da Centralidade do Luhongo, de quem as tirou.
+- **O quadro da loja é um mosaico** (`StoreGallery.jsx`, com a regra das peças em
+  `mosaicoDaGaleria`): a primeira fotografia grande, com a legenda sobre ela, e as outras em
+  volta. Mostram-se nove; acima disso a última peça conta as que faltam («+4») e abre a galeria
+  aí. A regra está provada em teste de uma a nove fotografias: nenhuma linha fica com um buraco
+  no canto. O limite do painel subiu de 12 para 20 fotografias por loja (a coluna aguenta 24 e
+  4 KB) — mostrar todas de uma vez é que não fazia sentido, e deixou de ser preciso.
+- **A galeria aberta** (a que o mosaico abre) ganhou a tira de miniaturas por baixo, com a
+  fotografia a ser vista marcada e trazida para o meio da tira, e o arrastar do dedo no
+  telemóvel. Com uma dúzia de fotografias, andar de seta em seta era o único caminho. Dois
+  pormenores que só se viram no navegador: sem `min-w-0` na figura, a tira alargava o diálogo e
+  o contador saía pela borda fora; e centrar a miniatura tem de esperar dois desenhos, senão o
+  foco que o diálogo põe ao abrir arrasta a tira de volta ao princípio.
+- **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
+  pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
+  (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.
+
 ## Análise geral e melhorias (2026-11-10, ramo `claude/clever-carson-ibv73h`)
 
 - **Pedido do dono:** "fazer uma análise em todo o sistema e melhorar onde for necessário".

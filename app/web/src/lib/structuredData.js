@@ -1,4 +1,4 @@
-// Dados estruturados (schema.org, em JSON-LD) da ficha de cada produto.
+// Dados estruturados (schema.org, em JSON-LD) da ficha de cada produto e das lojas físicas.
 //
 // Para que serve: a Google lê o preço, a disponibilidade, o autor e o caminho (Início › Loja ›
 // género) e pode mostrá-los nos resultados, em vez de uma linha de texto solto. O `index.html`
@@ -6,6 +6,10 @@
 //
 // Funções puras, sem React nem rede, para os testes. A página passa o produto tal como vem de
 // `api/EcommerceApi.js` (preços em cêntimos, `images: [{ url }]`, `purchasable`…).
+
+import { localDigits } from '@/lib/angolaPhone';
+import { CANONICAL_ORIGIN } from '@/lib/canonicalHost';
+import { hasCoords, storeGallery } from '@/lib/stores';
 
 export const SCHEMA_CURRENCY = 'AOA';
 const SELLER = 'Livraria Adventista';
@@ -115,6 +119,51 @@ export function productJsonLd(product, { origin, variant, isBook = false } = {})
 }
 
 /** O caminho da página (Início › Loja › género › produto), como `BreadcrumbList`. */
+/**
+ * Uma loja física para a Google (`Store`, um tipo de `LocalBusiness`).
+ *
+ * Para que serve: quem procura «livraria adventista no Huambo» vê a morada, o telefone e uma
+ * fotografia no resultado, e a loja pode aparecer no mapa. Sem isto, a página
+ * das lojas era texto solto para quem a lê de fora.
+ *
+ * A morada é uma linha só (é assim que está na base de dados) e a província vai como região.
+ * O telefone sai em formato internacional, que é o que a Google espera. As fotografias são as
+ * da galeria, com a miniatura à frente, em endereço absoluto.
+ *
+ * O horário fica de fora: o `openingHours` do schema.org tem uma escrita própria («Mo-Th
+ * 08:00-17:30») e o que a equipa escreve na ficha é uma frase em português, com feriados pelo
+ * meio. Mandá-la como está era dar à Google um horário que ela não sabe ler — pior do que não
+ * mandar nenhum. O horário continua à vista na página, que é quem o lê.
+ */
+export function storeJsonLd(store, { origin } = {}) {
+  if (!store?.id || !store?.name || !origin) return null;
+  const imagens = [...new Set([store.image_url, ...storeGallery(store).map((f) => f.url)]
+    .map((u) => absoluteUrl(u, origin)).filter(Boolean))];
+  const telefone = localDigits(store.phone || store.whatsapp);
+  const lat = Number(store.latitude);
+  const lng = Number(store.longitude);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name: store.name,
+    url: `${origin}/lojas#${encodeURIComponent(store.id)}`,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: store.address || undefined,
+      addressRegion: store.province || undefined,
+      addressCountry: 'AO',
+    },
+    ...(telefone.length === 9 ? { telephone: `+244${telefone}` } : {}),
+    ...(store.email ? { email: store.email } : {}),
+    ...(imagens.length ? { image: imagens } : {}),
+    ...(hasCoords(store) ? { geo: { '@type': 'GeoCoordinates', latitude: lat, longitude: lng } } : {}),
+    ...(store.maps_url ? { hasMap: store.maps_url } : {}),
+    // Liga a loja à empresa que o `index.html` já declara, para a Google as ler como uma só
+    // casa com várias moradas, e não como seis negócios com o mesmo nome.
+    parentOrganization: { '@id': `${CANONICAL_ORIGIN}/#organizacao` },
+  };
+}
+
 export function breadcrumbJsonLd(items) {
   const list = (items || []).filter((i) => i?.name && i?.url);
   if (list.length < 2) return null;
