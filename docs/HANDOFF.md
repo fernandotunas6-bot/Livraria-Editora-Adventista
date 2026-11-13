@@ -45,6 +45,9 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   ainda falta escolher uma «foto da loja», e o cartão ficava com as iniciais. O campo da
   miniatura continua a mandar quando está preenchido, e o formulário continua a editar só esse
   campo — mostrar-lhe a fotografia da galeria copiava-a para lá ao guardar.
+- **No checkout**, quem escolhe levantar na loja vê agora a fotografia e o horário de cada uma,
+  e não só o nome e a morada: é a porta a que vai bater e as horas a que a pode encontrar
+  aberta. O teste do levantamento passou a confirmar o horário.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.

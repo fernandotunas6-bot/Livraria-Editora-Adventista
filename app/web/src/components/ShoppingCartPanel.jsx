@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
+import StoreThumb from '@/components/StoreThumb';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -775,11 +776,18 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           {...fieldError('pickupStore')}
                         >
                           {physicalStores.map((store) => (
-                            <div key={store.id} className="flex items-center space-x-2 p-2 rounded-lg border text-sm">
+                            // A fotografia e o horário ao lado do nome: quem escolhe levantar
+                            // está a dizer a que porta vai bater, e a morada sozinha não chega
+                            // para a reconhecer nem diz a que horas a loja está aberta.
+                            <div key={store.id} className="flex items-center gap-2 p-2 rounded-lg border text-sm">
                               <RadioGroupItem value={store.name} id={`store-${store.id}`} />
-                              <Label htmlFor={`store-${store.id}`} className="cursor-pointer flex-1">
-                                <span className="font-medium">{store.name}</span>
-                                {store.address && <span className="block text-xs text-muted-foreground">{store.address}</span>}
+                              <Label htmlFor={`store-${store.id}`} className="cursor-pointer flex flex-1 items-center gap-3">
+                                <StoreThumb store={store} className="h-11 w-14 shrink-0 rounded-md" />
+                                <span className="min-w-0 flex-1">
+                                  <span className="font-medium">{store.name}</span>
+                                  {store.address && <span className="block text-xs text-muted-foreground">{store.address}</span>}
+                                  {store.hours && <span className="block text-xs text-muted-foreground">{store.hours}</span>}
+                                </span>
                               </Label>
                             </div>
                           ))}
