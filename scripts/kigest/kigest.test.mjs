@@ -11,6 +11,7 @@ import { prateleira, tipoDeProduto, titulo } from './titulos.mjs';
 import { descricaoEmFalta, gerar } from './migracao.mjs';
 import { catalogoOculto } from './catalogo-oculto.mjs';
 import { aplicarDecisoes, lerDecisoes } from './decisoes.mjs';
+import { gerarDescricoes } from './descricoes.mjs';
 
 const pasta = mkdtempSync(join(tmpdir(), 'kigest-'));
 afterAll(() => { /* a pasta é temporária do sistema; não faz mal ficar */ });
@@ -488,5 +489,70 @@ describe('gerar', () => {
     expect(sql).toContain("'Livro D''algo $kg$ --'");
     // E o preço e o stock entram como números, nunca como texto vindo do ficheiro.
     expect(sql).toMatch(/, 1::numeric, 1::numeric\)/);
+  });
+});
+
+describe('descrições e publicação', () => {
+  const mapa = {
+    novos: [
+      { kigest_ref: 'A', titulo: 'Um Livro', tipo: 'livro', preco: 1000, stock: 2 },
+      { kigest_ref: 'B', titulo: 'Cartão', tipo: 'papelaria', preco: 200, stock: 5 },
+      { kigest_ref: 'C', titulo: 'Outro Livro', tipo: 'livro', preco: 500, stock: 1 },
+    ],
+  };
+  const descricoes = {
+    sem_nome: [{ kigest_ref: 'B', artigo: 'CARTÃO', porque: 'não diz que cartão é' }],
+    descricoes: { A: '<p>Texto do primeiro, com mais de sessenta caracteres a sério para contar.</p>', C: '<p>Texto do terceiro, também com mais de sessenta caracteres para contar.</p>' },
+    por_titulo: { 'Produto Antigo': '<p>Texto escrito para um produto que veio sem descrição.</p>' },
+  };
+  const capas = { A: 'um-livro.webp', C: 'outro-livro.webp' };
+  const correr = (extra = {}) => gerarDescricoes({ mapa, descricoes, capas, capaExiste: () => true, ...extra });
+
+  it('escreve a descrição e a capa de cada produto, pela referência', () => {
+    const { sql, linhas } = correr();
+    expect(linhas.map((l) => l.ref)).toEqual(['A', 'C']);
+    expect(sql).toContain("'https://livrariaadventista.com/images/capas/kigest/um-livro.webp'");
+    expect(sql).toContain('where b.kigest_ref = t.kigest_ref');
+  });
+
+  it('não toca na descrição que já está escrita nem na capa que já é fotografia', () => {
+    const { sql } = correr();
+    expect(sql).toContain("coalesce(btrim(regexp_replace(b.description, '<[^>]*>', '', 'g')), '') = ''");
+    expect(sql).toContain("cover = case when coalesce(b.cover, '') = '' then t.capa else b.cover end");
+  });
+
+  it('deixa de fora quem não tem nome legível, e esse não leva capa nem descrição', () => {
+    const { sql, linhas } = correr();
+    expect(linhas.some((l) => l.ref === 'B')).toBe(false);
+    expect(sql).not.toContain("'Cartão'");
+  });
+
+  it('escreve também as descrições que se ligam pelo título', () => {
+    const { sql, porTitulo } = correr();
+    expect(porTitulo).toEqual(['Produto Antigo']);
+    expect(sql).toContain('lower(btrim(b.title)) = lower(btrim(t.titulo))');
+  });
+
+  it('publica só quem tem preço, capa, descrição e não é vestuário', () => {
+    const { sql } = correr();
+    expect(sql).toContain('set active = true');
+    expect(sql).toContain('coalesce(price, 0) > 0');
+    expect(sql).toContain("coalesce(btrim(cover), '') <> ''");
+    expect(sql).toContain("product_type <> 'vestuario'");
+    // E nunca esconde o que já estava à venda.
+    expect(sql).not.toContain('active = false');
+  });
+
+  it('avisa quando falta a capa de um produto que tem descrição', () => {
+    const { semCapa, linhas } = correr({ capaExiste: (f) => f !== 'outro-livro.webp' });
+    expect(semCapa.map((n) => n.kigest_ref)).toEqual(['C']);
+    expect(linhas.map((l) => l.ref)).toEqual(['A']);
+  });
+
+  it('avisa quando falta a descrição de um produto', () => {
+    const { semTexto } = gerarDescricoes({
+      mapa, capas, descricoes: { ...descricoes, descricoes: { A: descricoes.descricoes.A } },
+    });
+    expect(semTexto.map((n) => n.kigest_ref)).toEqual(['C']);
   });
 });

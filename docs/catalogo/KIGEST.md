@@ -32,10 +32,28 @@ node scripts/kigest/migracao.mjs KIGEST-exportacao-<data>.kigest \
   --mapa docs/catalogo/mapa-kigest-<AAAAMMDD>.json
 ```
 
-4. **Ler o relatório antes de abrir o PR.** É onde está o que precisa de decisão: preços que
-   mudam, artigos que o mesmo nome não distingue, stock que não pode estar certo.
-5. Abrir o PR com a migração, o relatório e o mapa. Publica-se como todas as outras: o merge no
-   `main` corre o Actions, que aplica a migração.
+4. **Ler o relatório antes de seguir.** É onde está o que precisa de decisão: preços que mudam,
+   artigos que o mesmo nome não distingue, stock que não pode estar certo. As decisões tomadas
+   escrevem-se em `docs/catalogo/kigest-decisoes.json`, cada uma com a prova, e o passo 3
+   corre-se outra vez.
+5. Gerar as capas dos produtos novos:
+
+```bash
+python3 scripts/catalogo/capa_tipografica.py docs/catalogo/mapa-kigest-<data>.json
+```
+
+6. Escrever a migração das descrições, das capas e da publicação:
+
+```bash
+node scripts/kigest/descricoes.mjs docs/catalogo/mapa-kigest-<data>.json --sql supabase/migrations/<AAAAMMDDHHMMSS>_kigest_descricoes_e_publicacao.sql
+```
+
+   Recusa escrever enquanto faltar a descrição ou a capa de algum produto, e é de propósito: um
+   produto publicado sem descrição é uma página que repete o título três vezes. Escreva as que
+   faltarem em `docs/catalogo/descricoes-kigest.json` e corra outra vez.
+
+7. Abrir o PR com as migrações, o relatório e o mapa. Publica-se como todas as outras: o merge
+   no `main` corre o Actions, que aplica as migrações.
 
 O script não escreve na base de dados. Lê o catálogo do site com a chave pública — só o que
 qualquer visitante lê — e escreve ficheiros.
@@ -107,34 +125,49 @@ exportação seguinte passa a emparelhá-lo por ela.
 
 ## Os produtos que a loja tem e o site não
 
-Na primeira conciliação eram 225, depois de postos de lado 2 repetidos do próprio KiGest, 11 que
-davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão os dois «Cordeirinho»)
-e 1 cujo título corrigido já existia no catálogo. Entram todos
-**ocultos** — `active = false`, sem capa e sem descrição — com o preço e o stock da loja. Não se
-põe um produto à venda sem fotografia e sem uma linha a dizer o que é.
+Na primeira conciliação eram 189, depois de postos de lado 8 repetidos do próprio KiGest e 5 que
+davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão os dois
+«Cordeirinho»). Entram com o preço e o stock da loja, e com duas coisas que lhes faltavam:
 
-Antes de publicar cada um, no painel:
+- **A descrição.** Estão escritas à mão em `docs/catalogo/descricoes-kigest.json`, uma a uma —
+  179 para estes e 28 para os que a migração das fotografias trouxe sem texto. Cada uma diz o
+  que o produto é, para que serve e quem o usa, e nada mais: nenhum número que não esteja na
+  ficha, nenhuma promessa de conteúdo que ninguém confirmou.
+- **A capa.** Não há fotografia de nenhum deles. O `scripts/catalogo/capa_tipografica.py` gera
+  uma capa tipográfica por produto no desenho da casa — o gradiente, o emblema e a moldura da
+  `capa-por-definir.webp` — com o título no lugar onde aquela diz «Capa por definir». Vê-se que
+  é tipográfica: não imita a arte da editora. Quando houver fotografia, substitui-se no painel.
+  O ficheiro de cada produto fica em `docs/catalogo/capas-kigest.json`, que é o que a migração
+  lê: dois títulos diferentes podem dar o mesmo nome de ficheiro.
 
-1. **Ler o título.** Vem do KiGest com a caixa arrumada e as gralhas conhecidas corrigidas
-   (`scripts/kigest/titulos.mjs`), mas o que não se conseguiu confirmar ficou como veio — e há
-   nomes que só quem tem o produto na mão decifra («TORSAL», «REGRAS PARA QUE»).
-2. **Pôr a capa** e escrever a descrição. Sem ela, a página do produto, o resultado no Google e
-   a partilha no WhatsApp ficam todos a repetir o título.
-3. **Corrigir o editor.** Entram com «Livraria e Editora Adventista», que é o que o catálogo usa
-   por omissão; onde o livro é de outra editora, muda-se.
-4. **Confirmar o stock** dos que o relatório assinala como improvável (há um folheto com 265 984
-   unidades).
-5. **Tamanhos** nas peças de vestuário, como variantes — senão a t-shirt compra-se sem escolher
-   tamanho.
+E publicam-se. Entra à venda quem tem as quatro coisas: **preço acima de zero, capa, descrição e
+um nome que um cliente consiga ler.** Com isto o catálogo passou de 124 produtos à venda para
+334.
 
-Para publicar em lote os que já estão prontos:
+### Quem fica oculto, e porquê
+
+| Quantos | Porquê | Quem resolve |
+|---:|---|---|
+| 39 | sem preço — o KiGest não tem par para eles | o dono, no painel, ou dá-se-lhes referência no KiGest |
+| 10 | o nome no KiGest não se lê («POR QUE NAO MAS ESTPITA») ou não diz que produto é («CARTÃO», «FOLHETOS») | corrige-se o nome no KiGest e entram na exportação seguinte |
+| 2 | vestuário sem tamanhos — uma t-shirt sem tamanhos compra-se sem escolher o tamanho | põem-se os tamanhos no painel, como variantes |
+
+Os 10 sem nome legível estão na secção `sem_nome` do ficheiro das descrições, cada um com a razão.
+
+Depois de pôr os tamanhos, o vestuário publica-se com:
 
 ```sql
 update public.stock_books set active = true
- where kigest_ref <> '' and price > 0 and coalesce(cover, '') <> ''
-   and coalesce(btrim(regexp_replace(description, '<[^>]*>', '', 'g')), '') <> ''
-   and (product_type <> 'vestuario' or jsonb_array_length(coalesce(versions, '[]'::jsonb)) > 0);
+ where product_type = 'vestuario' and price > 0
+   and jsonb_array_length(coalesce(versions, '[]'::jsonb)) > 0;
 ```
+
+E há duas coisas que continuam a valer a pena fazer no painel, produto a produto:
+
+1. **Corrigir o editor.** Entram com «Livraria e Editora Adventista», que é o que o catálogo usa
+   por omissão; onde o livro é de outra editora, muda-se.
+2. **Confirmar o stock** dos que o relatório assinala como improvável (há um folheto com 265 984
+   unidades).
 
 ## Ficheiros
 
@@ -143,7 +176,13 @@ update public.stock_books set active = true
 | `scripts/kigest/exportacao.mjs` | Lê o `.kigest` e devolve produto, preço e existência |
 | `scripts/kigest/titulos.mjs` | Caixa, gralhas, tipo de produto e prateleira |
 | `scripts/kigest/conciliar.mjs` | Emparelha, separa o ambíguo, apanha os repetidos |
+| `scripts/kigest/decisoes.mjs` | Aplica as decisões tomadas à mão, cada uma com a prova |
 | `scripts/kigest/migracao.mjs` | Escreve a migração, o relatório e o mapa |
+| `scripts/kigest/descricoes.mjs` | Escreve a migração das descrições, das capas e da publicação |
+| `scripts/catalogo/capa_tipografica.py` | Gera uma capa tipográfica por produto sem fotografia |
+| `docs/catalogo/descricoes-kigest.json` | As descrições, escritas à mão |
+| `docs/catalogo/kigest-decisoes.json` | As decisões à mão sobre o que o automático não resolve |
+| `docs/catalogo/capas-kigest.json` | Qual é a capa de qual produto |
 | `scripts/kigest/kigest.test.mjs` | Testes dos módulos (correm no `npm test`) |
 | `scripts/pglite/kigest.mjs` | Corre as migrações sobre o esquema real, em PGlite |
 | `docs/catalogo/KIGEST-<data>.md` | O relatório de cada conciliação |

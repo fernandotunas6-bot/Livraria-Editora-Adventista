@@ -26,6 +26,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 RAIZ = Path(__file__).resolve().parents[2]
 DESTINO = RAIZ / 'app/web/public/images/capas/kigest'
+# O índice de quem é a capa de quem. É ele que a migração lê (scripts/kigest/descricoes.mjs):
+# dois títulos diferentes podem dar o mesmo nome de ficheiro, e sem o índice o segundo produto
+# ficava com a capa do primeiro.
+INDICE = RAIZ / 'docs/catalogo/capas-kigest.json'
+# Os produtos cujo nome no KiGest não se lê não levam capa nem descrição, e não se publicam:
+# ficam na lista `sem_nome` do ficheiro das descrições.
+DESCRICOES = RAIZ / 'docs/catalogo/descricoes-kigest.json'
 EMBLEMA = RAIZ / 'app/web/public/logo-icon.png'
 
 # Medidas e cores lidas da capa-por-definir.webp, para as duas ficarem da mesma família.
@@ -134,18 +141,29 @@ def main():
     if len(sys.argv) < 2:
         raise SystemExit('uso: capa_tipografica.py <mapa-kigest-<data>.json>')
     mapa = json.loads(Path(sys.argv[1]).read_text('utf8'))
+    sem_nome = set()
+    if DESCRICOES.exists():
+        sem_nome = {x['kigest_ref'] for x in json.loads(DESCRICOES.read_text('utf8')).get('sem_nome', [])}
     DESTINO.mkdir(parents=True, exist_ok=True)
-    vistos, feitas = {}, 0
+    vistos, indice = {}, {}
     for produto in mapa['novos']:
+        if produto['kigest_ref'] in sem_nome:
+            continue
         nome = ficheiro_de(produto['titulo'])
         if nome in vistos:
             # Dois títulos diferentes a dar o mesmo nome de ficheiro: o segundo leva a
             # referência do KiGest ao fim, para não escrever por cima do primeiro.
             nome = f'{nome[:-5]}-{produto["kigest_ref"].lower()}.webp'
         vistos[nome] = produto['titulo']
+        indice[produto['kigest_ref']] = nome
         capa(produto['titulo']).save(DESTINO / nome, 'WEBP', quality=82, method=6)
-        feitas += 1
-    print(f'{feitas} capas em {DESTINO.relative_to(RAIZ)}')
+    # Apaga as capas que já não têm produto: a lista muda de exportação para exportação.
+    for antiga in sorted(DESTINO.glob('*.webp')):
+        if antiga.name not in vistos:
+            antiga.unlink()
+    INDICE.write_text(json.dumps(indice, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    print(f'{len(indice)} capas em {DESTINO.relative_to(RAIZ)}'
+          f' ({len(sem_nome)} sem nome legível ficaram de fora)')
 
 
 if __name__ == '__main__':

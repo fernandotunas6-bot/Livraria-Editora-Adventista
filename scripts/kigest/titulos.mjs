@@ -117,6 +117,9 @@ const REGRAS = [
   [/\bhinari|\bhinário/i, 'musica'],
   [/\bb[ií]blias?\b|\bb[ií]bia\b|novo testamento/i, 'biblia'],
   [/len[çc]o|emblema|distintivo|apito|cord[ãa]o|prendedor|torsal|insignia|ins[íi]gnia/i, 'desbravadores'],
+  // As classes dos Aventureiros e dos Desbravadores: cada uma tem o seu cartão de registo, e
+  // no KiGest estão lançadas só pelo nome da classe, a 250 Kz.
+  [/^(abelhinhas?|luminares|edificadores|m[ãa]os ajudadoras|cordeirinhos?|passarinhos?|amigos?|companheiros?|pesquisadores?|pioneiros?|excursionistas?|guias?)$/i, 'desbravadores'],
   [/t-?shirt|t-?chert|camis|blusa|gravata|farda/i, 'vestuario'],
   [/revista|trimes/i, 'revista'],
   [/cart[ãa]o|cart[õo]es|certificado|envelope|folheto|brochura|bloco|factura|cat[áa]logo|livro de (acta|registro|registo)/i, 'papelaria'],
@@ -131,7 +134,8 @@ const PRATELEIRAS = [
   [/santa ceia|vinho|suco de uva|bandeja/i, 'Santa Ceia'],
   [/hinari|hinário/i, 'Hinários'],
   [/\bb[ií]blias?\b|\bb[ií]bia\b|novo testamento/i, 'Bíblias'],
-  [/len[çc]o|emblema|apito|cord[ãa]o|prendedor|desbravador|aventureir|embaixador|\bja\b|cordeirinho|abelhinha|luminares|edificadores/i, 'Desbravadores'],
+  [/len[çc]o|emblema|apito|cord[ãa]o|prendedor|torsal|desbravador|aventureir|embaixador|\bja\b/i, 'Desbravadores'],
+  [/^(abelhinhas?|luminares|edificadores|m[ãa]os ajudadoras|cordeirinhos?|passarinhos?|amigos?|companheiros?|pesquisadores?|pioneiros?|excursionistas?|guias?)$/i, 'Desbravadores'],
   [/t-?shirt|t-?chert|camis|blusa/i, 'Vestuário'],
   [/cart[ãa]o|cart[õo]es|certificado|envelope|folheto|brochura|bloco|factura|cat[áa]logo|livro de (acta|registro|registo)/i, 'Material de Igreja'],
   [/sa[úu]de|aliment|receita|peso|suco|vegetarian|temperan|medicina|corpo|emo[çc]/i, 'Saúde & Estilo de Vida'],

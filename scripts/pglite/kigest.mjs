@@ -22,8 +22,10 @@ import { freshDb, migrationSql } from './base.mjs';
 const dir = process.argv[2];
 const CATALOGO = '20261112140000_catalogo_do_kigest.sql';
 const DESCRICOES = '20261112141000_descricoes_que_faltavam.sql';
+const PUBLICACAO = '20261112142000_kigest_descricoes_e_publicacao.sql';
 const ANTERIOR = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().filter((f) => f < CATALOGO).at(-1).slice(0, 14);
 const mapa = JSON.parse(readFileSync('docs/catalogo/mapa-kigest-20261112.json', 'utf8'));
+const textos = JSON.parse(readFileSync('docs/catalogo/descricoes-kigest.json', 'utf8'));
 // No mapa, quem tem book_code está à venda; quem não tem é um dos que ficaram ocultos.
 const aVenda = mapa.catalogo.filter((p) => p.book_code);
 const ocultos = mapa.catalogo.filter((p) => !p.book_code);
@@ -77,6 +79,7 @@ check('e só os à venda estão activos',
 
 const catalogo = migrationSql(readFileSync(join(dir, CATALOGO), 'utf8'));
 const descricoes = migrationSql(readFileSync(join(dir, DESCRICOES), 'utf8'));
+const publicacao = migrationSql(readFileSync(join(dir, PUBLICACAO), 'utf8'));
 await db.exec(catalogo);
 await db.exec(descricoes);
 
@@ -181,17 +184,62 @@ check('as funções auxiliares da migração não ficaram na base',
   (await q(`select count(*)::int n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
              where ns.nspname = 'private' and p.proname in ('chave_texto', 'texto_simples')`))[0].n === 0);
 
-// 6. O registo da importação.
+// 6. A terceira migração: descrição, capa e publicação.
+const ocultosAntes = (await q('select count(*) filter (where not active)::int n from public.stock_books'))[0].n;
+await db.exec(publicacao);
+const semNome = new Set(textos.sem_nome.map((x) => x.kigest_ref));
+const comTexto = await q(`select kigest_ref, title, product_type, description, cover, active, price
+                            from public.stock_books where kigest_ref <> ''`);
+const novosAgora = comTexto.filter((r) => mapa.novos.some((n) => n.kigest_ref === r.kigest_ref));
+check(`os ${mapa.novos.length} produtos do KiGest estão todos na base`, novosAgora.length === mapa.novos.length, novosAgora.length);
+const comDescricaoNova = novosAgora.filter((r) => !semNome.has(r.kigest_ref));
+check('cada um ficou com descrição e com capa',
+  comDescricaoNova.every((r) => (r.description ?? '').length > 60 && (r.cover ?? '').includes('/capas/kigest/')),
+  comDescricaoNova.filter((r) => !(r.description ?? '').length).map((r) => r.kigest_ref).slice(0, 3));
+check('a descrição não é o título repetido',
+  comDescricaoNova.every((r) => !new RegExp(`^<p>${r.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</p>$`).test(r.description)));
+check(`os ${semNome.size} sem nome legível ficaram sem descrição e ocultos`,
+  novosAgora.filter((r) => semNome.has(r.kigest_ref)).every((r) => (r.description ?? '') === '' && r.active === false),
+  [...semNome].length);
+check('publicaram-se os que têm preço, capa, descrição e nome',
+  comDescricaoNova.filter((r) => r.product_type !== 'vestuario').every((r) => r.active === true),
+  comDescricaoNova.filter((r) => r.product_type !== 'vestuario' && !r.active).map((r) => r.kigest_ref).slice(0, 5));
+check('o vestuário ficou oculto — uma t-shirt sem tamanhos compra-se sem escolher o tamanho',
+  comDescricaoNova.filter((r) => r.product_type === 'vestuario').every((r) => r.active === false));
+// Os que a migração das fotografias deixou ocultos à espera de preço: capa e descrição já
+// tinham, e agora que o KiGest lhes deu preço entram à venda.
+const ocultosComPreco = mapa.ligados.filter((l) => !l.book_code && l.preco_depois > 0);
+const estadoDeles = await q('select title, active, price from public.stock_books where lower(btrim(title)) = any($1::text[])',
+  [ocultosComPreco.map((l) => l.titulo_site.trim().toLowerCase())]);
+check(`os ${ocultosComPreco.length} que esperavam preço desde a migração das fotografias foram publicados`,
+  estadoDeles.length === ocultosComPreco.length && estadoDeles.every((r) => r.active === true),
+  estadoDeles.filter((r) => !r.active).map((r) => r.title).slice(0, 3));
+// E os que continuam sem preço continuam ocultos: ninguém compra um livro a 0 Kz.
+check('quem continua sem preço continua oculto',
+  (await q('select count(*)::int n from public.stock_books where active and coalesce(price, 0) <= 0'))[0].n === 0);
+check('o catálogo à venda cresceu', (await q('select count(*) filter (where active)::int n from public.stock_books'))[0].n > aVenda.length);
+const ocultosDepois = (await q('select count(*) filter (where not active)::int n from public.stock_books'))[0].n;
+check('e o que ficou oculto foi menos do que antes', ocultosDepois < ocultosAntes, { ocultosAntes, ocultosDepois });
+// Uma capa verdadeira posta no painel não é trocada pela tipográfica.
+const [umNovo] = comDescricaoNova;
+await q(`update public.stock_books set cover = 'https://livrariaadventista.com/images/capas/foto-real.jpg', description = '' where kigest_ref = $1`, [umNovo.kigest_ref]);
+await db.exec(publicacao);
+const [reposto] = await q('select cover, description from public.stock_books where kigest_ref = $1', [umNovo.kigest_ref]);
+check('a capa posta à mão fica, e a descrição em falta volta a ser escrita',
+  reposto.cover.endsWith('foto-real.jpg') && reposto.description.length > 60, reposto.cover);
+
+// 7. O registo da importação.
 const [registo] = await q(`select origem, ligados, criados from private.kigest_import order by id desc limit 1`);
 check('a importação ficou registada', registo?.ligados === mapa.ligados.length && registo?.criados === mapa.novos.length, registo);
 
-// 7. Correr outra vez não muda nada nem duplica nada.
+// 8. Correr outra vez não muda nada nem duplica nada.
 const retrato = async () => JSON.stringify(await q(`select book_code, title, kigest_ref, price, stock, isbn, description, active
                                                       from public.stock_books order by book_code`));
 const antesDaSegunda = await retrato();
 await db.exec(catalogo);
 await db.exec(descricoes);
-check('as duas migrações podem correr outra vez sem mudar nada', (await retrato()) === antesDaSegunda);
+await db.exec(publicacao);
+check('as três migrações podem correr outra vez sem mudar nada', (await retrato()) === antesDaSegunda);
 check('e sem duplicar nenhum produto',
   (await q(`select count(*)::int n from public.stock_books`))[0].n === mapa.catalogo.length + mapa.novos.length);
 

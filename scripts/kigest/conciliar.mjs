@@ -108,8 +108,10 @@ export function conciliar(artigosKigest, produtosSite) {
       const candidatos = porCodigo.map((alvo) => ({ nota: 1, alvo }));
       return { artigo, candidatos, pretendentes: candidatos, via: 'codigo' };
     }
-    // 4. Palavras do título.
-    const pa = palavras(tituloBase(nome));
+    // 4. Palavras do título. Do lado do KiGest conta o título INTEIRO: é a parte depois do
+    // travessão que distingue um devocional do outro — «Meditações Diárias — Maravilhoso Deus»
+    // ficava reduzido a «Meditações Diárias» e empatava com todos os devocionais da série.
+    const pa = palavras(nome);
     const pretendentes = site
       .map((alvo) => ({ nota: Math.max(semelhanca(pa, alvo.palavras), semelhanca(pa, alvo.palavrasInteiro)), alvo }))
       .filter((c) => c.nota >= MINIMO_PRETENDENTE)
