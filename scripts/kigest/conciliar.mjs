@@ -75,8 +75,13 @@ export function conciliar(artigosKigest, produtosSite) {
     ean: String(p.isbn ?? '').replace(/\D/g, ''),
     // Já ligado numa conciliação anterior.
     kigestRef: String(p.kigest_ref ?? '').trim(),
+    cpb: String(p.cpb ?? '').trim(),
   }));
   const porRef = new Map(site.filter((s) => s.kigestRef).map((s) => [s.kigestRef, s]));
+  // O id do produto na loja da editora. Em muitos artigos o KiGest usa-o como referência, e a
+  // ronda das fotografias (scripts/catalogo/produtos.py) guardou-o para 44 produtos do site:
+  // quando os dois batem, é o mesmo produto e não há nada a adivinhar.
+  const porCpb = new Map(site.filter((s) => s.cpb).map((s) => [String(s.cpb), s]));
   const porEan = new Map();
   for (const s of site) if (s.ean.length === 13) (porEan.get(s.ean) ?? porEan.set(s.ean, []).get(s.ean)).push(s);
 
@@ -84,13 +89,16 @@ export function conciliar(artigosKigest, produtosSite) {
     // 1. Já ligado pelo kigest_ref: é a chave boa e dispensa adivinhar.
     const ligado = porRef.get(artigo.ref);
     if (ligado) return { artigo, candidatos: [{ nota: 1, alvo: ligado }], pretendentes: [], via: 'ref' };
-    // 2. Mesmo código de barras de 13 dígitos nos dois lados.
+    // 2. Mesmo id na loja da editora.
+    const pelaEditora = porCpb.get(artigo.ref);
+    if (pelaEditora) return { artigo, candidatos: [{ nota: 1, alvo: pelaEditora }], pretendentes: [], via: 'cpb' };
+    // 3. Mesmo código de barras de 13 dígitos nos dois lados.
     const porCodigo = artigo.ean ? porEan.get(artigo.ean) ?? [] : [];
     if (porCodigo.length > 0) {
       const candidatos = porCodigo.map((alvo) => ({ nota: 1, alvo }));
       return { artigo, candidatos, pretendentes: candidatos, via: 'codigo' };
     }
-    // 3. Palavras do título.
+    // 4. Palavras do título.
     const pa = palavras(artigo.descricao);
     const pretendentes = site
       .map((alvo) => ({ nota: semelhanca(pa, alvo.palavras), alvo }))
