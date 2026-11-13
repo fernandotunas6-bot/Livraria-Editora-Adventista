@@ -48,6 +48,11 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
 - **No checkout**, quem escolhe levantar na loja vê agora a fotografia e o horário de cada uma,
   e não só o nome e a morada: é a porta a que vai bater e as horas a que a pode encontrar
   aberta. O teste do levantamento passou a confirmar o horário.
+- **Catumbela (Benguela):** as cinco que a loja mandou — entrada, equipa, balcão, estante das
+  Bíblias e os lenços de Desbravadores e Aventureiros. Migração
+  `20261113163000_fotografias_de_catumbela`, **por aplicar**, sem miniatura escrita (usa a
+  primeira da galeria) e sem telefone nem horário, que a loja ainda não deu. As fotografias
+  trazem a marca de água da Centralidade do Luhongo, de quem as tirou.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.
