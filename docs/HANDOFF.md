@@ -24,8 +24,15 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   também **por aplicar**. Substitui o horário de omissão do painel («Seg–Sex 9h–18h, Sáb
   9h–13h»), que punha a loja aberta ao sábado; um horário escrito à mão fica como está. Sem
   telefone: a loja ainda não deu nenhum.
-- **Para a loja seguinte:** correr o script com o slug da loja e juntar uma migração que escreva
-  a `gallery` dessa loja — o painel ainda não tem onde carregar a galeria (só a miniatura).
+- **A galeria passou para o painel** (Lojas → editar → «Fotografias da loja»,
+  `components/admin/StoreGalleryField.jsx`): juntar, remover, reordenar e legendar, com a
+  fotografia a ir para o Storage (pasta `physical_stores`, permissão «Configurações»). Até 12
+  fotografias e legendas de 80 caracteres, por folga sobre a restrição da coluna — o painel
+  avisa antes de a base de dados recusar, e não deixa guardar com um envio a meio. A lista das
+  lojas ganhou o número de fotografias e o filtro «Sem fotografias».
+- **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
+  pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
+  (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.
 
 ## Análise geral e melhorias (2026-11-10, ramo `claude/clever-carson-ibv73h`)
 

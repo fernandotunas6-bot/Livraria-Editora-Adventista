@@ -103,3 +103,44 @@ export function storeGallery(store) {
     }))
     .filter((f) => f.url);
 }
+
+/**
+ * Limites da galeria, iguais aos da base de dados (20261113103000_fotografias_das_lojas: no
+ * máximo 24 fotografias e 4 KB na coluna). Aqui são mais apertados de propósito: uma loja com
+ * doze fotografias já se mostra toda, e as legendas curtas cabem na linha por baixo da imagem.
+ * Com estes números a coluna nunca se aproxima dos 4 KB, por isso o painel nunca leva com o
+ * erro da restrição — que não diria à equipa o que fazer.
+ */
+export const GALERIA_MAX_FOTOS = 12;
+export const GALERIA_MAX_LEGENDA = 80;
+/** Folga para a restrição da coluna (4 KB), com margem para o que o jsonb acrescenta. */
+const GALERIA_MAX_BYTES = 3400;
+
+/** A galeria pronta para guardar: sem entradas vazias, legendas aparadas e dentro do limite. */
+export function galeriaParaGuardar(photos) {
+  return (Array.isArray(photos) ? photos : [])
+    .map((f) => ({ url: String(f?.url || '').trim(), caption: String(f?.caption || '').trim().slice(0, GALERIA_MAX_LEGENDA) }))
+    .filter((f) => f.url && !f.url.startsWith('blob:'))
+    .slice(0, GALERIA_MAX_FOTOS);
+}
+
+/**
+ * O que impede esta galeria de ser guardada, por extenso, ou '' se não houver nada.
+ *
+ * Uma fotografia ainda a ser enviada é um `blob:` — um endereço que só existe neste
+ * navegador. Guardá-lo deixava a loja com uma imagem partida para toda a gente menos para quem
+ * a carregou.
+ */
+export function erroDaGaleria(photos) {
+  const lista = Array.isArray(photos) ? photos : [];
+  if (lista.some((f) => String(f?.url || '').startsWith('blob:'))) {
+    return 'Há uma fotografia ainda a ser enviada. Espere que termine.';
+  }
+  if (lista.length > GALERIA_MAX_FOTOS) {
+    return `A galeria leva no máximo ${GALERIA_MAX_FOTOS} fotografias.`;
+  }
+  if (JSON.stringify(galeriaParaGuardar(lista)).length > GALERIA_MAX_BYTES) {
+    return 'As fotografias e as legendas ocupam demasiado espaço. Tire alguma ou encurte as legendas.';
+  }
+  return '';
+}

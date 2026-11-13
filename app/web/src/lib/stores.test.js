@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { lojaSrcSet, storeGallery } from './stores';
+import {
+  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, erroDaGaleria, galeriaParaGuardar, lojaSrcSet, storeGallery,
+} from './stores';
 
 describe('lojaSrcSet', () => {
   it('dá as duas variantes de uma fotografia do próprio site', () => {
@@ -46,5 +48,58 @@ describe('storeGallery', () => {
   it('deita fora as entradas sem URL', () => {
     expect(storeGallery({ gallery: [{ caption: 'sem ficheiro' }, '/b.webp', null] }))
       .toEqual([{ url: '/b.webp', caption: '' }]);
+  });
+});
+
+describe('galeriaParaGuardar', () => {
+  it('apara as legendas e deita fora as entradas vazias', () => {
+    expect(galeriaParaGuardar([
+      { url: ' /a.webp ', caption: '  Balcão  ' },
+      { url: '', caption: 'sem ficheiro' },
+      { url: '/b.webp' },
+    ])).toEqual([{ url: '/a.webp', caption: 'Balcão' }, { url: '/b.webp', caption: '' }]);
+  });
+
+  it('corta a legenda ao limite', () => {
+    const [foto] = galeriaParaGuardar([{ url: '/a.webp', caption: 'x'.repeat(200) }]);
+    expect(foto.caption).toHaveLength(GALERIA_MAX_LEGENDA);
+  });
+
+  it('não guarda fotografias ainda a ser enviadas', () => {
+    expect(galeriaParaGuardar([{ url: 'blob:http://localhost/abc' }, { url: '/a.webp' }]))
+      .toEqual([{ url: '/a.webp', caption: '' }]);
+  });
+
+  it('fica-se pelo número máximo de fotografias', () => {
+    const muitas = Array.from({ length: 20 }, (_, i) => ({ url: `/${i}.webp` }));
+    expect(galeriaParaGuardar(muitas)).toHaveLength(GALERIA_MAX_FOTOS);
+  });
+
+  it('aguenta o que não é lista', () => {
+    expect(galeriaParaGuardar(null)).toEqual([]);
+  });
+});
+
+describe('erroDaGaleria', () => {
+  it('não vê problema numa galeria normal', () => {
+    expect(erroDaGaleria([{ url: '/a.webp', caption: 'Balcão' }])).toBe('');
+    expect(erroDaGaleria([])).toBe('');
+  });
+
+  it('avisa enquanto uma fotografia está a ser enviada', () => {
+    expect(erroDaGaleria([{ url: 'blob:http://localhost/abc' }])).toMatch(/a ser enviada/);
+  });
+
+  it('avisa quando passa do número máximo', () => {
+    const muitas = Array.from({ length: GALERIA_MAX_FOTOS + 1 }, (_, i) => ({ url: `/${i}.webp` }));
+    expect(erroDaGaleria(muitas)).toMatch(/no máximo/);
+  });
+
+  it('avisa quando ocupa espaço a mais, antes de a base de dados recusar', () => {
+    const grandes = Array.from({ length: GALERIA_MAX_FOTOS }, (_, i) => ({
+      url: `https://exemplo.invalid/storage/v1/object/public/media/physical_stores/uploads/${'x'.repeat(200)}-${i}.webp`,
+      caption: 'y'.repeat(GALERIA_MAX_LEGENDA),
+    }));
+    expect(erroDaGaleria(grandes)).toMatch(/espaço/);
   });
 });

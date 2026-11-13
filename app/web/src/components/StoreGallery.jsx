@@ -51,7 +51,15 @@ export default function StoreGallery({ photos, storeName, className = '' }) {
       </ul>
 
       <Dialog open={aberta != null} onOpenChange={(o) => !o && setAberta(null)}>
-        <DialogContent className="max-w-3xl p-2 sm:p-3">
+        {/* As setas do teclado andam na galeria, como em qualquer visualizador de fotografias;
+            o Escape fecha-a (do próprio diálogo). */}
+        <DialogContent
+          className="max-w-3xl p-2 sm:p-3"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') { e.preventDefault(); andar(1); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); andar(-1); }
+          }}
+        >
           <DialogTitle className="sr-only">{`${storeName} — fotografia ${(aberta ?? 0) + 1} de ${total}`}</DialogTitle>
           <DialogDescription className="sr-only">{actual?.caption || 'Fotografia da loja'}</DialogDescription>
           {actual && (
