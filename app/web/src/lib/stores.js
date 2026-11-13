@@ -144,3 +144,16 @@ export function erroDaGaleria(photos) {
   }
   return '';
 }
+
+/**
+ * A fotografia que representa a loja: a que foi escolhida como miniatura, ou, se não houver, a
+ * primeira da galeria.
+ *
+ * Quem carrega quatro fotografias de uma loja no painel não pensa que ainda falta escolher uma
+ * «foto da loja» — e sem ela o cartão ficava com as iniciais, como se a loja não tivesse
+ * fotografia nenhuma. O campo da miniatura continua a mandar quando está preenchido: é assim
+ * que se escolhe outra que não a primeira.
+ */
+export function fotoDaLoja(store) {
+  return String(store?.image_url || '').trim() || storeGallery(store)[0]?.url || '';
+}

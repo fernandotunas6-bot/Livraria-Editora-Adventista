@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Store } from 'lucide-react';
 import { iniciaisDaLoja } from '@/lib/localizacao';
-import { lojaSrcSet } from '@/lib/stores';
+import { fotoDaLoja, lojaSrcSet } from '@/lib/stores';
 
 /**
  * A miniatura de uma loja — ou o que fica no lugar dela.
+ *
+ * A fotografia é a miniatura escolhida ou, se não houver, a primeira da galeria (`fotoDaLoja`).
  *
  * Nenhuma das lojas tem fotografia carregada, e o que aparecia era um quadrado cinzento com
  * o mesmo ícone em todas: quatro cartões indistinguíveis à primeira vista. O lugar reservado
@@ -16,7 +18,7 @@ import { lojaSrcSet } from '@/lib/stores';
  * justamente o que ficava pior.
  */
 export default function StoreThumb({ store, className = '' }) {
-  const url = store?.image_url;
+  const url = fotoDaLoja(store);
   // A miniatura nunca passa dos 96 px: com `srcset` o navegador fica-se pela variante de 480 px
   // das fotografias do próprio site, em vez de descarregar a de 1280.
   const srcSet = lojaSrcSet(url);

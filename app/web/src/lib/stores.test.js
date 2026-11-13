@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, erroDaGaleria, galeriaParaGuardar, lojaSrcSet, storeGallery,
+  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, erroDaGaleria, fotoDaLoja, galeriaParaGuardar, lojaSrcSet,
+  storeGallery,
 } from './stores';
 
 describe('lojaSrcSet', () => {
@@ -101,5 +102,22 @@ describe('erroDaGaleria', () => {
       caption: 'y'.repeat(GALERIA_MAX_LEGENDA),
     }));
     expect(erroDaGaleria(grandes)).toMatch(/espaço/);
+  });
+});
+
+describe('fotoDaLoja', () => {
+  it('usa a miniatura escolhida', () => {
+    expect(fotoDaLoja({ image_url: '/escolhida.webp', gallery: [{ url: '/primeira.webp' }] }))
+      .toBe('/escolhida.webp');
+  });
+
+  it('sem miniatura, usa a primeira da galeria', () => {
+    expect(fotoDaLoja({ image_url: '', gallery: [{ url: '/primeira.webp' }, { url: '/outra.webp' }] }))
+      .toBe('/primeira.webp');
+  });
+
+  it('sem nada, não devolve nada', () => {
+    expect(fotoDaLoja({ image_url: '   ' })).toBe('');
+    expect(fotoDaLoja(null)).toBe('');
   });
 });

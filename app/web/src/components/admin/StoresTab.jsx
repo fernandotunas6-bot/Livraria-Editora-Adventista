@@ -24,7 +24,7 @@ import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone, displayAngolaPhone } from '@/lib/angolaPhone';
 import { ANGOLA_PROVINCES_2024, avisoDeCoordenadas } from '@/lib/angolaGeo';
 import { distanciaKm } from '@/lib/localizacao';
-import { erroDaGaleria, galeriaParaGuardar, hasCoords, mapsUrl, mapEmbedUrl, parseCoords, storeGallery } from '@/lib/stores';
+import { erroDaGaleria, fotoDaLoja, galeriaParaGuardar, hasCoords, mapsUrl, mapEmbedUrl, parseCoords, storeGallery } from '@/lib/stores';
 
 const ANGOLA_PROVINCES = ANGOLA_PROVINCES_2024;
 
@@ -90,7 +90,12 @@ export default function StoresTab() {
   useEffect(() => { load(); }, [load]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const imageOf = (s) => s.image_url || (s.image ? pb.files.getURL(s, s.image) : '');
+  // A miniatura mesmo guardada na loja — é esta que o formulário edita.
+  const miniaturaOf = (s) => s.image_url || (s.image ? pb.files.getURL(s, s.image) : '');
+  // No cartão da lista vê-se o que o site mostra: a miniatura ou, na falta dela, a primeira
+  // fotografia da galeria. Se o cartão mostrasse esta no campo do formulário, guardar a loja
+  // copiava para a miniatura uma fotografia que ninguém escolheu para isso.
+  const imageOf = (s) => miniaturaOf(s) || fotoDaLoja(s);
 
   const stats = useMemo(() => ({
     total: stores.length,
@@ -140,7 +145,7 @@ export default function StoresTab() {
       whatsapp: s.whatsapp ? formatAngolaPhone(s.whatsapp) : '',
       email: s.email || '',
       hours: s.hours || '',
-      image_url: imageOf(s),
+      image_url: miniaturaOf(s),
       gallery: storeGallery(s),
       latitude: hasCoords(s) ? s.latitude : '',
       longitude: hasCoords(s) ? s.longitude : '',

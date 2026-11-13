@@ -78,7 +78,7 @@ const LOJAS = [
   {
     id: 'loja-huambo', name: 'Loja do Huambo', province: 'Huambo', address: 'Av. da Independência, 40',
     phone: '+244 923 428 459', whatsapp: '+244 923 428 459',
-    image_url: '/images/lojas/huambo-1.webp',
+    image_url: '',
     gallery: [
       { url: '/images/lojas/huambo-1.webp', caption: 'Balcão de atendimento' },
       { url: '/images/lojas/huambo-2.webp', caption: 'A equipa da loja' },

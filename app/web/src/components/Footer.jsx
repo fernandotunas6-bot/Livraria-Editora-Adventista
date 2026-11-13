@@ -10,7 +10,7 @@ import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
 import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
-import { lojaSrcSet } from '@/lib/stores';
+import { fotoDaLoja, lojaSrcSet } from '@/lib/stores';
 import SafeLink from '@/components/SafeLink.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -426,14 +426,14 @@ const Footer = () => {
                   <div className="space-y-4">
                     {list.map((store) => (
                       <div key={store.id} className="rounded-xl overflow-hidden bg-background/5 border border-background/10">
-                        {store.image_url && (
+                        {fotoDaLoja(store) && (
                           // O rodapé está em todas as páginas: sem `lazy` estas fotografias eram
                           // descarregadas em cada visita, mesmo por quem nunca chega ao fundo.
                           // E a caixa tem 112 px de altura — o `srcset` manda vir a variante de
                           // 480 px em vez dos 1280 do original.
                           <img
-                            src={store.image_url}
-                            srcSet={lojaSrcSet(store.image_url) || undefined}
+                            src={fotoDaLoja(store)}
+                            srcSet={lojaSrcSet(fotoDaLoja(store)) || undefined}
                             sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 90vw"
                             alt={store.name}
                             loading="lazy"

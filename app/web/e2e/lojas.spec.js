@@ -51,6 +51,8 @@ test('o rodapé só desce a fotografia da loja quando se chega lá, e em pequeno
   expect(pedidas, 'fotografias das lojas descarregadas sem se ter chegado ao rodapé').toEqual([]);
 
   await page.locator('footer').scrollIntoViewIfNeeded();
+  // A loja falsa não tem miniatura escolhida, só galeria: que apareça aqui alguma coisa prova
+  // também que a primeira fotografia da galeria faz as vezes dela (`fotoDaLoja`).
   await expect.poll(() => pedidas.length, { message: 'a fotografia da loja no rodapé' }).toBeGreaterThan(0);
   // A caixa do rodapé tem 112 px de altura: o `srcset` tem de trazer a variante de 480 px e não
   // o original de 1280 (uns 110 KB).

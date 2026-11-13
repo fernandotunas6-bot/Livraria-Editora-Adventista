@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { getFeaturedProducts, getProducts } from '@/api/EcommerceApi';
 import { getCollections, getPhysicalStores } from '@/api/PlatformApi';
-import { lojaSrcSet } from '@/lib/stores';
+import { fotoDaLoja, lojaSrcSet } from '@/lib/stores';
 import { SHOWCASE_CATEGORIES, CATEGORY_SHOP_FILTERS } from '@/lib/catalogCategories';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -273,7 +273,7 @@ export default function MegaMenu() {
           {data.stores.length ? (
             <div className="grid grid-cols-3 gap-4">
               {data.stores.slice(0, 3).map((s) => (
-                <ImageCard key={s.id} to={`/lojas#${s.id}`} image={s.image_url} srcSet={lojaSrcSet(s.image_url)} sizes="240px" title={s.name} subtitle={[s.address, s.province].filter(Boolean).join(' · ')} onNavigate={close} />
+                <ImageCard key={s.id} to={`/lojas#${s.id}`} image={fotoDaLoja(s)} srcSet={lojaSrcSet(fotoDaLoja(s))} sizes="240px" title={s.name} subtitle={[s.address, s.province].filter(Boolean).join(' · ')} onNavigate={close} />
               ))}
               {data.stores.length < 3 && (
                 <Link
