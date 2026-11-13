@@ -45,3 +45,13 @@ livraria Adventista.jpeg
 # Testes de ponta a ponta (Playwright): resultados, capturas e relatório de cada corrida
 app/web/test-results/
 app/web/playwright-report/
+
+# Exportações do KiGest, o programa de facturação da loja. Trazem a base de dados inteira:
+# clientes, facturas, contas correntes e salários. Do catálogo faz-se uma migração (ver
+# docs/catalogo/KIGEST.md); o ficheiro em si nunca vai para o repositório.
+KIGEST-exportacao-*.kigest
+*.kigest
+
+# Python compilado
+__pycache__/
+*.pyc
