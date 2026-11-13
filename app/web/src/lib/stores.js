@@ -62,3 +62,44 @@ export function whatsappLink(phone, text = '') {
   const num = digits.startsWith('244') ? digits : `244${digits.replace(/^0/, '')}`;
   return `https://wa.me/${num}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 }
+
+// Fotografias das lojas (galeria) -------------------------------------------------------------
+//
+// As fotografias chegam das próprias lojas e ficam no site, em dois tamanhos gerados por
+// `scripts/imagens/lojas.py`: `/images/lojas/<ficheiro>.webp` com 1280 px e
+// `/images/lojas/480/<ficheiro>.webp` com 480 px. A miniatura do cartão da loja tem menos de
+// 100 px de largura — sem isto, descarregava os 1280 px (uns 110 KB) para a mostrar aí.
+
+/** Larguras com variante gerada; as mesmas do script `scripts/imagens/lojas.py`. */
+const LARGURAS_LOJA = [480, 1280];
+
+/** `srcset` de uma fotografia de loja guardada no próprio site; vazio para qualquer outra URL. */
+export function lojaSrcSet(url) {
+  const path = String(url || '').split(/[?#]/)[0];
+  if (!/^\/images\/lojas\/[^/]+\.webp$/.test(path)) return '';
+  return LARGURAS_LOJA
+    .map((w) => `${w === 1280 ? path : path.replace('/images/lojas/', `/images/lojas/${w}/`)} ${w}w`)
+    .join(', ');
+}
+
+/**
+ * A galeria de uma loja, sempre como lista de `{ url, caption }`.
+ *
+ * A coluna aceita tanto `["/images/…"]` como `[{ url, caption }]` — quem carrega fotografias de
+ * uma loja nova não tem de escrever legendas — e pode chegar como texto JSON, conforme o
+ * caminho que trouxe o registo. Uma galeria mal formada devolve uma lista vazia em vez de
+ * rebentar a página das lojas.
+ */
+export function storeGallery(store) {
+  let bruta = store?.gallery;
+  if (typeof bruta === 'string') {
+    try { bruta = JSON.parse(bruta); } catch { return []; }
+  }
+  if (!Array.isArray(bruta)) return [];
+  return bruta
+    .map((item) => (typeof item === 'string' ? { url: item, caption: '' } : {
+      url: String(item?.url || ''),
+      caption: String(item?.caption || ''),
+    }))
+    .filter((f) => f.url);
+}

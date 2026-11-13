@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Store } from 'lucide-react';
 import { iniciaisDaLoja } from '@/lib/localizacao';
+import { lojaSrcSet } from '@/lib/stores';
 
 /**
  * A miniatura de uma loja — ou o que fica no lugar dela.
@@ -16,6 +17,9 @@ import { iniciaisDaLoja } from '@/lib/localizacao';
  */
 export default function StoreThumb({ store, className = '' }) {
   const url = store?.image_url;
+  // A miniatura nunca passa dos 96 px: com `srcset` o navegador fica-se pela variante de 480 px
+  // das fotografias do próprio site, em vez de descarregar a de 1280.
+  const srcSet = lojaSrcSet(url);
   const [falhou, setFalhou] = useState(false);
 
   // Trocar de loja não deve herdar a falha da anterior.
@@ -26,6 +30,8 @@ export default function StoreThumb({ store, className = '' }) {
       <div className={`overflow-hidden bg-muted ${className}`}>
         <img
           src={url}
+          srcSet={srcSet || undefined}
+          sizes={srcSet ? '96px' : undefined}
           alt=""
           loading="lazy"
           decoding="async"

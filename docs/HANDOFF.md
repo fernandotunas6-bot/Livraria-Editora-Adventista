@@ -2,6 +2,25 @@
 
 Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Fotografias das lojas (2026-11-13, ramo `claude/beautiful-maxwell-1q8dks`)
+
+- **Pedido do dono:** as fotografias da loja do Huambo e os contactos dela; as das outras lojas
+  vêm a seguir. Resposta à pergunta dos dois números: o mesmo (923 428 459) para chamadas e para
+  WhatsApp.
+- **As fotografias** ficam no próprio site, em `app/web/public/images/lojas/`, em WebP de 1280 e
+  480 px geradas por `python3 scripts/imagens/lojas.py <slug> <foto...>`. Servidas pelo site, e
+  não por Storage, entram no CSP (`img-src 'self'`) sem excepções. Das cinco que a loja mandou
+  entraram quatro: a quinta repetia o balcão da primeira.
+- **Base de dados:** `20261113103000_fotografias_das_lojas`, **por aplicar** (vai no merge).
+  Junta `physical_stores.gallery` (jsonb, lista de `{url, caption}`, no máximo 24 e 4 KB) e põe
+  as do Huambo, a miniatura e o telefone — que estava vazio desde a limpeza dos números
+  provisórios. Só escreve onde o campo está vazio, por isso não desfaz nada que o painel tenha
+  entretanto guardado.
+- **Site:** a página das lojas mostra as fotografias da loja escolhida (`StoreGallery.jsx`, abre
+  em grande com legenda e setas) e a miniatura do cartão passa a pedir a variante de 480 px.
+- **Para a loja seguinte:** correr o script com o slug da loja e juntar uma migração que escreva
+  a `gallery` dessa loja — o painel ainda não tem onde carregar a galeria (só a miniatura).
+
 ## Análise geral e melhorias (2026-11-10, ramo `claude/clever-carson-ibv73h`)
 
 - **Pedido do dono:** "fazer uma análise em todo o sistema e melhorar onde for necessário".
