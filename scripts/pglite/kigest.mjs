@@ -218,6 +218,17 @@ check(`os ${ocultosComPreco.length} que esperavam preço desde a migração das 
 check('quem continua sem preço continua oculto',
   (await q('select count(*)::int n from public.stock_books where active and coalesce(price, 0) <= 0'))[0].n === 0);
 check('o catálogo à venda cresceu', (await q('select count(*) filter (where active)::int n from public.stock_books'))[0].n > aVenda.length);
+// A lista de quem se publica é fechada: um produto escondido de propósito pelo dono — com
+// preço, capa e descrição, mas sem nada que ver com o KiGest nem com as fotografias — não
+// volta à loja por obra desta migração.
+await q(`insert into public.stock_books (title, product_type, price, stock, cover, description, active)
+         values ('Escondido de Propósito', 'livro', 9999, 3,
+                 'https://livrariaadventista.com/images/capas/LIV-999.jpg',
+                 '<p>Tem descrição, tem capa e tem preço — e o dono escondeu-o por querer.</p>', false)`);
+await db.exec(publicacao);
+check('um produto escondido de propósito continua escondido',
+  (await q(`select active from public.stock_books where title = 'Escondido de Propósito'`))[0].active === false);
+await q(`delete from public.stock_books where title = 'Escondido de Propósito'`);
 const ocultosDepois = (await q('select count(*) filter (where not active)::int n from public.stock_books'))[0].n;
 check('e o que ficou oculto foi menos do que antes', ocultosDepois < ocultosAntes, { ocultosAntes, ocultosDepois });
 // Uma capa verdadeira posta no painel não é trocada pela tipográfica.

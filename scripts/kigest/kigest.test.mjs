@@ -543,6 +543,18 @@ describe('descrições e publicação', () => {
     expect(sql).not.toContain('active = false');
   });
 
+  it('a lista de quem se publica é fechada, e não apanha o que o dono escondeu', () => {
+    const { sql } = correr();
+    // Cada referência é nomeada, uma a uma.
+    expect(sql).toContain("kigest_ref = any (array[");
+    expect(sql).toContain("       'A'");
+    expect(sql).toContain("       'C'");
+    // E os da ronda das fotografias, pela capa.
+    expect(sql).toContain("or cover like '%/images/capas/novos/%'");
+    // O que não é de nenhum dos dois grupos não é tocado — nem o que não tem nome legível.
+    expect(sql).not.toContain("       'B'");
+  });
+
   it('avisa quando falta a capa de um produto que tem descrição', () => {
     const { semCapa, linhas } = correr({ capaExiste: (f) => f !== 'outro-livro.webp' });
     expect(semCapa.map((n) => n.kigest_ref)).toEqual(['C']);

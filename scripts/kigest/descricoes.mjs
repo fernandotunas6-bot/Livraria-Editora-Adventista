@@ -129,9 +129,17 @@ update public.stock_books b
 -- 3 de 3 — publicar.
 --
 -- Entra à venda quem tem as quatro coisas: preço acima de zero, capa, descrição e nome legível.
--- Isto apanha dois grupos ao mesmo tempo: os que acabaram de receber descrição e capa aqui, e os
--- que a migração das fotografias deixou ocultos à espera de preço e que o KiGest acabou de
--- apreçar — capa e descrição esses já tinham.
+-- Isto apanha dois grupos, e SÓ estes dois:
+--
+--  - os ${linhas.length} que acabaram de receber descrição e capa aqui, nomeados um a um;
+--  - os que a migração das fotografias (20261110090000) deixou ocultos à espera de preço e que
+--    o KiGest acabou de apreçar — capa e descrição esses já tinham. Reconhecem-se pela capa,
+--    que está em images/capas/novos.
+--
+-- A lista é fechada de propósito. A regra larga — «todo o produto oculto que tenha preço, capa
+-- e descrição» — apanharia também um produto que o dono tenha escondido por querer, porque
+-- esgotou ou saiu de catálogo, e punha-o à venda outra vez sem ninguém pedir. Uma migração não
+-- desfaz decisões que não tomou.
 --
 -- O vestuário fica de fora com ou sem descrição: uma t-shirt sem tamanhos compra-se sem escolher
 -- o tamanho. Põem-se os tamanhos no painel, como variantes, e publica-se então:
@@ -144,7 +152,13 @@ update public.stock_books
    and coalesce(price, 0) > 0
    and coalesce(btrim(cover), '') <> ''
    and coalesce(btrim(regexp_replace(description, '<[^>]*>', '', 'g')), '') <> ''
-   and product_type <> 'vestuario';`);
+   and product_type <> 'vestuario'
+   and (
+     kigest_ref = any (array[
+${linhas.map((l) => `       ${lit(l.ref)}`).join(',\n')}
+     ])
+     or cover like '%/images/capas/novos/%'
+   );`);
 
   return {
     sql: `${sql.join('\n')}\n`, linhas, semCapa, semTexto,
