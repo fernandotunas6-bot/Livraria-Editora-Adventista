@@ -36,6 +36,10 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   morada e uma fotografia, em vez de uma linha de texto. Os endereços são sempre os do domínio
   oficial, mesmo numa pré-visualização. O horário fica de fora de propósito: o `openingHours`
   do schema.org tem escrita própria e a ficha guarda uma frase em português.
+- **O que as fotografias custam a descarregar:** o rodapé (que está em todas as páginas) pedia
+  a fotografia da loja em tamanho grande e sem `lazy` — com lojas sem fotografia isso não custava
+  nada, com fotografias passava a custar. Leva agora `loading="lazy"` e a variante de 480 px,
+  como o menu grande. Playwright 21/21, com um teste novo que conta os pedidos à rede.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.
