@@ -124,3 +124,67 @@ describe('StoreGallery com muitas fotografias', () => {
     expect(host.textContent).toContain('1 fotografia');
   });
 });
+
+describe('StoreGallery: andar pela galeria aberta', () => {
+  const MUITAS = Array.from({ length: 12 }, (_, i) => ({
+    url: `/images/lojas/huambo-${i + 1}.webp`, caption: `Fotografia ${i + 1}`,
+  }));
+
+  const abrirGrande = () => {
+    montar({ photos: MUITAS, storeName: 'Loja do Huambo' });
+    clicar(porRotulo(host, 'Ver em grande: Fotografia 1'));
+    return dialogo().querySelector('figure img');
+  };
+
+  /** Um arrasto de `dx` píxeis sobre a fotografia, como o de um dedo. */
+  const arrastar = (alvo, dx, dy = 0, pointerType = 'touch') => {
+    const evento = (tipo, x, y) => {
+      const e = new MouseEvent(tipo, { bubbles: true, clientX: x, clientY: y });
+      Object.defineProperty(e, 'pointerType', { value: pointerType });
+      return e;
+    };
+    act(() => {
+      alvo.dispatchEvent(evento('pointerdown', 200, 300));
+      alvo.dispatchEvent(evento('pointerup', 200 + dx, 300 + dy));
+    });
+  };
+
+  it('arrastar o dedo para a esquerda passa à fotografia seguinte', () => {
+    arrastar(abrirGrande(), -120);
+    expect(dialogo().textContent).toContain('2/12');
+  });
+
+  it('arrastar para a direita volta atrás, e dá a volta', () => {
+    arrastar(abrirGrande(), 120);
+    expect(dialogo().textContent).toContain('12/12');
+  });
+
+  it('um toque, ou um arrasto a subir, não muda de fotografia', () => {
+    const foto = abrirGrande();
+    arrastar(foto, -10);
+    expect(dialogo().textContent).toContain('1/12');
+    arrastar(foto, -60, -200);
+    expect(dialogo().textContent).toContain('1/12');
+  });
+
+  it('o rato não arrasta: aí há setas, teclado e a tira de miniaturas', () => {
+    arrastar(abrirGrande(), -120, 0, 'mouse');
+    expect(dialogo().textContent).toContain('1/12');
+  });
+
+  it('a tira de miniaturas salta para a fotografia escolhida e diz qual está aberta', () => {
+    abrirGrande();
+    const tira = dialogo().querySelector('ul[aria-label="Todas as fotografias"]');
+    expect(tira.querySelectorAll('li')).toHaveLength(12);
+    clicar(porRotulo(tira, 'Fotografia 7'));
+    expect(dialogo().textContent).toContain('7/12');
+    const activa = dialogo().querySelector('ul[aria-label="Todas as fotografias"] [aria-current="true"]');
+    expect(activa.getAttribute('aria-label')).toBe('Fotografia 7');
+  });
+
+  it('com duas fotografias não vale a pena tira nenhuma', () => {
+    montar({ photos: MUITAS.slice(0, 2), storeName: 'Loja do Huambo' });
+    clicar(porRotulo(host, 'Ver em grande: Fotografia 1'));
+    expect(dialogo().querySelector('ul[aria-label="Todas as fotografias"]')).toBeNull();
+  });
+});

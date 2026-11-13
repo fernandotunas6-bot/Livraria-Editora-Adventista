@@ -59,6 +59,12 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   aí. A regra está provada em teste de uma a nove fotografias: nenhuma linha fica com um buraco
   no canto. O limite do painel subiu de 12 para 20 fotografias por loja (a coluna aguenta 24 e
   4 KB) — mostrar todas de uma vez é que não fazia sentido, e deixou de ser preciso.
+- **A galeria aberta** (a que o mosaico abre) ganhou a tira de miniaturas por baixo, com a
+  fotografia a ser vista marcada e trazida para o meio da tira, e o arrastar do dedo no
+  telemóvel. Com uma dúzia de fotografias, andar de seta em seta era o único caminho. Dois
+  pormenores que só se viram no navegador: sem `min-w-0` na figura, a tira alargava o diálogo e
+  o contador saía pela borda fora; e centrar a miniatura tem de esperar dois desenhos, senão o
+  foco que o diálogo põe ao abrir arrasta a tira de volta ao princípio.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.
