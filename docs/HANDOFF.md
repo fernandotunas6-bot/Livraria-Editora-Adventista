@@ -18,6 +18,12 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   entretanto guardado.
 - **Site:** a página das lojas mostra as fotografias da loja escolhida (`StoreGallery.jsx`, abre
   em grande com legenda e setas) e a miniatura do cartão passa a pedir a variante de 480 px.
+- **Huíla (Lubango), a seguir:** as cinco fotografias que a loja mandou (fachada, equipa,
+  prateleiras, livros ao perto, balcão) e o horário que está escrito na porta — segunda a quinta
+  8h–17h30, sexta, domingo e feriados 8h–13h. Migração `20261113143000_fotografias_do_lubango`,
+  também **por aplicar**. Substitui o horário de omissão do painel («Seg–Sex 9h–18h, Sáb
+  9h–13h»), que punha a loja aberta ao sábado; um horário escrito à mão fica como está. Sem
+  telefone: a loja ainda não deu nenhum.
 - **Para a loja seguinte:** correr o script com o slug da loja e juntar uma migração que escreva
   a `gallery` dessa loja — o painel ainda não tem onde carregar a galeria (só a miniatura).
 
