@@ -30,6 +30,12 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   fotografias e legendas de 80 caracteres, por folga sobre a restrição da coluna — o painel
   avisa antes de a base de dados recusar, e não deixa guardar com um envio a meio. A lista das
   lojas ganhou o número de fotografias e o filtro «Sem fotografias».
+- **Na Google:** `/lojas` passa a levar um bloco JSON-LD por loja (`Store`, em
+  `lib/structuredData.js`) com morada, telefone, coordenadas, mapa e fotografias, ligado à
+  `Organization` que o `index.html` declara. Quem procura «livraria adventista no Huambo» vê a
+  morada e uma fotografia, em vez de uma linha de texto. Os endereços são sempre os do domínio
+  oficial, mesmo numa pré-visualização. O horário fica de fora de propósito: o `openingHours`
+  do schema.org tem escrita própria e a ficha guarda uma frase em português.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.

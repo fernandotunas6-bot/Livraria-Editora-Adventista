@@ -16,6 +16,8 @@ import StoreThumb from '@/components/StoreThumb';
 import StoreGallery from '@/components/StoreGallery';
 import useLocalizacaoAoVivo from '@/hooks/useLocalizacaoAoVivo';
 import { formatarDistancia, ordenarPorDistancia, precisaoLegivel } from '@/lib/localizacao';
+import { jsonLdString, storeJsonLd } from '@/lib/structuredData';
+import { CANONICAL_ORIGIN } from '@/lib/canonicalHost';
 
 export default function StoresPage() {
   const { settings } = useSiteSettings();
@@ -47,6 +49,16 @@ export default function StoresPage() {
   const embed = selected ? mapEmbedUrl(selected, settings.google_maps_embed_key) : '';
   const fotos = useMemo(() => storeGallery(selected), [selected]);
 
+  // Cada loja para a Google: morada, telefone, coordenadas e fotografias (lib/structuredData.js).
+  // Vão todas as lojas, e não só a escolhida — a página é a mesma para quem procura qualquer
+  // uma delas. Sem lojas carregadas não se escreve bloco nenhum. Os endereços são os do domínio
+  // oficial, e não os do navegador: numa pré-visualização os dados continuam a falar da loja
+  // a sério, que é o que a Google indexa.
+  const dadosEstruturados = useMemo(
+    () => jsonLdString((stores || []).map((s) => storeJsonLd(s, { origin: CANONICAL_ORIGIN }))),
+    [stores],
+  );
+
   // A primeira leitura escolhe a loja mais perto. As seguintes não voltam a escolher: quem
   // já abriu outra loja na lista não quer ser arrastado de volta a cada passo que dá.
   const jaEscolheuPorGps = useRef(false);
@@ -63,6 +75,7 @@ export default function StoresPage() {
       <Helmet>
         <title>{pageTitle('Lojas físicas')}</title>
         <meta name="description" content="Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola." />
+        {dadosEstruturados && <script type="application/ld+json">{dadosEstruturados}</script>}
       </Helmet>
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
