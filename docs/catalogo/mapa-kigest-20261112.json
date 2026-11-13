@@ -3,6 +3,19 @@
  "origem": "DESKTOP-G26LDJM/KigestGC",
  "ligados": [
   {
+   "book_code": "LIV-098",
+   "titulo_site": "Viagem ao Sobrenatural",
+   "artigo_kigest": "VIAJEM AO SOBRENATURAL",
+   "kigest_ref": "00007",
+   "preco_antes": 10265,
+   "preco_depois": 10000,
+   "stock_antes": 4,
+   "stock_depois": 1,
+   "isbn_antes": "",
+   "isbn_novo": "9788534531146",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-142",
    "titulo_site": "A Fé de Jesus — Guia de estudos para a classe baptismal",
    "artigo_kigest": "A FÉ DE JESUS",
@@ -26,6 +39,19 @@
    "stock_depois": 67,
    "isbn_antes": "",
    "isbn_novo": "9788534526203",
+   "via": "titulo"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Como Conhecer a Vontade de Deus",
+   "artigo_kigest": "COMO CONHECER A VONTE DE DEUS",
+   "kigest_ref": "00014",
+   "preco_antes": 0,
+   "preco_depois": 7182,
+   "stock_antes": 0,
+   "stock_depois": 7,
+   "isbn_antes": "",
+   "isbn_novo": "9788534525237",
    "via": "titulo"
   },
   {
@@ -185,6 +211,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-008",
+   "titulo_site": "Além da Morte - Respostas Bíblicas a Perguntas Milenares",
+   "artigo_kigest": "ALÉM DA MORTTE",
+   "kigest_ref": "00064",
+   "preco_antes": 12215,
+   "preco_depois": 12215,
+   "stock_antes": 1,
+   "stock_depois": 2,
+   "isbn_antes": "",
+   "isbn_novo": "9788534529648",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-009",
    "titulo_site": "O Amanhã Começa Hoje",
    "artigo_kigest": "O AMAHÃ COMEÇA HOJE",
@@ -302,6 +341,19 @@
    "via": "ref"
   },
   {
+   "book_code": "LIV-022",
+   "titulo_site": "Crenças Populares - O Que as Pessoas Acreditam e o Que a Bíblia Realmente Diz",
+   "artigo_kigest": "CRENÇA POPULARES",
+   "kigest_ref": "00083",
+   "preco_antes": 35925,
+   "preco_depois": 35925,
+   "stock_antes": 2,
+   "stock_depois": 7,
+   "isbn_antes": "",
+   "isbn_novo": "9788534513401",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-010",
    "titulo_site": "Amores que Matam - O Drama da Violência contra a Mulher",
    "artigo_kigest": "AMORES QUE MATAM",
@@ -312,6 +364,19 @@
    "stock_depois": 3,
    "isbn_antes": "",
    "isbn_novo": "9788534509282",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-023",
+   "titulo_site": "Crise Existencial - Existe Saída",
+   "artigo_kigest": "CRISE EXITENCIAL",
+   "kigest_ref": "00085",
+   "preco_antes": 7485,
+   "preco_depois": 7485,
+   "stock_antes": 2,
+   "stock_depois": 6,
+   "isbn_antes": "",
+   "isbn_novo": "9788534523707",
    "via": "titulo"
   },
   {
@@ -536,6 +601,45 @@
    "via": "ref"
   },
   {
+   "book_code": "LIV-058",
+   "titulo_site": "A Mensagem de 1888 - Justificação pela Fé em Cristo a Natureza Humana de Jesus Perfeccionismo",
+   "artigo_kigest": "A MESSAGEM DE 1888",
+   "kigest_ref": "000113",
+   "preco_antes": 14180,
+   "preco_depois": 14180,
+   "stock_antes": 2,
+   "stock_depois": 4,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-066",
+   "titulo_site": "Origens - Relacionando a Ciência com a Bíblia",
+   "artigo_kigest": "ORIGES",
+   "kigest_ref": "000114",
+   "preco_antes": 25895,
+   "preco_depois": 31627,
+   "stock_antes": 2,
+   "stock_depois": 6,
+   "isbn_antes": "",
+   "isbn_novo": "9788534507233",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-077",
+   "titulo_site": "Questões sobre Doutrina (Edição Anotada) - O Clássico Mais Polêmico da História do Adventismo",
+   "artigo_kigest": "QUETOES SOBRE DOUTRINAS",
+   "kigest_ref": "000116",
+   "preco_antes": 56325,
+   "preco_depois": 56325,
+   "stock_antes": 2,
+   "stock_depois": 6,
+   "isbn_antes": "",
+   "isbn_novo": "9788534510943",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-069",
    "titulo_site": "O Poder da Pregação Bíblica - Segredos de Grandes Oradores Atuais",
    "artigo_kigest": "O PODER DA PREGAÇAÕ",
@@ -611,19 +715,6 @@
    "stock_depois": 5,
    "isbn_antes": "",
    "isbn_novo": "",
-   "via": "titulo"
-  },
-  {
-   "book_code": "LIV-082",
-   "titulo_site": "Respostas a Objeções - Uma Defesa Bíblica da Doutrina Adventista",
-   "artigo_kigest": "RESPOSTAS A OBJEÇOES",
-   "kigest_ref": "000127",
-   "preco_antes": 30105,
-   "preco_depois": 30105,
-   "stock_antes": 3,
-   "stock_depois": 9,
-   "isbn_antes": "",
-   "isbn_novo": "9788534509053",
    "via": "titulo"
   },
   {
@@ -1043,6 +1134,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-097",
+   "titulo_site": "A Verdadeira Riqueza - Princípios da Prosperidade Bíblica",
+   "artigo_kigest": "A VERDADEIRA RIQUESA",
+   "kigest_ref": "000185",
+   "preco_antes": 10245,
+   "preco_depois": 10245,
+   "stock_antes": 11,
+   "stock_depois": 2,
+   "isbn_antes": "",
+   "isbn_novo": "9788534530125",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-047",
    "titulo_site": "Igreja em Missão - Como Tornar sua Igreja Relevante na Comunidade",
    "artigo_kigest": "IGREJA EM MISSAÕ",
@@ -1249,19 +1353,6 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "ref"
-  },
-  {
-   "book_code": "",
-   "titulo_site": "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra",
-   "artigo_kigest": "A GRANDE EXTINÇÃO EM MASSA",
-   "kigest_ref": "005",
-   "preco_antes": 0,
-   "preco_depois": 51561,
-   "stock_antes": 0,
-   "stock_depois": 0,
-   "isbn_antes": "",
-   "isbn_novo": "",
-   "via": "titulo"
   },
   {
    "book_code": "",
@@ -1486,6 +1577,19 @@
   },
   {
    "book_code": "",
+   "titulo_site": "Coração Restaurado — Transformação de vidas pelo amor",
+   "artigo_kigest": "CORAÇA RESTAURADO",
+   "kigest_ref": "193883",
+   "preco_antes": 0,
+   "preco_depois": 30680,
+   "stock_antes": 0,
+   "stock_depois": 0,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "titulo"
+  },
+  {
+   "book_code": "",
    "titulo_site": "Primeiro o Reino — Como uma pobre viúva nos ensina os princípios da verdadeira adoração",
    "artigo_kigest": "PRIMEIRO O REINO",
    "kigest_ref": "19612",
@@ -1551,13 +1655,13 @@
   },
   {
    "book_code": "",
-   "titulo_site": "Esperança para Viver — O verdadeiro caminho da felicidade",
-   "artigo_kigest": "ESPERANÇA PARA VIVER",
-   "kigest_ref": "6218731",
+   "titulo_site": "Palavras de Esperança — Histórias da vida diária",
+   "artigo_kigest": "PALAVRAS DE ESPERANÇÃO",
+   "kigest_ref": "30062026",
    "preco_antes": 0,
-   "preco_depois": 6000,
+   "preco_depois": 500,
    "stock_antes": 0,
-   "stock_depois": 2,
+   "stock_depois": 91,
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "titulo"
@@ -1671,19 +1775,6 @@
    "parecidos": []
   },
   {
-   "titulo": "A Mensagem de 1888",
-   "artigo_kigest": "A MESSAGEM DE 1888",
-   "kigest_ref": "000113",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 14180,
-   "stock": 4,
-   "isbn": "",
-   "parecidos": [
-    "LIV-058"
-   ]
-  },
-  {
    "titulo": "A Saúde Pelos Alimentos",
    "artigo_kigest": "A SAÚDE PELOS ALIMENTOS",
    "kigest_ref": "0050",
@@ -1710,19 +1801,6 @@
     "",
     "",
     ""
-   ]
-  },
-  {
-   "titulo": "A Verdadeira Riqueza",
-   "artigo_kigest": "A VERDADEIRA RIQUESA",
-   "kigest_ref": "000185",
-   "tipo": "livro",
-   "genero": "Fé & Doutrina",
-   "preco": 10245,
-   "stock": 2,
-   "isbn": "9788534530125",
-   "parecidos": [
-    "LIV-097"
    ]
   },
   {
@@ -1770,20 +1848,6 @@
    "parecidos": []
   },
   {
-   "titulo": "Além da Morte",
-   "artigo_kigest": "ALÉM DA MORTTE",
-   "kigest_ref": "00064",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 12215,
-   "stock": 2,
-   "isbn": "9788534529648",
-   "parecidos": [
-    "LIV-008",
-    ""
-   ]
-  },
-  {
    "titulo": "Amigos",
    "artigo_kigest": "AMIGOS",
    "kigest_ref": "2225588",
@@ -1817,7 +1881,7 @@
    "parecidos": []
   },
   {
-   "titulo": "Bebe Saúde para Mãe e Filhos",
+   "titulo": "Bebe Saúde para Mãe e Filho",
    "artigo_kigest": "BEBE SAÚDE PARA MAE E FILHO",
    "kigest_ref": "000339",
    "tipo": "livro",
@@ -1846,6 +1910,7 @@
     "BIB-016",
     "BIB-018",
     "BIB-020",
+    "",
     "",
     "",
     "",
@@ -2289,18 +2354,7 @@
    ]
   },
   {
-   "titulo": "Bíblia Sagrada RC",
-   "artigo_kigest": "BIBIA SAGRADA RC",
-   "kigest_ref": "000315",
-   "tipo": "biblia",
-   "genero": "Bíblias",
-   "preco": 49630,
-   "stock": 0,
-   "isbn": "",
-   "parecidos": []
-  },
-  {
-   "titulo": "Bíblia Sagrada se o Filhos Libertar",
+   "titulo": "Bíblia Sagrada se o Filho Libertar",
    "artigo_kigest": "BIBLIA SAGRADA SE O FILHO LIBERTAR",
    "kigest_ref": "000304",
    "tipo": "biblia",
@@ -2454,8 +2508,8 @@
    "titulo": "Casamento Princípio Bíblicos e Teológico",
    "artigo_kigest": "CASAMENTO PRINCIPIO BIBLICOS E TEOLOGICO",
    "kigest_ref": "15329",
-   "tipo": "biblia",
-   "genero": "Bíblias",
+   "tipo": "livro",
+   "genero": "Família & Relacionamentos",
    "preco": 35242,
    "stock": 5,
    "isbn": "",
@@ -2561,17 +2615,6 @@
    "parecidos": []
   },
   {
-   "titulo": "Ciclo da Infelicidade",
-   "artigo_kigest": "CIRCLO DA INFEICIDADE",
-   "kigest_ref": "11486",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 27818,
-   "stock": 0,
-   "isbn": "",
-   "parecidos": []
-  },
-  {
    "titulo": "Comece Hoje a Perder Peso",
    "artigo_kigest": "COMECE HOJE A PERDER PESO",
    "kigest_ref": "00035",
@@ -2583,7 +2626,7 @@
    "parecidos": []
   },
   {
-   "titulo": "Como Formar Filhos Vencedor",
+   "titulo": "Como Formar Filho Vencedor",
    "artigo_kigest": "COMO FORMAR FILHO VENCEDOR",
    "kigest_ref": "080620263",
    "tipo": "livro",
@@ -2706,19 +2749,6 @@
    "parecidos": []
   },
   {
-   "titulo": "Coração Restaurado",
-   "artigo_kigest": "CORAÇA RESTAURADO",
-   "kigest_ref": "193883",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 30680,
-   "stock": 0,
-   "isbn": "",
-   "parecidos": [
-    ""
-   ]
-  },
-  {
    "titulo": "Cordeirinho",
    "artigo_kigest": "CORDERINNHO",
    "kigest_ref": "33339999",
@@ -2750,32 +2780,6 @@
    "stock": 1,
    "isbn": "",
    "parecidos": []
-  },
-  {
-   "titulo": "Crenças Populares",
-   "artigo_kigest": "CRENÇA POPULARES",
-   "kigest_ref": "00083",
-   "tipo": "livro",
-   "genero": "Fé & Doutrina",
-   "preco": 35925,
-   "stock": 7,
-   "isbn": "9788534513401",
-   "parecidos": [
-    "LIV-022"
-   ]
-  },
-  {
-   "titulo": "Crise Existencial",
-   "artigo_kigest": "CRISE EXITENCIAL",
-   "kigest_ref": "00085",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 7485,
-   "stock": 6,
-   "isbn": "9788534523707",
-   "parecidos": [
-    "LIV-023"
-   ]
   },
   {
    "titulo": "Daniel Interpretação",
@@ -2885,20 +2889,6 @@
    "stock": 63,
    "isbn": "",
    "parecidos": []
-  },
-  {
-   "titulo": "Esperança para Viver",
-   "artigo_kigest": "ESPERENÇA PARA VIVER",
-   "kigest_ref": "06052026",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 6000,
-   "stock": 2,
-   "isbn": "9788534511186",
-   "parecidos": [
-    "",
-    ""
-   ]
   },
   {
    "titulo": "Estarei Pronta no Sábado",
@@ -3170,7 +3160,9 @@
    "preco": 24434,
    "stock": 1,
    "isbn": "",
-   "parecidos": []
+   "parecidos": [
+    "LIV-046"
+   ]
   },
   {
    "titulo": "Inigualável",
@@ -3237,24 +3229,6 @@
    "genero": "Desbravadores",
    "preco": 2000,
    "stock": 18,
-   "isbn": "",
-   "parecidos": [
-    "DBV-002",
-    "DBV-004",
-    "DBV-003",
-    "DBV-001",
-    "DBV-006",
-    "DBV-005"
-   ]
-  },
-  {
-   "titulo": "Lenço de Desbravadores",
-   "artigo_kigest": "LENÇO DE DESBRAVADORE",
-   "kigest_ref": "00050",
-   "tipo": "desbravadores",
-   "genero": "Desbravadores",
-   "preco": 2000,
-   "stock": 6,
    "isbn": "",
    "parecidos": [
     "DBV-002",
@@ -3720,7 +3694,9 @@
    "preco": 5000,
    "stock": 1,
    "isbn": "",
-   "parecidos": []
+   "parecidos": [
+    ""
+   ]
   },
   {
    "titulo": "O Grande Conflito Infantil",
@@ -3778,30 +3754,6 @@
    "stock": 6,
    "isbn": "9786589448747",
    "parecidos": []
-  },
-  {
-   "titulo": "Origens",
-   "artigo_kigest": "ORIGES",
-   "kigest_ref": "000114",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 31627,
-   "stock": 6,
-   "isbn": "9788534507233",
-   "parecidos": []
-  },
-  {
-   "titulo": "Palavras de Esperança",
-   "artigo_kigest": "PALAVRAS DE ESPERANÇÃO",
-   "kigest_ref": "30062026",
-   "tipo": "livro",
-   "genero": "Catálogo Geral",
-   "preco": 500,
-   "stock": 91,
-   "isbn": "",
-   "parecidos": [
-    ""
-   ]
   },
   {
    "titulo": "Passarinhos",
@@ -3965,7 +3917,9 @@
    "preco": 18485,
    "stock": 1,
    "isbn": "9786589895978",
-   "parecidos": []
+   "parecidos": [
+    "LIV-001"
+   ]
   },
   {
    "titulo": "Princípios para Lideres Cristaõs",
@@ -4037,30 +3991,6 @@
    "parecidos": []
   },
   {
-   "titulo": "Questões sobre Doutrinas",
-   "artigo_kigest": "QUETOES SOBRE DOUTRINAS",
-   "kigest_ref": "000116",
-   "tipo": "livro",
-   "genero": "Fé & Doutrina",
-   "preco": 56325,
-   "stock": 6,
-   "isbn": "9788534510943",
-   "parecidos": []
-  },
-  {
-   "titulo": "Reavivamento Verdadeiro",
-   "artigo_kigest": "REAVIMENTO VERDADEIRO",
-   "kigest_ref": "000460",
-   "tipo": "livro",
-   "genero": "Fé & Doutrina",
-   "preco": 6160,
-   "stock": 0,
-   "isbn": "9788534513760",
-   "parecidos": [
-    "LIV-078"
-   ]
-  },
-  {
    "titulo": "Regras para que",
    "artigo_kigest": "REGRAS PARA QUE",
    "kigest_ref": "100320263",
@@ -4070,6 +4000,20 @@
    "stock": 57,
    "isbn": "",
    "parecidos": []
+  },
+  {
+   "titulo": "Respostas a Objecções",
+   "artigo_kigest": "RESPOSTAS A OBJEÇOES",
+   "kigest_ref": "000127",
+   "tipo": "livro",
+   "genero": "Catálogo Geral",
+   "preco": 30105,
+   "stock": 9,
+   "isbn": "9788534509053",
+   "parecidos": [
+    "LIV-082",
+    "LIV-083"
+   ]
   },
   {
    "titulo": "Revista Esperança Novo Tempo",
@@ -4273,28 +4217,6 @@
     "VES-002",
     ""
    ]
-  },
-  {
-   "titulo": "T-shirt UmaVoz27",
-   "artigo_kigest": "T-CHERT UMA VOZ 27",
-   "kigest_ref": "21102026",
-   "tipo": "vestuario",
-   "genero": "Vestuário",
-   "preco": 3500,
-   "stock": 11,
-   "isbn": "",
-   "parecidos": []
-  },
-  {
-   "titulo": "Testemunho para a Igreja Vol. 1",
-   "artigo_kigest": "TESTEMUNHO PARA A IGREJA VLM 1",
-   "kigest_ref": "27082026",
-   "tipo": "livro",
-   "genero": "Ellen G. White",
-   "preco": 27925,
-   "stock": 2,
-   "isbn": "",
-   "parecidos": []
   },
   {
    "titulo": "Testemunho para Igreja Vol. 2",
@@ -4550,9 +4472,45 @@
    ]
   },
   {
+   "fica": "0002010",
+   "sai": [
+    "27082026"
+   ]
+  },
+  {
+   "fica": "000502",
+   "sai": [
+    "27072026"
+   ]
+  },
+  {
+   "fica": "123",
+   "sai": [
+    "11764"
+   ]
+  },
+  {
+   "fica": "004",
+   "sai": [
+    "11486"
+   ]
+  },
+  {
    "fica": "0010",
    "sai": [
     "19958"
+   ]
+  },
+  {
+   "fica": "33339999",
+   "sai": [
+    "555999"
+   ]
+  },
+  {
+   "fica": "55556666",
+   "sai": [
+    "2236666"
    ]
   }
  ],
@@ -4563,24 +4521,9 @@
    "titulo": "Conselhos sobre Mordomia"
   },
   {
-   "fica": "33339999",
-   "sai": "555999",
-   "titulo": "Cordeirinho"
-  },
-  {
-   "fica": "55556666",
-   "sai": "2236666",
-   "titulo": "Edificadores"
-  },
-  {
    "fica": "000408",
    "sai": "00023244",
    "titulo": "Folheto Impacto"
-  },
-  {
-   "fica": "00050",
-   "sai": "00024",
-   "titulo": "Lenço de Desbravadores"
   },
   {
    "fica": "000457",
@@ -4593,31 +4536,9 @@
    "titulo": "O Desejado de Todas as Nações"
   },
   {
-   "fica": "000502",
-   "sai": "27072026",
-   "titulo": "O Grande Conflito"
-  },
-  {
-   "fica": "123",
-   "sai": "11764",
-   "titulo": "Profecias Surpreendentes"
-  },
-  {
    "fica": "14878",
    "sai": "00010",
    "titulo": "Profetas e Reis"
-  },
-  {
-   "fica": "000460",
-   "sai": "12383",
-   "titulo": "Reavivamento Verdadeiro"
-  }
- ],
- "ja_no_catalogo": [
-  {
-   "kigest_ref": "00007",
-   "artigo_kigest": "VIAJEM AO SOBRENATURAL",
-   "titulo": "Viagem ao Sobrenatural"
   }
  ],
  "ambiguos": [
@@ -4627,7 +4548,7 @@
    "preco": 500,
    "stock": 17678,
    "candidatos": [
-    ""
+    "Palavras de Esperança — Histórias da vida diária"
    ]
   },
   {
@@ -4647,8 +4568,8 @@
    "preco": 10000,
    "stock": 112,
    "candidatos": [
-    "",
-    ""
+    "Segredos do Bem-Estar Emocional — Depressão, estresse, ansiedade",
+    "Saúde & Bem-Estar — Segredos que podem mudar a sua vida"
    ]
   },
   {
@@ -4658,6 +4579,18 @@
    "stock": 13,
    "candidatos": [
     "DBV-006"
+   ]
+  },
+  {
+   "kigest_ref": "21102026",
+   "artigo_kigest": "T-CHERT UMA VOZ 27",
+   "preco": 3500,
+   "stock": 11,
+   "candidatos": [
+    "VES-002",
+    "T-shirt branca UmaVoz27 — Missão para Todos",
+    "VES-001",
+    "Polo preta UmaVoz27 — Missão para Todos"
    ]
   },
   {
@@ -4679,38 +4612,29 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
     "LIV-085",
     "LIV-037",
     "LIV-096",
     "LIV-020",
     "BIB-020",
-    "",
-    "",
-    "",
-    ""
-   ]
-  },
-  {
-   "kigest_ref": "00014",
-   "artigo_kigest": "COMO CONHECER A VONTE DE DEUS",
-   "preco": 7182,
-   "stock": 7,
-   "candidatos": [
-    ""
+    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
+    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
    ]
   },
   {
@@ -4719,14 +4643,14 @@
    "preco": 47265,
    "stock": 7,
    "candidatos": [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada Letra Supergigante — capa castanha"
    ]
   },
   {
@@ -4735,8 +4659,8 @@
    "preco": 25000,
    "stock": 6,
    "candidatos": [
-    "",
-    "",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa",
     "LIV-085",
     "BIB-010",
     "LIV-037",
@@ -4747,22 +4671,37 @@
     "BIB-018",
     "DBV-006",
     "BIB-020",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
+    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
+    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja"
+   ]
+  },
+  {
+   "kigest_ref": "00050",
+   "artigo_kigest": "LENÇO DE DESBRAVADORE",
+   "preco": 2000,
+   "stock": 6,
+   "candidatos": [
+    "DBV-004",
+    "DBV-002",
+    "DBV-003",
+    "DBV-001",
+    "DBV-007",
+    "DBV-006",
+    "DBV-005"
    ]
   },
   {
@@ -4772,7 +4711,7 @@
    "stock": 5,
    "candidatos": [
     "LIV-021",
-    ""
+    "Coragem! — Eles confiaram em Deus e venceram o medo"
    ]
   },
   {
@@ -4781,7 +4720,7 @@
    "preco": 7500,
    "stock": 5,
    "candidatos": [
-    ""
+    "Futuro de Glória — Nossa vida será muito melhor"
    ]
   },
   {
@@ -4808,7 +4747,7 @@
    "preco": 21944,
    "stock": 5,
    "candidatos": [
-    ""
+    "A Descoberta — A experiência que revolucionou a vida de um cientista ateu"
    ]
   },
   {
@@ -4817,7 +4756,7 @@
    "preco": 15882,
    "stock": 5,
    "candidatos": [
-    ""
+    "Jesus Extremo — Paradoxos que dão vida"
    ]
   },
   {
@@ -4826,7 +4765,7 @@
    "preco": 28661,
    "stock": 5,
    "candidatos": [
-    ""
+    "Guia Prático para Descobrir a Vontade de Deus"
    ]
   },
   {
@@ -4839,29 +4778,29 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
     "LIV-085",
     "LIV-037",
     "LIV-096",
     "LIV-020",
     "BIB-020",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
+    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
    ]
   },
   {
@@ -4874,20 +4813,20 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -4900,20 +4839,20 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -4931,24 +4870,24 @@
    "preco": 33875,
    "stock": 3,
    "candidatos": [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
     "BIB-010",
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura"
    ]
   },
   {
@@ -4957,24 +4896,24 @@
    "preco": 53875,
    "stock": 3,
    "candidatos": [
-    "",
-    "",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
     "BIB-010",
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -4987,20 +4926,20 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -5009,7 +4948,7 @@
    "preco": 22367,
    "stock": 3,
    "candidatos": [
-    ""
+    "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom"
    ]
   },
   {
@@ -5022,15 +4961,30 @@
    ]
   },
   {
+   "kigest_ref": "00024",
+   "artigo_kigest": "ELNÇO DE DESBRAVADORES",
+   "preco": 2000,
+   "stock": 2,
+   "candidatos": [
+    "DBV-004",
+    "DBV-002",
+    "DBV-003",
+    "DBV-001",
+    "DBV-007",
+    "DBV-006",
+    "DBV-005"
+   ]
+  },
+  {
    "kigest_ref": "000115",
    "artigo_kigest": "MENSAGEIRA DO SENHOR",
    "preco": 55429,
    "stock": 2,
    "candidatos": [
     "LIV-057",
-    "",
+    "Mensageira do Senhor — O ministério profético de Ellen G. White",
     "LIV-072",
-    ""
+    "Por que, Senhor? — As respostas que você precisa para as perguntas que sempre fez"
    ]
   },
   {
@@ -5043,20 +4997,20 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -5069,20 +5023,50 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
+   ]
+  },
+  {
+   "kigest_ref": "06052026",
+   "artigo_kigest": "ESPERENÇA PARA VIVER",
+   "preco": 6000,
+   "stock": 2,
+   "candidatos": [
+    "Esperança para Viver — O verdadeiro caminho da felicidade",
+    "COL-001",
+    "LIV-147",
+    "Ainda Existe Esperança — A solução para os problemas da vida",
+    "Tempo de Esperança — 24 horas para você renovar suas energias",
+    "Viver Para Deus — Redescubra a alegria da virtude cristã",
+    "Palavras de Esperança — Histórias da vida diária"
+   ]
+  },
+  {
+   "kigest_ref": "6218731",
+   "artigo_kigest": "ESPERANÇA PARA VIVER",
+   "preco": 6000,
+   "stock": 2,
+   "candidatos": [
+    "Esperança para Viver — O verdadeiro caminho da felicidade",
+    "COL-001",
+    "LIV-147",
+    "Ainda Existe Esperança — A solução para os problemas da vida",
+    "Tempo de Esperança — 24 horas para você renovar suas energias",
+    "Viver Para Deus — Redescubra a alegria da virtude cristã",
+    "Palavras de Esperança — Histórias da vida diária"
    ]
   },
   {
@@ -5100,7 +5084,7 @@
    "preco": 18138,
    "stock": 1,
    "candidatos": [
-    ""
+    "Orando Como Nunca por Seus Filhos"
    ]
   },
   {
@@ -5110,7 +5094,7 @@
    "stock": 1,
    "candidatos": [
     "LIV-015",
-    ""
+    "Orando Como Nunca por Seus Filhos"
    ]
   },
   {
@@ -5139,14 +5123,40 @@
    "preco": 79775,
    "stock": 0,
    "candidatos": [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada Letra Supergigante — capa castanha"
+   ]
+  },
+  {
+   "kigest_ref": "000315",
+   "artigo_kigest": "BIBIA SAGRADA RC",
+   "preco": 49630,
+   "stock": 0,
+   "candidatos": [
+    "BIB-010",
+    "BIB-013",
+    "BIB-016",
+    "BIB-018",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -5159,20 +5169,20 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô"
    ]
   },
   {
@@ -5185,29 +5195,39 @@
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
+    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+    "Bíblia Sagrada — capa dura preta com moldura dourada",
+    "Bíblia Sagrada Letra Supergigante — capa castanha",
+    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+    "Bíblia Sagrada — capa dura com flores, fundo claro",
+    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+    "Bíblia Sagrada — capa dura floral azul-escura",
+    "Bíblia Sagrada — capa dura preta com relevo dourado",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+    "Bíblia Sagrada Letra Gigante — capa azul",
+    "Bíblia Sagrada Letra Gigante — capa bordô",
     "LIV-085",
     "LIV-037",
     "LIV-096",
     "LIV-020",
     "BIB-020",
-    "",
-    "",
-    "",
-    ""
+    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
+    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
+    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
+   ]
+  },
+  {
+   "kigest_ref": "000460",
+   "artigo_kigest": "REAVIMENTO VERDADEIRO",
+   "preco": 6160,
+   "stock": 0,
+   "candidatos": [
+    "LIV-078",
+    "O Reavivamento Prometido — Como receber a plenitude do Espírito Santo"
    ]
   },
   {
@@ -5216,12 +5236,12 @@
    "preco": 15882,
    "stock": 0,
    "candidatos": [
-    "",
+    "Jesus Extremo — Paradoxos que dão vida",
     "LIV-015",
     "BIB-020",
     "LIV-142",
-    "",
-    ""
+    "Revelação de Jesus Cristo — Comentário sobre o livro do Apocalipse",
+    "Jesus Voltará — Uma boa notícia para você"
    ]
   },
   {
@@ -5230,7 +5250,7 @@
    "preco": 21944,
    "stock": 0,
    "candidatos": [
-    ""
+    "A Descoberta — A experiência que revolucionou a vida de um cientista ateu"
    ]
   },
   {
@@ -5239,7 +5259,7 @@
    "preco": 21192,
    "stock": 0,
    "candidatos": [
-    ""
+    "Ser Pai — Redescubra o significado da paternidade"
    ]
   },
   {
@@ -5248,7 +5268,7 @@
    "preco": 51561,
    "stock": 0,
    "candidatos": [
-    ""
+    "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra"
    ]
   },
   {
@@ -5257,7 +5277,26 @@
    "preco": 21192,
    "stock": 0,
    "candidatos": [
-    ""
+    "Ser Pai — Redescubra o significado da paternidade"
+   ]
+  },
+  {
+   "kigest_ref": "005",
+   "artigo_kigest": "A GRANDE EXTINÇÃO EM MASSA",
+   "preco": 51561,
+   "stock": 0,
+   "candidatos": [
+    "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra"
+   ]
+  },
+  {
+   "kigest_ref": "12383",
+   "artigo_kigest": "REAVIVAMENTO VERDAEIRO",
+   "preco": 8551,
+   "stock": 0,
+   "candidatos": [
+    "LIV-078",
+    "O Reavivamento Prometido — Como receber a plenitude do Espírito Santo"
    ]
   },
   {
@@ -5266,26 +5305,21 @@
    "preco": 250,
    "stock": 0,
    "candidatos": [
-    "",
-    ""
+    "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom",
+    "Guia Prático para Descobrir a Vontade de Deus"
    ]
   }
  ],
  "so_no_site": [
-  "LIV-058",
   "LIV-070",
   "BIB-010",
   "LIV-073",
   "LIV-026",
   "LIV-072",
   "LIV-057",
-  "LIV-022",
-  "LIV-023",
   "BIB-013",
-  "LIV-097",
   "BIB-016",
   "BIB-018",
-  "LIV-098",
   "MUS-002",
   "MUS-001",
   "DBV-002",
@@ -5300,53 +5334,13 @@
   "DBV-005",
   "VES-002",
   "LIV-078",
-  "LIV-077",
+  "LIV-082",
   "COL-002",
-  "LIV-008",
   "LIV-005",
   "LIV-021",
   "LIV-031",
-  "LIV-066",
   "LIV-071",
-  "LIV-061",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  ""
+  "LIV-061"
  ],
  "catalogo": [
   {

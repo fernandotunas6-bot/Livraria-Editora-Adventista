@@ -209,24 +209,20 @@ describe('conciliar', () => {
     expect(r.ambiguos.map((a) => a.artigo.ref)).toEqual(['B']);
   });
 
-  it('não escolhe nenhum quando a gralha põe os dois à mesma distância', () => {
+  it('a gralha do KiGest não desvia o par, porque se compara o título corrigido', () => {
     // O caso verdadeiro da exportação de 2026-11-12: o lenço do membro está lançado no
-    // singular («DESBRAVADORE»), o que lhe tira a palavra que o identificava. Sem folga entre
-    // os dois, o site ficaria a vender o lenço do membro a 5 000 Kz, o preço do de líder.
+    // singular («LENÇO DE DESBRAVADORE»). Pelo nome cru não se parecia com o «Lenço do Clube de
+    // Desbravadores» do site e o lenço de líder — a 5 000 Kz, mais do dobro — ficava com o par.
+    // Corrigido o nome, o do membro ganha com folga e é ele o par; o de líder, que é outro
+    // produto, fica para o relatório.
     const arts = [
       { ref: 'A', referencia: 'A', descricao: 'LENÇO DE DESBRAVADORE', ean: '', preco: 2000, stock: 6 },
       { ref: 'B', referencia: 'B', descricao: 'LENÇO DE LÍDER (DESBRAVADORES)', ean: '', preco: 5000, stock: 10 },
     ];
     const r = conciliar(arts, site([{ book_code: 'DBV-004', title: 'Lenço do Clube de Desbravadores', price: 2500, stock: 78 }]));
-    // Nenhum dos dois escreve no DBV-004.
-    expect(r.firmes).toHaveLength(0);
-    // O do líder fica ambíguo, com o produto do site à vista para o dono escolher.
+    expect(r.firmes.map((f) => f.artigo.ref)).toEqual(['A']);
+    expect(r.firmes[0].produto.book_code).toBe('DBV-004');
     expect(r.ambiguos.map((a) => a.artigo.ref)).toEqual(['B']);
-    expect(r.ambiguos[0].alvos.map((p) => p.book_code)).toEqual(['DBV-004']);
-    // O do membro, que a gralha afastou, entra como produto novo — mas com o aviso de que se
-    // parece com um que já existe.
-    expect(r.semPar.map((a) => a.ref)).toEqual(['A']);
-    expect(r.semPar[0].parecidos).toEqual(['DBV-004']);
   });
 
   it('prefere a ligação já feita ao emparelhamento por palavras', () => {
@@ -444,25 +440,28 @@ describe('gerar', () => {
   });
 
   it('não cria produto novo com um título que já existe no catálogo', () => {
-    // «VIAJEM AO SOBRENATURAL» corrigido dá «Viagem ao Sobrenatural», que já lá está.
-    const { novos, jaNoCatalogo } = correr(
+    // «VIAJEM AO SOBRENATURAL» corrigido dá «Viagem ao Sobrenatural», que já lá está — e por
+    // isso passa a ser par dele, em vez de entrar outra vez.
+    const { novos, pares } = correr(
       [{ ref: 'X', referencia: 'X', descricao: 'VIAJEM AO SOBRENATURAL', ean: '', preco: 10000, stock: 1 }],
       [{ id: 'y', book_code: '', title: 'Viagem ao Sobrenatural', price: 0, stock: 0, isbn: '', product_type: 'livro', genre: '', active: false, description: '<p>uma descrição comprida o suficiente para não contar como em falta</p>', kigest_ref: '' }],
     );
     expect(novos).toHaveLength(0);
-    expect(jaNoCatalogo.map((n) => n.title)).toEqual(['Viagem ao Sobrenatural']);
+    expect(pares).toHaveLength(1);
+    expect(pares[0].artigo.ref).toBe('X');
   });
 
   it('não cria dois produtos novos com o mesmo título corrigido', () => {
-    const { novos, repetidosNoTitulo } = correr([
+    // «CORDERINNHO» e «CORDERINHO» dão os dois «Cordeirinho»: é o mesmo cartão lançado duas
+    // vezes no KiGest. Entra um só — o que tem existência.
+    const { novos, gruposRepetidos } = correr([
       { ref: 'A', referencia: 'A', descricao: 'CORDERINNHO', ean: '', preco: 250, stock: 0 },
       { ref: 'B', referencia: 'B', descricao: 'CORDERINHO', ean: '', preco: 250, stock: 4 },
     ], []);
     expect(novos.map((n) => n.title)).toEqual(['Cordeirinho']);
-    // Fica o que tem existência.
     expect(novos[0].artigo.ref).toBe('B');
-    expect(repetidosNoTitulo).toHaveLength(1);
-    expect(repetidosNoTitulo[0].sai.artigo.ref).toBe('A');
+    expect(gruposRepetidos).toHaveLength(1);
+    expect(gruposRepetidos[0].slice(1).map((a) => a.ref)).toEqual(['A']);
   });
 
   it('liga por título quem está oculto e não tem código', () => {

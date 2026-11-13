@@ -71,37 +71,32 @@ export const descricaoEmFalta = (p) => {
 };
 
 export function gerar({ exportacao, artigosKigest, produtosSite, decisoes = { paraODono: [] } }) {
-  const r = conciliar(artigosKigest, produtosSite);
+  // O título corrigido calcula-se uma vez e segue com o artigo: é com ele que se emparelha e é
+  // com ele que o produto entra na loja. Comparar o nome cru e criar o produto com o corrigido
+  // era o que fazia entrar doze produtos repetidos.
+  const comTitulo = artigosKigest.map((a) => ({ ...a, titulo: titulo(a.descricao) }));
+  const r = conciliar(comTitulo, produtosSite);
   const pares = diferencas(r.firmes);
   const gruposRepetidos = duplicados(r.semPar);
   const repetidos = new Set(gruposRepetidos.flatMap((g) => g.slice(1)).map((a) => a.ref));
   const chaveTitulo = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const titulosDoSite = new Set(produtosSite.map((p) => chaveTitulo(p.title)));
   const candidatos = r.semPar
     .filter((a) => !repetidos.has(a.ref))
-    .map((a) => {
-      const nome = titulo(a.descricao);
-      return { artigo: a, title: nome, tipo: tipoDeProduto(nome), genero: prateleira(nome) };
-    })
+    .map((a) => ({ artigo: a, title: a.titulo, tipo: tipoDeProduto(a.titulo), genero: prateleira(a.titulo) }))
     .sort((a, b) => a.title.localeCompare(b.title, 'pt'));
 
-  // Duas peneiras antes de criar produto novo.
+  // Uma peneira antes de criar produto novo: dois artigos do KiGest que, depois de corrigidos,
+  // dão o mesmo título («CONCELHO SOBRE MORDOMIA» e «CONSELHOS SOBRE MORDOMIA»). O `duplicados`
+  // não os apanha porque têm preços diferentes, e o «not exists» do insert também não — dentro
+  // da mesma instrução as linhas não se vêem umas às outras. Fica o que tem existência.
   //
-  // A primeira: o título corrigido já existe no catálogo. Acontece porque o emparelhamento por
-  // palavras compara o título abreviado do KiGest com o do site e pode não chegar à fasquia,
-  // enquanto o título corrigido fica igual ao que já lá está. A migração tem a mesma guarda em
-  // SQL — é ela que vale, porque em SQL vê-se o catálogo todo; esta serve para o relatório e a
-  // migração dizerem o mesmo número.
-  const jaNoCatalogo = candidatos.filter((n) => titulosDoSite.has(chaveTitulo(n.title)));
-  // A segunda: dois artigos do KiGest com o mesmo título depois de corrigido («CORDERINNHO» e
-  // «CORDERINHO», «EDIFICADORES» e «EDIFICADODORES»). O «not exists» do insert não os apanha —
-  // dentro da mesma instrução as linhas não se vêem umas às outras. Fica o que tem existência.
+  // Contra o produto que já existe no catálogo quem vale são as guardas em SQL do insert: a
+  // chave pública não vê o que está oculto, e em SQL vê-se o catálogo todo.
   const porTituloNovo = new Map();
   const novos = [];
   const repetidosNoTitulo = [];
   for (const n of candidatos) {
-    if (titulosDoSite.has(chaveTitulo(n.title))) continue;
     const k = chaveTitulo(n.title);
     const anterior = porTituloNovo.get(k);
     if (!anterior) {
@@ -250,7 +245,7 @@ insert into private.kigest_import (exportacao, origem, ligados, criados)
 values (${lit(exportacao.meta.data)}::timestamptz, ${lit(exportacao.meta.origem)}, ${pares.length}, ${novos.length});`);
 
   return {
-    sql: `${sql.join('\n')}\n`, pares, novos, gruposRepetidos, repetidosNoTitulo, jaNoCatalogo,
+    sql: `${sql.join('\n')}\n`, pares, novos, gruposRepetidos, repetidosNoTitulo,
     resultado: r, produtosSite, decisoes,
   };
 }
@@ -258,7 +253,7 @@ values (${lit(exportacao.meta.data)}::timestamptz, ${lit(exportacao.meta.origem)
 // O que a migração decidiu, em JSON: serve de prova para quem revê o PR (dá para conferir
 // número a número sem abrir o KiGest) e de cenário para o scripts/pglite/kigest.mjs.
 export function mapa({
-  exportacao, pares, novos, gruposRepetidos, repetidosNoTitulo = [], jaNoCatalogo = [], resultado, produtosSite,
+  exportacao, pares, novos, gruposRepetidos, repetidosNoTitulo = [], resultado, produtosSite,
 }) {
   return {
     exportacao: exportacao.meta.data,
@@ -289,20 +284,14 @@ export function mapa({
     })),
     repetidos: gruposRepetidos.map((g) => ({ fica: g[0].ref, sai: g.slice(1).map((a) => a.ref) })),
     repetidos_no_titulo: repetidosNoTitulo.map((x) => ({ fica: x.fica.artigo.ref, sai: x.sai.artigo.ref, titulo: x.fica.title })),
-    ja_no_catalogo: jaNoCatalogo.map((n) => ({ kigest_ref: n.artigo.ref, artigo_kigest: n.artigo.descricao, titulo: n.title })),
     ambiguos: resultado.ambiguos.map((a) => ({
       kigest_ref: a.artigo.ref,
       artigo_kigest: a.artigo.descricao,
       preco: a.artigo.preco,
       stock: a.artigo.stock,
-      candidatos: a.alvos.map((p) => p.book_code),
+      candidatos: a.alvos.map((p) => p.book_code || p.title),
     })),
-    so_no_site: resultado.soNoSite.map((p) => p.book_code),
-    // O catálogo como estava antes desta migração. Serve para quem revê conferir cada número
-    // e para o scripts/pglite/kigest.mjs montar uma base igual à de produção. A descrição só
-    // vem por inteiro onde está em falta (vazia ou o título repetido) — é a que a migração das
-    // descrições vai preencher; nas outras fica uma marca, que o cenário usa para verificar
-    // que não foram tocadas.
+    so_no_site: resultado.soNoSite.map((p) => p.book_code).filter(Boolean),
     catalogo: produtosSite.map((p) => ({
       book_code: p.book_code,
       title: p.title,
@@ -317,7 +306,7 @@ export function mapa({
 }
 
 export function relatorio({
-  exportacao, pares, novos, gruposRepetidos, repetidosNoTitulo = [], jaNoCatalogo = [], resultado,
+  exportacao, pares, novos, gruposRepetidos, repetidosNoTitulo = [], resultado,
   decisoes = { ligacoes: [], paraODono: [] },
 }) {
   const kz = (v) => Number(v).toLocaleString('pt-PT', { maximumFractionDigits: 2 });
@@ -401,18 +390,6 @@ export function relatorio({
     t(`|---|---:|---|---:|`);
     for (const g of gruposRepetidos) {
       t(`| ${g[0].descricao} | ${g[0].stock} | ${g.slice(1).map((a) => a.descricao).join(' / ')} | ${g.slice(1).map((a) => a.stock).join(' / ')} |`);
-    }
-  }
-  if (jaNoCatalogo.length > 0) {
-    t(`\n## O título corrigido já existia no catálogo\n`);
-    t(`Depois de arrumada a caixa e corrigidas as gralhas, o nome destes ficou igual ao de um`);
-    t(`produto que já lá está — e a chave pública não vê o que está oculto, por isso o`);
-    t(`emparelhamento por palavras não tinha como o saber. Não entram outra vez. Se algum for`);
-    t(`mesmo outro produto, é no KiGest que se lhe dá um nome que o distinga.\n`);
-    t(`| Ref. | Artigo da loja | Título corrigido | Preço | Stock |`);
-    t(`|---|---|---|---:|---:|`);
-    for (const n of jaNoCatalogo) {
-      t(`| ${n.artigo.ref} | ${n.artigo.descricao} | ${n.title} | ${kz(n.artigo.preco)} | ${n.artigo.stock} |`);
     }
   }
   if (repetidosNoTitulo.length > 0) {

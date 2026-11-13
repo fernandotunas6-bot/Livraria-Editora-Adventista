@@ -43,7 +43,7 @@ export const CORRECCOES = new Map(Object.entries({
   PROIBIDOS: 'Proibido', APOSETADORIA: 'Aposentadoria', VEU: 'Véu', CORAÇA: 'Coração',
   DESBRAVADORE: 'Desbravadores', SABADO: 'Sábado', MIDIA: 'Mídia', ACTA: 'Actas',
   QUITE: 'Kit', COMENTARIOS: 'Comentários', COMENTARIO: 'Comentário', DIARIAS: 'Diárias',
-  MEDITAÇAÕ: 'Meditação', SAUDAVEL: 'Saudável', FILHO: 'Filhos', LAÇO: 'Lenço',
+  MEDITAÇAÕ: 'Meditação', SAUDAVEL: 'Saudável', LAÇO: 'Lenço',
   VOCE: 'Você', NAO: 'Não', SO: 'Só', PROPOSITO: 'Propósito', PROPOSITOS: 'Propósitos', AREA: 'Área', PROPRIO: 'Próprio', JUIZO: 'Juízo', PRINCIPIO: 'Princípio', PRINCIPIOS: 'Princípios',
   BIBLICO: 'Bíblico', BIBLICOS: 'Bíblicos', TEOLOGICO: 'Teológico', LAGRIMAS: 'Lágrimas',
   CEU: 'Céu', FAMILIA: 'Família', SAUDE: 'Saúde', PRATICO: 'Prático', HISTORIA: 'História',
@@ -114,7 +114,7 @@ export function titulo(bruto) {
 const REGRAS = [
   [/santa ceia|vinho|suco de uva|bandeja/i, 'papelaria'],
   [/\bhinari|\bhinário/i, 'musica'],
-  [/\bb[ií]bl|novo testamento|\bb[ií]bia\b/i, 'biblia'],
+  [/\bb[ií]blias?\b|\bb[ií]bia\b|novo testamento/i, 'biblia'],
   [/len[çc]o|emblema|distintivo|apito|cord[ãa]o|prendedor|torsal|insignia|ins[íi]gnia/i, 'desbravadores'],
   [/t-?shirt|t-?chert|camis|blusa|gravata|farda/i, 'vestuario'],
   [/revista|trimes/i, 'revista'],
@@ -129,7 +129,7 @@ export function tipoDeProduto(nome) {
 const PRATELEIRAS = [
   [/santa ceia|vinho|suco de uva|bandeja/i, 'Santa Ceia'],
   [/hinari|hinário/i, 'Hinários'],
-  [/b[ií]bl|novo testamento/i, 'Bíblias'],
+  [/\bb[ií]blias?\b|\bb[ií]bia\b|novo testamento/i, 'Bíblias'],
   [/len[çc]o|emblema|apito|cord[ãa]o|prendedor|desbravador|aventureir|embaixador|\bja\b|cordeirinho|abelhinha|luminares|edificadores/i, 'Desbravadores'],
   [/t-?shirt|t-?chert|camis|blusa/i, 'Vestuário'],
   [/cart[ãa]o|cart[õo]es|certificado|envelope|folheto|brochura|bloco|factura|cat[áa]logo|livro de (acta|registro|registo)/i, 'Material de Igreja'],

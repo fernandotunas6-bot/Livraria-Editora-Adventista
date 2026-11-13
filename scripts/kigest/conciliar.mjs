@@ -8,6 +8,12 @@
 // chave comum: o código de barras só está preenchido num lado ou no outro e o book_code
 // (LIV-0xx) é do site. Daí o emparelhamento por palavras.
 //
+// Compara-se o título JÁ CORRIGIDO do artigo (scripts/kigest/titulos.mjs), e não o nome cru.
+// É o corrigido que vai para a loja, e é com ele que a comparação faz sentido: o «LENÇO DE
+// DESBRAVADORE» do KiGest, que está lançado no singular, não se parecia com o «Lenço do Clube
+// de Desbravadores» do site e entrava como produto novo — mas o nome com que entrava era
+// «Lenço de Desbravadores», que é o mesmo produto. Doze produtos entravam repetidos assim.
+//
 // A regra é conservadora de propósito — o que se vai escrever é preço e stock, e um par errado
 // põe o preço de um livro noutro. Só conta como par FIRME quando é um para um: o artigo do
 // KiGest tem um único candidato no topo e esse produto do site não é reclamado por mais nenhum
@@ -15,7 +21,7 @@
 // («capa dura castanha», «bordô com flores»…) e o KiGest tem vinte («RA», «NTLH», «SLIM»,
 // «LETRA GIGANTE», «UMBUNDU»…) — ninguém consegue dizer de fora qual é qual.
 
-import { CORRECCOES } from './titulos.mjs';
+import { CORRECCOES, titulo as corrigirTitulo } from './titulos.mjs';
 
 const VAZIAS = new Set([
   'de', 'da', 'do', 'das', 'dos', 'a', 'o', 'e', 'em', 'no', 'na', 'para', 'com', 'um', 'uma',
@@ -86,6 +92,7 @@ export function conciliar(artigosKigest, produtosSite) {
   for (const s of site) if (s.ean.length === 13) (porEan.get(s.ean) ?? porEan.set(s.ean, []).get(s.ean)).push(s);
 
   const avaliados = artigosKigest.map((artigo) => {
+    const nome = artigo.titulo ?? corrigirTitulo(artigo.descricao);
     // 1. Já ligado pelo kigest_ref: é a chave boa e dispensa adivinhar.
     const ligado = porRef.get(artigo.ref);
     if (ligado) return { artigo, candidatos: [{ nota: 1, alvo: ligado }], pretendentes: [], via: 'ref' };
@@ -99,7 +106,7 @@ export function conciliar(artigosKigest, produtosSite) {
       return { artigo, candidatos, pretendentes: candidatos, via: 'codigo' };
     }
     // 4. Palavras do título.
-    const pa = palavras(artigo.descricao);
+    const pa = palavras(tituloBase(nome));
     const pretendentes = site
       .map((alvo) => ({ nota: semelhanca(pa, alvo.palavras), alvo }))
       .filter((c) => c.nota >= MINIMO_PRETENDENTE)
@@ -178,13 +185,14 @@ export function diferencas(firmes) {
 // Dois sinais ao mesmo tempo, porque nenhum deles basta: títulos parecidos (há livros de nomes
 // próximos que são obras diferentes) e o mesmo preço ao cêntimo (há muitos livros a 40 000 Kz).
 const gralhas = (artigo) => artigo.descricao.split(/\s+/).filter((p) => CORRECCOES.has(p.toUpperCase())).length;
+const nomeDe = (artigo) => artigo.titulo ?? corrigirTitulo(artigo.descricao);
 
 export function duplicados(artigos) {
   const grupos = [];
   const usados = new Set();
   artigos.forEach((a, i) => {
     if (usados.has(i)) return;
-    const pa = palavras(a.descricao);
+    const pa = palavras(nomeDe(a));
     const grupo = [a];
     artigos.forEach((b, j) => {
       if (j <= i || usados.has(j)) return;
@@ -192,7 +200,7 @@ export function duplicados(artigos) {
       // Aqui conta a semelhança pura (Jaccard) e não a cobertura: «CERTIFICADO» cabe todo
       // dentro de «CERTIFICADO DO MINISTÉRIO PESSOAL» e são dois produtos diferentes.
       // E num título de uma palavra só meia semelhança não diz nada: tem de ser igual.
-      const pb = palavras(b.descricao);
+      const pb = palavras(nomeDe(b));
       const nota = jaccard(pa, pb);
       if (nota < 1 && (nota < 0.5 || pa.size < 2 || pb.size < 2)) return;
       grupo.push(b);

@@ -11,10 +11,10 @@
 --     faltava: sem ela, cada exportação obriga a emparelhar os dois catálogos pelos títulos,
 --     e os títulos do KiGest estão em maiúsculas e com gralhas. Com ela, a próxima exportação
 --     actualiza o stock sem adivinhar nada.
---  2. Liga 121 produtos que já existiam ao artigo do KiGest e passa a usar o stock e o preço
---     da loja. 108 tinham stock diferente e 50 tinham preço diferente. Preenche também
---     o ISBN em 74 livros que estavam sem ele.
---  3. Traz 225 artigos que a loja vende e o site não tinha, TODOS OCULTOS (active = false),
+--  2. Liga 129 produtos que já existiam ao artigo do KiGest e passa a usar o stock e o preço
+--     da loja. 116 tinham stock diferente e 53 tinham preço diferente. Preenche também
+--     o ISBN em 81 livros que estavam sem ele.
+--  3. Traz 210 artigos que a loja vende e o site não tinha, TODOS OCULTOS (active = false),
 --     com o preço e o stock do KiGest e sem capa. Ficam à espera de fotografia, descrição e de
 --     uma leitura ao título antes de serem publicados — ver docs/catalogo/KIGEST.md.
 --
@@ -48,10 +48,11 @@ revoke all on sequence private.kigest_import_id_seq from public, anon, authentic
 
 -- 1 de 3 — os que já estavam à venda. Só entra aqui quem ganhou com folga: o artigo do KiGest
 -- era o único candidato no topo e nenhum outro artigo da loja andava perto do mesmo produto. O
--- que ficou ambíguo (42 artigos — as bíblias à cabeça, e os lenços, onde a loja separa o do
+-- que ficou ambíguo (50 artigos — as bíblias à cabeça, e os lenços, onde a loja separa o do
 -- membro do de líder e o site tem um só) não entra aqui: está no relatório, para o dono decidir.
 with pares(book_code, kigest_ref, preco, stock, ean) as (values
-  ('LIV-142'::text, '0006'::text, 2000::numeric, 24::numeric, ''::text),
+  ('LIV-098'::text, '00007'::text, 10000::numeric, 1::numeric, '9788534531146'::text),
+  ('LIV-142', '0006', 2000, 24, ''),
   ('LIV-063', '0008', 20000, 67, '9788534526203'),
   ('LIV-030', '00034', 3571, 35, ''),
   ('DBV-003', '00039', 2000, 22, ''),
@@ -63,6 +64,7 @@ with pares(book_code, kigest_ref, preco, stock, ean) as (values
   ('LIV-013', '00061', 11030, 4, '9788534503082'),
   ('LIV-006', 'id-59', 36135, 9, '9788534522076'),
   ('LIV-007', '00063', 3150, 1, '9788534510288'),
+  ('LIV-008', '00064', 12215, 2, '9788534529648'),
   ('LIV-009', '00065', 14180, 2, '9788534527996'),
   ('LIV-011', '00067', 13925, 6, '9788534526753'),
   ('LIV-012', '00069', 18910, 1, '9788534521352'),
@@ -72,7 +74,9 @@ with pares(book_code, kigest_ref, preco, stock, ean) as (values
   ('LIV-016', '00079', 22450, 0, '9788534526104'),
   ('LIV-017', '00080', 28701.41, 0, '9788534511582'),
   ('LIV-018', '00081', 11425, 0, '9788534536233'),
+  ('LIV-022', '00083', 35925, 7, '9788534513401'),
   ('LIV-010', '00084', 20485, 3, '9788534509282'),
+  ('LIV-023', '00085', 7485, 6, '9788534523707'),
   ('LIV-024', '00086', 15365, 6, '9788534518833'),
   ('LIV-034', '00092', 16260, 1, '9788534508841'),
   ('LIV-027', '00093', 10605, 3, '9788534510424'),
@@ -90,13 +94,15 @@ with pares(book_code, kigest_ref, preco, stock, ean) as (values
   ('LIV-043', '000107', 16545, 5, '9788534534581'),
   ('LIV-076', '000111', 27970, 4, ''),
   ('LIV-075', '000112', 31510, 3, '9788534504720'),
+  ('LIV-058', '000113', 14180, 4, ''),
+  ('LIV-066', '000114', 31627, 6, '9788534507233'),
+  ('LIV-077', '000116', 56325, 6, '9788534510943'),
   ('LIV-069', '000118', 17790, 4, '9788534523608'),
   ('LIV-087', '000122', 15395, 8, '9788534520812'),
   ('LIV-074', '000123', 16490, 8, '9786589895831'),
   ('LIV-095', '000124', 18135, 7, '9788534530927'),
   ('LIV-096', '000125', 15755, 7, '9786586391589'),
   ('LIV-025', '000126', 25605, 5, ''),
-  ('LIV-082', '000127', 30105, 9, '9788534509053'),
   ('LIV-044', '000128', 58737, 0, '9788534533027'),
   ('LIV-041', '000129', 8210, 2, '9786586391084'),
   ('LIV-053', '000130', 15055, 2, '9788534520386'),
@@ -128,6 +134,7 @@ with pares(book_code, kigest_ref, preco, stock, ean) as (values
   ('LIV-045', '000180', 13790, 3, '9788534536240'),
   ('LIV-019', '000183', 19695, 7, '9788534512398'),
   ('LIV-085', '000184', 13790, 5, ''),
+  ('LIV-097', '000185', 10245, 2, '9788534530125'),
   ('LIV-047', '000226', 13685, 4, '9788534523332'),
   ('LIV-064', '000229', 18135, 6, '9788534536424'),
   ('LIV-100', '000231', 18515, 5, '9788534533867'),
@@ -151,13 +158,14 @@ update public.stock_books b
  where b.book_code = p.book_code
    and coalesce(b.kigest_ref, '') in ('', p.kigest_ref);
 
--- 2 de 3 — os 34 que estão ocultos desde a migração 20261110090000 e que a loja também vende.
+-- 2 de 3 — os 35 que estão ocultos desde a migração 20261110090000 e que a loja também vende.
 -- Estes ganham finalmente preço e stock, que era o que lhes faltava para poderem ser publicados.
 -- A ligação é pelo título exacto, porque o código que o gatilho lhes deu em produção não está
 -- escrito em lado nenhum. 12 deles confirmam-se pelo id na loja da editora, que o
 -- KiGest usa como referência do artigo.
 with pares(titulo, kigest_ref, preco, stock, ean) as (values
-  ('Olhando para o Criador e Salvador — Meditações diárias'::text, '000030'::text, 5700::numeric, 18::numeric, ''::text),
+  ('Como Conhecer a Vontade de Deus'::text, '00014'::text, 7182::numeric, 7::numeric, '9788534525237'::text),
+  ('Olhando para o Criador e Salvador — Meditações diárias', '000030', 5700, 18, ''),
   ('Ouvindo a Voz de Deus — Guia de estudos bíblicos', '000031', 2000, 295, ''),
   ('Comentário Bíblico Andrews — Colecção completa em 4 volumes', '000135', 161100, 0, ''),
   ('Momentos de Paz — O descanso que traz calma para uma vida agitada', '0000667766', 5000, 0, ''),
@@ -166,7 +174,6 @@ with pares(titulo, kigest_ref, preco, stock, ean) as (values
   ('Unidade e Foco na Missão — O segredo para uma organização eclesiástica eficaz', '01052026', 5000, 2, '9786501436289'),
   ('Além da Imaginação — Os surpreendentes mistérios da vida', '961000', 16019, 5, ''),
   ('Nunca Vou Me Render — A resistência de um jovem polonês ao nazismo', '99456', 35883, 0, ''),
-  ('A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra', '005', 51561, 0, ''),
   ('Proteja Sua Família — Os desafios de cada ciclo da vida', '006', 11324, 1, ''),
   ('O Altar da Família — Restaurando a comunhão com Deus', '009', 24153, 4, ''),
   ('Sonhe Alto — Como dar o melhor de si mesmo', '0011', 30026, 2, ''),
@@ -184,12 +191,13 @@ with pares(titulo, kigest_ref, preco, stock, ean) as (values
   ('Lágrimas — Como enfrentar a dor e superar o sofrimento', '15529', 29917, 5, ''),
   ('Devocional da Família — Pedacinho do Céu', '16298', 25139, 3, ''),
   ('Chuvas de Bênçãos — Liderança fiel até o fim', '16686', 4511, 13, ''),
+  ('Coração Restaurado — Transformação de vidas pelo amor', '193883', 30680, 0, ''),
   ('Primeiro o Reino — Como uma pobre viúva nos ensina os princípios da verdadeira adoração', '19612', 12346, 2, ''),
   ('Viver Para Deus — Redescubra a alegria da virtude cristã', '20147', 19876, 0, ''),
   ('O Atirador Convertido — E outras histórias de salvação e milagres', '21411', 15882, 3, ''),
   ('Ainda Existe Esperança — A solução para os problemas da vida', '0035', 3571, 18, ''),
   ('A Igreja Remanescente', '0040', 7941, 0, ''),
-  ('Esperança para Viver — O verdadeiro caminho da felicidade', '6218731', 6000, 2, ''),
+  ('Palavras de Esperança — Histórias da vida diária', '30062026', 500, 91, ''),
   ('Saúde & Bem-Estar — Segredos que podem mudar a sua vida', '45992', 6000, 4790, '9781920579128')
 )
 update public.stock_books b
@@ -225,19 +233,16 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('21 Dias para Mudar', 'livro', 'Catálogo Geral', '080620262', '9786586391534', 40000, 2),
   ('250 Receitas', 'livro', 'Saúde & Estilo de Vida', '010520263', '9788472083639', 52000, 2),
   ('A Ciência do Bom Viver', 'livro', 'Catálogo Geral', '0010', '', 26030, 1),
-  ('A Mensagem de 1888', 'livro', 'Catálogo Geral', '000113', '', 14180, 4),
   ('A Saúde Pelos Alimentos', 'livro', 'Saúde & Estilo de Vida', '0050', '9788472083592', 52000, 1),
   ('A Única Esperança', 'livro', 'Catálogo Geral', '000360', '9788534519533', 2000, 0),
-  ('A Verdadeira Riqueza', 'livro', 'Fé & Doutrina', '000185', '9788534530125', 10245, 2),
   ('A Volta por Cima', 'livro', 'Catálogo Geral', '0025', '', 28476, 5),
   ('Abelhinhas', 'livro', 'Desbravadores', '00009999', '', 250, 0),
   ('Administração Eficaz', 'livro', 'Catálogo Geral', '000227', '9788534531139', 17339, 0),
   ('Além da Magia (Livro Infantil)', 'livro', 'Catálogo Geral', '00020', '9788534511919', 7000, 1),
-  ('Além da Morte', 'livro', 'Catálogo Geral', '00064', '9788534529648', 12215, 2),
   ('Amigos', 'livro', 'Catálogo Geral', '2225588', '', 250, 0),
   ('Anciãos Anciãs, Manual dos Anciãos Adventistas', 'livro', 'Catálogo Geral', '00016', '9789898799906', 7200, 9),
   ('Bandeja de Santa Ceia', 'papelaria', 'Santa Ceia', '00022', '', 40000, 1),
-  ('Bebe Saúde para Mãe e Filhos', 'livro', 'Saúde & Estilo de Vida', '000339', '', 37465, 4),
+  ('Bebe Saúde para Mãe e Filho', 'livro', 'Saúde & Estilo de Vida', '000339', '', 37465, 4),
   ('Bíblia Andrews', 'biblia', 'Bíblias', '00048', '', 89350, 0),
   ('Bíblia Arqueológica', 'biblia', 'Bíblias', 'OO29', '', 99350, 0),
   ('Bíblia da Mulher', 'biblia', 'Bíblias', '16206', '', 55250, 0),
@@ -255,8 +260,7 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Bíblia Sagrada Nova Almeida Actualizada', 'biblia', 'Bíblias', '000311', '', 9500, 0),
   ('Bíblia Sagrada Nova Semente', 'biblia', 'Bíblias', 'LV00021', '', 6000, 7),
   ('Bíblia Sagrada RA Rosa', 'biblia', 'Bíblias', '000329', '', 49630, 8),
-  ('Bíblia Sagrada RC', 'biblia', 'Bíblias', '000315', '', 49630, 0),
-  ('Bíblia Sagrada se o Filhos Libertar', 'biblia', 'Bíblias', '000304', '', 13790, 20),
+  ('Bíblia Sagrada se o Filho Libertar', 'biblia', 'Bíblias', '000304', '', 13790, 20),
   ('Bíblia Sagrada Semeando a Palavra que Transforma', 'biblia', 'Bíblias', '000455', '', 9500, 0),
   ('Bíblia Sagrada Sociedade Bíblica Brasil', 'biblia', 'Bíblias', '000305', '', 15755, 0),
   ('Bilingue', 'livro', 'Catálogo Geral', '000313', '9788531117176', 55000, 1),
@@ -268,7 +272,7 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Cartão de Voto', 'papelaria', 'Material de Igreja', '023876', '', 845, 116),
   ('Cartas Jovens Namorados', 'livro', 'Família & Relacionamentos', '000503', '', 9733, 1),
   ('Cartões da Escola Sabatina', 'papelaria', 'Material de Igreja', '000350', '', 400, 47),
-  ('Casamento Princípio Bíblicos e Teológico', 'biblia', 'Bíblias', '15329', '', 35242, 5),
+  ('Casamento Princípio Bíblicos e Teológico', 'livro', 'Família & Relacionamentos', '15329', '', 35242, 5),
   ('Catalogo', 'papelaria', 'Material de Igreja', '0004050', '', 50, 10),
   ('Certificado', 'papelaria', 'Material de Igreja', '00099444', '', 250, 7295),
   ('Certificado A4', 'papelaria', 'Material de Igreja', '060520261', '', 600, 101),
@@ -278,9 +282,8 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Certificado Honroso', 'papelaria', 'Material de Igreja', '000462', '', 714.33, 0),
   ('Chamados para Salvar', 'livro', 'Catálogo Geral', '015062026', '', 15000, 0),
   ('Chave da Virada', 'livro', 'Catálogo Geral', '00004', '', 3000, 2),
-  ('Ciclo da Infelicidade', 'livro', 'Catálogo Geral', '11486', '', 27818, 0),
   ('Comece Hoje a Perder Peso', 'livro', 'Saúde & Estilo de Vida', '00035', '', 7000, 3),
-  ('Como Formar Filhos Vencedor', 'livro', 'Família & Relacionamentos', '080620263', '9786589895039', 40000, 0),
+  ('Como Formar Filho Vencedor', 'livro', 'Família & Relacionamentos', '080620263', '9786589895039', 40000, 0),
   ('Como Lidar com as Emoções', 'livro', 'Saúde & Estilo de Vida', '0020', '', 11747, 5),
   ('Companheiro', 'livro', 'Catálogo Geral', '1111999', '', 250, 0),
   ('Conduta Sexual', 'livro', 'Família & Relacionamentos', '000222', '9788534533409', 14945, 6),
@@ -291,12 +294,9 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Conselhos sobre Escola Sabatina', 'livro', 'Catálogo Geral', '00700', '', 14950, 0),
   ('Conselhos sobre Mordomia', 'livro', 'Catálogo Geral', '00019', '9788534501941', 16100, 14),
   ('Conselhos sobre Regime Alimentar', 'livro', 'Saúde & Estilo de Vida', '000196', '', 18310, 0),
-  ('Coração Restaurado', 'livro', 'Catálogo Geral', '193883', '', 30680, 0),
   ('Cordeirinho', 'livro', 'Desbravadores', '33339999', '', 250, 0),
   ('Corpo Saudável', 'livro', 'Saúde & Estilo de Vida', '300420261', '9789728891657', 65000, 3),
   ('Corte', 'livro', 'Catálogo Geral', '23568', '', 30000, 1),
-  ('Crenças Populares', 'livro', 'Fé & Doutrina', '00083', '9788534513401', 35925, 7),
-  ('Crise Existencial', 'livro', 'Catálogo Geral', '00085', '9788534523707', 7485, 6),
   ('Daniel Interpretação', 'livro', 'Apocalipse & Profecia', '00091', '9788534534604', 42675, 0),
   ('Declarações da Igreja', 'livro', 'Catálogo Geral', '0017', '', 41693, 10),
   ('Desfrutar da Vida', 'livro', 'Catálogo Geral', '010520262', '9789728891893', 65000, 0),
@@ -305,7 +305,6 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Em Busca de Esperança', 'livro', 'Catálogo Geral', '15766', '', 3571, 10),
   ('Emblemas de JA. Adultos', 'desbravadores', 'Desbravadores', '16032026', '', 1000, 91),
   ('Envelope de Dízimo', 'papelaria', 'Material de Igreja', '30032026', '', 250, 63),
-  ('Esperança para Viver', 'livro', 'Catálogo Geral', '06052026', '9788534511186', 6000, 2),
   ('Estarei Pronta no Sábado', 'livro', 'Fé & Doutrina', '000459', '', 6000, 3),
   ('Evangelismo', 'livro', 'Catálogo Geral', '0027', '', 29791, 2),
   ('Eventos Finais', 'livro', 'Apocalipse & Profecia', '0036', '', 17527, 2),
@@ -334,7 +333,6 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Juízo sem Medo', 'livro', 'Apocalipse & Profecia', '15439', '', 19125, 5),
   ('Kit de Comentários', 'livro', 'Catálogo Geral', '00049', '', 160000, 1),
   ('Lenço Aventureiro', 'desbravadores', 'Desbravadores', '00025', '', 2000, 18),
-  ('Lenço de Desbravadores', 'desbravadores', 'Desbravadores', '00050', '', 2000, 6),
   ('Lenço de Lider Jovem', 'desbravadores', 'Desbravadores', '09032026', '', 3000, 1),
   ('Lenço JA', 'desbravadores', 'Desbravadores', '000508', '', 2000, 61),
   ('Liderança Cristã', 'livro', 'Pregação & Liderança', '000221', '9788534531115', 10620, 8),
@@ -380,8 +378,6 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Obreiros Evangélicos', 'livro', 'Pregação & Liderança', '000197', '9788534533119', 23205, 9),
   ('Onda das Alianças', 'livro', 'Catálogo Geral', '00097', '9786589448822', 49370, 0),
   ('Orientação da Criança', 'livro', 'Catálogo Geral', '000192', '9786589448747', 23202, 6),
-  ('Origens', 'livro', 'Catálogo Geral', '000114', '9788534507233', 31627, 6),
-  ('Palavras de Esperança', 'livro', 'Catálogo Geral', '30062026', '', 500, 91),
   ('Passarinhos', 'livro', 'Catálogo Geral', '25559888', '', 250, 0),
   ('Patriarcas e Profetas Encadernado', 'livro', 'Apocalipse & Profecia', '14875', '', 33909, 6),
   ('Pecado e Salvação', 'livro', 'Catálogo Geral', '13165', '', 27207, 3),
@@ -402,9 +398,8 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Profetas e Reis', 'livro', 'Apocalipse & Profecia', '14878', '', 27271, 6),
   ('Quando Tudo Falha', 'livro', 'Catálogo Geral', '0012', '', 7471, 5),
   ('Quebrando o Silêncio', 'livro', 'Catálogo Geral', '000403', '', 2000, 20),
-  ('Questões sobre Doutrinas', 'livro', 'Fé & Doutrina', '000116', '9788534510943', 56325, 6),
-  ('Reavivamento Verdadeiro', 'livro', 'Fé & Doutrina', '000460', '9788534513760', 6160, 0),
   ('Regras para que', 'livro', 'Catálogo Geral', '100320263', '', 2000, 57),
+  ('Respostas a Objecções', 'livro', 'Catálogo Geral', '000127', '9788534509053', 30105, 9),
   ('Revista Esperança Novo Tempo', 'revista', 'Catálogo Geral', '24032026', '', 3500, 1),
   ('Revista Viva', 'revista', 'Catálogo Geral', '00027', '', 3000, 10),
   ('Revolucione Seu Futuro', 'livro', 'Catálogo Geral', '080620264', '9788534529303', 40000, 0),
@@ -421,8 +416,6 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
   ('Suco de Uva', 'papelaria', 'Santa Ceia', '000029', '', 12000, 1),
   ('T-shirt de Mordomia', 'vestuario', 'Vestuário', 'T-SHIRT20', '', 2000, 8),
   ('T-shirt do Centenário', 'vestuario', 'Vestuário', 'T-SHIRT23', '', 1500, 448),
-  ('T-shirt UmaVoz27', 'vestuario', 'Vestuário', '21102026', '', 3500, 11),
-  ('Testemunho para a Igreja Vol. 1', 'livro', 'Ellen G. White', '27082026', '', 27925, 2),
   ('Testemunho para Igreja Vol. 2', 'livro', 'Ellen G. White', '000211', '9786589448839', 27140, 3),
   ('Testemunho para Igreja Vol. 4', 'livro', 'Ellen G. White', '000213', '9786589448877', 26745, 4),
   ('Testemunho para Igreja Vol. 5', 'livro', 'Ellen G. White', '000215', '9786589448938', 28320, 3),
@@ -448,4 +441,4 @@ select v.title, v.tipo, v.genero, v.kigest_ref, v.ean, v.preco, v.stock,
    and not exists (select 1 from public.stock_books b where v.ean <> '' and b.isbn = v.ean);
 
 insert into private.kigest_import (exportacao, origem, ligados, criados)
-values ('2026-11-12 12:53:23'::timestamptz, 'DESKTOP-G26LDJM/KigestGC', 121, 225);
+values ('2026-11-12 12:53:23'::timestamptz, 'DESKTOP-G26LDJM/KigestGC', 129, 210);
