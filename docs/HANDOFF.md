@@ -53,6 +53,12 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   `20261113163000_fotografias_de_catumbela`, **por aplicar**, sem miniatura escrita (usa a
   primeira da galeria) e sem telefone nem horário, que a loja ainda não deu. As fotografias
   trazem a marca de água da Centralidade do Luhongo, de quem as tirou.
+- **O quadro da loja é um mosaico** (`StoreGallery.jsx`, com a regra das peças em
+  `mosaicoDaGaleria`): a primeira fotografia grande, com a legenda sobre ela, e as outras em
+  volta. Mostram-se nove; acima disso a última peça conta as que faltam («+4») e abre a galeria
+  aí. A regra está provada em teste de uma a nove fotografias: nenhuma linha fica com um buraco
+  no canto. O limite do painel subiu de 12 para 20 fotografias por loja (a coluna aguenta 24 e
+  4 KB) — mostrar todas de uma vez é que não fazia sentido, e deixou de ser preciso.
 - **Para a loja seguinte:** já não é preciso migração nenhuma — a equipa carrega as fotografias
   pelo painel. Por código, continua a dar: `python3 scripts/imagens/lojas.py <slug> <foto...>`
   (ficheiros do site, mais leves e sem passar pelo Storage) e uma migração com a `gallery`.

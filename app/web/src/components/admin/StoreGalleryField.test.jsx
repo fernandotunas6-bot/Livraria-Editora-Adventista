@@ -43,7 +43,7 @@ describe('StoreGalleryField', () => {
     montar({ photos: FOTOS, onChange: vi.fn() });
     expect(host.querySelectorAll('li')).toHaveLength(2);
     expect([...host.querySelectorAll('input')].map((i) => i.value)).toEqual(['Balcão', 'Equipa']);
-    expect(host.textContent).toContain('a primeira abre a galeria');
+    expect(host.textContent).toContain('esta aparece em grande');
   });
 
   it('junta a fotografia que o campo de imagem devolve', () => {

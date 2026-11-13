@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, erroDaGaleria, fotoDaLoja, galeriaParaGuardar, lojaSrcSet,
-  storeGallery,
+  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, GALERIA_MOSAICO, erroDaGaleria, fotoDaLoja,
+  galeriaParaGuardar, lojaSrcSet, mosaicoDaGaleria, storeGallery,
 } from './stores';
 
 describe('lojaSrcSet', () => {
@@ -119,5 +119,39 @@ describe('fotoDaLoja', () => {
   it('sem nada, não devolve nada', () => {
     expect(fotoDaLoja({ image_url: '   ' })).toBe('');
     expect(fotoDaLoja(null)).toBe('');
+  });
+});
+
+
+describe('mosaicoDaGaleria', () => {
+  // Quantas células de uma grelha de quatro colunas ocupa cada peça.
+  const celulas = (peca) => {
+    const cols = Number(/col-span-(\d)/.exec(peca)[1]);
+    const rows = Number(/row-span-(\d)/.exec(peca)[1]);
+    return cols * rows;
+  };
+
+  it('a primeira fotografia é a grande', () => {
+    expect(mosaicoDaGaleria(5)[0]).toBe('col-span-2 row-span-2');
+    expect(mosaicoDaGaleria(9)[0]).toBe('col-span-2 row-span-2');
+  });
+
+  it('nenhuma linha fica com um buraco no canto, de uma a nove fotografias', () => {
+    for (let n = 1; n <= GALERIA_MOSAICO; n += 1) {
+      const pecas = mosaicoDaGaleria(n);
+      expect(pecas, `${n} fotografias`).toHaveLength(n);
+      const ocupadas = pecas.reduce((soma, p) => soma + celulas(p), 0);
+      expect(ocupadas % 4, `${n} fotografias deixam ${ocupadas % 4} células por preencher`).toBe(0);
+    }
+  });
+
+  it('acima do que cabe, fica-se pelas peças do mosaico', () => {
+    expect(mosaicoDaGaleria(20)).toHaveLength(GALERIA_MOSAICO);
+  });
+
+  it('sem fotografias não há mosaico', () => {
+    expect(mosaicoDaGaleria(0)).toEqual([]);
+    expect(mosaicoDaGaleria(undefined)).toEqual([]);
+    expect(mosaicoDaGaleria(-3)).toEqual([]);
   });
 });

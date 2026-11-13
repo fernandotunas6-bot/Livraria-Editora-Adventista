@@ -91,3 +91,36 @@ describe('StoreGallery', () => {
     expect(porRotulo(host, 'Ver fotografia 1 de 1')).toBeTruthy();
   });
 });
+
+describe('StoreGallery com muitas fotografias', () => {
+  const MUITAS = Array.from({ length: 12 }, (_, i) => ({
+    url: `/images/lojas/huambo-${i + 1}.webp`, caption: `Fotografia ${i + 1}`,
+  }));
+
+  it('mostra nove peças e a última conta as que faltam', () => {
+    montar({ photos: MUITAS, storeName: 'Loja do Huambo' });
+    expect(host.querySelectorAll('li')).toHaveLength(9);
+    expect(host.textContent).toContain('12 fotografias');
+    expect(host.textContent).toContain('+4');
+    expect(porRotulo(host, 'Ver as restantes 4 fotografias')).toBeTruthy();
+  });
+
+  it('a última peça abre a galeria onde o mosaico ficou', () => {
+    montar({ photos: MUITAS, storeName: 'Loja do Huambo' });
+    clicar(porRotulo(host, 'Ver as restantes 4 fotografias'));
+    expect(dialogo().textContent).toContain('9/12');
+    clicar(porRotulo(dialogo(), 'Fotografia seguinte'));
+    expect(dialogo().textContent).toContain('Fotografia 10');
+  });
+
+  it('a primeira fotografia é a peça grande', () => {
+    montar({ photos: MUITAS, storeName: 'Loja do Huambo' });
+    expect(host.querySelector('li').className).toContain('col-span-2 row-span-2');
+  });
+
+  it('com uma só fotografia, ela ocupa o quadro todo', () => {
+    montar({ photos: [MUITAS[0]], storeName: 'Loja do Huambo' });
+    expect(host.querySelector('li').className).toContain('col-span-4');
+    expect(host.textContent).toContain('1 fotografia');
+  });
+});

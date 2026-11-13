@@ -105,13 +105,16 @@ export function storeGallery(store) {
 }
 
 /**
- * Limites da galeria, iguais aos da base de dados (20261113103000_fotografias_das_lojas: no
- * máximo 24 fotografias e 4 KB na coluna). Aqui são mais apertados de propósito: uma loja com
- * doze fotografias já se mostra toda, e as legendas curtas cabem na linha por baixo da imagem.
- * Com estes números a coluna nunca se aproxima dos 4 KB, por isso o painel nunca leva com o
- * erro da restrição — que não diria à equipa o que fazer.
+ * Limites da galeria, abaixo dos da base de dados (20261113103000_fotografias_das_lojas: no
+ * máximo 24 fotografias e 4 KB na coluna). Assim o aviso chega em português e antes de a
+ * restrição recusar, que é o que a equipa pode resolver — e com vinte fotografias de endereço
+ * longo (as carregadas para o Storage) a coluna ainda fica longe dos 4 KB.
+ *
+ * Vinte é muito mais do que o mosaico mostra de uma vez (nove); as restantes abrem-se a partir
+ * da última peça, que as conta. Uma loja que queira contar a sua história com uma dúzia de
+ * fotografias pode fazê-lo sem encher a página a quem só quer saber onde ela fica.
  */
-export const GALERIA_MAX_FOTOS = 12;
+export const GALERIA_MAX_FOTOS = 20;
 export const GALERIA_MAX_LEGENDA = 80;
 /** Folga para a restrição da coluna (4 KB), com margem para o que o jsonb acrescenta. */
 const GALERIA_MAX_BYTES = 3400;
@@ -156,4 +159,32 @@ export function erroDaGaleria(photos) {
  */
 export function fotoDaLoja(store) {
   return String(store?.image_url || '').trim() || storeGallery(store)[0]?.url || '';
+}
+
+/** Quantas fotografias cabem no mosaico antes de a última passar a contar as restantes. */
+export const GALERIA_MOSAICO = 9;
+
+/**
+ * A forma de cada peça do mosaico das fotografias da loja, numa grelha de quatro colunas.
+ *
+ * A primeira fotografia é a que a loja pôs à frente (a fachada, a montra) e fica grande; as
+ * outras acompanham-na em pequeno. A última linha ganha peças mais largas quando as fotografias
+ * não dão um número certo de quadrados — senão ficava um buraco no canto, que é o que estraga
+ * um mosaico. Em contas: a soma das células é sempre múltipla de quatro.
+ */
+export function mosaicoDaGaleria(total) {
+  const n = Math.min(Math.max(Number(total) || 0, 0), GALERIA_MOSAICO);
+  if (n <= 0) return [];
+  if (n === 1) return ['col-span-4 row-span-3'];
+  if (n === 2) return ['col-span-2 row-span-3', 'col-span-2 row-span-3'];
+  if (n === 3) return ['col-span-2 row-span-2', 'col-span-2 row-span-1', 'col-span-2 row-span-1'];
+  if (n === 4) return ['col-span-2 row-span-2', 'col-span-2 row-span-1', 'col-span-1 row-span-1', 'col-span-1 row-span-1'];
+  // A primeira num quadrado de 2×2; as quatro seguintes completam as duas primeiras linhas.
+  const pecas = ['col-span-2 row-span-2', ...Array(n - 1).fill('col-span-1 row-span-1')];
+  // O que sobra para as linhas de baixo, alargado para fechar a última.
+  const resto = (n - 5) % 4;
+  if (resto === 1) pecas[n - 1] = 'col-span-4 row-span-1';
+  if (resto === 2) pecas[n - 2] = pecas[n - 1] = 'col-span-2 row-span-1';
+  if (resto === 3) pecas[n - 1] = 'col-span-2 row-span-1';
+  return pecas;
 }

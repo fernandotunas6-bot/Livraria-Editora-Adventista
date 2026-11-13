@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Camera, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ImageField from '@/components/admin/ImageField';
-import { GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, erroDaGaleria } from '@/lib/stores';
+import { GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, GALERIA_MOSAICO, erroDaGaleria } from '@/lib/stores';
 
 /**
  * As fotografias de uma loja, no formulário do painel.
@@ -56,7 +56,11 @@ export default function StoreGalleryField({ photos = [], onChange, driveConfig =
                   aria-label={`Legenda da fotografia ${i + 1}`}
                   onChange={(e) => onChange(photos.map((f, j) => (j === i ? { ...f, caption: e.target.value } : f)))}
                 />
-                <p className="text-[11px] text-muted-foreground">Fotografia {i + 1} de {photos.length}{i === 0 ? ' · a primeira abre a galeria' : ''}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Fotografia {i + 1} de {photos.length}
+                  {i === 0 && ' · esta aparece em grande, e é a que representa a loja'}
+                  {i === GALERIA_MOSAICO - 1 && photos.length > GALERIA_MOSAICO && ' · daqui para a frente só se vêem ao abrir a galeria'}
+                </p>
               </div>
               <div className="flex shrink-0 gap-1">
                 <Button type="button" size="icon" variant="ghost" aria-label={`Subir a fotografia ${i + 1}`} disabled={i === 0} onClick={() => trocar(i, i - 1)}>
@@ -91,7 +95,7 @@ export default function StoreGalleryField({ photos = [], onChange, driveConfig =
           aspect="4:3"
           previewClassName="h-20 w-28"
           driveConfig={driveConfig}
-          hint={`Aparecem na página das lojas, por esta ordem. Até ${GALERIA_MAX_FOTOS} fotografias.`}
+          hint={`Aparecem na página das lojas por esta ordem: a primeira em grande, as ${GALERIA_MOSAICO} primeiras no mosaico e as outras ao abrir a galeria. Até ${GALERIA_MAX_FOTOS}.`}
         />
       )}
     </div>
