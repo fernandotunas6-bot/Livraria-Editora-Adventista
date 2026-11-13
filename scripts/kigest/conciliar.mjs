@@ -38,8 +38,10 @@ export function palavras(titulo) {
 }
 
 // O título do site traz o subtítulo depois de um travessão ou de um hífen solto; o do KiGest
-// quase nunca o tem. Compara-se só a parte antes, senão «Sobreviventes» nunca chegaria a
-// «Sobreviventes — Histórias de quem…».
+// quase nunca o tem. Daí haver duas comparações, e valer a melhor: contra a parte antes do
+// subtítulo, senão «Sobreviventes» nunca chegaria a «Sobreviventes — Histórias de quem…»; e
+// contra o título inteiro, senão «Música Sua Influencia» não chegava ao «Música - Sua
+// Influência na Vida do Cristão», cuja parte de antes é só «Música».
 export const tituloBase = (t) => String(t ?? '').split(/\s[—–-]\s/)[0];
 
 // Dois números: quanto os dois títulos se parecem (Jaccard) e quanto do título do KiGest cabe
@@ -78,6 +80,7 @@ export function conciliar(artigosKigest, produtosSite) {
   const site = produtosSite.map((p) => ({
     produto: p,
     palavras: palavras(tituloBase(p.title)),
+    palavrasInteiro: palavras(p.title),
     ean: String(p.isbn ?? '').replace(/\D/g, ''),
     // Já ligado numa conciliação anterior.
     kigestRef: String(p.kigest_ref ?? '').trim(),
@@ -108,7 +111,7 @@ export function conciliar(artigosKigest, produtosSite) {
     // 4. Palavras do título.
     const pa = palavras(tituloBase(nome));
     const pretendentes = site
-      .map((alvo) => ({ nota: semelhanca(pa, alvo.palavras), alvo }))
+      .map((alvo) => ({ nota: Math.max(semelhanca(pa, alvo.palavras), semelhanca(pa, alvo.palavrasInteiro)), alvo }))
       .filter((c) => c.nota >= MINIMO_PRETENDENTE)
       .sort((x, y) => y.nota - x.nota);
     const topo = pretendentes.length > 0 ? pretendentes[0].nota : 0;
