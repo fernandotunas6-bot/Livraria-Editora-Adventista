@@ -1,5 +1,5 @@
 {
- "sobre": "Decisões tomadas à mão sobre os artigos que o emparelhamento automático não resolveu (relatório KIGEST-20261112.md). Cada uma traz a prova que a sustenta. O scripts/kigest/decisoes.mjs transforma este ficheiro em migração.",
+ "sobre": "Decisões tomadas à mão sobre os artigos que o emparelhamento automático não resolve (relatório KIGEST-20261112.md). Cada uma traz a prova que a sustenta. Três tipos: 'ligacoes' (este artigo é este produto — pelo código ou pelo título exacto), 'repetidos' (o mesmo artigo lançado duas vezes no KiGest) e 'sao_mesmo_novos' (parece-se com um produto do site mas é outro). O que fica em 'ficam_para_o_dono' fica de propósito: a resposta não está nos dados. O scripts/kigest/decisoes.mjs aplica tudo isto antes de conciliar.",
  "exportacao": "2026-11-12 12:53:23",
  "ligacoes": [
   {
@@ -139,6 +139,96 @@
    "book_code": "DBV-001",
    "artigo": "LENÇO JA",
    "porque": "2 000 Kz dos dois lados; JA é Jovens Adventistas"
+  },
+  {
+   "kigest_ref": "00090",
+   "book_code": "LIV-021",
+   "artigo": "CORAGEM",
+   "porque": "12 215 Kz ao cêntimo; é o «Coragem! Eles Confiaram em Deus e Venceram»"
+  },
+  {
+   "kigest_ref": "000115",
+   "book_code": "LIV-057",
+   "artigo": "MENSAGEIRA DO SENHOR",
+   "porque": "55 429 Kz ao cêntimo"
+  },
+  {
+   "kigest_ref": "000460",
+   "book_code": "LIV-078",
+   "artigo": "REAVIMENTO VERDADEIRO",
+   "porque": "6 160 Kz ao cêntimo; gralha no «Reavivamento»"
+  },
+  {
+   "kigest_ref": "00050",
+   "book_code": "DBV-004",
+   "artigo": "LENÇO DE DESBRAVADORE",
+   "porque": "é o lenço do membro, que é o que o site vende; o de líder (00040) é produto à parte"
+  },
+  {
+   "kigest_ref": "00028",
+   "titulo": "Segredos do Bem-Estar Emocional — Depressão, estresse, ansiedade",
+   "artigo": "SEGREDO DO BEM ESTAR EMOCIONAL",
+   "porque": "mesmo livro, no singular no KiGest"
+  },
+  {
+   "kigest_ref": "002",
+   "titulo": "A Descoberta — A experiência que revolucionou a vida de um cientista ateu",
+   "artigo": "DESCOBERTA",
+   "porque": "título igual; é a entrada com existência (5)"
+  },
+  {
+   "kigest_ref": "11493",
+   "titulo": "Jesus Extremo — Paradoxos que dão vida",
+   "artigo": "JESUS EXTREMO",
+   "porque": "11493 é o código do produto na loja da editora; é a entrada com existência (5)"
+  },
+  {
+   "kigest_ref": "003",
+   "titulo": "Ser Pai — Redescubra o significado da paternidade",
+   "artigo": "SER PAI",
+   "porque": "título igual"
+  },
+  {
+   "kigest_ref": "005",
+   "titulo": "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra",
+   "artigo": "A GRANDE EXTINÇÃO EM MASSA",
+   "porque": "título igual"
+  },
+  {
+   "kigest_ref": "6218731",
+   "titulo": "Esperança para Viver — O verdadeiro caminho da felicidade",
+   "artigo": "ESPERANÇA PARA VIVER",
+   "porque": "título igual, bem escrito"
+  },
+  {
+   "kigest_ref": "11761",
+   "titulo": "Guia Prático para Descobrir a Vontade de Deus",
+   "artigo": "GUIA PRÁTICO PARA DESCOBRIR A VONTADE DE DEUS",
+   "porque": "11761 é o código do produto na loja da editora"
+  },
+  {
+   "kigest_ref": "13346",
+   "titulo": "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom",
+   "artigo": "GUIA DE SOBRE VIVENCIA PARA O TEMPO DO FIM",
+   "porque": "13346 é o código do produto na loja da editora"
+  },
+  {
+   "kigest_ref": "546972000",
+   "titulo": "Palavras de Esperança — Histórias da vida diária",
+   "artigo": "LIVRO MISSIORIO PALAVRAS DE ESPERANÇA",
+   "porque": "500 Kz dos dois lados; é a entrada com existência (17 678)"
+  },
+  {
+   "kigest_ref": "008",
+   "titulo": "Orando Como Nunca por Seus Filhos",
+   "artigo": "ORANDO COMO NUNCA POR SEU FILHO",
+   "porque": "é o dos filhos; o 007, que é o do marido, é outro livro"
+  },
+  {
+   "kigest_ref": "000030",
+   "titulo": "Olhando para o Criador e Salvador — Meditações diárias",
+   "artigo": "MEDITAÇÃO OLHANDO PARA O CRIADOR",
+   "porque": "é o mesmo devocional; no KiGest está lançado pela palavra «Meditação» à frente"
   }
  ],
  "repetidos": [
@@ -189,6 +279,60 @@
    "igual_a": "455475126",
    "artigo": "HISTORIA DA VIDA",
    "porque": "mesmo título, 1 Kz de diferença; sem existência"
+  },
+  {
+   "kigest_ref": "36487",
+   "igual_a": "002",
+   "artigo": "DESCOBERTA",
+   "porque": "mesmo preço (21 944) e mesmo título; sem existência"
+  },
+  {
+   "kigest_ref": "33336974",
+   "igual_a": "11493",
+   "artigo": "JESUS EXTREMO",
+   "porque": "mesmo preço (15 882) e mesmo título; sem existência"
+  },
+  {
+   "kigest_ref": "944231",
+   "igual_a": "003",
+   "artigo": "SER PAI",
+   "porque": "mesmo preço (21 192) e mesmo título"
+  },
+  {
+   "kigest_ref": "2164987",
+   "igual_a": "005",
+   "artigo": "A GRANDE EXTENÇAÕ EM MASSA",
+   "porque": "mesmo preço (51 561); é o mesmo título com gralha"
+  },
+  {
+   "kigest_ref": "06052026",
+   "igual_a": "6218731",
+   "artigo": "ESPERENÇA PARA VIVER",
+   "porque": "mesmo preço (6 000); é o mesmo título com gralha"
+  },
+  {
+   "kigest_ref": "000138",
+   "igual_a": "000109",
+   "artigo": "INTERPRETANDO AS ESCRITURAS",
+   "porque": "mesmo preço (31 820) e mesmo livro; sem existência"
+  },
+  {
+   "kigest_ref": "12383",
+   "igual_a": "000460",
+   "artigo": "REAVIVAMENTO VERDAEIRO",
+   "porque": "mesmo livro noutro preço; sem existência"
+  },
+  {
+   "kigest_ref": "30062026",
+   "igual_a": "546972000",
+   "artigo": "PALAVRAS DE ESPERANÇÃO",
+   "porque": "mesmo preço (500) e mesmo livro; fica a entrada com mais existência"
+  },
+  {
+   "kigest_ref": "00024",
+   "igual_a": "00050",
+   "artigo": "ELNÇO DE DESBRAVADORES",
+   "porque": "mesmo preço (2 000); é o mesmo lenço com as letras trocadas"
   }
  ],
  "ficam_para_o_dono": [
@@ -256,6 +400,113 @@
    "kigest_ref": "09032026",
    "artigo": "LAÇO DE LIDER JOVEM",
    "porque": "3 000 Kz como o «Lenço de liderança» (DBV-002) e como o «Lenço LJS» (DBV-005); é um dos dois e de fora não se sabe qual"
+  },
+  {
+   "kigest_ref": "000310",
+   "artigo": "BIBLIA SAGRADA LETRA GIGANTE EDIÇAÕ COM LETRA VERM",
+   "porque": "o site tem seis bíblias de letra gigante ocultas e nenhuma se identifica por este nome"
+  },
+  {
+   "kigest_ref": "000308",
+   "artigo": "BIBLIA SAGRADA LETRA GIGANTE",
+   "porque": "o mesmo"
+  },
+  {
+   "kigest_ref": "000318",
+   "artigo": "BIBLIA SAGRADA COM NOTAS E REFERENCIAS",
+   "porque": "o mesmo"
+  },
+  {
+   "kigest_ref": "000314",
+   "artigo": "BIBLIA SAGRADA LETRA EXTRA GIGANTE",
+   "porque": "o mesmo"
+  },
+  {
+   "kigest_ref": "000307",
+   "artigo": "BIBLIA SGARADA ALMEIDA REVISTA CORRIDA",
+   "porque": "Almeida Revista e Corrigida ou Corrida? e qual das edições do site é"
+  },
+  {
+   "kigest_ref": "000335",
+   "artigo": "BIBLIA SAGRADA ALMEIDA REVISTA CORRIGIDA",
+   "porque": "o mesmo"
+  },
+  {
+   "kigest_ref": "000311",
+   "artigo": "BÍblia SAGRADA NOVA ALMEIDA ACTUALIZADA",
+   "porque": "Nova Almeida Atualizada; o site não tem nenhuma identificada como tal"
+  },
+  {
+   "kigest_ref": "000315",
+   "artigo": "BIBIA SAGRADA RC",
+   "porque": "Almeida Revista e Corrigida; o site descreve as bíblias pela capa"
+  },
+  {
+   "kigest_ref": "000333",
+   "artigo": "BIBLIA SAGRADA MISSIONÁRIA CAPA DURA",
+   "porque": "edição missionária que o site não distingue"
+  },
+  {
+   "kigest_ref": "21102026",
+   "artigo": "T-CHERT UMA VOZ 27",
+   "porque": "o site tem três peças UmaVoz27 (t-shirt branca, polo preta e a VES-002) e o KiGest tem uma só, a 3 500 Kz"
+  },
+  {
+   "kigest_ref": "000400",
+   "artigo": "FOLHETO AMOR EM FAMILIA",
+   "porque": "7 500 Kz contra 5 500 do LIV-149: pode ser o bloco de folhetos e não o folheto solto"
+  }
+ ],
+ "sao_mesmo_novos": [
+  {
+   "kigest_ref": "00040",
+   "artigo": "LENÇO DE LÍDER (DESBRAVADORES)",
+   "porque": "é o lenço de líder, a 5 000 Kz; o do membro é o 00050, a 2 000"
+  },
+  {
+   "kigest_ref": "00042",
+   "artigo": "LENÇO DE LÍDER (AVENTUREIROS )",
+   "porque": "é o de líder, a 5 000 Kz; o do membro é o 00025, a 2 000"
+  },
+  {
+   "kigest_ref": "00043",
+   "artigo": "LENÇO DE LÍDER (EMBAIXADORES)",
+   "porque": "é o de líder, a 5 000 Kz; o do membro é o 00039, a 2 000"
+  },
+  {
+   "kigest_ref": "17032026",
+   "artigo": "LENÇO DE LIDER DE JOVENS",
+   "porque": "é o de líder, a 5 000 Kz; o dos membros é o 000508, a 2 000"
+  },
+  {
+   "kigest_ref": "000468",
+   "artigo": "ESPERANÇA PARA FAMILIA INFANTIL",
+   "porque": "é a edição infantil; a normal é o par do LIV-147"
+  },
+  {
+   "kigest_ref": "007",
+   "artigo": "ORANDO COMO NUNCA POR SEU MARIDO",
+   "porque": "é o do marido; o dos filhos é o 008"
+  },
+  {
+   "kigest_ref": "00000333",
+   "artigo": "GUIA",
+   "porque": "é o cartão da classe de Guia, dos Desbravadores, e não um livro com «guia» no nome"
+  },
+  {
+   "kigest_ref": "00013",
+   "artigo": "BIBLIA DOS AVENTUREIROS",
+   "porque": "a bíblia do clube, que o site ainda não tem com este nome"
+  },
+  {
+   "kigest_ref": "000300",
+   "artigo": "BIBLIA NOVA SEMENTE",
+   "porque": "edição Nova Semente, que o site não tem identificada"
+  },
+  {
+   "kigest_ref": "LV00021",
+   "artigo": "BÍBLIA SAGRADA NOVA SEMENTE",
+   "porque": "a mesma edição noutro preço e noutro acabamento"
   }
  ]
 }

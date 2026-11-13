@@ -28,13 +28,12 @@ const VAZIAS = new Set([
   'os', 'as', 'ao', 'que', 'se', 'por', 'the', 'livro', 'livros',
 ]);
 
-export function palavras(titulo) {
+export function palavras(titulo, emOrdem = false) {
   const limpo = String(titulo ?? '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase();
-  return new Set(
-    limpo.split(/[^a-z0-9]+/).filter((p) => p.length > 1 && !VAZIAS.has(p)),
-  );
+  const lista = limpo.split(/[^a-z0-9]+/).filter((p) => p.length > 1 && !VAZIAS.has(p));
+  return emOrdem ? lista : new Set(lista);
 }
 
 // O título do site traz o subtítulo depois de um travessão ou de um hífen solto; o do KiGest
@@ -54,11 +53,59 @@ export function jaccard(a, b) {
   return comuns / (a.size + b.size - comuns);
 }
 
-export function semelhanca(a, b) {
+// Quanto os dois títulos se parecem. Vale a melhor de duas medidas: o Jaccard, que conta o que
+// têm em comum contra tudo o que têm; e a cobertura, que conta só quanto do título do KiGest
+// cabe no do site — é ela que salva os títulos abreviados do balcão.
+//
+// A cobertura sozinha engana: «Vida de Jesus» tem as suas duas palavras dentro de «Jesus
+// Extremo — Paradoxos que dão vida» e dava nota cheia, quando são dois livros diferentes. Por
+// isso, quando é a cobertura que manda, exige-se que os dois títulos COMECEM pela mesma
+// palavra — «Música Sua Influencia» e «Música - Sua Influência na Vida do Cristão» começam;
+// «Vida de Jesus» e «Jesus Extremo» não. É o que distingue um título abreviado de uma coincidência
+// de palavras soltas.
+export function semelhanca(a, b, primeiraA = '', primeiraB = '') {
   if (a.size === 0 || b.size === 0) return 0;
   let comuns = 0;
   for (const p of a) if (b.has(p)) comuns += 1;
-  return Math.max(jaccard(a, b), comuns / a.size);
+  const j = jaccard(a, b);
+  const cobertura = comuns / a.size;
+  if (cobertura <= j) return j;
+  if (!mesmaPrimeiraPalavra(primeiraA, primeiraB)) return j;
+  return cobertura;
+}
+
+// A primeira palavra com peso de um título.
+export const primeiraPalavra = (titulo) => palavras(titulo, true)[0] ?? '';
+
+// Distância de edição, com tecto: quantas letras é preciso mexer para passar de uma palavra à
+// outra. Pára assim que passa do tecto — não interessa saber se são 5 ou 12.
+export function distancia(a, b, tecto = 2) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > tecto) return tecto + 1;
+  let anterior = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const linha = [i];
+    let menor = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      linha[j] = Math.min(linha[j - 1] + 1, anterior[j] + 1, anterior[j - 1] + custo);
+      if (linha[j] < menor) menor = linha[j];
+    }
+    if (menor > tecto) return tecto + 1;
+    anterior = linha;
+  }
+  return anterior[b.length];
+}
+
+// A mesma palavra, com a tolerância de quem a digitou ao balcão: «ETRE» por «Entre», «AMAHÃ»
+// por «Amanhã». Uma letra até às seis, duas daí para cima — e nunca em palavras de três letras
+// ou menos, onde uma letra já muda tudo.
+export function mesmaPrimeiraPalavra(a, b) {
+  if (!a || !b) return true;
+  if (a === b) return true;
+  const curto = Math.min(a.length, b.length);
+  if (curto <= 3) return false;
+  return distancia(a, b, curto <= 6 ? 1 : 2) <= (curto <= 6 ? 1 : 2);
 }
 
 // Fasquia para um artigo poder ser par de um produto.
@@ -81,6 +128,7 @@ export function conciliar(artigosKigest, produtosSite) {
     produto: p,
     palavras: palavras(tituloBase(p.title)),
     palavrasInteiro: palavras(p.title),
+    primeira: primeiraPalavra(p.title),
     ean: String(p.isbn ?? '').replace(/\D/g, ''),
     // Já ligado numa conciliação anterior.
     kigestRef: String(p.kigest_ref ?? '').trim(),
@@ -96,6 +144,8 @@ export function conciliar(artigosKigest, produtosSite) {
 
   const avaliados = artigosKigest.map((artigo) => {
     const nome = artigo.titulo ?? corrigirTitulo(artigo.descricao);
+    // Decidido à mão que é outro produto, por muito que o nome se pareça: não se lhe procura par.
+    if (artigo.eMesmoNovo) return { artigo, candidatos: [], pretendentes: [], via: 'decisao' };
     // 1. Já ligado pelo kigest_ref: é a chave boa e dispensa adivinhar.
     const ligado = porRef.get(artigo.ref);
     if (ligado) return { artigo, candidatos: [{ nota: 1, alvo: ligado }], pretendentes: [], via: 'ref' };
@@ -112,8 +162,13 @@ export function conciliar(artigosKigest, produtosSite) {
     // travessão que distingue um devocional do outro — «Meditações Diárias — Maravilhoso Deus»
     // ficava reduzido a «Meditações Diárias» e empatava com todos os devocionais da série.
     const pa = palavras(nome);
+    const primeira = primeiraPalavra(nome);
     const pretendentes = site
-      .map((alvo) => ({ nota: Math.max(semelhanca(pa, alvo.palavras), semelhanca(pa, alvo.palavrasInteiro)), alvo }))
+      .map((alvo) => ({
+        nota: Math.max(semelhanca(pa, alvo.palavras, primeira, alvo.primeira),
+          semelhanca(pa, alvo.palavrasInteiro, primeira, alvo.primeira)),
+        alvo,
+      }))
       .filter((c) => c.nota >= MINIMO_PRETENDENTE)
       .sort((x, y) => y.nota - x.nota);
     const topo = pretendentes.length > 0 ? pretendentes[0].nota : 0;

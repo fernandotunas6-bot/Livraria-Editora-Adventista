@@ -22,39 +22,51 @@ export function lerDecisoes({ raiz = RAIZ, ficheiro = FICHEIRO } = {}) {
   try {
     bruto = readFileSync(path.join(raiz, ficheiro), 'utf8');
   } catch {
-    return { ligacoes: [], repetidos: [], paraODono: [] };
+    return { ligacoes: [], repetidos: [], novosMesmo: [], paraODono: [] };
   }
   const d = JSON.parse(bruto);
   return {
     exportacao: d.exportacao ?? '',
     ligacoes: d.ligacoes ?? [],
     repetidos: d.repetidos ?? [],
+    novosMesmo: d.sao_mesmo_novos ?? [],
     paraODono: d.ficam_para_o_dono ?? [],
   };
 }
 
 // Aplica as decisões ao catálogo e à lista de artigos, antes de conciliar.
 //
-// Uma ligação escreve o kigest_ref no produto do site: a partir daí o emparelhamento pega nele
-// pela chave e não tem nada a adivinhar. Um repetido sai da lista de artigos — é o mesmo
-// produto lançado duas vezes no KiGest e quem fica é o outro.
+// Três coisas se podem decidir, e cada uma entra de sua maneira:
+//
+//  - **ligação**: escreve o kigest_ref no produto do site, e a partir daí o emparelhamento pega
+//    nele pela chave. O produto nomeia-se pelo código (`book_code`) ou, quando está oculto e
+//    não se sabe o código que o gatilho lhe deu em produção, pelo `titulo` exacto.
+//  - **repetido**: sai da lista de artigos — é o mesmo produto lançado duas vezes no KiGest e
+//    quem fica é o outro.
+//  - **é mesmo novo**: o artigo parece-se com um produto do site mas é outro produto — o lenço
+//    de líder ao lado do lenço do membro, a «Esperança para a Família» infantil ao lado da
+//    normal. Entra como produto novo em vez de ficar à espera de alguém que decida.
 //
 // Tudo é verificado contra os dados: uma decisão que aponte para um código que não existe, ou
 // para um artigo que já não vem na exportação, é um erro e é dito em voz alta. Mais vale parar
 // do que escrever preço no produto errado.
 export function aplicarDecisoes({ decisoes, produtosSite, artigosKigest, aviso = console.error }) {
   const porCodigo = new Map(produtosSite.filter((p) => p.book_code).map((p) => [p.book_code, p]));
+  const chave = (t) => String(t ?? '').trim().toLowerCase();
+  const porTitulo = new Map(produtosSite.map((p) => [chave(p.title), p]));
   const porRef = new Map(artigosKigest.map((a) => [a.ref, a]));
   const problemas = [];
   const aplicadas = [];
 
   for (const l of decisoes.ligacoes) {
-    const produto = porCodigo.get(l.book_code);
+    const alvo = l.book_code || l.titulo || '';
+    const produto = l.book_code ? porCodigo.get(l.book_code) : porTitulo.get(chave(l.titulo));
     const artigo = porRef.get(l.kigest_ref);
-    if (!produto) { problemas.push(`ligação ${l.kigest_ref} → ${l.book_code}: não há produto com esse código`); continue; }
-    if (!artigo) { problemas.push(`ligação ${l.kigest_ref} → ${l.book_code}: a exportação não traz esse artigo`); continue; }
+    if (!l.book_code && !l.titulo) { problemas.push(`ligação ${l.kigest_ref}: falta o book_code ou o titulo do produto`); continue; }
+    if (!produto) { problemas.push(`ligação ${l.kigest_ref} → ${alvo}: não há produto nenhum assim`); continue; }
+    if (!artigo) { problemas.push(`ligação ${l.kigest_ref} → ${alvo}: a exportação não traz esse artigo`); continue; }
     if (produto.kigest_ref && produto.kigest_ref !== l.kigest_ref) {
-      problemas.push(`ligação ${l.kigest_ref} → ${l.book_code}: o produto já está ligado a ${produto.kigest_ref}`);
+      problemas.push(`ligação ${l.kigest_ref} → ${alvo}: o produto já está ligado a ${produto.kigest_ref}`);
       continue;
     }
     produto.kigest_ref = l.kigest_ref;
@@ -73,11 +85,23 @@ export function aplicarDecisoes({ decisoes, produtosSite, artigosKigest, aviso =
     aRetirar.add(rep.kigest_ref);
   }
 
+  const mesmoNovos = new Set();
+  for (const n of decisoes.novosMesmo ?? []) {
+    if (!porRef.has(n.kigest_ref)) { problemas.push(`«é mesmo novo» ${n.kigest_ref}: a exportação não traz esse artigo`); continue; }
+    if (aRetirar.has(n.kigest_ref)) { problemas.push(`«é mesmo novo» ${n.kigest_ref}: já está marcado como repetido`); continue; }
+    mesmoNovos.add(n.kigest_ref);
+  }
+
   for (const p of problemas) aviso(`decisões: ${p}`);
   return {
-    artigos: artigosKigest.filter((a) => !aRetirar.has(a.ref)),
+    // Os marcados como «é mesmo novo» levam a marca com eles; o emparelhamento não lhes procura
+    // par nenhum.
+    artigos: artigosKigest
+      .filter((a) => !aRetirar.has(a.ref))
+      .map((a) => (mesmoNovos.has(a.ref) ? { ...a, eMesmoNovo: true } : a)),
     ligacoes: aplicadas,
     retirados: [...aRetirar],
+    novosMesmo: [...mesmoNovos],
     problemas,
   };
 }

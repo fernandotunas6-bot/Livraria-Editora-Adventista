@@ -5,14 +5,14 @@ O **KiGest** (KigestGC) é o programa de facturação que corre no computador da
 é o que lá está. O site tem o seu próprio catálogo, em `public.stock_books`.
 
 Até agora os dois viveram de costas voltadas. O preço no site veio da lista da Casa Publicadora
-Brasileira — e por isso 61 dos 106 produtos emparelhados tinham o preço certo ao cêntimo — mas o
+Brasileira — e por isso muitos dos produtos emparelhados tinham o preço certo ao cêntimo — mas o
 stock foi posto à mão quando cada produto entrou e nunca mais foi mexido. Na primeira conciliação
-(12 de Novembro de 2026) 94 dos 106 tinham stock diferente. Sete produtos estavam à venda no site
+(12 de Novembro de 2026) quase todos tinham stock diferente. Sete produtos estavam à venda no site
 com a loja a zero — o «Interpretando as Escrituras» dizia 12 — e três davam-se por esgotados tendo
 livros na prateleira.
 
-Outros 34 estavam ocultos desde a migração das fotografias (20261110090000) à espera de preço: é
-o KiGest que lho dá, e com isso ficam prontos a publicar.
+Dezenas de outros estavam ocultos desde a migração das fotografias (20261110090000) à espera de
+preço: é o KiGest que lho dá, e com isso ficam prontos a publicar.
 
 Agora há uma chave entre os dois: a coluna **`stock_books.kigest_ref`**, que guarda a referência
 do artigo no KiGest (`tbArtigos.Referencia`). Com ela, cada exportação nova actualiza o stock sem
@@ -106,7 +106,15 @@ põe o preço de um livro noutro:
   de «Música na Igreja — Aspectos Teológicos, Críticos…»).
 
 E só conta como par quem **ganha com folga**: o artigo tem de ser o único candidato no topo e
-nenhum outro artigo da loja pode andar a menos de 0,25 de nota do mesmo produto. O resto fica
+nenhum outro artigo da loja pode andar a menos de 0,25 de nota do mesmo produto.
+
+A nota vale a melhor de duas medidas: o Jaccard, que conta o que os dois títulos têm em comum
+contra tudo o que têm, e a cobertura, que conta só quanto do título do KiGest cabe no do site —
+é ela que salva os títulos abreviados do balcão. Mas a cobertura sozinha engana: «Vida de Jesus»
+tem as suas duas palavras dentro de «Jesus Extremo — Paradoxos que dão vida» e dava nota cheia,
+quando são dois livros diferentes. Por isso, quando é a cobertura que manda, exige-se que os dois
+títulos **comecem pela mesma palavra** — com a tolerância de uma letra, que é onde a gralha do
+balcão cai («ETRE» por «Entre», «AMAHÃ» por «Amanhã»). O resto fica
 para decidir à mão e vai no relatório.
 
 É o caso das bíblias — o site tem seis descritas pela capa («capa dura castanha») e a loja tem
@@ -120,17 +128,35 @@ Quando um artigo não ganha de ninguém mas se parecia com algum produto do site
 produto novo **com o aviso** na última coluna da lista dos ocultos: pode ser o mesmo produto com
 outro nome, e é melhor olhar do que ficar com ele duas vezes na loja.
 
-Para resolver um desses à mão basta pôr a referência do KiGest no campo da ficha do produto; a
-exportação seguinte passa a emparelhá-lo por ela.
+### As decisões tomadas à mão
+
+O que o automático deixa em dúvida resolve-se olhando, e fica escrito em
+`docs/catalogo/kigest-decisoes.json`, cada decisão com a prova que a sustenta. Há três tipos:
+
+- **`ligacoes`** — este artigo é este produto. Nomeia-se o produto pelo código (`book_code`) ou,
+  quando está oculto e não se sabe o código que o gatilho lhe deu em produção, pelo `titulo`
+  exacto. A prova é quase sempre o preço: «48 925 Kz dos dois lados, ao cêntimo».
+- **`repetidos`** — o mesmo produto lançado duas vezes no KiGest («DESCOBERTA» e «DESCOBERTA»,
+  ao mesmo preço). Fica o que tem existência.
+- **`sao_mesmo_novos`** — parece-se com um produto do site mas é outro: o lenço de líder ao lado
+  do lenço do membro, a «Esperança para a Família» infantil ao lado da normal.
+
+Uma decisão que não bata com os dados — um código que não existe, um artigo que já não vem na
+exportação, um produto já ligado a outro artigo — **pára o gerador**. Mais vale parar do que
+escrever preço no produto errado.
+
+Na primeira conciliação foram 38 ligações, 17 repetidos e 10 «é mesmo novo»; 24 ficaram para o
+dono. Para resolver um desses à mão basta pôr a referência do KiGest no campo da ficha do
+produto; a exportação seguinte passa a emparelhá-lo por ela.
 
 ## Os produtos que a loja tem e o site não
 
-Na primeira conciliação eram 189, depois de postos de lado 8 repetidos do próprio KiGest e 5 que
-davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão os dois
+Na primeira conciliação eram 201, depois de postos de lado os repetidos do próprio KiGest e os
+que davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão os dois
 «Cordeirinho»). Entram com o preço e o stock da loja, e com duas coisas que lhes faltavam:
 
 - **A descrição.** Estão escritas à mão em `docs/catalogo/descricoes-kigest.json`, uma a uma —
-  179 para estes e 28 para os que a migração das fotografias trouxe sem texto. Cada uma diz o
+  191 para estes e 28 para os que a migração das fotografias trouxe sem texto. Cada uma diz o
   que o produto é, para que serve e quem o usa, e nada mais: nenhum número que não esteja na
   ficha, nenhuma promessa de conteúdo que ninguém confirmou.
 - **A capa.** Não há fotografia de nenhum deles. O `scripts/catalogo/capa_tipografica.py` gera
@@ -142,13 +168,13 @@ davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão
 
 E publicam-se. Entra à venda quem tem as quatro coisas: **preço acima de zero, capa, descrição e
 um nome que um cliente consiga ler.** Com isto o catálogo passou de 124 produtos à venda para
-334.
+358.
 
 ### Quem fica oculto, e porquê
 
 | Quantos | Porquê | Quem resolve |
 |---:|---|---|
-| 39 | sem preço — o KiGest não tem par para eles | o dono, no painel, ou dá-se-lhes referência no KiGest |
+| 27 | sem preço — o KiGest não tem par para eles | o dono, no painel, ou dá-se-lhes referência no KiGest |
 | 10 | o nome no KiGest não se lê («POR QUE NAO MAS ESTPITA») ou não diz que produto é («CARTÃO», «FOLHETOS») | corrige-se o nome no KiGest e entram na exportação seguinte |
 | 2 | vestuário sem tamanhos — uma t-shirt sem tamanhos compra-se sem escolher o tamanho | põem-se os tamanhos no painel, como variantes |
 

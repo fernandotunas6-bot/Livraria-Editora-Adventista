@@ -16,6 +16,32 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-142",
+   "titulo_site": "A Fé de Jesus — Guia de estudos para a classe baptismal",
+   "artigo_kigest": "A FÉ DE JESUS",
+   "kigest_ref": "0006",
+   "preco_antes": 1500,
+   "preco_depois": 2000,
+   "stock_antes": 20,
+   "stock_depois": 24,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "LIV-063",
+   "titulo_site": "Nisto Cremos - As 28 Crenças Fundamentais da Igreja Adventista do Sétimo Dia",
+   "artigo_kigest": "NISTO CREMOS",
+   "kigest_ref": "0008",
+   "preco_antes": 17940,
+   "preco_depois": 20000,
+   "stock_antes": 20,
+   "stock_depois": 67,
+   "isbn_antes": "",
+   "isbn_novo": "9788534526203",
+   "via": "titulo"
+  },
+  {
    "book_code": "",
    "titulo_site": "Como Conhecer a Vontade de Deus",
    "artigo_kigest": "COMO CONHECER A VONTE DE DEUS",
@@ -42,6 +68,45 @@
    "via": "ref"
   },
   {
+   "book_code": "",
+   "titulo_site": "Segredos do Bem-Estar Emocional — Depressão, estresse, ansiedade",
+   "artigo_kigest": "SEGREDO DO BEM ESTAR EMOCIONAL",
+   "kigest_ref": "00028",
+   "preco_antes": 0,
+   "preco_depois": 10000,
+   "stock_antes": 0,
+   "stock_depois": 112,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Olhando para o Criador e Salvador — Meditações diárias",
+   "artigo_kigest": "MEDITAÇÃO OLHANDO PARA O CRIADOR",
+   "kigest_ref": "000030",
+   "preco_antes": 0,
+   "preco_depois": 5700,
+   "stock_antes": 0,
+   "stock_depois": 18,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Ouvindo a Voz de Deus — Guia de estudos bíblicos",
+   "artigo_kigest": "OUVINDO A VOZ DE DEUS",
+   "kigest_ref": "000031",
+   "preco_antes": 0,
+   "preco_depois": 2000,
+   "stock_antes": 0,
+   "stock_depois": 295,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-030",
    "titulo_site": "Os Dez Mandamentos - Princípios Divinos para Melhorar seus Relacionamentos",
    "artigo_kigest": "OS DEZ MANDAMENTOS",
@@ -63,6 +128,19 @@
    "preco_depois": 2000,
    "stock_antes": 40,
    "stock_depois": 22,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "DBV-004",
+   "titulo_site": "Lenço do Clube de Desbravadores — amarelo com faixas arco-íris",
+   "artigo_kigest": "LENÇO DE DESBRAVADORE",
+   "kigest_ref": "00050",
+   "preco_antes": 2500,
+   "preco_depois": 2000,
+   "stock_antes": 78,
+   "stock_depois": 6,
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "ref"
@@ -156,6 +234,19 @@
    "stock_depois": 4,
    "isbn_antes": "",
    "isbn_novo": "9788534503082",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-006",
+   "titulo_site": "Adventismo - Origem e Impacto do Movimento Milerita",
+   "artigo_kigest": "ADVENTISMO",
+   "kigest_ref": "id-59",
+   "preco_antes": 36135,
+   "preco_depois": 36135,
+   "stock_antes": 3,
+   "stock_depois": 9,
+   "isbn_antes": "",
+   "isbn_novo": "9788534522076",
    "via": "titulo"
   },
   {
@@ -354,6 +445,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-021",
+   "titulo_site": "Coragem! Eles Confiaram em Deus e Venceram o Medo",
+   "artigo_kigest": "CORAGEM",
+   "kigest_ref": "00090",
+   "preco_antes": 12215,
+   "preco_depois": 12215,
+   "stock_antes": 2,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "9788534531528",
+   "via": "ref"
+  },
+  {
    "book_code": "LIV-026",
    "titulo_site": "Daniel - Interpretação História e Teologia",
    "artigo_kigest": "DANIEL INTERPRETAÇAÕ",
@@ -377,6 +481,32 @@
    "stock_depois": 1,
    "isbn_antes": "",
    "isbn_novo": "9788534508841",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-027",
+   "titulo_site": "Deus me Ama de 28 Maneiras - Nisto Cremos para Crianças",
+   "artigo_kigest": "DEUS ME AMA DE 28 MANEIRAS",
+   "kigest_ref": "00093",
+   "preco_antes": 10605,
+   "preco_depois": 10605,
+   "stock_antes": 1,
+   "stock_depois": 3,
+   "isbn_antes": "",
+   "isbn_novo": "9788534510424",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-028",
+   "titulo_site": "Deus na Tempestade - Ele Se Importa com Você",
+   "artigo_kigest": "DEUS NA TEMPESTADE",
+   "kigest_ref": "00094",
+   "preco_antes": 14575,
+   "preco_depois": 14575,
+   "stock_antes": 1,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "9788534535755",
    "via": "titulo"
   },
   {
@@ -536,6 +666,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-049",
+   "titulo_site": "Interpretando as Escrituras - Descubra o Sentido dos Textos Mais Difíceis da Bíblia",
+   "artigo_kigest": "ITERPRETAÇAÕ DA AS ESCRITURAS",
+   "kigest_ref": "000109",
+   "preco_antes": 31820,
+   "preco_depois": 31820,
+   "stock_antes": 12,
+   "stock_depois": 0,
+   "isbn_antes": "",
+   "isbn_novo": "9788534521789",
+   "via": "ref"
+  },
+  {
    "book_code": "LIV-076",
    "titulo_site": "Uma Nova Era Segundo as Profecias de Daniel",
    "artigo_kigest": "UMA NOVA ERA SEGUNDO AS PROFECIAS DE DANIEL",
@@ -588,6 +731,32 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-057",
+   "titulo_site": "Mensageira do Senhor - O Ministério Profético de Ellen G. White",
+   "artigo_kigest": "MENSAGEIRA DO SENHOR",
+   "kigest_ref": "000115",
+   "preco_antes": 55429,
+   "preco_depois": 55429,
+   "stock_antes": 2,
+   "stock_depois": 2,
+   "isbn_antes": "",
+   "isbn_novo": "9788534507271",
+   "via": "ref"
+  },
+  {
+   "book_code": "LIV-077",
+   "titulo_site": "Questões sobre Doutrina (Edição Anotada) - O Clássico Mais Polêmico da História do Adventismo",
+   "artigo_kigest": "QUETOES SOBRE DOUTRINAS",
+   "kigest_ref": "000116",
+   "preco_antes": 56325,
+   "preco_depois": 56325,
+   "stock_antes": 2,
+   "stock_depois": 6,
+   "isbn_antes": "",
+   "isbn_novo": "9788534510943",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-069",
    "titulo_site": "O Poder da Pregação Bíblica - Segredos de Grandes Oradores Atuais",
    "artigo_kigest": "O PODER DA PREGAÇAÕ",
@@ -611,6 +780,19 @@
    "stock_depois": 8,
    "isbn_antes": "",
    "isbn_novo": "9788534520812",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-074",
+   "titulo_site": "Pregação Objetiva - Mais de 300 Dicas para Você Preparar e Apresentar Sermões",
+   "artigo_kigest": "PREGAÇAO OBJETIVA",
+   "kigest_ref": "000123",
+   "preco_antes": 16490,
+   "preco_depois": 16490,
+   "stock_antes": 3,
+   "stock_depois": 8,
+   "isbn_antes": "",
+   "isbn_novo": "9786589895831",
    "via": "titulo"
   },
   {
@@ -822,6 +1004,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-062",
+   "titulo_site": "Namoro Completo - Guia sobre Namoro Amor e Sexo",
+   "artigo_kigest": "NAMORO COMPLETO",
+   "kigest_ref": "000149",
+   "preco_antes": 18120,
+   "preco_depois": 18120,
+   "stock_antes": 2,
+   "stock_depois": 1,
+   "isbn_antes": "",
+   "isbn_novo": "9788534526975",
+   "via": "titulo"
+  },
+  {
    "book_code": "LIV-084",
    "titulo_site": "Risco Calculado - Aprenda a Decidir com Ousadia",
    "artigo_kigest": "RISCO CALCULADO",
@@ -832,6 +1027,19 @@
    "stock_depois": 6,
    "isbn_antes": "",
    "isbn_novo": "9788534513456",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-050",
+   "titulo_site": "A Jornada - A Dor de Crescer não é Igual para Todos",
+   "artigo_kigest": "A JORNADA",
+   "kigest_ref": "000152",
+   "preco_antes": 9455,
+   "preco_depois": 9455,
+   "stock_antes": 2,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "9788534532976",
    "via": "titulo"
   },
   {
@@ -936,6 +1144,19 @@
    "stock_depois": 4,
    "isbn_antes": "",
    "isbn_novo": "9788534531238",
+   "via": "titulo"
+  },
+  {
+   "book_code": "LIV-065",
+   "titulo_site": "A Oração Radical - Deus Precisa de Você",
+   "artigo_kigest": "A ORAÇAÕ RADICAL",
+   "kigest_ref": "00068",
+   "preco_antes": 11030,
+   "preco_depois": 11030,
+   "stock_antes": 12,
+   "stock_depois": 1,
+   "isbn_antes": "",
+   "isbn_novo": "9788534513388",
    "via": "titulo"
   },
   {
@@ -1121,6 +1342,19 @@
    "via": "titulo"
   },
   {
+   "book_code": "LIV-099",
+   "titulo_site": "Vida Sem Limites - Verdades Poderosas para sua Jornada Rumo à Esperança",
+   "artigo_kigest": "VIDA SEM LIMITES",
+   "kigest_ref": "000232",
+   "preco_antes": 22060,
+   "preco_depois": 22060,
+   "stock_antes": 2,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "9788534517850",
+   "via": "titulo"
+  },
+  {
    "book_code": "COL-002",
    "titulo_site": "Bebê - Saúde para a Mamãe e Criança",
    "artigo_kigest": "BEBE SAÚDE PARA MAE E FILHO",
@@ -1132,6 +1366,19 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "ref"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Futuro de Glória — Nossa vida será muito melhor",
+   "artigo_kigest": "FOLHETOS FUTURO DE GLORIA",
+   "kigest_ref": "000354",
+   "preco_antes": 0,
+   "preco_depois": 7500,
+   "stock_antes": 0,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "titulo"
   },
   {
    "book_code": "LIV-149",
@@ -1171,6 +1418,19 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "titulo"
+  },
+  {
+   "book_code": "LIV-078",
+   "titulo_site": "Reavivamento Verdadeiro - A Maior Necessidade da Igreja",
+   "artigo_kigest": "REAVIMENTO VERDADEIRO",
+   "kigest_ref": "000460",
+   "preco_antes": 6160,
+   "preco_depois": 6160,
+   "stock_antes": 2,
+   "stock_depois": 0,
+   "isbn_antes": "",
+   "isbn_novo": "9788534513760",
+   "via": "ref"
   },
   {
    "book_code": "LIV-088",
@@ -1304,6 +1564,45 @@
   },
   {
    "book_code": "",
+   "titulo_site": "A Descoberta — A experiência que revolucionou a vida de um cientista ateu",
+   "artigo_kigest": "DESCOBERTA",
+   "kigest_ref": "002",
+   "preco_antes": 0,
+   "preco_depois": 21944,
+   "stock_antes": 0,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Ser Pai — Redescubra o significado da paternidade",
+   "artigo_kigest": "SER PAI",
+   "kigest_ref": "003",
+   "preco_antes": 0,
+   "preco_depois": 21192,
+   "stock_antes": 0,
+   "stock_depois": 0,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra",
+   "artigo_kigest": "A GRANDE EXTINÇÃO EM MASSA",
+   "kigest_ref": "005",
+   "preco_antes": 0,
+   "preco_depois": 51561,
+   "stock_antes": 0,
+   "stock_depois": 0,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
    "titulo_site": "Proteja Sua Família — Os desafios de cada ciclo da vida",
    "artigo_kigest": "PROTEJA SUA FAMÍLIA",
    "kigest_ref": "006",
@@ -1314,6 +1613,19 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "titulo"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Orando Como Nunca por Seus Filhos",
+   "artigo_kigest": "ORANDO COMO NUNCA POR SEU FILHO",
+   "kigest_ref": "008",
+   "preco_antes": 0,
+   "preco_depois": 18138,
+   "stock_antes": 0,
+   "stock_depois": 1,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
   },
   {
    "book_code": "",
@@ -1408,6 +1720,19 @@
   },
   {
    "book_code": "",
+   "titulo_site": "Jesus Extremo — Paradoxos que dão vida",
+   "artigo_kigest": "JESUS EXTREMO",
+   "kigest_ref": "11493",
+   "preco_antes": 0,
+   "preco_depois": 15882,
+   "stock_antes": 0,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
    "titulo_site": "Tempo de Esperança — 24 horas para você renovar suas energias",
    "artigo_kigest": "TEMPO DE ESPERANÇA",
    "kigest_ref": "11631",
@@ -1418,6 +1743,19 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "cpb"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Guia Prático para Descobrir a Vontade de Deus",
+   "artigo_kigest": "GUIA PRÁTICO PARA DESCOBRIR A VONTADE DE DEUS",
+   "kigest_ref": "11761",
+   "preco_antes": 0,
+   "preco_depois": 28661,
+   "stock_antes": 0,
+   "stock_depois": 5,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
   },
   {
    "book_code": "",
@@ -1444,6 +1782,19 @@
    "isbn_antes": "",
    "isbn_novo": "",
    "via": "cpb"
+  },
+  {
+   "book_code": "",
+   "titulo_site": "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom",
+   "artigo_kigest": "GUIA DE SOBRE VIVENCIA PARA O TEMPO DO FIM",
+   "kigest_ref": "13346",
+   "preco_antes": 0,
+   "preco_depois": 22367,
+   "stock_antes": 0,
+   "stock_depois": 3,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
   },
   {
    "book_code": "",
@@ -1603,16 +1954,29 @@
   },
   {
    "book_code": "",
+   "titulo_site": "Esperança para Viver — O verdadeiro caminho da felicidade",
+   "artigo_kigest": "ESPERANÇA PARA VIVER",
+   "kigest_ref": "6218731",
+   "preco_antes": 0,
+   "preco_depois": 6000,
+   "stock_antes": 0,
+   "stock_depois": 2,
+   "isbn_antes": "",
+   "isbn_novo": "",
+   "via": "ref"
+  },
+  {
+   "book_code": "",
    "titulo_site": "Palavras de Esperança — Histórias da vida diária",
-   "artigo_kigest": "PALAVRAS DE ESPERANÇÃO",
-   "kigest_ref": "30062026",
+   "artigo_kigest": "LIVRO MISSIORIO PALAVRAS DE ESPERANÇA",
+   "kigest_ref": "546972000",
    "preco_antes": 0,
    "preco_depois": 500,
    "stock_antes": 0,
-   "stock_depois": 91,
+   "stock_depois": 17678,
    "isbn_antes": "",
    "isbn_novo": "",
-   "via": "titulo"
+   "via": "ref"
   },
   {
    "book_code": "",
@@ -1650,13 +2014,7 @@
    "stock": 95,
    "isbn": "",
    "parecidos": [
-    "COL-001",
-    "LIV-001",
-    "LIV-069",
-    "LIV-086",
-    "",
-    "",
-    ""
+    "LIV-001"
    ]
   },
   {
@@ -1745,15 +2103,7 @@
    "preco": 2000,
    "stock": 0,
    "isbn": "9788534519533",
-   "parecidos": [
-    "COL-001",
-    "LIV-099",
-    "LIV-147",
-    "",
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "A Volta por Cima",
@@ -1786,9 +2136,7 @@
    "preco": 17339,
    "stock": 0,
    "isbn": "9788534531139",
-   "parecidos": [
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Além da Magia (Livro Infantil)",
@@ -1844,23 +2192,11 @@
    "stock": 0,
    "isbn": "",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
-    "",
     "",
     "",
     "",
@@ -1891,22 +2227,11 @@
    "stock": 0,
    "isbn": "",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -1937,24 +2262,11 @@
    "stock": 0,
    "isbn": "",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-035",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-010",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -1985,22 +2297,11 @@
    "stock": 83,
    "isbn": "",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -2022,6 +2323,17 @@
    ]
   },
   {
+   "titulo": "Bíblia dos Aventureiros",
+   "artigo_kigest": "BIBLIA DOS AVENTUREIROS",
+   "kigest_ref": "00013",
+   "tipo": "biblia",
+   "genero": "Bíblias",
+   "preco": 25000,
+   "stock": 6,
+   "isbn": "9788472088023",
+   "parecidos": []
+  },
+  {
    "titulo": "Bíblia dos Desbravadores",
    "artigo_kigest": "BIBLIA DOS DESBRAVADORES",
    "kigest_ref": "00011",
@@ -2031,25 +2343,11 @@
    "stock": 2,
    "isbn": "9788472085688",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
-    "DBV-002",
-    "DBV-004",
-    "DBV-007",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -2080,22 +2378,11 @@
    "stock": 1,
    "isbn": "9788472085695",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -2128,6 +2415,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Bíblia Nova Semente",
+   "artigo_kigest": "BIBLIA NOVA SEMENTE",
+   "kigest_ref": "000300",
+   "tipo": "biblia",
+   "genero": "Bíblias",
+   "preco": 4950,
+   "stock": 338,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "Bíblia Recomeçar",
    "artigo_kigest": "BIBLIA RECOMEÇAR",
    "kigest_ref": "000406",
@@ -2137,22 +2435,11 @@
    "stock": 0,
    "isbn": "",
    "parecidos": [
-    "LIV-085",
     "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-013",
     "BIB-016",
     "BIB-018",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "",
     "",
     "",
     "",
@@ -2233,6 +2520,17 @@
     "",
     ""
    ]
+  },
+  {
+   "titulo": "Bíblia Sagrada Nova Semente",
+   "artigo_kigest": "BÍBLIA SAGRADA NOVA SEMENTE",
+   "kigest_ref": "LV00021",
+   "tipo": "biblia",
+   "genero": "Bíblias",
+   "preco": 6000,
+   "stock": 7,
+   "isbn": "",
+   "parecidos": []
   },
   {
    "titulo": "Bíblia Sagrada RA Rosa",
@@ -2581,9 +2879,18 @@
    "preco": 14945,
    "stock": 6,
    "isbn": "9788534533409",
-   "parecidos": [
-    ""
-   ]
+   "parecidos": []
+  },
+  {
+   "titulo": "Conecte-se com Seu Filho",
+   "artigo_kigest": "CONECTE-SE COM SEU FILHO",
+   "kigest_ref": "16373",
+   "tipo": "livro",
+   "genero": "Família & Relacionamentos",
+   "preco": 4511,
+   "stock": 3,
+   "isbn": "",
+   "parecidos": []
   },
   {
    "titulo": "Conhecer Jesus é Tudo",
@@ -2685,6 +2992,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Corte",
+   "artigo_kigest": "CORTE",
+   "kigest_ref": "23568",
+   "tipo": "livro",
+   "genero": "Catálogo Geral",
+   "preco": 30000,
+   "stock": 1,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "Declarações da Igreja",
    "artigo_kigest": "DECLARAÇÕES DA IGREJA",
    "kigest_ref": "0017",
@@ -2693,14 +3011,7 @@
    "preco": 41693,
    "stock": 10,
    "isbn": "",
-   "parecidos": [
-    "LIV-047",
-    "VES-001",
-    "LIV-078",
-    "LIV-063",
-    "LIV-060",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Desfrutar da Vida",
@@ -2711,25 +3022,7 @@
    "preco": 65000,
    "stock": 0,
    "isbn": "9789728891893",
-   "parecidos": [
-    "COL-001",
-    "LIV-099",
-    "LIV-048",
-    "LIV-088",
-    "LIV-046",
-    "LIV-061",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Edificadores",
@@ -2763,14 +3056,7 @@
    "stock": 10,
    "isbn": "",
    "parecidos": [
-    "COL-001",
-    "LIV-099",
-    "LIV-147",
-    "LIV-036",
-    "",
-    "",
-    "",
-    ""
+    "LIV-036"
    ]
   },
   {
@@ -2792,6 +3078,17 @@
    "genero": "Material de Igreja",
    "preco": 250,
    "stock": 63,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
+   "titulo": "Esperança para Família Infantil",
+   "artigo_kigest": "ESPERANÇA PARA FAMILIA INFANTIL",
+   "kigest_ref": "000468",
+   "tipo": "livro",
+   "genero": "Família & Relacionamentos",
+   "preco": 3000,
+   "stock": 1,
    "isbn": "",
    "parecidos": []
   },
@@ -2848,9 +3145,7 @@
    "preco": 14426,
    "stock": 5,
    "isbn": "",
-   "parecidos": [
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Fé e Obras",
@@ -2862,13 +3157,7 @@
    "stock": 0,
    "isbn": "",
    "parecidos": [
-    "LIV-058",
-    "LIV-053",
-    "LIV-004",
-    "LIV-034",
-    "LIV-142",
-    "LIV-003",
-    "LIV-051"
+    "LIV-142"
    ]
   },
   {
@@ -2880,16 +3169,7 @@
    "preco": 40000,
    "stock": 0,
    "isbn": "9788534526098",
-   "parecidos": [
-    "LIV-149",
-    "LIV-064",
-    "LIV-095",
-    "LIV-019",
-    "LIV-062",
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Folheto Impacto",
@@ -2900,9 +3180,7 @@
    "preco": 110,
    "stock": 68,
    "isbn": "",
-   "parecidos": [
-    "LIV-006"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Folheto Momento de Paz",
@@ -2971,6 +3249,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Guia",
+   "artigo_kigest": "GUIA",
+   "kigest_ref": "00000333",
+   "tipo": "desbravadores",
+   "genero": "Desbravadores",
+   "preco": 250,
+   "stock": 0,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "Guia de Liberdade Religiosa",
    "artigo_kigest": "GUIA DE LIBERDADE RELIGIOSA",
    "kigest_ref": "15062026",
@@ -3002,9 +3291,6 @@
    "stock": 1,
    "isbn": "",
    "parecidos": [
-    "LIV-142",
-    "LIV-062",
-    "",
     "",
     ""
    ]
@@ -3019,9 +3305,6 @@
    "stock": 34,
    "isbn": "",
    "parecidos": [
-    "LIV-142",
-    "LIV-062",
-    "",
     "",
     ""
    ]
@@ -3046,24 +3329,7 @@
    "preco": 55000,
    "stock": 4,
    "isbn": "",
-   "parecidos": [
-    "LIV-085",
-    "LIV-065",
-    "LIV-043",
-    "LIV-095",
-    "LIV-021",
-    "LIV-083",
-    "LIV-014",
-    "LIV-028",
-    "LIV-027",
-    "LIV-029",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Hinário Novo",
@@ -3075,7 +3341,6 @@
    "stock": 1,
    "isbn": "",
    "parecidos": [
-    "LIV-087",
     "MUS-002",
     "MUS-001",
     "MUS-003"
@@ -3091,11 +3356,7 @@
    "stock": 1,
    "isbn": "",
    "parecidos": [
-    "LIV-026",
-    "LIV-045",
-    "LIV-077",
-    "LIV-046",
-    ""
+    "LIV-046"
    ]
   },
   {
@@ -3143,6 +3404,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Lenço de Líder (Aventureiros )",
+   "artigo_kigest": "LENÇO DE LÍDER (AVENTUREIROS )",
+   "kigest_ref": "00042",
+   "tipo": "desbravadores",
+   "genero": "Desbravadores",
+   "preco": 5000,
+   "stock": 13,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "Lenço de Lider Jovem",
    "artigo_kigest": "LAÇO DE LIDER JOVEM",
    "kigest_ref": "09032026",
@@ -3163,12 +3435,6 @@
    "stock": 8,
    "isbn": "9788534531115",
    "parecidos": [
-    "LIV-052",
-    "DBV-002",
-    "LIV-091",
-    "",
-    "",
-    "",
     ""
    ]
   },
@@ -3236,15 +3502,7 @@
    "preco": 7000,
    "stock": 1588,
    "isbn": "",
-   "parecidos": [
-    "LIV-047",
-    "VES-001",
-    "LIV-078",
-    "LIV-063",
-    "LIV-060",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Manual Diáconos e Diaconisas",
@@ -3289,10 +3547,7 @@
    "stock": 8,
    "isbn": "9788534534819",
    "parecidos": [
-    "LIV-055",
-    "LIV-095",
-    "",
-    ""
+    "LIV-055"
    ]
   },
   {
@@ -3315,10 +3570,7 @@
    "preco": 14725,
    "stock": 0,
    "isbn": "",
-   "parecidos": [
-    "LIV-035",
-    "LIV-010"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Meditações Diárias — Maravilhoso Deus",
@@ -3329,10 +3581,7 @@
    "preco": 10000,
    "stock": 47,
    "isbn": "9788534529860",
-   "parecidos": [
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Mensageiro",
@@ -3442,10 +3691,7 @@
    "preco": 14945,
    "stock": 7,
    "isbn": "9788534534192",
-   "parecidos": [
-    "LIV-057",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Ministério Pastoral",
@@ -3456,10 +3702,7 @@
    "preco": 18090,
    "stock": 8,
    "isbn": "9788534533805",
-   "parecidos": [
-    "LIV-057",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Movidos a Internet",
@@ -3528,6 +3771,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Novo Testamento em Umbundo",
+   "artigo_kigest": "NOVO TESTAMENTO EM UMBUNDO",
+   "kigest_ref": "00044",
+   "tipo": "biblia",
+   "genero": "Bíblias",
+   "preco": 3000,
+   "stock": 5,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "O Ciclo da Infelicidade",
    "artigo_kigest": "O CICLO DA INFELICIDADE",
    "kigest_ref": "004",
@@ -3536,9 +3790,7 @@
    "preco": 27818,
    "stock": 5,
    "isbn": "",
-   "parecidos": [
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "O Colportor de Êxito",
@@ -3620,6 +3872,17 @@
    "parecidos": []
   },
   {
+   "titulo": "Orando como Nunca por Seu Marido",
+   "artigo_kigest": "ORANDO COMO NUNCA POR SEU MARIDO",
+   "kigest_ref": "007",
+   "tipo": "livro",
+   "genero": "Catálogo Geral",
+   "preco": 18138,
+   "stock": 1,
+   "isbn": "",
+   "parecidos": []
+  },
+  {
    "titulo": "Orientação da Criança",
    "artigo_kigest": "ORIETAÇAÕ DA CRIANÇA",
    "kigest_ref": "000192",
@@ -3628,9 +3891,7 @@
    "preco": 23202,
    "stock": 6,
    "isbn": "9786589448747",
-   "parecidos": [
-    "COL-002"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Passarinhos",
@@ -3663,12 +3924,7 @@
    "preco": 27207,
    "stock": 3,
    "isbn": "",
-   "parecidos": [
-    "LIV-095",
-    "LIV-051",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Pesquisador",
@@ -3701,9 +3957,7 @@
    "preco": 20298.76,
    "stock": 5,
    "isbn": "9788534516778",
-   "parecidos": [
-    "LIV-073"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Por que Não Mas Estpita",
@@ -3737,11 +3991,7 @@
    "stock": 3,
    "isbn": "",
    "parecidos": [
-    "LIV-035",
-    "LIV-057",
-    "LIV-001",
-    "LIV-094",
-    ""
+    "LIV-035"
    ]
   },
   {
@@ -3786,10 +4036,7 @@
    "preco": 18485,
    "stock": 1,
    "isbn": "9786589895978",
-   "parecidos": [
-    "LIV-001",
-    "LIV-034"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Princípios para Líderes Cristãos",
@@ -3822,12 +4069,7 @@
    "preco": 31353,
    "stock": 5,
    "isbn": "",
-   "parecidos": [
-    "LIV-075",
-    "LIV-002",
-    "LIV-076",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Profetas e Reis",
@@ -3895,12 +4137,7 @@
    "preco": 3000,
    "stock": 10,
    "isbn": "",
-   "parecidos": [
-    "COL-001",
-    "BIB-018",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Revolucione Seu Futuro",
@@ -3934,9 +4171,6 @@
    "stock": 5,
    "isbn": "",
    "parecidos": [
-    "COL-001",
-    "COL-002",
-    "",
     ""
    ]
   },
@@ -3949,9 +4183,7 @@
    "preco": 18514,
    "stock": 2,
    "isbn": "",
-   "parecidos": [
-    "LIV-061"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Simples Demais",
@@ -3962,9 +4194,7 @@
    "preco": 27680,
    "stock": 5,
    "isbn": "",
-   "parecidos": [
-    "LIV-002"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Sinais de Esperança",
@@ -3975,15 +4205,7 @@
    "preco": 3571,
    "stock": 18,
    "isbn": "",
-   "parecidos": [
-    "COL-001",
-    "LIV-099",
-    "LIV-147",
-    "",
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Sinta-se Bem",
@@ -3994,11 +4216,7 @@
    "preco": 42000,
    "stock": 3,
    "isbn": "9789728891572",
-   "parecidos": [
-    "",
-    "",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Sombras e Realidade",
@@ -4118,14 +4336,7 @@
    "preco": 16125,
    "stock": 4,
    "isbn": "9786589448921",
-   "parecidos": [
-    "LIV-047",
-    "VES-001",
-    "LIV-078",
-    "LIV-063",
-    "LIV-060",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Testemunhos para a Igreja 3",
@@ -4136,14 +4347,7 @@
    "preco": 25565,
    "stock": 4,
    "isbn": "9786589448952",
-   "parecidos": [
-    "LIV-047",
-    "VES-001",
-    "LIV-078",
-    "LIV-063",
-    "LIV-060",
-    ""
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Testemunhos para a Igreja Vol. 1",
@@ -4220,10 +4424,7 @@
    "preco": 1500,
    "stock": 0,
    "isbn": "",
-   "parecidos": [
-    "LIV-086",
-    "LIV-092"
-   ]
+   "parecidos": []
   },
   {
    "titulo": "Viagem ao Desconhecido Caderno de Actividade",
@@ -4248,6 +4449,20 @@
    "parecidos": []
   },
   {
+   "titulo": "Vida de Jesus",
+   "artigo_kigest": "VIDA DE JESUS",
+   "kigest_ref": "00005",
+   "tipo": "livro",
+   "genero": "Catálogo Geral",
+   "preco": 18000,
+   "stock": 101,
+   "isbn": "",
+   "parecidos": [
+    "COL-001",
+    "LIV-099"
+   ]
+  },
+  {
    "titulo": "Vida e Ensinos",
    "artigo_kigest": "VIDA E ENSINOS",
    "kigest_ref": "0037",
@@ -4258,22 +4473,7 @@
    "isbn": "",
    "parecidos": [
     "COL-001",
-    "LIV-099",
-    "LIV-048",
-    "LIV-088",
-    "LIV-046",
-    "LIV-061",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "LIV-099"
    ]
   },
   {
@@ -4286,9 +4486,31 @@
    "stock": 0,
    "isbn": "",
    "parecidos": []
+  },
+  {
+   "titulo": "Você e Deus",
+   "artigo_kigest": "VOCE E DEUS",
+   "kigest_ref": "0015",
+   "tipo": "livro",
+   "genero": "Catálogo Geral",
+   "preco": 10854,
+   "stock": 10,
+   "isbn": "",
+   "parecidos": [
+    "LIV-070",
+    "LIV-005"
+   ]
   }
  ],
  "repetidos": [
+  {
+   "fica": "00042",
+   "sai": [
+    "00040",
+    "17032026",
+    "00043"
+   ]
+  },
   {
    "fica": "14456",
    "sai": [
@@ -4367,15 +4589,6 @@
  ],
  "ambiguos": [
   {
-   "kigest_ref": "546972000",
-   "artigo_kigest": "LIVRO MISSIORIO PALAVRAS DE ESPERANÇA",
-   "preco": 500,
-   "stock": 17678,
-   "candidatos": [
-    "Palavras de Esperança — Histórias da vida diária"
-   ]
-  },
-  {
    "kigest_ref": "05032026",
    "artigo_kigest": "HINÁRIO HUMBUNDO PORTUGUES",
    "preco": 3000,
@@ -4387,109 +4600,6 @@
    ]
   },
   {
-   "kigest_ref": "000300",
-   "artigo_kigest": "BIBLIA NOVA SEMENTE",
-   "preco": 4950,
-   "stock": 338,
-   "candidatos": [
-    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
-   ]
-  },
-  {
-   "kigest_ref": "000031",
-   "artigo_kigest": "OUVINDO A VOZ DE DEUS",
-   "preco": 2000,
-   "stock": 295,
-   "candidatos": [
-    "Ouvindo a Voz de Deus — Guia de estudos bíblicos"
-   ]
-  },
-  {
-   "kigest_ref": "00028",
-   "artigo_kigest": "SEGREDO DO BEM ESTAR EMOCIONAL",
-   "preco": 10000,
-   "stock": 112,
-   "candidatos": [
-    "Segredos do Bem-Estar Emocional — Depressão, estresse, ansiedade",
-    "Saúde & Bem-Estar — Segredos que podem mudar a sua vida"
-   ]
-  },
-  {
-   "kigest_ref": "00005",
-   "artigo_kigest": "VIDA DE JESUS",
-   "preco": 18000,
-   "stock": 101,
-   "candidatos": [
-    "Jesus Extremo — Paradoxos que dão vida",
-    "LIV-058",
-    "COL-001",
-    "LIV-099",
-    "LIV-015",
-    "LIV-048",
-    "BIB-020",
-    "LIV-088",
-    "LIV-142",
-    "LIV-046",
-    "LIV-061",
-    "Além da Imaginação — Os surpreendentes mistérios da vida",
-    "Ainda Existe Esperança — A solução para os problemas da vida",
-    "Revelação de Jesus Cristo — Comentário sobre o livro do Apocalipse",
-    "A Descoberta — A experiência que revolucionou a vida de um cientista ateu",
-    "Só para Jovens — Dicas para você aproveitar o melhor da vida",
-    "Depois do Perdão — Experimente o fruto de uma vida santificada",
-    "Proteja Sua Família — Os desafios de cada ciclo da vida",
-    "Palavras de Esperança — Histórias da vida diária",
-    "Testemunhando por Cristo — Um manual para encaminhar pessoas a Jesus",
-    "Saúde & Bem-Estar — Segredos que podem mudar a sua vida",
-    "Momentos de Paz — O descanso que traz calma para uma vida agitada",
-    "Jesus Voltará — Uma boa notícia para você",
-    "Futuro de Glória — Nossa vida será muito melhor"
-   ]
-  },
-  {
-   "kigest_ref": "0008",
-   "artigo_kigest": "NISTO CREMOS",
-   "preco": 20000,
-   "stock": 67,
-   "candidatos": [
-    "LIV-063",
-    "LIV-027"
-   ]
-  },
-  {
-   "kigest_ref": "0006",
-   "artigo_kigest": "A FÉ DE JESUS",
-   "preco": 2000,
-   "stock": 24,
-   "candidatos": [
-    "LIV-142"
-   ]
-  },
-  {
-   "kigest_ref": "000030",
-   "artigo_kigest": "MEDITAÇÃO OLHANDO PARA O CRIADOR",
-   "preco": 5700,
-   "stock": 18,
-   "candidatos": [
-    "Olhando para o Criador e Salvador — Meditações diárias"
-   ]
-  },
-  {
-   "kigest_ref": "00042",
-   "artigo_kigest": "LENÇO DE LÍDER (AVENTUREIROS )",
-   "preco": 5000,
-   "stock": 13,
-   "candidatos": [
-    "DBV-006"
-   ]
-  },
-  {
    "kigest_ref": "21102026",
    "artigo_kigest": "T-CHERT UMA VOZ 27",
    "preco": 3500,
@@ -4497,72 +4607,7 @@
    "candidatos": [
     "VES-002",
     "T-shirt branca UmaVoz27 — Missão para Todos",
-    "VES-001",
-    "Polo preta UmaVoz27 — Missão para Todos"
-   ]
-  },
-  {
-   "kigest_ref": "00040",
-   "artigo_kigest": "LENÇO DE LÍDER (DESBRAVADORES)",
-   "preco": 5000,
-   "stock": 10,
-   "candidatos": [
-    "DBV-002",
-    "DBV-004"
-   ]
-  },
-  {
-   "kigest_ref": "0015",
-   "artigo_kigest": "VOCE E DEUS",
-   "preco": 10854,
-   "stock": 10,
-   "candidatos": [
-    "LIV-065",
-    "LIV-028",
-    "LIV-070",
-    "LIV-085",
-    "LIV-074",
-    "LIV-033",
-    "LIV-072",
-    "LIV-054",
-    "LIV-005",
-    "LIV-043",
-    "LIV-095",
-    "LIV-021",
-    "LIV-083",
-    "LIV-014",
-    "LIV-027",
-    "LIV-029",
-    "Ouvindo a Voz de Deus — Guia de estudos bíblicos",
-    "Tempo de Esperança — 24 horas para você renovar suas energias",
-    "Guia Prático para Descobrir a Vontade de Deus",
-    "Como Conhecer a Vontade de Deus",
-    "Viver Para Deus — Redescubra a alegria da virtude cristã",
-    "Por que, Senhor? — As respostas que você precisa para as perguntas que sempre fez",
-    "Só para Jovens — Dicas para você aproveitar o melhor da vida",
-    "O Altar da Família — Restaurando a comunhão com Deus",
-    "Coragem! — Eles confiaram em Deus e venceram o medo",
-    "Jesus Voltará — Uma boa notícia para você"
-   ]
-  },
-  {
-   "kigest_ref": "id-59",
-   "artigo_kigest": "ADVENTISMO",
-   "preco": 36135,
-   "stock": 9,
-   "candidatos": [
-    "LIV-006",
-    "LIV-077"
-   ]
-  },
-  {
-   "kigest_ref": "000123",
-   "artigo_kigest": "PREGAÇAO OBJETIVA",
-   "preco": 16490,
-   "stock": 8,
-   "candidatos": [
-    "LIV-074",
-    "LIV-069"
+    "VES-001"
    ]
   },
   {
@@ -4589,48 +4634,7 @@
     "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
     "Bíblia Sagrada Letra Gigante — capa azul",
     "Bíblia Sagrada Letra Gigante — capa bordô",
-    "LIV-085",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "O Limite do Prazer — O que a Bíblia diz sobre a identidade sexual",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
-   ]
-  },
-  {
-   "kigest_ref": "LV00021",
-   "artigo_kigest": "BÍBLIA SAGRADA NOVA SEMENTE",
-   "preco": 6000,
-   "stock": 7,
-   "candidatos": [
-    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
-    "BIB-010",
-    "BIB-013",
-    "BIB-016",
-    "BIB-018",
-    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
-    "Bíblia Sagrada — capa dura preta com moldura dourada",
-    "Bíblia Sagrada Letra Supergigante — capa castanha",
-    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
-    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
-    "Bíblia Sagrada — capa dura com flores, fundo claro",
-    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
-    "Bíblia Sagrada — capa dura floral azul-escura",
-    "Bíblia Sagrada — capa dura preta com relevo dourado",
-    "Bíblia Sagrada Letra Gigante — capa azul",
-    "Bíblia Sagrada Letra Gigante — capa bordô",
     "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
     "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
     "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
@@ -4654,186 +4658,12 @@
    ]
   },
   {
-   "kigest_ref": "00013",
-   "artigo_kigest": "BIBLIA DOS AVENTUREIROS",
-   "preco": 25000,
-   "stock": 6,
-   "candidatos": [
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
-    "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa",
-    "LIV-085",
-    "BIB-010",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
-    "BIB-013",
-    "BIB-016",
-    "BIB-018",
-    "DBV-006",
-    "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "O Limite do Prazer — O que a Bíblia diz sobre a identidade sexual",
-    "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
-    "Bíblia Sagrada — capa dura preta com moldura dourada",
-    "Bíblia Sagrada Letra Supergigante — capa castanha",
-    "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
-    "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
-    "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
-    "Bíblia Sagrada — capa dura com flores, fundo claro",
-    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
-    "Bíblia Sagrada — capa dura floral azul-escura",
-    "Bíblia Sagrada — capa dura preta com relevo dourado",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
-    "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
-    "Bíblia Sagrada Letra Gigante — capa azul",
-    "Bíblia Sagrada Letra Gigante — capa bordô",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
-    "Bíblia do Desbravador — Nova Versão Internacional, capa laranja"
-   ]
-  },
-  {
-   "kigest_ref": "00050",
-   "artigo_kigest": "LENÇO DE DESBRAVADORE",
-   "preco": 2000,
-   "stock": 6,
-   "candidatos": [
-    "DBV-002",
-    "DBV-004",
-    "DBV-003",
-    "DBV-001",
-    "DBV-007",
-    "DBV-006",
-    "DBV-005"
-   ]
-  },
-  {
-   "kigest_ref": "000116",
-   "artigo_kigest": "QUETOES SOBRE DOUTRINAS",
-   "preco": 56325,
-   "stock": 6,
-   "candidatos": [
-    "LIV-077"
-   ]
-  },
-  {
-   "kigest_ref": "00044",
-   "artigo_kigest": "NOVO TESTAMENTO EM UMBUNDO",
-   "preco": 3000,
-   "stock": 5,
-   "candidatos": [
-    "LIV-087"
-   ]
-  },
-  {
-   "kigest_ref": "00090",
-   "artigo_kigest": "CORAGEM",
-   "preco": 12215,
-   "stock": 5,
-   "candidatos": [
-    "LIV-021",
-    "Coragem! — Eles confiaram em Deus e venceram o medo"
-   ]
-  },
-  {
-   "kigest_ref": "00094",
-   "artigo_kigest": "DEUS NA TEMPESTADE",
-   "preco": 14575,
-   "stock": 5,
-   "candidatos": [
-    "LIV-028",
-    "LIV-085",
-    "LIV-065",
-    "LIV-043",
-    "LIV-095",
-    "LIV-021",
-    "LIV-083",
-    "LIV-014",
-    "LIV-027",
-    "LIV-029",
-    "Ouvindo a Voz de Deus — Guia de estudos bíblicos",
-    "Guia Prático para Descobrir a Vontade de Deus",
-    "Como Conhecer a Vontade de Deus",
-    "Viver Para Deus — Redescubra a alegria da virtude cristã",
-    "O Altar da Família — Restaurando a comunhão com Deus",
-    "Coragem! — Eles confiaram em Deus e venceram o medo"
-   ]
-  },
-  {
-   "kigest_ref": "000152",
-   "artigo_kigest": "A JORNADA",
-   "preco": 9455,
-   "stock": 5,
-   "candidatos": [
-    "LIV-099",
-    "LIV-050"
-   ]
-  },
-  {
-   "kigest_ref": "000232",
-   "artigo_kigest": "VIDA SEM LIMITES",
-   "preco": 22060,
-   "stock": 5,
-   "candidatos": [
-    "LIV-099"
-   ]
-  },
-  {
-   "kigest_ref": "000354",
-   "artigo_kigest": "FOLHETOS FUTURO DE GLORIA",
-   "preco": 7500,
-   "stock": 5,
-   "candidatos": [
-    "Futuro de Glória — Nossa vida será muito melhor"
-   ]
-  },
-  {
    "kigest_ref": "000400",
    "artigo_kigest": "FOLHETO AMOR EM FAMILIA",
    "preco": 7500,
    "stock": 5,
    "candidatos": [
     "LIV-149"
-   ]
-  },
-  {
-   "kigest_ref": "17032026",
-   "artigo_kigest": "LENÇO DE LIDER DE JOVENS",
-   "preco": 5000,
-   "stock": 5,
-   "candidatos": [
-    "DBV-001"
-   ]
-  },
-  {
-   "kigest_ref": "002",
-   "artigo_kigest": "DESCOBERTA",
-   "preco": 21944,
-   "stock": 5,
-   "candidatos": [
-    "A Descoberta — A experiência que revolucionou a vida de um cientista ateu"
-   ]
-  },
-  {
-   "kigest_ref": "11493",
-   "artigo_kigest": "JESUS EXTREMO",
-   "preco": 15882,
-   "stock": 5,
-   "candidatos": [
-    "Jesus Extremo — Paradoxos que dão vida"
-   ]
-  },
-  {
-   "kigest_ref": "11761",
-   "artigo_kigest": "GUIA PRÁTICO PARA DESCOBRIR A VONTADE DE DEUS",
-   "preco": 28661,
-   "stock": 5,
-   "candidatos": [
-    "Guia Prático para Descobrir a Vontade de Deus"
    ]
   },
   {
@@ -4860,18 +4690,7 @@
     "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
     "Bíblia Sagrada Letra Gigante — capa azul",
     "Bíblia Sagrada Letra Gigante — capa bordô",
-    "LIV-085",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "O Limite do Prazer — O que a Bíblia diz sobre a identidade sexual",
     "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
     "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
     "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
@@ -4937,15 +4756,6 @@
    "stock": 4,
    "candidatos": [
     "BIB-018"
-   ]
-  },
-  {
-   "kigest_ref": "00093",
-   "artigo_kigest": "DEUS ME AMA DE 28 MANEIRAS",
-   "preco": 10605,
-   "stock": 3,
-   "candidatos": [
-    "LIV-027"
    ]
   },
   {
@@ -5027,51 +4837,6 @@
    ]
   },
   {
-   "kigest_ref": "13346",
-   "artigo_kigest": "GUIA DE SOBRE VIVENCIA PARA O TEMPO DO FIM",
-   "preco": 22367,
-   "stock": 3,
-   "candidatos": [
-    "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom"
-   ]
-  },
-  {
-   "kigest_ref": "16373",
-   "artigo_kigest": "CONECTE-SE COM SEU FILHO",
-   "preco": 4511,
-   "stock": 3,
-   "candidatos": [
-    "LIV-015"
-   ]
-  },
-  {
-   "kigest_ref": "00024",
-   "artigo_kigest": "ELNÇO DE DESBRAVADORES",
-   "preco": 2000,
-   "stock": 2,
-   "candidatos": [
-    "DBV-002",
-    "DBV-004",
-    "DBV-003",
-    "DBV-001",
-    "DBV-007",
-    "DBV-006",
-    "DBV-005"
-   ]
-  },
-  {
-   "kigest_ref": "000115",
-   "artigo_kigest": "MENSAGEIRA DO SENHOR",
-   "preco": 55429,
-   "stock": 2,
-   "candidatos": [
-    "LIV-057",
-    "Mensageira do Senhor — O ministério profético de Ellen G. White",
-    "LIV-072",
-    "Por que, Senhor? — As respostas que você precisa para as perguntas que sempre fez"
-   ]
-  },
-  {
    "kigest_ref": "000306",
    "artigo_kigest": "BIBLIA SAGRADA NTLH",
    "preco": 49630,
@@ -5124,58 +4889,6 @@
    ]
   },
   {
-   "kigest_ref": "06052026",
-   "artigo_kigest": "ESPERENÇA PARA VIVER",
-   "preco": 6000,
-   "stock": 2,
-   "candidatos": [
-    "Esperança para Viver — O verdadeiro caminho da felicidade",
-    "COL-001",
-    "LIV-099",
-    "LIV-147",
-    "Ainda Existe Esperança — A solução para os problemas da vida",
-    "Tempo de Esperança — 24 horas para você renovar suas energias",
-    "Viver Para Deus — Redescubra a alegria da virtude cristã",
-    "Palavras de Esperança — Histórias da vida diária"
-   ]
-  },
-  {
-   "kigest_ref": "6218731",
-   "artigo_kigest": "ESPERANÇA PARA VIVER",
-   "preco": 6000,
-   "stock": 2,
-   "candidatos": [
-    "Esperança para Viver — O verdadeiro caminho da felicidade",
-    "COL-001",
-    "LIV-099",
-    "LIV-147",
-    "Ainda Existe Esperança — A solução para os problemas da vida",
-    "Tempo de Esperança — 24 horas para você renovar suas energias",
-    "Viver Para Deus — Redescubra a alegria da virtude cristã",
-    "Palavras de Esperança — Histórias da vida diária"
-   ]
-  },
-  {
-   "kigest_ref": "000149",
-   "artigo_kigest": "NAMORO COMPLETO",
-   "preco": 18120,
-   "stock": 1,
-   "candidatos": [
-    "LIV-062",
-    "LIV-033"
-   ]
-  },
-  {
-   "kigest_ref": "00068",
-   "artigo_kigest": "A ORAÇAÕ RADICAL",
-   "preco": 11030,
-   "stock": 1,
-   "candidatos": [
-    "LIV-065",
-    "LIV-083"
-   ]
-  },
-  {
    "kigest_ref": "000333",
    "artigo_kigest": "BIBLIA SAGRADA MISSIONÁRIA CAPA DURA",
    "preco": 15000,
@@ -5199,43 +4912,6 @@
    ]
   },
   {
-   "kigest_ref": "000468",
-   "artigo_kigest": "ESPERANÇA PARA FAMILIA INFANTIL",
-   "preco": 3000,
-   "stock": 1,
-   "candidatos": [
-    "LIV-147"
-   ]
-  },
-  {
-   "kigest_ref": "23568",
-   "artigo_kigest": "CORTE",
-   "preco": 30000,
-   "stock": 1,
-   "candidatos": [
-    "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado"
-   ]
-  },
-  {
-   "kigest_ref": "007",
-   "artigo_kigest": "ORANDO COMO NUNCA POR SEU MARIDO",
-   "preco": 18138,
-   "stock": 1,
-   "candidatos": [
-    "Orando Como Nunca por Seus Filhos"
-   ]
-  },
-  {
-   "kigest_ref": "008",
-   "artigo_kigest": "ORANDO COMO NUNCA POR SEU FILHO",
-   "preco": 18138,
-   "stock": 1,
-   "candidatos": [
-    "LIV-015",
-    "Orando Como Nunca por Seus Filhos"
-   ]
-  },
-  {
    "kigest_ref": "00026",
    "artigo_kigest": "HINÁRIO UMBUNDO",
    "preco": 3000,
@@ -5244,35 +4920,6 @@
     "MUS-002",
     "MUS-001",
     "MUS-003"
-   ]
-  },
-  {
-   "kigest_ref": "00043",
-   "artigo_kigest": "LENÇO DE LÍDER (EMBAIXADORES)",
-   "preco": 5000,
-   "stock": 0,
-   "candidatos": [
-    "DBV-003"
-   ]
-  },
-  {
-   "kigest_ref": "000109",
-   "artigo_kigest": "ITERPRETAÇAÕ DA AS ESCRITURAS",
-   "preco": 31820,
-   "stock": 0,
-   "candidatos": [
-    "LIV-049"
-   ]
-  },
-  {
-   "kigest_ref": "000138",
-   "artigo_kigest": "INTERPRETANDO AS ESCRITURAS",
-   "preco": 31820,
-   "stock": 0,
-   "candidatos": [
-    "LIV-049",
-    "LIV-037",
-    "LIV-044"
    ]
   },
   {
@@ -5403,155 +5050,30 @@
     "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
     "Bíblia Sagrada Letra Gigante — capa azul",
     "Bíblia Sagrada Letra Gigante — capa bordô",
-    "LIV-085",
-    "LIV-037",
-    "LIV-049",
-    "LIV-096",
-    "LIV-040",
-    "LIV-020",
-    "LIV-022",
     "BIB-020",
-    "LIV-086",
-    "LIV-066",
-    "LIV-071",
-    "O Limite do Prazer — O que a Bíblia diz sobre a identidade sexual",
     "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
     "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
     "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
     "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa"
    ]
-  },
-  {
-   "kigest_ref": "000460",
-   "artigo_kigest": "REAVIMENTO VERDADEIRO",
-   "preco": 6160,
-   "stock": 0,
-   "candidatos": [
-    "LIV-078",
-    "Esperança para Viver — O verdadeiro caminho da felicidade",
-    "O Reavivamento Prometido — Como receber a plenitude do Espírito Santo",
-    "Nem Tudo Que Cai na Rede é Peixe — Como encontrar o verdadeiro amor"
-   ]
-  },
-  {
-   "kigest_ref": "33336974",
-   "artigo_kigest": "JESUS EXTREMO",
-   "preco": 15882,
-   "stock": 0,
-   "candidatos": [
-    "Jesus Extremo — Paradoxos que dão vida",
-    "LIV-058",
-    "LIV-015",
-    "BIB-020",
-    "LIV-142",
-    "Revelação de Jesus Cristo — Comentário sobre o livro do Apocalipse",
-    "Testemunhando por Cristo — Um manual para encaminhar pessoas a Jesus",
-    "Jesus Voltará — Uma boa notícia para você"
-   ]
-  },
-  {
-   "kigest_ref": "36487",
-   "artigo_kigest": "DESCOBERTA",
-   "preco": 21944,
-   "stock": 0,
-   "candidatos": [
-    "A Descoberta — A experiência que revolucionou a vida de um cientista ateu"
-   ]
-  },
-  {
-   "kigest_ref": "944231",
-   "artigo_kigest": "SER PAI",
-   "preco": 21192,
-   "stock": 0,
-   "candidatos": [
-    "Ser Pai — Redescubra o significado da paternidade"
-   ]
-  },
-  {
-   "kigest_ref": "2164987",
-   "artigo_kigest": "A GRANDE EXTENÇAÕ EM MASSA",
-   "preco": 51561,
-   "stock": 0,
-   "candidatos": [
-    "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra"
-   ]
-  },
-  {
-   "kigest_ref": "003",
-   "artigo_kigest": "SER PAI",
-   "preco": 21192,
-   "stock": 0,
-   "candidatos": [
-    "Ser Pai — Redescubra o significado da paternidade"
-   ]
-  },
-  {
-   "kigest_ref": "005",
-   "artigo_kigest": "A GRANDE EXTINÇÃO EM MASSA",
-   "preco": 51561,
-   "stock": 0,
-   "candidatos": [
-    "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra"
-   ]
-  },
-  {
-   "kigest_ref": "12383",
-   "artigo_kigest": "REAVIVAMENTO VERDAEIRO",
-   "preco": 8551,
-   "stock": 0,
-   "candidatos": [
-    "LIV-078",
-    "Esperança para Viver — O verdadeiro caminho da felicidade",
-    "O Reavivamento Prometido — Como receber a plenitude do Espírito Santo",
-    "Nem Tudo Que Cai na Rede é Peixe — Como encontrar o verdadeiro amor"
-   ]
-  },
-  {
-   "kigest_ref": "00000333",
-   "artigo_kigest": "GUIA",
-   "preco": 250,
-   "stock": 0,
-   "candidatos": [
-    "LIV-142",
-    "LIV-062",
-    "Ouvindo a Voz de Deus — Guia de estudos bíblicos",
-    "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom",
-    "Guia Prático para Descobrir a Vontade de Deus"
-   ]
   }
  ],
  "so_no_site": [
-  "LIV-006",
-  "LIV-099",
-  "LIV-074",
   "BIB-010",
   "LIV-073",
-  "LIV-049",
-  "LIV-057",
-  "LIV-065",
   "BIB-013",
   "BIB-016",
   "BIB-018",
   "MUS-002",
   "MUS-001",
   "DBV-002",
-  "DBV-004",
+  "DBV-007",
   "VES-001",
   "MUS-003",
   "DBV-009",
-  "DBV-007",
   "DBV-008",
   "DBV-005",
   "VES-002",
-  "LIV-078",
-  "LIV-077",
-  "LIV-063",
-  "LIV-142",
-  "LIV-050",
-  "LIV-021",
-  "LIV-028",
-  "LIV-027",
-  "LIV-062",
   "LIV-071"
  ],
  "catalogo": [
@@ -6216,6 +5738,16 @@
    "description": "Lenço dos Jovens Adventistas — azul-marinho com debrum azul e amarelo"
   },
   {
+   "book_code": "DBV-007",
+   "title": "Emblema bordado do Clube de Desbravadores",
+   "product_type": "desbravadores",
+   "genre": "Desbravadores",
+   "price": 1500,
+   "stock": 40,
+   "isbn": "",
+   "description": ""
+  },
+  {
    "book_code": "LIV-069",
    "title": "O Poder da Pregação Bíblica - Segredos de Grandes Oradores Atuais",
    "product_type": "livro",
@@ -6254,16 +5786,6 @@
    "stock": 13,
    "isbn": "",
    "description": "Cordão de apito trançado — amarelo e verde"
-  },
-  {
-   "book_code": "DBV-007",
-   "title": "Emblema bordado do Clube de Desbravadores",
-   "product_type": "desbravadores",
-   "genre": "Desbravadores",
-   "price": 1500,
-   "stock": 40,
-   "isbn": "",
-   "description": ""
   },
   {
    "book_code": "DBV-008",

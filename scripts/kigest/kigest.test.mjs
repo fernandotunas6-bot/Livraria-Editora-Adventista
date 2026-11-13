@@ -6,7 +6,9 @@ import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ARMAZEM_LOJA, artigos, codigoEan, lerExportacao } from './exportacao.mjs';
-import { conciliar, diferencas, duplicados, jaccard, palavras, semelhanca, tituloBase } from './conciliar.mjs';
+import {
+  conciliar, diferencas, distancia, duplicados, jaccard, palavras, primeiraPalavra, semelhanca, tituloBase,
+} from './conciliar.mjs';
 import { prateleira, tipoDeProduto, titulo } from './titulos.mjs';
 import { descricaoEmFalta, gerar } from './migracao.mjs';
 import { catalogoOculto } from './catalogo-oculto.mjs';
@@ -166,6 +168,24 @@ describe('semelhança de títulos', () => {
   it('corta o subtítulo do título do site', () => {
     expect(tituloBase('Sobreviventes — Histórias reais')).toBe('Sobreviventes');
     expect(tituloBase('Nisto Cremos - As 28 Crenças')).toBe('Nisto Cremos');
+  });
+
+  it('a cobertura não casa palavras soltas: exige a mesma palavra no início', () => {
+    // «Vida de Jesus» tem as suas duas palavras dentro de «Jesus Extremo — Paradoxos que dão
+    // vida» e dava nota cheia, quando são dois livros diferentes.
+    const nota = (a, b) => semelhanca(palavras(a), palavras(b), primeiraPalavra(a), primeiraPalavra(b));
+    expect(nota('Vida de Jesus', 'Jesus Extremo — Paradoxos que dão vida')).toBeLessThan(0.6);
+    expect(nota('Guia', 'Guia Prático para Descobrir a Vontade de Deus')).toBe(1);
+    expect(nota('Música Sua Influencia', 'Música - Sua Influência na Vida do Cristão')).toBe(1);
+  });
+
+  it('tolera uma letra na primeira palavra, que é onde a gralha do balcão cai', () => {
+    const nota = (a, b) => semelhanca(palavras(a), palavras(b), primeiraPalavra(a), primeiraPalavra(b));
+    // «ETRE» por «Entre», «AMAHÃ» por «Amanhã».
+    expect(nota('Etre os Leoes de Angola', 'Entre os Leões de Angola')).toBeGreaterThan(0.6);
+    expect(nota('O Amahã Começa Hoje', 'O Amanhã Começa Hoje')).toBeGreaterThan(0.6);
+    // Mas uma palavra de três letras não aceita trocas: já muda tudo.
+    expect(distancia('vida', 'jesus')).toBeGreaterThan(2);
   });
 
   it('dá nota cheia ao título abreviado que cabe todo no completo', () => {
@@ -357,7 +377,9 @@ describe('decisões à mão', () => {
   it('lê o ficheiro do repositório', () => {
     const d = lerDecisoes();
     expect(d.ligacoes.length).toBeGreaterThan(0);
-    expect(d.ligacoes.every((l) => l.kigest_ref && l.book_code && l.porque)).toBe(true);
+    // Cada ligação nomeia o produto pelo código ou pelo título, e traz sempre a prova.
+    expect(d.ligacoes.every((l) => l.kigest_ref && (l.book_code || l.titulo) && l.porque)).toBe(true);
+    expect(d.novosMesmo.every((n) => n.kigest_ref && n.porque)).toBe(true);
     // As bíblias e os hinários ficam de fora de propósito.
     expect(d.paraODono.some((x) => /B[ÍI]BLIA/i.test(x.artigo))).toBe(true);
   });
@@ -413,8 +435,50 @@ describe('decisões à mão', () => {
     expect(r.problemas).toHaveLength(1);
   });
 
+  it('liga pelo título quando o produto está oculto e não se sabe o código', () => {
+    const produtosSite = [{ book_code: '', title: 'Jesus Extremo — Paradoxos que dão vida', kigest_ref: '' }];
+    const r = aplicarDecisoes({
+      decisoes: {
+        ligacoes: [{ kigest_ref: '11493', titulo: '  jesus extremo — PARADOXOS QUE DÃO VIDA  ', artigo: 'JESUS EXTREMO', porque: 'id da editora' }],
+        repetidos: [],
+      },
+      produtosSite,
+      artigosKigest: [{ ref: '11493', descricao: 'JESUS EXTREMO', preco: 15882, stock: 5 }],
+      aviso: () => {},
+    });
+    expect(produtosSite[0].kigest_ref).toBe('11493');
+    expect(r.problemas).toEqual([]);
+  });
+
+  it('«é mesmo novo» tira o artigo da procura de par', () => {
+    const arts = [{ ref: '00040', descricao: 'LENÇO DE LÍDER (DESBRAVADORES)', preco: 5000, stock: 10 }];
+    const r = aplicarDecisoes({
+      decisoes: { ligacoes: [], repetidos: [], novosMesmo: [{ kigest_ref: '00040', artigo: 'x', porque: 'é o de líder' }] },
+      produtosSite: [{ book_code: 'DBV-004', title: 'Lenço do Clube de Desbravadores', kigest_ref: '' }],
+      artigosKigest: arts,
+      aviso: () => {},
+    });
+    expect(r.artigos[0].eMesmoNovo).toBe(true);
+    expect(r.novosMesmo).toEqual(['00040']);
+  });
+
+  it('um artigo não pode ser repetido e novo ao mesmo tempo', () => {
+    const r = aplicarDecisoes({
+      decisoes: {
+        ligacoes: [],
+        repetidos: [{ kigest_ref: 'A', igual_a: 'B', artigo: 'x', porque: 'y' }],
+        novosMesmo: [{ kigest_ref: 'A', artigo: 'x', porque: 'y' }],
+      },
+      produtosSite: [],
+      artigosKigest: [{ ref: 'A', descricao: 'X' }, { ref: 'B', descricao: 'Y' }],
+      aviso: () => {},
+    });
+    expect(r.problemas).toHaveLength(1);
+    expect(r.novosMesmo).toEqual([]);
+  });
+
   it('sem ficheiro não decide nada', () => {
-    expect(lerDecisoes({ raiz: '/nao/existe' })).toEqual({ ligacoes: [], repetidos: [], paraODono: [] });
+    expect(lerDecisoes({ raiz: '/nao/existe' })).toEqual({ ligacoes: [], repetidos: [], novosMesmo: [], paraODono: [] });
   });
 });
 

@@ -1,11 +1,11 @@
 -- Descrição, capa e publicação dos produtos que vieram do KiGest.
 --
--- A migração 20261112140000 trouxe 189 artigos da loja com preço e existência, ocultos,
+-- A migração 20261112140000 trouxe 201 artigos da loja com preço e existência, ocultos,
 -- porque lhes faltava o que nenhum catálogo pode dispensar: uma descrição e uma capa.
 --
 -- A descrição é o texto da página do produto, é a meta description que o Google mostra e é o que
 -- aparece quando alguém partilha o livro numa conversa — sem ela o seo-catalogo.mjs cai para o
--- título e as três coisas ficam a repetir a mesma linha. As 179 descrições estão escritas à
+-- título e as três coisas ficam a repetir a mesma linha. As 191 descrições estão escritas à
 -- mão, uma a uma, em docs/catalogo/descricoes-kigest.json: dizem o que o produto é, para que
 -- serve e quem o usa, e nada mais — nenhum número que não esteja na ficha, nenhuma promessa de
 -- conteúdo que ninguém confirmou.
@@ -13,7 +13,7 @@
 -- A capa é tipográfica, gerada pelo scripts/catalogo/capa_tipografica.py no desenho da casa (o
 -- gradiente, o emblema e a moldura da capa-por-definir.webp), com o título no lugar onde aquela
 -- diz «Capa por definir». Nenhum destes produtos tem fotografia; repetir a mesma capa genérica
--- 189 vezes dava uma grelha onde o cliente não distingue um produto do outro. Vê-se que é
+-- 201 vezes dava uma grelha onde o cliente não distingue um produto do outro. Vê-se que é
 -- tipográfica: não imita a arte da editora. Quando houver fotografia, substitui-se no painel.
 --
 -- 10 artigos ficam de fora, e ficam ocultos: o nome com que estão lançados no KiGest não se
@@ -44,12 +44,15 @@ with textos(kigest_ref, capa, descricao) as (values
   ('OO29', 'https://livrariaadventista.com/images/capas/kigest/biblia-arqueologica.webp', '<p>Bíblia Arqueológica — o texto bíblico com o que a arqueologia encontrou.</p><p>Fotografias, mapas e notas sobre as cidades, os povos e os objectos que as escavações trouxeram à luz. Lê-se a Escritura com o chão onde ela aconteceu à vista.</p>'),
   ('16206', 'https://livrariaadventista.com/images/capas/kigest/biblia-da-mulher.webp', '<p>Bíblia da Mulher — o texto bíblico com notas e leituras para a mulher.</p><p>As mulheres da Escritura, a oração, a família, o trabalho. É a bíblia que acompanha os encontros do Ministério da Mulher.</p>'),
   ('00003', 'https://livrariaadventista.com/images/capas/kigest/biblia-disciplos.webp', '<p>Bíblia do Discípulo — a bíblia preparada para quem está a aprender a estudar.</p><p>Traz ajudas ao longo do texto para o estudo pessoal e para as classes. É a que se dá a quem acaba de chegar à fé e quer ir mais fundo.</p>'),
+  ('00013', 'https://livrariaadventista.com/images/capas/kigest/biblia-dos-aventureiros.webp', '<p>Bíblia do Clube de Desbravadores e Aventureiros — a bíblia do clube.</p><p>Traz, a par do texto bíblico, o que o membro do clube usa: as classes, os votos e a lei. É a que se leva ao campori e à investidura.</p>'),
   ('00011', 'https://livrariaadventista.com/images/capas/kigest/biblia-dos-desbravadores.webp', '<p>Bíblia dos Desbravadores — a bíblia do clube.</p><p>Traz, a par do texto, o que o desbravador usa: as classes, os votos e a lei do clube. É a que se leva ao campori e à investidura.</p>'),
   ('0009', 'https://livrariaadventista.com/images/capas/kigest/biblia-ilustrada.webp', '<p>Bíblia ilustrada — o texto bíblico acompanhado de imagens.</p><p>As gravuras ajudam quem lê a situar as histórias. É a escolha de muitas famílias para o culto em casa e para as crianças mais velhas.</p>'),
   ('000404', 'https://livrariaadventista.com/images/capas/kigest/biblia-missionaria-eu-vou.webp', '<p>Bíblia missionária «Eu Vou» — edição feita para dar.</p><p>Preço de missão e acabamento simples, pensada para se oferecer em quantidade nas campanhas e nas visitas. É a bíblia que se põe na mão de quem ainda não tem nenhuma.</p>'),
+  ('000300', 'https://livrariaadventista.com/images/capas/kigest/biblia-nova-semente.webp', '<p>Bíblia Sagrada na edição Nova Semente.</p><p>Edição de distribuição: acabamento simples e preço de missão, feita para se dar em quantidade nas campanhas e nas visitas. Para muita gente é a primeira bíblia da casa.</p>'),
   ('000406', 'https://livrariaadventista.com/images/capas/kigest/biblia-recomecar.webp', '<p>Bíblia «Recomeçar» — edição missionária, para dar a quem começa agora.</p><p>Simples e de preço baixo, feita para se oferecer. Para muitos é a primeira bíblia da casa.</p>'),
   ('04032026', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-com-concordancia-arc.webp', '<p>Bíblia Sagrada com concordância, na tradução Almeida Revista e Corrigida (ARC).</p><p>A concordância no fim do volume diz em que versículos está cada palavra — é o que permite encontrar um texto de que só se lembra meia frase. A ARC é a Almeida na forma mais próxima da tradução antiga, a que muitos ouviram em casa.</p>'),
   ('16044', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-da-mulher-rosa.webp', '<p>Bíblia da Mulher, de capa rosa.</p><p>O texto bíblico com notas e leituras pensadas para a mulher: as mulheres da Escritura, a oração, a família, o trabalho. Muitas igrejas usam-na nos encontros do Ministério da Mulher.</p>'),
+  ('LV00021', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-nova-semente.webp', '<p>Bíblia Sagrada Nova Semente, noutro acabamento.</p><p>A mesma edição de distribuição, com capa e corte diferentes. Antigo e Novo Testamento completos, em português.</p>'),
   ('000329', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-ra-rosa.webp', '<p>Bíblia Sagrada na tradução Almeida Revista e Atualizada, de capa rosa.</p><p>A Almeida Revista e Atualizada é a tradução que a maior parte das igrejas de língua portuguesa usa no púlpito e nos estudos bíblicos. Esta edição tem a capa rosa e o acabamento de quem a leva à igreja todas as semanas.</p>'),
   ('000304', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-se-o-filho-libertar.webp', '<p>Bíblia Sagrada «Se o Filho vos Libertar» — da frase de Jesus em João 8:36.</p><p>Antigo e Novo Testamento completos, em português, nesta edição temática.</p>'),
   ('000455', 'https://livrariaadventista.com/images/capas/kigest/biblia-sagrada-semeando-a-palavra-que-transforma.webp', '<p>Bíblia Sagrada «Semeando a Palavra que Transforma» — edição missionária.</p><p>Feita para distribuição: acabamento simples e preço de missão, para se dar em quantidade nas campanhas.</p>'),
@@ -73,6 +76,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('0020', 'https://livrariaadventista.com/images/capas/kigest/como-lidar-com-as-emocoes.webp', '<p>Como lidar com as emoções — o medo, a raiva, a tristeza e a culpa.</p><p>O que cada uma é, o que faz ao corpo e o que se faz com ela em vez de a esconder. Leitura de quem precisa de nome para o que sente.</p>'),
   ('1111999', 'https://livrariaadventista.com/images/capas/kigest/companheiro.webp', '<p>Cartão da classe de Companheiro, a segunda classe dos Desbravadores.</p><p>Onde o desbravador vai marcando os requisitos cumpridos, até à investidura.</p>'),
   ('000222', 'https://livrariaadventista.com/images/capas/kigest/conduta-sexual.webp', '<p>Conduta sexual — o que a Escritura diz e o que a igreja ensina.</p><p>Fala do assunto de frente, sem o tratar como vergonha nem como banalidade: o corpo, o casamento, os limites e o perdão.</p>'),
+  ('16373', 'https://livrariaadventista.com/images/capas/kigest/conecte-se-com-seu-filho.webp', '<p>Conecte-se com o seu filho — sobre a conversa que falta entre pais e filhos.</p><p>Como se recupera uma ligação que se foi perdendo nos horários, nos ecrãs e no silêncio. Leitura curta e prática, para pais de adolescentes.</p>'),
   ('5100', 'https://livrariaadventista.com/images/capas/kigest/conhecer-jesus-e-tudo.webp', '<p>Conhecer Jesus é tudo — sobre o centro da fé cristã.</p><p>Que a religião não é um conjunto de regras mas uma pessoa, e que tudo o mais vem depois disso. Leitura devocional.</p>'),
   ('21002', 'https://livrariaadventista.com/images/capas/kigest/conselho-sobre-saude.webp', '<p>«Conselhos sobre Saúde», de Ellen G. White.</p><p>A saúde como parte da fé, e não um assunto à parte: o ar, a água, o descanso, o movimento, a comida, o médico e o doente. É dos livros de saúde mais citados da literatura adventista.</p>'),
   ('000199', 'https://livrariaadventista.com/images/capas/kigest/conselhos-aos-pais-professores-e-estudantes.webp', '<p>«Conselhos aos Pais, Professores e Estudantes», de Ellen G. White.</p><p>Os três lados da educação no mesmo livro: o que cabe a casa, o que cabe à escola e o que cabe ao próprio estudante.</p>'),
@@ -82,6 +86,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('000196', 'https://livrariaadventista.com/images/capas/kigest/conselhos-sobre-regime-alimentar.webp', '<p>«Conselhos sobre Regime Alimentar», de Ellen G. White.</p><p>Reúne o que ela escreveu sobre a comida ao longo de décadas: o que se come, quanto se come, quando se come — e porque é que isso tem que ver com a vida espiritual.</p>'),
   ('33339999', 'https://livrariaadventista.com/images/capas/kigest/cordeirinho.webp', '<p>Cartão da classe dos Cordeirinhos, dos Aventureiros — as crianças mais novas do clube.</p><p>Registam-se os requisitos cumpridos ao longo do ano, até à investidura.</p>'),
   ('300420261', 'https://livrariaadventista.com/images/capas/kigest/corpo-saudavel.webp', '<p>Corpo saudável — o cuidado do corpo explicado sem termos médicos.</p><p>O movimento, o descanso, a água, o sol, o ar e a comida: os hábitos que a medicina confirma e que a mensagem adventista de saúde defende há mais de um século.</p>'),
+  ('23568', 'https://livrariaadventista.com/images/capas/kigest/corte.webp', '<p>Corte — material da loja.</p><p>Vendido ao metro ou à peça, no balcão. Pergunte pelas medidas e pelo tecido disponível antes de encomendar.</p>'),
   ('0017', 'https://livrariaadventista.com/images/capas/kigest/declaracoes-da-igreja.webp', '<p>As declarações oficiais da Igreja Adventista do Sétimo Dia.</p><p>O que a Igreja mundial diz, por escrito e em assembleia, sobre os assuntos em que lhe pedem posição: a família, a saúde, a paz, o ambiente, a bioética, a liberdade religiosa. É o documento que se cita quando alguém pergunta «e a Igreja, o que diz?».</p>'),
   ('010520262', 'https://livrariaadventista.com/images/capas/kigest/desfrutar-da-vida.webp', '<p>Desfrutar da vida — sobre viver bem o tempo que se tem.</p><p>Contra a pressa e a ideia de que a felicidade está sempre no passo seguinte. Leitura devocional, de capítulos curtos.</p>'),
   ('55556666', 'https://livrariaadventista.com/images/capas/kigest/edificadores.webp', '<p>Cartão da classe dos Edificadores, dos Aventureiros.</p><p>Onde se marcam os requisitos cumpridos durante o ano, até à investidura.</p>'),
@@ -89,6 +94,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('15766', 'https://livrariaadventista.com/images/capas/kigest/em-busca-de-esperanca.webp', '<p>Em busca de esperança — folheto missionário para quem atravessa um mau momento.</p><p>Leitura curta, de abrir e ler de uma vez, com as passagens bíblicas ao lado. Feito para se dar nas visitas e nas campanhas.</p>'),
   ('16032026', 'https://livrariaadventista.com/images/capas/kigest/emblemas-de-ja-adultos.webp', '<p>Emblema dos Jovens Adventistas (JA) para adultos, para coser no uniforme.</p><p>Bordado a fio, com o símbolo dos JA. Vai na manga ou no bolso, no lugar que o manual indica.</p>'),
   ('30032026', 'https://livrariaadventista.com/images/capas/kigest/envelope-de-dizimo.webp', '<p>Envelopes de dízimo e ofertas.</p><p>O envelope onde se entrega o dízimo e as ofertas no culto, com os campos para o nome e para o que vai em cada rubrica. Vende-se para a igreja repor o que distribui aos membros.</p>'),
+  ('000468', 'https://livrariaadventista.com/images/capas/kigest/esperanca-para-familia-infantil.webp', '<p>«Esperança para a Família» na edição infantil.</p><p>A mesma mensagem da edição para adultos, em linguagem e tamanho que uma criança lê sozinha. Folheto missionário, feito para dar.</p>'),
   ('000459', 'https://livrariaadventista.com/images/capas/kigest/estarei-pronta-no-sabado.webp', '<p>Estarei pronta no sábado — sobre guardar o sábado na vida real.</p><p>O que se prepara antes, o que se deixa de fora e como uma casa inteira entra no descanso do sétimo dia sem correr.</p>'),
   ('0027', 'https://livrariaadventista.com/images/capas/kigest/evangelismo.webp', '<p>«Evangelismo», de Ellen G. White.</p><p>O livro de trabalho de quem faz campanhas: como se prepara, como se prega, o que se diz primeiro e o que se deixa para depois, como se cuida de quem decide. Prático, do princípio ao fim.</p>'),
   ('0036', 'https://livrariaadventista.com/images/capas/kigest/eventos-finais.webp', '<p>«Eventos Finais» — o que Ellen G. White escreveu sobre o fim, reunido por ordem dos acontecimentos.</p><p>Vai do tempo em que vivemos até à nova terra, juntando num só fio textos espalhados por toda a sua obra. É dos livros mais pedidos sobre profecia.</p>'),
@@ -102,6 +108,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('000456', 'https://livrariaadventista.com/images/capas/kigest/folhetos-as-cinco-colunas-da-verdade.webp', '<p>Folhetos «As Cinco Colunas da Verdade», para distribuição.</p><p>Apresentam, um a um, os pontos da fé que a Igreja Adventista do Sétimo Dia prega. É material de campanha: leva-se em quantidade.</p>'),
   ('0000', 'https://livrariaadventista.com/images/capas/kigest/folhetos-em-papel-couche.webp', '<p>Folhetos em papel couché, para distribuição.</p><p>Papel liso e brilhante, que aguenta o manuseio e a chuva melhor do que o papel comum — é o que se escolhe para o que vai andar de mão em mão.</p>'),
   ('0038', 'https://livrariaadventista.com/images/capas/kigest/fundamentos-da-educacao-crista.webp', '<p>«Fundamentos da Educação Cristã», de Ellen G. White.</p><p>Reúne os artigos e as cartas em que ela defendeu, ponto por ponto, uma escola diferente da que havia: o que se ensina, como se ensina e para que se ensina.</p>'),
+  ('00000333', 'https://livrariaadventista.com/images/capas/kigest/guia.webp', '<p>Cartão da classe de Guia, a última das classes dos Desbravadores.</p><p>Onde se registam os requisitos cumpridos ao longo do ano, até à investidura. É a classe que prepara quem vai dirigir.</p>'),
   ('15062026', 'https://livrariaadventista.com/images/capas/kigest/guia-de-liberdade-religiosa.webp', '<p>Guia de liberdade religiosa.</p><p>O que é a liberdade de crer, onde ela está escrita nas leis e o que fazer quando é posta em causa — no trabalho, na escola, no tribunal. A Igreja Adventista defende este princípio desde o século XIX, e este guia explica porquê.</p>'),
   ('00015', 'https://livrariaadventista.com/images/capas/kigest/guia-de-secretaria-da-igreja.webp', '<p>Guia da secretaria da igreja.</p><p>O rol de membros, as actas, os relatórios, as transferências, a estatística. É o livro de quem tem a seu cargo a papelada da igreja — e de quem a vai receber depois.</p>'),
   ('00037', 'https://livrariaadventista.com/images/capas/kigest/guia-do-anciao.webp', '<p>Guia do ancião — o manual de quem dirige a igreja local ao lado do pastor.</p><p>A assembleia, a comissão, o culto, a visita, o acompanhamento dos novos membros, a relação com o pastor e com os departamentos. Prático, para consulta.</p>'),
@@ -114,6 +121,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('0023', 'https://livrariaadventista.com/images/capas/kigest/ira-sob-controle.webp', '<p>A ira sob controlo — sobre a raiva que estraga o que mais se ama.</p><p>Porque aparece, o que a alimenta e como se interrompe antes de fazer estragos. Prático, com exercícios e com Escritura.</p>'),
   ('15439', 'https://livrariaadventista.com/images/capas/kigest/juizo-sem-medo.webp', '<p>Juízo sem medo — sobre o julgamento de Deus, para quem o teme.</p><p>Que o juízo é notícia boa para quem está em Cristo, e porquê. Lê a doutrina do santuário sem a transformar em ameaça.</p>'),
   ('00049', 'https://livrariaadventista.com/images/capas/kigest/kit-de-comentarios.webp', '<p>Colecção de comentários bíblicos — o conjunto completo.</p><p>Comentário versículo a versículo de toda a Escritura, com introduções, mapas e notas de língua. É a ferramenta de quem prega, ensina ou estuda a sério — e é um investimento para muitos anos.</p>'),
+  ('00042', 'https://livrariaadventista.com/images/capas/kigest/lenco-de-lider-aventureiros.webp', '<p>Lenço de líder do Clube de Aventureiros.</p><p>Distingue quem dirige o clube do restante uniforme. Usa-se ao pescoço, dobrado e preso pelo prendedor, nos cultos, nas investiduras e nas actividades.</p>'),
   ('09032026', 'https://livrariaadventista.com/images/capas/kigest/lenco-de-lider-jovem.webp', '<p>Lenço de líder dos Jovens, para o uniforme de quem dirige.</p><p>Usa-se ao pescoço, dobrado e preso pelo prendedor, nos cultos, nas investiduras e nas actividades do clube.</p>'),
   ('000221', 'https://livrariaadventista.com/images/capas/kigest/lideranca-crista.webp', '<p>Liderança cristã — o que distingue quem dirige na igreja de quem dirige numa empresa.</p><p>A autoridade que vem do serviço, a confiança que se constrói devagar, e o cuidado com as pessoas que ficam no caminho das decisões.</p>'),
   ('0018', 'https://livrariaadventista.com/images/capas/kigest/livre-das-garras-do-sucesso.webp', '<p>Livre das garras do sucesso — sobre o preço que se paga para chegar ao topo.</p><p>A carreira que come a família, o reconhecimento que nunca chega e o lugar que a fé ocupa em tudo isso. Para quem já conseguiu o que queria e sente que perdeu alguma coisa pelo caminho.</p>'),
@@ -145,6 +153,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('0014', 'https://livrariaadventista.com/images/capas/kigest/no-deserto-da-tentacao.webp', '<p>No deserto da tentação: Jesus, quarenta dias sem comer, frente a frente com o tentador.</p><p>Estuda as três tentações uma a uma — o pão, o prodígio, o poder — e o que cada uma diz de nós. Mostra onde a vitória se ganha antes de a luta começar.</p>'),
   ('14499', 'https://livrariaadventista.com/images/capas/kigest/no-principio.webp', '<p>No princípio — sobre a origem de tudo.</p><p>O relato do Génesis, o que ele diz e o que não diz, e o que se discute hoje sobre o começo do mundo e da vida. Leitura para quem quer entender a posição adventista sobre a criação.</p>'),
   ('0019', 'https://livrariaadventista.com/images/capas/kigest/nos-bastidores-da-midia.webp', '<p>Nos bastidores da mídia — como se faz o que vemos e ouvimos.</p><p>Quem decide o que é notícia, como se constrói uma imagem e porque é que o entretenimento não é neutro. Para ver televisão com outros olhos.</p>'),
+  ('00044', 'https://livrariaadventista.com/images/capas/kigest/novo-testamento-em-umbundo.webp', '<p>Novo Testamento em umbundo.</p><p>Os vinte e sete livros do Novo Testamento na língua que se fala no planalto. É o volume que acompanha quem lê e prega em umbundo.</p>'),
   ('004', 'https://livrariaadventista.com/images/capas/kigest/o-ciclo-da-infelicidade.webp', '<p>O ciclo da infelicidade — sobre os padrões que se repetem.</p><p>Porque é que uma pessoa volta ao mesmo erro, à mesma relação, à mesma queda — e onde é que o ciclo se parte.</p>'),
   ('00017', 'https://livrariaadventista.com/images/capas/kigest/o-colportor-de-exito.webp', '<p>O colportor de êxito — o manual prático da colportagem.</p><p>Como se prepara o dia, como se aborda, o que se diz, como se responde ao «não» e como se volta. Para quem vive disto e para quem começa agora.</p>'),
   ('000224', 'https://livrariaadventista.com/images/capas/kigest/o-colportor-evangelista.webp', '<p>O colportor evangelista, de Ellen G. White.</p><p>Sobre o trabalho de quem leva livros de porta em porta: que não é venda, é missão. A preparação, a oração, a conversa, a persistência e o cuidado com quem recebe.</p>'),
@@ -153,6 +162,7 @@ with textos(kigest_ref, capa, descricao) as (values
   ('00033', 'https://livrariaadventista.com/images/capas/kigest/o-grande-conflito-infantil.webp', '<p>«O Grande Conflito» contado para crianças.</p><p>A mesma história — a luta entre o bem e o mal desde o princípio até ao fim — em linguagem e tamanho de capítulo que uma criança aguenta, para o culto em família e para a leitura antes de dormir.</p>'),
   ('30042026', 'https://livrariaadventista.com/images/capas/kigest/o-poder-medicinal-dos-sucos.webp', '<p>O poder medicinal dos sucos — o que as frutas e os legumes trazem quando se bebem.</p><p>Que suco para que necessidade, como se faz e o que esperar dele. Da linha de saúde da editora.</p>'),
   ('000197', 'https://livrariaadventista.com/images/capas/kigest/obreiros-evangelicos.webp', '<p>«Obreiros Evangélicos», de Ellen G. White.</p><p>Escrito para o pastor e para o obreiro: a vida pessoal, o estudo, a visita, o púlpito, o trato com as pessoas. É o manual espiritual de quem trabalha na igreja a tempo inteiro.</p>'),
+  ('007', 'https://livrariaadventista.com/images/capas/kigest/orando-como-nunca-por-seu-marido.webp', '<p>Orando como nunca pelo seu marido.</p><p>Escrito para a mulher que quer orar pelo marido e não sabe por onde começar: um tema por capítulo, com a passagem bíblica e a oração ao lado.</p>'),
   ('000192', 'https://livrariaadventista.com/images/capas/kigest/orientacao-da-crianca.webp', '<p>«Orientação da Criança», de Ellen G. White — o livro da educação em casa.</p><p>Do berço à adolescência: a obediência, o trabalho, o exemplo dos pais, a disciplina sem violência, a religião que se aprende a ver e não a ouvir.</p>'),
   ('25559888', 'https://livrariaadventista.com/images/capas/kigest/passarinhos.webp', '<p>Cartão da classe dos Passarinhos, dos Aventureiros.</p><p>Onde se marcam os requisitos cumpridos durante o ano, até à investidura.</p>'),
   ('14875', 'https://livrariaadventista.com/images/capas/kigest/patriarcas-e-profetas-encadernado.webp', '<p>O primeiro volume da série Conflito, de Ellen G. White, nesta edição encadernada.</p><p>Vai da criação à morte de David: Adão, Noé, Abraão, José, Moisés, Josué, os juízes, Samuel, Saul e David. Comentário devocional dos livros de Génesis a 1 Samuel, com um fio que atravessa tudo — para cada queda humana, Deus tem um plano de levantar.</p>'),
@@ -200,8 +210,10 @@ with textos(kigest_ref, capa, descricao) as (values
   ('000500', 'https://livrariaadventista.com/images/capas/kigest/ultimo-convite.webp', '<p>O último convite — folheto missionário sobre o apelo final do evangelho.</p><p>Leitura curta, feita para distribuição em campanhas e visitas.</p>'),
   ('100320261', 'https://livrariaadventista.com/images/capas/kigest/viagem-ao-desconhecido-caderno-de-actividade.webp', '<p>«Viagem ao Desconhecido» — caderno de actividades.</p><p>O caderno que acompanha os temas semanais: espaços para escrever, perguntas e exercícios, para o estudante preencher ao longo do programa.</p>'),
   ('10032026', 'https://livrariaadventista.com/images/capas/kigest/viagem-ao-desconhecido-temas-semanais.webp', '<p>«Viagem ao Desconhecido» — temas semanais.</p><p>O programa de estudo semana a semana, para grupos pequenos e para classes. Cada tema com o texto bíblico, as perguntas e a aplicação.</p>'),
+  ('00005', 'https://livrariaadventista.com/images/capas/kigest/vida-de-jesus.webp', '<p>A vida de Jesus, contada do princípio ao fim.</p><p>Acompanha Cristo do nascimento à ressurreição, parando no que os Evangelhos contam depressa. Leitura devocional e material de estudo para quem quer conhecer Jesus pela ordem dos acontecimentos.</p>'),
   ('0037', 'https://livrariaadventista.com/images/capas/kigest/vida-e-ensinos.webp', '<p>«A Vida e os Ensinos de Jesus» — a vida de Cristo contada e explicada, capítulo a capítulo.</p><p>Serve de leitura devocional e de material de estudo: cada passagem com o que ela diz e o que ela pede.</p>'),
-  ('00023', 'https://livrariaadventista.com/images/capas/kigest/vinho-de-santa-ceia.webp', '<p>Vinho de Santa Ceia — suco de uva sem fermentação, para o serviço de comunhão.</p><p>É o que a Igreja Adventista do Sétimo Dia usa no cálice: suco puro, sem álcool. Vem na garrafa, para encher os copos da bandeja.</p>')
+  ('00023', 'https://livrariaadventista.com/images/capas/kigest/vinho-de-santa-ceia.webp', '<p>Vinho de Santa Ceia — suco de uva sem fermentação, para o serviço de comunhão.</p><p>É o que a Igreja Adventista do Sétimo Dia usa no cálice: suco puro, sem álcool. Vem na garrafa, para encher os copos da bandeja.</p>'),
+  ('0015', 'https://livrariaadventista.com/images/capas/kigest/voce-e-deus.webp', '<p>Você e Deus — sobre a relação pessoal com Deus.</p><p>Que a fé não se vive por procuração: a oração, a leitura, a dúvida e o silêncio de quem está a aprender a falar com Ele. Leitura devocional.</p>')
 )
 update public.stock_books b
    set description = t.descricao,
@@ -257,7 +269,7 @@ update public.stock_books b
 -- Entra à venda quem tem as quatro coisas: preço acima de zero, capa, descrição e nome legível.
 -- Isto apanha dois grupos, e SÓ estes dois:
 --
---  - os 179 que acabaram de receber descrição e capa aqui, nomeados um a um;
+--  - os 191 que acabaram de receber descrição e capa aqui, nomeados um a um;
 --  - os que a migração das fotografias (20261110090000) deixou ocultos à espera de preço e que
 --    o KiGest acabou de apreçar — capa e descrição esses já tinham. Reconhecem-se pela capa,
 --    que está em images/capas/novos.
@@ -302,12 +314,15 @@ update public.stock_books
        'OO29',
        '16206',
        '00003',
+       '00013',
        '00011',
        '0009',
        '000404',
+       '000300',
        '000406',
        '04032026',
        '16044',
+       'LV00021',
        '000329',
        '000304',
        '000455',
@@ -331,6 +346,7 @@ update public.stock_books
        '0020',
        '1111999',
        '000222',
+       '16373',
        '5100',
        '21002',
        '000199',
@@ -340,6 +356,7 @@ update public.stock_books
        '000196',
        '33339999',
        '300420261',
+       '23568',
        '0017',
        '010520262',
        '55556666',
@@ -347,6 +364,7 @@ update public.stock_books
        '15766',
        '16032026',
        '30032026',
+       '000468',
        '000459',
        '0027',
        '0036',
@@ -360,6 +378,7 @@ update public.stock_books
        '000456',
        '0000',
        '0038',
+       '00000333',
        '15062026',
        '00015',
        '00037',
@@ -372,6 +391,7 @@ update public.stock_books
        '0023',
        '15439',
        '00049',
+       '00042',
        '09032026',
        '000221',
        '0018',
@@ -403,6 +423,7 @@ update public.stock_books
        '0014',
        '14499',
        '0019',
+       '00044',
        '004',
        '00017',
        '000224',
@@ -411,6 +432,7 @@ update public.stock_books
        '00033',
        '30042026',
        '000197',
+       '007',
        '000192',
        '25559888',
        '14875',
@@ -458,8 +480,10 @@ update public.stock_books
        '000500',
        '100320261',
        '10032026',
+       '00005',
        '0037',
-       '00023'
+       '00023',
+       '0015'
      ])
      or cover like '%/images/capas/novos/%'
    );
