@@ -11,7 +11,9 @@ describe('ligações legais', () => {
     'MobileCategoriesSheet.jsx',
     'Header.jsx',
     'auth/AuthForm.jsx',
-    'ShoppingCart.jsx',
+    // O painel do carrinho mudou de ficheiro: o ShoppingCart.jsx passou a ser a casca que o
+    // carrega em lazy, e o aviso vive no painel.
+    'ShoppingCartPanel.jsx',
     '../pages/ShippingReturnsPage.jsx',
   ])('%s liga aos termos', (file) => {
     // MobileCategoriesSheet tem as ligações numa lista: ['/termos', 'Termos e condições'].
@@ -19,10 +21,10 @@ describe('ligações legais', () => {
   });
 
   it('o aviso do checkout aparece em todos os ecrãs e abre noutro separador', () => {
-    const aviso = source('ShoppingCart.jsx').match(/<p className="([^"]*)">\s*Ao confirmar, aceita os/);
+    const aviso = source('ShoppingCartPanel.jsx').match(/<p className="([^"]*)">\s*Ao confirmar, aceita os/);
     expect(aviso).not.toBeNull();
     expect(aviso[1]).not.toMatch(/hidden/);
-    expect(source('ShoppingCart.jsx')).toMatch(/href="\/termos" target="_blank"/);
+    expect(source('ShoppingCartPanel.jsx')).toMatch(/href="\/termos" target="_blank"/);
   });
 });
 
