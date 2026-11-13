@@ -9,6 +9,8 @@ import { ARMAZEM_LOJA, artigos, codigoEan, lerExportacao } from './exportacao.mj
 import { conciliar, diferencas, duplicados, jaccard, palavras, semelhanca, tituloBase } from './conciliar.mjs';
 import { prateleira, tipoDeProduto, titulo } from './titulos.mjs';
 import { descricaoEmFalta, gerar } from './migracao.mjs';
+import { catalogoOculto } from './catalogo-oculto.mjs';
+import { aplicarDecisoes, lerDecisoes } from './decisoes.mjs';
 
 const pasta = mkdtempSync(join(tmpdir(), 'kigest-'));
 afterAll(() => { /* a pasta é temporária do sistema; não faz mal ficar */ });
@@ -176,7 +178,7 @@ describe('conciliar', () => {
   const site = (ps) => ps.map((p, i) => ({
     id: `id${i}`, book_code: p.book_code, title: p.title, price: p.price ?? 0, stock: p.stock ?? 0,
     isbn: p.isbn ?? '', product_type: 'livro', genre: '', active: true, description: p.description ?? '<p>texto</p>',
-    kigest_ref: p.kigest_ref ?? '',
+    kigest_ref: p.kigest_ref ?? '', cpb: p.cpb ?? '',
   }));
 
   it('liga um para um e separa o que é ambíguo', () => {
@@ -232,6 +234,15 @@ describe('conciliar', () => {
     const r = conciliar(arts, site([{ book_code: 'LIV-063', title: 'Outro Título Qualquer', kigest_ref: '0008' }]));
     expect(r.firmes[0].via).toBe('ref');
     expect(r.firmes[0].produto.book_code).toBe('LIV-063');
+  });
+
+  it('liga pelo id da loja da editora, que o KiGest usa como referência', () => {
+    // A prova mais forte que há: o mesmo id nos dois lados. O título nem precisa de se parecer
+    // — «PEDACINHO DO CEU» contra «Devocional da Família — Pedacinho do Céu».
+    const arts = [{ ref: '16298', referencia: '16298', descricao: 'PEDACINHO DO CEU', ean: '', preco: 25139, stock: 3 }];
+    const r = conciliar(arts, site([{ book_code: '', title: 'Devocional da Família — Pedacinho do Céu', cpb: '16298' }]));
+    expect(r.firmes[0].via).toBe('cpb');
+    expect(r.firmes[0].produto.title).toBe('Devocional da Família — Pedacinho do Céu');
   });
 
   it('liga pelo código de barras quando os títulos não se parecem', () => {
@@ -307,6 +318,109 @@ describe('descricaoEmFalta', () => {
   });
 });
 
+describe('catalogoOculto', () => {
+  // A chave pública não lê o que está oculto, e sem estes 93 a conciliação dava-os por
+  // inexistentes e a loja ficava com cada um deles duas vezes.
+  const todos = catalogoOculto();
+
+  it('lê os 93 produtos que a migração das fotografias trouxe', () => {
+    expect(todos).toHaveLength(93);
+    expect(todos.every((p) => p.title && p.product_type && p.book_code === '')).toBe(true);
+  });
+
+  it('traz o id da loja da editora dos que a ronda das fotografias curou', () => {
+    expect(todos.filter((p) => p.cpb)).toHaveLength(44);
+    expect(todos.find((p) => p.cpb === '21411').title).toMatch(/^O Atirador Convertido/);
+  });
+
+  it('deixa de fora os que o dono já publicou', () => {
+    const publicado = todos[0].title;
+    const resto = catalogoOculto({ titulosAVista: [`  ${publicado.toUpperCase()}  `] });
+    expect(resto).toHaveLength(92);
+    expect(resto.some((p) => p.title === publicado)).toBe(false);
+  });
+
+  it('devolve lista vazia se a migração não estiver lá', () => {
+    expect(catalogoOculto({ raiz: '/nao/existe' })).toEqual([]);
+  });
+});
+
+describe('decisões à mão', () => {
+  const produtos = () => [
+    { book_code: 'LIV-035', title: 'Ellen White - Mulher de Visão', kigest_ref: '' },
+    { book_code: 'LIV-001', title: '101 Perguntas sobre Ellen White', kigest_ref: '' },
+  ];
+  const artigos2 = () => [
+    { ref: '000100', descricao: 'ELLEN WHITE', preco: 48925, stock: 6 },
+    { ref: '00055', descricao: '101 PERGUNTAS SOBRE ELLEN WHITE', preco: 21895, stock: 9 },
+    { ref: '00096', descricao: 'OS DEZ MANDAMENTOS', preco: 3571, stock: 0 },
+    { ref: '00034', descricao: 'OS DEZ MANDAMENTOS', preco: 3571, stock: 35 },
+  ];
+
+  it('lê o ficheiro do repositório', () => {
+    const d = lerDecisoes();
+    expect(d.ligacoes.length).toBeGreaterThan(0);
+    expect(d.ligacoes.every((l) => l.kigest_ref && l.book_code && l.porque)).toBe(true);
+    // As bíblias e os hinários ficam de fora de propósito.
+    expect(d.paraODono.some((x) => /B[ÍI]BLIA/i.test(x.artigo))).toBe(true);
+  });
+
+  it('a ligação escreve o kigest_ref no produto e o repetido sai da lista', () => {
+    const produtosSite = produtos();
+    const r = aplicarDecisoes({
+      decisoes: {
+        ligacoes: [{ kigest_ref: '000100', book_code: 'LIV-035', artigo: 'ELLEN WHITE', porque: 'preço igual' }],
+        repetidos: [{ kigest_ref: '00096', igual_a: '00034', artigo: 'OS DEZ MANDAMENTOS', porque: 'sem existência' }],
+      },
+      produtosSite,
+      artigosKigest: artigos2(),
+      aviso: () => {},
+    });
+    expect(produtosSite[0].kigest_ref).toBe('000100');
+    expect(r.artigos.map((a) => a.ref)).toEqual(['000100', '00055', '00034']);
+    expect(r.problemas).toEqual([]);
+  });
+
+  it('recusa uma decisão que não bate com os dados', () => {
+    const r = aplicarDecisoes({
+      decisoes: {
+        ligacoes: [
+          { kigest_ref: '000100', book_code: 'LIV-999', artigo: 'x', porque: 'y' },
+          { kigest_ref: 'nao-existe', book_code: 'LIV-035', artigo: 'x', porque: 'y' },
+        ],
+        repetidos: [{ kigest_ref: '00096', igual_a: '00096', artigo: 'x', porque: 'y' }],
+      },
+      produtosSite: produtos(),
+      artigosKigest: artigos2(),
+      aviso: () => {},
+    });
+    expect(r.problemas).toHaveLength(3);
+    expect(r.ligacoes).toHaveLength(0);
+    expect(r.retirados).toHaveLength(0);
+  });
+
+  it('não deixa duas decisões ligar o mesmo produto a artigos diferentes', () => {
+    const r = aplicarDecisoes({
+      decisoes: {
+        ligacoes: [
+          { kigest_ref: '000100', book_code: 'LIV-035', artigo: 'x', porque: 'y' },
+          { kigest_ref: '00055', book_code: 'LIV-035', artigo: 'x', porque: 'y' },
+        ],
+        repetidos: [],
+      },
+      produtosSite: produtos(),
+      artigosKigest: artigos2(),
+      aviso: () => {},
+    });
+    expect(r.ligacoes).toHaveLength(1);
+    expect(r.problemas).toHaveLength(1);
+  });
+
+  it('sem ficheiro não decide nada', () => {
+    expect(lerDecisoes({ raiz: '/nao/existe' })).toEqual({ ligacoes: [], repetidos: [], paraODono: [] });
+  });
+});
+
 describe('gerar', () => {
   const exportacao = { meta: { data: '2026-11-12 12:53:23', origem: 'TESTE/KigestGC' } };
   const correr = (arts, produtos) => gerar({ exportacao, artigosKigest: arts, produtosSite: produtos });
@@ -327,6 +441,38 @@ describe('gerar', () => {
     expect(sql).toContain('active, featured');
     // Nada de apagar nem de activar nada.
     expect(sql).not.toMatch(/\bdelete\b|\bdrop table\b|set active = true/i);
+  });
+
+  it('não cria produto novo com um título que já existe no catálogo', () => {
+    // «VIAJEM AO SOBRENATURAL» corrigido dá «Viagem ao Sobrenatural», que já lá está.
+    const { novos, jaNoCatalogo } = correr(
+      [{ ref: 'X', referencia: 'X', descricao: 'VIAJEM AO SOBRENATURAL', ean: '', preco: 10000, stock: 1 }],
+      [{ id: 'y', book_code: '', title: 'Viagem ao Sobrenatural', price: 0, stock: 0, isbn: '', product_type: 'livro', genre: '', active: false, description: '<p>uma descrição comprida o suficiente para não contar como em falta</p>', kigest_ref: '' }],
+    );
+    expect(novos).toHaveLength(0);
+    expect(jaNoCatalogo.map((n) => n.title)).toEqual(['Viagem ao Sobrenatural']);
+  });
+
+  it('não cria dois produtos novos com o mesmo título corrigido', () => {
+    const { novos, repetidosNoTitulo } = correr([
+      { ref: 'A', referencia: 'A', descricao: 'CORDERINNHO', ean: '', preco: 250, stock: 0 },
+      { ref: 'B', referencia: 'B', descricao: 'CORDERINHO', ean: '', preco: 250, stock: 4 },
+    ], []);
+    expect(novos.map((n) => n.title)).toEqual(['Cordeirinho']);
+    // Fica o que tem existência.
+    expect(novos[0].artigo.ref).toBe('B');
+    expect(repetidosNoTitulo).toHaveLength(1);
+    expect(repetidosNoTitulo[0].sai.artigo.ref).toBe('A');
+  });
+
+  it('liga por título quem está oculto e não tem código', () => {
+    const { sql, pares } = correr(
+      [{ ref: '000031', referencia: '000031', descricao: 'OUVINDO A VOZ DE DEUS', ean: '', preco: 2000, stock: 295 }],
+      [{ id: 'z', book_code: '', title: 'Ouvindo a Voz de Deus — Guia de estudos bíblicos', price: 0, stock: 0, isbn: '', product_type: 'livro', genre: '', active: false, description: '<p>uma descrição comprida o suficiente para não contar como em falta</p>', kigest_ref: '' }],
+    );
+    expect(pares).toHaveLength(1);
+    expect(sql).toContain('lower(btrim(b.title)) = lower(btrim(p.titulo))');
+    expect(sql).toContain("'Ouvindo a Voz de Deus — Guia de estudos bíblicos'");
   });
 
   it('só escreve o ISBN que é de livro', () => {

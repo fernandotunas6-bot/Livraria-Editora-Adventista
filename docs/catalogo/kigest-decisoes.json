@@ -1,0 +1,45 @@
+{
+  "sobre": "Decisões tomadas à mão sobre os artigos que o emparelhamento automático não resolveu (relatório KIGEST-20261112.md). Cada uma traz a prova que a sustenta. O scripts/kigest/decisoes.mjs transforma este ficheiro em migração.",
+  "exportacao": "2026-11-12 12:53:23",
+  "ligacoes": [
+    { "kigest_ref": "000100", "book_code": "LIV-035", "artigo": "ELLEN WHITE", "porque": "48 925 Kz dos dois lados, ao cêntimo; o site tem «Ellen White - Mulher de Visão»" },
+    { "kigest_ref": "00055", "book_code": "LIV-001", "artigo": "101 PERGUNTAS SOBRE ELLEN WHITE", "porque": "o título do site é o mesmo com o subtítulo («e seus Escritos»)" },
+    { "kigest_ref": "000104", "book_code": "LIV-038", "artigo": "OS EMBAIXADORES", "porque": "18 135 Kz ao cêntimo; é o livro «Os Embaixadores - Atos dos Apóstolos em Linguagem de Hoje» e não o lenço do clube" },
+    { "kigest_ref": "000168", "book_code": "LIV-020", "artigo": "CONHEÇA A BIBLIA FAZENDO", "porque": "15 755 Kz ao cêntimo; o nome está cortado, falta «Arte»" },
+    { "kigest_ref": "000111", "book_code": "LIV-076", "artigo": "UMA NOVA ERA SEGUNDO AS PROFECIAS DE DANIEL", "porque": "27 970 Kz ao cêntimo; o par de Daniel, não o do Apocalipse" },
+    { "kigest_ref": "000112", "book_code": "LIV-075", "artigo": "UMA NOVA ERA SEGUNDO A PROFECIA DE APOCALIPSE", "porque": "31 510 Kz ao cêntimo; o par do Apocalipse" },
+    { "kigest_ref": "000180", "book_code": "LIV-045", "artigo": "HEROIS DE TODAS AS ÉPOCAS", "porque": "13 790 Kz ao cêntimo" },
+    { "kigest_ref": "000130", "book_code": "LIV-053", "artigo": "A LÓGICA DA FÉ", "porque": "15 055 Kz ao cêntimo" },
+    { "kigest_ref": "000153", "book_code": "LIV-083", "artigo": "RESPOSTAS INCRIVES A ORAÇAÕ", "porque": "7 160 Kz ao cêntimo" },
+    { "kigest_ref": "00081", "book_code": "LIV-018", "artigo": "CONPROMETIDOS COM A NOSSA IDENTIDADE", "porque": "11 425 Kz ao cêntimo; gralha no «Comprometidos»" },
+    { "kigest_ref": "00059", "book_code": "LIV-004", "artigo": "JUSTIFIÇAÕ PELA FÉ", "porque": "18 475 Kz ao cêntimo; é o «95 Teses sobre Justificação pela Fé»" },
+    { "kigest_ref": "00034", "book_code": "LIV-030", "artigo": "OS DEZ MANDAMENTOS", "porque": "o título do site é o mesmo com o subtítulo; é a entrada com existência (35)" },
+    { "kigest_ref": "0006", "book_code": "LIV-142", "artigo": "A FÉ DE JESUS", "porque": "título igual; é a entrada com existência (24)" },
+    { "kigest_ref": "00039", "book_code": "DBV-003", "artigo": "LENÇO DOS EMBAIXADORES", "porque": "é o lenço do membro, que é o que o site vende; o de líder (00043) fica como produto à parte" },
+    { "kigest_ref": "455475126", "book_code": "LIV-046", "artigo": "HISTÓRIA DA VIDA", "porque": "título igual; é a entrada com existência (3)" }
+  ],
+  "repetidos": [
+    { "kigest_ref": "00096", "igual_a": "00034", "artigo": "OS DEZ MANDAMENTOS", "porque": "mesmo preço (3 571) e mesmo título; sem existência" },
+    { "kigest_ref": "000032", "igual_a": "0006", "artigo": "A FÉ DE JESUS", "porque": "mesmo preço (2 000) e mesmo título; sem existência" },
+    { "kigest_ref": "000137", "igual_a": "000130", "artigo": "A LÓGICA DA FÉ", "porque": "mesmo preço (15 055) e mesmo título; sem existência" },
+    { "kigest_ref": "00082", "igual_a": "000168", "artigo": "BIBLIA FAZENDO ARTE", "porque": "mesmo preço (15 755); é o mesmo «Conheça a Bíblia Fazendo Arte»; sem existência" },
+    { "kigest_ref": "0039", "igual_a": "000180", "artigo": "HEROIS DE TODAS AS EPOCAS", "porque": "mesmo título; sem existência" },
+    { "kigest_ref": "456127", "igual_a": "000111", "artigo": "UMA NOVA ERA SEGUNDO DANIEL", "porque": "mesmo livro, nome abreviado; sem existência" },
+    { "kigest_ref": "46512", "igual_a": "000112", "artigo": "LIMA NOVA ERA SESUNGUNDO APOCALIPSE", "porque": "mesmo livro, nome com gralhas; sem existência" },
+    { "kigest_ref": "001", "igual_a": "455475126", "artigo": "HISTORIA DA VIDA", "porque": "mesmo título, 1 Kz de diferença; sem existência" }
+  ],
+  "ficam_para_o_dono": [
+    { "kigest_ref": "000312", "artigo": "BIBLIA SAGRADA", "porque": "o site descreve as bíblias pela capa e a loja pela tradução; só quem a tem na mão sabe qual é" },
+    { "kigest_ref": "000301", "artigo": "BIBLIA SAGRADA", "porque": "o mesmo" },
+    { "kigest_ref": "000453", "artigo": "BIBLIA SAGRADA", "porque": "o mesmo" },
+    { "kigest_ref": "000316", "artigo": "BIBLIA SAGRADA RA", "porque": "Almeida Revista e Atualizada; o site tem a BIB-018 nessa tradução mas a 52 000 Kz e esta está a 79 775" },
+    { "kigest_ref": "000323", "artigo": "BIBLIA SAGRADA CLÁSSICA", "porque": "edição que o site não distingue" },
+    { "kigest_ref": "000322", "artigo": "BIBLIA SAGRADA SLIM", "porque": "edição que o site não distingue" },
+    { "kigest_ref": "000332", "artigo": "BIBLIA SAGRADA FIEL AOS ORIGINAIS", "porque": "tradução diferente da BIB-018 (Almeida Revista e Atualizada)" },
+    { "kigest_ref": "000306", "artigo": "BIBLIA SAGRADA NTLH", "porque": "Nova Tradução na Linguagem de Hoje; o site não tem nenhuma identificada como tal" },
+    { "kigest_ref": "000321", "artigo": "BIBLIA SAGRADA NTLH", "porque": "o mesmo, noutro preço" },
+    { "kigest_ref": "000334", "artigo": "BIBLIA SAGRADA UMBUNDU", "porque": "o site não tem bíblia em umbundo identificada" },
+    { "kigest_ref": "05032026", "artigo": "HINÁRIO HUMBUNDO PORTUGUES", "porque": "o site tem três hinários iguais que só diferem na cor da capa (rosa, castanha, branca) e o KiGest tem um artigo só; além disso a existência (14 986) não pode estar certa" },
+    { "kigest_ref": "00026", "artigo": "HINÁRIO UMBUNDO", "porque": "o mesmo" }
+  ]
+}

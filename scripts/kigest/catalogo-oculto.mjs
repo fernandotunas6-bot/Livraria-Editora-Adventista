@@ -14,6 +14,12 @@
 // migração não o fixa, e o contador estava noutro ponto). Quem os liga é o título exacto, que é
 // o que a migração escreveu e está aqui no repositório.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// A raiz do repositório, a partir deste ficheiro (scripts/kigest/): os testes correm com a
+// pasta do site como directório de trabalho e não encontrariam nada por caminho relativo.
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const MIGRACAO_93 = 'supabase/migrations/20261110090000_produtos_novos_da_loja.sql';
 const TABELA_93 = 'scripts/catalogo/produtos.py';
@@ -26,7 +32,7 @@ const LINHA = /\(\$t\$(.*?)\$t\$, \$t\$(.*?)\$t\$, \$t\$(.*?)\$t\$, \$t\$(.*?)\$
 // KiGest usa-o como referência em muitos artigos.
 const CURADO = /^\('([^']+)','([^']+)','(.*?)','(.*?)','(.*?)',\('(\w+)','([^']*)'\)\),$/gm;
 
-export function catalogoOculto({ raiz = '.', titulosAVista = [] } = {}) {
+export function catalogoOculto({ raiz = RAIZ, titulosAVista = [] } = {}) {
   let sql;
   try {
     sql = readFileSync(`${raiz}/${MIGRACAO_93}`, 'utf8');

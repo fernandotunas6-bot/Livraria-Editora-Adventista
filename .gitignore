@@ -51,3 +51,7 @@ app/web/playwright-report/
 # docs/catalogo/KIGEST.md); o ficheiro em si nunca vai para o repositório.
 KIGEST-exportacao-*.kigest
 *.kigest
+
+# Python compilado
+__pycache__/
+*.pyc

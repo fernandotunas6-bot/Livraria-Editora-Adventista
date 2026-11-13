@@ -3,10 +3,18 @@
 //   PGLITE_MODULE=… node scripts/pglite/kigest.mjs supabase/migrations
 // Instruções em base.mjs e em docs/catalogo/KIGEST.md.
 //
-// Uma base vazia não diria nada: estas migrações mexem num catálogo que já existe. Aplicam-se
-// por isso as migrações até à anterior, monta-se o catálogo tal como estava em produção quando
-// a exportação foi feita (docs/catalogo/mapa-kigest-20261112.json, secção "catalogo") e só
-// então correm as duas — duas vezes, porque o cabeçalho promete que podem correr outra vez.
+// Uma base vazia não diria nada: estas migrações mexem num catálogo que já existe, e que tem
+// duas camadas que contam as duas:
+//
+//  - os 124 produtos à venda, que a chave pública lê;
+//  - os 93 que a migração 20261110090000 trouxe das fotografias da loja, dos quais o dono já
+//    publicou 21 (são parte dos 124) e 72 continuam ocultos, sem preço.
+//
+// Os 93 já estão na base quando este cenário começa: foram criados pelas migrações que correram
+// acima. O que se faz aqui é afastar-lhes o código — em produção o gatilho deu-lhes LIV-101 e
+// seguintes, porque o contador ia nos 100, e aqui deu-lhes LIV-001, que colide com os códigos
+// verdadeiros — tirar os 21 que já estão publicados (esses entram pela lista de cima, com o
+// código e o preço que têm) e escrever os 124 à venda. Ficam 196 produtos, como em produção.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { freshDb, migrationSql } from './base.mjs';
@@ -14,9 +22,11 @@ import { freshDb, migrationSql } from './base.mjs';
 const dir = process.argv[2];
 const CATALOGO = '20261112140000_catalogo_do_kigest.sql';
 const DESCRICOES = '20261112141000_descricoes_que_faltavam.sql';
-const ficheiros = () => readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-const ANTERIOR = ficheiros().filter((f) => f < CATALOGO).at(-1).slice(0, 14);
+const ANTERIOR = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().filter((f) => f < CATALOGO).at(-1).slice(0, 14);
 const mapa = JSON.parse(readFileSync('docs/catalogo/mapa-kigest-20261112.json', 'utf8'));
+// No mapa, quem tem book_code está à venda; quem não tem é um dos que ficaram ocultos.
+const aVenda = mapa.catalogo.filter((p) => p.book_code);
+const ocultos = mapa.catalogo.filter((p) => !p.book_code);
 
 let ok = 0;
 let fail = 0;
@@ -33,14 +43,17 @@ const anon = (sql) => db.transaction(async (tx) => {
   return (await tx.query(sql)).rows;
 });
 
-// O catálogo de produção: os 124 produtos com o código, o título, o preço, o stock, o ISBN e a
-// descrição que tinham, todos activos, como estavam.
-//
-// As migrações anteriores já deixam produtos na base (os 93 da loja, da 20261110090000, entre
-// outros), por isso não se insere por cima: escreve-se o retrato de produção sobre o que lá
-// está — pelo código, que é o mesmo nas duas — e apaga-se o que produção não tem. Fica uma
-// base igual à que a exportação encontrou.
-for (const p of mapa.catalogo) {
+const jaNaBase = await q('select id, title from public.stock_books order by title');
+check('as migrações anteriores deixam os 93 produtos das fotografias', jaNaBase.length === 93, jaNaBase.length);
+for (const [i, r] of jaNaBase.entries()) {
+  await q('update public.stock_books set book_code = $1 where id = $2', [`PRE-${String(i + 1).padStart(3, '0')}`, r.id]);
+}
+await q('delete from public.stock_books where lower(btrim(title)) = any($1::text[])',
+  [aVenda.map((p) => p.title.trim().toLowerCase())]);
+check(`sobram os ${ocultos.length} que continuam ocultos`,
+  (await q('select count(*)::int n from public.stock_books'))[0].n === ocultos.length);
+
+for (const p of aVenda) {
   await q(`insert into public.stock_books (title, book_code, product_type, genre, price, stock, isbn, description, active, cover)
                 values ($1, $2, $3, $4, $5, $6, $7, $8, true, 'https://livrariaadventista.com/images/capas/' || $2 || '.jpg')
            on conflict (book_code) where book_code <> '' do update
@@ -50,22 +63,28 @@ for (const p of mapa.catalogo) {
   [p.title, p.book_code, p.product_type, p.genre, p.price, p.stock, p.isbn,
     p.description === 'ESCRITA' ? `<p>Descrição escrita pela equipa para o ${p.book_code}, com mais de sessenta caracteres de texto a sério.</p>` : p.description]);
 }
-await q('delete from public.stock_books where not (book_code = any($1::text[]))', [mapa.catalogo.map((p) => p.book_code)]);
-await q(`update private.product_code_counters c set last_value = greatest(c.last_value, x.n)
-           from (select left(book_code, 4) prefix, max(nullif(regexp_replace(substr(book_code, 5), '\\D', '', 'g'), '')::int) n
-                   from public.stock_books group by 1) x
-          where c.prefix = x.prefix`);
-const antes = Object.fromEntries((await q(`select book_code, price, stock, isbn, description from public.stock_books`))
-  .map((r) => [r.book_code, r]));
-check('o catálogo de partida tem os 124 produtos de produção', Object.keys(antes).length === 124, Object.keys(antes).length);
+// O retrato do catálogo, pelo título: é a chave que serve às duas camadas. A coluna kigest_ref
+// só existe depois da migração, por isso o retrato de partida não a pede.
+const retratoPorTitulo = async (comRef = true) => Object.fromEntries(
+  (await q(`select title, book_code, price, stock, isbn, description, active${comRef ? ', kigest_ref' : ''} from public.stock_books`))
+    .map((r) => [r.title.trim().toLowerCase(), r]),
+);
+const antes = await retratoPorTitulo(false);
+check(`o catálogo de partida tem os ${aVenda.length} à venda e os ${ocultos.length} ocultos`,
+  Object.keys(antes).length === mapa.catalogo.length, Object.keys(antes).length);
+check('e só os à venda estão activos',
+  (await q('select count(*) filter (where active)::int n from public.stock_books'))[0].n === aVenda.length);
 
 const catalogo = migrationSql(readFileSync(join(dir, CATALOGO), 'utf8'));
 const descricoes = migrationSql(readFileSync(join(dir, DESCRICOES), 'utf8'));
 await db.exec(catalogo);
 await db.exec(descricoes);
 
+const chave = (t) => String(t).trim().toLowerCase();
+const depois = await retratoPorTitulo();
+
 // 1. A coluna nova e a sua unicidade.
-const [coluna] = await q(`select data_type, is_nullable, column_default from information_schema.columns
+const [coluna] = await q(`select data_type, is_nullable from information_schema.columns
                            where table_schema = 'public' and table_name = 'stock_books' and column_name = 'kigest_ref'`);
 check('a coluna kigest_ref existe, é texto e não aceita nulos', coluna?.data_type === 'text' && coluna?.is_nullable === 'NO', coluna);
 await q(`insert into public.stock_books (title, product_type, kigest_ref, active) values ('Teste A', 'livro', 'ref-de-teste', false)`);
@@ -75,42 +94,50 @@ try {
   duplicou = true;
 } catch { /* é o que se espera */ }
 check('dois produtos não podem apontar para o mesmo artigo do KiGest', !duplicou);
-// Mas vários produtos só do site (kigest_ref vazio) continuam a poder existir.
 await q(`insert into public.stock_books (title, product_type, active) values ('Só do site 1', 'livro', false), ('Só do site 2', 'livro', false)`);
 check('produtos sem artigo no KiGest não colidem entre si',
   (await q(`select count(*)::int n from public.stock_books where kigest_ref = ''`))[0].n >= 2);
 await q(`delete from public.stock_books where title in ('Teste A', 'Só do site 1', 'Só do site 2')`);
 
-// 2. Os produtos que já existiam: ligados, com o preço e o stock da loja.
-const ligados = await q(`select book_code, kigest_ref, price, stock, isbn from public.stock_books where kigest_ref <> '' and book_code in (
-                           select unnest($1::text[]))`, [mapa.ligados.map((l) => l.book_code)]);
-check(`os ${mapa.ligados.length} produtos emparelhados ficaram ligados`, ligados.length === mapa.ligados.length, ligados.length);
-const porCodigo = Object.fromEntries(ligados.map((r) => [r.book_code, r]));
+// 2. Os produtos emparelhados: ligados, com o preço e o stock da loja.
 const errados = mapa.ligados.filter((l) => {
-  const r = porCodigo[l.book_code];
+  const r = depois[chave(l.titulo_site)];
   return !r || r.kigest_ref !== l.kigest_ref || Number(r.price) !== l.preco_depois || Number(r.stock) !== l.stock_depois;
 });
-check('cada um ficou com a referência, o preço e o stock do KiGest', errados.length === 0, errados.slice(0, 3));
+check(`os ${mapa.ligados.length} produtos emparelhados ficaram com a referência, o preço e o stock do KiGest`,
+  errados.length === 0, errados.slice(0, 3));
+
+// Os que estavam ocultos sem preço são os que mais ganham: passam a ter preço e stock, que era
+// o que lhes faltava para poderem ser publicados.
+const ocultosLigados = mapa.ligados.filter((l) => !l.book_code);
+check(`os ${ocultosLigados.length} ocultos que a loja também vende ganharam preço`,
+  ocultosLigados.length > 0 && ocultosLigados.every((l) => Number(depois[chave(l.titulo_site)].price) > 0), ocultosLigados.length);
+check('e continuam ocultos — publicá-los é decisão do dono',
+  ocultosLigados.every((l) => depois[chave(l.titulo_site)].active === false));
+check('os ligados pelo id da loja da editora ficaram certos',
+  mapa.ligados.filter((l) => l.via === 'cpb').every((l) => depois[chave(l.titulo_site)].kigest_ref === l.kigest_ref),
+  mapa.ligados.filter((l) => l.via === 'cpb').length);
 
 // O caso que custa dinheiro: estava à venda no site e não havia na loja.
 const vendiaSemTer = mapa.ligados.filter((l) => l.stock_antes > 0 && l.stock_depois === 0);
 check('os que o site vendia sem haver na loja ficaram a zero',
-  vendiaSemTer.length > 0 && vendiaSemTer.every((l) => Number(porCodigo[l.book_code].stock) === 0), vendiaSemTer.length);
+  vendiaSemTer.length > 0 && vendiaSemTer.every((l) => Number(depois[chave(l.titulo_site)].stock) === 0), vendiaSemTer.length);
 
 // O ISBN entra onde faltava e não pisa o que já estava lá.
 const comIsbnNovo = mapa.ligados.filter((l) => l.isbn_novo && !l.isbn_antes);
 check('o ISBN foi preenchido onde faltava',
-  comIsbnNovo.length > 0 && comIsbnNovo.every((l) => porCodigo[l.book_code].isbn === l.isbn_novo), comIsbnNovo.length);
+  comIsbnNovo.length > 0 && comIsbnNovo.every((l) => depois[chave(l.titulo_site)].isbn === l.isbn_novo), comIsbnNovo.length);
 const jaTinhaIsbn = mapa.ligados.filter((l) => l.isbn_antes);
 check('o ISBN que já estava preenchido não foi tocado',
-  jaTinhaIsbn.every((l) => porCodigo[l.book_code].isbn === l.isbn_antes), jaTinhaIsbn.map((l) => l.book_code));
+  jaTinhaIsbn.every((l) => depois[chave(l.titulo_site)].isbn === l.isbn_antes), jaTinhaIsbn.map((l) => l.book_code));
 
 // Os produtos que o KiGest não conhece ficam exactamente como estavam.
-const intocados = await q(`select book_code, price, stock from public.stock_books where book_code = any($1::text[])`, [mapa.so_no_site]);
+const intocados = mapa.so_no_site.map((bc) => aVenda.find((p) => p.book_code === bc)).filter(Boolean);
 check('os produtos que só existem no site não mudaram de preço nem de stock',
-  intocados.every((r) => Number(r.price) === antes[r.book_code].price && Number(r.stock) === antes[r.book_code].stock));
-check('e nenhum deles ficou com referência do KiGest',
-  (await q(`select count(*)::int n from public.stock_books where book_code = any($1::text[]) and kigest_ref <> ''`, [mapa.so_no_site]))[0].n === 0);
+  intocados.every((p) => {
+    const r = depois[chave(p.title)];
+    return Number(r.price) === p.price && Number(r.stock) === p.stock && r.kigest_ref === '';
+  }), intocados.length);
 
 // 3. Os produtos novos: entram ocultos, com preço e stock, e sem capa.
 const novos = await q(`select title, product_type, genre, kigest_ref, price, stock, active, cover, description, book_code
@@ -130,22 +157,26 @@ check('nenhum título ficou em maiúsculas', novos.every((r) => r.title !== r.ti
 check('os repetidos do KiGest não entraram',
   (await q(`select count(*)::int n from public.stock_books where kigest_ref = any($1::text[])`,
     [mapa.repetidos.flatMap((g) => g.sai)]))[0].n === 0);
+// A guarda que apanha o que o emparelhamento em JavaScript não pode ver: nenhum produto novo
+// repete um título que já existia na base.
+const titulosRepetidos = await q(`select lower(btrim(title)) t, count(*)::int n from public.stock_books
+                                   group by 1 having count(*) > 1`);
+check('nenhum título ficou duplicado no catálogo', titulosRepetidos.length === 0, titulosRepetidos.slice(0, 5));
 
 // 4. Nada disto chega à loja: um visitante continua a ver os mesmos produtos.
 const activos = await anon(`select count(*)::int n from public.stock_books where active`);
-check('o visitante continua a ver só os 124 produtos de sempre', activos[0].n === 124, activos[0].n);
+check(`o visitante continua a ver só os ${aVenda.length} produtos de sempre`, activos[0].n === aVenda.length, activos[0].n);
 
 // 5. As descrições.
-const comDescricao = await q(`select book_code, description from public.stock_books where book_code = any($1::text[])`,
-  [mapa.catalogo.filter((p) => p.description !== 'ESCRITA').map((p) => p.book_code)]);
-check('os 24 produtos sem descrição ficaram com uma',
-  comDescricao.length === 24 && comDescricao.every((r) => (r.description ?? '').length > 120), comDescricao.length);
+const semDescricao = mapa.catalogo.filter((p) => p.book_code && p.description !== 'ESCRITA');
+check(`os ${semDescricao.length} produtos à venda sem descrição ficaram com uma`,
+  semDescricao.length === 24 && semDescricao.every((p) => (depois[chave(p.title)].description ?? '').length > 120), semDescricao.length);
 check('nenhuma descrição nova é o título repetido',
-  comDescricao.every((r) => !/^<p>[^<]{0,80}<\/p>$/.test(r.description)));
-const escritas = await q(`select book_code, description from public.stock_books where book_code = any($1::text[])`,
-  [mapa.catalogo.filter((p) => p.description === 'ESCRITA').map((p) => p.book_code)]);
+  semDescricao.every((p) => !/^<p>[^<]{0,80}<\/p>$/.test(depois[chave(p.title)].description)));
+const comDescricao = mapa.catalogo.filter((p) => p.description === 'ESCRITA');
 check('as descrições que já estavam escritas ficaram como estavam',
-  escritas.every((r) => r.description === antes[r.book_code].description), escritas.filter((r) => r.description !== antes[r.book_code].description).map((r) => r.book_code));
+  comDescricao.every((p) => depois[chave(p.title)].description === antes[chave(p.title)].description),
+  comDescricao.filter((p) => depois[chave(p.title)].description !== antes[chave(p.title)].description).map((p) => p.title).slice(0, 3));
 check('as funções auxiliares da migração não ficaram na base',
   (await q(`select count(*)::int n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
              where ns.nspname = 'private' and p.proname in ('chave_texto', 'texto_simples')`))[0].n === 0);
@@ -162,7 +193,7 @@ await db.exec(catalogo);
 await db.exec(descricoes);
 check('as duas migrações podem correr outra vez sem mudar nada', (await retrato()) === antesDaSegunda);
 check('e sem duplicar nenhum produto',
-  (await q(`select count(*)::int n from public.stock_books`))[0].n === 124 + mapa.novos.length);
+  (await q(`select count(*)::int n from public.stock_books`))[0].n === mapa.catalogo.length + mapa.novos.length);
 
 console.log(`kigest: ${ok} ok, ${fail} falhas`);
 if (fail) process.exit(1);

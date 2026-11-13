@@ -5,11 +5,14 @@ O **KiGest** (KigestGC) é o programa de facturação que corre no computador da
 é o que lá está. O site tem o seu próprio catálogo, em `public.stock_books`.
 
 Até agora os dois viveram de costas voltadas. O preço no site veio da lista da Casa Publicadora
-Brasileira — e por isso 63 dos 74 produtos emparelhados tinham o preço certo ao cêntimo — mas o
+Brasileira — e por isso 61 dos 106 produtos emparelhados tinham o preço certo ao cêntimo — mas o
 stock foi posto à mão quando cada produto entrou e nunca mais foi mexido. Na primeira conciliação
-(12 de Novembro de 2026) 70 dos 74 tinham stock diferente: somados, 590 unidades no site contra
-419 na loja. Sete produtos estavam à venda no site com a loja a zero — o «Interpretando as
-Escrituras» dizia 12 — e três davam-se por esgotados tendo livros na prateleira.
+(12 de Novembro de 2026) 94 dos 106 tinham stock diferente. Sete produtos estavam à venda no site
+com a loja a zero — o «Interpretando as Escrituras» dizia 12 — e três davam-se por esgotados tendo
+livros na prateleira.
+
+Outros 34 estavam ocultos desde a migração das fotografias (20261110090000) à espera de preço: é
+o KiGest que lho dá, e com isso ficam prontos a publicar.
 
 Agora há uma chave entre os dois: a coluna **`stock_books.kigest_ref`**, que guarda a referência
 do artigo no KiGest (`tbArtigos.Referencia`). Com ela, cada exportação nova actualiza o stock sem
@@ -37,6 +40,23 @@ node scripts/kigest/migracao.mjs KIGEST-exportacao-<data>.kigest \
 O script não escreve na base de dados. Lê o catálogo do site com a chave pública — só o que
 qualquer visitante lê — e escreve ficheiros.
 
+## O catálogo tem duas camadas, e a chave pública só vê uma
+
+A chave pública lê o catálogo como qualquer visitante — e um visitante não vê o que está oculto:
+as regras de RLS escondem tudo o que tem `active = false`. Na primeira conciliação isso deixou de
+fora **72 produtos**, os que a migração das fotografias trouxe e que ainda esperam preço.
+
+Sem eles, a conciliação dava-os por inexistentes e a loja ficava com cada um **duas vezes**: o
+«ATIRADOR COVERTIDO» do KiGest entraria como produto novo ao lado do «O Atirador Convertido — E
+outras histórias de salvação e milagres» que já lá estava. Eram 50 produtos repetidos.
+
+Por isso o `scripts/kigest/catalogo-oculto.mjs` lê esses 72 do próprio repositório — da migração
+que os criou e da tabela curada das fotografias. Ligam-se pelo **título exacto**, porque o código
+que o gatilho lhes deu em produção não está escrito em lado nenhum.
+
+E a migração repete as guardas **em SQL**, onde se vê o catálogo todo: um produto novo não entra
+se já existir um com aquela referência do KiGest, com aquele título ou com aquele ISBN.
+
 ## O que a exportação traz e o que se usa
 
 O `.kigest` é um gzip de JSON por linhas, com 164 objectos: a facturação toda, contas correntes,
@@ -57,6 +77,11 @@ palavras, e é conservador de propósito — o que se vai escrever é preço e s
 põe o preço de um livro noutro:
 
 - **Já ligado** (`kigest_ref` preenchido) — é a chave boa e dispensa adivinhar.
+- **Id na loja da editora.** Em muitos artigos o KiGest usa como referência o próprio código do
+  produto na Casa Publicadora Brasileira, e a ronda das fotografias guardou esse código para 44
+  produtos do site (`scripts/catalogo/produtos.py`). Quando os dois batem é o mesmo produto, e o
+  título nem precisa de se parecer: foi assim que «PEDACINHO DO CEU» encontrou o «Devocional da
+  Família — Pedacinho do Céu». São 12 pares que nenhuma outra regra apanharia.
 - **Código de barras** igual nos dois lados, com 13 dígitos.
 - **Palavras do título**, com duas medidas: quanto os dois títulos se parecem e quanto do título
   do KiGest cabe no do site (é esta que salva os abreviados — «MÚSICA NA IGREJA» está todo dentro
@@ -82,7 +107,9 @@ exportação seguinte passa a emparelhá-lo por ela.
 
 ## Os produtos que a loja tem e o site não
 
-Na primeira conciliação eram 287 (com seis repetidos do próprio KiGest de fora). Entram todos
+Na primeira conciliação eram 225, depois de postos de lado 2 repetidos do próprio KiGest, 11 que
+davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» dão os dois «Cordeirinho»)
+e 1 cujo título corrigido já existia no catálogo. Entram todos
 **ocultos** — `active = false`, sem capa e sem descrição — com o preço e o stock da loja. Não se
 põe um produto à venda sem fotografia e sem uma linha a dizer o que é.
 
