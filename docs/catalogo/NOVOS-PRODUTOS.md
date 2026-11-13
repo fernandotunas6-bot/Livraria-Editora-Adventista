@@ -1,0 +1,76 @@
+# Produtos novos da loja (fotografias de 2026-11-09)
+
+Estado em 2026-11-10, para quem continuar o trabalho.
+
+## O que está feito
+
+- **Levantamento das 295 fotografias** da pasta `Novos livros/` (fica na raiz do repositório, fora
+  do git — 52 MB). Cada fotografia foi vista e identificada em
+  [levantamento-fotografias.tsv](levantamento-fotografias.tsv): número, frente/verso, tipo, título,
+  autor, editora. O número de cada fotografia → nome do ficheiro está em
+  [indice-fotografias.json](indice-fotografias.json) (também diz quais são cópias exactas).
+- **Duplicados**: 20 ficheiros repetidos; 42 produtos já existiam no catálogo (LIV-010…LIV-099) e
+  ficaram de fora. Sobram **93 produtos novos**: 55 livros, 23 bíblias, 3 hinários em umbundo,
+  9 artigos de Desbravadores/Jovens, 3 peças de vestuário.
+- **Capas** em `app/web/public/images/capas/novos/` (340×510, como o resto do catálogo):
+  - 44 capas oficiais da loja da CPB (`https://imagens.cpb.com.br/produtos/<id>/<id>-01-web-product-page.png`),
+    conferidas uma a uma contra a fotografia;
+  - 46 tratadas a partir da fotografia (`scripts/catalogo/enquadrar.py`: recorte do produto,
+    perspectiva, rotação, limpeza) — edições de Angola/Portugal, bíblias da SBB, lenços, emblemas;
+  - 3 montagens de camisas (`scripts/catalogo/modelo_camisa.py`) com a estampa real extraída das
+    fotografias (logótipo da Igreja e marca UmaVoz27).
+  A lista produto → ficheiro → origem está em [mapa-novos-produtos.json](mapa-novos-produtos.json).
+  **Revistas em 2026-11-11** ([AUDITORIA-IMAGENS.md](AUDITORIA-IMAGENS.md)): as capas da CPB
+  endireitadas (sem maqueta nem fundo preto), as bíblias da SBB trocadas pela foto oficial do
+  fabricante (`origem: "sbb"`), e os emblemas, lenços e cordão sem mãos e em fundo neutro.
+- **Descrições**: 44 sinopses da CPB em [sinopses-cpb.json](sinopses-cpb.json). Em 26 tinham
+  vindo também as avaliações dos clientes da CPB (com nome e data de cada pessoa) e, numa, o
+  código e o CNPJ da página: a migração `20261110121000_descricoes_sem_avaliacoes` tira-os (só
+  onde a descrição ainda não foi mudada no painel) e o `sinopses.py` passou a parar nas
+  avaliações.
+- **Migração** `supabase/migrations/20261110090000_produtos_novos_da_loja.sql`: insere os 93
+  produtos **ocultos (active = false), com preço e stock a 0**. O código (LIV-/BIB-/MUS-/DBV-/VES-)
+  é dado pelo gatilho. Pode correr mais de uma vez.
+- **Testada no PGlite** (`scripts/pglite/produtos-novos.mjs`, corre no CI com os outros cenários),
+  sobre um catálogo como o de produção (LIV-001…LIV-100, COL-001/002): entram ocultos e a zero,
+  os códigos continuam a numeração (LIV-101 em diante), um título já existente não entra outra
+  vez, correr duas vezes não muda nada, as 93 capas existem e batem com o mapa, e a consulta de
+  publicação só põe à venda o que tem preço (e o vestuário só com tamanhos).
+
+## O que falta
+
+1. **Preços e stock**: não há preços nas fotografias. O dono tem de os pôr no painel; só depois se
+   publicam com a consulta do cabeçalho da migração, que só publica o que tem preço.
+   **As 3 peças de vestuário entram sem tamanhos**: pôr os tamanhos (cada um com o seu stock) no
+   painel antes de as publicar. A consulta deixa-as de fora enquanto não os tiverem; sem eles, a
+   t-shirt comprava-se sem escolher o tamanho.
+2. **Materiais de Santa Ceia**: o dono falou neles, mas não há nenhum nas fotografias. Confirmar se
+   faltam fotografias ou se quer que se acrescentem a partir de imagens da internet.
+3. **Emblemas oficiais**: os logótipos vectoriais dos Desbravadores/Aventureiros/JA estão em
+   `https://downloads.adventistas.org/pt/desbravadores/logomarcas/logos-abertos-desbravadores/`
+   (ZIP em `deptos.adventistas.org`, que recusa descargas fora do navegador — 403). Os emblemas
+   ficaram com a fotografia recortada (sem a mão, em fundo neutro); se se quiser arte vectorial,
+   descarregar o ZIP à mão.
+4. **Cinco contracapas sem frente** (não entraram): 026 (livro pequeno da LEA sobre Jesus Mestre),
+   032 (livro laranja de evangelismo, esperanca.com.br), 037 (livro verde da CPB sobre
+   administração/finanças, «Crede no Senhor»), 276 (Carol Cannon, capa amarela), 295 (Karl Haffner,
+   alegoria de John Bunyan, CASA). Precisam de fotografia da frente ou de identificação.
+5. **Bíblia do Desbravador laranja** entrou só com a contracapa fotografada (170) e a capa da CPB —
+   confirmar que existe em stock.
+7. ~~Capas aceitáveis mas não perfeitas~~ — resolvido em 2026-11-11 (hinário castanho sem o de
+   trás; bíblias 147/153/156 com a foto da SBB). Ficam com reflexo do plástico as que a auditoria
+   lista em [AUDITORIA-IMAGENS.md](AUDITORIA-IMAGENS.md#o-que-fica-por-fazer).
+
+## Como voltar a correr
+
+```bash
+python3 -m venv /tmp/venv-capas && /tmp/venv-capas/bin/pip install opencv-python-headless pillow numpy
+# capa a partir da fotografia (rodar=180 quando o livro foi fotografado ao contrário)
+/tmp/venv-capas/bin/python -c "import sys; sys.path.insert(0,'scripts/catalogo'); import enquadrar; \
+  print(enquadrar.recortar('Novos livros/<ficheiro>.jpeg', 'saida.jpg', rodar=0))"
+# busca na loja da CPB
+python3 scripts/catalogo/cpb.py "Título do livro"
+```
+
+`scripts/catalogo/produtos.py` é a lista dos 93 produtos (fotografia, tipo, título, autor, editora,
+origem da capa); `sinopses.py` recolhe as sinopses da CPB a partir dela.

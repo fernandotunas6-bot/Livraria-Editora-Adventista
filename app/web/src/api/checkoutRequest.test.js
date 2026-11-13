@@ -62,6 +62,23 @@ describe('initializeCheckout', () => {
     expect(sent().body).toMatchObject({ deliveryGpsLat: -8.83, deliveryGpsLng: 13.23 });
   });
 
+  it('a precisão do GPS chega ao servidor com as coordenadas, e só quando é um número', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    await initializeCheckout({ ...base, deliveryGpsLat: -8.83, deliveryGpsLng: 13.23, deliveryGpsAccuracy: 18.5 });
+    expect(sent().body).toMatchObject({ deliveryGpsLat: -8.83, deliveryGpsLng: 13.23, deliveryGpsAccuracy: 18.5 });
+    fetchMock.mockClear();
+    // Ponto arrastado no mapa: há coordenadas, mas não há precisão medida.
+    await initializeCheckout({ ...base, deliveryGpsLat: -8.83, deliveryGpsLng: 13.23, deliveryGpsAccuracy: null });
+    expect(sent().body).not.toHaveProperty('deliveryGpsAccuracy');
+  });
+
+  it('o estado do pagamento que o servidor devolve chega ao carrinho', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ orderId: '1', payment_status: 'awaiting_confirmation' }) });
+    const result = await initializeCheckout(base);
+    expect(result.payment_status).toBe('awaiting_confirmation');
+  });
+
   it('a chave de idempotência chega ao servidor, e só quando existe', async () => {
     getSession.mockResolvedValue({ data: { session: null } });
     await initializeCheckout({ ...base, idempotencyKey: '0b6f3c1e-9a7d-4c2b-8e1f-5d4a3b2c1d0e' });

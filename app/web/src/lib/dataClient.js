@@ -359,6 +359,8 @@ const authStore = {
     return () => listeners.delete(callback);
   },
   clear() {
+    // Um perfil ainda a caminho (de uma entrada ou renovação de há instantes) já não é desta sessão.
+    authGeneration += 1;
     // Antes do `signOut`: os outros separadores recebem o `SIGNED_OUT` e têm de saber que foi a
     // pessoa a sair, e não o servidor a terminar a sessão.
     writeSignOutMark('user');
@@ -390,12 +392,25 @@ const authStore = {
   onReady(callback) { return authGate.onReady(callback); },
 };
 
-function setAuth(token, record) {
+// Cada mudança de sessão tem um número. O perfil é lido depois do aviso do Auth (fora do callback):
+// se entretanto a pessoa saiu, ou chegou um aviso mais recente, a resposta antiga não escreve por
+// cima. Antes, carregar em "Sair" logo depois de entrar (ou de voltar à app) podia devolver a
+// conta à vista com o token já revogado.
+let authGeneration = 0;
+
+/**
+ * `cache: false` para um perfil incompleto (a leitura falhou): fica à vista nesta visita, mas não
+ * substitui o perfil guardado — sem papel nem permissões, a equipa ficava sem painel até a rede
+ * voltar e o perfil ser lido outra vez.
+ */
+function setAuth(token, record, { cache = true } = {}) {
   const changed = authStore.token !== token || JSON.stringify(authStore.record) !== JSON.stringify(record);
   authStore.token = token;
   authStore.record = record;
   try {
-    if (record) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(record));
+    if (record && !cache) {
+      // nada: fica o perfil completo que já estava guardado
+    } else if (record) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(record));
     else localStorage.removeItem(PROFILE_CACHE_KEY);
   } catch {
     // armazenamento indisponível
@@ -403,9 +418,30 @@ function setAuth(token, record) {
   if (changed) listeners.forEach((cb) => cb(token, record));
 }
 
+/**
+ * O perfil da conta. Lança quando a leitura falha: o supabase-js não lança, devolve `{ error }`,
+ * e esse erro era ignorado — uma falha de rede numa renovação do token passava por "conta sem
+ * perfil" (sem nome, papel `member`) e ficava guardada.
+ */
 async function loadProfile(user) {
-  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (error) throw toDataError(error);
   return decorate('users', { ...(data || { id: user.id, name: '', role: 'member' }), email: user.email || data?.email || '' });
+}
+
+/** Perfil mínimo de uma conta, quando o da base de dados ainda não existe ou não se leu. */
+function minimalProfile(user) {
+  return decorate('users', { id: user.id, name: '', role: 'member', email: user.email || '' });
+}
+
+/** O perfil, com uma segunda tentativa: na rede móvel, a primeira falha muitas vezes sozinha. */
+async function loadProfileRetry(user) {
+  try {
+    return await loadProfile(user);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return loadProfile(user);
+  }
 }
 
 // Sessão guardada: disponível de imediato (o papel vem do perfil em cache até ser confirmado).
@@ -443,6 +479,7 @@ supabase.auth.onAuthStateChange((event, session) => {
     return;
   }
   keptOffline = false;
+  const generation = ++authGeneration;
   if (action === 'signed-out') {
     const shown = authStore.record;
     setAuth('', null);
@@ -468,8 +505,17 @@ supabase.auth.onAuthStateChange((event, session) => {
   writeSignOutMark(null);
   // Fora do callback: o supabase-js não permite chamadas ao cliente dentro dele.
   setTimeout(async () => {
-    const record = await loadProfile(session.user).catch(() => authStore.record);
-    setAuth(session.access_token, record);
+    let record;
+    let complete = true;
+    try {
+      record = await loadProfileRetry(session.user);
+    } catch {
+      // Sem perfil novo: fica o que estava à vista, se for desta conta; senão, um mínimo que não
+      // vai para a cache (a próxima renovação lê-o outra vez).
+      complete = authStore.record?.id === session.user.id;
+      record = complete ? authStore.record : minimalProfile(session.user);
+    }
+    if (generation === authGeneration) setAuth(session.access_token, record, { cache: complete });
     authGate.resolve();
   }, 0);
 });
@@ -602,8 +648,17 @@ function collection(name) {
     async authWithPassword(email, password) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw translateAuthError(error);
-      const record = await loadProfile(data.user);
-      setAuth(data.session.access_token, record);
+      // A entrada já valeu: uma falha a ler o perfil não a desfaz. O `SIGNED_IN` que o Auth manda a
+      // seguir volta a ler o perfil e acerta o papel e as permissões.
+      let record;
+      let complete = true;
+      try {
+        record = await loadProfile(data.user);
+      } catch {
+        complete = false;
+        record = minimalProfile(data.user);
+      }
+      setAuth(data.session.access_token, record, { cache: complete });
       return { token: data.session.access_token, record };
     },
 
@@ -693,6 +748,24 @@ const files = {
   },
 };
 files.getUrl = files.getURL;
+
+/**
+ * Cabeçalho `Authorization` com o token válido da sessão, para os `fetch` à Edge Function.
+ *
+ * Não usar `pb.authStore.token`: é o último token conhecido, e ao voltar a um separador parado
+ * mais de uma hora (o supabase-js pára a renovação com a página escondida), ou ao abrir a app com
+ * a sessão guardada, está caducado. A Edge Function trata um token inválido como visitante, sem
+ * erro: a visita não ficava no histórico da conta, as sugestões não eram "para si" e o
+ * assistente respondia como a um anónimo. O `getSession()` renova primeiro, se for preciso.
+ */
+export async function authHeaders() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Equivalente a pb.send('/api/app/...') — chama a Edge Function "app". */
 async function send(path, options = {}) {

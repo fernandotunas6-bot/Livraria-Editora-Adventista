@@ -26,6 +26,13 @@ describe('shipping', () => {
     expect(shippingRules({ shipping_cost: 0 }).standardCents).toBe(0);
   });
 
+  it('valores com cêntimos dão cêntimos inteiros (sem resto da vírgula flutuante)', () => {
+    const regras = shippingRules({ shipping_free_threshold: 19999.99, shipping_cost: 2499.99, shipping_express_cost: 0.29 });
+    expect(regras).toEqual({ freeThresholdCents: 1999999, standardCents: 249999, expressCents: 29 });
+    // Um subtotal de exactamente 19 999,99 Kz já não paga portes.
+    expect(calcShippingCents('delivery', 1999999, { shipping_free_threshold: 19999.99, shipping_cost: 1500 })).toBe(0);
+  });
+
   it('definições vazias usam os valores por omissão', () => {
     expect(shippingRules({})).toEqual({ freeThresholdCents: 2000000, standardCents: 150000, expressCents: 300000 });
     expect(settingNumber('', 7)).toBe(7);

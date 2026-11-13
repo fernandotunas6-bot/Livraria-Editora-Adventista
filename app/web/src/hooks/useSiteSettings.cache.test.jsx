@@ -38,6 +38,20 @@ describe('configurações entre visitas', () => {
     expect(JSON.parse(localStorage.getItem('livraria:cache:definicoes:v1')).data.site_name).toBe('Livraria (nova)');
   });
 
+  it('não escreve por cima do título que a página já pôs', async () => {
+    document.title = 'FAQ — Livraria Adventista';
+    await mount();
+    await act(async () => resolveFetch.resolve({ site_name: 'Livraria Adventista' }));
+    expect(document.title).toBe('FAQ — Livraria Adventista');
+  });
+
+  it('o título genérico passa a ser o nome configurado da loja', async () => {
+    document.title = 'Livraria Adventista';
+    await mount();
+    await act(async () => resolveFetch.resolve({ site_name: 'Livraria Adventista — Huambo' }));
+    expect(document.title).toBe('Livraria Adventista — Huambo');
+  });
+
   it('na primeira visita espera; se o servidor falhar, não guarda nada', async () => {
     await mount();
     expect(seen.loading).toBe(true);

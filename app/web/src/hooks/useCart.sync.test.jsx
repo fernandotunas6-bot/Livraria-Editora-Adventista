@@ -62,6 +62,22 @@ describe('carrinho entre separadores', () => {
     expect(cart.cartItems).toEqual([]);
   });
 
+  // Depois de uma compra o carrinho esvazia e a página muda logo para /success. O efeito que
+  // grava o carrinho só corre depois do próximo desenho: quando a página nova chegava antes,
+  // os livros comprados continuavam guardados e voltavam a aparecer no carrinho.
+  it('esvaziar grava logo, sem esperar pelo próximo desenho', () => {
+    act(() => { window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: JSON.stringify([linha('a', 2)]) })); });
+    expect(localStorage.getItem(KEY)).toContain('a-default');
+    let guardadoNoMomento;
+    act(() => {
+      cart.clearCart();
+      // Ainda dentro do mesmo passo: o React não redesenhou nem correu efeitos.
+      guardadoNoMomento = localStorage.getItem(KEY);
+    });
+    expect(guardadoNoMomento).toBe('[]');
+    expect(cart.cartItems).toEqual([]);
+  });
+
   it('remover deixa anular: o livro volta com a mesma quantidade e para o mesmo lugar', () => {
     act(() => { window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: JSON.stringify([linha('a'), linha('b', 3), linha('c')]) })); });
     act(() => cart.removeFromCart('b-default'));

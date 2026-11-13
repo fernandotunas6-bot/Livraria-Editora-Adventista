@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 let authCallback = null;
 const getSession = vi.fn(async () => ({ data: { session: null } }));
 const signOut = vi.fn(async () => ({ error: null }));
+// A leitura de public.profiles; cada teste pode trocá-la (falha de rede, resposta lenta).
+const PROFILE_OK = async () => ({ data: { id: 'u1', name: 'Maria Lopes', role: 'member' }, error: null });
+let readProfile = PROFILE_OK;
 
 vi.mock('@/lib/supabaseClient', () => ({
   SUPABASE_URL: 'http://supabase.invalid',
@@ -22,7 +25,7 @@ vi.mock('@/lib/supabaseClient', () => ({
       signOut,
     },
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'u1', name: 'Maria Lopes', role: 'member' } }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: () => readProfile() }) }),
     }),
   },
 }));
@@ -58,6 +61,7 @@ async function load({ stored = STORED, profile = PROFILE } = {}) {
 }
 
 beforeEach(() => {
+  readProfile = PROFILE_OK;
   authCallback = null;
   getSession.mockClear();
   signOut.mockClear();
@@ -192,5 +196,91 @@ describe('fim da sessão', () => {
     expect(localStorage.getItem('livraria_saida')).toBeNull();
     await tick();
     expect(pb.authStore.isValid).toBe(true);
+  });
+});
+
+describe('perfil lido depois de cada aviso do Auth', () => {
+  const ADMIN = { ...PROFILE, name: 'Ana Admin', role: 'admin' };
+
+  it('uma falha a ler o perfil na renovação não tira o papel nem estraga a cache', async () => {
+    vi.useFakeTimers();
+    try {
+      const pb = await load({ profile: ADMIN });
+      readProfile = async () => ({ data: null, error: { message: 'Failed to fetch', code: '' } });
+      authCallback('TOKEN_REFRESHED', { access_token: 'token-novo', user: { id: 'u1', email: 'maria@exemplo.ao' } });
+      await vi.advanceTimersByTimeAsync(2000); // as duas tentativas
+      expect(pb.authStore.token).toBe('token-novo');
+      expect(pb.authStore.record.role).toBe('admin');
+      expect(pb.authStore.record.name).toBe('Ana Admin');
+      expect(JSON.parse(localStorage.getItem('livraria_profile')).role).toBe('admin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a segunda tentativa vale quando a primeira falha', async () => {
+    vi.useFakeTimers();
+    try {
+      const pb = await load({ profile: null });
+      let calls = 0;
+      readProfile = async () => (++calls === 1
+        ? { data: null, error: { message: 'Failed to fetch', code: '' } }
+        : { data: { id: 'u1', name: 'Ana Admin', role: 'admin' }, error: null });
+      authCallback('SIGNED_IN', { access_token: 't1', user: { id: 'u1', email: 'maria@exemplo.ao' } });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(pb.authStore.record.role).toBe('admin');
+      expect(JSON.parse(localStorage.getItem('livraria_profile')).role).toBe('admin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sem perfil lido e sem perfil desta conta, um mínimo que não vai para a cache', async () => {
+    vi.useFakeTimers();
+    try {
+      const pb = await load({ stored: null, profile: null });
+      readProfile = async () => ({ data: null, error: { message: 'Failed to fetch', code: '' } });
+      authCallback('SIGNED_IN', { access_token: 't1', user: { id: 'u2', email: 'novo@exemplo.ao' } });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(pb.authStore.isValid).toBe(true);
+      expect(pb.authStore.record.id).toBe('u2');
+      expect(localStorage.getItem('livraria_profile')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('"Sair" com o perfil ainda a caminho: a resposta tardia não devolve a conta', async () => {
+    const pb = await load({ stored: null, profile: null });
+    let answer;
+    readProfile = () => new Promise((resolve) => { answer = resolve; });
+    authCallback('SIGNED_IN', { access_token: 't1', user: { id: 'u1', email: 'maria@exemplo.ao' } });
+    await tick(); // o pedido do perfil sai
+    pb.authStore.clear();
+    answer({ data: { id: 'u1', name: 'Maria Lopes', role: 'member' }, error: null });
+    await tick();
+    await tick();
+    expect(pb.authStore.isValid).toBe(false);
+    expect(pb.authStore.token).toBe('');
+    expect(localStorage.getItem('livraria_profile')).toBeNull();
+  });
+});
+
+describe('authHeaders', () => {
+  it('usa o token da sessão renovada, não o último conhecido', async () => {
+    const pb = await load();
+    getSession.mockResolvedValueOnce({ data: { session: { access_token: 'token-renovado' } } });
+    const { authHeaders } = await import('@/lib/dataClient');
+    expect(pb.authStore.token).toBe('token-velho');
+    expect(await authHeaders()).toEqual({ Authorization: 'Bearer token-renovado' });
+  });
+
+  it('sem sessão, ou com o getSession a falhar, não manda cabeçalho', async () => {
+    await load();
+    const { authHeaders } = await import('@/lib/dataClient');
+    getSession.mockResolvedValueOnce({ data: { session: null } });
+    expect(await authHeaders()).toEqual({});
+    getSession.mockRejectedValueOnce(new Error('rede'));
+    expect(await authHeaders()).toEqual({});
   });
 });

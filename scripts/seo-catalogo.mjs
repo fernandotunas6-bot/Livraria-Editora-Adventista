@@ -6,6 +6,8 @@
 //
 // 1. Troca o endereço de origem pelo de destino no index.html, sitemap.xml e robots.txt
 //    (canonical, og:, twitter:): o mesmo commit pode ir para o projecto novo ou para o .ao.
+//    Escreve também as páginas fixas do sitemap (shop.html, faq.html…), cada uma com o seu
+//    canonical, título e descrição (FIXED_PAGES em seo-paginas.mjs).
 // 2. Junta ao sitemap os livros e as colecções activos.
 // 3. Escreve product/<id>.html e colecoes/<slug>.html: o index.html com o título, a
 //    descrição e a capa de cada um. Quem partilha um livro no WhatsApp, Facebook ou Telegram
@@ -24,7 +26,8 @@ import { fileURLToPath } from 'node:url';
 import { ROUTES, headersFor } from './partilha-comunidade.mjs';
 import path from 'node:path';
 import {
-  bookShareDescription, isSafeId, isSafeSlug, plainSummary, renderSharePage, rewriteSiteUrl, sitemapEntry, SITE_NAME,
+  FIXED_PAGES, bookShareDescription, fixedPageFile, isSafeId, isSafeSlug, plainSummary, renderSharePage, rewriteSiteUrl,
+  sitemapEntry, SITE_NAME,
 } from './seo-paginas.mjs';
 
 const [dir, siteArg] = process.argv.slice(2);
@@ -48,6 +51,23 @@ try {
   process.exit(1);
 }
 console.log(`→ endereços públicos: ${site}`);
+
+// 1b. As páginas fixas do sitemap com o seu próprio HTML (ver FIXED_PAGES): sem isto, todas
+// eram o index.html, com o canonical a apontar para a página inicial. Não dependem da base de
+// dados, por isso saem mesmo quando o catálogo não responde (SEO_SEM_CATALOGO=1).
+try {
+  const base = read('index.html');
+  const fixed = FIXED_PAGES.map((p) => [fixedPageFile(p.path), renderSharePage(base, {
+    title: p.title,
+    description: p.description,
+    url: `${site}${p.path}`,
+  })]);
+  for (const [name, html] of fixed) write(name, html);
+  console.log(`→ páginas fixas: ${fixed.length}, cada uma com o seu canonical`);
+} catch (err) {
+  console.error(`✘ páginas fixas não geradas (${err.message})`);
+  process.exit(1);
+}
 
 function readEnv(file) {
   if (!existsSync(file)) return {};

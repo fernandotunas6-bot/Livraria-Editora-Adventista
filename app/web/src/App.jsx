@@ -8,6 +8,7 @@ import { SiteSettingsProvider, useSiteSettings } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { MotionConfig } from 'framer-motion';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
@@ -17,6 +18,7 @@ import ReaderActivity from '@/components/ReaderActivity.jsx';
 import { toast } from 'sonner';
 import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
+import { useAfterLoad } from '@/hooks/useAfterLoad';
 import { captureReferral } from '@/lib/colporteurReferral';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
@@ -178,8 +180,12 @@ function ColporteurReferralCapture() {
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
+  // O assistente só entra ao primeiro gesto ou uns segundos depois do load
+  // (hooks/useAfterLoad.js): o código dele, o /chat/config e o canal em tempo real competiam
+  // com a página pela rede do telemóvel.
+  const afterLoad = useAfterLoad();
   // Páginas sem o assistente: escolha do painel (lib/floatingButtons.js).
-  const showAssistant = !isFloatingHidden('chat', pathname, settings);
+  const showAssistant = afterLoad && !isFloatingHidden('chat', pathname, settings);
 
   return (
     <Suspense fallback={null}>
@@ -195,6 +201,10 @@ function GlobalWidgets() {
 function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="livraria-theme">
+    {/* "Reduzir movimento" do sistema também nas animações do framer-motion (o CSS já o
+        respeitava): sem isto, as entradas e as transições corriam na mesma. Não custa bytes — o
+        vendor-motion já é pré-carregado em todas as páginas (FloatingScrollTop). */}
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
     <SiteSettingsProvider>
     <IntegrationsProvider>
@@ -286,6 +296,7 @@ function App() {
     </IntegrationsProvider>
     </SiteSettingsProvider>
     </TooltipProvider>
+    </MotionConfig>
     </ThemeProvider>
   );
 }

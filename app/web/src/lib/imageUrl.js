@@ -1,6 +1,7 @@
 /**
  * Normaliza URLs de imagem — inclui links partilhados do Google Drive.
  */
+import SLIDE_VARIANTS from './slideVariants.json';
 export function extractDriveFileId(url) {
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
@@ -74,4 +75,21 @@ export function withCacheBust(url, version) {
   if (!url || !version) return url || '';
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}v=${encodeURIComponent(version)}`;
+}
+
+// Slides com variantes de 960 e 1280 px (geradas por scripts/imagens/variantes.py, que escreve a
+// lista; as larguras são as mesmas do script).
+const SLIDES_REDUZIDOS = new Set(SLIDE_VARIANTS);
+const LARGURAS = [960, 1280];
+
+/**
+ * `srcset` de um slide do próprio site: as variantes de 960 e 1280 px para os telemóveis e o
+ * original de 1920 px para os ecrãs grandes. Vazio para o resto (imagens carregadas no painel,
+ * Drive, Supabase), que ficam só com o `src`.
+ */
+export function siteSrcSet(url) {
+  const path = toSiteRelativeUrl(url || '').split(/[?#]/)[0];
+  if (!SLIDES_REDUZIDOS.has(path)) return '';
+  const reduzidas = LARGURAS.map((w) => `${path.replace(/^\/images\/site\//, `/images/site/${w}/`)} ${w}w`);
+  return [...reduzidas, `${path} 1920w`].join(', ');
 }

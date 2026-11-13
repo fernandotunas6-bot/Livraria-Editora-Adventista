@@ -1,0 +1,932 @@
+[
+ {
+  "foto": "001",
+  "tipo": "livro",
+  "titulo": "Primeiro o Reino — Como uma pobre viúva nos ensina os princípios da verdadeira adoração",
+  "autor": "Josanan Alves",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "primeiro-o-reino-como-uma-pobre-viuva-nos-ensina-os-principios-da-verdad",
+  "origem": "cpb",
+  "ref": "19612"
+ },
+ {
+  "foto": "003",
+  "tipo": "livro",
+  "titulo": "Além da Imaginação — Os surpreendentes mistérios da vida",
+  "autor": "Baldwin, Gibson e Thomas",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "alem-da-imaginacao-os-surpreendentes-misterios-da-vida",
+  "origem": "cpb",
+  "ref": "14618"
+ },
+ {
+  "foto": "016",
+  "tipo": "livro",
+  "titulo": "O Atirador Convertido — E outras histórias de salvação e milagres",
+  "autor": "José De Gracia",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "o-atirador-convertido-e-outras-historias-de-salvacao-e-milagres",
+  "origem": "cpb",
+  "ref": "21411"
+ },
+ {
+  "foto": "018",
+  "tipo": "livro",
+  "titulo": "Sonhe Alto — Como dar o melhor de si mesmo",
+  "autor": "Ben Carson e Cecil Murphey",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "sonhe-alto-como-dar-o-melhor-de-si-mesmo",
+  "origem": "cpb",
+  "ref": "5025"
+ },
+ {
+  "foto": "033",
+  "tipo": "livro",
+  "titulo": "Esperança para Viver — O verdadeiro caminho da felicidade",
+  "autor": "Ellen G. White",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "esperanca-para-viver-o-verdadeiro-caminho-da-felicidade",
+  "origem": "cpb",
+  "ref": "10447"
+ },
+ {
+  "foto": "034",
+  "tipo": "livro",
+  "titulo": "Ouvindo a Voz de Deus — Guia de estudos bíblicos",
+  "autor": "Casa Publicadora Brasileira",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "ouvindo-a-voz-de-deus-guia-de-estudos-biblicos",
+  "origem": "cpb",
+  "ref": "13705"
+ },
+ {
+  "foto": "035",
+  "tipo": "livro",
+  "titulo": "Ainda Existe Esperança — A solução para os problemas da vida",
+  "autor": "Enrique Chaij",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "ainda-existe-esperanca-a-solucao-para-os-problemas-da-vida",
+  "origem": "cpb",
+  "ref": "12246"
+ },
+ {
+  "foto": "039",
+  "tipo": "livro",
+  "titulo": "Tempo de Esperança — 24 horas para você renovar suas energias",
+  "autor": "Mark Finley",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "tempo-de-esperanca-24-horas-para-voce-renovar-suas-energias",
+  "origem": "cpb",
+  "ref": "11631"
+ },
+ {
+  "foto": "041",
+  "tipo": "livro",
+  "titulo": "Chuvas de Bênçãos — Liderança fiel até o fim",
+  "autor": "Ellen G. White",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "chuvas-de-bencaos-lideranca-fiel-ate-o-fim",
+  "origem": "cpb",
+  "ref": "16686"
+ },
+ {
+  "foto": "078",
+  "tipo": "livro",
+  "titulo": "Guia de Sobrevivência para o Tempo do Fim — Segurança e conforto durante o Armagedom",
+  "autor": "John C. Brunt",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "guia-de-sobrevivencia-para-o-tempo-do-fim-seguranca-e-conforto-durante-o",
+  "origem": "cpb",
+  "ref": "13346"
+ },
+ {
+  "foto": "094",
+  "tipo": "livro",
+  "titulo": "Sombra e Realidade — O ritual do santuário e o plano da salvação",
+  "autor": "Roberto Gullón",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "sombra-e-realidade-o-ritual-do-santuario-e-o-plano-da-salvacao",
+  "origem": "cpb",
+  "ref": "18598"
+ },
+ {
+  "foto": "106",
+  "tipo": "livro",
+  "titulo": "A Grande Extinção em Massa — Evidências e implicações da maior tragédia ambiental da história da Terra",
+  "autor": "Nahor N. Souza Jr.",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "a-grande-extincao-em-massa-evidencias-e-implicacoes-da-maior-tragedia-am",
+  "origem": "cpb",
+  "ref": "16712"
+ },
+ {
+  "foto": "108",
+  "tipo": "livro",
+  "titulo": "Visões do Futuro — As sete ideias centrais da escatologia bíblica",
+  "autor": "Marcos De Benedicto",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "visoes-do-futuro-as-sete-ideias-centrais-da-escatologia-biblica",
+  "origem": "cpb",
+  "ref": "18596"
+ },
+ {
+  "foto": "114",
+  "tipo": "livro",
+  "titulo": "Revelação de Jesus Cristo — Comentário sobre o livro do Apocalipse",
+  "autor": "Ranko Stefanovic",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "revelacao-de-jesus-cristo-comentario-sobre-o-livro-do-apocalipse",
+  "origem": "cpb",
+  "ref": "16085"
+ },
+ {
+  "foto": "124",
+  "tipo": "livro",
+  "titulo": "Mensageira do Senhor — O ministério profético de Ellen G. White",
+  "autor": "Herbert E. Douglass",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "mensageira-do-senhor-o-ministerio-profetico-de-ellen-g-white",
+  "origem": "cpb",
+  "ref": "5423"
+ },
+ {
+  "foto": "155",
+  "tipo": "livro",
+  "titulo": "Comentário Bíblico Andrews — Colecção completa em 4 volumes",
+  "autor": "Ángel Manuel Rodríguez (org.)",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "comentario-biblico-andrews-coleccao-completa-em-4-volumes",
+  "origem": "cpb",
+  "ref": "22538"
+ },
+ {
+  "foto": "193",
+  "tipo": "livro",
+  "titulo": "Jesus Extremo — Paradoxos que dão vida",
+  "autor": "Marcos Blanco",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "jesus-extremo-paradoxos-que-dao-vida",
+  "origem": "cpb",
+  "ref": "11493"
+ },
+ {
+  "foto": "196",
+  "tipo": "livro",
+  "titulo": "A Descoberta — A experiência que revolucionou a vida de um cientista ateu",
+  "autor": "Denis Cruz e Michelson Borges",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "a-descoberta-a-experiencia-que-revolucionou-a-vida-de-um-cientista-ateu",
+  "origem": "cpb",
+  "ref": "13276"
+ },
+ {
+  "foto": "203",
+  "tipo": "livro",
+  "titulo": "Guia Prático para Descobrir a Vontade de Deus",
+  "autor": "Troy Fitzgerald",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "guia-pratico-para-descobrir-a-vontade-de-deus",
+  "origem": "cpb",
+  "ref": "11761"
+ },
+ {
+  "foto": "207",
+  "tipo": "livro",
+  "titulo": "O Reavivamento Prometido — Como receber a plenitude do Espírito Santo",
+  "autor": "Mark Finley",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "o-reavivamento-prometido-como-receber-a-plenitude-do-espirito-santo",
+  "origem": "cpb",
+  "ref": "12382"
+ },
+ {
+  "foto": "211",
+  "tipo": "livro",
+  "titulo": "Crer Faz Bem — Pesquisas comprovam os benefícios da espiritualidade cristã",
+  "autor": "Julián Melgosa",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "crer-faz-bem-pesquisas-comprovam-os-beneficios-da-espiritualidade-crista",
+  "origem": "cpb",
+  "ref": "14620"
+ },
+ {
+  "foto": "212",
+  "tipo": "livro",
+  "titulo": "Como Conhecer a Vontade de Deus",
+  "autor": "Morris Venden",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "como-conhecer-a-vontade-de-deus",
+  "origem": "cpb",
+  "ref": "5648"
+ },
+ {
+  "foto": "216",
+  "tipo": "livro",
+  "titulo": "Viver Para Deus — Redescubra a alegria da virtude cristã",
+  "autor": "Frank M. Hasel",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "viver-para-deus-redescubra-a-alegria-da-virtude-crista",
+  "origem": "cpb",
+  "ref": "20147"
+ },
+ {
+  "foto": "233",
+  "tipo": "livro",
+  "titulo": "Por que, Senhor? — As respostas que você precisa para as perguntas que sempre fez",
+  "autor": "José Pereira",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "por-que-senhor-as-respostas-que-voce-precisa-para-as-perguntas-que-sempr",
+  "origem": "cpb",
+  "ref": "7533"
+ },
+ {
+  "foto": "245",
+  "tipo": "livro",
+  "titulo": "Lágrimas — Como enfrentar a dor e superar o sofrimento",
+  "autor": "Roberto Badenas",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "lagrimas-como-enfrentar-a-dor-e-superar-o-sofrimento",
+  "origem": "cpb",
+  "ref": "15529"
+ },
+ {
+  "foto": "250",
+  "tipo": "livro",
+  "titulo": "Nunca Vou Me Render — A resistência de um jovem polonês ao nazismo",
+  "autor": "Paweł Cieślar",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "nunca-vou-me-render-a-resistencia-de-um-jovem-polones-ao-nazismo",
+  "origem": "cpb",
+  "ref": "16721"
+ },
+ {
+  "foto": "255",
+  "tipo": "livro",
+  "titulo": "Coração Restaurado — Transformação de vidas pelo amor",
+  "autor": "Deise Marques, Luciana Almeida e Rebeca Moreira",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "coracao-restaurado-transformacao-de-vidas-pelo-amor",
+  "origem": "cpb",
+  "ref": "19383"
+ },
+ {
+  "foto": "257",
+  "tipo": "livro",
+  "titulo": "Devocional da Família — Pedacinho do Céu",
+  "autor": "Claudio e Pamela Consuegra",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "devocional-da-familia-pedacinho-do-ceu",
+  "origem": "cpb",
+  "ref": "16298"
+ },
+ {
+  "foto": "265",
+  "tipo": "livro",
+  "titulo": "Só para Jovens — Dicas para você aproveitar o melhor da vida",
+  "autor": "Ellen G. White",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "so-para-jovens-dicas-para-voce-aproveitar-o-melhor-da-vida",
+  "origem": "cpb",
+  "ref": "6521"
+ },
+ {
+  "foto": "267",
+  "tipo": "livro",
+  "titulo": "Ser Pai — Redescubra o significado da paternidade",
+  "autor": "Norbel Iagob (org.)",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "ser-pai-redescubra-o-significado-da-paternidade",
+  "origem": "cpb",
+  "ref": "19381"
+ },
+ {
+  "foto": "270",
+  "tipo": "livro",
+  "titulo": "O Altar da Família — Restaurando a comunhão com Deus",
+  "autor": "António e Irene Amorim",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "o-altar-da-familia-restaurando-a-comunhao-com-deus",
+  "origem": "cpb",
+  "ref": "14505"
+ },
+ {
+  "foto": "273",
+  "tipo": "livro",
+  "titulo": "Depois do Perdão — Experimente o fruto de uma vida santificada",
+  "autor": "Emilson dos Reis",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "depois-do-perdao-experimente-o-fruto-de-uma-vida-santificada",
+  "origem": "cpb",
+  "ref": "14504"
+ },
+ {
+  "foto": "277",
+  "tipo": "livro",
+  "titulo": "Orando Como Nunca por Seus Filhos",
+  "autor": "Tamyra Horst",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "orando-como-nunca-por-seus-filhos",
+  "origem": "cpb",
+  "ref": "23032"
+ },
+ {
+  "foto": "279",
+  "tipo": "livro",
+  "titulo": "Proibido para Meninos, Indispensável para Meninas",
+  "autor": "Sonia Rigoli Santos",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "proibido-para-meninos-indispensavel-para-meninas",
+  "origem": "cpb",
+  "ref": "9097"
+ },
+ {
+  "foto": "281",
+  "tipo": "livro",
+  "titulo": "Coragem! — Eles confiaram em Deus e venceram o medo",
+  "autor": "Charles Mills",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "coragem-eles-confiaram-em-deus-e-venceram-o-medo",
+  "origem": "cpb",
+  "ref": "21343"
+ },
+ {
+  "foto": "282",
+  "tipo": "livro",
+  "titulo": "Segredos da Vitória no Amor — Como aumentar sua capacidade de dar e receber afeto",
+  "autor": "Eronides de Nicola",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "segredos-da-vitoria-no-amor-como-aumentar-sua-capacidade-de-dar-e-recebe",
+  "origem": "cpb",
+  "ref": "9185"
+ },
+ {
+  "foto": "284",
+  "tipo": "livro",
+  "titulo": "Proteja Sua Família — Os desafios de cada ciclo da vida",
+  "autor": "Claudio e Pamela Consuegra",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "proteja-sua-familia-os-desafios-de-cada-ciclo-da-vida",
+  "origem": "cpb",
+  "ref": "18402"
+ },
+ {
+  "foto": "288",
+  "tipo": "livro",
+  "titulo": "A Igreja Remanescente",
+  "autor": "Ellen G. White",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "a-igreja-remanescente",
+  "origem": "cpb",
+  "ref": "22853"
+ },
+ {
+  "foto": "290",
+  "tipo": "livro",
+  "titulo": "Natural Naturalmente — Renove sua culinária e ganhe mais saúde",
+  "autor": "Odete Lima e Simone Di Giaimo",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "natural-naturalmente-renove-sua-culinaria-e-ganhe-mais-saude",
+  "origem": "cpb",
+  "ref": "15120"
+ },
+ {
+  "foto": "294",
+  "tipo": "livro",
+  "titulo": "Nem Tudo Que Cai na Rede é Peixe — Como encontrar o verdadeiro amor",
+  "autor": "Heather Marie Thompson",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "nem-tudo-que-cai-na-rede-e-peixe-como-encontrar-o-verdadeiro-amor",
+  "origem": "cpb",
+  "ref": "13167"
+ },
+ {
+  "foto": "024",
+  "tipo": "livro",
+  "titulo": "Palavras de Esperança — Histórias da vida diária",
+  "autor": "Ellen G. White",
+  "editora": "",
+  "slug": "palavras-de-esperanca-historias-da-vida-diaria",
+  "origem": "foto",
+  "ref": "024"
+ },
+ {
+  "foto": "030",
+  "tipo": "livro",
+  "titulo": "A Fé de Jesus — Guia de estudos para a classe baptismal",
+  "autor": "Carlos E. Aeschlimann",
+  "editora": "",
+  "slug": "a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal",
+  "origem": "foto",
+  "ref": "030"
+ },
+ {
+  "foto": "044",
+  "tipo": "livro",
+  "titulo": "Olhando para o Criador e Salvador — Meditações diárias",
+  "autor": "António Bambi",
+  "editora": "Livraria e Editora Adventista",
+  "slug": "olhando-para-o-criador-e-salvador-meditacoes-diarias",
+  "origem": "foto",
+  "ref": "044"
+ },
+ {
+  "foto": "046",
+  "tipo": "livro",
+  "titulo": "Testemunhando por Cristo — Um manual para encaminhar pessoas a Jesus",
+  "autor": "Divisão África Austral-Oceano Índico",
+  "editora": "Divisão África Austral-Oceano Índico",
+  "slug": "testemunhando-por-cristo-um-manual-para-encaminhar-pessoas-a-jesus",
+  "origem": "foto",
+  "ref": "046"
+ },
+ {
+  "foto": "047",
+  "tipo": "livro",
+  "titulo": "Paragem da Nuvem — Meditações diárias",
+  "autor": "Necas Henrique dos Santos",
+  "editora": "Livraria e Editora Adventista",
+  "slug": "paragem-da-nuvem-meditacoes-diarias",
+  "origem": "foto",
+  "ref": "047"
+ },
+ {
+  "foto": "059",
+  "tipo": "livro",
+  "titulo": "Segredos do Bem-Estar Emocional — Depressão, estresse, ansiedade",
+  "autor": "Julián Melgosa e Michelson Borges",
+  "editora": "",
+  "slug": "segredos-do-bem-estar-emocional-depressao-estresse-ansiedade",
+  "origem": "foto",
+  "ref": "059"
+ },
+ {
+  "foto": "062",
+  "tipo": "livro",
+  "titulo": "Esperança para a Família — O caminho para um final feliz",
+  "autor": "Willie e Elaine Oliver",
+  "editora": "",
+  "slug": "esperanca-para-a-familia-o-caminho-para-um-final-feliz",
+  "origem": "foto",
+  "ref": "062"
+ },
+ {
+  "foto": "064",
+  "tipo": "livro",
+  "titulo": "Saúde & Bem-Estar — Segredos que podem mudar a sua vida",
+  "autor": "Mark A. Finley e Peter N. Landless",
+  "editora": "",
+  "slug": "saude-bem-estar-segredos-que-podem-mudar-a-sua-vida",
+  "origem": "foto",
+  "ref": "064"
+ },
+ {
+  "foto": "065",
+  "tipo": "livro",
+  "titulo": "Amor em Família — O segredo para a alegria no lar",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "amor-em-familia-o-segredo-para-a-alegria-no-lar",
+  "origem": "foto",
+  "ref": "065"
+ },
+ {
+  "foto": "069",
+  "tipo": "livro",
+  "titulo": "Momentos de Paz — O descanso que traz calma para uma vida agitada",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "momentos-de-paz-o-descanso-que-traz-calma-para-uma-vida-agitada",
+  "origem": "foto",
+  "ref": "069"
+ },
+ {
+  "foto": "070",
+  "tipo": "livro",
+  "titulo": "Jesus Voltará — Uma boa notícia para você",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "jesus-voltara-uma-boa-noticia-para-voce",
+  "origem": "foto",
+  "ref": "070"
+ },
+ {
+  "foto": "071",
+  "tipo": "livro",
+  "titulo": "Futuro de Glória — Nossa vida será muito melhor",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "futuro-de-gloria-nossa-vida-sera-muito-melhor",
+  "origem": "foto",
+  "ref": "071"
+ },
+ {
+  "foto": "097",
+  "tipo": "livro",
+  "titulo": "Liderança & Missão — Uma perspectiva bíblica",
+  "autor": "Robson Marinho",
+  "editora": "",
+  "slug": "lideranca-missao-uma-perspectiva-biblica",
+  "origem": "foto",
+  "ref": "097"
+ },
+ {
+  "foto": "101",
+  "tipo": "livro",
+  "titulo": "O Limite do Prazer — O que a Bíblia diz sobre a identidade sexual",
+  "autor": "Ronald M. Springett",
+  "editora": "",
+  "slug": "o-limite-do-prazer-o-que-a-biblia-diz-sobre-a-identidade-sexual",
+  "origem": "foto",
+  "ref": "101"
+ },
+ {
+  "foto": "102",
+  "tipo": "livro",
+  "titulo": "Unidade e Foco na Missão — O segredo para uma organização eclesiástica eficaz",
+  "autor": "Teixeira M. Vinte",
+  "editora": "",
+  "slug": "unidade-e-foco-na-missao-o-segredo-para-uma-organizacao-eclesiastica-efi",
+  "origem": "foto",
+  "ref": "102"
+ },
+ {
+  "foto": "126",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Extragigante — Almeida Revista e Atualizada, com letras vermelhas",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-extragigante-almeida-revista-e-atualizada-com-letra",
+  "origem": "sbb",
+  "ref": "151404"
+ },
+ {
+  "foto": "129",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura preta com moldura dourada",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-preta-com-moldura-dourada",
+  "origem": "sbb",
+  "ref": "151401"
+ },
+ {
+  "foto": "131",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Supergigante — capa castanha",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-supergigante-capa-castanha",
+  "origem": "sbb",
+  "ref": "150755"
+ },
+ {
+  "foto": "135",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante — Nova Tradução na Linguagem de Hoje",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-nova-traducao-na-linguagem-de-hoje",
+  "origem": "sbb",
+  "ref": "151395"
+ },
+ {
+  "foto": "137",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante com notas e referências — Almeida Revista e Atualizada, capa branca",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-com-notas-e-referencias-almeida-revista-e-a",
+  "origem": "sbb",
+  "ref": "150753"
+ },
+ {
+  "foto": "138",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante com letras vermelhas, notas e referências — capa castanha",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-com-letras-vermelhas-notas-e-referencias-ca",
+  "origem": "sbb",
+  "ref": "151382"
+ },
+ {
+  "foto": "141",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura com flores, fundo claro",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-com-flores-fundo-claro",
+  "origem": "foto",
+  "ref": "141"
+ },
+ {
+  "foto": "142",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante — capa castanha com corte decorado",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-capa-castanha-com-corte-decorado",
+  "origem": "sbb",
+  "ref": "151467"
+ },
+ {
+  "foto": "146",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura «Olhai para as aves do céu»",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-olhai-para-as-aves-do-ceu",
+  "origem": "sbb",
+  "ref": "151271"
+ },
+ {
+  "foto": "147",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura floral azul-escura",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-floral-azul-escura",
+  "origem": "sbb",
+  "ref": "151273"
+ },
+ {
+  "foto": "150",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura preta com relevo dourado",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-preta-com-relevo-dourado",
+  "origem": "sbb",
+  "ref": "151423"
+ },
+ {
+  "foto": "152",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura bordô com flores e pássaro",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-bordo-com-flores-e-passaro",
+  "origem": "sbb",
+  "ref": "151358"
+ },
+ {
+  "foto": "153",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, capa dura com flores e borboletas",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-nova-traducao-na-linguagem-de-hoje-capa-dura-com-flores-e",
+  "origem": "sbb",
+  "ref": "151425"
+ },
+ {
+  "foto": "156",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — Nova Tradução na Linguagem de Hoje, brochura",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-nova-traducao-na-linguagem-de-hoje-brochura",
+  "origem": "sbb",
+  "ref": "151036"
+ },
+ {
+  "foto": "161",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — capa dura castanha",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-capa-dura-castanha",
+  "origem": "foto",
+  "ref": "161"
+ },
+ {
+  "foto": "176",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante — capa azul",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-capa-azul",
+  "origem": "sbb",
+  "ref": "151041"
+ },
+ {
+  "foto": "177",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada — Almeida Revista e Atualizada, capa azul-marinho",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-almeida-revista-e-atualizada-capa-azul-marinho",
+  "origem": "sbb",
+  "ref": "151166"
+ },
+ {
+  "foto": "180",
+  "tipo": "biblia",
+  "titulo": "Bíblia Sagrada Letra Gigante — capa bordô",
+  "autor": "",
+  "editora": "Sociedade Bíblica do Brasil",
+  "slug": "biblia-sagrada-letra-gigante-capa-bordo",
+  "origem": "sbb",
+  "ref": "151368"
+ },
+ {
+  "foto": "184",
+  "tipo": "biblia",
+  "titulo": "Bíblia «Jesus» — capa castanha com relevo",
+  "autor": "",
+  "editora": "",
+  "slug": "biblia-jesus-capa-castanha-com-relevo",
+  "origem": "foto",
+  "ref": "184"
+ },
+ {
+  "foto": "171",
+  "tipo": "biblia",
+  "titulo": "Bíblia do Desbravador — Nova Versão Internacional, capa verde",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "biblia-do-desbravador-nova-versao-internacional-capa-verde",
+  "origem": "cpb",
+  "ref": "16055"
+ },
+ {
+  "foto": "170",
+  "tipo": "biblia",
+  "titulo": "Bíblia do Desbravador — Nova Versão Internacional, capa laranja",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "biblia-do-desbravador-nova-versao-internacional-capa-laranja",
+  "origem": "cpb",
+  "ref": "16046"
+ },
+ {
+  "foto": "167",
+  "tipo": "biblia",
+  "titulo": "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa azul",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "biblia-do-clube-de-aventureiros-nova-versao-internacional-capa-azul",
+  "origem": "cpb",
+  "ref": "19798"
+ },
+ {
+  "foto": "165",
+  "tipo": "biblia",
+  "titulo": "Bíblia do Clube de Aventureiros — Nova Versão Internacional, capa rosa",
+  "autor": "",
+  "editora": "Casa Publicadora Brasileira",
+  "slug": "biblia-do-clube-de-aventureiros-nova-versao-internacional-capa-rosa",
+  "origem": "cpb",
+  "ref": "19799"
+ },
+ {
+  "foto": "025",
+  "tipo": "musica",
+  "titulo": "Hinário Adventista em Umbundo e Português — capa rosa",
+  "autor": "",
+  "editora": "União Angolana dos Adventistas do Sétimo Dia",
+  "slug": "hinario-adventista-em-umbundo-e-portugues-capa-rosa",
+  "origem": "foto",
+  "ref": "025"
+ },
+ {
+  "foto": "027",
+  "tipo": "musica",
+  "titulo": "Hinário Adventista em Umbundo e Português — capa castanha",
+  "autor": "",
+  "editora": "União Angolana dos Adventistas do Sétimo Dia",
+  "slug": "hinario-adventista-em-umbundo-e-portugues-capa-castanha",
+  "origem": "foto",
+  "ref": "027"
+ },
+ {
+  "foto": "028",
+  "tipo": "musica",
+  "titulo": "Hinário Adventista em Umbundo e Português — capa branca",
+  "autor": "",
+  "editora": "União Angolana dos Adventistas do Sétimo Dia",
+  "slug": "hinario-adventista-em-umbundo-e-portugues-capa-branca",
+  "origem": "foto",
+  "ref": "028"
+ },
+ {
+  "foto": "048",
+  "tipo": "desbravadores",
+  "titulo": "Lenço dos Jovens Adventistas — azul-marinho com debrum azul e amarelo",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-dos-jovens-adventistas-azul-marinho-com-debrum-azul-e-amarelo",
+  "origem": "obj",
+  "ref": "048"
+ },
+ {
+  "foto": "049",
+  "tipo": "desbravadores",
+  "titulo": "Lenço de liderança — bordô com faixas arco-íris e emblema do Clube de Desbravadores",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-de-lideranca-bordo-com-faixas-arco-iris-e-emblema-do-clube-de-desb",
+  "origem": "obj",
+  "ref": "049"
+ },
+ {
+  "foto": "051",
+  "tipo": "desbravadores",
+  "titulo": "Lenço do Clube dos Embaixadores — azul-claro",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-do-clube-dos-embaixadores-azul-claro",
+  "origem": "obj",
+  "ref": "051"
+ },
+ {
+  "foto": "052",
+  "tipo": "desbravadores",
+  "titulo": "Lenço do Clube de Desbravadores — amarelo com faixas arco-íris",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-do-clube-de-desbravadores-amarelo-com-faixas-arco-iris",
+  "origem": "obj",
+  "ref": "052"
+ },
+ {
+  "foto": "053",
+  "tipo": "desbravadores",
+  "titulo": "Lenço LJS (Líderes Juvenis) — amarelo com debrum vermelho",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-ljs-lideres-juvenis-amarelo-com-debrum-vermelho",
+  "origem": "obj",
+  "ref": "053"
+ },
+ {
+  "foto": "054",
+  "tipo": "desbravadores",
+  "titulo": "Lenço do Clube de Aventureiros — bordô",
+  "autor": "",
+  "editora": "",
+  "slug": "lenco-do-clube-de-aventureiros-bordo",
+  "origem": "obj",
+  "ref": "054"
+ },
+ {
+  "foto": "056",
+  "tipo": "desbravadores",
+  "titulo": "Emblema bordado do Clube de Desbravadores",
+  "autor": "",
+  "editora": "",
+  "slug": "emblema-bordado-do-clube-de-desbravadores",
+  "origem": "obj",
+  "ref": "056"
+ },
+ {
+  "foto": "057",
+  "tipo": "desbravadores",
+  "titulo": "Emblema bordado dos Jovens Adventistas",
+  "autor": "",
+  "editora": "",
+  "slug": "emblema-bordado-dos-jovens-adventistas",
+  "origem": "obj",
+  "ref": "057"
+ },
+ {
+  "foto": "075",
+  "tipo": "desbravadores",
+  "titulo": "Cordão de apito trançado — amarelo e verde",
+  "autor": "",
+  "editora": "",
+  "slug": "cordao-de-apito-trancado-amarelo-e-verde",
+  "origem": "obj",
+  "ref": "075"
+ },
+ {
+  "foto": "072",
+  "tipo": "vestuario",
+  "titulo": "T-shirt preta com o logótipo da Igreja Adventista do Sétimo Dia",
+  "autor": "",
+  "editora": "",
+  "slug": "t-shirt-preta-com-o-logotipo-da-igreja-adventista-do-setimo-dia",
+  "origem": "mockup",
+  "ref": "072"
+ },
+ {
+  "foto": "074",
+  "tipo": "vestuario",
+  "titulo": "T-shirt branca UmaVoz27 — Missão para Todos",
+  "autor": "",
+  "editora": "",
+  "slug": "t-shirt-branca-umavoz27-missao-para-todos",
+  "origem": "mockup",
+  "ref": "074"
+ },
+ {
+  "foto": "076",
+  "tipo": "vestuario",
+  "titulo": "Polo preta UmaVoz27 — Missão para Todos",
+  "autor": "",
+  "editora": "",
+  "slug": "polo-preta-umavoz27-missao-para-todos",
+  "origem": "mockup",
+  "ref": "076"
+ }
+]

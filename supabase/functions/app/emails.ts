@@ -288,7 +288,9 @@ function stepsBlock(doc: EmailDoc): string {
   // parta no telemóvel nem no Outlook, e em lista lê-se igual de bem nos dois.
   const rows = doc.steps
     .map((st) => {
-      const mark = st.done ? "✓" : st.current ? "•" : "○";
+      // A etapa actual com o círculo cheio, do tamanho do vazio das que faltam: o "•" que lá
+      // estava saía mais pequeno do que os outros sinais e parecia um ponto perdido.
+      const mark = st.done ? "✓" : st.current ? "●" : "○";
       const color = st.done ? TONES.success.fg : st.current ? TONES.brand.fg : INK_SOFT;
       const weight = st.current ? "600" : "400";
       return `<tr>
@@ -302,6 +304,19 @@ function stepsBlock(doc: EmailDoc): string {
   </td></tr>`;
 }
 
+/**
+ * O texto do botão principal. No telemóvel o botão parte-se em duas linhas, e partia nos piores
+ * sítios: a seta sozinha na segunda linha, ou "palavra-" / "passe →". As palavras com hífen não
+ * se partem, e a seta fica colada à última palavra.
+ */
+export function buttonLabelHtml(label: string): string {
+  const words = String(label || "").trim().split(/\s+/).filter(Boolean);
+  const last = words.pop() || "";
+  const nowrap = (html: string) => `<span style="white-space:nowrap">${html}</span>`;
+  const glue = (w: string) => (w.includes("-") ? nowrap(esc(w)) : esc(w));
+  return [...words.map(glue), nowrap(`${esc(last)}&nbsp;&rarr;`)].join(" ");
+}
+
 function buttons(brand: Brand, doc: EmailDoc): string {
   const primary = doc.cta && safeUrl(doc.cta.url) ? doc.cta : null;
   const secondary = doc.secondaryCta && safeUrl(doc.secondaryCta.url) ? doc.secondaryCta : null;
@@ -309,7 +324,7 @@ function buttons(brand: Brand, doc: EmailDoc): string {
   const main = primary
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto"><tr>
         <td align="center" style="background:${TEAL};border-radius:999px">
-          <a href="${esc(safeUrl(primary.url))}" style="display:inline-block;padding:15px 34px;font:600 15px/1.2 ${FONT};color:#ffffff;text-decoration:none;border-radius:999px">${esc(primary.label)} &rarr;</a>
+          <a href="${esc(safeUrl(primary.url))}" style="display:inline-block;padding:15px 28px;font:600 15px/1.3 ${FONT};color:#ffffff;text-decoration:none;border-radius:999px">${buttonLabelHtml(primary.label)}</a>
         </td>
       </tr></table>`
     : "";

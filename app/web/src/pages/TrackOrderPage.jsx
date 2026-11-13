@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PayLaterBox from '@/components/PayLaterBox';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Helmet } from 'react-helmet';
@@ -55,52 +55,67 @@ export default function TrackOrderPage() {
   const [error, setError] = useState('');
   const [cancelling, setCancelling] = useState('');
 
+  // O email com que a encomenda à vista foi encontrada. Os painéis da encomenda (pagar, trajeto,
+  // confirmar a recepção, cancelar) usam este e não o campo: mudar o campo depois de procurar não
+  // pode mandar o pedido de uma encomenda com o email de outra.
+  const [trackedEmail, setTrackedEmail] = useState('');
+  // Cada pesquisa tem um número: a resposta de uma pesquisa antiga (a automática, ao abrir a
+  // página) não substitui a de uma mais recente nem desliga o "a procurar" dela.
+  const searchSeq = useRef(0);
+
+  // O que vem da navegação (rodapé, "Acompanhar") preenche os campos só quando chega. Antes o
+  // efeito dependia do próprio `email` e repunha o valor de `location.state` a cada tecla: quem
+  // tinha escrito mal o email no rodapé não o conseguia corrigir aqui.
   useEffect(() => {
     if (location.state?.orderNumber) setOrderNumber(location.state.orderNumber);
     if (location.state?.email) setEmail(location.state.email);
-    else if (user?.email && !email) setEmail(user.email);
-  }, [location.state, user?.email, email]);
+  }, [location.state]);
+
+  // O email da conta só entra com o campo vazio (a sessão chega depois do primeiro desenho), e
+  // nunca por cima do que a pessoa escreveu ou apagou.
+  const accountEmailUsed = useRef(false);
+  useEffect(() => {
+    if (!user?.email || accountEmailUsed.current) return;
+    accountEmailUsed.current = true;
+    setEmail((prev) => prev || user.email);
+  }, [user?.email]);
+
+  const runTrack = async (num, em, { clear = false } = {}) => {
+    const seq = ++searchSeq.current;
+    setLoading(true);
+    setError('');
+    if (clear) setOrder(null);
+    try {
+      const data = await trackOrder(num, em);
+      if (seq !== searchSeq.current) return;
+      setOrder(data);
+      setTrackedEmail(em);
+    } catch (err) {
+      if (seq === searchSeq.current) setError(err.message);
+    } finally {
+      if (seq === searchSeq.current) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const num = (location.state?.orderNumber || linkedNumber).trim();
     const em = (location.state?.email || user?.email || '').trim();
-    if (!num || !em) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const data = await trackOrder(num, em);
-        if (!cancelled) setOrder(data);
-      } catch (err) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    if (!num || !em) return undefined;
+    runTrack(num, em);
+    // Ao sair da página, nenhuma resposta pendente escreve no estado.
+    return () => { searchSeq.current += 1; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleTrack = async (e) => {
+  const handleTrack = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setOrder(null);
-    try {
-      const data = await trackOrder(orderNumber.trim(), email.trim());
-      setOrder(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    runTrack(orderNumber.trim(), email.trim(), { clear: true });
   };
 
   // Depois de cancelar, a encomenda volta a ser lida (estado, histórico e o botão).
   const refresh = async () => {
     try {
-      setOrder(await trackOrder(order.order_number, email.trim()));
+      setOrder(await trackOrder(order.order_number, trackedEmail));
     } catch {
       // Fica o que estava; o aviso de sucesso já saiu.
     }
@@ -179,7 +194,7 @@ export default function TrackOrderPage() {
                 {order.payment_upfront && !['paid', 'refunded'].includes(order.payment_status) && order.status !== 'cancelled' && (
                   <PayLaterBox
                     orderNumber={order.order_number}
-                    email={email.trim()}
+                    email={trackedEmail}
                     total={order.total}
                     methodName={order.payment_method_name}
                     accountInfo={order.payment_account_info}
@@ -283,7 +298,7 @@ export default function TrackOrderPage() {
                   <LiveTracking
                     order={order}
                     orderNumber={order.order_number}
-                    email={email.trim()}
+                    email={trackedEmail}
                     onSaved={(saved) => setOrder((prev) => ({ ...prev, delivery_gps: { lat: saved.lat, lng: saved.lng, accuracy: saved.accuracy, updated_at: saved.updated_at } }))}
                   />
                 )}
@@ -347,8 +362,8 @@ export default function TrackOrderPage() {
                 {/* "Recebi tudo bem" é da entrega: a edição digital não tem. */}
                 {!isDigital && (
                 <DeliveryConfirmPanel
-                  orderNumber={orderNumber}
-                  email={email}
+                  orderNumber={order.order_number}
+                  email={trackedEmail}
                   order={order}
                   onConfirmed={(updated) => setOrder((prev) => ({ ...prev, ...updated }))}
                 />
@@ -364,7 +379,7 @@ export default function TrackOrderPage() {
                     </Button>
                   </div>
                 )}
-                <CancelOrderDialog orderNumber={cancelling} email={email.trim()} onClose={() => setCancelling('')} onCancelled={refresh} />
+                <CancelOrderDialog orderNumber={cancelling} email={trackedEmail} onClose={() => setCancelling('')} onCancelled={refresh} />
 
                 <p className="text-center text-sm text-muted-foreground">
                   Dúvidas? <Link to="/contact" className="text-primary hover:underline">Contacte-nos</Link>

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import pb from '@/lib/dataClient';
 import { canAccessAdmin, hasPermission, getUserPermissions } from '@/lib/permissions';
-import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { escapeFilterValue } from '@/lib/filterValue';
 import { IS_PASSWORD_RECOVERY_REDIRECT, supabase } from '@/lib/supabaseClient';
 import { normalizeLoginEmail, parsePbAuthError } from '@/lib/pbAuth';
 import { requestSessionNotice, requestWelcomeEmail, safeInternalPath } from '@/lib/authSession';
@@ -123,8 +123,15 @@ export const AuthProvider = ({ children }) => {
       // Termina também a ligação ao Google Workspace, se existir. O Firebase só serve as
       // ferramentas Workspace do painel: é carregado aqui, e não no arranque da loja, para
       // não pôr 154 KB gzip no caminho crítico de quem só vem comprar um livro.
-      const tinhaGoogle = !!sessionStorage.getItem('google_access_token');
-      sessionStorage.removeItem('google_access_token');
+      // Com o armazenamento bloqueado, o sessionStorage lança: a sessão já saiu, e "Sair" não
+      // pode acabar num erro por causa disso.
+      let tinhaGoogle = false;
+      try {
+        tinhaGoogle = !!sessionStorage.getItem('google_access_token');
+        sessionStorage.removeItem('google_access_token');
+      } catch {
+        // sem sessionStorage: não havia token do Google guardado
+      }
       if (tinhaGoogle) {
         await import('@/lib/firebaseClient')
           .then((m) => m.logoutFirebase())

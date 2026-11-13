@@ -1,6 +1,60 @@
 # Passagem de trabalho — Livraria Adventista
 
-Estado em 2026-11-08. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
+
+## Análise geral e melhorias (2026-11-10, ramo `claude/clever-carson-ibv73h`)
+
+- **Pedido do dono:** "fazer uma análise em todo o sistema e melhorar onde for necessário".
+  Respostas às perguntas: incluir a migração dos privilégios e abrir PR. Achados e correcções em
+  [audits/livraria-premium-360.md](audits/livraria-premium-360.md), secção **J** (A360-34 a 41).
+- **Antes de mexer**, tudo verde: lint, 1 613 testes, build, `npm audit`, segredos, Playwright
+  18/18, os 12 grupos de cenários PGlite. Depois: 1 631 testes, Playwright 19 (+1 só no
+  computador), cenários com +8 verificações, `deno check` verde.
+- **O mais importante:** um gestor com `manage_users` conseguia entrar na conta de um cliente
+  sem conta criando-a ele próprio (A360-34). Agora só um administrador escolhe a palavra-passe.
+- **Base de dados:** `20261110120000_privilegios_minimos` e
+  `20261110121000_descricoes_sem_avaliacoes`, **por aplicar** (vão no merge, com a Edge
+  Function). A segunda tira as avaliações de clientes da CPB (com nomes) de 26 descrições dos
+  produtos novos, que estão ocultos.
+- **Site:** sessão (perfil perdido numa falha de rede, token caducado em 8 sítios), rastreio,
+  carrinho, sucesso, portes; loja no telemóvel com livros no 1.º ecrã; DOMPurify fora do arranque
+  (bloco principal −12 KB comprimidos); "reduzir movimento" no framer-motion.
+- **Fica para o dono** (sem mudança): os itens 👤 da auditoria (email, gateway, MFA, contactos,
+  termos, facturação) e a decisão sobre `/confirm-delivery` numa encomenda a pagar na entrega.
+- **Não verificado:** o painel com uma sessão de equipa real e a loja publicada (a rede desta
+  sessão não chega ao domínio); a auditoria visual corre no PR.
+- **Continuação ("continua"), mesmo ramo:** herói com variantes de 960/1280 px e sem fades no
+  primeiro desenho; fontes servidas pela loja; capas na mesma origem; dados da ficha pedidos no
+  arranque. LCP da inicial no telemóvel 5,17 → 4,21 s (densidade 1). Medições e o que falta em
+  audits/livraria-premium-360.md, secção J. Ao juntar ou trocar um slide em
+  `public/images/site`, correr `python3 scripts/imagens/variantes.py`: sem isso o slide novo
+  funciona, mas sem `srcset` (o telemóvel desce os 1920 px).
+- **2.ª continuação: saúde do site (A360-16).** Erros de JavaScript e Core Web Vitals medidos em
+  quem visita (`lib/telemetry.js` → `POST /telemetria` → `private.site_events`), vistos em
+  Sistema → Saúde do site. Migração `20261111090000_saude_do_site`, **por aplicar** (vai no merge).
+  Política de privacidade actualizada. Com uma ou duas semanas de dados, o p75 do LCP e do INP no
+  telemóvel diz o próximo passo do A360-28.
+
+## Auditoria Premium 360° (2026-11-09, ramo `claude/auditoria-premium-360`)
+
+- **Pedido do dono:** auditoria 360° com critérios verificáveis (WCAG 2.2 AA, OWASP ASVS 5.0,
+  Core Web Vitals, Baymard) e "melhorar onde puder". Relatório em
+  [audits/livraria-premium-360.md](audits/livraria-premium-360.md); resumo em
+  [AUDITORIA.md](AUDITORIA.md), secção **9.22**.
+- **No PR:** só frontend e scripts de build (sem migrações nem Edge Function). O pós-build passa
+  a escrever `shop.html`, `faq.html`… (10 páginas fixas com o seu canonical); JSON-LD na ficha e
+  no `index.html`; salto para o conteúdo; carrossel com Parar/Retomar e "reduzir movimento".
+- **Fica por fazer, e é do dono:** email (A360-01/02), gateway (A360-03), reconciliação das
+  encomendas entregues por pagar (A360-04), MFA (A360-05), contactos da loja (A360-07).
+- **Auditoria visual:** `.github/workflows/auditoria-visual.yml` (Playwright + axe-core). Num PR
+  constrói e serve o site do PR; à mão (Run workflow) audita a loja publicada. Resultados no ramo
+  `auditoria-visual` (substituído a cada execução). Primeira medição: LCP do telemóvel 4,3–6,1 s
+  em todas as páginas (A360-28). 1.º passo no PR: carrinho (agora `ShoppingCart.jsx` é um
+  invólucro e o checkout está em `ShoppingCartPanel.jsx`), assistente e pagamentos do rodapé só
+  ao primeiro gesto ou 6 s depois do load (`hooks/useAfterLoad.js`) — LCP médio −8 a −9 % (duas medições). Seguinte:
+  `srcset` no herói, a ficha do livro, o `vendor-motion` e os tipos de letra.
+- **Não verificado nesta passagem:** medições de campo (INP), o painel com sessão de equipa e o
+  pagamento em sandbox.
 
 ## Trajeto da encomenda com GPS dos dois lados (2026-11-08, ramo `claude/vigilant-edison-lp6gpg`)
 

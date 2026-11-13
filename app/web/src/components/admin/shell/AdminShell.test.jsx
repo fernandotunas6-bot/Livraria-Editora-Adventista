@@ -76,7 +76,7 @@ describe('AdminShell', () => {
     const el = await mount(shell({ layout: 'sidebar', active: 'books' }));
     const side = el.querySelector('nav[aria-label="Secções do painel"]');
     expect(side).not.toBeNull();
-    expect(side.querySelectorAll('button[data-sidebar="menu-button"]').length).toBe(26);
+    expect(side.querySelectorAll('button[data-sidebar="menu-button"]').length).toBe(27);
     expect(side.querySelector('[aria-current="page"]').textContent).toContain('Produtos');
     expect(side.textContent).toContain('4');
     expect(el.querySelector('nav[aria-label="Grupos do painel"]')).toBeNull();

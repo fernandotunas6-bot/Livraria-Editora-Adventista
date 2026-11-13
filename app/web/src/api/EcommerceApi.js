@@ -1,7 +1,7 @@
-import pb from '@/lib/dataClient';
+import pb, { authHeaders } from '@/lib/dataClient';
 import { APP_API_URL, mediaUrl, supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
-import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import { escapeFilterValue } from '@/lib/filterValue';
 import { getSearchRelevance } from '@/lib/searchUtils';
 import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
@@ -15,7 +15,11 @@ const VISIBLE = 'active = true';
 const CURRENCY = { code: 'AOA', symbol: 'Kz' };
 
 function resolveBookCover(book) {
-  if (book.cover) return book.cover;
+  // As capas foram gravadas com o endereço completo do domínio antigo
+  // (`https://livrariaadventista.com/images/capas/…`). Na loja `.ao`, cada capa abria uma segunda
+  // ligação (DNS e TLS) a outro domínio — no telemóvel, centenas de milissegundos antes da capa
+  // da ficha aparecer. São ficheiros do próprio site: ficam como caminho relativo.
+  if (book.cover) return toSiteRelativeUrl(book.cover);
   if (book.cover_image) {
     try {
       return pb.files.getURL(book, book.cover_image);
@@ -296,7 +300,32 @@ export function variantStock(book, version) {
   return Number.isFinite(own) ? Math.max(0, Math.min(Math.floor(own), total)) : total;
 }
 
+// A ficha aberta directamente (de um link, da Google) pedia o livro só depois de o código da
+// página chegar: código → dados → capa, em série. O `main.jsx` pede os dados logo no arranque
+// (`prefetchProduct`), em paralelo com o código, e a página aproveita esse pedido.
+const PREFETCH_TTL_MS = 30_000;
+const productPrefetch = new Map(); // id → { promise, at }
+
+/** Começa já a leitura do livro; o próximo `getProduct(id)` (dentro de 30 s) aproveita-a. */
+export function prefetchProduct(id) {
+  if (!id || productPrefetch.has(id)) return;
+  const promise = loadProduct(id);
+  productPrefetch.set(id, { promise, at: Date.now() });
+  // Uma falha não fica guardada (e não aparece como erro por tratar na consola).
+  promise.catch(() => productPrefetch.delete(id));
+}
+
 export async function getProduct(id) {
+  const pre = productPrefetch.get(id);
+  if (pre) {
+    productPrefetch.delete(id); // uma vez só: a seguinte (voltar à ficha) lê dados frescos
+    // Se a leitura antecipada falhar, tenta-se outra vez, como se não tivesse havido.
+    if (Date.now() - pre.at < PREFETCH_TTL_MS) return pre.promise.catch(() => loadProduct(id));
+  }
+  return loadProduct(id);
+}
+
+async function loadProduct(id) {
   const book = await pb.collection('stock_books').getOne(id);
   const collectionsMap = await getCollectionsMap();
   const product = bookToProduct(book, collectionsMap);
@@ -416,7 +445,7 @@ export async function initializeCheckout({
   deliveryProvince, deliveryProvinceId, deliveryMunicipality, deliveryMunicipalityId,
   deliveryLocality, deliveryLocalityId, deliveryStreet, deliveryReference, deliveryAddressFull,
   deliveryRelativeName, deliveryRelativePhone, checkoutSignature,
-  deliveryGpsLat, deliveryGpsLng,
+  deliveryGpsLat, deliveryGpsLng, deliveryGpsAccuracy,
   idempotencyKey,
   colporteurCode,
 }) {
@@ -447,6 +476,10 @@ export async function initializeCheckout({
       // O carrinho já mandava as coordenadas, mas esta função só reenviava os campos que
       // nomeia, e estes não estavam na lista: nenhuma encomenda chegou a ter GPS.
       deliveryGpsLat, deliveryGpsLng,
+      // A precisão teve o mesmo destino das coordenadas: o carrinho mandava-a, o servidor
+      // guardava-a (`delivery_gps_accuracy`), e ela ficava aqui. Quem entrega via o ponto sem
+      // saber se era de ±10 m ou de ±2 km.
+      ...(Number.isFinite(deliveryGpsAccuracy) ? { deliveryGpsAccuracy } : {}),
       // A mesma em cada repetição da mesma compra: o servidor devolve a encomenda já criada
       // em vez de fazer outra (ver lib/checkoutIdempotency.js).
       ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -455,9 +488,23 @@ export async function initializeCheckout({
     }),
   });
 
-  const data = await res.json();
+  // Um 502/504 do gateway traz HTML ou nada. O `res.json()` lançava "Unexpected token '<'", e o
+  // cliente não sabia que a encomenda pode já ter ficado gravada — e repetia de outra página,
+  // com outra chave de idempotência.
+  const data = await res.json().catch(() => null);
+  if (!data) {
+    throw new Error(res.ok
+      ? 'A resposta do servidor chegou incompleta. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.'
+      : 'A ligação ao servidor falhou. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.');
+  }
   if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
-  return { url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type, email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent };
+  return {
+    url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type,
+    // O carrinho lê o estado do pagamento para a nota de encomenda (lib/receipt.js), mas ele não
+    // saía daqui: ficava sempre "pending", mesmo com a referência indicada no checkout.
+    payment_status: data.payment_status,
+    email_queued: data.email_queued, whatsapp_sent: data.whatsapp_sent,
+  };
 }
 
 export async function subscribeNewsletter(email) {
@@ -467,7 +514,7 @@ export async function subscribeNewsletter(email) {
     body: JSON.stringify({ email }),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Erro na subscrição');
   return data;
 }
@@ -496,15 +543,16 @@ export function trackBookView(bookId) {
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
   } catch { /* sem sessionStorage: conta na mesma */ }
-  fetch(`${APP_API_URL}/catalog/view`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-    },
-    body: JSON.stringify({ book_id: bookId }),
-    keepalive: true,
-  }).catch(() => {});
+  // O token válido da sessão (`authHeaders` renova-o se for preciso): com o guardado, caducado
+  // depois de uma hora parado, a visita contava como de um visitante e não entrava no histórico.
+  authHeaders()
+    .then((auth) => fetch(`${APP_API_URL}/catalog/view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      body: JSON.stringify({ book_id: bookId }),
+      keepalive: true,
+    }))
+    .catch(() => {});
 }
 
 /** Lê livros visíveis pelos ids, pela ordem pedida. */
@@ -526,10 +574,7 @@ async function productsByIds(ids) {
 export async function getRecommendations() {
   const res = await fetch(`${APP_API_URL}/recommendations`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ viewed: getRecentlyViewed().map((e) => e.id).filter(Boolean).slice(0, 30) }),
   });
   const data = await res.json().catch(() => ({}));

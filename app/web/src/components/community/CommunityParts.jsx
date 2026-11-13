@@ -33,9 +33,9 @@ export function CommunityHero({ stats, onWrite }) {
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
           {stats && (
             <dl className="flex gap-6 text-sm sm:gap-8">
-              <div><dt className="text-white/70">Leitores</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.members || 0}</dd></div>
-              <div><dt className="text-white/70">Publicações</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.posts_total || 0}</dd></div>
-              <div><dt className="text-white/70">Esta semana</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces', serif" }}>{stats.posts_week || 0}</dd></div>
+              <div><dt className="text-white/70">Leitores</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>{stats.members || 0}</dd></div>
+              <div><dt className="text-white/70">Publicações</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>{stats.posts_total || 0}</dd></div>
+              <div><dt className="text-white/70">Esta semana</dt><dd className="text-2xl font-semibold tabular-nums" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>{stats.posts_week || 0}</dd></div>
             </dl>
           )}
           <Button type="button" onClick={onWrite} className="h-11 rounded-full bg-[#e2c27d] px-6 font-semibold text-editorial-marinho hover:bg-[#ecd39b]">

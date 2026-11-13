@@ -6,7 +6,7 @@
  * - Criar contas e gerar links de acesso: Edge Function "app" (precisam da API de administração do Auth).
  * Enquanto a migração das RPC não estiver aplicada, as chamadas caem para a Edge Function.
  */
-import pb from '@/lib/dataClient';
+import { authHeaders } from '@/lib/dataClient';
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
 
 const EDGE_OUTDATED = 'A Edge Function publicada ainda não tem esta funcionalidade. Publique-a com: npx supabase functions deploy app --project-ref bggqkjjqbjhbjsckzopj --no-verify-jwt';
@@ -18,10 +18,7 @@ async function call(method, path, { query, body } = {}) {
   });
   const res = await fetch(url, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${pb.authStore.token}`,
-    },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));

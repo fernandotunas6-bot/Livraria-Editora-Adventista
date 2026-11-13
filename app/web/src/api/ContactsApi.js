@@ -1,12 +1,9 @@
-import pb from '@/lib/dataClient';
-import { escapeFilterValue } from '@/lib/sanitizeHtml';
+import pb, { authHeaders } from '@/lib/dataClient';
+import { escapeFilterValue } from '@/lib/filterValue';
 import { APP_API_URL } from '@/lib/supabaseClient';
 
-function getAuthHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
-  };
+async function getAuthHeaders() {
+  return { 'Content-Type': 'application/json', ...(await authHeaders()) };
 }
 
 async function apiPost(path, body) {
@@ -15,7 +12,7 @@ async function apiPost(path, body) {
   }
   const res = await fetch(`${APP_API_URL}${path.replace(/^\/api\/app/, '')}`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -28,7 +25,7 @@ async function apiGet(path) {
     throw new Error('Sessão expirada. Inicie sessão com email e palavra-passe.');
   }
   const res = await fetch(`${APP_API_URL}${path.replace(/^\/api\/app/, '')}`, {
-    headers: { Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : '' },
+    headers: await authHeaders(),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || `Erro ${res.status}`);

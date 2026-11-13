@@ -30,7 +30,7 @@ const AboutPage = () => {
     <>
       <Helmet>
         <title>{pageTitle('Sobre Nós')}</title>
-        <meta name="description" content={`Conheça o ${BRAND.name} — a nossa missão de difundir literatura cristã e educacional.`} />
+        <meta name="description" content={`Conheça a ${BRAND.name} — a nossa missão de difundir literatura cristã e educacional.`} />
       </Helmet>
 
       <Header onCartOpen={() => setIsCartOpen(true)} />

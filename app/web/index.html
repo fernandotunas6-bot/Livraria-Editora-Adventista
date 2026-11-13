@@ -10,12 +10,10 @@
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="apple-mobile-web-app-title" content="Livraria Adventista" />
 		<link rel="apple-touch-icon" href="/icons/icon-192.png" />
-		<!-- Fontes: pedidas aqui, e não com @import dentro do CSS. Com o @import o browser só as
-		     descobria depois de descarregar e ler o CSS da loja, e fazia mais dois pedidos em série
-		     (0,2–0,4 s cada a partir de Angola). O preconnect abre já as ligações. -->
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" />
+		<!-- Os tipos de letra (Inter e Fraunces) são servidos pela própria loja (@fontsource-variable,
+		     importados no main.jsx). Vinham da Google: um CSS que bloqueava o primeiro desenho e duas
+		     origens a mais (DNS e TLS de cada uma), o que no telemóvel, a partir de Angola, pesava
+		     centenas de milissegundos antes de a página aparecer. -->
 		<meta name="description" content="Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio." />
 		<title>Livraria Adventista</title>
 		<link rel="canonical" href="https://livrariaadventista.ao/" />
@@ -37,6 +35,12 @@
 		<meta name="twitter:title" content="Livraria Adventista" />
 		<meta name="twitter:description" content="Literatura cristã, educação e inspiração. Compre online com entrega em todo o país." />
 		<meta name="twitter:image" content="https://livrariaadventista.ao/og-image.png" />
+
+		<!-- Quem é a loja, para os motores de busca (schema.org: o nome do site e o logótipo nos
+		     resultados). É um bloco de dados e não um script: o navegador não o executa, e o CSP
+		     (`script-src` sem 'unsafe-inline') não o bloqueia. A ficha de cada livro acrescenta o
+		     seu (lib/structuredData.js). Numa pré-visualização o pós-build troca os endereços. -->
+		<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://livrariaadventista.ao/#organizacao","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","logo":"https://livrariaadventista.ao/icons/icon-512.png"},{"@type":"WebSite","@id":"https://livrariaadventista.ao/#site","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","inLanguage":"pt-AO","publisher":{"@id":"https://livrariaadventista.ao/#organizacao"}}]}</script>
 	</head>
 	<body>
 		<div id="root"></div>

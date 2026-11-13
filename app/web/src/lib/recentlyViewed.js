@@ -52,9 +52,22 @@ function escrever(storage, lista) {
   }
 }
 
+/**
+ * O `localStorage` do browser, ou `null`. Com os cookies e os dados do site bloqueados, só ler
+ * `window.localStorage` lança `SecurityError` (o `typeof` não o evita): fora de um `try`, a
+ * ficha de cada livro mostrava "Erro ao carregar o livro" e o resto da loja seguia normal.
+ */
+function defaultStorage() {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Os livros vistos, do mais recente para o mais antigo. */
 export function getRecentlyViewed({ storage } = {}) {
-  const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  const store = storage ?? defaultStorage();
   return ler(store);
 }
 
@@ -65,7 +78,7 @@ export function getRecentlyViewed({ storage } = {}) {
  * vezes não é um histórico, é ruído.
  */
 export function addRecentlyViewed(product, { storage } = {}) {
-  const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  const store = storage ?? defaultStorage();
   const entrada = toRecentEntry(product);
   if (!entrada) return ler(store);
   const lista = [entrada, ...ler(store).filter((e) => e.id !== entrada.id)].slice(0, MAX_RECENT);
@@ -75,7 +88,7 @@ export function addRecentlyViewed(product, { storage } = {}) {
 
 /** Esquece tudo. */
 export function clearRecentlyViewed({ storage } = {}) {
-  const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  const store = storage ?? defaultStorage();
   try {
     store?.removeItem(STORAGE_KEY);
   } catch {

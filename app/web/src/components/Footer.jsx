@@ -13,6 +13,7 @@ import { safeLinkUrl } from '@/lib/safeLink';
 import SafeLink from '@/components/SafeLink.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAfterLoad } from '@/hooks/useAfterLoad';
 import FooterCompact from '@/components/FooterCompact.jsx';
 
 // Só caminhos que existem no App.jsx. O separador do perfil vai no URL (/profile?tab=…),
@@ -139,10 +140,14 @@ const Footer = () => {
     }
   }, [showStores]);
 
-  // Os métodos de pagamento que o admin tem activos — os mesmos que o checkout aceita.
+  // Os métodos de pagamento que o admin tem activos — os mesmos que o checkout aceita. Pedidos
+  // ao primeiro gesto ou uns segundos depois do load: o rodapé está no fim, e este pedido
+  // competia com a página.
+  const afterLoad = useAfterLoad();
   useEffect(() => {
+    if (!afterLoad) return;
     getPaymentMethods().then((d) => setPayments(d?.methods || [])).catch(() => {});
-  }, []);
+  }, [afterLoad]);
 
   // Rastreio rápido: a página /track recebe o número e o email já preenchidos.
   const handleTrackSubmit = (e) => {
