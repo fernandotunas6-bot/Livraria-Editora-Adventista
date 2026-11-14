@@ -2,6 +2,7 @@ import { buildWhatsAppUrl } from '@/lib/whatsapp';
 import { orderItemTitle } from '@/lib/productTypes';
 import { fetchMessagingStatus, sendReceiptViaWhatsAppApi, isWhatsAppApiActive } from '@/lib/messaging';
 import { orderDeliveryAddress, orderPaymentLabel, orderPickupStore } from '@/lib/orderUtils';
+import { estiloBaseImpressao } from '@/lib/fontes';
 
 const SITE_NAME = 'Livraria Adventista';
 
@@ -144,7 +145,8 @@ export function buildReceiptHtml(order, brand = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>${docTitle} ${e(order.orderNumber || '')}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 24px; color: #1a1a1a; }
+    ${estiloBaseImpressao()}
+    body { max-width: 640px; margin: 32px auto; padding: 24px; color: #1a1a1a; }
     header { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #0ea5c9; padding-bottom: 14px; margin-bottom: 18px; }
     .logo { height: 52px; width: auto; }
     h1 { color: #0ea5c9; font-size: 1.4rem; margin: 0; }

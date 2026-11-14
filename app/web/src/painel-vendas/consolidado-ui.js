@@ -13,6 +13,7 @@ import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, m
 import { buildXlsx, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
+import { estiloBaseImpressao } from '../lib/fontes.js';
 
 export function mountConsolidado(root, api) {
   const $ = (id) => root.getElementById(id);
@@ -983,7 +984,8 @@ export function mountConsolidado(root, api) {
     win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8">
 <title>Relatório conjunto das livrarias — ${c.ano}</title>
 <style>
-  body{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#111;margin:24px}
+  ${estiloBaseImpressao()}
+  body{color:#111;margin:24px}
   h1{font-size:22px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px} p{margin:2px 0;color:#555;font-size:12px}
   img{width:100%;margin:10px 0;border-radius:8px;break-inside:avoid}
   table{width:100%;border-collapse:collapse;font-size:10px;margin-top:6px}

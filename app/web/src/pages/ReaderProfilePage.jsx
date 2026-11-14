@@ -113,7 +113,7 @@ export default function ReaderProfilePage() {
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {stats.map(([label, value]) => (
                       <div key={label} className="rounded-xl bg-editorial-tela p-3 text-center">
-                        <dd className="text-2xl font-semibold tabular-nums text-editorial-tinta" style={{ fontFamily: "'Fraunces Variable', 'Fraunces', serif" }}>{value || 0}</dd>
+                        <dd className="text-2xl font-semibold tabular-nums text-editorial-tinta font-serif">{value || 0}</dd>
                         <dt className="text-xs text-editorial-tinta-suave">{label}</dt>
                       </div>
                     ))}

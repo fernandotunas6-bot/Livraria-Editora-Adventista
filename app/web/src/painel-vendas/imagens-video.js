@@ -12,6 +12,7 @@
  * CORS «sujava» o canvas e a gravação falhava. Uma imagem que não carregue não aparece — o livro
  * passa a ter uma capa tipográfica desenhada aqui.
  */
+import { fonteCanvas } from '../lib/fontes.js';
 
 // ---------- Utilitários ----------
 export function rng(seed) {
@@ -410,10 +411,10 @@ export function capaTipografica(titulo) {
   g.strokeRect(16, 16, 268, 418);
   g.fillStyle = '#FFF4DA';
   g.textAlign = 'center';
-  g.font = '700 30px Lora, Georgia, serif';
+  g.font = fonteCanvas(700, 30, { titulo: true });
   const linhas = partir(g, k || 'Livro', 230, 5);
   linhas.forEach((l, i) => g.fillText(l, 150, 170 + i * 38 - (linhas.length - 1) * 19));
-  g.font = '700 12px Manrope, Arial, sans-serif';
+  g.font = fonteCanvas(700, 12);
   g.fillStyle = 'rgba(255,244,218,0.8)';
   g.fillText('LIVRARIA ADVENTISTA', 150, 410);
   capasTipograficas.set(k, c);

@@ -18,6 +18,7 @@
 import { MESES, MESES_CURTOS } from './modelo.js';
 import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharPaisagem, veu } from './imagens-video.js';
 import { destaqueDe } from './destaques.js';
+import { carregarFontes, fonteCanvas } from '../lib/fontes.js';
 
 // ---------- Ritmos e planos ----------
 
@@ -139,7 +140,7 @@ const COL = {
   teal: '#22A6A9', amber: '#F2B705', line: 'rgba(255,255,255,.12)',
 };
 // As cores das lojas vêm de consolidado.js (CORES_LOJAS), já atribuídas a cada loja em `c.lojas[].cor`.
-const FONT = (w, px) => `${w} ${px}px Manrope, "Segoe UI", Arial, sans-serif`;
+const FONT = (w, px) => fonteCanvas(w, px);
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 const ease = (t) => 1 - Math.pow(1 - clamp01(t), 3);
 // A animação de cada quadro dura no máximo 1,4 s (ou 30% de um quadro curto); o resto é para ler.
@@ -1070,8 +1071,10 @@ function capasDe(...ambitos) {
  * pode esperar pela rede a meio). Uma imagem que não carregue fica de fora.
  */
 async function preparar(base, plano, { capas = [], fotos = [], fundo = 'natureza' } = {}) {
-  const [logo, imgs, fts] = await Promise.all([
+  const [logo, , imgs, fts] = await Promise.all([
     carregarImagem(base.logoSrc),
+    // A Inter e a Fraunces têm de estar prontas antes do primeiro quadro: o canvas não espera.
+    carregarFontes(),
     Promise.all(capas.map((u) => carregarImagem(u).then((img) => [u, img]))),
     fundo === 'biblioteca' ? Promise.all(fotos.slice(0, 8).map((u) => carregarImagem(u))) : Promise.resolve([]),
   ]);

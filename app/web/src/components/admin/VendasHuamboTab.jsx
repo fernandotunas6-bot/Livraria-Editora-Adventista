@@ -10,14 +10,7 @@ import markup from '@/painel-vendas/painel.html?raw';
 // que o painel exporta. Antes era o do Ministério de Publicações.
 import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
 
-const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:wght@600;700&display=swap';
 const STORE_KEY = 'painel-vendas:loja';
-
-// Dentro de um Shadow DOM as fontes só funcionam se forem carregadas no documento.
-function loadFonts() {
-  if (document.querySelector(`link[href="${FONTS_HREF}"]`)) return;
-  document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: FONTS_HREF }));
-}
 
 const isHuambo = (s) => /huambo/i.test(`${s?.province || ''} ${s?.name || ''}`);
 
@@ -69,7 +62,6 @@ const VendasHuamboTab = () => {
   const storeId = store?.id || '';
   useEffect(() => {
     if (!stores) return undefined;
-    loadFonts();
     const host = hostRef.current;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl)}`;

@@ -8,14 +8,8 @@ import cssConjunto from '@/painel-vendas/consolidado.css?inline';
 import markup from '@/painel-vendas/consolidado.html?raw';
 import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
 
-const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:wght@600;700&display=swap';
 // A mesma chave do separador Vendas por loja: abrir uma loja daqui deixa-a escolhida lá.
 const STORE_KEY = 'painel-vendas:loja';
-
-function loadFonts() {
-  if (document.querySelector(`link[href="${FONTS_HREF}"]`)) return;
-  document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: FONTS_HREF }));
-}
 
 /**
  * Separador «Todas as livrarias» do Painel Admin: o relatório conjunto, com o desenho do painel de
@@ -41,7 +35,6 @@ const RelatoriosLojasTab = ({ onOpenStore }) => {
 
   useEffect(() => {
     if (!multi) return undefined;
-    loadFonts();
     const host = hostRef.current;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${cssPainel}\n${cssConjunto}</style>${markup.replace('__LOGO__', logoUrl)}`;
