@@ -125,6 +125,12 @@
         <div class="legend"><span><i style="background:var(--c25)"></i><span class="lgA">—</span></span><span><i style="background:var(--c26)"></i><span class="lgB">—</span></span><span><i class="hatch"></i>Em curso</span><span><i class="ghost"></i>Estimativa</span><span id="lg-meta" hidden><i class="meta"></i>Meta mensal</span></div>
       </div>
       <div class="box" id="chart-mensal"><div class="tip"></div></div>
+      <!-- O Mapa do ano (fillMapa em painel.js): os 12 meses numa grelha de cores, no espaço que o
+           Mês em destaque, mais alto, deixava vazio por baixo do gráfico. -->
+      <div class="mapa" id="mapa-ano">
+        <div class="mapa-h"><h3>Mapa do ano</h3><span class="note">Quanto mais forte a cor, mais se vendeu. Clique num mês para o pôr em destaque.</span></div>
+        <div class="mapa-g" id="mapa-g" role="group" aria-label="Mapa do ano: as vendas, o crescimento e o peso de cada mês"></div>
+      </div>
     </div>
 
     <div class="card spot" id="apresentacao">
@@ -346,6 +352,7 @@
     <button type="button" id="pr-next" aria-label="Diapositivo seguinte">▶</button>
     <button type="button" id="pr-play">Reproduzir</button>
     <label for="pr-speed">Ritmo<select id="pr-speed"><option value="6000">6 s</option><option value="8000" selected>8 s</option><option value="12000">12 s</option></select></label>
+    <button type="button" id="pr-som" aria-pressed="true" title="Ligar ou desligar o som (M)">Som</button>
     <div class="grow" aria-hidden="true"><span id="pr-prog"></span></div>
     <button type="button" id="pr-fs">Ecrã inteiro</button>
     <button type="button" id="pr-close">Sair (Esc)</button>

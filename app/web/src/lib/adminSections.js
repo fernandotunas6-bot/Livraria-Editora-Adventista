@@ -235,6 +235,7 @@ export const ADMIN_SECTIONS = {
       { id: 'candidaturas', label: 'Candidaturas', icon: Inbox, keywords: 'pedidos novos aprovar recusar', description: 'Quem se candidatou: aprovar, recusar ou pedir mais dados.' },
       { id: 'colportores', label: 'Colportores', icon: Users, keywords: 'fichas codigo cpt', description: 'As fichas dos colportores: código, categoria, igreja, zona e estado.' },
       { id: 'relatorios', label: 'Relatórios', icon: ClipboardList, keywords: 'semanais validar devolver', description: 'Relatórios semanais: validar ou devolver, ver quem falta e lançar por um colportor.' },
+      { id: 'interessados', label: 'Interessados', icon: UsersRound, keywords: 'pastores contactos estudos biblicos visita oracao encaminhar whatsapp distrito', description: 'As pessoas interessadas que os colportores escrevem nos relatórios, por distrito, para enviar ao pastor por WhatsApp ou em papel.' },
       { id: 'entregas', label: 'Entregas', icon: Bike, keywords: 'domicilio ofertas preparar levantar loja', description: 'As entregas ao domicílio com colportores: o que preparar na loja, as ofertas à espera e quanto cada um fez e ganhou.' },
       { id: 'guias', label: 'Guias e stock', icon: Truck, keywords: 'consignacao entrega devolucao compra', description: 'Guias de entrega, devolução e compra, com o stock da loja e o do colportor.' },
       { id: 'contas', label: 'Contas', icon: Scale, keywords: 'conta corrente saldo extracto acertos pagamentos', description: 'O saldo de cada colportor, o extracto, os pagamentos e as correcções.' },

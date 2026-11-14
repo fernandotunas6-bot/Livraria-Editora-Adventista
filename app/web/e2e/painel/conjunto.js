@@ -5,6 +5,8 @@ import { mountConsolidado } from '@/painel-vendas/consolidado-ui.js';
 import cssPainel from '@/painel-vendas/painel.css?inline';
 import cssConjunto from '@/painel-vendas/consolidado.css?inline';
 import markup from '@/painel-vendas/consolidado.html?raw';
+import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
+import logoClaroUrl from '@/painel-vendas/logo-livraria-adventista-claro.png';
 
 const vazio = () => Array(12).fill('');
 const ano = (a, meses, extra = {}) => ({ ano: a, meses, observacoes: vazio(), mes_em_curso: null, meta_anual: null, criterio: 'media', fonte: 'Teste', origem: 'importacao', actualizado: `2026-11-01T10:00:00.${a}00+00:00`, ...extra });
@@ -60,5 +62,5 @@ window.addEventListener('error', (e) => window.__erros.push(String(e.message)));
 window.addEventListener('unhandledrejection', (e) => window.__erros.push(String((e.reason && e.reason.message) || e.reason)));
 
 const root = document.getElementById('host').attachShadow({ mode: 'open' });
-root.innerHTML = `<style>${cssPainel}\n${cssConjunto}</style>${markup.replace('__LOGO__', '').replace('__LOGO_CLARO__', '')}`;
+root.innerHTML = `<style>${cssPainel}\n${cssConjunto}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
 mountConsolidado(root, api);

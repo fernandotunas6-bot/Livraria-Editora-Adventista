@@ -145,6 +145,21 @@ O fluxo é: rascunho → **enviado** → a equipa **valida** ou **devolve** com 
 - A percentagem usada é a que vigorava no **último dia da semana** do relatório.
 - O separador mostra quem não enviou relatório nas duas últimas semanas fechadas.
 
+### Interessados para os pastores (vista "Interessados")
+
+Os colportores escrevem no relatório semanal as pessoas que pediram estudos bíblicos, visita ou oração (nome, telefone, bairro e pedido). A vista **Interessados** junta-as por **distrito**, para a equipa as encaminhar ao pastor:
+
+- **O distrito** é o da igreja do colportor. O **pastor** é o titular em funções do distrito (Registo da Igreja → Distritos); sem titular, um associado.
+- **Período:** as últimas 4 semanas (por omissão), um mês à escolha (as semanas com a quinta-feira nesse mês, como no relatório mensal) ou desde o início. Filtro por distrito e procura por nome, telefone ou bairro.
+- **Contam os relatórios enviados e os validados.** Os que vêm de um relatório por validar têm a etiqueta «por validar». A mesma pessoa (o mesmo telefone ou, sem telefone, o mesmo nome) no mesmo distrito aparece uma vez, com o relatório mais recente e o número de relatórios em que apareceu.
+- **Em cada distrito:**
+  - **Enviar ao pastor** abre o WhatsApp para o telefone do pastor, com a lista já escrita: nome, telefone, bairro, pedido, quem a encontrou e a semana. Uma mensagem leva no máximo 40 pessoas e diz quantas ficaram de fora.
+  - **Copiar texto** copia a mesma mensagem, para outro meio.
+  - **Imprimir** dá a folha do distrito, com o pastor e o espaço para assinar.
+- **Imprimir** (em cima) dá uma página por distrito; **Excel** dá a lista com o distrito e o pastor de cada pessoa.
+- Um distrito sem pastor no registo, ou um pastor sem telefone, não tem o botão do WhatsApp, e o ecrã diz onde se corrige. Os colportores sem igreja no registo ficam em «Sem distrito».
+- A lista vê-se com a permissão **Colportagem**, a mesma dos relatórios. Não muda nada na base de dados: as mensagens saem do telemóvel ou do computador de quem as envia.
+
 ### Contas (separador "Contas")
 
 Cada colportor tem uma conta corrente:
@@ -381,5 +396,6 @@ Como funciona:
   - `colporteur_top_books(p_colporteur_id, p_church_id, p_year, p_limit)`;
   - `book_reviews.hidden` e `hidden_reason`, com a guarda `book_reviews_oculta_guarda` (o autor não os muda), a política de leitura nova, `book_review_hide` e `book_reviews_recent` (permissão `manage_catalog`).
 - Ecrãs: `ColporteurExtras.jsx` (cartão, avaliações e livros na ficha), `ReviewsPanel.jsx` (vista Avaliações), `igreja/ChurchColporteurs.jsx` (ficha da igreja), `colportagem/MyCardReviews.jsx` (área do colportor), `ColporteurReviewPanel.jsx` (página da encomenda) e `pages/ColporteurVerifyPage.jsx` (`/colportor/verificar`). O cartão é `cardHtml` em `lib/colporteurPrint.js`, com o QR de `qrcode-generator`.
+- Interessados: `lib/colporteurInterests.js` (`interestRows`, `groupByDistrict`, `districtPastor`, `pastorMessage`, `pastorWhatsApp`), a impressão `interestsHtml` em `lib/colporteurPrint.js` e o ecrã `InterestsPanel.jsx` (vista `interessados`); testes em `colporteurInterests.test.js` e `InterestsPanel.test.jsx`.
 - Migração `20261114235000_colportagem_relatorio_mensal.sql`: `colporteur_site_period(p_from, p_to)` (só a equipa da colportagem) soma por colportor as encomendas do site no período, em hora de Angola, com o valor dos produtos e a comissão creditada. As semanas do mês e o resumo estão em `lib/colporteurReports.js` (`weekMonth`, `monthWeeks`, `reportMonths`, `summarize`); a impressão é `summaryHtml` em `lib/colporteurPrint.js`; o ecrã é `SummaryPanel.jsx`. Sem a migração, o Resumo funciona como antes, com as vendas no site só em «Este ano».
 - Testes: 91 cenários em PGlite, em `scripts/pglite/colportores.mjs` (13 do relatório mensal: o fuso de Angola nos limites do mês, canceladas, por pagar e quem pode ver); `colporteurReports.test.js` (as semanas de cada mês ao longo de um ano) e `SummaryPanel.test.jsx` (o ecrã).

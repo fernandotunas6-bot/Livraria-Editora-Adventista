@@ -128,7 +128,7 @@ describe('navegação por contexto (vistas)', () => {
     const el = await mount(colp({ layout: 'sidebar' }));
     const sub = el.querySelector('ul[aria-label="Vistas de Colportagem"]');
     expect(sub).not.toBeNull();
-    expect(sub.querySelectorAll('button').length).toBe(12);
+    expect(sub.querySelectorAll('button').length).toBe(13); // as vistas da Colportagem, com «Interessados»
     expect(sub.querySelector('[aria-current="page"]').textContent).toContain('Contas');
     // só a secção aberta se desdobra
     expect(el.querySelectorAll('[data-sidebar="menu-sub"]').length).toBe(1);

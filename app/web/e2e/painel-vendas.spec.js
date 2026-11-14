@@ -280,3 +280,85 @@ test('os relatórios não usam a palavra PowerPoint', async ({ page }) => {
   await expect(rel.locator('#ed-ppt-st')).toContainText('a grelha já tem os valores do ficheiro');
   expect(await textoDoEcra(rel)).not.toMatch(/power\s*point/i);
 });
+
+// Pedido do dono (14/11): no modo apresentação, o diapositivo de cada mês deixa a «Sequência de
+// apresentação» (1.º 2025, 2.º 2026, 3.º Crescimento) e mostra o detalhe em cartões, como o
+// «Período em apresentação até» do painel, com os valores inteiros (sem «…»).
+test('modo apresentação: o detalhe do mês em cartões, sem a sequência', async ({ page }) => {
+  await page.goto(PAINEL);
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  // No painel, os valores do período também cabem inteiros.
+  expect(await painel.locator('.pk b').evaluateAll((bs) => bs.filter((b) => b.scrollWidth > b.clientWidth).map((b) => b.textContent))).toEqual([]);
+  await painel.locator('#btn-pres').click();
+  const slide = painel.locator('#pres-view .slide');
+  for (let i = 0; i < 20 && !(await slide.locator('.s-dk').count()); i++) await painel.locator('#pr-next').click();
+  await expect(slide.locator('.s-ct').last()).toHaveText('Detalhe de Janeiro');
+  await expect(slide.getByText('Sequência de apresentação')).toHaveCount(0);
+  const cartoes = slide.locator('.s-dkc');
+  await expect(cartoes.locator('span')).toHaveText(['Média mensal 2025', 'Média mensal 2026', 'Diferença mensal 25/26', 'Diferença periódica 25/26']);
+  await expect(cartoes.locator('b').nth(2)).toHaveText('+1 952 693,00 Kz');
+  await expect(cartoes.locator('b').nth(2)).toHaveClass(/s-ok/);
+  expect(await cartoes.locator('b').evaluateAll((bs) => bs.every((b) => b.scrollWidth <= b.clientWidth))).toBe(true);
+  await expect(slide.locator('.s-dst')).toContainText('Fechado');
+});
+
+// Pedido do dono (14/11): na apresentação, os números rodam como num contador de máquina de
+// calcular, os totais ficam com o duplo traço dos balancetes, e há som (tiques, subidas, caixa
+// registadora), com um botão para o desligar.
+test('modo apresentação: som, números a rodar e o duplo traço dos totais', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  await page.goto(PAINEL);
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  await painel.locator('#btn-pres').click();
+  const som = painel.locator('#pr-som');
+  await expect(som).toHaveAttribute('aria-pressed', 'true');
+  await expect(som).toContainText('Som ligado');
+  const slide = painel.locator('#pres-view .slide');
+  for (let i = 0; i < 20 && !(await slide.locator('.s-dk').count()); i++) await painel.locator('#pr-next').click();
+  const total = slide.locator('.s-kpi .v.dupla');
+  // A rodar: cada algarismo é uma fita; no fim, só o valor, sublinhado com o duplo traço.
+  await expect(total.locator('.odo-f').first()).toBeAttached();
+  await expect(total).toHaveText('2 171 368,00 Kz');
+  await expect(total).toHaveClass(/\bon\b/);
+  await expect(slide.locator('.s-dkc b.dupla')).toHaveText('+1 952 693,00 Kz');
+  // O logótipo da Livraria continua no canto do diapositivo.
+  await expect.poll(() => slide.locator('img.s-logo').evaluate((i) => i.complete && i.naturalWidth > 0)).toBe(true);
+
+  await som.click();
+  await expect(som).toHaveAttribute('aria-pressed', 'false');
+  await expect(som).toContainText('Som desligado');
+  expect(await page.evaluate(() => localStorage.getItem('livraria_apresentacao_som'))).toBe('desligado');
+  await page.keyboard.press('m');
+  await expect(som).toHaveAttribute('aria-pressed', 'true');
+  expect(erros).toEqual([]);
+
+  // Todas as livrarias: o mesmo botão, com a escolha deste aparelho.
+  await page.goto(CONJUNTO);
+  await page.locator('#host').locator('#btn-pres').click();
+  await expect(page.locator('#host').locator('#pr-som')).toHaveAttribute('aria-pressed', 'true');
+});
+
+// Pedido do dono (14/11): o espaço vazio por baixo do Comparativo mensal passa a ter o Mapa do ano,
+// uma grelha de cores dos 12 meses (cada ano, o crescimento e o peso no ano); clicar num mês põe-no
+// em destaque.
+test('o Mapa do ano ocupa o espaço por baixo do Comparativo mensal e põe o mês em destaque', async ({ page }) => {
+  await page.goto(PAINEL);
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  const mapa = painel.locator('#mapa-g');
+  await expect(mapa.locator('.mapa-m')).toHaveCount(12);
+  await expect(mapa.locator('.mapa-l')).toHaveText(['2025', '2026', 'Crescimento', 'Peso em 2026']);
+  await expect(mapa.locator('.mapa-c')).toHaveCount(48);
+  await expect(mapa.locator('.mapa-c[data-mes="Julho"]').nth(2)).toHaveText('+2158%');
+  await expect(mapa.locator('.mapa-c[data-mes="Novembro"]').nth(1)).toHaveClass(/\best\b/);
+  await mapa.locator('.mapa-c[data-mes="Março"]').first().click();
+  await expect(painel.locator('#sp-mes')).toHaveText('Março');
+  await expect(mapa.locator('.mapa-m[data-mes="Março"]')).toHaveAttribute('aria-pressed', 'true');
+  // No computador, o mapa chega ao fundo do cartão: não fica espaço vazio por baixo.
+  const vazio = await painel.locator('#card-mensal').evaluate((c) => c.getBoundingClientRect().bottom - c.querySelector('#mapa-ano').getBoundingClientRect().bottom);
+  if ((page.viewportSize()?.width || 0) >= 1000) expect(vazio).toBeLessThan(40);
+  expect(await mapa.locator('.mapa-c span, .mapa-m').evaluateAll((es) => es.filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth + 1).length)).toBe(0);
+});

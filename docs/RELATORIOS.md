@@ -347,6 +347,48 @@ discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as uni
 
 Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
 
+**O diapositivo de cada mês** (modo apresentação do painel de uma loja): em cima, o período até ao
+mês (venda periódica de cada ano e crescimento periódico); à esquerda, as barras do mês e o
+crescimento mensal; à direita, o **Detalhe do mês** em cartões, como o «Período em apresentação
+até» do painel: média mensal de cada ano (a cinzento e a rosa), diferença mensal e diferença
+periódica (a verde ou a vermelho), e o estado do mês. Os valores contam até ao número ao mesmo
+tempo que as barras. A «Sequência de apresentação» (1.º 2025, 2.º 2026, 3.º Crescimento) saiu do
+diapositivo (pedido do dono, 14/11); continua no Mês em destaque do painel, onde acompanha a
+animação. Nos cartões do painel, a letra do valor acompanha a largura do cartão
+(`container-type`), para «10 857 624,65 Kz» caber inteiro em vez de acabar em «…».
+
+**Mapa do ano** (painel de uma loja, por baixo do Comparativo mensal): o cartão do gráfico estica
+até à altura do Mês em destaque, e o espaço que ficava vazio tem agora uma grelha de cores dos 12
+meses (`fillMapa` em `painel.js`):
+
+| Linha | Cor |
+|---|---|
+| O ano de comparação (2025) | cinzento, mais forte quanto mais se vendeu |
+| O ano (2026) | rosa, mais forte quanto mais se vendeu; a estimativa com rebordo tracejado («≈3,8M») |
+| Crescimento | verde ou vermelho, mais forte quanto maior; acima de 100% sem casa decimal («+2158%») |
+| Peso no ano | azul-petróleo: a parte de cada mês nas vendas do ano |
+
+A escala de cor é a mesma para os dois anos, para se compararem. Clicar num mês (o nome ou uma
+célula) põe-no em destaque, e a coluna fica marcada; os meses fora do filtro ficam esbatidos; o
+valor exacto aparece ao passar o rato. Num ecrã estreito, os meses passam a uma letra e as células
+só têm a cor.
+
+**Animações e som no modo apresentação** (nos dois relatórios):
+
+- **Contador mecânico** (`odometro.js`): no diapositivo de cada mês, os valores do período e do
+  detalhe rodam algarismo a algarismo até ao número, como num conta-quilómetros ou numa máquina de
+  calcular (os da esquerda param primeiro). No fim, fica só o texto.
+- **Duplo traço dos totais**, como nos balancetes: desenha-se por baixo da venda periódica do ano e
+  da diferença periódica, depois de o número parar. Os cartões do detalhe entram um a um.
+- **Som** (`som-apresentacao.js`), com os sons do Estúdio de vídeo, gerados no navegador (sem
+  ficheiros): a página a virar em cada diapositivo, os tiques de máquina de calcular enquanto os
+  números contam (nos dois relatórios), as barras a subir e, no crescimento do mês, a caixa
+  registadora (subiu) ou a queda (desceu). O botão **Som** na barra (ou a tecla **M**) liga e
+  desliga; a escolha fica no aparelho. Ao mudar de diapositivo, o som do anterior cala-se. Com
+  «reduzir movimento» no sistema, os números aparecem logo.
+- O **logótipo** da Livraria continua no canto de cada diapositivo (um teste e2e confirma-o; as
+  páginas de teste usam agora os logótipos verdadeiros, como o separador).
+
 **Imagens no modo apresentação** (`diapositivos` em `painel.js`; `fotosDaLoja` e os controlos em
 `apresentacao.js`, os mesmos nos dois relatórios):
 

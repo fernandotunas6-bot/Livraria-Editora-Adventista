@@ -22,6 +22,8 @@ import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
 import { avisosDePlausibilidade, textoDoAviso } from './plausibilidade.js';
 import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
+import { criarSomDaApresentacao } from './som-apresentacao.js';
+import { rolar } from './odometro.js';
 
 export { cidadeDaLoja, fotosDaLoja, lojaDe };
 
@@ -69,11 +71,16 @@ export function mountPainel(root, api) {
   }
   // Cada elemento tem uma contagem de cada vez: uma nova (ou um valor escrito sem animação)
   // cancela a anterior, que senão continuava a escrever por cima (ao mudar de filtro ou de mês).
+  // O som do modo apresentação (som-apresentacao.js); presAberta passa a ser a do PRES quando existe.
+  const SOM = criarSomDaApresentacao();
+  let presAberta = () => false;
   const contagens = new WeakMap();
   function countUp(e, to, fmt, dur, delay) {
     const id = {};
     contagens.set(e, id);
     if (reduce || !dur || to == null || !isFinite(to)) { e.textContent = fmt(to); return; }
+    // No modo apresentação, os tiques da máquina de calcular enquanto o número conta.
+    if (presAberta()) SOM.contar(dur, delay || 0);
     const t0 = performance.now() + (delay || 0);
     const tick = (now) => {
       if (!e.isConnected || contagens.get(e) !== id) return;
@@ -201,7 +208,82 @@ export function mountPainel(root, api) {
       .on('click', (ev, r) => { stopPlay(); select(r.mes, true); });
     highlight();
   }
+  // ---------- Mapa do ano ----------
+  // Os 12 meses numa grelha de cores, por baixo do Comparativo mensal: o ano de comparação e o ano
+  // (quanto mais forte a cor, mais se vendeu), o crescimento (verde ou vermelho, mais forte quanto
+  // maior) e o peso de cada mês nas vendas do ano. Clicar num mês põe-no em destaque.
+  function fillMapa(M, animate) {
+    const g = $('mapa-g'); if (!g) return;
+    const rows = M.rows;
+    const B = M.comp, A = M.ano;
+    const max = Math.max(1, ...rows.map((r) => Math.max(r.v1 || 0, r.v2 || 0, r.est || 0)));
+    const totalA = rows.reduce((t, r) => t + (r.v2 || 0), 0);
+    const tom = (cor, f) => `color-mix(in srgb, ${cor} ${Math.round(14 + 70 * Math.min(1, Math.max(0, f)))}%, transparent)`;
+    const vazio = () => { const c = el('div', 'vazio'); c.append(el('span', null, '—')); return c; };
+    const pintado = (cor, f, texto) => {
+      const c = el('div', f > 0.62 ? 'claro' : '');
+      c.style.background = tom(cor, f);
+      c.append(el('span', null, texto));
+      return c;
+    };
+    const nodes = [el('span')];
+    rows.forEach((r) => {
+      const b = el('button', 'mapa-m' + (r.fora ? ' fora' : ''));
+      // «Jan» no computador; «J» num ecrã estreito (painel.css, @container).
+      b.append(el('span', 'l', short(r.mes)), el('span', 's', r.mes[0]));
+      b.type = 'button'; b.dataset.mes = r.mes; b.title = r.mes; b.setAttribute('aria-pressed', 'false');
+      nodes.push(b);
+    });
+    const linha = (rotulo, cell) => {
+      nodes.push(el('span', 'mapa-l', rotulo));
+      rows.forEach((r, i) => {
+        const c = cell(r);
+        c.className = ('mapa-c ' + c.className + (r.fora ? ' fora' : '')).trim();
+        c.dataset.mes = r.mes;
+        if (animate && !reduce) c.style.animationDelay = (i * 35) + 'ms'; else c.style.animation = 'none';
+        nodes.push(c);
+      });
+    };
+    const curto = (v) => mi(v).replace(' M', 'M');
+    if (B != null) {
+      linha(String(B), (r) => {
+        const c = r.v1 == null ? vazio() : pintado('var(--c25)', r.v1 / max, curto(r.v1));
+        c.title = `${r.mes} de ${B}: ${r.v1 != null ? kz(r.v1) : 'sem valor'}`;
+        return c;
+      });
+    }
+    linha(String(A), (r) => {
+      const v = r.v2 != null ? r.v2 : r.est;
+      let c;
+      if (v == null) c = vazio();
+      else if (r.v2 == null) { c = el('div', 'est'); c.append(el('span', null, '≈' + curto(v))); }
+      else c = pintado('var(--c26)', v / max, curto(v));
+      c.title = `${r.mes} de ${A}: ${r.v2 != null ? kz(r.v2) + (r.estado === 'Em curso' ? ' (em curso)' : '') : r.est != null ? 'estimativa ' + kz(r.est) : 'sem valor'}`;
+      return c;
+    });
+    if (B != null) {
+      linha('Crescimento', (r) => {
+        // Acima de 100%, sem casa decimal («+2158%»), para caber na célula; o valor exacto vai no título.
+        const curtoPct = (p) => (Math.abs(p) >= 1 ? (p >= 0 ? '+' : '−') + Math.round(Math.abs(p) * 100) + '%' : pct(p).replace(',0%', '%'));
+        const c = r.cresc == null ? vazio() : pintado(r.cresc >= 0 ? 'var(--ok)' : 'var(--bad)', Math.min(1, Math.abs(r.cresc)) * 0.85, curtoPct(r.cresc));
+        c.title = `${r.mes}: crescimento ${r.cresc == null ? '—' : pct(r.cresc)}`;
+        return c;
+      });
+    }
+    linha('Peso em ' + A, (r) => {
+      const p = r.v2 != null && totalA ? r.v2 / totalA : null;
+      const c = p == null ? vazio() : pintado('var(--teal)', p * 4, Math.round(p * 100) + '%');
+      c.title = `${r.mes}: ${p == null ? 'sem valor' : (p * 100).toFixed(1).replace('.', ',') + '% das vendas de ' + A}`;
+      return c;
+    });
+    g.style.setProperty('--linhas', String(B != null ? 4 : 2));
+    g.replaceChildren(...nodes);
+  }
   function highlight() {
+    root.querySelectorAll('#mapa-g [data-mes]').forEach((e) => {
+      if (e.classList.contains('mapa-m')) e.setAttribute('aria-pressed', String(e.dataset.mes === S.sel));
+      else e.classList.toggle('sel', e.dataset.mes === S.sel);
+    });
     d3.select($('chart-mensal')).selectAll('.mgrp').transition().duration(250).style('opacity', (r) => (r.fora ? 0.16 : !S.sel || r.mes === S.sel ? 1 : 0.38));
     root.querySelectorAll('#tbl-quadro tbody tr').forEach((tr) => tr.classList.toggle('rsel', tr.dataset.key === S.sel));
     root.querySelectorAll('#sp-chips .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mes === S.sel)));
@@ -539,6 +621,8 @@ export function mountPainel(root, api) {
   $('sp-prev').addEventListener('click', () => stepMonth(-1));
   $('sp-next').addEventListener('click', () => stepMonth(1));
   $('sp-chips').addEventListener('click', (ev) => { const b = ev.target.closest('.chip'); if (!b) return; stopPlay(); select(b.dataset.mes, true); });
+  // O Mapa do ano: um mês (o nome ou qualquer célula da coluna) vai para o destaque.
+  $('mapa-g').addEventListener('click', (ev) => { const c = ev.target.closest('[data-mes]'); if (!c) return; stopPlay(); select(c.dataset.mes, true); });
   root.querySelector('#tbl-quadro tbody').addEventListener('click', (ev) => {
     const tr = ev.target.closest('tr[data-key]'); if (!tr) return;
     stopPlay(); select(tr.dataset.key, true);
@@ -574,7 +658,7 @@ export function mountPainel(root, api) {
     const M = S.model;
     fillKpis(M, animate);
     // O acumulado é sempre o do ano inteiro (com a projecção do ano); o resto segue o filtro.
-    drawMensal(M, animate); drawAcum(S.modelAno, animate); drawVar(M, animate);
+    drawMensal(M, animate); fillMapa(M, animate); drawAcum(S.modelAno, animate); drawVar(M, animate);
     fillQuadro(M); fillConf(M); videoLabels(M); topoCapas(M.ano);
     $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : '') + (r.fora ? ' fora' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
     const naSel = S.sel ? M.rows.find((q) => q.mes === S.sel) : null;
@@ -1196,7 +1280,7 @@ export function mountPainel(root, api) {
     const lg = el('img', 's-logo'); lg.src = logoSrc(); lg.alt = ''; s.appendChild(lg);
     s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · ' + lojaDe(S.store) + ' · ' + M.ano));
   }
-  function desenharDiapositivo(s, it, { depois }) {
+  function desenharDiapositivo(s, it, { depois, som }) {
     const M = S.model;
     const B = M.comp, A = M.ano, R = M.R;
     if (it.k === 'capa') {
@@ -1256,6 +1340,7 @@ export function mountPainel(root, api) {
         .attr('fill', (r) => r.v2 != null ? '#EF8DB8' : 'rgba(224,103,154,.1)').attr('stroke', (r) => r.v2 != null ? 'none' : C2).attr('stroke-dasharray', '4 3').attr('y', 150).attr('height', 0);
       const tr = (sel, f, d0) => sel.transition().delay((r) => (reduce ? 0 : d0 + r.i * 60)).duration(reduce ? 0 : 800).ease(d3.easeCubicOut).attr('y', (r) => y(f(r))).attr('height', (r) => 150 - y(f(r)));
       tr(r1, (r) => r.v1, 700); tr(r2, (r) => r.v2 != null ? r.v2 : r.est, 800);
+      if (som) som.tocar('subida', 0.45, 700);
       g.append('text').attr('x', x.bandwidth() / 2).attr('y', 170).attr('text-anchor', 'middle').style('font-size', '13px').style('fill', '#6A7076').style('font-family', 'var(--font)').text((r) => short(r.mes));
     } else if (it.k === 'mes') {
       const r = it.r;
@@ -1279,31 +1364,53 @@ export function mountPainel(root, api) {
       card.appendChild(bars);
       const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento mensal')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
       s.appendChild(card);
+      // O detalhe do mês: os números do período até ao mês em cartões, como no painel («Período em
+      // apresentação até»), sem a sequência 1.º/2.º/3.º, que só repetia o que as barras já mostram.
       const det = abs('s-card s-det', { left: '852px', top: '256px', width: '380px', height: '400px' });
       det.appendChild(abs('s-ct', null, 'Detalhe de ' + r.mes));
-      const row2 = (top, k, v) => { const d = abs('row2', { top: top + 'px' }); d.append(el('span', null, k), el('b', null, v)); det.appendChild(d); };
       const ab = B != null ? `${String(B).slice(-2)}/${String(A).slice(-2)}` : String(A);
-      row2(66, 'Média mensal ' + (B != null ? B : '—'), B != null ? kz(P.media1) : '—');
-      row2(94, 'Média mensal ' + A, kz(P.media2));
-      row2(122, 'Diferença mensal ' + ab, P.difMensal != null ? kzs(P.difMensal) : '—');
-      row2(150, 'Diferença periódica ' + ab, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
-      row2(178, 'Estado do mês', r.estado);
-      const sq = el('div', 's-seq'); sq.append(el('div', 'h', 'Sequência de apresentação'));
-      const i1 = el('div', 'i a', '1º  ' + (B != null ? B : '—')), i2 = el('div', 'i b', '2º  ' + A), i3 = el('div', 'i c', '3º  Crescimento');
-      sq.append(i1, i2, i3); det.appendChild(sq);
-      if (r.obs) det.appendChild(abs('s-obs', null, '“' + r.obs + '”'));
+      const lista = el('div', 's-dk' + (r.obs ? ' com-obs' : ''));
+      const D = (cls, k) => { const c = el('div', 's-dkc ' + cls); c.append(el('span', null, k)); const v = el('b', null, '—'); c.append(v); lista.appendChild(c); return v; };
+      const dm1 = D('a', 'Média mensal ' + (B != null ? B : '—'));
+      const dm2 = D('b', 'Média mensal ' + A);
+      const dd1 = D('d', 'Diferença mensal ' + ab);
+      const dd2 = D('d', 'Diferença periódica ' + ab);
+      const est = el('div', 's-dst');
+      est.append(el('span', null, 'Estado do mês'), el('b', r.estado === 'Fechado' ? 'fechado' : r.estado === 'Em curso' ? 'curso' : 'falta', r.estado));
+      lista.appendChild(est);
+      if (r.obs) lista.appendChild(el('div', 's-dobs', '“' + r.obs + '”'));
+      det.appendChild(lista);
       s.appendChild(det);
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      depois(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
-      depois(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
+      const sinal = (e, v) => { e.classList.remove('s-mut', 's-ok', 's-bad'); e.classList.add(v == null ? 's-mut' : v >= 0 ? 's-ok' : 's-bad'); if (v != null) roda(e, v, kzs); };
+      // Os números rodam como num contador de máquina de calcular, com os tiques; as barras sobem
+      // com som; os totais do período ficam com o duplo traço dos balancetes.
+      const roda = (e, v, fmt, dur = 900) => { if (v == null || !isFinite(v)) { e.textContent = fmt(v); return; } rolar(e, fmt(v), { dur, reduce }); if (som) som.contar(dur); };
+      k2.classList.add('dupla'); dd2.classList.add('dupla');
       depois(() => {
-        i3.classList.add('on'); gr.classList.add('on');
+        b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800);
+        if (som && r.v1 != null) som.tocar('subida_curta', 0.4);
+        if (B != null) { roda(k1, P.venda1, kz); roda(dm1, P.media1, kz); }
+      }, 400);
+      depois(() => {
+        b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800);
+        if (som && val2 != null) som.tocar('subida_curta', 0.55);
+        roda(k2, P.venda2, kz); roda(dm2, P.media2, kz);
+      }, 1400);
+      depois(() => k2.classList.add('on'), 2450);
+      depois(() => dd2.classList.add('on'), 3400);
+      depois(() => {
+        gr.classList.add('on');
+        sinal(dd1, P.difMensal);
+        sinal(dd2, P.difPeriodica);
+        // O crescimento do mês: a caixa registadora se subiu, a queda se desceu.
+        if (som && r.cresc != null) som.tocar(r.cresc >= 0 ? 'caixa' : 'queda', r.cresc >= 0 ? 0.7 : 0.55, 350);
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
         gv.className = 'g ' + cls;
         k3.className = 'v ' + (P.crescimento == null ? 's-mut' : P.crescimento >= 0 ? 's-ok' : 's-bad');
-        if (P.crescimento != null) countUp(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
+        if (P.crescimento != null) roda(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
         if (r.cresc != null) countUp(gv, r.cresc, pct, 1000);
         else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; }
         gd.textContent = r.dif != null ? kzs(r.dif) + (r.estado === 'Em curso' ? ' · mês em curso' : '') : (r.est != null ? 'Estimativa: ' + CRIT[M.crit] : '');
@@ -1355,7 +1462,9 @@ export function mountPainel(root, api) {
     lista: () => (S.model ? slideList(S.model) : []),
     desenhar: desenharDiapositivo,
     aoAbrir: () => { stopPlay(); clearTimers(); },
+    som: SOM,
   });
+  presAberta = PRES.aberta;
 
   // ---------- Filtros avançados ----------
   FIL = montarFiltros(root, {
