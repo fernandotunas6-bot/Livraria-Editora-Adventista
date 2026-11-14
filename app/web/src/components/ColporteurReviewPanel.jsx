@@ -41,7 +41,8 @@ export default function ColporteurReviewPanel({ orderNumber }) {
     colporteurReviewTargets(orderNumber).then((r) => {
       if (!vivo) return;
       setAlvos(r || []);
-      setForm(Object.fromEntries((r || []).map((a) => [a.colporteur_id, { rating: a.review?.rating || 0, comment: a.review?.comment || '', saved: !!a.review }])));
+      setForm(Object.fromEntries((r || []).map((a) => [a.colporteur_id,
+        { rating: a.review?.rating || 0, comment: a.review?.comment || '', saved: !!a.review, existe: !!a.review }])));
     }).catch(() => { /* sem a migração ou sem sessão: não há avaliação */ });
     return () => { vivo = false; };
   }, [orderNumber]);
@@ -54,7 +55,7 @@ export default function ColporteurReviewPanel({ orderNumber }) {
     setBusy(a.colporteur_id);
     try {
       await saveColporteurReview({ orderNumber, colporteurId: a.colporteur_id, rating: f.rating, comment: f.comment.trim() });
-      setForm((x) => ({ ...x, [a.colporteur_id]: { ...x[a.colporteur_id], saved: true } }));
+      setForm((x) => ({ ...x, [a.colporteur_id]: { ...x[a.colporteur_id], saved: true, existe: true } }));
       toast({ title: 'Obrigado pela avaliação', description: 'Ajuda-nos a acompanhar os colportores.' });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Não foi possível guardar', description: e.message });
@@ -80,7 +81,7 @@ export default function ColporteurReviewPanel({ orderNumber }) {
               placeholder="Como foi? (opcional: simpatia, pontualidade, cuidado com os livros…)" aria-label={`Comentário sobre ${a.full_name}`} />
             <div className="flex items-center gap-3">
               <Button size="sm" onClick={() => guardar(a)} disabled={busy === a.colporteur_id}>
-                {busy === a.colporteur_id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{a.review ? 'Actualizar avaliação' : 'Enviar avaliação'}
+                {busy === a.colporteur_id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{f.existe ? 'Actualizar avaliação' : 'Enviar avaliação'}
               </Button>
               {f.saved && <span className="text-sm text-emerald-700 dark:text-emerald-400">Avaliação guardada.</span>}
               {a.review?.hidden && <span className="text-xs text-muted-foreground">A equipa ocultou esta avaliação.</span>}
