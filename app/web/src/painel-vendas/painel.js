@@ -13,7 +13,8 @@ import * as d3 from 'd3';
 // painel a partir do build para isto não voltar.
 import 'd3-transition';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
-import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
+import { planoVideo, duracaoPlano, fmtDuracao } from './video.js';
+import { abrirEstudio } from './estudio-video.js';
 import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './filtros.js';
@@ -1071,15 +1072,18 @@ export function mountPainel(root, api) {
         await printReport(d);
         say('Relatório aberto noutra janela: escolha “Guardar como PDF” na impressão.', 'okk');
       } else if (fmt === 'video') {
-        const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
-        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
-        Object.assign(d, await extrasDe(d.ano), { fundo: $('vid-fundo').value });
-        videoAbort = new AbortController();
-        $('exp-cancel').hidden = false;
-        const { blob, ext, duracao } = await renderVideo(d, (t, total, cena) => say('A gravar o vídeo ' + RITMOS[ritmo].nome.replace('Vídeo ', '') + ': '
-          + fmtDuracao(t) + ' de ' + fmtDuracao(total) + (cena ? ' · ' + cena.nome : '') + '. Mantenha este separador aberto.'), { ritmo, signal: videoAbort.signal });
-        await S.downloads.save({ filename: base + '-video-' + ritmo + '.' + ext, data: blob });
-        say('Vídeo pronto (' + ext.toUpperCase() + ', ' + fmtDuracao(duracao) + ').', 'okk');
+        // O Estúdio de vídeo (estudio-video.js): pré-visualizar com som, a narração e as legendas, e gravar.
+        say('A abrir o Estúdio de vídeo…');
+        Object.assign(d, await extrasDe(d.ano));
+        $('exp-menu').hidden = true; $('btn-exp').setAttribute('aria-expanded', 'false');
+        abrirEstudio(root, {
+          tipo: 'loja', dados: d, ritmo: opts.ritmo, fundo: $('vid-fundo').value,
+          titulo: lojaDe(S.store) + ' · ' + d.ano + (d.comp ? ' vs ' + d.comp : ''),
+          guardar: ({ blob, ext, ritmo }) => S.downloads.save({ filename: base + '-video-' + ritmo + '.' + ext, data: blob }),
+          aoMudarFundo: (v) => { $('vid-fundo').value = v; },
+          aoFechar: () => { if (!dead) $('btn-exp').focus(); },
+        });
+        say('');
       }
     } catch (e) {
       say((e && e.message) || 'Não foi possível exportar agora.', e && e.name === 'AbortError' ? '' : 'err');

@@ -52,7 +52,8 @@ const db = {
 const api = {
   db,
   user: { id: async () => 'teste', isOwner: async () => false, canEdit: async () => editar, can: async () => editar, profiles: async () => ({}) },
-  downloads: { save: async () => ({ status: 'saved' }) },
+  // O último ficheiro exportado fica em window.__ficheiro (o vídeo, para o teste conferir o som).
+  downloads: { save: async (f) => { window.__ficheiro = f; return { status: 'saved' }; } },
   store: {
     id: 'loja-huambo', name: 'Livraria Adventista — Huambo', province: 'Huambo',
     fotos: imagens ? [

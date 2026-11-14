@@ -50,7 +50,8 @@ const api = {
   historico: async () => [],
   lerNota: async () => ({ texto: '', actualizado: null }),
   gravarNota: async () => {},
-  downloads: { save: async () => ({ status: 'saved' }) },
+  // O último ficheiro exportado fica em window.__ficheiro (o vídeo, para o teste conferir o som).
+  downloads: { save: async (f) => { window.__ficheiro = f; return { status: 'saved' }; } },
   extras: async () => (imagens ? { destaques: { rede: { ano: MAIS_VENDIDOS, meses: [] }, porLoja: {} }, fotos: [] } : { destaques: null, fotos: [] }),
 };
 

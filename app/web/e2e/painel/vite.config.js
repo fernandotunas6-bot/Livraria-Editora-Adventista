@@ -11,7 +11,7 @@ export default {
   build: {
     outDir: path.resolve(aqui, '../../../../dist/e2e-painel'),
     emptyOutDir: true,
-    // index.html: o painel de uma loja; conjunto.html: o relatório de todas as livrarias.
-    rollupOptions: { input: { index: path.resolve(aqui, 'index.html'), conjunto: path.resolve(aqui, 'conjunto.html') } },
+    // index.html: o painel de uma loja; conjunto.html: o relatório de todas as livrarias; som.html: a banda sonora.
+    rollupOptions: { input: { index: path.resolve(aqui, 'index.html'), conjunto: path.resolve(aqui, 'conjunto.html'), som: path.resolve(aqui, 'som.html') } },
   },
 };

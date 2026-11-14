@@ -231,3 +231,4 @@ test('todas as livrarias: o modo apresentação mostra todas as lojas com as sua
   expect(erros, 'erros de JavaScript na página').toEqual([]);
   expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
 });
+

@@ -16,7 +16,8 @@ import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { filtroActivo, mesesDoPeriodo, recortarConsolidado, rotuloFiltro } from './filtros.js';
 import { montarFiltros } from './filtros-ui.js';
-import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
+import { duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo } from './video.js';
+import { abrirEstudio } from './estudio-video.js';
 import { estiloBaseImpressao } from '../lib/fontes.js';
 import { avisosDePlausibilidade, origemDasAlteracoes, substituicoesComValor, textoDoAviso } from './plausibilidade.js';
 
@@ -1398,14 +1399,18 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
         await imprimir(c);
         say('Relatório aberto noutra janela: escolha «Guardar como PDF» na impressão.', 'okk');
       } else if (fmt === 'video') {
-        const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
-        videoAbort = new AbortController();
-        $('exp-cancel').hidden = false;
-        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
-        Object.assign(c, await extrasDe(c.ano), { fundo: $('vid-fundo').value });
-        const { blob, ext, duracao } = await renderVideoConjunto(c, (t, total, cena) => say(`A gravar o vídeo ${RITMOS[ritmo].nome.replace('Vídeo ', '')}: ${fmtDuracao(t)} de ${fmtDuracao(total)}${cena ? ' · ' + cena.nome : ''}. Mantenha este separador aberto.`), { ritmo, signal: videoAbort.signal });
-        await api.downloads.save({ filename: `${base}-video-${ritmo}.${ext}`, data: blob });
-        say(`Vídeo pronto (${ext.toUpperCase()}, ${fmtDuracao(duracao)}).`, 'okk');
+        // O Estúdio de vídeo (estudio-video.js): pré-visualizar com som, a narração e as legendas, e gravar.
+        say('A abrir o Estúdio de vídeo…');
+        Object.assign(c, await extrasDe(c.ano));
+        $('exp-menu').hidden = true; $('btn-exp').setAttribute('aria-expanded', 'false');
+        abrirEstudio(root, {
+          tipo: 'conjunto', dados: c, ritmo: opts.ritmo, fundo: $('vid-fundo').value,
+          titulo: 'Todas as livrarias · ' + c.ano + (c.comp != null ? ' vs ' + c.comp : ''),
+          guardar: ({ blob, ext, ritmo }) => api.downloads.save({ filename: `${base}-video-${ritmo}.${ext}`, data: blob }),
+          aoMudarFundo: (v) => { $('vid-fundo').value = v; },
+          aoFechar: () => { if (!dead) $('btn-exp').focus(); },
+        });
+        say('');
       }
     } catch (e) {
       say((e && e.message) || 'Não foi possível exportar agora.', e && e.name === 'AbortError' ? '' : 'err');
