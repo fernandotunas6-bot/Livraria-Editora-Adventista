@@ -9,13 +9,15 @@
  */
 import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
-import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
+import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, diapositivosConjunto, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
+import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
 import { buildXlsx, imprimirJanela, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { filtroActivo, mesesDoPeriodo, recortarConsolidado, rotuloFiltro } from './filtros.js';
 import { montarFiltros } from './filtros-ui.js';
-import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
+import { duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo } from './video.js';
+import { abrirEstudio } from './estudio-video.js';
 import { estiloBaseImpressao } from '../lib/fontes.js';
 import { avisosDePlausibilidade, origemDasAlteracoes, substituicoesComValor, textoDoAviso } from './plausibilidade.js';
 
@@ -147,6 +149,7 @@ export function mountConsolidado(root, api) {
     root.querySelectorAll('.lgA').forEach((e) => { e.textContent = c.comp != null ? String(c.comp) : '—'; });
     root.querySelectorAll('.lgB').forEach((e) => { e.textContent = String(c.ano); });
     $('btn-exp').disabled = false;
+    $('btn-pres').disabled = !c.lojas.length;
     $('btn-edit').hidden = !api.canEdit;
     $('ro-badge').hidden = !!api.canEdit;
     fillTake(c); fillKpis(c, animate); fillPend(c);
@@ -173,8 +176,216 @@ export function mountConsolidado(root, api) {
       $('mv-ano').textContent = String(ano);
       pintarMaisVendidos($('mv-lista'), itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
       $('mv').hidden = !itens.length;
+      S.mv = { ano, itens };
+      PRES.actualizar(mesmoDiapositivo);
     });
   }
+
+  // ---------- Modo apresentação ----------
+  // Os controlos estão em apresentacao.js (os mesmos do painel de cada loja); aqui ficam os
+  // diapositivos da rede: cada livraria com a sua fotografia (separador Lojas) e a sua cor.
+  const mvRede = (ano) => (S.mv && S.mv.ano === ano ? S.mv.itens : []);
+  const mesmoDiapositivo = (a, b) => a.k === b.k && (a.l && b.l ? a.l.id === b.l.id : a.l === b.l);
+  const abs = (cls, css, text) => { const e = el('div', cls, text); if (css) Object.assign(e.style, css); return e; };
+  const logoClaro = () => ($('logo-claro') ? $('logo-claro').src : logoSrc());
+  const corPct = (p) => (p == null ? 's-mut' : p >= 0 ? 's-ok' : 's-bad');
+  const nomeDe = (l) => lojaDe({ name: l.nome });
+  function cabecaSlide(s, c, sub) {
+    s.append(abs('s-h', null, 'PAINEL DE VENDAS — TODAS AS LIVRARIAS'), abs('s-sub', null, sub));
+    const lg = el('img', 's-logo'); lg.src = logoSrc(); lg.alt = ''; s.appendChild(lg);
+    s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · Todas as livrarias · ' + c.ano));
+  }
+  /** Sem fotografia (ou se não carregar): a cor da loja com a terra em grande. */
+  function semFoto(caixa, l) {
+    caixa.classList.add('s-sem-foto');
+    caixa.appendChild(el('span', 's-sem-foto-t', nomeDe(l).replace(/^Loja (do|da|de) /, '')));
+  }
+  /** A primeira fotografia da galeria da loja a cobrir `caixa` (ou a cor da loja). */
+  function fotoDaLoja(caixa, l, i = 0) {
+    caixa.style.setProperty('--cor', l.cor);
+    const f = fotosDaLoja({ fotos: l.fotos }, 1)[0];
+    if (f) fotoEm(caixa, f.url, i, () => semFoto(caixa, l)); else semFoto(caixa, l);
+    return f || null;
+  }
+  /** As barras dos 12 meses de um modelo (ano anterior a cinzento, o ano na cor `cor`), a crescer. */
+  function barrasMeses(M, cor, depois, atraso = 500) {
+    const box = el('div', 's-mini');
+    const mx = Math.max(1, ...M.rows.map((r) => Math.max(r.v1 || 0, r.v2 ?? r.est ?? 0)));
+    M.rows.forEach((r, i) => {
+      const g = el('div', 'g' + (r.fora ? ' fora' : ''));
+      const b1 = el('i', 'a'); const b2 = el('i', 'b' + (r.v2 == null ? ' est' : ''));
+      b2.style.setProperty('--cor', cor);
+      g.append(b1, b2, el('span', null, MESES_CURTOS[i]));
+      box.appendChild(g);
+      depois(() => {
+        b1.style.height = ((r.v1 || 0) / mx * 100) + '%';
+        b2.style.height = ((r.v2 ?? r.est ?? 0) / mx * 100) + '%';
+      }, atraso + i * 50);
+    });
+    return box;
+  }
+  function desenharDiapositivo(s, it, { depois }) {
+    const c = S.c;
+    const R = c.total.R;
+    const A = c.ano;
+    const B = c.comp;
+    const comDados = c.lojas.filter((l) => l.temDados);
+    if (it.k === 'capa') {
+      s.classList.add('dark');
+      s.appendChild(abs('s-cover-glow'));
+      const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = logoClaro(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
+      const parede = abs('s-cover-capas'); parede.setAttribute('aria-hidden', 'true');
+      pintarParede(parede, capasParaFundo(mvRede(A), { n: 16, chave: `rede:${A}` }), { colunas: 4 });
+      s.append(parede, abs('s-cover-fade'));
+      const n = c.nComDados;
+      s.append(abs('s-cover-eye', null, 'TODAS AS LIVRARIAS'), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
+        abs('s-cover-s', null, (B != null ? 'Comparativo ' + B + ' vs ' + A + ' · ' : '') + n + (n === 1 ? ' livraria' : ' livrarias') + ' · Livraria e Editora Adventista, S.A.'));
+    } else if (it.k === 'livrarias') {
+      s.classList.add('dark');
+      s.append(abs('s-loja-eye', null, 'A REDE · ' + A), abs('s-loja-t', null, 'As livrarias'));
+      const lg = el('img', 's-logo'); lg.src = logoClaro(); lg.alt = ''; s.appendChild(lg);
+      const grade = abs('s-rede');
+      grade.style.setProperty('--cols', String(c.lojas.length <= 4 ? c.lojas.length : 3));
+      c.lojas.forEach((l, i) => {
+        const card = el('figure', 's-rede-l');
+        card.style.setProperty('--cor', l.cor);
+        card.style.animationDelay = (0.12 + i * 0.12) + 's';
+        const foto = el('div', 's-rede-foto');
+        fotoDaLoja(foto, l, i);
+        const cap = el('figcaption');
+        const L = l.M.R;
+        cap.append(el('b', null, nomeDe(l)));
+        if (l.temDados) {
+          cap.append(el('span', 'v', kz(L.ytd2)));
+          const q = el('span', 'q', pctS(l.quota) + ' da rede');
+          if (L.cresc_ytd != null) { q.append(' · '); q.append(el('em', corPct(L.cresc_ytd), pct(L.cresc_ytd))); }
+          cap.append(q);
+        } else cap.append(el('span', 'q', 'Sem vendas registadas em ' + A));
+        card.append(foto, cap);
+        grade.appendChild(card);
+      });
+      s.appendChild(grade);
+      s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — Todas as livrarias'));
+    } else if (it.k === 'resumo') {
+      cabecaSlide(s, c, 'Resumo da rede · ' + (R.ultimo ? 'até ' + R.ultimo.mes + (R.ultimo.estado !== 'Fechado' ? ' (parcial)' : '') : 'sem dados') + (c.filtro && c.filtro.texto ? ' · ' + c.filtro.texto : ''));
+      const tiles = el('div', 's-tiles');
+      const T = (k, d) => { const t = el('div', 's-tile'); t.append(el('div', 'k', k)); const vv = el('div', 'v', '—'); t.append(vv); t.append(el('div', 'd', d)); tiles.appendChild(t); return vv; };
+      const contas = [
+        [T('Vendas da rede ' + A, R.cresc_ytd != null ? pct(R.cresc_ytd) + ' nas lojas comparáveis vs ' + B : comDados.length + ' livrarias com vendas'), R.ytd2],
+        [T('Média mensal (meses completos)', R.media1 != null ? 'vs ' + kz(R.media1) + ' em ' + B : ''), R.media2],
+        [T('Melhor mês da rede', R.melhor ? R.melhor.mes + (R.melhor.cresc != null ? ' · ' + pct(R.melhor.cresc) : '') : '—'), R.melhor ? R.melhor.v2 : null],
+        [T('Projecção da rede ' + A, 'soma das projecções de cada loja'), R.projeccao],
+        [T(B != null ? 'Total da rede ' + B : 'Falta para a projecção', B != null ? 'ano completo' : ''), B != null ? R.total1 : R.falta],
+      ];
+      const lider = T('Livraria com mais vendas', c.melhorLoja ? pctS(c.melhorLoja.quota) + ' das vendas da rede' : '');
+      lider.textContent = c.melhorLoja ? nomeDe(c.melhorLoja) : '—';
+      lider.classList.add('nome');
+      s.appendChild(tiles);
+      contas.forEach(([e, v], i) => depois(() => countUp(e, v, kz, 1100), 200 + i * 90));
+      const barras = barrasMeses(c.total, '#EF8DB8', depois, 600);
+      barras.classList.add('s-mini-resumo');
+      s.appendChild(barras);
+    } else if (it.k === 'ranking') {
+      cabecaSlide(s, c, 'Ranking das livrarias · vendas de ' + A + ', quota na rede e crescimento' + (B != null ? ' face a ' + B : ''));
+      const lista = [...comDados].sort((a, b) => (a.posicao || 99) - (b.posicao || 99));
+      const max = Math.max(1, ...lista.map((l) => l.M.R.ytd2));
+      const box = abs('s-rank');
+      box.style.setProperty('--n', String(lista.length));
+      lista.forEach((l, i) => {
+        const row = el('div', 's-rank-l');
+        row.style.setProperty('--cor', l.cor);
+        const foto = el('div', 'f');
+        fotoDaLoja(foto, l, i);
+        const bar = el('div', 'b'); const fill = el('span'); bar.appendChild(fill);
+        row.append(el('span', 'p', (l.posicao || i + 1) + '.º'), foto, el('span', 'n', nomeDe(l)), bar,
+          el('span', 'v', kz(l.M.R.ytd2)), el('span', 'q', pctS(l.quota)), el('span', 'c ' + corPct(l.M.R.cresc_ytd), pct(l.M.R.cresc_ytd)));
+        box.appendChild(row);
+        depois(() => { row.classList.add('on'); fill.style.width = (l.M.R.ytd2 / max * 100) + '%'; }, 250 + i * 160);
+      });
+      s.appendChild(box);
+    } else if (it.k === 'loja') {
+      const l = c.lojas.find((x) => x.id === it.l.id) || it.l;
+      const L = l.M.R;
+      s.classList.add('dark');
+      s.style.setProperty('--cor', l.cor);
+      const foto = abs('s-lj-foto');
+      const f = fotoDaLoja(foto, l, 0);
+      if (f && f.caption) foto.appendChild(el('span', 's-lj-leg', f.caption));
+      s.appendChild(foto);
+      s.append(abs('s-lj-eye', null, ((l.posicao ? l.posicao + '.º de ' + comDados.length + ' livrarias' : 'Sem posição') + (l.provincia ? ' · ' + l.provincia : '')).toUpperCase()),
+        abs('s-lj-t', null, nomeDe(l)));
+      const lg = el('img', 's-logo'); lg.src = logoClaro(); lg.alt = ''; s.appendChild(lg);
+      const kp = abs('s-lj-kpis');
+      const K = (k, v, cls) => { const d = el('div', 'r'); d.append(el('span', 'k', k)); const vv = el('b', cls || null, v); d.append(vv); kp.appendChild(d); return vv; };
+      const vendas = K('Vendas ' + A + (L.ultimo ? ' · até ' + L.ultimo.mes : ''), '—');
+      K('Crescimento' + (B != null ? ' face a ' + B : ''), pct(L.cresc_ytd), corPct(L.cresc_ytd));
+      K('Quota na rede', pctS(l.quota));
+      K('Média mensal', kz(L.media2));
+      K('Melhor mês', L.melhor ? L.melhor.mes + ' · ' + kz(L.melhor.v2) : '—');
+      K('Projecção ' + A, kz(L.projeccao));
+      if (l.atrasados) K('Por registar', l.atrasados.join(', '), 's-warn');
+      s.appendChild(kp);
+      depois(() => countUp(vendas, L.ytd2, kz, 1100), 300);
+      const barras = barrasMeses(l.M, l.cor, depois, 700);
+      barras.classList.add('s-mini-loja');
+      s.appendChild(barras);
+      s.appendChild(abs('s-foot s-foot-dir', null, 'Livraria e Editora Adventista, S.A. — ' + nomeDe(l)));
+    } else if (it.k === 'mv') {
+      cabecaSlide(s, c, 'Os mais vendidos de ' + A + ' · unidades vendidas em todas as livrarias');
+      const itens = mvRede(A).slice(0, 6);
+      const lista = el('ol', 's-mv'); lista.style.setProperty('--n', String(itens.length));
+      pintarMaisVendidos(lista, itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+      lista.querySelectorAll('.mv-i').forEach((li, i) => { li.style.animationDelay = (0.2 + i * 0.12) + 's'; });
+      s.appendChild(lista);
+    } else if (it.k === 'quadro') {
+      cabecaSlide(s, c, 'Quadro das livrarias · valores em Kwanzas (AOA)' + (B != null ? ' · comparável: lojas e meses com valor nos dois anos' : ''));
+      const box = el('div', 's-table s-table-lojas'); const tb = el('table');
+      const th = el('thead'); const hr = el('tr');
+      ['Livraria', B != null ? 'Comparável ' + B : '—', 'Vendas ' + A, 'Crescimento', 'Quota', 'Projecção'].forEach((t) => hr.appendChild(el('th', null, t)));
+      th.appendChild(hr);
+      const body = el('tbody');
+      comDados.forEach((l, i) => {
+        const tr = el('tr', 'r');
+        const nome = el('td');
+        const ponto = el('i', 's-ponto'); ponto.style.background = l.cor;
+        nome.append(ponto, nomeDe(l));
+        tr.append(nome, el('td', null, B != null ? kz(l.M.R.ytd1) : '—'), el('td', null, kz(l.M.R.ytd2)),
+          el('td', corPct(l.M.R.cresc_ytd), pct(l.M.R.cresc_ytd)), el('td', null, pctS(l.quota)), el('td', null, kz(l.M.R.projeccao)));
+        body.appendChild(tr);
+        depois(() => tr.classList.add('on'), 200 + i * 110);
+      });
+      const tf = el('tfoot'); const fr = el('tr');
+      fr.append(el('td', null, 'Rede'), el('td', null, B != null ? kz(R.ytd1) : '—'), el('td', null, kz(R.ytd2)), el('td', corPct(R.cresc_ytd), pct(R.cresc_ytd)), el('td', null, '100%'), el('td', null, kz(R.projeccao)));
+      tf.appendChild(fr);
+      tb.append(th, body, tf); box.appendChild(tb); s.appendChild(box);
+    } else if (it.k === 'persp') {
+      s.classList.add('dark');
+      // Por trás, as fotografias das livrarias, esbatidas.
+      const fundo = abs('s-bg-mosaico');
+      c.lojas.forEach((l, i) => { const f = fotosDaLoja({ fotos: l.fotos }, 1)[0]; if (f) fundo.appendChild(fotoEm(el('div', 'm'), f.url, i)); });
+      if (fundo.childNodes.length) { fundo.style.setProperty('--n', String(fundo.childNodes.length)); s.append(fundo, abs('s-bg-veu')); }
+      s.appendChild(abs('s-rem-t', null, 'PERSPECTIVA DA REDE'));
+      s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — Todas as livrarias'));
+      const c1 = abs('s-rem-card', { left: '80px' }); c1.appendChild(abs('k', null, 'PERSPECTIVA ANUAL'));
+      const bx1 = abs('s-rem-box pink'); const a = el('div', 'a');
+      if (B != null) { a.append(document.createTextNode(B + ' – ')); a.append(el('b', null, grp(R.total1))); a.append(document.createTextNode(' AOA')); }
+      bx1.append(a, el('div', 'a', 'Previsão para ' + A + ':')); const pv = el('div', 'big', '—'); bx1.append(pv);
+      bx1.append(el('div', 'sm', (R.cresc_proj != null ? pct(R.cresc_proj) + ' face a ' + B + ' · ' : '') + 'soma das projecções de cada loja'));
+      c1.appendChild(bx1); s.appendChild(c1);
+      const c2 = abs('s-rem-card', { left: '680px' }); c2.appendChild(abs('k', null, 'SITUAÇÃO ACTUAL'));
+      const bx2 = abs('s-rem-box'); bx2.append(el('div', 'a', 'VALOR ACTUAL' + (R.ultimo ? ' (JAN–' + MESES_CURTOS[R.ultimo.i].toUpperCase() + ')' : '') + ':'));
+      const va = el('div', 'big g', '—'); bx2.append(va);
+      bx2.append(el('div', 'sm', R.falta != null ? 'Faltam ' + grp(R.falta) + ' para a previsão' : ''));
+      c2.appendChild(bx2); s.appendChild(c2);
+      depois(() => { countUp(pv, R.projeccao, grp, 1400); }, 300);
+      depois(() => { countUp(va, R.ytd2, grp, 1400); }, 700);
+    }
+  }
+  const PRES = montarApresentacao({
+    $, listen, reduce,
+    lista: () => (S.c && S.c.lojas.length ? diapositivosConjunto(S.c, { maisVendidos: mvRede(S.c.ano).length }) : []),
+    desenhar: desenharDiapositivo,
+  });
 
   function fillTake(c) {
     const R = c.total.R;
@@ -1188,14 +1399,18 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
         await imprimir(c);
         say('Relatório aberto noutra janela: escolha «Guardar como PDF» na impressão.', 'okk');
       } else if (fmt === 'video') {
-        const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
-        videoAbort = new AbortController();
-        $('exp-cancel').hidden = false;
-        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
-        Object.assign(c, await extrasDe(c.ano), { fundo: $('vid-fundo').value });
-        const { blob, ext, duracao } = await renderVideoConjunto(c, (t, total, cena) => say(`A gravar o vídeo ${RITMOS[ritmo].nome.replace('Vídeo ', '')}: ${fmtDuracao(t)} de ${fmtDuracao(total)}${cena ? ' · ' + cena.nome : ''}. Mantenha este separador aberto.`), { ritmo, signal: videoAbort.signal });
-        await api.downloads.save({ filename: `${base}-video-${ritmo}.${ext}`, data: blob });
-        say(`Vídeo pronto (${ext.toUpperCase()}, ${fmtDuracao(duracao)}).`, 'okk');
+        // O Estúdio de vídeo (estudio-video.js): pré-visualizar com som, a narração e as legendas, e gravar.
+        say('A abrir o Estúdio de vídeo…');
+        Object.assign(c, await extrasDe(c.ano));
+        $('exp-menu').hidden = true; $('btn-exp').setAttribute('aria-expanded', 'false');
+        abrirEstudio(root, {
+          tipo: 'conjunto', dados: c, ritmo: opts.ritmo, fundo: $('vid-fundo').value,
+          titulo: 'Todas as livrarias · ' + c.ano + (c.comp != null ? ' vs ' + c.comp : ''),
+          guardar: ({ blob, ext, ritmo }) => api.downloads.save({ filename: `${base}-video-${ritmo}.${ext}`, data: blob }),
+          aoMudarFundo: (v) => { $('vid-fundo').value = v; },
+          aoFechar: () => { if (!dead) $('btn-exp').focus(); },
+        });
+        say('');
       }
     } catch (e) {
       say((e && e.message) || 'Não foi possível exportar agora.', e && e.name === 'AbortError' ? '' : 'err');
@@ -1245,6 +1460,7 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
   return () => {
     dead = true;
     clearTimeout(rz);
+    PRES.desmontar();
     if (videoAbort) videoAbort.abort();
     offs.forEach((off) => off());
   };

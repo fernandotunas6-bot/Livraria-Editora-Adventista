@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado';
+import { aplicarSistema, anosDisponiveis, buildConsolidado, diapositivosConjunto, linhasTodosOsAnos, matrizLojasMeses } from './consolidado';
 import { buildYearModel, toC } from './modelo';
 
 const HUAMBO_2025 = [218675, 189500, 743550, 1053650, 1018225, 551909.65, 211650, 2904902, 430902, 2623345, 911316, 1101450];
@@ -179,5 +179,33 @@ describe('ajudantes', () => {
     // Um mês sem vendas no sistema (0) não apaga o que está gravado.
     expect(todos.meses.slice(0, 4)).toEqual([150, 200, 300, 400.56]);
     expect(todos.mudou.map((m) => m.mes)).toEqual(['Janeiro', 'Fevereiro', 'Abril']);
+  });
+});
+
+describe('diapositivosConjunto', () => {
+  const ks = (l) => l.map((x) => (x.k === 'loja' ? 'loja:' + x.l.id : x.k));
+
+  it('a rede, uma por livraria com vendas (pela posição) e o fecho', () => {
+    const c = buildConsolidado(lojas(), 2026, 2025);
+    expect(ks(diapositivosConjunto(c))).toEqual(['capa', 'livrarias', 'resumo', 'ranking', 'loja:huambo000000001', 'loja:lubango00000001', 'quadro', 'persp']);
+  });
+
+  it('com os mais vendidos, entram antes do quadro', () => {
+    const c = buildConsolidado(lojas(), 2026, 2025);
+    expect(ks(diapositivosConjunto(c, { maisVendidos: 3 }))).toContain('mv');
+    expect(ks(diapositivosConjunto(c, { maisVendidos: 3 })).slice(-3)).toEqual(['mv', 'quadro', 'persp']);
+  });
+
+  it('as fotografias de cada loja chegam ao modelo', () => {
+    const l = lojas();
+    l[1].fotos = [{ url: '/images/lojas/lubango-1.webp', caption: 'A entrada' }];
+    const c = buildConsolidado(l, 2026, 2025);
+    expect(c.lojas.find((x) => x.id === 'lubango00000001').fotos).toEqual([{ url: '/images/lojas/lubango-1.webp', caption: 'A entrada' }]);
+    expect(c.lojas.find((x) => x.id === 'huambo000000001').fotos).toEqual([]);
+  });
+
+  it('com uma só livraria não há ranking', () => {
+    const c = buildConsolidado(lojas().slice(0, 1), 2026, 2025);
+    expect(ks(diapositivosConjunto(c))).not.toContain('ranking');
   });
 });

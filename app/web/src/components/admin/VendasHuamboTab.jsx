@@ -3,6 +3,7 @@ import { Store } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { createPainelApi, detectMultiStore, listStores } from '@/painel-vendas/adapter';
+import { storeGallery } from '@/lib/stores';
 import { mountPainel } from '@/painel-vendas/painel.js';
 import css from '@/painel-vendas/painel.css?inline';
 import markup from '@/painel-vendas/painel.html?raw';
@@ -69,7 +70,8 @@ const VendasHuamboTab = () => {
     root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
     const api = createPainelApi({ id: userId, role }, {
       lojaId: multi ? storeId || null : null,
-      store: store ? { id: store.id, name: store.name, province: store.province } : null,
+      // As fotografias da galeria da loja (separador Lojas) entram no modo apresentação.
+      store: store ? { id: store.id, name: store.name, province: store.province, fotos: storeGallery(store) } : null,
       canReadOrders,
       canEdit,
       canReadSales,

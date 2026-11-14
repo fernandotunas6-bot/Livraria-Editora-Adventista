@@ -20,6 +20,8 @@ import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharMuralCapas,
 import { capasParaFundo } from './capas-de-fundo.js';
 import { destaqueDe } from './destaques.js';
 import { carregarFontes, fonteCanvas } from '../lib/fontes.js';
+import { esticarPlano, guiaoDoVideo, legendaNoTempo, tempoDasLegendas } from './guiao-video.js';
+import { pistaDeEfeitos } from './deixas-video.js';
 
 // ---------- Ritmos e planos ----------
 
@@ -251,10 +253,12 @@ function cabecalho(ctx, f, titulo, sub, { semFundo = false, subMax = 0 } = {}) {
 
 /** Rodapé: o quadro, o tempo e a barra de progresso do vídeo — para parar e voltar a um ponto. */
 function rodape(ctx, f, at) {
-  const y = H - 30;
-  txt(ctx, `Quadro ${at.i + 1} de ${f.plano.length} · ${at.cena.nome}`, 48, y, { w: 600, size: 14, color: COL.mut, max: 560 });
-  txt(ctx, `${relogio(at.t)} de ${relogio(f.total)}`, W - 48, y, { w: 700, size: 14, color: COL.mut, align: 'right' });
-  txt(ctx, f.fonteTxt, W / 2, y, { w: 500, size: 13, color: COL.dim, align: 'center', max: 420 });
+  // Com legendas, o rodapé desce um pouco e mais pequeno: a legenda fica entre ele e os números.
+  const y = f.comLegendas ? H - 15 : H - 30;
+  const px = f.comLegendas ? 12 : 14;
+  txt(ctx, `Quadro ${at.i + 1} de ${f.plano.length} · ${at.cena.nome}`, 48, y, { w: 600, size: px, color: COL.mut, max: 560 });
+  txt(ctx, `${relogio(at.t)} de ${relogio(f.total)}`, W - 48, y, { w: 700, size: px, color: COL.mut, align: 'right' });
+  txt(ctx, f.fonteTxt, W / 2, y, { w: 500, size: px - 1, color: COL.dim, align: 'center', max: 420 });
   ctx.fillStyle = COL.line;
   ctx.fillRect(0, H - 6, W, 6);
   ctx.fillStyle = COL.main;
@@ -1032,12 +1036,15 @@ function desenharConjunto(ctx, f, at, c) {
 
 // ---------- Gravação ----------
 
-function escolherFormato() {
+function escolherFormato(comSom = false) {
   if (typeof MediaRecorder === 'undefined' || typeof HTMLCanvasElement === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
     throw new Error('Este navegador não consegue gravar vídeo. Use o Chrome, o Edge ou o Firefox actualizados.');
   }
-  const mime = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-    .find((m) => MediaRecorder.isTypeSupported(m));
+  // Com som, um formato com áudio declarado (H.264 + AAC, ou VP9/VP8 + Opus).
+  const lista = comSom
+    ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4', 'video/webm']
+    : ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mime = lista.find((m) => MediaRecorder.isTypeSupported(m));
   if (!mime) throw new Error('Este navegador não tem nenhum formato de vídeo disponível para gravar.');
   return mime;
 }
@@ -1135,7 +1142,7 @@ function luzes(ctx, sec, clarao = 0) {
  * Um instante do vídeo: o quadro (ou a transição entre dois) e o acabamento. `desenhar(ctx, at)`
  * desenha um quadro; `telas` são dois canvas de trabalho (criados uma vez por vídeo).
  */
-function montar(ctx, plano, sec, desenhar, telas) {
+function montar(ctx, plano, sec, desenhar, telas, sobre = null) {
   const at = { ...cenaNoTempo(plano, sec), t: sec };
   const tr = estadoDaTransicao(plano, sec);
   if (tr) {
@@ -1162,44 +1169,100 @@ function montar(ctx, plano, sec, desenhar, telas) {
     desenhar(ctx, at);
     luzes(ctx, sec, 0);
   }
+  if (sobre) sobre(ctx, sec);
   graoDoFilme(ctx, sec);
   return at;
 }
 
-async function gravar(plano, desenhar, { onProgress, signal } = {}) {
-  const mime = escolherFormato();
+/**
+ * A legenda (o guião do quadro) numa faixa escura por cima do rodapé, uma linha de cada vez.
+ * `leg` vem de legendaNoTempo() (guiao-video.js), com a opacidade da entrada e da saída.
+ */
+function desenharLegenda(ctx, leg) {
+  if (!leg || !leg.texto || leg.alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = leg.alpha;
+  let px = 20;
+  ctx.font = FONT(600, px);
+  let w = ctx.measureText(leg.texto).width;
+  while (w > W - 220 && px > 14) { px -= 1; ctx.font = FONT(600, px); w = ctx.measureText(leg.texto).width; }
+  // Entre os nomes dos meses das barras de baixo (até y≈648) e o rodapé (a partir de y≈693).
+  const h = 34;
+  const y = 652;
+  const x = (W - w) / 2 - 20;
+  ctx.fillStyle = 'rgba(6,12,22,0.84)';
+  roundRect(ctx, x, y, w + 40, h, 10); ctx.fill();
+  ctx.fillStyle = COL.main;
+  roundRect(ctx, x, y + 9, 3, h - 18, 2); ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(leg.texto, W / 2, y + h / 2 + 1);
+  ctx.restore();
+}
+
+/**
+ * Grava o vídeo `V` (de prepararVideo) no `canvas` dado (ou num à parte). Com `mistura`
+ * (som-video.js), junta a faixa de áudio e o tempo do vídeo passa a ser o do relógio do áudio: a
+ * imagem e o som não se desencontram, mesmo que o separador abrande. onProgress(seg, total, cena, i).
+ */
+export async function gravarVideo(V, { canvas = null, mistura = null, musica = true, efeitos = true, onProgress, signal } = {}) {
+  const comSom = !!mistura;
+  const mime = escolherFormato(comSom);
   const FPS = 30;
-  const canvas = Object.assign(document.createElement('canvas'), { width: W, height: H });
-  const ctx = canvas.getContext('2d');
-  const total = duracaoPlano(plano);
-  const telas = [tela(), tela()];
-  const frame = (sec) => montar(ctx, plano, sec, desenhar, telas);
-  frame(0);
-  const stream = canvas.captureStream(FPS);
+  const tela0 = canvas || Object.assign(document.createElement('canvas'), { width: W, height: H });
+  const ctx = tela0.getContext('2d');
+  const total = V.total;
+  V.desenhar(ctx, 0);
+  const stream = tela0.captureStream(FPS);
+  let destino = null;
+  let sessao = null;
+  if (comSom) {
+    destino = mistura.ctx.createMediaStreamDestination();
+    mistura.master.connect(destino);
+    destino.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
+  }
   // O conteúdo é quase sempre parado: 5 Mb/s chegam para os números ficarem nítidos.
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000, ...(comSom ? { audioBitsPerSecond: 160_000 } : {}) });
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise((resolve) => { rec.onstop = resolve; });
   rec.start(1000);
   const t0 = performance.now();
+  let a0 = 0;
+  if (comSom) {
+    a0 = mistura.ctx.currentTime + 0.25;
+    sessao = mistura.tocar({ pista: V.pista, total, desde: 0, quando: a0, musicaLigada: musica, efeitosLigados: efeitos });
+  }
+  const agora = () => (comSom ? mistura.ctx.currentTime - a0 : (performance.now() - t0) / 1000);
   let cancelado = false;
-  await new Promise((resolve) => {
-    // setInterval continua (mais devagar) com o separador em segundo plano; requestAnimationFrame pararia.
-    const id = setInterval(() => {
-      if (signal && signal.aborted) { cancelado = true; clearInterval(id); resolve(); return; }
-      const sec = (performance.now() - t0) / 1000;
-      const at = frame(Math.min(sec, total));
-      onProgress?.(Math.min(sec, total), total, at.cena);
-      if (sec >= total + 0.4) { clearInterval(id); resolve(); }
-    }, 1000 / FPS);
-  });
-  rec.stop();
-  await done;
-  stream.getTracks().forEach((tr) => tr.stop());
+  try {
+    await new Promise((resolve) => {
+      // setInterval continua (mais devagar) com o separador em segundo plano; requestAnimationFrame pararia.
+      const id = setInterval(() => {
+        if (signal && signal.aborted) { cancelado = true; clearInterval(id); resolve(); return; }
+        const sec = Math.max(0, agora());
+        const at = V.desenhar(ctx, Math.min(sec, total));
+        onProgress?.(Math.min(sec, total), total, at.cena, at.i);
+        if (sec >= total + 0.4) { clearInterval(id); resolve(); }
+      }, 1000 / FPS);
+    });
+  } finally {
+    if (sessao) sessao.parar();
+    rec.stop();
+    await done;
+    stream.getVideoTracks().forEach((tr) => tr.stop());
+    if (destino) { try { mistura.master.disconnect(destino); } catch (e) { /* já desligado */ } }
+  }
   if (cancelado) { const e = new Error('Gravação do vídeo cancelada.'); e.name = 'AbortError'; throw e; }
   const type = mime.split(';')[0];
-  return { blob: new Blob(chunks, { type }), ext: type === 'video/mp4' ? 'mp4' : 'webm', duracao: total };
+  return { blob: new Blob(chunks, { type }), ext: type === 'video/mp4' ? 'mp4' : 'webm', duracao: total, comSom };
+}
+
+/** A gravação de antes (sem som nem legendas), para quem chama renderVideo/renderVideoConjunto. */
+async function gravar(plano, desenhar, { onProgress, signal } = {}) {
+  const telas = [tela(), tela()];
+  return gravarVideo({ total: duracaoPlano(plano), pista: [], desenhar: (ctx, sec) => montar(ctx, plano, sec, desenhar, telas) }, { onProgress, signal });
 }
 
 const fonteTxtDe = (fonte) => (fonte ? 'Fonte: ' + fonte : 'Livraria e Editora Adventista');
@@ -1266,6 +1329,38 @@ export async function renderVideoConjunto(c, onProgress, opts = {}) {
     etiqueta: `Todas as livrarias · ${c.ano}${c.comp ? ' vs ' + c.comp : ''}`, logoSrc: c.logo, logoClaroSrc: c.logoClaro,
   }, plano, { capas: capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))), fotos: c.fotos || [], fundo: fundoDe(c.fundo) });
   return gravar(plano, (ctx, at) => desenharConjunto(ctx, f, at, c), { onProgress, signal: opts.signal });
+}
+
+/**
+ * Prepara um vídeo para o Estúdio (pré-visualizar e gravar): o plano, o guião, as legendas, as
+ * deixas do som e a função que desenha qualquer instante. `tipo` = 'loja' (dados = exportData() do
+ * painel) ou 'conjunto' (dados = buildConsolidado() com geradoEm, logo e logoClaro).
+ * opts = { ritmo, fundo, legendas (desenhar o guião no vídeo), esticar (cada quadro do tamanho da
+ * frase: para as legendas e para quem narra) }.
+ */
+export async function prepararVideo(tipo, dados, opts = {}) {
+  const conjunto = tipo === 'conjunto';
+  const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
+  const plano0 = conjunto ? planoVideoConjunto(dados, ritmo) : planoVideo(dados, ritmo);
+  const guiao = guiaoDoVideo(tipo, dados, plano0, ritmo);
+  const plano = opts.esticar ? esticarPlano(plano0, guiao) : plano0;
+  const D = dados.destaques || {};
+  const capas = conjunto ? capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))) : capasDe(D);
+  const f = await preparar(conjunto
+    ? { ano: dados.ano, comp: dados.comp, critTxt: dados.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: dados.geradoEm, etiqueta: `Todas as livrarias · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo, logoClaroSrc: dados.logoClaro }
+    : { ano: dados.ano, comp: dados.comp, critTxt: dados.critTxt, fonte: dados.fonte, fonteTxt: fonteTxtDe(dados.fonte), geradoEm: dados.geradoEm, etiqueta: `${dados.loja} · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo, logoClaroSrc: dados.logoClaro },
+  plano, { capas, fotos: dados.fotos || [], fundo: fundoDe(dados.fundo) });
+  const legendas = opts.legendas ? tempoDasLegendas(plano, guiao) : [];
+  f.comLegendas = legendas.length > 0;
+  const telas = [tela(), tela()];
+  const cena = (c, a) => (conjunto ? desenharConjunto(c, f, a, dados) : desenharLoja(c, f, a, dados));
+  const sobre = legendas.length ? (c, sec) => desenharLegenda(c, legendaNoTempo(legendas, sec)) : null;
+  return {
+    tipo, ritmo, plano, total: f.total, guiao, legendas,
+    pista: pistaDeEfeitos(tipo, dados, plano),
+    /** Desenha o segundo `sec` em `ctx` (1280×720) e devolve o quadro em que está. */
+    desenhar: (ctx, sec) => montar(ctx, plano, sec, cena, telas, sobre),
+  };
 }
 
 /**

@@ -23,7 +23,11 @@
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M8.5 1 11 3.5 4 10.5H1.5V8z" fill="currentColor"/></svg>
           Lançar vendas
         </button>
-        <button class="btn" id="btn-exp" type="button" aria-haspopup="menu" aria-expanded="false" disabled>
+        <button class="btn" id="btn-pres" type="button" disabled>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1h10v7H1zM5 9h2v1.5h2V12H3v-1.5h2z" fill="currentColor"/></svg>
+          Modo apresentação
+        </button>
+        <button class="btn ghost" id="btn-exp" type="button" aria-haspopup="menu" aria-expanded="false" disabled>
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M5 1h2v5h2L6 9 3 6h2zM1 10h10v1.5H1z" fill="currentColor"/></svg>
           Exportar
         </button>
@@ -37,6 +41,7 @@
             <option value="simples">Simples (escuro)</option>
           </select>
         </label>
+        <p class="exp-nota">Os vídeos abrem no <b>Estúdio de vídeo</b>: música, efeitos de som, narração com a sua voz e legendas.</p>
         <button type="button" role="menuitem" data-fmt="video" data-ritmo="lento">Vídeo lento<span id="vid-lento">para analisar: cada loja e cada mês</span></button>
         <button type="button" role="menuitem" data-fmt="video" data-ritmo="normal">Vídeo normal<span id="vid-normal">os mesmos quadros, mais depressa</span></button>
         <button type="button" role="menuitem" data-fmt="video" data-ritmo="curto">Vídeo curto<span id="vid-curto">só o resumo da rede</span></button>
@@ -309,4 +314,19 @@
   </section>
 
   <div class="foot">Livraria e Editora Adventista, S.A. · Relatório conjunto das livrarias</div>
+</div>
+
+<!-- Modo apresentação (apresentacao.js, o mesmo do painel de cada loja): a rede, cada livraria com a sua fotografia. -->
+<div class="pres" id="pres" hidden role="dialog" aria-label="Modo apresentação">
+  <div class="pres-view" id="pres-view"><div class="pres-ptimer"><span id="pres-timer"></span></div></div>
+  <div class="pres-bar">
+    <button type="button" id="pr-prev" aria-label="Diapositivo anterior">◀</button>
+    <span class="cnt" id="pr-cnt">1 / 1</span>
+    <button type="button" id="pr-next" aria-label="Diapositivo seguinte">▶</button>
+    <button type="button" id="pr-play">Reproduzir</button>
+    <label for="pr-speed">Ritmo<select id="pr-speed"><option value="6000">6 s</option><option value="8000" selected>8 s</option><option value="12000">12 s</option></select></label>
+    <div class="grow" aria-hidden="true"><span id="pr-prog"></span></div>
+    <button type="button" id="pr-fs">Ecrã inteiro</button>
+    <button type="button" id="pr-close">Sair (Esc)</button>
+  </div>
 </div>

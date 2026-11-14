@@ -9,8 +9,10 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Strict-Transport-Security: max-age=15552000
   # A loja usa a localização para "lojas perto de mim" (StoresPage) e para as coordenadas das
-  # lojas no painel. Câmara, microfone e sensores de pagamento nunca são usados.
-  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=(), usb=()
+  # lojas no painel. O microfone só para o próprio site: a narração com a própria voz no Estúdio
+  # de vídeo dos relatórios (estudio-video.js), que só o pede quando alguém da equipa a liga.
+  # Câmara e sensores de pagamento nunca são usados.
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(self), payment=(), usb=()
   # Política de segurança de conteúdo. As origens foram levantadas do que o navegador
   # carrega de facto (`performance.getEntriesByType('resource')`), não só do código: a loja
   # usa o Supabase e as fontes do Google, e o painel acrescenta as APIs do Google Workspace.

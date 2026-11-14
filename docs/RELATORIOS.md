@@ -225,6 +225,55 @@ O plano de cada vídeo (`planoVideo`, `planoVideoConjunto`) é uma função pura
 `video.test.js`; `quadroDoVideo()` desenha um instante sem gravar (serve à imagem PNG e ao PDF do
 relatório conjunto, e para conferir o desenho num navegador).
 
+### O Estúdio de vídeo: som, narração e legendas
+
+Os botões **Vídeo lento / normal / curto** do menu Exportar abrem o **Estúdio de vídeo**
+(`estudio-video.js`), nos dois relatórios. É feito à maneira do Adobe Premiere, sem inteligência
+artificial e sem nada sair do navegador:
+
+| Parte | O que faz |
+|---|---|
+| **Monitor** | A pré-visualização do vídeo, com som, a partir de qualquer ponto (▶, ⏮, espaço, clicar na linha de tempo). |
+| **Linha de tempo** | Quatro pistas: **V1 Quadros** (um bloco por quadro, com a cor do tipo ou da loja), **A1 Narração** (o guião de cada quadro), **A2 Efeitos** (cada som no seu segundo, com a cor da família) e **A3 Música**. A cabeça de leitura vermelha mostra onde se está. |
+| **Mesa de som** | Ligar e o volume da **música**, dos **efeitos** e da **voz**; legendas; ouvir durante a gravação; ritmo e fundo. Fica lembrado no aparelho (`relatorios:estudio`). |
+| **Narração com a minha voz** | Liga o microfone (só aí o navegador pede autorização). O guião aparece no monitor, como teleponto, com a frase seguinte; antes de gravar há uma contagem de 3 segundos. A voz entra no ficheiro; a música baixa sozinha enquanto se fala (*ducking*); a voz não volta às colunas, para não haver eco. Com auscultadores ouve-se tudo. |
+| **Gravar o vídeo** | Grava com a faixa de áudio (MP4 com AAC no Chrome e no Edge; WebM com Opus no Firefox). O relógio do vídeo é o do áudio: a imagem e o som não se desencontram. |
+
+O microfone só funciona porque o `Permissions-Policy` do site (`app/web/public/_headers`) o deixa ao
+próprio site (`microphone=(self)`); antes estava fechado (`microphone=()`) e a narração seria recusada
+pelo navegador em produção. Nenhuma outra origem o pode pedir, e o site só o pede no Estúdio.
+
+**Os efeitos seguem o que cada quadro desenha** (`deixas-video.js`, puro e testado):
+
+| Momento do vídeo | Som |
+|---|---|
+| Transição entre quadros (o clarão e o zoom) | Um sopro que atravessa o ecrã da esquerda para a direita |
+| A capa | A **porta da loja a abrir**, com a campainha, e o impacto do título |
+| Cada livraria, no vídeo de todas as livrarias | A **porta dessa loja** a abrir |
+| Os números a contar (resumo, cada loja) | O **contador** (tiques que abrandam com a contagem) e, no fim, a **caixa registadora** |
+| As barras e o acumulado a crescer | Uma **subida** |
+| Crescimento positivo | Um toque a subir e **moedas** |
+| Crescimento negativo | Uma **descida** |
+| O melhor mês, a projecção | A caixa e um **brilho** |
+| Um mês por preencher, meses por registar | Um aviso suave |
+| As linhas do quadro geral, o ranking | Tiques, um por linha, e moedas no fim |
+| Os mais vendidos | Uma página a virar e um toque por livro |
+| O fecho | A **porta a fechar** e o acorde final da música |
+
+**O som é gerado no navegador** (`som-video.js`, Web Audio API): cada efeito é sintetizado uma vez
+(porta com rangido e campainha, caixa com mola, gaveta e sino, moedas com parciais metálicos,
+subidas e descidas filtradas, sinos…) e a música é um ciclo de quatro acordes em Ré maior a 88 bpm
+(pad, baixo, arpejo com eco e uma batida discreta), que se repete sem emenda. Não há ficheiros de
+áudio, nem licenças, nem serviços de fora, e o mesmo vídeo soa sempre igual. A mesa tem compressor e
+limitador no fim; medido na página de teste `e2e/painel/som.html`, os efeitos ficam 3 a 15 dB acima da
+música e o pico abaixo de 0 dBFS.
+
+**O guião e as legendas** (`guiao-video.js`, puro e testado): uma ou duas frases por quadro, tiradas
+dos números («Março: 4,96 milhões de Kz, contra 744 mil Kz em 2025 — +566,6%.»), completas no vídeo
+lento e breves no normal e no curto. Com legendas ou narração, cada quadro estica ao tempo de ler a
+frase em voz alta (14 caracteres por segundo); as legendas passam em pedaços de uma linha, por cima
+do rodapé, sem tapar os números.
+
 ## 6. Imagens e mais vendidos — a secção «Imagens dos vídeos»
 
 `/admin?tab=imagens-videos`, no grupo Relatórios (`ImagensVideosTab.jsx`), com duas vistas.
@@ -297,6 +346,38 @@ discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as uni
 
 Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
 
+**Imagens no modo apresentação** (`diapositivos` em `painel.js`; `fotosDaLoja` e os controlos em
+`apresentacao.js`, os mesmos nos dois relatórios):
+
+| Diapositivo | Imagem |
+|---|---|
+| Capa | A parede de capas do topo, à direita: os mais vendidos da loja no ano e, a completar, o catálogo |
+| **A loja** (a seguir à capa) | Até 3 fotografias da galeria da loja (separador **Lojas**), com as legendas; só aparece se a loja tiver fotografias |
+| **Os mais vendidos** (a seguir ao resumo) | Os 6 primeiros do ano, com capa, unidades e valor; sem capa, uma capa com o título. Só aparece se houver mais vendidos |
+| Perspectiva (o fecho) | A primeira fotografia da loja, esbatida por trás dos números |
+
+As fotografias só entram com endereço do próprio site ou `https`. Sem fotografias nem mais vendidos, a
+sequência é a de sempre. Os mais vendidos chegam depois de o painel abrir: se a apresentação já
+estiver aberta, o diapositivo junta-se à lista sem mudar o que está à vista.
+
+**Todas as livrarias** também tem modo apresentação (`diapositivosConjunto` em `consolidado.js`),
+com a galeria de cada loja:
+
+| Diapositivo | O que mostra |
+|---|---|
+| Capa | «Todas as livrarias», a parede de capas dos mais vendidos da rede |
+| **As livrarias** | Um cartão por loja com a primeira fotografia, a cor da loja, as vendas, a quota e o crescimento |
+| Resumo da rede | Vendas, média, melhor mês, projecção, ano anterior, a livraria líder e os 12 meses |
+| Ranking (com mais de uma loja) | As lojas pela posição, com a fotografia num círculo e a barra na cor da loja |
+| **Uma por livraria** (pela posição) | A fotografia à esquerda com a legenda; à direita as vendas, o crescimento, a quota, a média, o melhor mês, a projecção, os meses por registar e os 12 meses |
+| Os mais vendidos da rede | Se os houver |
+| Quadro das livrarias | Comparável, vendas, crescimento, quota e projecção, com o total da rede |
+| Perspectiva da rede | As fotografias das lojas esbatidas por trás da previsão e do valor actual |
+
+Uma loja sem fotografias (hoje o Bié) aparece com a sua cor e o nome da terra; para a ver com
+fotografia, juntam-se fotografias à galeria em **Admin → Lojas**. Com o filtro de lojas, só entram as
+escolhidas.
+
 **Filtros avançados** (barra «Filtros», por baixo do topo; `filtros.js` e `filtros-ui.js`):
 
 - **Período:** ano inteiro, 1.º a 4.º trimestre, 1.º e 2.º semestre, até ao último mês registado,
@@ -345,7 +426,12 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
 | `app/web/src/painel-vendas/modelo.js` | As contas de um ano (puro). Antes vivia dentro de `painel.js`. |
 | `app/web/src/painel-vendas/consolidado.js` | As contas da rede (puro). |
 | `app/web/src/painel-vendas/plausibilidade.js` | Os valores a confirmar e a origem de cada gravação (puro). |
-| `app/web/src/painel-vendas/video.js` | Os vídeos. |
+| `app/web/src/painel-vendas/video.js` | Os vídeos: o desenho, a preparação (`prepararVideo`) e a gravação com som (`gravarVideo`). |
+| `app/web/src/painel-vendas/estudio-video.js` | O Estúdio de vídeo: monitor, linha de tempo, mesa de som, narração e gravação. |
+| `app/web/src/painel-vendas/som-video.js` | O som: os efeitos e a música sintetizados, a mesa de mistura, o microfone. |
+| `app/web/src/painel-vendas/deixas-video.js` | Que som toca em que segundo de cada vídeo, e as notas da música (puro). |
+| `app/web/src/painel-vendas/guiao-video.js` | O guião, as legendas e o plano esticado ao tempo de leitura (puro). |
+| `app/web/src/painel-vendas/apresentacao.js` | Os controlos do modo apresentação, iguais nos dois relatórios, e as fotografias das lojas. |
 | `app/web/src/painel-vendas/imagens-video.js` | As paisagens desenhadas, as fotografias com movimento e o livro em 3D. |
 | `app/web/src/painel-vendas/destaques.js` | Os mais vendidos: o site e o lançado à mão, por loja, mês e ano, e a rede (puro). |
 | `app/web/src/painel-vendas/biblioteca.js` | Supabase: a biblioteca de imagens e os mais vendidos à mão. |
@@ -368,6 +454,8 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
 - `npm test`: `modelo.test.js` (as contas, com os números reais do Huambo, e o período até ao mês
   com os valores do PowerPoint), `consolidado.test.js`, `filtros.test.js`, `pptx.test.js` (o
   PowerPoint real do repositório), `capas-de-fundo.test.js`, `video.test.js` (com as transições),
+  `guiao-video.test.js` (o guião, os números ditos, as legendas), `deixas-video.test.js` (que som
+  toca em que quadro: portas, caixa, subidas, quedas; a música),
   `destaques.test.js`, `fontes.test.js`, `scripts/relatorios/pptx-para-sql.test.mjs`, `ImagensVideosTab.test.jsx`, `permissions.test.js` (as três
   listas de permissões), `adminSections.test.js`.
 - `plausibilidade.test.js` (os valores a confirmar, com os números reais das três lojas, e a
@@ -380,6 +468,10 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
   diz porquê quando uma gravação é recusada. Em Novembro de 2026 o painel de cada loja esteve
   partido em produção (o tree-shaking tirou o `.transition()` do d3) com todos os testes unitários
   verdes: é isto que o apanha.
+- O Estúdio de vídeo (`app/web/e2e/estudio-video.spec.js`): abre com as quatro pistas e os efeitos
+  no sítio, pré-visualiza e salta na linha de tempo; a banda sonora misturada à parte (página
+  `som.html`) tem cada efeito acima da música e sem saturar; e uma gravação a sério do vídeo curto de
+  todas as livrarias com narração (um microfone falso do Chromium) dá um ficheiro com faixa de áudio.
 - Base de dados, com as migrações reais (95 cenários: quem lê, grava e apaga, o histórico, os
   valores inválidos, os documentos, as vendas do sistema, os mais vendidos por produto, os lançados
   à mão, a biblioteca de imagens, a pasta do Storage e a gravação protegida — duas pessoas no mesmo
