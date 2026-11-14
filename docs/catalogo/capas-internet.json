@@ -582,8 +582,28 @@
     527,
     800
    ],
-   "nota": "",
-   "fonte": "iyquzwd0849dujw_0_ev.jpg"
+   "nota": "foto de livreiro: recortada pelos cantos à mão, para tirar a marca do telemóvel e o fundo",
+   "fonte": "iyquzwd0849dujw_0_ev.jpg",
+   "metodo": "branco",
+   "quad": [
+    [
+     89,
+     152
+    ],
+    [
+     420,
+     150
+    ],
+    [
+     420,
+     646
+    ],
+    [
+     87,
+     646
+    ]
+   ],
+   "inset": 1.5
   },
   {
    "id": "cyf3oea3iv325lh",

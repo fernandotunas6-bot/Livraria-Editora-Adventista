@@ -148,17 +148,46 @@ Os nomes que vieram truncados ou com gralhas do KiGest e que a capa e o ISBN con
 E o ISBN de «Princípios sobre Aposentadoria», que tinha uma gralha (`9788732534895` →
 `9788534534895`).
 
+## Descrições revistas
+
+As descrições dos produtos do KiGest foram escritas só a partir do nome do artigo, antes de se saber
+que livro era cada um. Com a capa e a página da editora identificadas, leram-se todas ao lado da
+sinopse da CPB (95) ou da capa (14). **25 foram reescritas** e a do «Mensageiro», que não tinha
+nenhuma, é nova. As outras dizem o mesmo que a editora e ficaram.
+
+| Porquê | Livros |
+|---|---|
+| Falavam de outro assunto | «Livre das Garras do Sucesso» (é sobre música, não sobre carreiras), «Vida e Ensinos» (a autobiografia de Ellen White, não a vida de Jesus), «Simples Demais» (a saúde da mente, não viver com menos), «Administração Eficaz» (mordomia, não gestão de instituições), «Profecias Surpreendentes» (as predições de Ellen White, não Daniel e o Apocalipse), «Sucesso em Dose Dupla» (empreendedores e colaboradores, não a família), «A Chave da Virada» (saúde emocional), «21 Dias para Mudar» (saúde), «Hinário Novo» (dizia «a numeração de sempre»; tem 600 hinos e numeração nova), «Por Detrás do Véu» (o duplicado) |
+| Chamavam folheto a um livro | «A Única Esperança», «Em Busca de Esperança», «Sinais de Esperança» (e «O Último Convite», no passo 5) |
+| Outro público ou outro género | «Inigualável» (estudo teológico, não leitura devocional), «Maravilhas da Criação» (13–16 anos), «Bíblia dos Aventureiros» (dizia «Desbravadores e Aventureiros»), «Chamados para Salvar» (guia de evangelismo), «Revolucione Seu Futuro» (carreira profissional) |
+| Prometiam o que ninguém confirmou | «Prazer em Conhecer Ellen White» («cem mil páginas»), «Orando como Nunca por Seu Marido», «O Ciclo da Infelicidade», «Ministério para as Cidades», «Além da Magia», «Bíblia do Desbravador», «Testemunhos para a Igreja Vol. 7» |
+
+Cada descrição nova diz o que o livro é, de que trata e para quem é, com o título completo e o autor
+tirados da capa, e só o que a editora ou a capa dizem. A migração só troca a descrição que ainda é a
+que foi escrita (compara a impressão md5 do texto), por isso não pisa uma descrição mudada no painel.
+O ficheiro de origem, [descricoes-kigest.json](descricoes-kigest.json), tem os textos novos.
+
+**Autores:** os 93 livros com autor conhecido (da página da CPB ou da capa) passam a tê-lo; as bíblias
+e o hinário ficam sem, porque na CPB o «autor» deles é a tradução ou a editora.
+
+**O «Mensageiro»** (Dirceu Madalena e Hirailton Vinhote Correa) tem agora capa, descrição e autor, e
+vai à venda pela mesma regra dos outros produtos do KiGest (preço, capa, descrição, nome legível).
+
+**Editora:** todo o catálogo, incluindo os livros antigos da CPB, tem a editora «Livraria e Editora
+Adventista». Parece ser a regra da casa, por isso não se mexeu; se a ideia for mostrar a editora de
+cada livro, os 95 com capa da CPB são da Casa Publicadora Brasileira.
+
 ## Notas para a equipa
 
 | Produto | Nota |
 |---|---|
-| «Mensageiro» (14159, oculto) | Ganhou a capa; falta-lhe a descrição para se publicar. |
 | «O Grande Conflito Infantil» (00033) | Pôs-se «Deus e o Anjo Rebelde — O Grande Conflito recontado», a versão para crianças da CPB. Provável, não confirmado. |
 | «Conselhos sobre Mordomia» | O ISBN da loja é de uma edição antiga; a capa é a da edição actual. |
 | «Conselhos sobre Escola Sabatina» (00700) e «Conselhos sobre a Escola Sabatina» (000201058) | São dois artigos no KiGest, ambos à venda no site, provavelmente duas edições do mesmo livro. Ficaram como estão. |
 | «Kit de Comentários» (00049, 160 000 Kz) | Pode ser o «Comentário Bíblico Andrews — 4 volumes» (161 100 Kz); não está confirmado e ficou como está. |
 | Bíblias dos Aventureiros e do Desbravador ocultas de 2026-11-10 (BIB-021 a BIB-024) | São as fotografias de cada cor; com as cores à escolha nas bíblias do KiGest, ficam ocultas. |
 | «Guia de Liberdade Religiosa», «Guiados por Deus», «Guia para Anciãos» | Só havia fotos pequenas (184–240 px de largura): ficam legíveis mas menos nítidas. |
+| «Guiados por Deus» e «Estarei Pronta no Sábado» | Não se encontrou de que tratam (só a capa); as descrições são as que foram escritas pelo nome. **Convém confirmar com o livro na mão.** |
 
 ## Os 44 que ficam com a capa tipográfica
 
