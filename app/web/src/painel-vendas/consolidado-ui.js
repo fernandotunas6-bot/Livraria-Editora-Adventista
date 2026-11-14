@@ -11,6 +11,7 @@ import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
 import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
 import { buildXlsx, toCsv } from './exportar.js';
+import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
 
 export function mountConsolidado(root, api) {
@@ -614,6 +615,7 @@ export function mountConsolidado(root, api) {
     edHints();
     edCheck();
     edSysButtons();
+    if (typeof pptEstado === 'function' && PPT.r) pptEstado();
   }
 
   function edInputs() { return [...root.querySelectorAll('#ed-grid input.v')]; }
@@ -723,6 +725,65 @@ export function mountConsolidado(root, api) {
       + (bad ? `${bad} valores não foram reconhecidos. ` : '') + `${n} meses aplicados à grelha. Reveja e carregue em Guardar.`;
     edCheck();
     edHints();
+  });
+
+  // ---------- Importar o PowerPoint da loja ----------
+  const PPT = { r: null, nome: '' };
+  function pptEstado() {
+    const r = PPT.r;
+    const go = $('ed-ppt-go');
+    if (!r) { go.disabled = true; return; }
+    const loja = lojaDoPptx(r.loja, ED.lojas);
+    const anos = Object.keys(r.anos).map(Number);
+    const temAno = anos.includes(S.ed.ano) && r.anos[S.ed.ano].some((v) => v != null);
+    go.disabled = !loja || !temAno;
+    go.textContent = `Aplicar ${S.ed.ano} à grelha`;
+    const ate = (a) => (r.ultimo[a] >= 0 ? `até ${MESES[r.ultimo[a]]}` : 'sem valores');
+    const partes = [`«${PPT.nome}»: ${r.loja ? 'Loja ' + (/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do ') + r.loja : 'loja sem nome'}`, anos.map((a) => `${a} ${ate(a)}`).join(', ')];
+    if (!loja) partes.push(r.loja ? `não há no painel uma loja com o nome «${r.loja}»` : 'não consegui ler o nome da loja');
+    else if (!temAno) partes.push(`não tem ${S.ed.ano}: abra ${anos.join(' ou ')} nos separadores acima`);
+    $('ed-ppt-st').textContent = partes.join(' · ') + '.';
+    $('ed-ppt-st').className = 'st' + (!loja ? ' err' : '');
+    const av = $('ed-ppt-av');
+    av.replaceChildren(...r.avisos.map((a) => el('li', null, a)));
+    av.hidden = !r.avisos.length;
+  }
+  $('ed-ppt').addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    PPT.r = null; PPT.nome = f.name;
+    $('ed-ppt-st').textContent = 'A ler o PowerPoint…'; $('ed-ppt-st').className = 'st';
+    $('ed-ppt-av').hidden = true;
+    try {
+      if (f.size > 40 * 1024 * 1024) throw new Error('O ficheiro passa de 40 MB.');
+      PPT.r = await lerPainelPptx(await f.arrayBuffer());
+    } catch (e) {
+      if (dead) return;
+      $('ed-ppt-st').textContent = (e && e.message) || 'Não foi possível ler este ficheiro.';
+      $('ed-ppt-st').className = 'st err';
+      $('ed-ppt-go').disabled = true;
+      return;
+    }
+    if (dead) return;
+    pptEstado();
+    ev.target.value = '';
+  });
+  $('ed-ppt-go').addEventListener('click', () => {
+    const r = PPT.r;
+    if (!r || !r.anos[S.ed.ano]) return;
+    const loja = lojaDoPptx(r.loja, ED.lojas);
+    const li = ED.lojas.indexOf(loja);
+    if (li < 0) return;
+    const inps = edInputs().filter((x) => Number(x.dataset.l) === li).sort((a, b) => a.dataset.i - b.dataset.i);
+    const atual = inps.map((x) => { const p = parseKz(x.value); return p.ok ? p.v : null; });
+    const { meses, mudou } = aplicarPptx(atual, r.anos[S.ed.ano]);
+    mudou.forEach((m) => { inps[m.i].value = inField(meses[m.i]); inps[m.i].classList.remove('sis'); inps[m.i].classList.add('ppt'); });
+    edCheck();
+    edHints();
+    $('ed-ppt-st').textContent = mudou.length
+      ? `${loja.name}, ${S.ed.ano}: ${mudou.length} ${mudou.length === 1 ? 'mês mudou' : 'meses mudaram'} (${mudou.map((m) => MESES_CURTOS[m.i]).join(', ')}). Reveja a verde e carregue em Guardar.`
+      : `${loja.name}, ${S.ed.ano}: a grelha já tem os valores do PowerPoint. Nada a mudar.`;
+    $('ed-ppt-st').className = 'st' + (mudou.length ? ' okk' : '');
   });
 
   $('ed-cancel').addEventListener('click', () => { edRender(); edStatus('Alterações descartadas.'); });
