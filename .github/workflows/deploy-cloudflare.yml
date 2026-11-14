@@ -60,16 +60,19 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       # Cria o projecto no Cloudflare Pages na primeira vez; se já existir, não faz nada.
+      # O wrangler tem a versão fixa, como as acções (fixadas por SHA): este passo corre com o token
+      # da Cloudflare no ambiente, e `wrangler@3` descarregava a versão 3.x que estivesse no npm
+      # nesse dia. Para actualizar, mudar aqui e no `wranglerVersion` do passo seguinte.
       - name: Garantir que o projecto Pages existe
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
         run: |
-          if npx --yes wrangler@3 pages project list 2>/dev/null | grep -qw -- "$PROJECT"; then
+          if npx --yes wrangler@3.114.17 pages project list 2>/dev/null | grep -qw -- "$PROJECT"; then
             echo "Projecto $PROJECT já existe."
           else
-            npx --yes wrangler@3 pages project create "$PROJECT" --production-branch=main
+            npx --yes wrangler@3.114.17 pages project create "$PROJECT" --production-branch=main
           fi
 
       - name: Publicar no Cloudflare Pages
@@ -77,4 +80,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '3.114.17'
           command: pages deploy dist/app/web --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main

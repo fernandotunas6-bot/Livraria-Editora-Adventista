@@ -93,5 +93,18 @@ await q(job.command);
 const [{ n }] = await q(`select count(*)::int n from private.site_events where name = 'CLS'`);
 check('a limpeza apaga o que passou dos 30 dias', n === 0, n);
 
+// O registo das execuções do pg_cron (migração limpeza_do_registo_do_cron): fica só duas semanas.
+{
+  const [cron] = await q(`select schedule, command from cron.job where jobname = 'limpeza-cron'`);
+  check('a limpeza do registo do pg_cron está agendada, uma vez por dia', cron && cron.schedule === '53 3 * * *' && /14 days/.test(cron.command), cron);
+  await q(`insert into cron.job_run_details (jobid, status, start_time, end_time) values
+             (1, 'succeeded', now() - interval '20 days', now() - interval '20 days'),
+             (1, 'failed', now() - interval '3 days', now() - interval '3 days'),
+             (1, 'running', now(), null)`);
+  await q(cron.command);
+  const linhas = await q(`select status from cron.job_run_details order by runid`);
+  check('apaga só as execuções com mais de 14 dias (e nunca as que estão a correr)', linhas.map((l) => l.status).join() === 'failed,running', linhas);
+}
+
 console.log(`saude: ${ok} certos, ${fail} falhados`);
 if (fail) process.exit(1);

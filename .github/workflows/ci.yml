@@ -147,9 +147,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A mesma versão do CLI que publica em produção (deploy-supabase.yml): com `latest`, o CI
+      # podia validar as migrações com um CLI diferente do que as aplica.
       - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v1 (v1.7.3)
         with:
-          version: latest
+          version: 2.121.0
 
       - name: Postgres local com todas as migrações
         run: supabase db start

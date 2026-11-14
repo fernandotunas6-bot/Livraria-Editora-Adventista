@@ -21,12 +21,13 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
       PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
     steps:
       - name: Confirmar segredos e variáveis
         run: |
           missing=""
-          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD BACKUP_PASSPHRASE PROJECT_REF; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
@@ -51,6 +52,54 @@ jobs:
             echo "::error::Versões de migração repetidas: $repetidas"
             exit 1
           fi
+
+      # O plano Free não tem recuperação pontual (PITR) e o backup semanal pode ter até 7 dias: antes
+      # de aplicar migrações — algumas mexem nos dados (encomendas, vendas) — tira-se um backup
+      # completo, cifrado como o semanal (backup-base-dados.yml; restauro em docs/BACKUPS.md). Só
+      # quando há alguma por aplicar. Se o backup falhar, produção não é tocada.
+      - name: Há migrações por aplicar?
+        id: pendentes
+        run: |
+          set -o pipefail
+          saida=$(supabase db push --include-all --dry-run 2>&1) || { echo "$saida"; exit 1; }
+          echo "$saida"
+          if echo "$saida" | grep -qi "up to date"; then
+            echo "aplicar=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "aplicar=sim" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Backup antes das migrações (cifrado)
+        if: steps.pendentes.outputs.aplicar == 'sim'
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%MZ)"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          mkdir -p "backup-$stamp"
+          supabase db dump --linked -f "backup-$stamp/roles.sql" --role-only
+          supabase db dump --linked -f "backup-$stamp/schema.sql"
+          supabase db dump --linked -f "backup-$stamp/data.sql" --use-copy --data-only
+          for f in roles schema data; do
+            size=$(stat -c %s "backup-$stamp/$f.sql")
+            echo "$f.sql: $size bytes"
+            [ "$size" -gt 100 ] || { echo "::error::$f.sql veio vazio: não se aplicam migrações sem backup"; exit 1; }
+          done
+          ( cd "backup-$stamp" && sha256sum *.sql > SHA256SUMS )
+          tar -czf "backup-$stamp.tar.gz" "backup-$stamp"
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase-fd 0 -o "backup-$stamp.tar.gz.gpg" "backup-$stamp.tar.gz" <<< "$BACKUP_PASSPHRASE"
+          sha256sum "backup-$stamp.tar.gz.gpg" > "backup-$stamp.tar.gz.gpg.sha256"
+          rm -rf "backup-$stamp" "backup-$stamp.tar.gz"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.pendentes.outputs.aplicar == 'sim'
+        with:
+          name: backup-antes-do-deploy-${{ env.STAMP }}
+          path: |
+            backup-*.tar.gz.gpg
+            backup-*.tar.gz.gpg.sha256
+          retention-days: 30
+          if-no-files-found: error
 
       # `--include-all`: há PRs em paralelo com migrações do mesmo dia. Sem isto, quando um PR
       # com migrações mais antigas entra depois de outro com mais recentes, o `db push` recusa-as
