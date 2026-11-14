@@ -200,14 +200,14 @@ function header(ctx, d, W, logo, title) {
   }
   ctx.fillStyle = COL.mut; ctx.font = FONT(600, 18); ctx.textAlign = 'right';
   ctx.fillText(`${d.loja} · ${d.ano}${d.comp ? ' vs ' + d.comp : ''}`, W - 48, 64);
-  ctx.textAlign = 'left'; ctx.fillStyle = COL.fg; ctx.font = FONT(800, 38);
+  ctx.textAlign = 'left'; ctx.fillStyle = COL.fg; ctx.font = fonteCanvas(600, 38, { titulo: true });
   ctx.fillText(title, 48, 140);
 }
 
 function kpiCard(ctx, x, y, w, h, label, value, delta, deltaColor) {
   ctx.fillStyle = COL.card; roundRect(ctx, x, y, w, h, 16); ctx.fill();
   ctx.fillStyle = COL.mut; ctx.font = FONT(600, 17); ctx.fillText(label, x + 22, y + 38);
-  ctx.fillStyle = COL.fg; ctx.font = FONT(800, w > 300 ? 34 : 28); ctx.fillText(value, x + 22, y + 88);
+  ctx.fillStyle = COL.fg; ctx.font = FONT(700, w > 300 ? 34 : 28); ctx.fillText(value, x + 22, y + 88);
   if (delta) { ctx.fillStyle = deltaColor || COL.mut; ctx.font = FONT(700, 17); ctx.fillText(delta, x + 22, y + 122); }
 }
 

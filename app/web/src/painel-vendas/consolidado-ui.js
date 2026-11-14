@@ -201,7 +201,7 @@ export function mountConsolidado(root, api) {
   function setKpi(n, lab, val, delta, { animate, fmt = kz, raw = null, small = false } = {}) {
     $(`k${n}-lab`).textContent = lab;
     const v = $(`k${n}`);
-    v.style.fontSize = small ? '19px' : '';
+    v.classList.toggle('txt', small);
     if (animate && raw != null) countUp(v, raw, fmt); else v.textContent = val;
     const d = $(`k${n}-d`);
     d.replaceChildren(...(Array.isArray(delta) ? delta : [delta || ' ']));

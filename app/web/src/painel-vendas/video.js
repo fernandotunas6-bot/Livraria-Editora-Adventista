@@ -163,11 +163,12 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 /** Escreve `text` reduzindo a letra até caber em `max` px. */
-function txt(ctx, text, x, y, { w = 600, size = 16, color = COL.fg, align = 'left', max = 0 } = {}) {
+function txt(ctx, text, x, y, { w = 600, size = 16, color = COL.fg, align = 'left', max = 0, titulo = false } = {}) {
   const s = String(text ?? '');
   let px = size;
-  ctx.font = FONT(w, px);
-  if (max) while (px > 10 && ctx.measureText(s).width > max) { px -= 1; ctx.font = FONT(w, px); }
+  const fonte = (p) => (titulo ? fonteCanvas(w, p, { titulo: true }) : FONT(w, p));
+  ctx.font = fonte(px);
+  if (max) while (px > 10 && ctx.measureText(s).width > max) { px -= 1; ctx.font = fonte(px); }
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.fillText(s, x, y);
@@ -244,7 +245,7 @@ function cabecalho(ctx, f, titulo, sub, { semFundo = false, subMax = 0 } = {}) {
     ctx.drawImage(f.logo, 50, 32, w, h);
   }
   txt(ctx, f.etiqueta, W - 48, 56, { w: 600, size: 17, color: COL.mut, align: 'right', max: 640 });
-  if (titulo) txt(ctx, titulo, 48, 128, { w: 800, size: 36, max: W - 96 });
+  if (titulo) txt(ctx, titulo, 48, 128, { w: 600, size: 36, max: W - 96, titulo: true });
   if (sub) txt(ctx, sub, 48, 158, { w: 600, size: 18, color: semFundo ? '#C9D3E2' : COL.mut, max: subMax || W - 96 });
 }
 
@@ -264,7 +265,7 @@ function kpiCard(ctx, x, y, w, h, label, value, delta, deltaColor, k = 1) {
   card(ctx, x, y, w, h);
   txt(ctx, label, x + 22, y + 36, { w: 700, size: 15, color: COL.mut, max: w - 44 });
   ctx.globalAlpha = 0.25 + 0.75 * k;
-  txt(ctx, value, x + 22, y + 82, { w: 800, size: 30, max: w - 44 });
+  txt(ctx, value, x + 22, y + 82, { w: 700, size: 30, max: w - 44 });
   ctx.globalAlpha = 1;
   if (delta) txt(ctx, delta, x + 22, y + 116, { w: 700, size: 15, color: deltaColor || COL.mut, max: w - 44 });
 }
@@ -274,7 +275,7 @@ function linhas(ctx, x, y, w, rows, { step = 30, size = 17 } = {}) {
   rows.forEach(([k, v, c], i) => {
     const yy = y + i * step;
     txt(ctx, k, x, yy, { w: 600, size: size - 1, color: COL.mut, max: w * 0.55 });
-    txt(ctx, v, x + w, yy, { w: 800, size, color: c || COL.fg, align: 'right', max: w * 0.45 });
+    txt(ctx, v, x + w, yy, { w: 700, size, color: c || COL.fg, align: 'right', max: w * 0.45 });
     if (i < rows.length - 1) { ctx.fillStyle = COL.line; ctx.fillRect(x, yy + step / 2 - 2, w, 1); }
   });
 }
@@ -381,7 +382,7 @@ function linhaAcumulada(ctx, f, M, x, y, w, h, prog) {
     const last = [...rows].reverse().find((r) => r.acum2 != null);
     if (last) {
       ctx.fillStyle = COL.main; ctx.beginPath(); ctx.arc(px(last.i), py(last.acum2), 6, 0, Math.PI * 2); ctx.fill();
-      txt(ctx, kz(last.acum2), px(last.i) + (last.i > 8 ? -12 : 12), py(last.acum2) - 14, { w: 800, size: 16, align: last.i > 8 ? 'right' : 'left' });
+      txt(ctx, kz(last.acum2), px(last.i) + (last.i > 8 ? -12 : 12), py(last.acum2) - 14, { w: 700, size: 16, align: last.i > 8 ? 'right' : 'left' });
     }
     if (f.comp && M.R.total1) txt(ctx, `Total ${f.comp}: ${kz(M.R.total1)}`, x + w, py(M.R.total1) - 12, { w: 700, size: 14, color: COL.comp, align: 'right' });
     if (proj) {
@@ -424,7 +425,7 @@ function cenaCapa(ctx, f, at, titulo, linha2, linha3, livros) {
   const al = temLivros ? 'left' : 'center';
   const max = temLivros ? 640 : W - 140;
   ctx.globalAlpha = k;
-  txt(ctx, titulo, x, 300 + (1 - k) * 20, { w: 800, size: 58, align: al, max });
+  txt(ctx, titulo, x, 300 + (1 - k) * 20, { w: 600, size: 58, align: al, max, titulo: true });
   txt(ctx, linha2, x, 362, { w: 700, size: 32, color: COL.main, align: al, max });
   txt(ctx, linha3, x, 410, { w: 600, size: 24, color: '#D5DCE8', align: al, max });
   txt(ctx, 'Valores em Kwanzas (AOA), com cêntimos · Gerado em ' + f.geradoEm, x, 462, { w: 500, size: 17, color: '#B7C2D3', align: al, max });
@@ -447,7 +448,7 @@ function cenaDestaque(ctx, f, at, ambito, rotulo) {
   const kb = ease((at.s - 0.2) / 1.1);
   desenharLivro(ctx, { img: imagemDe(f, d), titulo: d.titulo, cx: 940, cy: 380 + (1 - kb) * 60, h: 440, t: at.s, giro: 0.4, alpha: kb });
   ctx.globalAlpha = k;
-  const linhas = partirTexto(ctx, d.titulo, 556, FONT(800, 38), 3);
+  const linhas = partirTexto(ctx, d.titulo, 556, FONT(700, 38), 3);
   const y0 = 222 + linhas.length * 46 + 8;
   // O cartão à medida do que leva (o título pode ter uma a três linhas).
   const alto = y0 + 178 + 34 - 120;
@@ -457,8 +458,8 @@ function cenaDestaque(ctx, f, at, ambito, rotulo) {
   ctx.translate(0, dy);
   ctx.fillStyle = 'rgba(10,18,32,0.62)';
   roundRect(ctx, 48, 120, 620, alto, 20); ctx.fill();
-  txt(ctx, `O MAIS VENDIDO DE ${f.ano}${rotulo ? ' · ' + rotulo.toUpperCase() : ''}`, 80, 170, { w: 800, size: 17, color: COL.main, max: 560 });
-  linhas.forEach((l, i) => txt(ctx, l, 80, 222 + i * 46, { w: 800, size: 38, max: 556 }));
+  txt(ctx, `O MAIS VENDIDO DE ${f.ano}${rotulo ? ' · ' + rotulo.toUpperCase() : ''}`, 80, 170, { w: 700, size: 17, color: COL.main, max: 560 });
+  linhas.forEach((l, i) => txt(ctx, l, 80, 222 + i * 46, { w: 700, size: 38, max: 556 }));
   const quadro = [
     ['Unidades vendidas', unid(d.unidades)],
     ['Valor das vendas', d.valor != null ? kz(d.valor) : '—'],
@@ -469,7 +470,7 @@ function cenaDestaque(ctx, f, at, ambito, rotulo) {
     const x = 80 + (i % 2) * 290;
     const y = y0 + Math.floor(i / 2) * 84;
     txt(ctx, rot, x, y + 20, { w: 700, size: 15, color: '#AEBBCD', max: 270 });
-    txt(ctx, val, x, y + 52, { w: 800, size: 25, max: 270 });
+    txt(ctx, val, x, y + 52, { w: 700, size: 25, max: 270 });
   });
   const yb = y0 + 178;
   const extras = [
@@ -499,10 +500,10 @@ function cenaMaisVendidos(ctx, f, at, ambito, rotulo) {
     // O lugar, num círculo.
     ctx.fillStyle = i === 0 ? COL.main : 'rgba(10,18,32,0.75)';
     ctx.beginPath(); ctx.arc(cx - 70, 232, 22, 0, Math.PI * 2); ctx.fill();
-    txt(ctx, `${i + 1}º`, cx - 70, 240, { w: 800, size: 18, align: 'center' });
+    txt(ctx, `${i + 1}º`, cx - 70, 240, { w: 700, size: 18, align: 'center' });
     const linhas = partirTexto(ctx, it.titulo, passo - 24, FONT(700, 17), 2);
     linhas.forEach((l, j) => txt(ctx, l, cx, 528 + j * 22, { w: 700, size: 17, align: 'center', max: passo - 20 }));
-    txt(ctx, unid(it.unidades), cx, 528 + linhas.length * 22 + 8, { w: 800, size: 17, color: '#F7C8DB', align: 'center', max: passo - 20 });
+    txt(ctx, unid(it.unidades), cx, 528 + linhas.length * 22 + 8, { w: 700, size: 17, color: '#F7C8DB', align: 'center', max: passo - 20 });
     if (it.valor != null) txt(ctx, kz(it.valor), cx, 528 + linhas.length * 22 + 32, { w: 600, size: 15, color: '#C9D3E2', align: 'center', max: passo - 20 });
     ctx.globalAlpha = 1;
   });
@@ -580,7 +581,7 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) 
         ctx.strokeStyle = COL.main; ctx.setLineDash([5, 4]); ctx.lineWidth = 2;
         roundRect(ctx, cx, base - bh, 96, bh, 8); ctx.stroke(); ctx.setLineDash([]);
       }
-      txt(ctx, valTxt, cx + 48, base - bh - 12, { w: 800, size: 17, align: 'center', max: 200 });
+      txt(ctx, valTxt, cx + 48, base - bh - 12, { w: 700, size: 17, align: 'center', max: 200 });
       txt(ctx, etiqueta, cx + 48, base + 28, { w: 700, size: 17, color: COL.mut, align: 'center' });
     };
     bar(lx + 40, B != null ? r.v1 : null, COL.comp, 1, B != null ? String(B) : 'sem comparação', B != null ? kz(r.v1) : '');
@@ -590,13 +591,13 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) 
     txt(ctx, r.v2 == null ? 'Crescimento estimado' : 'Crescimento', gx, ly + 70, { w: 700, size: 15, color: COL.mut, max: gmax });
     ctx.globalAlpha = clamp01(at.s / animDe(at.cena) * 1.5 - 0.4);
     if (r.cresc != null) {
-      txt(ctx, pct(r.cresc), gx, ly + 122, { w: 800, size: 44, color: corDe(r.cresc), max: gmax });
+      txt(ctx, pct(r.cresc), gx, ly + 122, { w: 700, size: 44, color: corDe(r.cresc), max: gmax });
       txt(ctx, kzs(r.dif), gx, ly + 156, { w: 700, size: 16, color: corDe(r.dif), max: gmax });
     } else if (crescEst != null) {
-      txt(ctx, '≈ ' + pct(crescEst), gx, ly + 122, { w: 800, size: 36, color: COL.mut, max: gmax });
+      txt(ctx, '≈ ' + pct(crescEst), gx, ly + 122, { w: 700, size: 36, color: COL.mut, max: gmax });
       txt(ctx, 'se o mês chegar à estimativa', gx, ly + 156, { w: 600, size: 14, color: COL.mut, max: gmax });
     } else {
-      txt(ctx, r.estado === 'Por preencher' ? 'Por preencher' : 'Sem comparação', gx, ly + 116, { w: 800, size: 22, color: COL.mut, max: gmax });
+      txt(ctx, r.estado === 'Por preencher' ? 'Por preencher' : 'Sem comparação', gx, ly + 116, { w: 700, size: 22, color: COL.mut, max: gmax });
     }
     if (r.estado === 'Em curso') txt(ctx, 'Mês em curso: o valor ainda pode subir', gx, ly + 186, { w: 600, size: 14, color: COL.amber, max: gmax });
     if (livro) {
@@ -604,7 +605,7 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) 
       const kl = ease((at.s - 0.6) / 0.8);
       desenharLivro(ctx, { img: imagemDe(f, livro), titulo: livro.titulo, cx: gx + 30, cy: ly + 262 + (1 - kl) * 16, h: 92, t: at.s, giro: 0.36, alpha: kl, reflexo: false });
       ctx.globalAlpha = kl;
-      txt(ctx, 'MAIS VENDIDO', gx + 70, ly + 232, { w: 800, size: 11, color: COL.main });
+      txt(ctx, 'MAIS VENDIDO', gx + 70, ly + 232, { w: 700, size: 11, color: COL.main });
       partirTexto(ctx, livro.titulo, gmax - 72, FONT(700, 13), 3).forEach((l, i) => txt(ctx, l, gx + 70, ly + 252 + i * 17, { w: 700, size: 13, max: gmax - 72 }));
       txt(ctx, unid(livro.unidades), gx + 70, ly + 310, { w: 600, size: 12, color: COL.mut, max: gmax - 72 });
       ctx.globalAlpha = 1;
@@ -684,11 +685,11 @@ function cenaQuadro(ctx, f, at, M) {
   });
   const yt = y0 + rh * 13 + 4;
   ctx.fillStyle = COL.line; ctx.fillRect(64, yt - 22, W - 128, 2);
-  txt(ctx, 'Comparável' + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''), 64, yt, { w: 800, size: 15, max: 250 });
-  txt(ctx, kz(R.ytd1), 420, yt, { w: 800, size: 15, align: 'right' });
-  txt(ctx, kz(R.ytd2c), 640, yt, { w: 800, size: 15, align: 'right' });
-  txt(ctx, kzs(R.dif_ytd), 840, yt, { w: 800, size: 15, color: corDe(R.dif_ytd), align: 'right' });
-  txt(ctx, pct(R.cresc_ytd), 950, yt, { w: 800, size: 15, color: corDe(R.cresc_ytd), align: 'right' });
+  txt(ctx, 'Comparável' + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''), 64, yt, { w: 700, size: 15, max: 250 });
+  txt(ctx, kz(R.ytd1), 420, yt, { w: 700, size: 15, align: 'right' });
+  txt(ctx, kz(R.ytd2c), 640, yt, { w: 700, size: 15, align: 'right' });
+  txt(ctx, kzs(R.dif_ytd), 840, yt, { w: 700, size: 15, color: corDe(R.dif_ytd), align: 'right' });
+  txt(ctx, pct(R.cresc_ytd), 950, yt, { w: 700, size: 15, color: corDe(R.cresc_ytd), align: 'right' });
   txt(ctx, `Total ${f.ano}: ${kz(R.ytd2)}${B != null ? ' · Total ' + B + ': ' + kz(R.total1) : ''} · Projecção: ${kz(R.projeccao)}`, 64, yt + 34, { w: 600, size: 15, color: COL.mut, max: W - 128 });
 }
 
@@ -707,12 +708,12 @@ function cenaRanking(ctx, f, at, M) {
   lista.forEach((r, i) => {
     const y = 196 + i * rh;
     const k = ease((at.s - i * 0.08) / 0.8);
-    txt(ctx, ord(i + 1), 64, y + rh * 0.62, { w: 800, size: 16, color: i < 3 ? COL.main : COL.mut });
+    txt(ctx, ord(i + 1), 64, y + rh * 0.62, { w: 700, size: 16, color: i < 3 ? COL.main : COL.mut });
     txt(ctx, r.mes, 110, y + rh * 0.62, { w: 700, size: 16 });
     const bw = 560 * (r.v2 / max) * k;
     ctx.fillStyle = i < 3 ? COL.main : COL.mainSoft;
     roundRect(ctx, 240, y + 6, Math.max(2, bw), rh - 12, 5); ctx.fill();
-    txt(ctx, kz(r.v2), W - 220, y + rh * 0.62, { w: 800, size: 16, align: 'right' });
+    txt(ctx, kz(r.v2), W - 220, y + rh * 0.62, { w: 700, size: 16, align: 'right' });
     txt(ctx, r.cresc == null ? '(—)' : '(' + pct(r.cresc) + ')', W - 64, y + rh * 0.62, { w: 700, size: 15, color: corDe(r.cresc), align: 'right' });
   });
 }
@@ -726,15 +727,15 @@ function cenaFecho(ctx, f, at, M, titulo, nota) {
   const cw = (W - 96 - 20) / 2;
   const vidro = f.fundo === 'simples' ? COL.card2 : 'rgba(16,30,52,0.84)';
   card(ctx, 48, 190, cw, 320, vidro);
-  txt(ctx, 'PROJECÇÃO ' + f.ano, 76, 236, { w: 800, size: 16, color: COL.main });
-  txt(ctx, kz(R.projeccao), 76, 300, { w: 800, size: 40, max: cw - 56 });
+  txt(ctx, 'PROJECÇÃO ' + f.ano, 76, 236, { w: 700, size: 16, color: COL.main });
+  txt(ctx, kz(R.projeccao), 76, 300, { w: 700, size: 40, max: cw - 56 });
   txt(ctx, R.cresc_proj != null ? pct(R.cresc_proj) + ' face ao total de ' + f.comp + ' (' + kz(R.total1) + ')' : 'sem ano de comparação', 76, 344, { w: 700, size: 17, color: corDe(R.cresc_proj), max: cw - 56 });
   txt(ctx, 'Critério: ' + f.critTxt, 76, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
   if (R.ultrapassa) txt(ctx, 'O total de ' + f.comp + ' foi ultrapassado em ' + R.ultrapassa + '.', 76, 416, { w: 600, size: 16, color: COL.pos, max: cw - 56 });
   const x2 = 48 + cw + 20;
   card(ctx, x2, 190, cw, 320, vidro);
-  txt(ctx, M.meta ? 'META ' + f.ano : 'SITUAÇÃO ACTUAL', x2 + 28, 236, { w: 800, size: 16, color: COL.teal });
-  txt(ctx, kz(R.ytd2), x2 + 28, 300, { w: 800, size: 40, max: cw - 56 });
+  txt(ctx, M.meta ? 'META ' + f.ano : 'SITUAÇÃO ACTUAL', x2 + 28, 236, { w: 700, size: 16, color: COL.teal });
+  txt(ctx, kz(R.ytd2), x2 + 28, 300, { w: 700, size: 40, max: cw - 56 });
   txt(ctx, 'Vendido' + (R.ultimo ? ' de Janeiro a ' + R.ultimo.mes : ''), x2 + 28, 344, { w: 700, size: 17, color: COL.mut, max: cw - 56 });
   txt(ctx, M.meta ? Math.round((R.metaPct || 0) * 100) + '% da meta de ' + kz(M.meta) + ' · faltam ' + kz(R.metaFalta) : (R.falta != null ? 'Faltam ' + kz(R.falta) + ' para a projecção' : ''), x2 + 28, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
   const pr = M.meta ? R.metaPct : R.progresso;
@@ -816,11 +817,11 @@ function cenaLojas(ctx, f, at, c) {
     const y = 192 + i * rh;
     const k = ease((at.s - i * 0.1) / 0.9);
     const yy = y + rh * 0.6;
-    txt(ctx, ord(l.posicao || i + 1), 64, yy, { w: 800, size: 18, color: l.cor });
+    txt(ctx, ord(l.posicao || i + 1), 64, yy, { w: 700, size: 18, color: l.cor });
     txt(ctx, l.nome, 112, yy, { w: 700, size: 17, max: 280 });
     const bw = 380 * (l.M.R.ytd2 / max) * k;
     ctx.fillStyle = l.cor; roundRect(ctx, 410, y + 8, Math.max(2, bw), rh - 16, 6); ctx.fill();
-    txt(ctx, kz(l.M.R.ytd2), 1000, yy, { w: 800, size: 17, align: 'right' });
+    txt(ctx, kz(l.M.R.ytd2), 1000, yy, { w: 700, size: 17, align: 'right' });
     txt(ctx, pctSimples(l.quota), 1100, yy, { w: 700, size: 16, color: COL.mut, align: 'right' });
     txt(ctx, pct(l.M.R.cresc_ytd), W - 64, yy, { w: 700, size: 16, color: corDe(l.M.R.cresc_ytd), align: 'right' });
   });
@@ -896,7 +897,7 @@ function cenaLoja(ctx, f, at, c, l) {
     const kl = ease((at.s - 0.4) / 0.8);
     desenharLivro(ctx, { img: imagemDe(f, top), titulo: top.titulo, cx: 1186, cy: 128, h: 96, t: at.s, giro: 0.36, alpha: kl, reflexo: false });
     ctx.globalAlpha = kl;
-    txt(ctx, 'MAIS VENDIDO DA LOJA', 1132, 108, { w: 800, size: 11, color: COL.main, align: 'right' });
+    txt(ctx, 'MAIS VENDIDO DA LOJA', 1132, 108, { w: 700, size: 11, color: COL.main, align: 'right' });
     txt(ctx, top.titulo, 1132, 130, { w: 700, size: 15, align: 'right', max: 360 });
     txt(ctx, unid(top.unidades) + (top.valor != null ? ' · ' + kz(top.valor) : ''), 1132, 151, { w: 600, size: 13, color: COL.mut, align: 'right', max: 360 });
     ctx.globalAlpha = 1;
@@ -978,12 +979,12 @@ function cenaQuadroRede(ctx, f, at, c) {
   });
   const yt = y0 + rh * (lista.length + 1) + 18;
   ctx.fillStyle = COL.line; ctx.fillRect(64, yt - 24, W - 128, 2);
-  txt(ctx, 'Rede', 76, yt, { w: 800, size: 16 });
-  txt(ctx, B != null ? kz(R.ytd1) : '—', 470, yt, { w: 800, size: 16, align: 'right' });
-  txt(ctx, kz(R.ytd2), 680, yt, { w: 800, size: 16, align: 'right' });
-  txt(ctx, pct(R.cresc_ytd), 790, yt, { w: 800, size: 16, color: corDe(R.cresc_ytd), align: 'right' });
+  txt(ctx, 'Rede', 76, yt, { w: 700, size: 16 });
+  txt(ctx, B != null ? kz(R.ytd1) : '—', 470, yt, { w: 700, size: 16, align: 'right' });
+  txt(ctx, kz(R.ytd2), 680, yt, { w: 700, size: 16, align: 'right' });
+  txt(ctx, pct(R.cresc_ytd), 790, yt, { w: 700, size: 16, color: corDe(R.cresc_ytd), align: 'right' });
   txt(ctx, '100%', 880, yt, { w: 700, size: 16, color: COL.mut, align: 'right' });
-  txt(ctx, kz(R.projeccao), 1090, yt, { w: 800, size: 16, align: 'right' });
+  txt(ctx, kz(R.projeccao), 1090, yt, { w: 700, size: 16, align: 'right' });
   // O crescimento da rede é o das lojas comparáveis; as contas, à vista.
   if (B != null) {
     txt(ctx, R.ytd1 != null
@@ -1001,7 +1002,7 @@ function cenaPendentes(ctx, f, at, c) {
     const y = 196 + i * rh;
     card(ctx, 48, y, W - 96, rh - 10, COL.card);
     ctx.fillStyle = COL.amber; ctx.fillRect(48, y, 6, rh - 10);
-    txt(ctx, p.nome, 76, y + rh * 0.52, { w: 800, size: 18, max: 380 });
+    txt(ctx, p.nome, 76, y + rh * 0.52, { w: 700, size: 18, max: 380 });
     txt(ctx, p.meses.join(', '), W - 76, y + rh * 0.52, { w: 600, size: 17, color: COL.amber, align: 'right', max: 700 });
   });
   ctx.globalAlpha = 1;

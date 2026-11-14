@@ -709,7 +709,7 @@ export function capaTipografica(titulo) {
   g.strokeRect(16, 16, 268, 418);
   g.fillStyle = '#FFF4DA';
   g.textAlign = 'center';
-  g.font = fonteCanvas(700, 30, { titulo: true });
+  g.font = fonteCanvas(600, 30, { titulo: true });
   const linhas = partir(g, k || 'Livro', 230, 5);
   linhas.forEach((l, i) => g.fillText(l, 150, 170 + i * 38 - (linhas.length - 1) * 19));
   g.font = fonteCanvas(700, 12);
