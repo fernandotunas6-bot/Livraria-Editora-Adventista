@@ -153,7 +153,8 @@ E o ISBN de «Princípios sobre Aposentadoria», que tinha uma gralha (`97887325
 As descrições dos produtos do KiGest foram escritas só a partir do nome do artigo, antes de se saber
 que livro era cada um. Com a capa e a página da editora identificadas, leram-se todas ao lado da
 sinopse da CPB (95) ou da capa (14). **25 foram reescritas** e a do «Mensageiro», que não tinha
-nenhuma, é nova. As outras dizem o mesmo que a editora e ficaram.
+nenhuma, é nova; as de «Guiados por Deus» e «Estarei Pronta no Sábado» são provisórias (ver as notas).
+As outras dizem o mesmo que a editora e ficaram.
 
 | Porquê | Livros |
 |---|---|
@@ -187,7 +188,7 @@ cada livro, os 95 com capa da CPB são da Casa Publicadora Brasileira.
 | «Kit de Comentários» (00049, 160 000 Kz) | Pode ser o «Comentário Bíblico Andrews — 4 volumes» (161 100 Kz); não está confirmado e ficou como está. |
 | Bíblias dos Aventureiros e do Desbravador ocultas de 2026-11-10 (BIB-021 a BIB-024) | São as fotografias de cada cor; com as cores à escolha nas bíblias do KiGest, ficam ocultas. |
 | «Guia de Liberdade Religiosa», «Guiados por Deus», «Guia para Anciãos» | Só havia fotos pequenas (184–240 px de largura): ficam legíveis mas menos nítidas. |
-| «Guiados por Deus» e «Estarei Pronta no Sábado» | Não se encontrou de que tratam (só a capa); as descrições são as que foram escritas pelo nome. **Convém confirmar com o livro na mão.** |
+| «Guiados por Deus» e «Estarei Pronta no Sábado» | Não se encontrou de que tratam. As descrições foram trocadas por umas **provisórias**, só com o que o título e a capa dizem (as anteriores afirmavam conteúdo e género que ninguém confirmou). Com o livro na mão, escreve-se a definitiva no painel. |
 
 ## Os 44 que ficam com a capa tipográfica
 

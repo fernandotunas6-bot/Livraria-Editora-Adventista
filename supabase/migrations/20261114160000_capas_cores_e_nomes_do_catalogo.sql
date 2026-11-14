@@ -56,7 +56,11 @@ with textos(kigest_ref, era_md5, nova) as (values
   ('015062026', 'f88153ffe9ff84a682f686784929f444', '<p>«Chamados para Salvar — Um guia para o ministério evangelístico», de Roy Allan Anderson.</p><p>Para pastores, evangelistas e todos os que se dedicam à evangelização.</p>'),
   ('00004', '174dfae1a73ff96945bc18e4d09ca7ed', '<p>«A Chave da Virada — Guia prático para melhorar sua saúde emocional», de Marcello Niek e Bruno Raso.</p><p>Um guia prático para cuidar da saúde emocional no dia a dia.</p>'),
   ('080620261', '24e93af436efd3c00fe808b1759ca434', '<p>«Sucesso em Dose Dupla — Empreendedores e colaboradores podem chegar juntos ao topo», de Wélida Dancini.</p><p>Sobre a relação entre quem dirige uma empresa e quem nela trabalha, e como podem crescer juntos. Para empresários, líderes e profissionais em início de carreira.</p>'),
-  ('080620264', 'd6ab0f5dcf2ddd0117b79d06e038d80b', '<p>«Revolucione Seu Futuro — Como chegar ao topo da carreira profissional», de Rosana Alves.</p><p>Sobre a carreira profissional e o caminho para crescer no trabalho. Para quem está a começar e para quem quer dar o passo seguinte.</p>')
+  ('080620264', 'd6ab0f5dcf2ddd0117b79d06e038d80b', '<p>«Revolucione Seu Futuro — Como chegar ao topo da carreira profissional», de Rosana Alves.</p><p>Sobre a carreira profissional e o caminho para crescer no trabalho. Para quem está a começar e para quem quer dar o passo seguinte.</p>'),
+  -- provisória: só pelo título e pela capa; não se encontrou de que trata o livro
+  ('01042026', 'f5c79d94937f5f3c832cfff560b9aaea', '<p>«Guiados por Deus».</p><p>Como o título diz, um livro sobre a direcção de Deus na vida de quem confia nele. Para ler e para oferecer.</p>'),
+  -- provisória: só pelo título e pela capa; não se encontrou de que trata o livro
+  ('000459', '9403a0ee261104ef07df8d62a78d3f58', '<p>«Estarei Pronta no Sábado», da Divisão Sul-Americana da Igreja Adventista do Sétimo Dia.</p><p>Como o título diz, sobre estar preparada para receber o sábado, o dia de descanso que a Bíblia manda guardar. Para ler e para oferecer.</p>')
 )
 update public.stock_books b
    set description = t.nova,
