@@ -292,6 +292,19 @@ export async function getFeaturedProducts(limit = 8) {
 }
 
 /** Stock vendável de uma variante: o dela, sem passar o do produto (o `place_order` verifica os dois). */
+/** As imagens do produto mais a capa de cada variante que ainda não esteja lá, por esta ordem. */
+export function withVariantImages(images, variants) {
+  const out = Array.isArray(images) ? [...images] : [];
+  const seen = new Set(out.map((i) => i?.url));
+  for (const v of Array.isArray(variants) ? variants : []) {
+    if (v?.image_url && !seen.has(v.image_url)) {
+      seen.add(v.image_url);
+      out.push({ url: v.image_url });
+    }
+  }
+  return out;
+}
+
 export function variantStock(book, version) {
   const total = Math.max(0, Math.floor(Number(book?.stock) || 0));
   const raw = version?.stock;
@@ -341,7 +354,7 @@ async function loadProduct(id) {
       const digital = versionIsDigital(v);
       return {
         id: `${book.id}-v${i}`,
-        title: v.label || v.title || `${variantNames(book.product_type).one} ${i + 1}`,
+        title: v.label || v.title || `${variantNames(book.product_type, book.versions).one} ${i + 1}`,
         price_in_cents: priceInCents,
         sale_price_in_cents: saleInCents,
         price_formatted: formatCurrency(priceInCents),
@@ -357,6 +370,9 @@ async function loadProduct(id) {
         isbn: v.isbn || '',
       };
     });
+    // A capa própria de cada variante (a cor de uma bíblia) entra na galeria: a página do
+    // produto só muda a imagem ao escolher a variante se a capa dela estiver em `images`.
+    product.images = withVariantImages(product.images, product.variants);
   }
   return product;
 }

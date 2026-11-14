@@ -163,6 +163,7 @@ que davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» 
   uma capa tipográfica por produto no desenho da casa — o gradiente, o emblema e a moldura da
   `capa-por-definir.webp` — com o título no lugar onde aquela diz «Capa por definir». Vê-se que
   é tipográfica: não imita a arte da editora. Quando houver fotografia, substitui-se no painel.
+  (2026-11-14: 109 já têm a capa verdadeira, encontrada na internet — [CAPAS-INTERNET.md](CAPAS-INTERNET.md).)
   O ficheiro de cada produto fica em `docs/catalogo/capas-kigest.json`, que é o que a migração
   lê: dois títulos diferentes podem dar o mesmo nome de ficheiro.
 
@@ -206,6 +207,7 @@ E há duas coisas que continuam a valer a pena fazer no painel, produto a produt
 | `scripts/kigest/migracao.mjs` | Escreve a migração, o relatório e o mapa |
 | `scripts/kigest/descricoes.mjs` | Escreve a migração das descrições, das capas e da publicação |
 | `scripts/catalogo/capa_tipografica.py` | Gera uma capa tipográfica por produto sem fotografia |
+| `scripts/catalogo/procurar_capas.py`, `estante.py`, `capas_internet.py` | Procuram a capa verdadeira na CPB e na Estante Virtual e gravam-na por cima da tipográfica |
 | `docs/catalogo/descricoes-kigest.json` | As descrições, escritas à mão |
 | `docs/catalogo/kigest-decisoes.json` | As decisões à mão sobre o que o automático não resolve |
 | `docs/catalogo/capas-kigest.json` | Qual é a capa de qual produto |
