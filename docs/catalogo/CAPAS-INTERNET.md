@@ -7,7 +7,8 @@ gradiente da casa), porque não havia fotografia de nenhum ([KIGEST.md](KIGEST.m
 
 Procurou-se a capa de cada um na internet, viu-se cada candidata ao lado do título do produto, e
 só entrou a que é de facto aquele livro. **Entraram 109**; um outro afinal era um duplicado de um livro que já tinha
-capa (ver «Duplicados»); e **ficam 44**, listados no fim com o motivo.
+capa (ver «Duplicados»); e **ficavam 44**, listados no fim com o motivo — hoje 43, depois da
+primeira fotografia mandada pelo dono (ver «Capas das fotografias do dono»).
 As quatro bíblias que a CPB faz em várias capas passaram a ter **as cores todas à escolha** (mais
 8 capas), e corrigiram-se de caminho dois duplicados e os nomes que as capas desmentiam.
 
@@ -56,7 +57,8 @@ houve de tudo:
   colados na capa;
 - «Meditação da Mulher» e «Meditação 2026»: há uma por ano e não se sabe qual é a da loja;
 - «Sinta-se Bem» e «O Poder Medicinal dos Sucos»: o ISBN da loja é da edição portuguesa e só se
-  encontrou a brasileira, que pode ter outra capa.
+  encontrou a brasileira, que pode ter outra capa. (O segundo já tem capa: ver «Capas das
+  fotografias do dono», no fim.)
 
 Entre várias edições do mesmo livro escolheu-se a do ISBN: «Felizes no Amor» (ISBN de 2018, capa
 cinzenta, não a dos anos 90), «Como Formar Filhos Vencedores» (edição amarela). Entre fotos da
@@ -190,7 +192,7 @@ cada livro, os 95 com capa da CPB são da Casa Publicadora Brasileira.
 | «Guia de Liberdade Religiosa», «Guiados por Deus», «Guia para Anciãos» | Só havia fotos pequenas (184–240 px de largura): ficam legíveis mas menos nítidas. |
 | «Guiados por Deus» e «Estarei Pronta no Sábado» | Não se encontrou de que tratam. As descrições foram trocadas por umas **provisórias**, só com o que o título e a capa dizem (as anteriores afirmavam conteúdo e género que ninguém confirmou). Com o livro na mão, escreve-se a definitiva no painel. |
 
-## Os 44 que ficam com a capa tipográfica
+## Os 43 que ficam com a capa tipográfica
 
 Precisam de uma fotografia do exemplar da loja (de frente, sem plástico) ou de quem saiba qual é
 a edição.
@@ -198,7 +200,7 @@ a edição.
 | Motivo | Produtos |
 |---|---|
 | Bíblias de edição local ou missionária, sem capa na internet | Missionária «Eu Vou», «Nova Semente» (2), «Recomeçar», «Se o Filho Libertar», «Semeando a Palavra que Transforma», com Concordância ARC, RA Rosa, «Sociedade Bíblica Brasil», Novo Testamento em Umbundo |
-| Edição portuguesa ou espanhola (Publicadora Atlântico, Servir, Safeliz) sem capa encontrada | «Corpo Saudável», «Desfrutar da Vida», «Mente Positiva», «Sinta-se Bem», «O Poder Medicinal dos Sucos», «Manual dos Anciãos», «Manual Diáconos e Diaconisas», «250 Receitas», «A Saúde pelos Alimentos» |
+| Edição portuguesa ou espanhola (Publicadora Atlântico, Servir, Safeliz) sem capa encontrada | «Corpo Saudável», «Desfrutar da Vida», «Mente Positiva», «Sinta-se Bem», «Manual dos Anciãos», «Manual Diáconos e Diaconisas», «250 Receitas», «A Saúde pelos Alimentos» |
 | O resultado era outro livro, ou só havia fotos com etiqueta | «Guia de Secretaria da Igreja», «Guia do Diácono», «Vida de Jesus», «Viagem ao Desconhecido» (2), «Por que Saí do Escritório», «Corte» |
 | Não se sabe que edição é (anual, série, nome vago) | «Meditação 2026», «Meditação da Mulher», «Quebrando o Silêncio», «Trimestrais», «Revista Viva», «Revista Esperança Novo Tempo», «Kit de Comentários», «Pesquisador», «101 Segredos», «111 Administrar Dinheiro», «111 Estudante», «111 Dicas para Criar Filhos», «Mensagens e Mensageiros», «Esperança para Família Infantil», «Guia do Ministério da Criança», «100 Anos de Missão, Fé e Esperança» |
 | Ocultos, sem nome legível | «Bilingue», «Regras para que» |
@@ -212,3 +214,14 @@ python3 scripts/catalogo/capas_internet.py docs/catalogo/capas-internet.json pas
 
 (com `opencv-python-headless`, `pillow` e `numpy`; as fontes descarregam-se do `url` de cada
 entrada para a pasta, com o nome do campo `fonte`).
+
+## Capas das fotografias do dono
+
+Quando o dono manda a fotografia do exemplar da loja, a capa endireita-se com
+`scripts/catalogo/capa_da_fotografia.py` (cantos da frente medidos à mão, sem deformar nem cortar:
+as faixas que sobram dos 400×600 continuam a fotografia, desfocadas) e grava-se por cima da
+tipográfica, com o mesmo nome de ficheiro. A base de dados só muda no que a capa confirma.
+
+| Data | Produto | Ficheiro | O que a capa confirmou |
+|---|---|---|---|
+| 2026-11-14 | LIV-159 «O Poder Medicinal dos Sucos e Shakes» (KiGest 30042026) | `kigest/o-poder-medicinal-dos-sucos.webp` | o nome inteiro (o KiGest cortou «e Shakes»), o autor (Dr. Jorge Pamplona) e a descrição — migração `20261114233700_capa_e_nome_dos_sucos` |
