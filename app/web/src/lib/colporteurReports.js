@@ -137,6 +137,7 @@ export function previewCommission({ report, colporteur, books, rules, overrides,
 
 export const SUMMARY_GROUPS = {
   colportor: 'Colportor',
+  loja: 'Loja',
   igreja: 'Igreja',
   distrito: 'Distrito',
   provincia: 'Província',
@@ -144,9 +145,9 @@ export const SUMMARY_GROUPS = {
 };
 
 /**
- * Totais da colportagem agrupados (colportor, igreja, distrito, província ou campo), a partir
+ * Totais da colportagem agrupados (colportor, loja, igreja, distrito, província ou campo), a partir
  * dos relatórios validados desde `from` (YYYY-MM-DD) e, se `withSite`, das vendas no site do ano.
- * `where(c)` diz a igreja, o distrito, a província e o campo de cada colportor.
+ * `where(c)` diz a loja, a igreja, o distrito, a província e o campo de cada colportor.
  */
 export function summarize({ colporteurs, reports, overview = [], groupBy = 'colportor', from = '', withSite = false, where }) {
   const site = new Map(overview.map((o) => [o.colporteur_id, Number(o.site_year_value || 0)]));
@@ -158,6 +159,8 @@ export function summarize({ colporteurs, reports, overview = [], groupBy = 'colp
       case 'distrito': return [w.districtId || '', w.districtLabel || 'Sem distrito'];
       case 'provincia': return [w.provinceId || '', w.provinceLabel || 'Sem província'];
       case 'campo': return [w.fieldId || '', w.fieldLabel || 'Sem campo'];
+      // A loja de cada colportor (migração lojas_donas_dos_dados).
+      case 'loja': return [w.storeId || '', w.storeLabel || 'Sem loja'];
       default: return [c.id, `${c.code || ''} ${c.full_name}`.trim()];
     }
   };

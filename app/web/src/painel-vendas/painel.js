@@ -7,6 +7,27 @@ import * as d3 from 'd3';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
 import { MESES, CRIT, buildYearModel } from './modelo.js';
+import { cidadeDaLoja } from '@/lib/stores';
+
+export { cidadeDaLoja };
+
+// Terras que se dizem com artigo («do Huambo», «da Huíla»); as outras levam «de» («de Catumbela»,
+// «de Benguela», «de Luanda»). Pela primeira palavra, sem acentos.
+const COM_DO = new Set(['huambo', 'lubango', 'lobito', 'uige', 'namibe', 'sumbe', 'soyo', 'dundo', 'luena', 'cuito', 'kuito', 'bie']);
+const COM_DA = new Set(['huila', 'lunda']);
+
+/**
+ * Como o rodapé e os diapositivos dizem a loja escolhida: «Loja do Huambo», «Loja do Lubango», «Loja de
+ * Catumbela». Sem cidade no nome fica o próprio nome da loja; sem loja (antes da migração
+ * painel_vendas_por_loja só havia a do Huambo), a do Huambo, como sempre foi.
+ */
+export function lojaDe(store) {
+  if (!store) return 'Loja do Huambo';
+  const cidade = cidadeDaLoja(store);
+  if (!cidade) return String(store.name || '').trim() || 'Loja do Huambo';
+  const k = cidade.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z]/)[0];
+  return 'Loja ' + (COM_DA.has(k) ? 'da' : COM_DO.has(k) ? 'do' : 'de') + ' ' + cidade;
+}
 
 export function mountPainel(root, api) {
   const short = (m) => m.slice(0, 3);
@@ -1026,9 +1047,10 @@ export function mountPainel(root, api) {
   const pLater = (fn, ms) => P.steps.push(setTimeout(fn, reduce ? 0 : ms));
   function abs(cls, css, text) { const e = el('div', cls, text); if (css) Object.assign(e.style, css); return e; }
   function head(s, M, sub) {
-    s.append(abs('s-h', null, 'PAINEL DE VENDAS — HUAMBO'), abs('s-sub', null, sub));
+    const terra = S.store ? cidadeDaLoja(S.store) || S.store.name : 'Huambo';
+    s.append(abs('s-h', null, 'PAINEL DE VENDAS — ' + terra.toUpperCase()), abs('s-sub', null, sub));
     const lg = el('img', 's-logo'); lg.src = logoSrc(); lg.alt = ''; s.appendChild(lg);
-    s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · Loja do Huambo · ' + M.ano));
+    s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · ' + lojaDe(S.store) + ' · ' + M.ano));
   }
   function renderSlide(dir) {
     pClear();
@@ -1041,7 +1063,7 @@ export function mountPainel(root, api) {
       s.classList.add('dark');
       s.appendChild(abs('s-cover-glow'));
       const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
-      s.append(abs('s-cover-eye', null, 'LOJA DO HUAMBO'), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
+      s.append(abs('s-cover-eye', null, lojaDe(S.store).toUpperCase()), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
         abs('s-cover-s', null, (B != null ? 'Comparativo ' + B + ' vs ' + A + ' · ' : '') + 'Livraria e Editora Adventista, S.A.'));
     } else if (it.k === 'resumo') {
       head(s, M, 'Resumo do ano · ' + (R.ultimo ? 'até ' + R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : '') : 'sem dados'));
@@ -1137,7 +1159,7 @@ export function mountPainel(root, api) {
     } else if (it.k === 'persp') {
       s.classList.add('dark');
       s.appendChild(abs('s-rem-t', null, 'REMARQUE:'));
-      s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — Loja do Huambo'));
+      s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — ' + lojaDe(S.store)));
       const c1 = abs('s-rem-card', { left: '80px' }); c1.appendChild(abs('k', null, 'PERSPECTIVA ANUAL'));
       const bx1 = abs('s-rem-box pink'); const a = el('div', 'a');
       if (B != null) { a.append(document.createTextNode(B + ' – ')); a.append(el('b', null, grp(R.total1))); a.append(document.createTextNode(' AOA')); }
@@ -1226,6 +1248,7 @@ export function mountPainel(root, api) {
     S.extras = extras || null;
     S.store = store || null; S.sales = sales || null;
     if (S.store) $('eyebrow').textContent = 'Livraria e Editora Adventista · ' + S.store.name;
+    $('foot').textContent = 'Livraria e Editora Adventista, S.A. · ' + lojaDe(S.store);
     if (!S.sales || !S.sales.available) $('ed-sys-note').textContent = (S.sales && S.sales.reason) || 'As vendas do sistema não estão disponíveis nesta vista.';
     S.db = db; S.user = user;
     try { S.uid = user ? await user.id() : null; } catch (e) { S.uid = null; }

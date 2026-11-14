@@ -112,6 +112,8 @@ export class LojaFalsa {
     this.definicoes = { ...DEFINICOES };
     this.pagamentos = PAGAMENTOS.map((p) => ({ ...p }));
     this.lojas = LOJAS.map((l) => ({ ...l }));
+    /** «Temos / não temos» por loja (tabela store_stock): { store_id, book_id, available }. */
+    this.disponibilidade = [];
     /** Encomendas gravadas, pela ordem em que entraram. */
     this.encomendas = [];
     /** Todos os pedidos de checkout que chegaram, tal como o navegador os mandou. */
@@ -177,7 +179,12 @@ export class LojaFalsa {
   #rest(request, url, json) {
     const tabela = url.pathname.replace('/rest/v1/', '').split('/')[0];
     if (request.method() !== 'GET') return json([], 200);
-    const dados = { stock_books: this.livros, physical_stores: this.lojas, payment_methods: this.pagamentos.map((p) => ({ ...p, enabled: true })) };
+    const dados = {
+      stock_books: this.livros,
+      physical_stores: this.lojas,
+      payment_methods: this.pagamentos.map((p) => ({ ...p, enabled: true })),
+      store_stock: this.disponibilidade,
+    };
     const linhas = filtrar(dados[tabela] || [], url.searchParams);
     const cabecalhos = { 'content-range': linhas.length ? `0-${linhas.length - 1}/${linhas.length}` : '*/0' };
     if ((request.headers().accept || '').includes('vnd.pgrst.object')) {

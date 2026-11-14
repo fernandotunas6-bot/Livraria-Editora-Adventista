@@ -141,6 +141,16 @@ export default function ColporteurSheet({ colporteur: c, data, reg, idx, run, on
           <ProvinceMunicipality provinces={reg.provinces} municipalities={reg.municipalities} provinceId={form.province_id || ''} municipalityId={form.municipality_id || ''}
             onChange={(geo) => set(geo)} />
           <FormField label="Território" hint="Bairros ou localidades onde trabalha."><Input value={form.territory} onChange={(e) => set({ territory: e.target.value })} maxLength={300} /></FormField>
+          {/* A loja do colportor (migração lojas_donas_dos_dados): por omissão a da província. Conta
+              para «colportores por loja» no Resumo e diz de que loja são as guias dele. */}
+          {'store_id' in form && (
+            <FormField label="Loja" hint="Por omissão, a loja da província dele. As guias novas saem desta loja.">
+              <NativeSelect value={form.store_id || ''} onChange={(v) => set({ store_id: v })}>
+                <option value="">— sem loja —</option>
+                {(data.stores || []).map((s) => <option key={s.id} value={s.id}>{s.name}{s.active ? '' : ' (inactiva)'}</option>)}
+              </NativeSelect>
+            </FormField>
+          )}
           {/* Entregas por colportor: a localização é ele que a regista, na sua área. */}
           {'accepts_deliveries' in form && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-2 text-sm">

@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
   XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare,
-  Truck, Wallet, Store, Youtube, Share2,
+  Truck, Wallet, Youtube, Share2,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,6 +41,7 @@ import { hasReadingSample, productType, variantNames } from '@/lib/productTypes'
 import { breadcrumbJsonLd, jsonLdString, productJsonLd } from '@/lib/structuredData';
 import CommunityFeed from '@/components/community/CommunityFeed';
 import ProductDownloads from '@/components/downloads/ProductDownloads';
+import StoreAvailability from '@/components/StoreAvailability';
 import { variantIndexOf } from '@/lib/digitalEditions';
 import { loadMyLibrary } from '@/lib/digitalLibrary';
 
@@ -692,10 +693,8 @@ function ProductDetailPage() {
                 <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span><strong className="font-medium text-foreground">Pagamento na entrega</strong> <span className="text-muted-foreground">ou por transferência.</span></span>
               </li>
-              <li className="flex items-start gap-2.5">
-                <Store className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary underline underline-offset-2 hover:no-underline">ver moradas</Link>.</span>
-              </li>
+              {/* As lojas que marcaram «temos» neste produto; sem nenhuma, a linha de sempre. */}
+              <StoreAvailability bookId={product.id} />
             </ul>
 
             {/* Resumo da descrição depois do botão de compra: o texto completo, em "Detalhes",

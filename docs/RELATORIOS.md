@@ -51,12 +51,14 @@ nenhum dado de clientes chega ao navegador. Regras (as mesmas do painel de cada 
   sem os portes, pelo mês do pagamento na hora de Luanda (UTC+1). **Todas, excepto canceladas**:
   o total sem portes, pelo mês da encomenda.
 - Sem as encomendas canceladas (estado ou entrega).
-- **Levantamento** conta para a loja onde se levanta (o nome, sem acentos nem maiúsculas).
-- **Entrega ao domicílio** conta para a loja da província da entrega. Numa província com duas lojas
-  conta só para uma — a primeira activa pela ordem do separador Lojas —, para a rede não a contar
-  duas vezes.
-- A entrega numa província sem loja aparece à parte («Sem loja»), para o total bater com as
-  encomendas.
+- **Cada encomenda conta para a loja gravada nela** (`orders.store_id`, migração
+  `20261114180000_lojas_donas_dos_dados`; ver [LOJAS.md](LOJAS.md)): a do levantamento, ou, numa
+  entrega ao domicílio, a loja que serve a província da entrega — o Namibe e o Cunene são da loja do
+  Lubango, o Cuanza Sul da de Catumbela. Mudar o nome de uma loja já não lhe tira as vendas.
+- Uma encomenda sem loja (só digital, ou de uma província que nenhuma loja serve) aparece à parte
+  («Sem loja»), para o total bater com as encomendas.
+- Antes desta migração contava-se pelo nome da loja do levantamento e, nas entregas, pela loja da
+  mesma província (uma entrega no Namibe não era de nenhuma).
 
 A tabela mostra o sistema ao lado do que está registado; a **vermelho** os meses em que não batem.
 Com a grelha aberta no mesmo ano, **Preencher meses vazios** copia o sistema para os meses vazios e

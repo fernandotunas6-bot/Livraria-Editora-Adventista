@@ -86,6 +86,8 @@ export async function getPhysicalStores() {
       longitude: r.longitude,
       maps_url: r.maps_url || '',
       pickup_enabled: r.pickup_enabled !== false,
+      // As províncias que a loja serve (migração lojas_donas_dos_dados); antes dela, nenhuma.
+      service_provinces: Array.isArray(r.service_provinces) ? r.service_provinces : [],
     }));
   } catch {
     return [];
