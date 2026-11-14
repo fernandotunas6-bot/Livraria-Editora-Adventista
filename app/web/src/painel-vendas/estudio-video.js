@@ -369,6 +369,9 @@ export function abrirEstudio(root, opts) {
         mistura.ligarMicrofone(micStream);
         cfg.narracao = true;
         narr.classList.add('on');
+        // O medidor do microfone mexe já, antes de reproduzir: dá para experimentar a voz.
+        const medirParado = () => { if (!cfg.narracao || fechado) return; if (!toca && !gravando) medir(); requestAnimationFrame(medirParado); };
+        requestAnimationFrame(medirParado);
         dizer('Microfone ligado. Os quadros esticam ao tempo de ler o guião; experimente com ▶ antes de gravar.');
       } catch (e) {
         chkNarr.checked = false;

@@ -239,6 +239,10 @@ artificial e sem nada sair do navegador:
 | **Narração com a minha voz** | Liga o microfone (só aí o navegador pede autorização). O guião aparece no monitor, como teleponto, com a frase seguinte; antes de gravar há uma contagem de 3 segundos. A voz entra no ficheiro; a música baixa sozinha enquanto se fala (*ducking*); a voz não volta às colunas, para não haver eco. Com auscultadores ouve-se tudo. |
 | **Gravar o vídeo** | Grava com a faixa de áudio (MP4 com AAC no Chrome e no Edge; WebM com Opus no Firefox). O relógio do vídeo é o do áudio: a imagem e o som não se desencontram. |
 
+O microfone só funciona porque o `Permissions-Policy` do site (`app/web/public/_headers`) o deixa ao
+próprio site (`microphone=(self)`); antes estava fechado (`microphone=()`) e a narração seria recusada
+pelo navegador em produção. Nenhuma outra origem o pode pedir, e o site só o pede no Estúdio.
+
 **Os efeitos seguem o que cada quadro desenha** (`deixas-video.js`, puro e testado):
 
 | Momento do vídeo | Som |

@@ -522,6 +522,15 @@ export function criarMistura(ctx, som, volumes = {}) {
   const bufV = new Float32Array(medidorVoz.fftSize);
   let mic = null;
   let comVoz = false;
+  // O ducking só marca uma automação quando muda (fala ↔ silêncio), não a cada imagem.
+  let falaAgora = false;
+  let ultimaFala = -10;
+  const baixar = (fala) => {
+    if (fala === falaAgora) return;
+    falaAgora = fala;
+    duck.gain.cancelScheduledValues(ctx.currentTime);
+    duck.gain.setTargetAtTime(fala ? 0.32 : 1, ctx.currentTime, fala ? 0.06 : 0.45);
+  };
 
   const M = {
     ctx, master, monitor,
@@ -547,6 +556,7 @@ export function criarMistura(ctx, som, volumes = {}) {
       if (!mic) return;
       try { mic.src.disconnect(); mic.g.disconnect(); } catch (e) { /* já desligado */ }
       mic = null; comVoz = false;
+      baixar(false);
     },
     /** A voz entra (ou sai) da mistura que vai para o ficheiro. */
     gravarVoz(on) {
@@ -554,15 +564,17 @@ export function criarMistura(ctx, som, volumes = {}) {
       if (on && !comVoz) mic.g.connect(voz);
       if (!on && comVoz) { try { mic.g.disconnect(voz); } catch (e) { /* idem */ } }
       comVoz = !!on;
+      if (!comVoz) baixar(false);
     },
     temMicrofone: () => !!mic,
     /** Níveis (0–1, RMS) da mistura e da voz, para os medidores; e a música baixa quando se fala. */
     medir() {
       const geral = nivelDe(medidor, bufM);
       const v = mic ? nivelDe(medidorVoz, bufV) : 0;
+      // Fica em baixo até 0,6 s depois da última palavra: entre sílabas a música não sobe e desce.
       if (comVoz) {
-        const fala = v > 0.035;
-        duck.gain.setTargetAtTime(fala ? 0.32 : 1, ctx.currentTime, fala ? 0.06 : 0.45);
+        if (v > 0.035) ultimaFala = ctx.currentTime;
+        baixar(ctx.currentTime - ultimaFala < 0.6);
       }
       return { geral, voz: v };
     },
