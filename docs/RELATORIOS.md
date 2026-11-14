@@ -347,6 +347,16 @@ discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as uni
 
 Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
 
+**O diapositivo de cada mês** (modo apresentação do painel de uma loja): em cima, o período até ao
+mês (venda periódica de cada ano e crescimento periódico); à esquerda, as barras do mês e o
+crescimento mensal; à direita, o **Detalhe do mês** em cartões, como o «Período em apresentação
+até» do painel: média mensal de cada ano (a cinzento e a rosa), diferença mensal e diferença
+periódica (a verde ou a vermelho), e o estado do mês. Os valores contam até ao número ao mesmo
+tempo que as barras. A «Sequência de apresentação» (1.º 2025, 2.º 2026, 3.º Crescimento) saiu do
+diapositivo (pedido do dono, 14/11); continua no Mês em destaque do painel, onde acompanha a
+animação. Nos cartões do painel, a letra do valor acompanha a largura do cartão
+(`container-type`), para «10 857 624,65 Kz» caber inteiro em vez de acabar em «…».
+
 **Imagens no modo apresentação** (`diapositivos` em `painel.js`; `fotosDaLoja` e os controlos em
 `apresentacao.js`, os mesmos nos dois relatórios):
 

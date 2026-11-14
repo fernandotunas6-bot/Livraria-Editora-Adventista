@@ -181,9 +181,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .per-h span { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
 .per-h b { font-family: var(--serif); font-size: 20px; font-weight: 600; }
 .per-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: 8px; }
-.pk { display: grid; gap: 3px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+/* A letra do valor acompanha a largura do cartão: «10 857 624,65 Kz» cabe inteiro, sem «…». */
+.pk { display: grid; gap: 3px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); min-width: 0; container-type: inline-size; }
 .pk span { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
-.pk b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk b { font-size: clamp(11px, 8.6cqi, 15px); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pk.a b { color: var(--muted); }
 .pk.b b { color: var(--c26); }
 .pk.g b.ok, .pk.d b.ok { color: var(--ok); } .pk.g b.bad, .pk.d b.bad { color: var(--bad); }
@@ -308,14 +309,19 @@ details.more[open] summary { margin-bottom: 10px; }
 .s-growth .k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #5A6067; }
 .s-growth .g { font-family: var(--serif); font-size: 54px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .s-growth .d { font-size: 14px; color: #5A6067; font-variant-numeric: tabular-nums; }
-.s-det .row2 { position: absolute; left: 26px; right: 26px; display: flex; justify-content: space-between; gap: 10px; font-size: 14.5px; color: #4A5056; white-space: nowrap; }
-.s-det .row2 b { color: #1E2124; font-variant-numeric: tabular-nums; }
-.s-seq { position: absolute; left: 26px; right: 26px; top: 214px; display: grid; gap: 10px; }
-.s-seq .h { font-size: 14px; color: #4A5056; font-weight: 600; }
-.s-seq div.i { font-size: 18px; font-weight: 700; color: #B8BCC0; transition: color .3s, transform .3s; }
-.s-seq div.i.on.a { color: #8A8F95; } .s-seq div.i.on.b { color: #9A7A00; } .s-seq div.i.on.c { color: #1E8449; }
-.s-seq div.i.on { transform: translateX(6px); }
-.s-obs { position: absolute; left: 26px; right: 26px; bottom: 22px; font-size: 14px; color: #5A6067; font-style: italic; line-height: 1.4; }
+/* O detalhe do mês no modo apresentação: os números do período em cartões, como no painel
+   («Período em apresentação até»), um por linha, para os valores caberem inteiros. */
+.s-dk { position: absolute; left: 26px; right: 26px; top: 66px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+.s-dkc { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 14px; border-radius: 12px; background: #F3F4F6; border: 1px solid #E4E6E9; }
+.s-dkc span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6067; }
+.s-dkc b { font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; color: #1E2124; }
+.s-dkc.a b { color: #6A7076; } .s-dkc.b b { color: #E0679A; }
+/* As diferenças a verde ou a vermelho, como no painel (a regra de cima, mais específica, ganhava). */
+.s-dkc b.s-ok { color: #1E8449; } .s-dkc b.s-bad { color: #C0392B; } .s-dkc b.s-mut { color: #8A9096; }
+.s-dk.com-obs .s-dkc b { font-size: 19px; }
+.s-dst { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 4px; font-size: 14.5px; color: #4A5056; }
+.s-dst b { color: #1E2124; } .s-dst b.curso { color: #9A7A00; } .s-dst b.falta { color: #8A9096; }
+.s-dobs { padding: 0 4px; font-size: 13px; color: #5A6067; font-style: italic; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .s-cover-eye { position: absolute; left: 80px; top: 300px; color: #F2B705; font-size: 30px; font-weight: 700; letter-spacing: .02em; }
 .s-cover-t { position: absolute; left: 80px; top: 345px; font-size: 64px; font-weight: 700; letter-spacing: -.01em; }
 .s-cover-s { position: absolute; left: 82px; top: 440px; font-size: 20px; color: #AEB3B8; }

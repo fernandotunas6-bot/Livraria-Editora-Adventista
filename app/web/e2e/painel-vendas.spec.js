@@ -280,3 +280,25 @@ test('os relatórios não usam a palavra PowerPoint', async ({ page }) => {
   await expect(rel.locator('#ed-ppt-st')).toContainText('a grelha já tem os valores do ficheiro');
   expect(await textoDoEcra(rel)).not.toMatch(/power\s*point/i);
 });
+
+// Pedido do dono (14/11): no modo apresentação, o diapositivo de cada mês deixa a «Sequência de
+// apresentação» (1.º 2025, 2.º 2026, 3.º Crescimento) e mostra o detalhe em cartões, como o
+// «Período em apresentação até» do painel, com os valores inteiros (sem «…»).
+test('modo apresentação: o detalhe do mês em cartões, sem a sequência', async ({ page }) => {
+  await page.goto(PAINEL);
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  // No painel, os valores do período também cabem inteiros.
+  expect(await painel.locator('.pk b').evaluateAll((bs) => bs.filter((b) => b.scrollWidth > b.clientWidth).map((b) => b.textContent))).toEqual([]);
+  await painel.locator('#btn-pres').click();
+  const slide = painel.locator('#pres-view .slide');
+  for (let i = 0; i < 20 && !(await slide.locator('.s-dk').count()); i++) await painel.locator('#pr-next').click();
+  await expect(slide.locator('.s-ct').last()).toHaveText('Detalhe de Janeiro');
+  await expect(slide.getByText('Sequência de apresentação')).toHaveCount(0);
+  const cartoes = slide.locator('.s-dkc');
+  await expect(cartoes.locator('span')).toHaveText(['Média mensal 2025', 'Média mensal 2026', 'Diferença mensal 25/26', 'Diferença periódica 25/26']);
+  await expect(cartoes.locator('b').nth(2)).toHaveText('+1 952 693,00 Kz');
+  await expect(cartoes.locator('b').nth(2)).toHaveClass(/s-ok/);
+  expect(await cartoes.locator('b').evaluateAll((bs) => bs.every((b) => b.scrollWidth <= b.clientWidth))).toBe(true);
+  await expect(slide.locator('.s-dst')).toContainText('Fechado');
+});

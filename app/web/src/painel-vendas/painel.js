@@ -1279,27 +1279,33 @@ export function mountPainel(root, api) {
       card.appendChild(bars);
       const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento mensal')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
       s.appendChild(card);
+      // O detalhe do mês: os números do período até ao mês em cartões, como no painel («Período em
+      // apresentação até»), sem a sequência 1.º/2.º/3.º, que só repetia o que as barras já mostram.
       const det = abs('s-card s-det', { left: '852px', top: '256px', width: '380px', height: '400px' });
       det.appendChild(abs('s-ct', null, 'Detalhe de ' + r.mes));
-      const row2 = (top, k, v) => { const d = abs('row2', { top: top + 'px' }); d.append(el('span', null, k), el('b', null, v)); det.appendChild(d); };
       const ab = B != null ? `${String(B).slice(-2)}/${String(A).slice(-2)}` : String(A);
-      row2(66, 'Média mensal ' + (B != null ? B : '—'), B != null ? kz(P.media1) : '—');
-      row2(94, 'Média mensal ' + A, kz(P.media2));
-      row2(122, 'Diferença mensal ' + ab, P.difMensal != null ? kzs(P.difMensal) : '—');
-      row2(150, 'Diferença periódica ' + ab, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
-      row2(178, 'Estado do mês', r.estado);
-      const sq = el('div', 's-seq'); sq.append(el('div', 'h', 'Sequência de apresentação'));
-      const i1 = el('div', 'i a', '1º  ' + (B != null ? B : '—')), i2 = el('div', 'i b', '2º  ' + A), i3 = el('div', 'i c', '3º  Crescimento');
-      sq.append(i1, i2, i3); det.appendChild(sq);
-      if (r.obs) det.appendChild(abs('s-obs', null, '“' + r.obs + '”'));
+      const lista = el('div', 's-dk' + (r.obs ? ' com-obs' : ''));
+      const D = (cls, k) => { const c = el('div', 's-dkc ' + cls); c.append(el('span', null, k)); const v = el('b', null, '—'); c.append(v); lista.appendChild(c); return v; };
+      const dm1 = D('a', 'Média mensal ' + (B != null ? B : '—'));
+      const dm2 = D('b', 'Média mensal ' + A);
+      const dd1 = D('d', 'Diferença mensal ' + ab);
+      const dd2 = D('d', 'Diferença periódica ' + ab);
+      const est = el('div', 's-dst');
+      est.append(el('span', null, 'Estado do mês'), el('b', r.estado === 'Fechado' ? 'fechado' : r.estado === 'Em curso' ? 'curso' : 'falta', r.estado));
+      lista.appendChild(est);
+      if (r.obs) lista.appendChild(el('div', 's-dobs', '“' + r.obs + '”'));
+      det.appendChild(lista);
       s.appendChild(det);
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      depois(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
-      depois(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
+      const sinal = (e, v) => { e.className = v == null ? 's-mut' : v >= 0 ? 's-ok' : 's-bad'; if (v != null) countUp(e, v, kzs, 900); };
+      depois(() => { b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) { countUp(k1, P.venda1, kz, 800); countUp(dm1, P.media1, kz, 800); } }, 400);
+      depois(() => { b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); countUp(dm2, P.media2, kz, 800); }, 1400);
       depois(() => {
-        i3.classList.add('on'); gr.classList.add('on');
+        gr.classList.add('on');
+        sinal(dd1, P.difMensal);
+        sinal(dd2, P.difPeriodica);
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
         gv.className = 'g ' + cls;
         k3.className = 'v ' + (P.crescimento == null ? 's-mut' : P.crescimento >= 0 ? 's-ok' : 's-bad');
