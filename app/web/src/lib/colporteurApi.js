@@ -177,6 +177,20 @@ export async function loadOperations() {
   return { documents, reports, ledger, overview: overview || [] };
 }
 
+/**
+ * Vendas no site de cada colportor entre duas datas (YYYY-MM-DD, em hora de Angola), para o
+ * relatório mensal: [{ colporteur_id, orders, value, commission }]. Sem a migração
+ * 20261114235000_colportagem_relatorio_mensal devolve null (o Resumo usa então o total do ano).
+ */
+export async function colporteurSitePeriod(from, to) {
+  const { data, error } = await supabase.rpc('colporteur_site_period', { p_from: from, p_to: to });
+  if (error) {
+    if (error.code === 'PGRST202' || /could not find/i.test(error.message || '')) return null;
+    throw new Error(colporteurError(error));
+  }
+  return data || [];
+}
+
 export const issueDocument = ({ colporteurId, kind, lines, notes = '' }) =>
   rpc('colporteur_issue_document', { p_colporteur: colporteurId, p_kind: kind, p_lines: lines, p_notes: notes });
 export const saveReport = (report, submit = false, colporteurId = null) =>
