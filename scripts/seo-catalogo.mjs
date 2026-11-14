@@ -8,6 +8,8 @@
 //    (canonical, og:, twitter:): o mesmo commit pode ir para o projecto novo ou para o .ao.
 //    Escreve também as páginas fixas do sitemap (shop.html, faq.html…), cada uma com o seu
 //    canonical, título e descrição (FIXED_PAGES em seo-paginas.mjs).
+//    E põe no manifesto e no título da app no iPhone o nome e a cor do painel (PWA, ver
+//    pwa-manifesto.mjs) — sem resposta das definições, ficam os do repositório.
 // 2. Junta ao sitemap os livros e as colecções activos.
 // 3. Escreve product/<id>.html e colecoes/<slug>.html: o index.html com o título, a
 //    descrição e a capa de cada um. Quem partilha um livro no WhatsApp, Facebook ou Telegram
@@ -29,6 +31,7 @@ import {
   FIXED_PAGES, bookShareDescription, fixedPageFile, isSafeId, isSafeSlug, plainSummary, renderSharePage, rewriteSiteUrl,
   sitemapEntry, SITE_NAME,
 } from './seo-paginas.mjs';
+import { manifestoDaApp, tituloDaAppNoIphone } from './pwa-manifesto.mjs';
 
 const [dir, siteArg] = process.argv.slice(2);
 if (!dir || !siteArg || !/^https:\/\/[^/]+/.test(siteArg)) {
@@ -51,23 +54,6 @@ try {
   process.exit(1);
 }
 console.log(`→ endereços públicos: ${site}`);
-
-// 1b. As páginas fixas do sitemap com o seu próprio HTML (ver FIXED_PAGES): sem isto, todas
-// eram o index.html, com o canonical a apontar para a página inicial. Não dependem da base de
-// dados, por isso saem mesmo quando o catálogo não responde (SEO_SEM_CATALOGO=1).
-try {
-  const base = read('index.html');
-  const fixed = FIXED_PAGES.map((p) => [fixedPageFile(p.path), renderSharePage(base, {
-    title: p.title,
-    description: p.description,
-    url: `${site}${p.path}`,
-  })]);
-  for (const [name, html] of fixed) write(name, html);
-  console.log(`→ páginas fixas: ${fixed.length}, cada uma com o seu canonical`);
-} catch (err) {
-  console.error(`✘ páginas fixas não geradas (${err.message})`);
-  process.exit(1);
-}
 
 function readEnv(file) {
   if (!existsSync(file)) return {};
@@ -93,18 +79,55 @@ async function rows(query) {
  * quase sempre isso — um segundo depois já responde —, e sem repetição bastava esse segundo
  * para o site ir para o ar sem as páginas de partilha.
  */
-async function insistir(fn, vezes = 3) {
+async function insistir(fn, vezes = 3, oQue = 'catálogo') {
   let ultimo;
   for (let i = 1; i <= vezes; i += 1) {
     try { return await fn(); } catch (err) {
       ultimo = err;
       if (i < vezes) {
-        console.warn(`⚠ catálogo inalcançável (${err.message}) — tentativa ${i} de ${vezes}`);
+        console.warn(`⚠ ${oQue} inalcançável (${err.message}) — tentativa ${i} de ${vezes}`);
         await new Promise((r) => setTimeout(r, 1500 * i));
       }
     }
   }
   throw ultimo;
+}
+
+// 1a. A app instalada (PWA): o nome, o nome curto e a cor que estão no painel vão para o
+// manifesto e para o título da app no iPhone (ver pwa-manifesto.mjs). Antes do 1b e do 3,
+// porque as outras páginas são cópias do index.html. As definições lêem-se no mesmo endereço
+// público que o site usa. Sem resposta, ficam o manifesto e o título do repositório — a app
+// continua instalável, só com o nome de omissão —, por isso aqui não se pára o deploy.
+try {
+  if (!api) throw new Error('VITE_SUPABASE_URL em falta');
+  const definicoes = await insistir(async () => {
+    const res = await fetch(`${api}/functions/v1/app/settings`);
+    if (!res.ok) throw new Error(`settings: HTTP ${res.status}`);
+    return res.json();
+  }, 3, 'definições');
+  write('manifest.webmanifest', manifestoDaApp(read('manifest.webmanifest'), definicoes));
+  write('index.html', tituloDaAppNoIphone(read('index.html'), definicoes));
+  const m = JSON.parse(read('manifest.webmanifest'));
+  console.log(`→ app instalada: «${m.short_name}» (${m.name}), cor ${m.theme_color}`);
+} catch (err) {
+  console.warn(`⚠ app instalada com o nome do repositório (${err.message})`);
+}
+
+// 1b. As páginas fixas do sitemap com o seu próprio HTML (ver FIXED_PAGES): sem isto, todas
+// eram o index.html, com o canonical a apontar para a página inicial. Não dependem da base de
+// dados, por isso saem mesmo quando o catálogo não responde (SEO_SEM_CATALOGO=1).
+try {
+  const base = read('index.html');
+  const fixed = FIXED_PAGES.map((p) => [fixedPageFile(p.path), renderSharePage(base, {
+    title: p.title,
+    description: p.description,
+    url: `${site}${p.path}`,
+  })]);
+  for (const [name, html] of fixed) write(name, html);
+  console.log(`→ páginas fixas: ${fixed.length}, cada uma com o seu canonical`);
+} catch (err) {
+  console.error(`✘ páginas fixas não geradas (${err.message})`);
+  process.exit(1);
 }
 
 /** URL absoluto de uma imagem: as do próprio site vêm como caminho (/images/…). */

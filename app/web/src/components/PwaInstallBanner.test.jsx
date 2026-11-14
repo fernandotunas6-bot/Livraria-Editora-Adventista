@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ settings: { pwa_enabled: true, site_name: 'Livraria' } }) }));
 const { default: PwaInstallBanner } = await import('./PwaInstallBanner');
+const { ENGAGE_AFTER_MS, HOME_TOP_PX } = await import('@/lib/installPrompt');
 
 let root;
 let host;
@@ -53,6 +54,35 @@ describe('PwaInstallBanner', () => {
     await mount('/product/abc');
     await scroll(2000);
     expect(banner()).toBeNull();
+  });
+
+  it('no topo da página inicial espera, mesmo passado o tempo, e sai quando se volta ao topo', async () => {
+    vi.useFakeTimers();
+    try {
+      await mount('/');
+      await act(async () => { vi.advanceTimersByTime(ENGAGE_AFTER_MS + 1000); });
+      // Passou o tempo, mas o banner de destaques está à vista: o chat subia para cima da seta.
+      expect(banner()).toBeNull();
+      expect(document.documentElement.style.getPropertyValue('--aviso-instalar')).toBe('0px');
+      await scroll(HOME_TOP_PX + 40);
+      expect(banner()).not.toBeNull();
+      await scroll(0);
+      expect(banner()).toBeNull();
+      expect(document.documentElement.style.getPropertyValue('--aviso-instalar')).toBe('0px');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('noutras páginas, o tempo chega', async () => {
+    vi.useFakeTimers();
+    try {
+      await mount('/shop');
+      await act(async () => { vi.advanceTimersByTime(ENGAGE_AFTER_MS + 1000); });
+      expect(banner()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fechar guarda a escolha e tira o afastamento', async () => {

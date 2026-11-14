@@ -646,6 +646,34 @@
     bottom: calc(var(--float-gap, 1.5rem) + env(safe-area-inset-bottom, 0px) + var(--barra-navegacao, 0px));
   }
 
+  /* Banner da página inicial (HeroSlider): a fila de baixo — setas, pausa e pontos — sobe só o
+     que for preciso para não ficar debaixo do botão do assistente.
+     O banner mede 85svh (no mínimo 520 px, no máximo 900) e a fila assenta no fundo dele; o
+     assistente está preso ao fundo do ecrã, 1.5rem acima da área segura e da barra de baixo, e
+     mede 3rem. Em quase todos os telemóveis o fundo do banner cai nessa zona: o assistente
+     tapava a seta «anterior» (28 px num iPhone SE, 15 com a app instalada). A subida é o que
+     o banner tem a mais em relação ao topo do assistente, mais 0.5rem de folga — num ecrã alto
+     ou no computador dá zero e nada se mexe. O aviso de instalação não entra na conta: subir
+     por cima dele levava a fila contra o botão do slide, por isso é ele que não aparece no topo
+     da página inicial (installPromptCoversHero, lib/installPrompt.js). */
+  .heroi-subida {
+    --heroi-subida: max(0px, calc(
+      min(max(85svh, 520px), 900px) - 100svh + 1.5rem + env(safe-area-inset-bottom, 0px) +
+        var(--barra-navegacao, 0px) + 3rem + 0.5rem - 1.25rem
+    ));
+  }
+  .heroi-seta {
+    bottom: calc(1.25rem + var(--heroi-subida, 0px));
+  }
+  .heroi-pontos {
+    bottom: calc(22px + var(--heroi-subida, 0px));
+  }
+  @media (min-width: 640px) {
+    .heroi-pontos {
+      bottom: calc(2rem + var(--heroi-subida, 0px));
+    }
+  }
+
   /* Barra de navegação inferior do telemóvel (MobileBottomNav). A variável vale 0 quando a
      barra não está à vista (desktop, ficha do livro, painel), por isso nada muda fora dela.
      O corpo ganha espaço no fim, para o último cartão não ficar por baixo da barra, e os

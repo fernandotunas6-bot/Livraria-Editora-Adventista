@@ -82,7 +82,7 @@ const empty = {
 
   pwa_enabled: true,
   pwa_name: '',
-  pwa_short_name: 'LA',
+  pwa_short_name: 'Livraria',
   pwa_theme_color: '#0c4a6e',
   shipping_free_threshold: 20000,
   shipping_cost: 1500,
@@ -230,7 +230,7 @@ export default function SettingsTab() {
           youtube: r.youtube || '',
           pwa_enabled: !!r.pwa_enabled,
           pwa_name: r.pwa_name || '',
-          pwa_short_name: r.pwa_short_name || 'LA',
+          pwa_short_name: r.pwa_short_name || 'Livraria',
           pwa_theme_color: r.pwa_theme_color || '#0c4a6e',
           shipping_free_threshold: r.shipping_free_threshold ?? 20000,
           shipping_cost: r.shipping_cost ?? 1500,
@@ -685,7 +685,16 @@ export default function SettingsTab() {
             <Label>Permitir instalação como app (PWA)</Label>
           </div>
           <div className="space-y-2"><Label>Nome da App</Label><Input value={form.pwa_name} onChange={(e) => set('pwa_name', e.target.value)} placeholder={form.site_name} /></div>
-          <div className="space-y-2"><Label>Nome Curto (ícone)</Label><Input value={form.pwa_short_name} onChange={(e) => set('pwa_short_name', e.target.value)} maxLength={12} /></div>
+          <div className="space-y-2">
+            <Label htmlFor="pwa-nome-curto">Nome Curto (ícone)</Label>
+            <Input id="pwa-nome-curto" value={form.pwa_short_name} onChange={(e) => set('pwa_short_name', e.target.value)} maxLength={12} aria-describedby="pwa-nomes-quando" />
+          </div>
+          {/* O nome e o nome curto vão para o manifesto na publicação do site (scripts/pwa-manifesto.mjs):
+              é o que o telemóvel lê ao instalar. Dizê-lo aqui evita que se mude e se fique à espera. */}
+          <p id="pwa-nomes-quando" className="text-xs text-muted-foreground">
+            O nome curto aparece por baixo do ícone, no ecrã do telemóvel. Os nomes chegam à app na próxima publicação do site;
+            quem já a instalou vê a mudança quando o Android actualizar a app — no iPhone, só ao instalar de novo.
+          </p>
           <div className="space-y-2">
             <Label>Cor do Tema Mobile</Label>
             <div className="flex gap-2">
