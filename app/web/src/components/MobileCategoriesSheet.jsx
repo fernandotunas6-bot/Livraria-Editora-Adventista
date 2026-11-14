@@ -64,7 +64,7 @@ export default function MobileCategoriesSheet({ open, onOpenChange }) {
               {[
                 ['/track', 'Seguir encomenda'], ['/lojas', 'Lojas'], ['/shipping-returns', 'Envios e devoluções'],
                 ['/faq', 'Perguntas frequentes'], ['/contact', 'Contactos'], ['/about', 'Sobre nós'],
-                ['/privacidade', 'Privacidade'],
+                ['/privacidade', 'Privacidade'], ['/termos', 'Termos e condições'],
               ].map(([to, label]) => (
                 <Link key={to} to={to} className="rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{label}</Link>
               ))}

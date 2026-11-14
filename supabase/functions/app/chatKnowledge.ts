@@ -17,7 +17,7 @@ export const FAQ_SECTIONS = [
   {
     category: "Encomendas e Envios",
     questions: [
-      { question: "Quanto tempo demora a entrega?", answer: "A entrega padrão demora 5 a 7 dias úteis em Luanda e 7 a 14 dias para outras províncias. Envio expresso disponível mediante consulta." },
+      { question: "Quanto tempo demora a entrega?", answer: "A entrega padrão demora 5 a 7 dias úteis em Luanda e 7 a 14 dias para outras províncias. A entrega expressa demora 24 a 48 horas em Luanda." },
       { question: "Oferecem envio grátis?", answer: "Sim, envio grátis para encomendas acima de {free_threshold} em todo o território nacional." },
       { question: "Posso acompanhar a minha encomenda?", answer: "Sim! Use a página Rastrear Encomenda com o número e email da compra." },
     ],

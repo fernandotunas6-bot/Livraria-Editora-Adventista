@@ -355,7 +355,9 @@ export default function AuthForm({
         </Button>
         {mode === 'signup' && (
           <p className="text-center text-xs text-muted-foreground">
-            Ao criar conta, os seus dados são tratados como explicado na{' '}
+            Ao criar conta, aceita os{' '}
+            <a href="/termos" target="_blank" rel="noopener" className="font-medium text-primary underline underline-offset-2">termos e condições</a>
+            , e os seus dados são tratados como explicado na{' '}
             <a href="/privacidade" target="_blank" rel="noopener" className="font-medium text-primary underline underline-offset-2">política de privacidade</a>.
           </p>
         )}

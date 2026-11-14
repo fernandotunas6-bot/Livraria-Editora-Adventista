@@ -34,6 +34,7 @@ const FAQPage = lazy(() => import('@/pages/FAQPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 const CommunityPage = lazy(() => import('@/pages/CommunityPage.jsx'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage.jsx'));
+const TermsPage = lazy(() => import('@/pages/TermsPage.jsx'));
 const CommunityPostPage = lazy(() => import('@/pages/CommunityPostPage.jsx'));
 const ReaderProfilePage = lazy(() => import('@/pages/ReaderProfilePage.jsx'));
 const MaterialsPage = lazy(() => import('@/pages/MaterialsPage.jsx'));
@@ -250,6 +251,9 @@ function App() {
               <Route path="/privacidade" element={<PrivacyPage />} />
               <Route path="/privacy" element={<Navigate to="/privacidade" replace />} />
               <Route path="/politica-de-privacidade" element={<Navigate to="/privacidade" replace />} />
+              <Route path="/termos" element={<TermsPage />} />
+              <Route path="/terms" element={<Navigate to="/termos" replace />} />
+              <Route path="/termos-e-condicoes" element={<Navigate to="/termos" replace />} />
               <Route path="/comunidade/p/:id" element={<CommunityPostPage />} />
               <Route path="/comunidade/leitor/:key" element={<ReaderProfilePage />} />
               <Route path="/materiais" element={<MaterialsPage />} />

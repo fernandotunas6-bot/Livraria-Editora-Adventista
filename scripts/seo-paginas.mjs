@@ -110,6 +110,9 @@ export const FIXED_PAGES = [
   { path: '/comunidade', title: 'Comunidade de Leitores', description: 'Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.' },
   { path: '/shipping-returns', title: 'Envios e Devoluções', description: 'Prazos de entrega, custos de envio em Angola e como devolver um livro.' },
   { path: '/privacidade', title: 'Política de privacidade', description: 'Que dados pessoais tratamos na loja, na comunidade de leitores e no atendimento, com quem os partilhamos e como exercer os seus direitos.' },
+  // A mesma descrição da TermsPage.jsx, como na privacidade: a página estática (a que o Google
+  // e as aplicações de mensagens lêem) e a do site dizem o mesmo.
+  { path: '/termos', title: 'Termos e condições', description: 'As regras da loja online: conta, encomendas, pagamentos, entregas, devoluções, edições digitais, comunidade e as responsabilidades de cada parte.' },
 ];
 
 /** Nome do ficheiro de uma página fixa no build: `/shipping-returns` → `shipping-returns.html`. */
