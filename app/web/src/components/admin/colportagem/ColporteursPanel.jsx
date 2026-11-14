@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CodeChip } from '@/components/admin/users/userFormat';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { downloadCsv, matchesQuery } from '@/lib/churchRegistryApi';
+import { colporteurRatings, ratingText } from '@/lib/colporteurApi';
 import { CATEGORIES, STATUSES } from '@/lib/colporteurCommission';
 import { DataTable, NativeSelect, Pill, SearchBox, Toolbar } from '@/components/admin/igreja/registryUi';
 import ColporteurSheet from './ColporteurSheet';
@@ -17,6 +18,15 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
   const [category, setCategory] = useState('');
   const [district, setDistrict] = useState('');
   const [openId, setOpenId] = useState(null);
+  const [igrejaFiltro, setIgrejaFiltro] = useState('');
+  const [ratings, setRatings] = useState(() => new Map());
+  // A média das avaliações de cada colportor (sem a migração, a lista fica sem a coluna).
+  useEffect(() => {
+    if (mode !== 'colportores') return undefined;
+    let vivo = true;
+    colporteurRatings().then((m) => { if (vivo) setRatings(m); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [mode, data.colporteurs]);
 
   const churchOf = (c) => idx.churchesById.get(c.church_id);
   const districtOf = (c) => churchOf(c)?.district_id || '';
@@ -25,10 +35,11 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
     .filter((c) => (status === 'all' ? true : status === 'open' ? OPEN.includes(c.status) : c.status === status))
     .filter((c) => !category || c.category === category)
     .filter((c) => !district || districtOf(c) === district)
+    .filter((c) => !igrejaFiltro || (igrejaFiltro === 'sem' ? !c.church_id : c.church_id === igrejaFiltro))
     .filter((c) => !query || matchesQuery(`${c.code || ''} ${c.full_name} ${c.phone} ${churchOf(c)?.name || c.church_other} ${idx.districtName(districtOf(c))}`, query))
     .sort((a, b) => (mode === 'candidaturas' ? String(b.created).localeCompare(String(a.created)) : a.full_name.localeCompare(b.full_name))),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [data.colporteurs, mode, status, category, district, query, idx]);
+  [data.colporteurs, mode, status, category, district, igrejaFiltro, query, idx]);
 
   const statusOptions = mode === 'candidaturas'
     ? [['open', 'Por decidir'], ['candidatura', 'Novas'], ['em_analise', 'Em análise'], ['recusado', 'Recusadas'], ['all', 'Todas']]
@@ -57,11 +68,16 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
           <option value="">Todos os distritos</option>
           {[...reg.districts].sort((a, b) => a.name.localeCompare(b.name)).map((d) => <option key={d.id} value={d.id}>{d.name} · {idx.provinceName(d.province_id)}</option>)}
         </NativeSelect>
+        <NativeSelect value={igrejaFiltro} onChange={setIgrejaFiltro} className="w-auto max-w-56">
+          <option value="">Todas as igrejas</option>
+          <option value="sem">Sem igreja ligada (só texto)</option>
+          {[...reg.churches].filter((ch) => !district || ch.district_id === district).sort((a, b) => a.name.localeCompare(b.name)).map((ch) => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+        </NativeSelect>
         <Button variant="outline" size="sm" className="ml-auto" onClick={exportCsv}><Download className="mr-1.5 h-4 w-4" />Excel</Button>
       </Toolbar>
 
       <DataTable count={rows.length}
-        head={mode === 'candidaturas' ? ['Data', 'Nome', 'Telefone', 'Igreja · Distrito', 'Pede', 'Recomendação', 'Estado'] : ['Código', 'Nome', 'Telefone', 'Igreja · Distrito', 'Categoria', 'Estado', 'Conta']}
+        head={mode === 'candidaturas' ? ['Data', 'Nome', 'Telefone', 'Igreja · Distrito', 'Pede', 'Recomendação', 'Estado'] : ['Código', 'Nome', 'Telefone', 'Igreja · Distrito', 'Categoria', 'Estado', 'Avaliação', 'Conta']}
         empty={mode === 'candidaturas' ? 'Sem candidaturas. Partilhe o link de candidatura (separador "Links").' : 'Ainda não há colportores aprovados.'}>
         {rows.map((c) => {
           const church = churchOf(c);
@@ -71,7 +87,8 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
               <td className="px-3 py-2">{mode === 'candidaturas' ? new Date(c.created).toLocaleDateString('pt-AO') : <CodeChip code={c.code} />}</td>
               <td className="px-3 py-2 font-medium">{c.full_name}</td>
               <td className="px-3 py-2 whitespace-nowrap">{displayAngolaPhone(c.phone)}</td>
-              <td className="px-3 py-2">{church?.name || c.church_other || '—'}{church?.district_id ? <span className="text-muted-foreground"> · {idx.districtName(church.district_id)}</span> : ''}</td>
+              <td className="px-3 py-2">{church?.name || c.church_other || '—'}{church?.district_id ? <span className="text-muted-foreground"> · {idx.districtName(church.district_id)}</span> : ''}
+                {!church && mode === 'colportores' && <> <Pill tone="amber">sem igreja ligada</Pill></>}</td>
               {mode === 'candidaturas' ? (
                 <>
                   <td className="px-3 py-2">{CATEGORIES[c.requested_category]?.label}</td>
@@ -81,6 +98,7 @@ export default function ColporteursPanel({ mode, data, reg, idx, run }) {
                 <td className="px-3 py-2">{CATEGORIES[c.category]?.label}</td>
               )}
               <td className="px-3 py-2"><Pill tone={st.tone}>{st.label}</Pill></td>
+              {mode === 'colportores' && <td className="whitespace-nowrap px-3 py-2 text-sm">{ratings.get(c.id) ? <span className="text-amber-600 dark:text-amber-400">{ratingText(ratings.get(c.id).avg, ratings.get(c.id).count)}</span> : <span className="text-muted-foreground">—</span>}</td>}
               {mode === 'colportores' && <td className="px-3 py-2">{c.profile_id ? <Pill tone="green">ligada</Pill> : <span title="Envie o convite na ficha"><Link2 className="h-4 w-4 text-muted-foreground" /></span>}</td>}
             </tr>
           );

@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import DeliveryConfirmPanel from '@/components/DeliveryConfirmPanel';
+import ColporteurReviewPanel from '@/components/ColporteurReviewPanel';
 import LiveTracking from '@/components/delivery/LiveTracking';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import { getDeliveryStatusLabel, orderDeliveryAddress } from '@/lib/orderUtils';
@@ -367,6 +368,11 @@ export default function TrackOrderPage() {
                   order={order}
                   onConfirmed={(updated) => setOrder((prev) => ({ ...prev, ...updated }))}
                 />
+                )}
+
+                {/* Avaliar o colportor (quem entregou, ou o do código): só com sessão e a encomenda entregue. */}
+                {isAuthed && !isDigital && (order.delivery_status === 'delivered' || order.delivery_confirmed_at) && (
+                  <ColporteurReviewPanel orderNumber={order.order_number} />
                 )}
 
                 {order.can_cancel && (

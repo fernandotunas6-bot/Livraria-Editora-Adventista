@@ -12,6 +12,7 @@ import {
 } from '@/lib/colporteurApi';
 import { CATEGORIES, SALE_MODES, STATUSES, STATUS_FLOW, inForce, resolvePct, today } from '@/lib/colporteurCommission';
 import { FormField, NativeSelect, Pill, ProvinceMunicipality } from '@/components/admin/igreja/registryUi';
+import ColporteurExtras from './ColporteurExtras';
 
 const NEEDS_REASON = ['recusado', 'suspenso', 'inactivo'];
 const ACTION_LABEL = { em_analise: 'Pôr em análise', activo: 'Aprovar', recusado: 'Recusar', suspenso: 'Suspender', inactivo: 'Desactivar', candidatura: 'Voltar a candidatura' };
@@ -23,6 +24,7 @@ const EVENT_TEXT = {
   conta: (d) => (d.unlinked ? `Conta desligada${d.reason ? `: ${d.reason}` : ''}` : 'Conta ligada pelo colportor'),
   percentagem: (d) => `Percentagem própria ${d.sale_mode ? SALE_MODES[d.sale_mode]?.label : 'todos os modos'}${d.product_type ? ` · ${d.product_type}` : ''}: ${d.pct == null ? 'retirada' : `${d.pct}%`} desde ${d.from}${d.reason ? ` (${d.reason})` : ''}`,
   nota: () => 'Nota',
+  cartao: (d) => (d.accao === 'reemitido' ? 'Cartão reemitido (o anterior deixou de valer)' : 'Cartão emitido'),
 };
 
 export default function ColporteurSheet({ colporteur: c, data, reg, idx, run, onClose }) {
@@ -124,6 +126,8 @@ export default function ColporteurSheet({ colporteur: c, data, reg, idx, run, on
             )}
           </section>
         )}
+
+        {c.code && <ColporteurExtras colporteur={c} run={run} />}
 
         <section className="space-y-3 rounded-xl border border-border p-4">
           <h3 className="font-semibold">Ficha</h3>

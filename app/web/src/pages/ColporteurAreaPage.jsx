@@ -16,6 +16,7 @@ import ColporteurWorkspace from '@/components/colportagem/ColporteurWorkspace';
 import AreaBreadcrumb from '@/components/AreaBreadcrumb';
 import { forgetColporteurMe } from '@/hooks/useColporteurMe';
 import { COLPORTEUR_VIEWS, resolveColporteurView } from '@/lib/siteAreas';
+import MyCardReviews from '@/components/colportagem/MyCardReviews';
 
 const EVENT_TEXT = {
   candidatura: () => 'Candidatura enviada',
@@ -25,6 +26,7 @@ const EVENT_TEXT = {
   conta: (d) => (d.unlinked ? 'Conta desligada' : 'Conta ligada'),
   percentagem: (d) => `Percentagem própria${d.sale_mode ? ` (${SALE_MODES[d.sale_mode]?.label})` : ''}: ${d.pct == null ? 'retirada' : `${d.pct}%`}`,
   nota: () => 'Nota',
+  cartao: (d) => (d.accao === 'reemitido' ? 'Cartão reemitido' : 'Cartão emitido'),
 };
 
 /**
@@ -130,6 +132,8 @@ export default function ColporteurAreaPage() {
             {Object.keys(me.pct_by_type || {}).length > 0 && <p className="mt-2 text-xs text-muted-foreground">Alguns tipos de produto têm percentagem própria; a Livraria indica-a em cada guia.</p>}
           </div>
         </div>
+
+        <MyCardReviews me={me} />
 
         <div className="rounded-2xl border border-border p-5">
           <h3 className="mb-3 flex items-center gap-2 font-semibold"><ScrollText className="h-4 w-4" />Histórico</h3>

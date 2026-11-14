@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Download, Pencil, Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -7,11 +7,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { deleteRecord, downloadCsv, matchesQuery, saveRecord } from '@/lib/churchRegistryApi';
 import { DataTable, FormField, NativeSelect, Pill, ProvinceMunicipality, SearchBox, Toolbar } from './registryUi';
+import { churchColporteurs } from '@/lib/colporteurApi';
+import ChurchColporteurs, { resumoIgreja } from './ChurchColporteurs';
 
 const EMPTY = {
   cn: '', name: '', kind: 'igreja', district_id: '', province_id: '', municipality_id: '', address: '',
   delegate_name: '', delegate_pastor_id: '', congress_label: '', active: true, notes: '',
 };
+// Contactos e localização (migração 20261114160000): só entram no formulário com as colunas na base de dados.
+const CONTACTO = { phone: '', email: '', responsible_name: '', members_count: '', latitude: '', longitude: '' };
+const temContacto = (churches) => churches.some((c) => 'phone' in c);
 const KINDS = { igreja: 'Igreja', grupo: 'Grupo', companhia: 'Companhia' };
 
 export default function ChurchesPanel({ reg, idx, canEdit, run }) {
@@ -20,6 +25,15 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
   const [provinceFilter, setProvinceFilter] = useState('');
   const [status, setStatus] = useState('active');
   const [editing, setEditing] = useState(null);
+  const [ficha, setFicha] = useState(null);
+  const [stats, setStats] = useState(() => new Map());
+  const contacto = temContacto(reg.churches);
+  // Os colportores de cada igreja (activos, candidaturas, média das avaliações).
+  useEffect(() => {
+    let vivo = true;
+    churchColporteurs().then((r) => { if (vivo) setStats(new Map((r || []).map((x) => [x.church_id, x]))); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [reg.churches]);
 
   const rows = useMemo(() => reg.churches
     .filter((c) => (status === 'all' ? true : status === 'active' ? c.active : !c.active))
@@ -50,7 +64,16 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
   const save = async () => {
     if (!editing.name.trim()) throw new Error('Indique o nome da igreja.');
     if (editing.cn && !/^[0-9A-Za-z-]{1,12}$/.test(editing.cn.trim())) throw new Error('O número da igreja só leva algarismos, letras e hífen (até 12).');
-    await saveRecord('church', { ...editing, cn: editing.cn.trim() || null, name: editing.name.trim() });
+    const num = (v) => (v === '' || v == null ? null : Number(String(v).replace(',', '.')));
+    const extra = contacto ? {
+      phone: String(editing.phone || '').replace(/\D/g, '').replace(/^244/, ''), email: String(editing.email || '').trim().toLowerCase(),
+      responsible_name: String(editing.responsible_name || '').trim(), members_count: num(editing.members_count),
+      latitude: num(editing.latitude), longitude: num(editing.longitude),
+    } : {};
+    if (contacto && extra.phone && !/^[29][0-9]{8}$/.test(extra.phone)) throw new Error('O telefone da igreja tem 9 algarismos (ex.: 923 456 789).');
+    if (contacto && (extra.latitude == null) !== (extra.longitude == null)) throw new Error('Indique a latitude e a longitude, ou nenhuma.');
+    const base = Object.fromEntries(Object.entries(editing).filter(([k]) => contacto || !(k in CONTACTO)));
+    await saveRecord('church', { ...base, ...extra, cn: editing.cn.trim() || null, name: editing.name.trim() });
     setEditing(null);
   };
 
@@ -74,11 +97,11 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
         </NativeSelect>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={exportCsv}><Download className="mr-1.5 h-4 w-4" />Excel</Button>
-          {canEdit && <Button size="sm" onClick={() => setEditing({ ...EMPTY, district_id: districtFilter && districtFilter !== '__none' ? districtFilter : '' })}><Plus className="mr-1.5 h-4 w-4" />Nova igreja</Button>}
+          {canEdit && <Button size="sm" onClick={() => setEditing({ ...EMPTY, ...(contacto ? CONTACTO : {}), district_id: districtFilter && districtFilter !== '__none' ? districtFilter : '' })}><Plus className="mr-1.5 h-4 w-4" />Nova igreja</Button>}
         </div>
       </Toolbar>
 
-      <DataTable head={['Nº', 'Igreja', 'Distrito', 'Província · Município', 'Delegado', '']} count={rows.length}
+      <DataTable head={['Nº', 'Igreja', 'Distrito', 'Província · Município', 'Delegado', 'Colportores', '']} count={rows.length}
         empty={reg.churches.length ? 'Nenhuma igreja com estes filtros.' : 'Ainda não há igrejas. Use "Importar" ou "Nova igreja".'}>
         {rows.map((c) => (
           <tr key={c.id} className={c.active ? '' : 'opacity-60'}>
@@ -87,15 +110,23 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
             <td className="px-3 py-2">{idx.districtName(c.district_id) || <Pill tone="amber">sem distrito</Pill>}</td>
             <td className="px-3 py-2">{idx.provinceName(c.province_id)}{c.municipality_id ? ` · ${idx.municipalityName(c.municipality_id)}` : ''}</td>
             <td className="px-3 py-2">{c.delegate_pastor_id ? idx.pastorLabel(c.delegate_pastor_id) : (c.delegate_name || '—')}</td>
+            <td className="px-3 py-2">
+              <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-left" title="Os colportores desta igreja" onClick={() => setFicha(c)}>
+                <Users className="mr-1.5 h-4 w-4 shrink-0" /><span className="text-xs">{stats.get(c.id) ? resumoIgreja(stats.get(c.id)) : 'ver'}</span>
+              </Button>
+            </td>
             <td className="px-3 py-2 text-right">
               {canEdit && <Button variant="ghost" size="icon" title="Editar" onClick={() => setEditing({
-                ...EMPTY, ...c, cn: c.cn || '', district_id: c.district_id || '', province_id: c.province_id || '',
+                ...EMPTY, ...(contacto ? CONTACTO : {}), ...c, cn: c.cn || '',
+                ...(contacto ? { phone: c.phone || '', email: c.email || '', responsible_name: c.responsible_name || '', members_count: c.members_count ?? '', latitude: c.latitude ?? '', longitude: c.longitude ?? '' } : {}), district_id: c.district_id || '', province_id: c.province_id || '',
                 municipality_id: c.municipality_id || '', delegate_pastor_id: c.delegate_pastor_id || '',
               })}><Pencil className="h-4 w-4" /></Button>}
             </td>
           </tr>
         ))}
       </DataTable>
+
+      {ficha && <ChurchColporteurs church={ficha} idx={idx} onClose={() => setFicha(null)} />}
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -137,6 +168,16 @@ export default function ChurchesPanel({ reg, idx, canEdit, run }) {
                   <Input value={editing.delegate_name} onChange={(e) => setEditing({ ...editing, delegate_name: e.target.value })} maxLength={120} />
                 </FormField>
               </div>
+              {contacto && (
+                <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
+                  <FormField label="Telefone da igreja"><Input value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} inputMode="tel" placeholder="923 456 789" /></FormField>
+                  <FormField label="Email"><Input value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} type="email" /></FormField>
+                  <FormField label="Responsável" hint="Ancião ou secretário que responde pela igreja."><Input value={editing.responsible_name} onChange={(e) => setEditing({ ...editing, responsible_name: e.target.value })} maxLength={120} /></FormField>
+                  <FormField label="Membros"><Input value={editing.members_count} onChange={(e) => setEditing({ ...editing, members_count: e.target.value })} inputMode="numeric" /></FormField>
+                  <FormField label="Latitude" hint="Ex.: -12.7761"><Input value={editing.latitude} onChange={(e) => setEditing({ ...editing, latitude: e.target.value })} inputMode="decimal" /></FormField>
+                  <FormField label="Longitude" hint="Ex.: 15.7392"><Input value={editing.longitude} onChange={(e) => setEditing({ ...editing, longitude: e.target.value })} inputMode="decimal" /></FormField>
+                </div>
+              )}
               <FormField label="Congresso"><Input value={editing.congress_label} onChange={(e) => setEditing({ ...editing, congress_label: e.target.value })} maxLength={60} placeholder="11-13-SET" /></FormField>
               <FormField label="Notas"><Textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={2} maxLength={2000} /></FormField>
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.active} onCheckedChange={(v) => setEditing({ ...editing, active: v })} />Activa</label>
