@@ -1,0 +1,1908 @@
+{
+ "sobre": "Capas encontradas na internet para os produtos que tinham capa tipográfica (2026-11-14). Cada uma foi vista ao lado do título do produto antes de entrar; ver CAPAS-INTERNET.md.",
+ "capas": [
+  {
+   "id": "tn9xcqm7lqjuham",
+   "titulo": "21 Dias para Mudar",
+   "ficheiro": "21-dias-para-mudar.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "TKN-2416-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/TKN-2416-000/TKN-2416-000_detail1.png",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "tn9xcqm7lqjuham_0_ev.png",
+   "metodo": "plano"
+  },
+  {
+   "id": "gmrce1vtc5lwu7c",
+   "titulo": "A Ciência do Bom Viver",
+   "ficheiro": "a-ciencia-do-bom-viver.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19959",
+   "titulo_na_fonte": "A Ciência do Bom Viver (Edição Atualizada - Brochu",
+   "url": "https://imagens.cpb.com.br/produtos/19959/19959-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "gmrce1vtc5lwu7c_0_cpb.png"
+  },
+  {
+   "id": "pujavgy7tawd9ct",
+   "titulo": "A Volta por Cima",
+   "ficheiro": "a-volta-por-cima.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "10404",
+   "titulo_na_fonte": "A Volta Por Cima",
+   "url": "https://imagens.cpb.com.br/produtos/10404/10404-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "pujavgy7tawd9ct_0_cpb.png"
+  },
+  {
+   "id": "ge65fy9jv01x3c7",
+   "titulo": "A Única Esperança",
+   "ficheiro": "a-unica-esperanca.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14147",
+   "titulo_na_fonte": "A Única Esperança",
+   "url": "https://imagens.cpb.com.br/produtos/14147/14147-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "ge65fy9jv01x3c7_0_cpb.png"
+  },
+  {
+   "id": "ze8i2php5eczlu4",
+   "titulo": "Administração Eficaz",
+   "ficheiro": "administracao-eficaz.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "7610",
+   "titulo_na_fonte": "Administração Eficaz - Reformulado",
+   "url": "https://imagens.cpb.com.br/produtos/7610/7610-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "ze8i2php5eczlu4_0_cpb.png"
+  },
+  {
+   "id": "7hc3buq9y0t92eq",
+   "titulo": "Além da Magia (Livro Infantil)",
+   "ficheiro": "alem-da-magia-livro-infantil.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "11077",
+   "titulo_na_fonte": "Além da Magia",
+   "url": "https://imagens.cpb.com.br/produtos/11077/11077-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "7hc3buq9y0t92eq_0_cpb.png"
+  },
+  {
+   "id": "b05i8ohx7lwxbfv",
+   "titulo": "Bíblia Andrews",
+   "ficheiro": "biblia-andrews.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21696",
+   "titulo_na_fonte": "Bíblia de Estudo Andrews NAA - Capa Couro Preta",
+   "url": "https://imagens.cpb.com.br/produtos/21696/21696-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "cor por confirmar (há preta, castanha e rosa)",
+   "fonte": "b05i8ohx7lwxbfv_0_cpb.png"
+  },
+  {
+   "id": "2z3nd1cxbcdh6ty",
+   "titulo": "Bíblia Arqueológica",
+   "ficheiro": "biblia-arqueologica.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22344",
+   "titulo_na_fonte": "Bíblia de Estudo Arqueológica - Capa Couro Marrom",
+   "url": "https://imagens.cpb.com.br/produtos/22344/22344-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "cor por confirmar (castanha/azul)",
+   "fonte": "2z3nd1cxbcdh6ty_0_cpb.png"
+  },
+  {
+   "id": "xn2kcqr038u257q",
+   "titulo": "Bíblia Disciplos",
+   "ficheiro": "biblia-disciplos.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "18119",
+   "titulo_na_fonte": "Bíblia do Discípulo",
+   "url": "https://imagens.cpb.com.br/produtos/18119/18119-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "xn2kcqr038u257q_0_cpb.png"
+  },
+  {
+   "id": "tekfiytwn7qjqs2",
+   "titulo": "Bíblia Ilustrada",
+   "ficheiro": "biblia-ilustrada.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "18122",
+   "titulo_na_fonte": "Bíblia Ilustrada",
+   "url": "https://imagens.cpb.com.br/produtos/18122/18122-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "tekfiytwn7qjqs2_0_cpb.png"
+  },
+  {
+   "id": "2f8nfjiw07oljrw",
+   "titulo": "Bíblia Sagrada da Mulher Rosa",
+   "ficheiro": "biblia-sagrada-da-mulher-rosa.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16044",
+   "titulo_na_fonte": "Bíblia da Mulher (Capa Rosa)",
+   "url": "https://imagens.cpb.com.br/produtos/16044/16044-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "2f8nfjiw07oljrw_0_cpb.png"
+  },
+  {
+   "id": "atcyth584dcxwt3",
+   "titulo": "Bíblia da Mulher",
+   "ficheiro": "biblia-da-mulher.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16206",
+   "titulo_na_fonte": "Bíblia da Mulher (Capa Cinza)",
+   "url": "https://imagens.cpb.com.br/produtos/16206/16206-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "atcyth584dcxwt3_0_cpb.png"
+  },
+  {
+   "id": "om3l398xn3cvm77",
+   "titulo": "Bíblia dos Aventureiros",
+   "ficheiro": "biblia-dos-aventureiros.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19798",
+   "titulo_na_fonte": "Bíblia dos Aventureiros - Capa Azul",
+   "url": "https://imagens.cpb.com.br/produtos/19798/19798-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "cor por confirmar (azul/rosa)",
+   "fonte": "om3l398xn3cvm77_0_cpb.png"
+  },
+  {
+   "id": "svmw8vnxg6wzeqe",
+   "titulo": "Bíblia dos Desbravadores",
+   "ficheiro": "biblia-dos-desbravadores.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16043",
+   "titulo_na_fonte": "Bíblia do Desbravador - Capa Rosa",
+   "url": "https://imagens.cpb.com.br/produtos/16043/16043-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "cor por confirmar (4 cores); ISBN aponta para a rosa",
+   "fonte": "svmw8vnxg6wzeqe_0_cpb.png"
+  },
+  {
+   "id": "dq0ywzsb0x5jt9o",
+   "titulo": "Cartas Jovens Namorados",
+   "ficheiro": "cartas-jovens-namorados.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5801",
+   "titulo_na_fonte": "Cartas a Jovens Namorados",
+   "url": "https://imagens.cpb.com.br/produtos/5801/5801-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "dq0ywzsb0x5jt9o_0_cpb.png"
+  },
+  {
+   "id": "4x9d1sqs2ypia7q",
+   "titulo": "Casamento Princípio Bíblicos e Teológico",
+   "ficheiro": "casamento-principio-biblicos-e-teologico.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15329",
+   "titulo_na_fonte": "Casamento, Princípios Bíblicos e Teológicos",
+   "url": "https://imagens.cpb.com.br/produtos/15329/15329-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "4x9d1sqs2ypia7q_0_cpb.png"
+  },
+  {
+   "id": "tzcsrflp6bnnoha",
+   "titulo": "Chamados para Salvar",
+   "ficheiro": "chamados-para-salvar.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "JDX-8626-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/JDX-8626-000/JDX-8626-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "tzcsrflp6bnnoha_2_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "3fbiqtbjebeqrmx",
+   "titulo": "Chave da Virada",
+   "ficheiro": "chave-da-virada.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "J7R-3451-000",
+   "titulo_na_fonte": "A Chave da Virada",
+   "url": "https://static.estantevirtual.com.br/book/00/J7R-3451-000/J7R-3451-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "3fbiqtbjebeqrmx_2_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "sns8fq5cnseuhj3",
+   "titulo": "Comece Hoje a Perder Peso",
+   "ficheiro": "comece-hoje-a-perder-peso.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "G9K-7234-000",
+   "titulo_na_fonte": "Comece Hoje A Perder Peso",
+   "url": "https://static.estantevirtual.com.br/book/00/G9K-7234-000/G9K-7234-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "sns8fq5cnseuhj3_2_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "7n3gjnz9hh1haxl",
+   "titulo": "Como Formar Filho Vencedor",
+   "ficheiro": "como-formar-filho-vencedor.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "TNL-7067-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/TNL-7067-000/TNL-7067-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "7n3gjnz9hh1haxl_0_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "mlp0jvmyulks8wc",
+   "titulo": "Como Lidar com as Emoções",
+   "ficheiro": "como-lidar-com-as-emocoes.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "9089",
+   "titulo_na_fonte": "Como Lidar com as Emoções",
+   "url": "https://imagens.cpb.com.br/produtos/9089/9089-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "mlp0jvmyulks8wc_0_cpb.png"
+  },
+  {
+   "id": "lqygm6dyhkpxtft",
+   "titulo": "Conduta Sexual",
+   "ficheiro": "conduta-sexual.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21922",
+   "titulo_na_fonte": "Conduta Sexual (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/21922/21922-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "lqygm6dyhkpxtft_0_cpb.png"
+  },
+  {
+   "id": "aomv3w3kzz2dc1w",
+   "titulo": "Conecte-se com Seu Filho",
+   "ficheiro": "conecte-se-com-seu-filho.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16373",
+   "titulo_na_fonte": "Conecte-se Com Seu Filho",
+   "url": "https://imagens.cpb.com.br/produtos/16373/16373-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "aomv3w3kzz2dc1w_0_cpb.png"
+  },
+  {
+   "id": "srdde96tv5u83dh",
+   "titulo": "Conhecer Jesus é Tudo",
+   "ficheiro": "conhecer-jesus-e-tudo.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5100",
+   "titulo_na_fonte": "Conhecer Jesus é Tudo",
+   "url": "https://imagens.cpb.com.br/produtos/5100/5100-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "srdde96tv5u83dh_0_cpb.png"
+  },
+  {
+   "id": "2oob3mqnz2kqwui",
+   "titulo": "Conselho sobre Saúde",
+   "ficheiro": "conselho-sobre-saude.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21002",
+   "titulo_na_fonte": "Conselhos Sobre Saúde (Edição Atualizada - Capa Du",
+   "url": "https://imagens.cpb.com.br/produtos/21002/21002-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "2oob3mqnz2kqwui_0_cpb.png"
+  },
+  {
+   "id": "yt2t82a1jmhyn7j",
+   "titulo": "Conselhos aos Pais, Professores e Estudantes",
+   "ficheiro": "conselhos-aos-pais-professores-e-estudantes.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20844",
+   "titulo_na_fonte": "Conselhos aos Pais, Professores e Estudantes (Ediç",
+   "url": "https://imagens.cpb.com.br/produtos/20844/20844-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "yt2t82a1jmhyn7j_0_cpb.png"
+  },
+  {
+   "id": "lqm3tr0k9ochkdm",
+   "titulo": "Conselhos sobre Escola Sabatina",
+   "ficheiro": "conselhos-sobre-escola-sabatina.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16315",
+   "titulo_na_fonte": "Conselhos Sobre Escola Sabatina (Edição Atualizada",
+   "url": "https://imagens.cpb.com.br/produtos/16315/16315-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "lqm3tr0k9ochkdm_0_cpb.png"
+  },
+  {
+   "id": "ziyy5o16fad8kea",
+   "titulo": "Conselhos sobre Mordomia",
+   "ficheiro": "conselhos-sobre-mordomia.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "18338",
+   "titulo_na_fonte": "Conselhos Sobre Mordomia (Edição Atualizada - Broc",
+   "url": "https://imagens.cpb.com.br/produtos/18338/18338-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "capa da edição actual; o ISBN da loja é de edição anterior",
+   "fonte": "ziyy5o16fad8kea_0_cpb.png"
+  },
+  {
+   "id": "o10817ofdob6zbp",
+   "titulo": "Conselhos sobre Regime Alimentar",
+   "ficheiro": "conselhos-sobre-regime-alimentar.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20826",
+   "titulo_na_fonte": "Conselhos Sobre o Regime Alimentar (Edição Atualiz",
+   "url": "https://imagens.cpb.com.br/produtos/20826/20826-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "o10817ofdob6zbp_0_cpb.png"
+  },
+  {
+   "id": "t0doxb6wad20ywm",
+   "titulo": "Conselhos sobre a Escola Sabatina",
+   "ficheiro": "conselhos-sobre-a-escola-sabatina.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22007",
+   "titulo_na_fonte": "Conselhos Sobre a Escola Sabatina (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/22007/22007-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "t0doxb6wad20ywm_0_cpb.png"
+  },
+  {
+   "id": "ebkfbb65gopcr0k",
+   "titulo": "Declarações da Igreja",
+   "ficheiro": "declaracoes-da-igreja.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "7674",
+   "titulo_na_fonte": "Declarações da Igreja",
+   "url": "https://imagens.cpb.com.br/produtos/7674/7674-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "ebkfbb65gopcr0k_0_cpb.png",
+   "aparar": false
+  },
+  {
+   "id": "knhmb6j0ps7fwic",
+   "titulo": "Educação",
+   "ficheiro": "educacao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19994",
+   "titulo_na_fonte": "Educação (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/19994/19994-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "knhmb6j0ps7fwic_0_cpb.png"
+  },
+  {
+   "id": "1mz8p23f04oznlv",
+   "titulo": "Em Busca de Esperança",
+   "ficheiro": "em-busca-de-esperanca.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15766",
+   "titulo_na_fonte": "Em Busca de Esperança",
+   "url": "https://imagens.cpb.com.br/produtos/15766/15766-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "1mz8p23f04oznlv_0_cpb.png"
+  },
+  {
+   "id": "iyquzwd0849dujw",
+   "titulo": "Estarei Pronta no Sábado",
+   "ficheiro": "estarei-pronta-no-sabado.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "QJZ-1408-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/QJZ-1408-000/QJZ-1408-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "iyquzwd0849dujw_0_ev.jpg"
+  },
+  {
+   "id": "cyf3oea3iv325lh",
+   "titulo": "Evangelismo",
+   "ficheiro": "evangelismo.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19968",
+   "titulo_na_fonte": "Evangelismo (Edição Atualizada - Brochura)",
+   "url": "https://imagens.cpb.com.br/produtos/19968/19968-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "cyf3oea3iv325lh_0_cpb.png"
+  },
+  {
+   "id": "quwqsmrdkycuzvm",
+   "titulo": "Eventos Finais",
+   "ficheiro": "eventos-finais.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15954",
+   "titulo_na_fonte": "Eventos Finais (Edição Atualizada - Brochura)",
+   "url": "https://imagens.cpb.com.br/produtos/15954/15954-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "quwqsmrdkycuzvm_0_cpb.png"
+  },
+  {
+   "id": "xs3nrw01h5mcdd8",
+   "titulo": "Experimente um Recomeço",
+   "ficheiro": "experimente-um-recomeco.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15528",
+   "titulo_na_fonte": "Experimente um Recomeço",
+   "url": "https://imagens.cpb.com.br/produtos/15528/15528-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "xs3nrw01h5mcdd8_0_cpb.png",
+   "aparar": false
+  },
+  {
+   "id": "h32bou7litxqkxy",
+   "titulo": "Felizes no Amor",
+   "ficheiro": "felizes-no-amor.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "RXN-2092-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/RXN-2092-000/RXN-2092-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "h32bou7litxqkxy_2_ev.jpg"
+  },
+  {
+   "id": "9w4ve7jyfcgcox5",
+   "titulo": "Fundamentos da Educação Cristã",
+   "ficheiro": "fundamentos-da-educacao-crista.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21989",
+   "titulo_na_fonte": "Fundamentos da Educação Cristã (Edição Atualizada",
+   "url": "https://imagens.cpb.com.br/produtos/21989/21989-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "9w4ve7jyfcgcox5_0_cpb.png"
+  },
+  {
+   "id": "d7luqlsrg81gybs",
+   "titulo": "Fé e Obras",
+   "ficheiro": "fe-e-obras.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5146",
+   "titulo_na_fonte": "Fé e Obras",
+   "url": "https://imagens.cpb.com.br/produtos/5146/5146-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "d7luqlsrg81gybs_0_cpb.png"
+  },
+  {
+   "id": "hkvthkmvfdv30et",
+   "titulo": "Guia de Liberdade Religiosa",
+   "ficheiro": "guia-de-liberdade-religiosa.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "LQT-7527-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/LQT-7527-000/LQT-7527-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    184,
+    274
+   ],
+   "nota": "",
+   "fonte": "hkvthkmvfdv30et_1_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "rvdkpxao3tlsyad",
+   "titulo": "Guia do Ancião",
+   "ficheiro": "guia-do-anciao.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "HT6-4842-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/HT6-4842-000/HT6-4842-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    240,
+    360
+   ],
+   "nota": "",
+   "fonte": "rvdkpxao3tlsyad_0_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "bkjcg7qune75wmu",
+   "titulo": "Guiados por Deus",
+   "ficheiro": "guiados-por-deus.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "E1P-2813-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/E1P-2813-000/E1P-2813-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    240,
+    360
+   ],
+   "nota": "",
+   "fonte": "bkjcg7qune75wmu_0_ev.jpg",
+   "metodo": "branco",
+   "quad": [
+    [
+     22,
+     38
+    ],
+    [
+     218,
+     33
+    ],
+    [
+     213,
+     326
+    ],
+    [
+     25,
+     322
+    ]
+   ],
+   "inset": 1.5
+  },
+  {
+   "id": "x9v23lrx764lgp7",
+   "titulo": "Hinário Novo",
+   "ficheiro": "hinario-novo.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20837",
+   "titulo_na_fonte": "Hinário Adventista Com Música - Capa Preta",
+   "url": "https://imagens.cpb.com.br/produtos/20837/20837-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "x9v23lrx764lgp7_0_cpb.png"
+  },
+  {
+   "id": "cgqhuhnhpqp1s5a",
+   "titulo": "História da Redenção",
+   "ficheiro": "historia-da-redencao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19989",
+   "titulo_na_fonte": "História da Redenção (Edição Atualizada - Capa Dur",
+   "url": "https://imagens.cpb.com.br/produtos/19989/19989-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "cgqhuhnhpqp1s5a_0_cpb.png"
+  },
+  {
+   "id": "3pl8j1lgcfwmgg4",
+   "titulo": "Inigualável",
+   "ficheiro": "inigualavel.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16720",
+   "titulo_na_fonte": "Inigualável",
+   "url": "https://imagens.cpb.com.br/produtos/16720/16720-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "3pl8j1lgcfwmgg4_0_cpb.png"
+  },
+  {
+   "id": "3ck9avfckb2189k",
+   "titulo": "Ira sob Controle",
+   "ficheiro": "ira-sob-controle.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "10406",
+   "titulo_na_fonte": "Ira Sob Controle",
+   "url": "https://imagens.cpb.com.br/produtos/10406/10406-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "3ck9avfckb2189k_0_cpb.png"
+  },
+  {
+   "id": "f7iwbn4v8wxebus",
+   "titulo": "Juízo sem Medo",
+   "ficheiro": "juizo-sem-medo.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15439",
+   "titulo_na_fonte": "Juízo sem Medo",
+   "url": "https://imagens.cpb.com.br/produtos/15439/15439-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "f7iwbn4v8wxebus_0_cpb.png"
+  },
+  {
+   "id": "l874sad8oprjqhc",
+   "titulo": "Liderança Cristã",
+   "ficheiro": "lideranca-crista.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21303",
+   "titulo_na_fonte": "Liderança Cristã - (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/21303/21303-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "l874sad8oprjqhc_0_cpb.png"
+  },
+  {
+   "id": "sfc6hheymalrfxf",
+   "titulo": "Livre das Garras do Sucesso",
+   "ficheiro": "livre-das-garras-do-sucesso.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "8145",
+   "titulo_na_fonte": "Livre das Garras do Sucesso",
+   "url": "https://imagens.cpb.com.br/produtos/8145/8145-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "sfc6hheymalrfxf_0_cpb.png"
+  },
+  {
+   "id": "b93kruhc0a03ula",
+   "titulo": "Manual da Igreja",
+   "ficheiro": "manual-da-igreja.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "23156",
+   "titulo_na_fonte": "Manual da Igreja",
+   "url": "https://imagens.cpb.com.br/produtos/23156/23156-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "b93kruhc0a03ula_0_cpb.png"
+  },
+  {
+   "id": "lygihpup42o0oxh",
+   "titulo": "Maravilhas da Criação",
+   "ficheiro": "maravilhas-da-criacao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "15102",
+   "titulo_na_fonte": "Maravilhas da Criação",
+   "url": "https://imagens.cpb.com.br/produtos/15102/15102-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "lygihpup42o0oxh_0_cpb.png"
+  },
+  {
+   "id": "22fpwvr9aa0yg9g",
+   "titulo": "Medicina e Salvação",
+   "ficheiro": "medicina-e-salvacao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21984",
+   "titulo_na_fonte": "Medicina e Salvação (Edição Atualizada - Capa Dura",
+   "url": "https://imagens.cpb.com.br/produtos/21984/21984-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "22fpwvr9aa0yg9g_0_cpb.png"
+  },
+  {
+   "id": "lmm6plpr8diit5b",
+   "titulo": "Meditações Diárias — Maravilhoso Deus",
+   "ficheiro": "meditacoes-diarias-maravilhoso-deus.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "SY2-5568-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/SY2-5568-000/SY2-5568-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "lmm6plpr8diit5b_1_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "4ipn3raq5pq2j4t",
+   "titulo": "Mensageiro",
+   "ficheiro": "mensageiro.webp",
+   "novo_ficheiro": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14159",
+   "titulo_na_fonte": "Mensageiro",
+   "url": "https://imagens.cpb.com.br/produtos/14159/14159-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "produto inactivo sem imagem",
+   "fonte": "4ipn3raq5pq2j4t_0_cpb.png"
+  },
+  {
+   "id": "sreaac6okkses9p",
+   "titulo": "Mensagens Escolhida Vol. 2",
+   "ficheiro": "mensagens-escolhida-vol-2.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20189",
+   "titulo_na_fonte": "Mensagens Escolhidas, Vol.2 (Edição Atualizada - C",
+   "url": "https://imagens.cpb.com.br/produtos/20189/20189-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "sreaac6okkses9p_0_cpb.png"
+  },
+  {
+   "id": "wsooemvq3qbz80g",
+   "titulo": "Mensagens Escolhidas Vol. 1",
+   "ficheiro": "mensagens-escolhidas-vol-1.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20186",
+   "titulo_na_fonte": "Mensagens Escolhidas, Vol.1 (Edição Atualizada - C",
+   "url": "https://imagens.cpb.com.br/produtos/20186/20186-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "wsooemvq3qbz80g_0_cpb.png"
+  },
+  {
+   "id": "tmr4hxht2wghw9e",
+   "titulo": "Mensagens Escolhidas Vol. 3",
+   "ficheiro": "mensagens-escolhidas-vol-3.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20192",
+   "titulo_na_fonte": "Mensagens Escolhidas, Vol.3 (Edição Atualizada - C",
+   "url": "https://imagens.cpb.com.br/produtos/20192/20192-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "tmr4hxht2wghw9e_0_cpb.png"
+  },
+  {
+   "id": "pfl3cjy2kvhw947",
+   "titulo": "Mensagens aos Jovens",
+   "ficheiro": "mensagens-aos-jovens.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19135",
+   "titulo_na_fonte": "Mensagens aos Jovens (Edição Atualizada - Brochura",
+   "url": "https://imagens.cpb.com.br/produtos/19135/19135-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "pfl3cjy2kvhw947_0_cpb.png"
+  },
+  {
+   "id": "6v840hqcoj9zy8p",
+   "titulo": "Mente Carácter Personalidade Vol. 1",
+   "ficheiro": "mente-caracter-personalidade-vol-1.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14458",
+   "titulo_na_fonte": "Mente, Caráter e Personalidade, Vol. 1 (Edição Atu",
+   "url": "https://imagens.cpb.com.br/produtos/14458/14458-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "6v840hqcoj9zy8p_0_cpb.png"
+  },
+  {
+   "id": "cc6w9dfii5j7lpt",
+   "titulo": "Mente Carácter Personalidade Vol. 2",
+   "ficheiro": "mente-caracter-personalidade-vol-2.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14461",
+   "titulo_na_fonte": "Mente, Caráter e Personalidade, Vol. 2 (Edição Atu",
+   "url": "https://imagens.cpb.com.br/produtos/14461/14461-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "cc6w9dfii5j7lpt_0_cpb.png"
+  },
+  {
+   "id": "faauk0s2g1ymz5m",
+   "titulo": "Ministério Pastoral",
+   "ficheiro": "ministerio-pastoral.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21931",
+   "titulo_na_fonte": "Ministério Pastoral (Edição Atualizada - Capa Dura",
+   "url": "https://imagens.cpb.com.br/produtos/21931/21931-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "faauk0s2g1ymz5m_0_cpb.png"
+  },
+  {
+   "id": "epnm4ka7zb48xub",
+   "titulo": "Ministério para as Cidades",
+   "ficheiro": "ministerio-para-as-cidades.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22060",
+   "titulo_na_fonte": "Ministério Para as Cidades (Edição Atualizada - Ca",
+   "url": "https://imagens.cpb.com.br/produtos/22060/22060-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "epnm4ka7zb48xub_0_cpb.png"
+  },
+  {
+   "id": "832re1sq4915og0",
+   "titulo": "Movidos a Internet",
+   "ficheiro": "movidos-a-internet.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20092",
+   "titulo_na_fonte": "Movidos a Internet",
+   "url": "https://imagens.cpb.com.br/produtos/20092/20092-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "832re1sq4915og0_0_cpb.png"
+  },
+  {
+   "id": "4cp9vf2vhvly8zf",
+   "titulo": "Nepp-lar Adventista o Encadernado",
+   "ficheiro": "nepp-lar-adventista-o-encadernado.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14456",
+   "titulo_na_fonte": "O Lar Adventista (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/14456/14456-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "«Nepp-lar» = O Lar Adventista",
+   "fonte": "4cp9vf2vhvly8zf_0_cpb.png"
+  },
+  {
+   "id": "1xqlc3d4oskmy5y",
+   "titulo": "Nepp-temperança",
+   "ficheiro": "nepp-temperanca.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21068",
+   "titulo_na_fonte": "Temperança (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/21068/21068-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "«Nepp-temperança» = Temperança",
+   "fonte": "1xqlc3d4oskmy5y_0_cpb.png"
+  },
+  {
+   "id": "a1hc0hm73uifmks",
+   "titulo": "No Deserto da Tentação",
+   "ficheiro": "no-deserto-da-tentacao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5229",
+   "titulo_na_fonte": "No Deserto da Tentação",
+   "url": "https://imagens.cpb.com.br/produtos/5229/5229-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "a1hc0hm73uifmks_0_cpb.png"
+  },
+  {
+   "id": "4fkchduydq8uuba",
+   "titulo": "No Princípio",
+   "ficheiro": "no-principio.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14499",
+   "titulo_na_fonte": "No Princípio",
+   "url": "https://imagens.cpb.com.br/produtos/14499/14499-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "4fkchduydq8uuba_0_cpb.png"
+  },
+  {
+   "id": "we5xt4n48fxfztp",
+   "titulo": "Nos Bastidores da Mídia",
+   "ficheiro": "nos-bastidores-da-midia.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "8780",
+   "titulo_na_fonte": "Nos Bastidores da Mídia",
+   "url": "https://imagens.cpb.com.br/produtos/8780/8780-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "we5xt4n48fxfztp_0_cpb.png"
+  },
+  {
+   "id": "gii93aiiy7eb6zr",
+   "titulo": "O Ciclo da Infelicidade",
+   "ficheiro": "o-ciclo-da-infelicidade.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "11486",
+   "titulo_na_fonte": "O Ciclo da Infelicidade",
+   "url": "https://imagens.cpb.com.br/produtos/11486/11486-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "gii93aiiy7eb6zr_0_cpb.png"
+  },
+  {
+   "id": "d2drchfy34ocadc",
+   "titulo": "O Colportor Evangelista",
+   "ficheiro": "o-colportor-evangelista.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22122",
+   "titulo_na_fonte": "Colportor Evangelista (Edição Atualizada - Capa Du",
+   "url": "https://imagens.cpb.com.br/produtos/22122/22122-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "d2drchfy34ocadc_0_cpb.png"
+  },
+  {
+   "id": "glaqfub62yb908t",
+   "titulo": "O Colportor de Êxito",
+   "ficheiro": "o-colportor-de-exito.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5099",
+   "titulo_na_fonte": "O Colportor de Êxito",
+   "url": "https://imagens.cpb.com.br/produtos/5099/5099-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "glaqfub62yb908t_0_cpb.png"
+  },
+  {
+   "id": "047fsrl1mka65wf",
+   "titulo": "O Desejado de Todas as Nações",
+   "ficheiro": "o-desejado-de-todas-as-nacoes.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14869",
+   "titulo_na_fonte": "O Desejado de Todas as Nações (Edição Atualizada -",
+   "url": "https://imagens.cpb.com.br/produtos/14869/14869-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "047fsrl1mka65wf_0_cpb.png"
+  },
+  {
+   "id": "i8slu8wmujx2fjj",
+   "titulo": "O Grande Conflito",
+   "ficheiro": "o-grande-conflito.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14865",
+   "titulo_na_fonte": "O Grande Conflito (Edição Atualizada - Brochura)",
+   "url": "https://imagens.cpb.com.br/produtos/14865/14865-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "edição actualizada (brochura)",
+   "fonte": "i8slu8wmujx2fjj_0_cpb.png"
+  },
+  {
+   "id": "alwrwddmqex9pee",
+   "titulo": "O Grande Conflito Infantil",
+   "ficheiro": "o-grande-conflito-infantil.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "8475",
+   "titulo_na_fonte": "Deus e o Anjo Rebelde (O Grande Conflito Para Cria",
+   "url": "https://imagens.cpb.com.br/produtos/8475/8475-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "provável: é o Grande Conflito para crianças da CPB",
+   "fonte": "alwrwddmqex9pee_0_cpb.png"
+  },
+  {
+   "id": "py0u7v4jjz96i7d",
+   "titulo": "Obreiros Evangélicos",
+   "ficheiro": "obreiros-evangelicos.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21153",
+   "titulo_na_fonte": "Obreiros Evangélicos (Edição Atualizada - Capa Dur",
+   "url": "https://imagens.cpb.com.br/produtos/21153/21153-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "py0u7v4jjz96i7d_0_cpb.png"
+  },
+  {
+   "id": "y0hd1rfx1sunnby",
+   "titulo": "Orando como Nunca por Seu Marido",
+   "ficheiro": "orando-como-nunca-por-seu-marido.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "23007",
+   "titulo_na_fonte": "Orando Como Nunca Por Seu Marido",
+   "url": "https://imagens.cpb.com.br/produtos/23007/23007-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "y0hd1rfx1sunnby_0_cpb.png"
+  },
+  {
+   "id": "zk0rgvl47oaxq14",
+   "titulo": "Orientação da Criança",
+   "ficheiro": "orientacao-da-crianca.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19991",
+   "titulo_na_fonte": "Orientação da Criança (Edição Atualizada - Capa Du",
+   "url": "https://imagens.cpb.com.br/produtos/19991/19991-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "zk0rgvl47oaxq14_0_cpb.png"
+  },
+  {
+   "id": "51lc88fmuouvig7",
+   "titulo": "Patriarcas e Profetas Encadernado",
+   "ficheiro": "patriarcas-e-profetas-encadernado.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14875",
+   "titulo_na_fonte": "Patriarcas e Profetas (Edição Atualizada - Capa Du",
+   "url": "https://imagens.cpb.com.br/produtos/14875/14875-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "51lc88fmuouvig7_0_cpb.png"
+  },
+  {
+   "id": "ouo32zlbb7oqu4u",
+   "titulo": "Pecado e Salvação",
+   "ficheiro": "pecado-e-salvacao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "13165",
+   "titulo_na_fonte": "Pecado e Salvação",
+   "url": "https://imagens.cpb.com.br/produtos/13165/13165-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "ouo32zlbb7oqu4u_0_cpb.png"
+  },
+  {
+   "id": "mgn57ty1io63vvf",
+   "titulo": "Por Detrás do Véu",
+   "ficheiro": "por-detras-do-veu.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "7502",
+   "titulo_na_fonte": "Por Trás do Véu",
+   "url": "https://imagens.cpb.com.br/produtos/7502/7502-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "mgn57ty1io63vvf_0_cpb.png"
+  },
+  {
+   "id": "r5e9nupmto1pvm2",
+   "titulo": "Por que Não Mas Estpita",
+   "ficheiro": "por-que-nao-sou-mais-espirita.webp",
+   "novo_ficheiro": true,
+   "origem": "Estante Virtual",
+   "ref": "SUJ-2609-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/SUJ-2609-000/SUJ-2609-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    240,
+    360
+   ],
+   "nota": "título real: Por Que Não Sou Mais Espírita",
+   "fonte": "r5e9nupmto1pvm2_0_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "69oxinoulkrja9h",
+   "titulo": "Prazer em Conhecer Ellen White",
+   "ficheiro": "prazer-em-conhecer-ellen-white.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16707",
+   "titulo_na_fonte": "Prazer em Conhecer Ellen White",
+   "url": "https://imagens.cpb.com.br/produtos/16707/16707-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "69oxinoulkrja9h_0_cpb.png"
+  },
+  {
+   "id": "8ds1o95olug37c6",
+   "titulo": "Primeiros Escritos",
+   "ficheiro": "primeiros-escritos.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19961",
+   "titulo_na_fonte": "Primeiros Escritos (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/19961/19961-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "8ds1o95olug37c6_0_cpb.png"
+  },
+  {
+   "id": "5f3dat0w5d46gk9",
+   "titulo": "Princípios para Líderes Cristãos",
+   "ficheiro": "principios-para-lideres-cristaos.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21925",
+   "titulo_na_fonte": "Princípios Para Líderes Cristãos (Edição Atualizad",
+   "url": "https://imagens.cpb.com.br/produtos/21925/21925-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "5f3dat0w5d46gk9_0_cpb.png"
+  },
+  {
+   "id": "twjdcjfgbgpmpjl",
+   "titulo": "Princípios sobre Aposentadoria",
+   "ficheiro": "principios-sobre-aposentadoria.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22018",
+   "titulo_na_fonte": "Princípios Sobre Aposentadoria (Edição Atualizada",
+   "url": "https://imagens.cpb.com.br/produtos/22018/22018-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "ISBN na base de dados tem gralha: 9788732534895 → 9788534534895",
+   "fonte": "twjdcjfgbgpmpjl_0_cpb.png"
+  },
+  {
+   "id": "1p875e85bu16y95",
+   "titulo": "Profecias Surpreendentes",
+   "ficheiro": "profecias-surpreendentes.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "11764",
+   "titulo_na_fonte": "Profecias Surpreendentes",
+   "url": "https://imagens.cpb.com.br/produtos/11764/11764-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "1p875e85bu16y95_0_cpb.png"
+  },
+  {
+   "id": "r043sk5nxp7t7lk",
+   "titulo": "Profetas e Reis",
+   "ficheiro": "profetas-e-reis.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "14878",
+   "titulo_na_fonte": "Profetas e Reis (Edição Atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/14878/14878-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "r043sk5nxp7t7lk_0_cpb.png"
+  },
+  {
+   "id": "gab0a6zaq0lhlc4",
+   "titulo": "Quando Tudo Falha",
+   "ficheiro": "quando-tudo-falha.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "5043",
+   "titulo_na_fonte": "Quando Tudo Falha",
+   "url": "https://imagens.cpb.com.br/produtos/5043/5043-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "gab0a6zaq0lhlc4_0_cpb.png"
+  },
+  {
+   "id": "id07rkxw0swi2ed",
+   "titulo": "Revolucione Seu Futuro",
+   "ficheiro": "revolucione-seu-futuro.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "SXS-0230-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/SXS-0230-000/SXS-0230-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "id07rkxw0swi2ed_0_ev.jpg",
+   "metodo": "plano"
+  },
+  {
+   "id": "rc6voigc94roz51",
+   "titulo": "Saldo Extra",
+   "ficheiro": "saldo-extra.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16711",
+   "titulo_na_fonte": "Saldo Extra",
+   "url": "https://imagens.cpb.com.br/produtos/16711/16711-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "rc6voigc94roz51_0_cpb.png"
+  },
+  {
+   "id": "scyvksvtxvrk7uz",
+   "titulo": "Saúde Total",
+   "ficheiro": "saude-total.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "13348",
+   "titulo_na_fonte": "Saúde Total",
+   "url": "https://imagens.cpb.com.br/produtos/13348/13348-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "scyvksvtxvrk7uz_0_cpb.png"
+  },
+  {
+   "id": "5jjhsd3u65g7ro9",
+   "titulo": "Serviço Cristão",
+   "ficheiro": "servico-cristao.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19964",
+   "titulo_na_fonte": "Serviço Cristão (Edição atualizada - Capa Dura)",
+   "url": "https://imagens.cpb.com.br/produtos/19964/19964-01-web-product-page.png",
+   "prova": "kigest_ref = código CPB",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "5jjhsd3u65g7ro9_0_cpb.png"
+  },
+  {
+   "id": "d80fysbm5j3wlt1",
+   "titulo": "Simples Demais",
+   "ficheiro": "simples-demais.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "11073",
+   "titulo_na_fonte": "Simples Demais",
+   "url": "https://imagens.cpb.com.br/produtos/11073/11073-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "d80fysbm5j3wlt1_0_cpb.png"
+  },
+  {
+   "id": "logaiji8mwm1gei",
+   "titulo": "Sinais de Esperança",
+   "ficheiro": "sinais-de-esperanca.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "11168",
+   "titulo_na_fonte": "Sinais de Esperança",
+   "url": "https://imagens.cpb.com.br/produtos/11168/11168-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "logaiji8mwm1gei_0_cpb.png"
+  },
+  {
+   "id": "dogi7xawoe2ujt1",
+   "titulo": "Sombras e Realidade",
+   "ficheiro": "sombras-e-realidade.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "18598",
+   "titulo_na_fonte": "Sombra e Realidade",
+   "url": "https://imagens.cpb.com.br/produtos/18598/18598-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "dogi7xawoe2ujt1_0_cpb.png"
+  },
+  {
+   "id": "r38zawg6ahkqdzf",
+   "titulo": "Sucesso em Dose Dupla",
+   "ficheiro": "sucesso-em-dose-dupla.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "NW0-2839-000",
+   "titulo_na_fonte": "",
+   "url": "https://static.estantevirtual.com.br/book/00/NW0-2839-000/NW0-2839-000_detail1.jpg",
+   "prova": "ISBN (pesquisa na Estante Virtual)",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "r38zawg6ahkqdzf_1_ev.jpg"
+  },
+  {
+   "id": "hcuieicqr6u42pv",
+   "titulo": "Testemunho para Igreja Vol. 2",
+   "ficheiro": "testemunho-para-igreja-vol-2.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20073",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 2 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20073/20073-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "hcuieicqr6u42pv_0_cpb.png"
+  },
+  {
+   "id": "w6kzwnere66rhdc",
+   "titulo": "Testemunho para Igreja Vol. 4",
+   "ficheiro": "testemunho-para-igreja-vol-4.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20077",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 4 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20077/20077-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "w6kzwnere66rhdc_0_cpb.png"
+  },
+  {
+   "id": "grcjghoeh1ivkx1",
+   "titulo": "Testemunho para Igreja Vol. 5",
+   "ficheiro": "testemunho-para-igreja-vol-5.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20079",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 5 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20079/20079-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "grcjghoeh1ivkx1_0_cpb.png"
+  },
+  {
+   "id": "e4stcxzjk8r337j",
+   "titulo": "Testemunho para Igreja Vol. 6",
+   "ficheiro": "testemunho-para-igreja-vol-6.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20081",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 6 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20081/20081-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "e4stcxzjk8r337j_0_cpb.png"
+  },
+  {
+   "id": "fknt7caq1znldfo",
+   "titulo": "Testemunhos para Igreja Vol. 8",
+   "ficheiro": "testemunhos-para-igreja-vol-8.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20085",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 8 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20085/20085-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "fknt7caq1znldfo_0_cpb.png"
+  },
+  {
+   "id": "66s68hwpolq6f4l",
+   "titulo": "Testemunhos para Igreja Vol. 9",
+   "ficheiro": "testemunhos-para-igreja-vol-9.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20087",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 9 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20087/20087-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "66s68hwpolq6f4l_0_cpb.png"
+  },
+  {
+   "id": "xyj71ak0zw355a1",
+   "titulo": "Testemunhos para Ministros",
+   "ficheiro": "testemunhos-para-ministros.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21987",
+   "titulo_na_fonte": "Testemunhos Para Ministros (Edição Atualizada - Ca",
+   "url": "https://imagens.cpb.com.br/produtos/21987/21987-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "xyj71ak0zw355a1_0_cpb.png"
+  },
+  {
+   "id": "1ryrdif3xplebp2",
+   "titulo": "Testemunhos para a Igreja",
+   "ficheiro": "testemunhos-para-a-igreja.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20083",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 7 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20083/20083-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "pelo ISBN é o Vol. 7",
+   "fonte": "1ryrdif3xplebp2_0_cpb.png"
+  },
+  {
+   "id": "a17qdqss0c4wet8",
+   "titulo": "Testemunhos para a Igreja 3",
+   "ficheiro": "testemunhos-para-a-igreja-3.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20075",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 3 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20075/20075-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "a17qdqss0c4wet8_0_cpb.png"
+  },
+  {
+   "id": "lg7659vgwvbdq0q",
+   "titulo": "Testemunhos para a Igreja Vol. 1",
+   "ficheiro": "testemunhos-para-a-igreja-vol-1.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "20071",
+   "titulo_na_fonte": "Testemunhos para a Igreja, Vol. 1 (Edição Atualiza",
+   "url": "https://imagens.cpb.com.br/produtos/20071/20071-01-web-product-page.png",
+   "prova": "ISBN",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "lg7659vgwvbdq0q_0_cpb.png"
+  },
+  {
+   "id": "jklqqfs4a92r5m1",
+   "titulo": "Vida e Ensinos",
+   "ficheiro": "vida-e-ensinos.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "21886",
+   "titulo_na_fonte": "Vida e Ensinos (Edição Atualizada - Brochura)",
+   "url": "https://imagens.cpb.com.br/produtos/21886/21886-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "jklqqfs4a92r5m1_0_cpb.png"
+  },
+  {
+   "id": "u0dnbkvz5anox5x",
+   "titulo": "Você e Deus",
+   "ficheiro": "voce-e-deus.webp",
+   "novo_ficheiro": false,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "6345",
+   "titulo_na_fonte": "Você e Deus",
+   "url": "https://imagens.cpb.com.br/produtos/6345/6345-01-web-product-page.png",
+   "prova": "título",
+   "px": [
+    340,
+    510
+   ],
+   "nota": "",
+   "fonte": "u0dnbkvz5anox5x_0_cpb.png"
+  },
+  {
+   "id": "ikmpxzz5yhchgff",
+   "titulo": "Último Convite",
+   "ficheiro": "ultimo-convite.webp",
+   "novo_ficheiro": false,
+   "origem": "Estante Virtual",
+   "ref": "GOO-7940-000",
+   "titulo_na_fonte": "O Último Convite",
+   "url": "https://static.estantevirtual.com.br/book/00/GOO-7940-000/GOO-7940-000_detail1.jpg",
+   "prova": "título",
+   "px": [
+    527,
+    800
+   ],
+   "nota": "",
+   "fonte": "ikmpxzz5yhchgff_2_ev.jpg",
+   "metodo": "plano"
+  }
+ ]
+}
