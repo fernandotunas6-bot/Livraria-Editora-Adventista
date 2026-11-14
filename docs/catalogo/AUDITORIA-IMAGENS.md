@@ -1,7 +1,8 @@
 # Auditoria das imagens do catálogo (2026-11-11)
 
 > Continuação (2026-11-14): as capas tipográficas dos produtos do KiGest foram trocadas pelas
-> capas verdadeiras encontradas na internet — ver [CAPAS-INTERNET.md](CAPAS-INTERNET.md).
+> capas verdadeiras encontradas na internet, e as bíblias com várias cores ficaram com
+> as cores à escolha — ver [CAPAS-INTERNET.md](CAPAS-INTERNET.md).
 
 Vistas à mão as 195 capas da loja: as 102 do catálogo antigo (`images/capas/LIV-*.jpg`,
 `COL-*.jpg`) e as 93 dos produtos novos (`images/capas/novos/`). Mudaram **97**; os nomes dos

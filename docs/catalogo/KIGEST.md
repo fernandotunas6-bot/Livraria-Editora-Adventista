@@ -163,7 +163,7 @@ que davam o mesmo título depois de corrigido («CORDERINNHO» e «CORDERINHO» 
   uma capa tipográfica por produto no desenho da casa — o gradiente, o emblema e a moldura da
   `capa-por-definir.webp` — com o título no lugar onde aquela diz «Capa por definir». Vê-se que
   é tipográfica: não imita a arte da editora. Quando houver fotografia, substitui-se no painel.
-  (2026-11-14: 110 já têm a capa verdadeira, encontrada na internet — [CAPAS-INTERNET.md](CAPAS-INTERNET.md).)
+  (2026-11-14: 109 já têm a capa verdadeira, encontrada na internet — [CAPAS-INTERNET.md](CAPAS-INTERNET.md).)
   O ficheiro de cada produto fica em `docs/catalogo/capas-kigest.json`, que é o que a migração
   lê: dois títulos diferentes podem dar o mesmo nome de ficheiro.
 

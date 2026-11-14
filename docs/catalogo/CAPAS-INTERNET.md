@@ -6,13 +6,16 @@ gradiente da casa), porque não havia fotografia de nenhum ([KIGEST.md](KIGEST.m
 (certificados, blocos, lenços, emblemas) não.
 
 Procurou-se a capa de cada um na internet, viu-se cada candidata ao lado do título do produto, e
-só entrou a que é de facto aquele livro. **Entraram 110. Ficam 44**, listados no fim com o motivo.
+só entrou a que é de facto aquele livro. **Entraram 109**; um outro afinal era um duplicado de um livro que já tinha
+capa (ver «Duplicados»); e **ficam 44**, listados no fim com o motivo.
+As quatro bíblias que a CPB faz em várias capas passaram a ter **as cores todas à escolha** (mais
+8 capas), e corrigiram-se de caminho dois duplicados e os nomes que as capas desmentiam.
 
 | | Quantas |
 |---|---:|
 | Capa da Casa Publicadora Brasileira (`imagens.cpb.com.br`) | 95 |
-| Capa da Estante Virtual (livros que a CPB já não vende) | 15 |
-| Confirmadas pelo **ISBN** da loja | 41 |
+| Capa da Estante Virtual (livros que a CPB já não vende) | 14 |
+| Confirmadas pelo **ISBN** da loja | 40 |
 | Confirmadas pela **referência do KiGest**, que é o código do produto na CPB | 23 |
 | Confirmadas pelo título (e vistas uma a uma) | 46 |
 
@@ -76,27 +79,86 @@ da tipográfica, **com o mesmo nome de ficheiro**, em `app/web/public/images/cap
 - foto do livro com fundo real: cantos dados à mão (`quad` no registo) — foi o caso de «Guiados
   por Deus».
 
-Como os nomes não mudaram, **a base de dados não muda** para 108 deles. A migração
-`20261114160000_capas_da_internet.sql` trata dos dois que não tinham imagem nenhuma (estão
-ocultos e continuam ocultos): «Mensageiro» e «Por que Não Mas Estpita». Escreve só onde a capa
-está vazia, e corrige o nome do segundo para «Por Que Não Sou Mais Espírita».
+Como os nomes não mudaram, **a base de dados não muda** para as capas. O resto está na migração
+`20261114160000_capas_cores_e_nomes_do_catalogo.sql`, que só mexe no que ainda está como estava
+(não pisa o que alguém tenha corrigido no painel) e que se testou em PGlite sobre o esquema real,
+duas vezes seguidas, com o mesmo resultado.
 
 Quem já tinha visitado a loja vê a capa tipográfica mais uma vez: o service worker serve as
 imagens da cache e actualiza-as em segundo plano, por isso na visita seguinte já aparece a nova.
+
+## As cores das bíblias
+
+A CPB faz estas bíblias em várias capas e não se sabia qual a loja tinha. As fotografias dos
+produtos ocultos de 2026-11-10 (Desbravador laranja e verde, Aventureiros azul e rosa) mostram que
+tem mais do que uma. Cada cor passou a ser uma **variante** do produto, com a sua capa:
+
+| Bíblia | Cores |
+|---|---|
+| Andrews (NAA, couro) | preta, castanha, rosa |
+| Arqueológica | couro castanho, couro azul, P.U. azul |
+| Aventureiros | azul, rosa |
+| Desbravador | rosa, azul, laranja, verde |
+
+Na página do produto o cliente escolhe a **cor** (não «a edição»: as variantes marcadas
+`tipo: 'cor'` chamam-se cores — `variantNames` em `lib/productTypes.js`) e a imagem muda para a
+capa dessa cor (`withVariantImages` em `api/EcommerceApi.js` junta as capas das variantes à galeria).
+A cor escolhida vai na encomenda, no carrinho e no recibo, como os tamanhos.
+
+**Por fazer na loja:** cada cor ainda usa o stock do produto inteiro. Quando se souber quantas há
+de cada, põe-se no painel (produto → Versões → stock); uma cor que não haja fica a 0 e aparece
+riscada.
+
+## Duplicados
+
+Dois artigos do KiGest tinham entrado como produtos novos, mas o livro já estava no site, vindo do
+catálogo antigo com outro nome:
+
+| Do KiGest | Já existia | O que se fez |
+|---|---|---|
+| 000163 «Por que Não Mas Estpita» (oculto) | «Por Que Não Sou Mais Espírita - O Testemunho…» (à venda) | O ISBN 9788534509305 e o preço são os mesmos. |
+| 000142 «Por Detrás do Véu» (à venda) | «Por Trás do Véu» (à venda) | O mesmo livro de Esmie G. Branner estava à venda **duas vezes**, e a descrição do duplicado falava do santuário, que não é o assunto do livro. |
+
+A referência do KiGest passa para o produto antigo (que fica com o preço e o stock da loja, como os
+outros produtos ligados ao KiGest) e o duplicado fica oculto. «Por Trás do Véu» passa assim de
+16 155 Kz para 20 298,76 Kz, que é o preço no KiGest.
+
+## Nomes
+
+Os nomes que vieram truncados ou com gralhas do KiGest e que a capa e o ISBN confirmam:
+
+| Era | Fica |
+|---|---|
+| Testemunho para Igreja Vol. 2 / 4 / 5 / 6, Testemunhos para Igreja Vol. 8 / 9, Testemunhos para a Igreja 3 | Testemunhos para a Igreja Vol. N |
+| Testemunhos para a Igreja (000217) | Testemunhos para a Igreja **Vol. 7** (pelo ISBN) |
+| Mensagens Escolhida Vol. 2 | Mensagens Escolhidas Vol. 2 |
+| Mente Carácter Personalidade Vol. 1 / 2 | Mente, Carácter e Personalidade Vol. 1 / 2 |
+| Nepp-lar Adventista o Encadernado | O Lar Adventista |
+| Nepp-temperança | Temperança |
+| Conselho sobre Saúde | Conselhos sobre Saúde |
+| Casamento Princípio Bíblicos e Teológico | Casamento — Princípios Bíblicos e Teológicos |
+| Patriarcas e Profetas Encadernado | Patriarcas e Profetas |
+| Cartas Jovens Namorados | Cartas a Jovens Namorados |
+| Como Formar Filho Vencedor | Como Formar Filhos Vencedores |
+| Último Convite | O Último Convite (e a descrição, que lhe chamava folheto; é o livro de Clifford Goldstein) |
+| Sombras e Realidade | Sombra e Realidade |
+| Bíblia Disciplos | Bíblia do Discípulo |
+| Bíblia dos Desbravadores | Bíblia do Desbravador |
+
+E o ISBN de «Princípios sobre Aposentadoria», que tinha uma gralha (`9788732534895` →
+`9788534534895`).
 
 ## Notas para a equipa
 
 | Produto | Nota |
 |---|---|
-| «Por que Não Mas Estpita» (KiGest 000163, oculto) | Pelo ISBN 9788534509305 é **«Por Que Não Sou Mais Espírita»**, de Maurício Braga: a migração corrige o nome e o autor. Continua oculto porque não tem descrição; escrevendo-a, pode publicar-se. |
-| «Testemunhos para a Igreja» (000217) | O ISBN é o do **Vol. 7**; o nome no site não diz o volume. |
-| «Princípios sobre Aposentadoria» (000209) | O ISBN na base de dados tem uma gralha: `9788732534895`; o da CPB é `9788534534895`. |
-| «O Último Convite» (000500) | A descrição chama-lhe folheto; é o livro missionário de Clifford Goldstein. |
-| «Nepp-lar Adventista» e «Nepp-temperança» | São «O Lar Adventista» e «Temperança», de Ellen G. White (a referência do KiGest é o código CPB). |
+| «Mensageiro» (14159, oculto) | Ganhou a capa; falta-lhe a descrição para se publicar. |
 | «O Grande Conflito Infantil» (00033) | Pôs-se «Deus e o Anjo Rebelde — O Grande Conflito recontado», a versão para crianças da CPB. Provável, não confirmado. |
 | «Conselhos sobre Mordomia» | O ISBN da loja é de uma edição antiga; a capa é a da edição actual. |
-| Bíblias Andrews, Arqueológica, Aventureiros e Desbravadores | Existem em várias cores; pôs-se uma (a dos Desbravadores pelo ISBN, rosa). **Confirmar a cor na loja.** |
-| «Guia de Liberdade Religiosa», «Guiados por Deus», «Guia para Anciãos», «Por Que Não Sou Mais Espírita» | Só havia fotos pequenas (184–240 px de largura): ficam legíveis mas menos nítidas. |
+| «Conselhos sobre Escola Sabatina» (00700) e «Conselhos sobre a Escola Sabatina» (000201058) | São dois artigos no KiGest, ambos à venda no site, provavelmente duas edições do mesmo livro. Ficaram como estão. |
+| «Kit de Comentários» (00049, 160 000 Kz) | Pode ser o «Comentário Bíblico Andrews — 4 volumes» (161 100 Kz); não está confirmado e ficou como está. |
+| Bíblias dos Aventureiros e do Desbravador ocultas de 2026-11-10 (BIB-021 a BIB-024) | São as fotografias de cada cor; com as cores à escolha nas bíblias do KiGest, ficam ocultas. |
+| «Guia de Liberdade Religiosa», «Guiados por Deus», «Guia para Anciãos» | Só havia fotos pequenas (184–240 px de largura): ficam legíveis mas menos nítidas. |
 
 ## Os 44 que ficam com a capa tipográfica
 

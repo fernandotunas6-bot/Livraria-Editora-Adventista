@@ -218,7 +218,11 @@ function ProductDetailPage() {
         if (fetchedProduct.variants && fetchedProduct.variants.length > 0) {
           // Começa na primeira variante com stock: abrir num tamanho esgotado parecia o produto todo esgotado.
           const vs = fetchedProduct.variants;
-          setSelectedVariant(vs.find((v) => v.inventory_quantity > 0) || vs[0]);
+          const first = vs.find((v) => v.inventory_quantity > 0) || vs[0];
+          setSelectedVariant(first);
+          // A imagem acompanha a variante: se a primeira com stock for outra cor, mostra essa.
+          const img = (fetchedProduct.images || []).findIndex((i) => i.url === first?.image_url);
+          setCurrentImageIndex(img > 0 ? img : 0);
         }
       } catch (err) {
         setError(err.message || 'Não foi possível carregar o livro');
@@ -328,7 +332,7 @@ function ProductDetailPage() {
     : isStockManaged && availableStock <= 0
       // Com variantes, a mensagem do tipo ("Este tamanho esgotou. Escolha outro." numa t-shirt,
       // "Esta edição esgotou…" num livro, auditoria 9.11); sem variantes, o produto esgotou.
-      ? { ok: false, label: product.variants?.length > 1 ? variantNames(product.product_type).soldOut : 'Esgotado', tone: 'text-destructive' }
+      ? { ok: false, label: product.variants?.length > 1 ? variantNames(product.product_type, product.versions).soldOut : 'Esgotado', tone: 'text-destructive' }
       : isStockManaged && !canAddToCart
         ? { ok: false, label: `Só ${availableStock} disponíve${availableStock === 1 ? 'l' : 'is'}`, tone: 'text-destructive' }
         : isStockManaged && product.stock_low
@@ -550,7 +554,7 @@ function ProductDetailPage() {
 
             {product.variants.length > 1 && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3 text-foreground">{variantNames(product.product_type).one}</h3>
+                <h3 className="text-sm font-semibold mb-3 text-foreground">{variantNames(product.product_type, product.versions).one}</h3>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map(variant => (
                     <Button
@@ -749,7 +753,7 @@ function ProductDetailPage() {
                 <TabsTrigger value="author"><User className="h-4 w-4 mr-1.5" />Sobre o Autor</TabsTrigger>
               )}
               {product.variants?.length > 1 && (
-                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type).many}</TabsTrigger>
+                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type, product.versions).many}</TabsTrigger>
               )}
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
               <TabsTrigger value="discussion"><MessagesSquare className="h-4 w-4 mr-1.5" />Discussão</TabsTrigger>

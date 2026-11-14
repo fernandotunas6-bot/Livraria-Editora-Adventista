@@ -1,5 +1,5 @@
 {
- "sobre": "Capas encontradas na internet para os produtos que tinham capa tipográfica (2026-11-14). Cada uma foi vista ao lado do título do produto antes de entrar; ver CAPAS-INTERNET.md.",
+ "sobre": "Capas encontradas na internet para os produtos que tinham capa tipográfica (2026-11-14): 109 capas de produto e 8 capas de cores das bíblias (variante: true). Cada uma foi vista ao lado do título do produto antes de entrar; ver CAPAS-INTERNET.md.",
  "capas": [
   {
    "id": "tn9xcqm7lqjuham",
@@ -118,7 +118,7 @@
     340,
     510
    ],
-   "nota": "cor por confirmar (há preta, castanha e rosa)",
+   "nota": "capa da cor preta; as três cores são variantes à escolha",
    "fonte": "b05i8ohx7lwxbfv_0_cpb.png"
   },
   {
@@ -135,7 +135,7 @@
     340,
     510
    ],
-   "nota": "cor por confirmar (castanha/azul)",
+   "nota": "capa do couro castanho; as três capas são variantes à escolha",
    "fonte": "2z3nd1cxbcdh6ty_0_cpb.png"
   },
   {
@@ -220,7 +220,7 @@
     340,
     510
    ],
-   "nota": "cor por confirmar (azul/rosa)",
+   "nota": "capa azul; azul e rosa são variantes à escolha",
    "fonte": "om3l398xn3cvm77_0_cpb.png"
   },
   {
@@ -237,7 +237,7 @@
     340,
     510
    ],
-   "nota": "cor por confirmar (4 cores); ISBN aponta para a rosa",
+   "nota": "capa rosa; as quatro cores são variantes à escolha",
    "fonte": "svmw8vnxg6wzeqe_0_cpb.png"
   },
   {
@@ -1405,26 +1405,8 @@
     340,
     510
    ],
-   "nota": "",
+   "nota": "duplicado de «Por Trás do Véu» (LIV-073): a migração oculta-o e passa a referência do KiGest para o LIV-073",
    "fonte": "mgn57ty1io63vvf_0_cpb.png"
-  },
-  {
-   "id": "r5e9nupmto1pvm2",
-   "titulo": "Por que Não Mas Estpita",
-   "ficheiro": "por-que-nao-sou-mais-espirita.webp",
-   "novo_ficheiro": true,
-   "origem": "Estante Virtual",
-   "ref": "SUJ-2609-000",
-   "titulo_na_fonte": "",
-   "url": "https://static.estantevirtual.com.br/book/00/SUJ-2609-000/SUJ-2609-000_detail1.jpg",
-   "prova": "ISBN (pesquisa na Estante Virtual)",
-   "px": [
-    240,
-    360
-   ],
-   "nota": "título real: Por Que Não Sou Mais Espírita",
-   "fonte": "r5e9nupmto1pvm2_0_ev.jpg",
-   "metodo": "plano"
   },
   {
    "id": "69oxinoulkrja9h",
@@ -1903,6 +1885,118 @@
    "nota": "",
    "fonte": "ikmpxzz5yhchgff_2_ev.jpg",
    "metodo": "plano"
+  },
+  {
+   "id": "b05i8ohx7lwxbfv",
+   "titulo": "Bíblia Andrews",
+   "ficheiro": "biblia-andrews-castanha.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22611",
+   "titulo_na_fonte": "Bíblia de Estudo Andrews NAA - Capa Couro Marrom",
+   "url": "https://imagens.cpb.com.br/produtos/22611/22611-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "b05i8ohx7lwxbfv_cor_22611.png"
+  },
+  {
+   "id": "b05i8ohx7lwxbfv",
+   "titulo": "Bíblia Andrews",
+   "ficheiro": "biblia-andrews-rosa.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22612",
+   "titulo_na_fonte": "Bíblia de Estudo Andrews NAA - Capa Couro Rosa",
+   "url": "https://imagens.cpb.com.br/produtos/22612/22612-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "b05i8ohx7lwxbfv_cor_22612.png"
+  },
+  {
+   "id": "2z3nd1cxbcdh6ty",
+   "titulo": "Bíblia Arqueológica",
+   "ficheiro": "biblia-arqueologica-azul.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22484",
+   "titulo_na_fonte": "Bíblia de Estudo Arqueológica - Capa Couro Azul",
+   "url": "https://imagens.cpb.com.br/produtos/22484/22484-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "2z3nd1cxbcdh6ty_cor_22484.png"
+  },
+  {
+   "id": "2z3nd1cxbcdh6ty",
+   "titulo": "Bíblia Arqueológica",
+   "ficheiro": "biblia-arqueologica-pu-azul.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "22485",
+   "titulo_na_fonte": "Bíblia de Estudo Arqueológica - Capa P.U. Azul",
+   "url": "https://imagens.cpb.com.br/produtos/22485/22485-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "2z3nd1cxbcdh6ty_cor_22485.png"
+  },
+  {
+   "id": "om3l398xn3cvm77",
+   "titulo": "Bíblia dos Aventureiros",
+   "ficheiro": "biblia-dos-aventureiros-rosa.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "19799",
+   "titulo_na_fonte": "Bíblia dos Aventureiros - Capa Rosa",
+   "url": "https://imagens.cpb.com.br/produtos/19799/19799-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "om3l398xn3cvm77_cor_19799.png"
+  },
+  {
+   "id": "svmw8vnxg6wzeqe",
+   "titulo": "Bíblia dos Desbravadores",
+   "ficheiro": "biblia-dos-desbravadores-azul.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16056",
+   "titulo_na_fonte": "Bíblia do Desbravador - Capa Azul",
+   "url": "https://imagens.cpb.com.br/produtos/16056/16056-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "svmw8vnxg6wzeqe_cor_16056.png"
+  },
+  {
+   "id": "svmw8vnxg6wzeqe",
+   "titulo": "Bíblia dos Desbravadores",
+   "ficheiro": "biblia-dos-desbravadores-laranja.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16046",
+   "titulo_na_fonte": "Bíblia do Desbravador - Capa Laranja",
+   "url": "https://imagens.cpb.com.br/produtos/16046/16046-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "svmw8vnxg6wzeqe_cor_16046.png"
+  },
+  {
+   "id": "svmw8vnxg6wzeqe",
+   "titulo": "Bíblia dos Desbravadores",
+   "ficheiro": "biblia-dos-desbravadores-verde.webp",
+   "novo_ficheiro": true,
+   "variante": true,
+   "origem": "Casa Publicadora Brasileira",
+   "ref": "16055",
+   "titulo_na_fonte": "Bíblia do Desbravador - Capa Verde",
+   "url": "https://imagens.cpb.com.br/produtos/16055/16055-01-web-product-page.png",
+   "prova": "título (cor da mesma bíblia na CPB)",
+   "nota": "capa de uma cor à escolha (variante)",
+   "fonte": "svmw8vnxg6wzeqe_cor_16055.png"
   }
  ]
 }
