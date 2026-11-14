@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ledgerWithBalance, missingReports, previewCommission, recentWeeks, suggestCategory, summarize, weekEnd, weekLabel, weekStart,
+  ledgerWithBalance, missingReports, monthBounds, monthLabel, monthWeeks, previewCommission, recentWeeks, reportMonths, suggestCategory, summarize,
+  weekEnd, weekLabel, weekMonth, weekStart,
 } from '@/lib/colporteurReports';
-import { documentHtml, statementHtml } from '@/lib/colporteurPrint';
+import { documentHtml, statementHtml, summaryHtml } from '@/lib/colporteurPrint';
 
 describe('semanas', () => {
   it('a semana começa à segunda, como no Postgres', () => {
@@ -130,5 +131,78 @@ describe('summarize', () => {
     const outro = [...colporteurs, { id: 'c', code: 'CPT-0003', full_name: 'Carla', status: 'activo', church_id: 'c2' }];
     const { rows } = summarize({ colporteurs: outro, reports, where: comLoja, groupBy: 'loja' });
     expect(rows.map((r) => [r.label, r.count, r.hours])).toEqual(expect.arrayContaining([['Livraria Adventista — Huambo', 2, 50], ['Sem loja', 1, 0]]));
+  });
+});
+
+describe('meses (relatório mensal)', () => {
+  it('cada semana conta para o mês da sua quinta-feira', () => {
+    expect(weekMonth('2026-10-26')).toBe('2026-10'); // quinta 29/10
+    expect(weekMonth('2026-11-30')).toBe('2026-12'); // quinta 03/12
+    expect(weekMonth('2026-09-28')).toBe('2026-10'); // quinta 01/10
+  });
+  it('Novembro de 2026 tem 4 semanas (02/11 a 29/11); Outubro tem 5', () => {
+    expect(monthWeeks('2026-11')).toEqual(['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
+    expect(monthWeeks('2026-10')).toEqual(['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26']);
+    expect(monthWeeks('2027-01')).toEqual(['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']);
+  });
+  it('num ano, nenhuma semana fica de fora nem conta duas vezes', () => {
+    const doAno = Array.from({ length: 12 }, (_, i) => monthWeeks(`2026-${String(i + 1).padStart(2, '0')}`)).flat();
+    expect(new Set(doAno).size).toBe(doAno.length);
+    expect(doAno[0]).toBe('2025-12-29'); // a quinta 01/01/2026 está nessa semana
+    expect(doAno.at(-1)).toBe('2026-12-28');
+    for (let i = 1; i < doAno.length; i += 1) expect(Date.parse(doAno[i]) - Date.parse(doAno[i - 1])).toBe(7 * 86400000);
+  });
+  it('nome e dias do mês civil (para as encomendas do site)', () => {
+    expect(monthLabel('2026-11')).toBe('Novembro de 2026');
+    expect(monthBounds('2026-11')).toEqual({ from: '2026-11-01', to: '2026-11-30' });
+    expect(monthBounds('2028-02')).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+  });
+  it('os meses a escolher: do actual até ao primeiro com relatórios ou colportores', () => {
+    expect(reportMonths({ today: '2026-11-14' })).toEqual(['2026-11']);
+    const r = reportMonths({ reports: [{ week_start: '2026-08-31' }], colporteurs: [{ start_date: '2026-10-01' }], today: '2026-11-14' });
+    expect(r).toEqual(['2026-11', '2026-10', '2026-09']); // a semana de 31/08 é de Setembro
+    expect(reportMonths({ colporteurs: [{ start_date: '2025-12-15' }], today: '2026-02-01' })).toEqual(['2026-02', '2026-01', '2025-12']);
+    expect(reportMonths({ colporteurs: [{ start_date: '2000-01-01' }], today: '2026-11-14' })).toHaveLength(60);
+  });
+});
+
+describe('summarize num mês', () => {
+  const colporteurs = [
+    { id: 'a', code: 'CPT-0001', full_name: 'Ana', status: 'activo' },
+    { id: 'b', code: 'CPT-0002', full_name: 'Bento', status: 'activo' },
+  ];
+  const where = () => ({});
+  const reports = [
+    { colporteur_id: 'a', status: 'validado', week_start: '2026-10-26', hours: 10, prayers: 9, free_literature: 9, sales_value: 9, commission_value: 9 }, // Outubro
+    { colporteur_id: 'a', status: 'validado', week_start: '2026-11-02', hours: 30, visits: 40, prayers: 12, free_literature: 5, bible_studies: 2, interests: 3, baptisms: 1, sales_value: 10000, commission_value: 3000 },
+    { colporteur_id: 'a', status: 'validado', week_start: '2026-11-23', hours: 20, prayers: 8, free_literature: 1, sales_value: 2000, commission_value: 600 },
+    { colporteur_id: 'a', status: 'validado', week_start: '2026-11-30', hours: 99, sales_value: 99 }, // Dezembro
+    { colporteur_id: 'b', status: 'enviado', week_start: '2026-11-09', hours: 25, sales_value: 5000 }, // por validar
+  ];
+  const weeks = monthWeeks('2026-11');
+  it('só as semanas do mês, com as orações e a literatura oferecida', () => {
+    const { rows, totals } = summarize({ colporteurs, reports, where, from: weeks[0], to: weeks.at(-1) });
+    const a = rows.find((r) => r.key === 'a');
+    expect(a).toMatchObject({ reports: 2, hours: 50, visits: 40, prayers: 20, freeLiterature: 6, bibleStudies: 2, interests: 3, baptisms: 1, sales: 12000, commission: 3600 });
+    expect(rows.find((r) => r.key === 'b')).toMatchObject({ reports: 0, hours: 0 });
+    expect(totals).toMatchObject({ reports: 2, hours: 50, prayers: 20, freeLiterature: 6, totalCommission: 3600 });
+  });
+  it('com as vendas no site do período: valor e comissão somam-se à parte e no total', () => {
+    const sitePeriod = [{ colporteur_id: 'b', orders: 2, value: 8000, commission: 800 }, { colporteur_id: 'a', orders: 1, value: '1500', commission: '150' }];
+    const { rows, totals } = summarize({ colporteurs, reports, where, from: weeks[0], to: weeks.at(-1), withSite: true, sitePeriod, overview: [{ colporteur_id: 'a', site_year_value: 999999 }] });
+    expect(rows.map((r) => [r.key, r.site, r.siteCommission, r.total, r.totalCommission])).toEqual([['a', 1500, 150, 13500, 3750], ['b', 8000, 800, 8000, 800]]);
+    expect(totals).toMatchObject({ site: 9500, siteCommission: 950, total: 21500, commission: 3600, totalCommission: 4550 });
+  });
+  it('a impressão do relatório mensal: semanas por colportor, totais e textos escapados', () => {
+    const { rows, totals } = summarize({ colporteurs: [...colporteurs, { id: 'c', code: 'CPT-0003', full_name: '<Carla>', status: 'activo' }], reports, where, from: weeks[0], to: weeks.at(-1), withSite: true, sitePeriod: [] });
+    const html = summaryHtml({ title: 'Relatório da colportagem', period: 'Novembro de 2026', groupLabel: 'Colportor', rows, totals, weeks: 4, withSite: true, notes: ['Contam só os <validados>.'] });
+    expect(html).toContain('Relatório da colportagem · Novembro de 2026');
+    expect(html).toContain('size:A4 landscape');
+    expect(html).toContain('>2/4<'); // Ana: 2 relatórios nas 4 semanas
+    expect(html).toContain('CPT-0003 &lt;Carla&gt;');
+    expect(html).toContain('Contam só os &lt;validados&gt;.');
+    expect(html).toMatch(/<tr class="tot"><td>Total<\/td><td class="n">2<\/td>/);
+    expect(html).toContain('No site');
+    expect(summaryHtml({ title: 'T', period: 'P', groupLabel: 'Igreja', rows, totals })).not.toContain('No site');
   });
 });

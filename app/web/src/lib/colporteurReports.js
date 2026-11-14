@@ -27,6 +27,64 @@ export function recentWeeks(n = 8, today = new Date().toISOString().slice(0, 10)
   return Array.from({ length: n }, (_, i) => iso(new Date(first - i * 7 * DAY)));
 }
 
+// --- Meses (relatório mensal) ---------------------------------------------------------------------
+// Os relatórios são semanais (segunda a domingo) e uma semana pode ter dias de dois meses. Para o
+// relatório mensal, cada semana conta inteira para o mês da sua quinta-feira (a regra das semanas
+// ISO): o mês tem 4 ou 5 semanas, e nenhuma fica de fora nem conta duas vezes.
+
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+/** O mês (YYYY-MM) a que pertence a semana que começa em `start`: o da sua quinta-feira. */
+export const weekMonth = (start) => iso(new Date(parse(start).getTime() + 3 * DAY)).slice(0, 7);
+
+/** As semanas (as segundas-feiras) de um mês YYYY-MM, pela ordem. */
+export function monthWeeks(month) {
+  const out = [];
+  for (let t = parse(weekStart(`${month}-01`)).getTime(); ; t += 7 * DAY) {
+    const w = iso(new Date(t));
+    const m = weekMonth(w);
+    if (m > month) break;
+    if (m === month) out.push(w);
+  }
+  return out;
+}
+
+/** «Novembro de 2026». */
+export function monthLabel(month) {
+  const [y, m] = String(month).split('-');
+  return `${MESES[Number(m) - 1] || ''} de ${y}`;
+}
+
+/** O mês civil (do dia 1 ao último), para as encomendas do site, que não são semanais. */
+export function monthBounds(month) {
+  const [y, m] = String(month).split('-').map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, '0')}` };
+}
+
+/**
+ * Os meses que se podem escolher, do mais recente (o de `today`) para trás, até ao primeiro com
+ * relatórios ou com colportores a começar (no máximo 60). Sem nada, só o mês actual.
+ */
+export function reportMonths({ reports = [], colporteurs = [], today = new Date().toISOString().slice(0, 10) } = {}) {
+  const now = today.slice(0, 7);
+  const firsts = [
+    ...reports.map((r) => r.week_start && weekMonth(r.week_start)),
+    ...colporteurs.map((c) => c.start_date && String(c.start_date).slice(0, 7)),
+  ].filter((m) => m && m <= now);
+  const first = firsts.length ? firsts.reduce((a, b) => (a < b ? a : b)) : now;
+  const out = [];
+  let [y, m] = now.split('-').map(Number);
+  while (out.length < 60) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    out.push(key);
+    if (key <= first) break;
+    m -= 1;
+    if (!m) { m = 12; y -= 1; }
+  }
+  return out;
+}
+
 /**
  * Colportores activos sem relatório (enviado ou validado) nas semanas dadas.
  * Só conta semanas a partir do início de cada um.
@@ -146,11 +204,16 @@ export const SUMMARY_GROUPS = {
 
 /**
  * Totais da colportagem agrupados (colportor, loja, igreja, distrito, província ou campo), a partir
- * dos relatórios validados desde `from` (YYYY-MM-DD) e, se `withSite`, das vendas no site do ano.
+ * dos relatórios validados das semanas que começam entre `from` e `to` (YYYY-MM-DD, os dois
+ * opcionais) e, se `withSite`, das vendas no site: as de `sitePeriod` (o que colporteur_site_period
+ * devolve para o período: valor e comissão) ou, sem ele, as do ano no `overview`.
  * `where(c)` diz a loja, a igreja, o distrito, a província e o campo de cada colportor.
+ * `commission` é a dos relatórios; `siteCommission`, a das vendas no site.
  */
-export function summarize({ colporteurs, reports, overview = [], groupBy = 'colportor', from = '', withSite = false, where }) {
-  const site = new Map(overview.map((o) => [o.colporteur_id, Number(o.site_year_value || 0)]));
+export function summarize({ colporteurs, reports, overview = [], groupBy = 'colportor', from = '', to = '', withSite = false, sitePeriod = null, where }) {
+  const site = sitePeriod
+    ? new Map(sitePeriod.map((s) => [s.colporteur_id, { value: Number(s.value || 0), commission: Number(s.commission || 0) }]))
+    : new Map(overview.map((o) => [o.colporteur_id, { value: Number(o.site_year_value || 0), commission: 0 }]));
   const groups = new Map();
   const keyOf = (c) => {
     const w = where(c);
@@ -167,7 +230,7 @@ export function summarize({ colporteurs, reports, overview = [], groupBy = 'colp
   const row = (c) => {
     const [key, label] = keyOf(c);
     if (!groups.has(key)) {
-      groups.set(key, { key, label, colporteurs: new Set(), active: 0, reports: 0, hours: 0, visits: 0, bibleStudies: 0, baptisms: 0, interests: 0, sales: 0, commission: 0, site: 0 });
+      groups.set(key, { key, label, colporteurs: new Set(), active: 0, reports: 0, hours: 0, visits: 0, prayers: 0, freeLiterature: 0, bibleStudies: 0, baptisms: 0, interests: 0, sales: 0, commission: 0, site: 0, siteCommission: 0 });
     }
     return groups.get(key);
   };
@@ -176,25 +239,30 @@ export function summarize({ colporteurs, reports, overview = [], groupBy = 'colp
     const g = row(c);
     g.colporteurs.add(c.id);
     if (c.status === 'activo') g.active += 1;
-    if (withSite) g.site += site.get(c.id) || 0;
+    if (withSite) {
+      g.site += site.get(c.id)?.value || 0;
+      g.siteCommission += site.get(c.id)?.commission || 0;
+    }
   }
   for (const r of reports) {
-    if (r.status !== 'validado' || (from && String(r.week_start) < from)) continue;
+    if (r.status !== 'validado' || (from && String(r.week_start) < from) || (to && String(r.week_start) > to)) continue;
     const c = byId.get(r.colporteur_id);
     if (!c) continue;
     const g = row(c);
     g.reports += 1;
     g.hours += Number(r.hours || 0);
     g.visits += Number(r.visits || 0);
+    g.prayers += Number(r.prayers || 0);
+    g.freeLiterature += Number(r.free_literature || 0);
     g.bibleStudies += Number(r.bible_studies || 0);
     g.baptisms += Number(r.baptisms || 0);
     g.interests += Number(r.interests || 0);
     g.sales += Number(r.sales_value || 0);
     g.commission += Number(r.commission_value || 0);
   }
-  const rows = [...groups.values()].map(({ colporteurs: set, ...g }) => ({ ...g, count: set.size, total: g.sales + g.site }));
+  const rows = [...groups.values()].map(({ colporteurs: set, ...g }) => ({ ...g, count: set.size, total: g.sales + g.site, totalCommission: g.commission + g.siteCommission }));
   const totals = rows.reduce((t, g) => {
-    for (const k of ['count', 'active', 'reports', 'hours', 'visits', 'bibleStudies', 'baptisms', 'interests', 'sales', 'commission', 'site', 'total']) t[k] = (t[k] || 0) + g[k];
+    for (const k of ['count', 'active', 'reports', 'hours', 'visits', 'prayers', 'freeLiterature', 'bibleStudies', 'baptisms', 'interests', 'sales', 'commission', 'site', 'siteCommission', 'total', 'totalCommission']) t[k] = (t[k] || 0) + g[k];
     return t;
   }, {});
   return { rows: rows.sort((a, b) => b.total - a.total || b.hours - a.hours || a.label.localeCompare(b.label)), totals };

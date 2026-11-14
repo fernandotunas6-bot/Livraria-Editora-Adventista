@@ -57,6 +57,40 @@ ${STYLE}</style></head><body>
   </body></html>`;
 }
 
+/**
+ * O relatório mensal da colportagem (ou de outro período do Resumo), para imprimir ou guardar em
+ * PDF e mandar à Missão: uma linha por colportor, igreja, distrito, província, campo ou loja, com
+ * as perguntas do relatório de Evangelismo pela Literatura, as vendas e as comissões, e os totais.
+ * `rows` e `totals` são os de summarize(); `weeks` (opcional) é o número de semanas do mês.
+ */
+export function summaryHtml({ title, period, groupLabel, rows, totals, weeks = null, withSite = false, notes = [], brandName = 'Livraria Adventista' }) {
+  const n = (v) => Number(v || 0).toLocaleString('pt-AO', { maximumFractionDigits: 1 });
+  const cols = [
+    ['Relatórios', (r, total) => (weeks && !total && r.count === 1 ? `${n(r.reports)}/${weeks}` : n(r.reports))],
+    ['Horas', (r) => n(r.hours)],
+    ['Visitas', (r) => n(r.visits)],
+    ['Orações', (r) => n(r.prayers)],
+    ['Literatura', (r) => n(r.freeLiterature)],
+    ['Estudos', (r) => n(r.bibleStudies)],
+    ['Interessados', (r) => n(r.interests)],
+    ['Baptismos', (r) => n(r.baptisms)],
+    ['Vendas', (r) => kz(r.sales)],
+    ...(withSite ? [['No site', (r) => kz(r.site)]] : []),
+    ['Comissão', (r) => kz(r.totalCommission ?? r.commission)],
+  ];
+  const line = (r, total = false) => `<tr${total ? ' class="tot"' : ''}><td>${esc(total ? 'Total' : r.label)}</td>${cols.map(([, f]) => `<td class="n">${esc(f(r, total))}</td>`).join('')}</tr>`;
+  return `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>${esc(title)} · ${esc(period)}</title><style>${estiloBaseImpressao()}
+${STYLE}
+@page{size:A4 landscape}body{font-size:12px}th,td{padding:5px 4px}</style></head><body>
+  <h1>${esc(title)} · ${esc(period)}</h1>
+  <p class="muted">${esc(brandName)} · ${esc(groupLabel)} · impresso a ${new Date().toLocaleString('pt-AO')}</p>
+  <table><thead><tr><th>${esc(groupLabel)}</th>${cols.map(([h]) => `<th class="n">${esc(h)}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map((r) => line(r)).join('')}${line(totals, true)}</tbody></table>
+  ${notes.map((t) => `<p class="muted" style="margin-top:8px">${esc(t)}</p>`).join('')}
+  <div class="sig"><div>Pela Livraria</div><div>Director de Publicações</div></div>
+  </body></html>`;
+}
+
 /** Abre a janela de impressão. Devolve false se o browser bloqueou a janela. */
 export function openPrint(html) {
   const w = window.open('', '_blank', 'width=900,height=700');

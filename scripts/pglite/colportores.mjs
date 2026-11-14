@@ -264,5 +264,42 @@ await raises('a lista de moderação é do catálogo', () => as(cliente, `select
 await as(catalogo, `select public.book_review_hide($1, false)`, [br.id]);
 check('mostrar outra vez limpa o motivo', (await q(`select hidden, hidden_reason from public.book_reviews where id = $1`, [br.id]))[0].hidden_reason === '');
 
+// 8. Relatório mensal: vendas no site de cada colportor num período (20261114235000) ---------------
+// Datas de Novembro de 2025: as encomendas de cima têm a data de hoje e ficam de fora.
+await q(`update public.colporteur_settings set base_pct = 10 where id = 1`);
+const noSite = async (n, codigo, quando, { pago = true, cancelada = false } = {}) => {
+  const [o] = await q(`insert into public.orders (order_number, customer_email, customer_name, customer_id, items, total, colporteur_code, shipping_method, created)
+    values ($1, 'cliente@exemplo.ao', 'Maria Cliente', $2, $3::jsonb, 10000, $4, 'delivery', $5::timestamptz) returning id`,
+  [n, cliente.id, JSON.stringify([{ book_id: livro.id, quantity: 2, price: 5000 }]), codigo, quando]);
+  if (pago) {
+    await svc(`select public.order_payment_record($1, 10000::numeric, 'transferencia', $2)`, [o.id, `TRF-${n}`], admin.id);
+    await q(`update public.orders set delivery_status = 'delivered' where id = $1`, [o.id]);
+  }
+  if (cancelada) await q(`update public.orders set status = 'cancelled' where id = $1`, [o.id]);
+  return o;
+};
+await noSite('ENC-M1', 'CPT-0001', '2025-10-31T23:30:00Z'); // 1/11 às 00:30 em Luanda: Novembro
+await noSite('ENC-M2', 'CPT-0001', '2025-11-20T10:00:00Z', { pago: false }); // por pagar: conta o valor, sem comissão
+await noSite('ENC-M3', 'CPT-0002', '2025-11-30T22:30:00Z'); // 30/11 às 23:30 em Luanda: Novembro
+await noSite('ENC-M4', 'CPT-0002', '2025-11-30T23:30:00Z'); // 1/12 às 00:30 em Luanda: Dezembro
+await noSite('ENC-M5', 'CPT-0001', '2025-11-10T10:00:00Z', { cancelada: true }); // cancelada: não conta
+const periodo = async (u, de, ate) => (await as(u, `select public.colporteur_site_period($1::date, $2::date) as p`, [de, ate]))[0].p;
+const nov = await periodo(gestor, '2025-11-01', '2025-11-30');
+const linha = (lista, id) => lista.find((x) => x.colporteur_id === id);
+check('Novembro: A com 2 encomendas (a cancelada fica de fora), 20 000 Kz e a comissão da paga',
+  linha(nov, A)?.orders === 2 && Number(linha(nov, A)?.value) === 20000 && Number(linha(nov, A)?.commission) === 1000, nov);
+check('Novembro: B só com a de 30/11 em hora de Angola', linha(nov, B)?.orders === 1 && Number(linha(nov, B)?.value) === 10000 && Number(linha(nov, B)?.commission) === 1000, nov);
+check('Novembro: só os dois colportores com vendas', nov.length === 2, nov);
+const dez = await periodo(gestor, '2025-12-01', '2025-12-31');
+check('Dezembro: a de 1/12 às 00:30 em Luanda', dez.length === 1 && linha(dez, B)?.orders === 1, dez);
+check('o administrador vê o mesmo', JSON.stringify(await periodo(admin, '2025-11-01', '2025-11-30')) === JSON.stringify(nov));
+check('um período sem encomendas dá uma lista vazia', (await periodo(gestor, '2024-01-01', '2024-01-31')).length === 0);
+await raises('um cliente não vê as vendas dos colportores', () => periodo(cliente, '2025-11-01', '2025-11-30'), /Sem acesso/);
+await raises('o colportor não vê as vendas de todos', () => periodo(contaA, '2025-11-01', '2025-11-30'), /Sem acesso/);
+await raises('a equipa do catálogo não vê', () => periodo(catalogo, '2025-11-01', '2025-11-30'), /Sem acesso/);
+await raises('sem sessão não chega à função', () => anon(`select public.colporteur_site_period('2025-11-01', '2025-11-30')`));
+await raises('o fim antes do início é recusado', () => periodo(gestor, '2025-11-30', '2025-11-01'), /Período inválido/);
+await raises('mais de dez anos de uma vez é recusado', () => periodo(gestor, '2010-01-01', '2025-11-30'), /Período inválido/);
+
 console.log(`colportores: ${ok} certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);

@@ -180,13 +180,21 @@ Os requisitos estão em **Definições**. Cada sugestão aplica-se uma a uma, co
 - O colportor vê as suas encomendas do site (número, data, valor, estado e comissão paga, prevista ou anulada), **sem os dados do cliente**.
 - **Encomenda sem o código:** em Contas → colportor → "Encomenda do site sem o código", com o número da encomenda. Precisa da permissão "Encomendas", e só funciona enquanto a comissão não tiver entrado.
 
-### Resumo
+### Resumo e relatório mensal
 
 O separador **Resumo** tem:
 
 - os números do momento: colportores activos, candidaturas e relatórios por decidir, livros à consignação e quanto há a receber;
-- uma tabela **por colportor, igreja, distrito, província ou campo**, para este ano, os últimos 3 meses, este mês ou desde o início: horas, visitas, estudos bíblicos, baptismos, vendas e comissões;
-- exportação para Excel.
+- uma tabela **por colportor, loja, igreja, distrito, província ou campo**, com uma linha de total, para **este ano**, **um mês** (o relatório mensal), os **últimos 3 meses** ou **desde o início**. As colunas são as perguntas do relatório: relatórios, horas, visitas, orações, literatura oferecida, estudos bíblicos, interessados e baptismos, e depois as vendas dos relatórios, as vendas no site e a comissão;
+- **Imprimir** (A4 deitado, com os totais, as notas do período e o espaço para as assinaturas da Livraria e do Director de Publicações; guarda-se em PDF pelo browser) e **Excel**.
+
+**Relatório mensal** (período «Um mês», e escolhe-se o mês, por exemplo Novembro de 2026):
+
+- **As semanas do mês.** Os relatórios são semanais, de segunda a domingo, e uma semana pode ter dias de dois meses. Cada semana conta inteira para o mês da sua **quinta-feira**, por isso um mês tem 4 ou 5 semanas, e nenhuma semana fica de fora nem conta duas vezes. Novembro de 2026 tem 4 semanas, de 02/11 a 29/11. A semana de 30/11 a 06/12 conta para Dezembro.
+- **Por colportor**, a coluna Relatórios diz quantas semanas do mês têm relatório validado, por exemplo «3/4».
+- **Só contam os relatórios validados.** Se houver relatórios do mês por validar, o ecrã avisa quantos são, e a impressão também.
+- **As vendas no site** são as encomendas com o código do colportor feitas do dia 1 ao último dia do mês (em hora de Angola), sem as canceladas nem as reembolsadas. A comissão do site é a que já entrou na conta corrente (a encomenda paga e entregue). Com esta função, as vendas no site entram em qualquer período, e não só em «Este ano».
+- Os meses que se podem escolher vão do mês actual até ao primeiro com relatórios ou com colportores a começar.
 
 O painel abre no Resumo, ou nas Candidaturas quando há alguma por decidir.
 
@@ -373,4 +381,5 @@ Como funciona:
   - `colporteur_top_books(p_colporteur_id, p_church_id, p_year, p_limit)`;
   - `book_reviews.hidden` e `hidden_reason`, com a guarda `book_reviews_oculta_guarda` (o autor não os muda), a política de leitura nova, `book_review_hide` e `book_reviews_recent` (permissão `manage_catalog`).
 - Ecrãs: `ColporteurExtras.jsx` (cartão, avaliações e livros na ficha), `ReviewsPanel.jsx` (vista Avaliações), `igreja/ChurchColporteurs.jsx` (ficha da igreja), `colportagem/MyCardReviews.jsx` (área do colportor), `ColporteurReviewPanel.jsx` (página da encomenda) e `pages/ColporteurVerifyPage.jsx` (`/colportor/verificar`). O cartão é `cardHtml` em `lib/colporteurPrint.js`, com o QR de `qrcode-generator`.
-- Testes: 73 cenários em PGlite, em `scripts/pglite/colportores.mjs`.
+- Migração `20261114235000_colportagem_relatorio_mensal.sql`: `colporteur_site_period(p_from, p_to)` (só a equipa da colportagem) soma por colportor as encomendas do site no período, em hora de Angola, com o valor dos produtos e a comissão creditada. As semanas do mês e o resumo estão em `lib/colporteurReports.js` (`weekMonth`, `monthWeeks`, `reportMonths`, `summarize`); a impressão é `summaryHtml` em `lib/colporteurPrint.js`; o ecrã é `SummaryPanel.jsx`. Sem a migração, o Resumo funciona como antes, com as vendas no site só em «Este ano».
+- Testes: 91 cenários em PGlite, em `scripts/pglite/colportores.mjs` (13 do relatório mensal: o fuso de Angola nos limites do mês, canceladas, por pagar e quem pode ver); `colporteurReports.test.js` (as semanas de cada mês ao longo de um ano) e `SummaryPanel.test.jsx` (o ecrã).
