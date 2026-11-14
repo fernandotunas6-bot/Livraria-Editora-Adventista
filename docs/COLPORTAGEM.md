@@ -315,6 +315,8 @@ Como funciona:
 - **Quem avalia:** o cliente, com sessão, na página da encomenda (Seguir encomenda), depois de a
   receber. Pode avaliar quem lhe fez a entrega (entrega feita) e o colportor do código usado na
   compra (encomenda paga e entregue). Dá de 1 a 5 estrelas e, se quiser, um comentário.
+- **De quem é a encomenda:** da conta que a fez ou, se foi feita sem conta, da conta com o mesmo
+  email, só depois de esse email estar confirmado (a mesma regra dos livros digitais).
 - **Uma avaliação por encomenda e colportor.** O cliente pode mudá-la.
 - **O colportor** vê na sua área a média e os comentários, sem saber quem os escreveu.
 - **A equipa:**
@@ -333,8 +335,9 @@ Como funciona:
   mostra a média das avaliações desse livro no site.
 - **Avaliações dos livros:** em Colportagem → Avaliações, quem tem a permissão «Gerir Catálogo» vê
   as avaliações recentes que os leitores escrevem na página de cada livro, e pode ocultar uma (com o
-  motivo). A oculta deixa de aparecer no site e de contar para a média. Só o autor e a equipa a
-  vêem, e o autor não a volta a mostrar.
+  motivo). A oculta deixa de aparecer no site e de contar para a média, também para a equipa que
+  abre a página do livro. O autor continua a vê-la em «A sua avaliação», com o aviso de que a
+  equipa a ocultou (sem o motivo), e não a volta a mostrar.
 
 ## Técnico
 
