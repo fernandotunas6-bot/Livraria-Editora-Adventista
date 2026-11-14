@@ -239,7 +239,7 @@ const HeroSlider = () => {
 
   return (
     <section
-      className="hero-height relative min-h-[520px] max-h-[900px] overflow-hidden bg-foreground"
+      className="hero-height heroi-subida relative min-h-[520px] max-h-[900px] overflow-hidden bg-foreground"
       aria-label="Destaques"
       aria-roledescription="carrossel"
       {...(slides.length > 1 ? swipe : {})}
@@ -285,18 +285,20 @@ const HeroSlider = () => {
               56px da margem, e o `container-custom` só se afasta da borda acima dos 1280px
               que tem de largura máxima, por isso em tudo abaixo de ~1392px (um portátil de
               1366 incluído) a seta assentava em cima do título. Em baixo não há largura em
-              que colida. */}
-          <button type="button" onClick={prev} className="absolute left-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Slide anterior">
+              que colida. Só o botão do assistente, preso ao fundo do ecrã, as tapava no
+              telemóvel: a fila sobe o necessário para passar por cima dele (.heroi-subida,
+              index.css), e num ecrã alto fica onde estava. */}
+          <button type="button" onClick={prev} className="absolute left-4 heroi-seta z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Slide anterior">
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <button type="button" onClick={next} className="absolute right-4 bottom-5 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Próximo slide">
+          <button type="button" onClick={next} className="absolute right-4 heroi-seta z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-xs" aria-label="Próximo slide">
             <ChevronRight className="h-6 w-6" />
           </button>
           {/* O ponto mede 8px: em vez de o engordar, o botão à volta dele passa a medir 24,
               o mínimo que a WCAG 2.5.8 pede em AA. O intervalo sai do contentor porque o
               preenchimento de cada botão já afasta os pontos — somados, davam alvos
               encostados a nada e uma fila larga de mais. */}
-          <div className="absolute bottom-[22px] left-1/2 -translate-x-1/2 z-20 flex sm:bottom-8">
+          <div className="absolute heroi-pontos left-1/2 -translate-x-1/2 z-20 flex">
             {/* Parar e retomar a passagem automática, ao lado dos pontos e da mesma altura. 36px
                 de largura no telemóvel (acima dos 24 da WCAG 2.5.8): com seis slides num ecrã
                 de 320px, a fila continua a caber entre as duas setas. */}

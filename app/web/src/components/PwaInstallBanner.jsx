@@ -4,7 +4,7 @@ import { Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { withCacheBust } from '@/lib/imageUrl';
-import { ENGAGE_AFTER_MS, ENGAGE_SCROLL_PX, installPromptAllowed, installPromptOffsets } from '@/lib/installPrompt';
+import { ENGAGE_AFTER_MS, ENGAGE_SCROLL_PX, installPromptAllowed, installPromptCoversHero, installPromptOffsets } from '@/lib/installPrompt';
 
 export default function PwaInstallBanner() {
   const { settings } = useSiteSettings();
@@ -39,7 +39,18 @@ export default function PwaInstallBanner() {
     };
   }, [engaged, deferred]);
 
-  const visible = !!settings.pwa_enabled && !dismissed && !isStandalone && !!deferred && engaged && installPromptAllowed(pathname);
+  // No topo da página inicial o aviso fica à espera (ver installPromptCoversHero).
+  const [overHero, setOverHero] = useState(() => installPromptCoversHero(pathname, window.scrollY));
+  useEffect(() => {
+    const measure = () => setOverHero(installPromptCoversHero(pathname, window.scrollY));
+    measure();
+    if (pathname !== '/') return undefined;
+    window.addEventListener('scroll', measure, { passive: true });
+    return () => window.removeEventListener('scroll', measure);
+  }, [pathname]);
+
+  const visible = !!settings.pwa_enabled && !dismissed && !isStandalone && !!deferred && engaged && !overHero
+    && installPromptAllowed(pathname);
 
   // A altura do aviso vai para variáveis de CSS, e o chat e o botão de subir afastam-se dele
   // (ver installPromptOffsets e index.css). Antes ficavam por baixo.
