@@ -91,6 +91,7 @@ import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.
 import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
 import { publicContactFields } from "./crmContacts.ts";
 import { isPushEndpoint } from "./pushEndpoints.ts";
+import { accessToken, isFcmToken, parseServiceAccount, sendToDevice } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1197,16 +1198,45 @@ async function pushToSubscription(webpush: PushSender, sub: Row, payload: Row): 
   }
 }
 
-/** Push para os dispositivos de uma pessoa (cliente ou equipa). */
+/**
+ * Push para os dispositivos de uma pessoa (cliente ou equipa): os navegadores (Web Push, com o
+ * push ligado nas Configurações) e as apps instaladas (Firebase, com o segredo FCM_SERVICE_ACCOUNT).
+ */
 async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
-  if (!userId || !pushKeys(settings)) return 0;
+  if (!userId) return 0;
+  let sent = await sendAppPush(userId, payload);
+  if (!pushKeys(settings)) return sent;
   const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", userId).limit(10);
-  if (!subs?.length) return 0;
+  if (!subs?.length) return sent;
   const webpush = await pushSender(settings);
-  if (!webpush) return 0;
-  let sent = 0;
+  if (!webpush) return sent;
   for (const sub of subs) {
     if (await pushToSubscription(webpush, sub, payload) === "sent") sent++;
+  }
+  return sent;
+}
+
+/**
+ * Push para as apps instaladas de uma pessoa (a de colportores, app/colportor), pelo Firebase
+ * (fcm.ts). Sem o segredo FCM_SERVICE_ACCOUNT não se envia nada. Um aparelho que já não existe
+ * (app desinstalada) sai da lista, como as subscrições web mortas.
+ */
+async function sendAppPush(userId: string, payload: { title: string; body: string; url: string }) {
+  const account = parseServiceAccount(Deno.env.get("FCM_SERVICE_ACCOUNT"));
+  if (!account) return 0;
+  const { data: devices } = await db.from("app_push_tokens").select("id, token").eq("user_id", userId)
+    .order("updated", { ascending: false }).limit(10);
+  if (!devices?.length) return 0;
+  const bearer = await accessToken(account, fetch, Date.now());
+  if (!bearer) {
+    console.log("push app: a Google recusou a conta de serviço do Firebase");
+    return 0;
+  }
+  let sent = 0;
+  for (const d of devices as Row[]) {
+    const outcome = await sendToDevice(account, bearer, String(d.token), payload, fetch);
+    if (outcome === "sent") sent++;
+    else if (outcome === "gone") await db.from("app_push_tokens").delete().eq("id", d.id);
   }
   return sent;
 }
@@ -3206,6 +3236,32 @@ route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; 
   const { error } = await db.from("push_subscriptions").upsert(rec, { onConflict: "endpoint" });
   if (error) throw error;
   return json({ message: "Subscrição push registada." });
+});
+
+// A app de colportores (app/colportor) regista o token Firebase do aparelho depois de entrar, e
+// tira-o ao sair. Um token é de um aparelho só: se outra conta entrar no mesmo telemóvel, passa
+// para ela (migração app_push_tokens).
+route("POST", "/push/app-token", sessao(), async ({ auth, body, ip }) => {
+  if (!await checkRateLimit("push-app-token", ip, 20)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const token = String(body.token || "").trim();
+  if (!isFcmToken(token)) throw bad("Token inválido.");
+  const platform = body.platform === "ios" ? "ios" : "android";
+  const app = /^[a-z]{2,20}$/.test(String(body.app || "")) ? String(body.app) : "colportor";
+  const appVersion = String(body.appVersion || "").slice(0, 40);
+  const { error } = await db.from("app_push_tokens").upsert(
+    { user_id: auth.id, token, platform, app, app_version: appVersion, updated: nowISO() },
+    { onConflict: "token" },
+  );
+  if (error) throw error;
+  return json({ message: "Aparelho registado para as notificações." });
+});
+
+route("POST", "/push/app-token/remover", sessao(), async ({ auth, body }) => {
+  const token = String(body.token || "").trim();
+  if (!isFcmToken(token)) throw bad("Token inválido.");
+  const { error } = await db.from("app_push_tokens").delete().eq("token", token).eq("user_id", auth.id);
+  if (error) throw error;
+  return json({ message: "Aparelho retirado das notificações." });
 });
 
 /**
