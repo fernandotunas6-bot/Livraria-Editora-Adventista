@@ -45,7 +45,7 @@ describe('SiteHealthTab', () => {
     await mount();
     expect(rpc).toHaveBeenCalledWith('site_health_vitals', { p_days: 7 });
     const linhas = [...host.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th').textContent);
-    expect(linhas).toEqual(['Todas as páginas', 'Página inicial/', 'Ficha de produto/product/:id']);
+    expect(linhas).toEqual(['Toda a loja (sem o painel)', 'Página inicial/', 'Ficha de produto/product/:id']);
     const lcpInicial = host.querySelectorAll('tbody tr')[1].querySelector('td span');
     expect(lcpInicial.textContent).toContain('4,8 s');
     expect(lcpInicial.className).toContain('bg-red-50');

@@ -16,6 +16,12 @@
 		     centenas de milissegundos antes de a página aparecer. -->
 		<meta name="description" content="Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio." />
 		<title>Livraria Adventista</title>
+		<style>
+			.arranque{min-height:100vh;background:#fcfdfd;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+			.arranque-barra{display:flex;align-items:center;gap:10px;box-sizing:content-box;height:56px;padding:env(safe-area-inset-top) 16px 0;background:#363d47;color:#fff;font-weight:700;font-size:17px}
+			.arranque-txt{margin:28vh 0 0;text-align:center;color:#5b6573;font-size:14px}
+			@media (min-width:640px){.arranque-barra{height:64px;padding-left:24px;padding-right:24px}}
+		</style>
 		<link rel="canonical" href="https://livrariaadventista.ao/" />
 
 		<!-- Partilha no WhatsApp, Facebook e X. As páginas de livro e de colecção reescrevem
@@ -43,7 +49,12 @@
 		<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://livrariaadventista.ao/#organizacao","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","logo":"https://livrariaadventista.ao/icons/icon-512.png"},{"@type":"WebSite","@id":"https://livrariaadventista.ao/#site","name":"Livraria Adventista","url":"https://livrariaadventista.ao/","inLanguage":"pt-AO","publisher":{"@id":"https://livrariaadventista.ao/#organizacao"}}]}</script>
 	</head>
 	<body>
-		<div id="root"></div>
+		<!-- O esqueleto da página, enquanto o JavaScript chega. O HTML vinha vazio e nada aparecia antes
+		     de ~280 kB comprimidos de código serem descarregados e executados: num telemóvel em 4G
+		     lento, 3,8 s de ecrã branco (medido; ver docs/DESEMPENHO-BASELINE.md). Isto é só HTML e
+		     CSS embutido, desenha-se com o primeiro byte de CSS, e o React substitui-o ao arrancar
+		     (createRoot().render limpa o #root). Sem scripts: o CSP não os deixaria correr aqui. -->
+		<div id="root"><div class="arranque"><div class="arranque-barra"><img src="/logo-icon-light.svg" alt="" width="25" height="28"><span>Livraria Adventista</span></div><p class="arranque-txt" role="status">A carregar…</p></div></div>
 		<script type="module" src="/src/main.jsx"></script>
 		<script src="/sw-register.js" defer></script>
 	</body>

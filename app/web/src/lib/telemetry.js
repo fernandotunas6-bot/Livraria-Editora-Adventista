@@ -20,6 +20,11 @@ const ERROR_FLUSH_MS = 3000;
 // Erros que não são da loja: extensões do navegador, scripts de outros sites sem detalhe
 // ("Script error."), avisos inofensivos do ResizeObserver e pedidos cancelados ao sair da página.
 const IGNORED = /^(Script error\.?|ResizeObserver loop|Non-Error promise rejection captured)|(chrome|moz|safari(-web)?)-extension:|AbortError|The user aborted a request/i;
+// As carteiras de criptomoedas (MetaMask e afins) injectam código em todas as páginas e rejeitam
+// promessas quando não conseguem ligar-se. Uma promessa rejeitada não traz o ficheiro de origem,
+// por isso o filtro acima não as apanhava pela fonte: em Novembro de 2026 eram 6 dos 38 erros na
+// Saúde do site. Também se olha para a pilha, onde aparece o endereço da extensão.
+const EXTENSION_NOISE = /MetaMask|ethereum|web3/i;
 
 /** Telemóvel ou computador, pela largura (a mesma fronteira do site: 768 px). */
 function deviceOf(win) {
@@ -59,7 +64,8 @@ export function createTelemetry({ win = globalThis.window, send = defaultSend, v
 
   function reportError(message, detail = {}) {
     const text = String(message || '').trim();
-    if (!text || IGNORED.test(text) || IGNORED.test(String(detail.source || ''))) return false;
+    if (!text || IGNORED.test(text) || IGNORED.test(String(detail.source || '')) || IGNORED.test(String(detail.stack || ''))) return false;
+    if (EXTENSION_NOISE.test(text)) return false;
     if (errorsThisPage >= MAX_ERRORS_PER_PAGE || seenErrors.has(text)) return false;
     seenErrors.add(text);
     errorsThisPage += 1;
