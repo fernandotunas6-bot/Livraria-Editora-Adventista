@@ -17,7 +17,7 @@ const FALLBACK_SLIDES = [
   {
     id: '1',
     title: 'Catálogo Oficial da Livraria',
-    subtitle: 'Mais de 100 títulos adventistas — teologia, família, saúde e muito mais.',
+    subtitle: 'Centenas de títulos adventistas — teologia, família, saúde e muito mais.',
     image: '/images/site/slide-catalogo.webp',
     cta_text: 'Ver Catálogo Geral',
     cta_link: '/shop?category=Cat%C3%A1logo%20Geral',

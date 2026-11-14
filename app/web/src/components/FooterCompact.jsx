@@ -45,10 +45,12 @@ export default function FooterCompact() {
     // (index.css). Aqui o rodapé desce por cima dele (margem negativa e o mesmo espaço por
     // dentro): o fundo escuro chega ao fundo do ecrã — sem a faixa clara que aparecia quando a
     // barra se esconde — e a página não fica com o espaço a dobrar.
+    // Com o aviso «Instalar App» à vista, soma-se a altura dele (PwaInstallBanner): no fim da
+    // página tapava «Termos e condições».
     <footer
       className="bg-foreground text-background md:hidden"
       style={{
-        paddingBottom: 'var(--barra-navegacao-total, 0px)',
+        paddingBottom: 'calc(var(--barra-navegacao-total, 0px) + var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px))',
         marginBottom: 'calc(-1 * var(--barra-navegacao-total, 0px))',
       }}
     >

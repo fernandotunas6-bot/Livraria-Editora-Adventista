@@ -191,7 +191,12 @@ const Footer = () => {
   return (
     // Fundo sólido sempre: por baixo do rodapé não há nada para desfocar, e o "vidro" sobre o
     // fundo claro deixava-o cinzento, com o texto abaixo do contraste mínimo (3,4:1).
-    <footer className="bg-foreground text-background">
+    // Com o aviso «Instalar App» à vista, o fim do rodapé ganha a altura dele (PwaInstallBanner,
+    // canto direito): no fim da página tapava a «Política de privacidade» e os «Termos e condições».
+    <footer
+      className="bg-foreground text-background"
+      style={{ paddingBottom: 'calc(var(--aviso-instalar, 0px) + var(--aviso-instalar-direita, 0px))' }}
+    >
       <div className="container-custom section-spacing">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-12">
           <div className="lg:col-span-4">
