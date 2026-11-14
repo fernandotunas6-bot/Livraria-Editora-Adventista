@@ -17,12 +17,16 @@ export const SHOP_BANNER_IMAGES = [
 export default function PageBannerSlider({
   children,
   images = SHOP_BANNER_IMAGES,
+  // O que mostrar quando `images` vem vazia. Por omissão, os banners da loja. A página das
+  // lojas passa `[]`: enquanto as lojas carregam vê-se a cor da marca, e não um relance de
+  // capas de livros que depois dá lugar às fotografias das lojas.
+  fallbackImages = SHOP_BANNER_IMAGES,
   overlayOpacity = 0.65,
   contentClassName = 'text-left',
   ariaLabel = 'Banners da livraria',
 }) {
   const configuredSlides = [...new Set((images || []).filter(Boolean))];
-  const slides = configuredSlides.length > 0 ? configuredSlides : SHOP_BANNER_IMAGES;
+  const slides = configuredSlides.length > 0 ? configuredSlides : fallbackImages;
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const activeIndex = current % slides.length;

@@ -10,8 +10,8 @@ import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pageTitle } from '@/lib/brand';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
-import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink, storeGallery } from '@/lib/stores';
-import PageBannerSlider from '@/components/PageBannerSlider';
+import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink, storeGallery, fotoDaLoja } from '@/lib/stores';
+import PageBannerSlider, { SHOP_BANNER_IMAGES } from '@/components/PageBannerSlider';
 import StoreThumb from '@/components/StoreThumb';
 import StoreGallery from '@/components/StoreGallery';
 import useLocalizacaoAoVivo from '@/hooks/useLocalizacaoAoVivo';
@@ -19,8 +19,27 @@ import { formatarDistancia, ordenarPorDistancia, precisaoLegivel } from '@/lib/l
 import { jsonLdString, storeJsonLd } from '@/lib/structuredData';
 import { CANONICAL_ORIGIN } from '@/lib/canonicalHost';
 
+// A largura a partir da qual a página tem duas colunas (lista à esquerda, mapa e fotografias à
+// direita): a `lg` do Tailwind, a mesma da grelha mais abaixo. O `useIsMobile` corta nos 768 px
+// e não serve — num tablet a página ainda é de uma coluna só.
+const DUAS_COLUNAS = '(min-width: 1024px)';
+
+function useDuasColunas() {
+  const [duas, setDuas] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(DUAS_COLUNAS).matches);
+  useEffect(() => {
+    const mql = window.matchMedia?.(DUAS_COLUNAS);
+    if (!mql) return undefined;
+    const mudou = () => setDuas(mql.matches);
+    mql.addEventListener('change', mudou);
+    mudou();
+    return () => mql.removeEventListener('change', mudou);
+  }, []);
+  return !!duas;
+}
+
 export default function StoresPage() {
   const { settings } = useSiteSettings();
+  const duasColunas = useDuasColunas();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [stores, setStores] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -48,6 +67,16 @@ export default function StoresPage() {
   const selected = visible.find((s) => s.id === selectedId) || visible[0] || null;
   const embed = selected ? mapEmbedUrl(selected, settings.google_maps_embed_key) : '';
   const fotos = useMemo(() => storeGallery(selected), [selected]);
+
+  // O banner do topo mostra as lojas, uma fotografia de cada — a da miniatura, ou a primeira da
+  // galeria. Mostrava as capas de livros da loja online, e numa página que se chama «Visite-nos»
+  // a primeira coisa que se via era um livro e não uma loja. Enquanto as lojas carregam, a cor da
+  // marca (fallbackImages vazio); se nenhuma tiver fotografia, os banners de sempre.
+  const fotosDoBanner = useMemo(() => {
+    if (stores === null) return [];
+    const daLojas = stores.map(fotoDaLoja).filter(Boolean);
+    return daLojas.length > 0 ? daLojas : SHOP_BANNER_IMAGES;
+  }, [stores]);
 
   // Cada loja para a Google: morada, telefone, coordenadas e fotografias (lib/structuredData.js).
   // Vão todas as lojas, e não só a escolhida — a página é a mesma para quem procura qualquer
@@ -80,7 +109,7 @@ export default function StoresPage() {
       <Header onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <PageBannerSlider contentClassName="text-left">
+      <PageBannerSlider images={fotosDoBanner} fallbackImages={[]} ariaLabel="Fotografias das lojas" contentClassName="text-left">
         <p className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/80"><Store className="h-4 w-4" /> Lojas físicas</p>
         <h1 className="mb-3 font-serif text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Visite-nos</h1>
         <p className="max-w-xl text-sm text-white/85 sm:text-base">
@@ -154,7 +183,11 @@ export default function StoresPage() {
                 </div>
               )}
 
-              <div className="grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6 items-start">
+              {/* `grid-cols-1` é `minmax(0, 1fr)`: no telemóvel a coluna fica do tamanho do ecrã.
+                  Sem ela a grelha usava uma coluna implícita `auto`, que não encolhe abaixo do
+                  conteúdo mais largo — a página ficava com 429 px num ecrã de 390 e cortava o
+                  nome da loja, o botão «Direcções» e o lado direito das fotografias. */}
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6 items-start">
                 <ul className="space-y-3" aria-label="Lista de lojas">
                   {visible.map((s) => {
                     const active = selected?.id === s.id;
@@ -212,6 +245,12 @@ export default function StoresPage() {
                                   <a href={mapsUrl(s)} target="_blank" rel="noopener noreferrer">Abrir no mapa</a>
                                 </Button>
                               </div>
+                              {/* Numa coluna só (telemóvel e tablet), as fotografias da loja vêm
+                                  dentro do cartão dela. No painel ao lado ficavam depois da lista
+                                  inteira e de um mapa: tocava-se numa loja e não se via nada mudar. */}
+                              {!duasColunas && fotos.length > 0 && (
+                                <StoreGallery photos={fotos} storeName={s.name} className="border-t border-border pt-4" />
+                              )}
                             </div>
                           )}
                         </article>
@@ -221,43 +260,54 @@ export default function StoresPage() {
                   {!visible.length && <li className="text-center py-10 text-muted-foreground">Nenhuma loja corresponde à pesquisa.</li>}
                 </ul>
 
-                <div className="lg:sticky lg:top-28 space-y-4">
-                  <div className="rounded-2xl border border-border bg-background overflow-hidden">
-                    {embed ? (
-                      <iframe
-                        key={selected.id}
-                        title={`Mapa — ${selected.name}`}
-                        src={embed}
-                        className="w-full aspect-4/3 lg:aspect-auto lg:h-[560px] border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    ) : (
-                      <div className="aspect-4/3 flex flex-col items-center justify-center gap-3 text-center p-8 text-muted-foreground">
-                        <MapPin className="h-10 w-10 text-primary/50" />
-                        <p className="text-sm max-w-xs">{selected ? 'Esta loja ainda não tem coordenadas GPS. Use «Como chegar» para abrir a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
-                      </div>
-                    )}
-                    {selected && (
-                      <div className="p-4 border-t border-border flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold truncate">{selected.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{selected.address}</p>
+                {/* Numa coluna só, o painel aparece apenas quando há mapa: sem ele, o cartão da
+                    loja já tem a morada, «Como chegar» e as fotografias, e o painel repetia-os. */}
+                {(duasColunas || embed) && (
+                  <div className="lg:sticky lg:top-28 space-y-4">
+                    <div className="rounded-2xl border border-border bg-background overflow-hidden">
+                      {embed ? (
+                        <iframe
+                          key={selected.id}
+                          title={`Mapa — ${selected.name}`}
+                          src={embed}
+                          className="w-full aspect-4/3 lg:aspect-auto lg:h-[560px] border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      ) : fotos.length === 0 && (
+                        // Sem mapa e sem fotografias, um aviso numa linha. Era uma caixa 4:3 vazia
+                        // — quase um ecrã de telemóvel — em duas das três lojas.
+                        <div className="flex items-center gap-3 p-5 text-muted-foreground">
+                          <MapPin className="h-6 w-6 shrink-0 text-primary/50" aria-hidden />
+                          <p className="text-sm">{selected ? 'Esta loja ainda não tem localização no mapa. «Direcções» abre a morada no Google Maps.' : 'Seleccione uma loja.'}</p>
                         </div>
-                        <Button asChild size="sm" variant="outline">
-                          <a href={directionsUrl(selected)} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-1.5" /> Direcções</a>
-                        </Button>
-                      </div>
+                      )}
+                      {selected && (
+                        <div className={`p-4 flex items-center justify-between gap-3 ${embed || fotos.length === 0 ? 'border-t border-border' : ''}`}>
+                          {/* O nome dobra em vez de ser cortado: com «Livraria Adventista — » à
+                              frente, o que ficava escondido era a cidade, que é o que distingue. */}
+                          <div className="min-w-0">
+                            <p className="font-semibold leading-snug">{selected.name}</p>
+                            <p className="text-xs text-muted-foreground">{selected.address}</p>
+                            {!embed && fotos.length > 0 && (
+                              <p className="mt-1 text-xs text-muted-foreground">Ainda sem localização no mapa — «Direcções» abre a morada no Google Maps.</p>
+                            )}
+                          </div>
+                          <Button asChild size="sm" variant="outline" className="shrink-0">
+                            <a href={directionsUrl(selected)} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-1.5" /> Direcções</a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {duasColunas && selected && fotos.length > 0 && (
+                      <StoreGallery
+                        photos={fotos}
+                        storeName={selected.name}
+                        className="rounded-2xl border border-border bg-background p-4"
+                      />
                     )}
                   </div>
-                  {selected && fotos.length > 0 && (
-                    <StoreGallery
-                      photos={fotos}
-                      storeName={selected.name}
-                      className="rounded-2xl border border-border bg-background p-4"
-                    />
-                  )}
-                </div>
+                )}
               </div>
             </>
           )}
