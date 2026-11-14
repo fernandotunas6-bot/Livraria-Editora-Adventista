@@ -19,10 +19,13 @@ pedidas pelo dono a 2026-11-14).
   quando uma província está em duas lojas (fica com a primeira da lista) e mostra as províncias
   que nenhuma loja serve.
 - Uma loja sem lista serve só a sua própria província. Com lista, marque também a da própria loja.
-- **A loja do Bié** foi criada pela migração **escondida do site e sem levantamento**, com a
-  província por morada, porque ainda não tem morada, telefone, horário nem fotografias. Até ser
-  activada, as encomendas do Bié, do Cuando e do Cubango já ficam com ela, mas o cliente não a vê.
-  Para a abrir: preencher os dados em Lojas e ligar «Activa» (e «Levantamento», se fizer).
+- **A loja do Bié**, no Cuito, foi criada pela migração **escondida do site e sem levantamento**,
+  porque ainda não abriu. Tem o telefone e o horário das outras lojas, como o dono pediu (o
+  telefone da do Huambo e o horário da porta da do Lubango), e as coordenadas do centro do Cuito
+  (12°23′S, 16°56′E). Até ser activada, as encomendas do Bié, do Cuando e do Cubango já ficam com
+  ela, mas o cliente não a vê. Para a abrir: em Lojas, confirmar a morada, afinar o ponto no mapa
+  («Usar a minha localização», já na loja), juntar as fotografias e ligar «Activa» (e
+  «Levantamento», se fizer).
 - As províncias que nenhuma loja serve (Luanda, por agora, e as outras) ficam com a equipa central,
   como antes.
 
@@ -55,9 +58,12 @@ encomendas. As encomendas antigas receberam a loja pela mesma regra.
 - **As guias** (entrega à consignação, devolução, compra) ficam com a loja do colportor
   (`colporteur_documents.store_id`). O stock continua a ser um só (o do KiGest): a guia diz de que
   loja é, não mexe no stock de uma loja em particular.
-- As **entregas por colportor** ainda escolhem a loja onde se levantam os livros pelas regras de
-  sempre (a da província do colportor, ou a mais perto por GPS) — ver [COLPORTAGEM.md](COLPORTAGEM.md),
-  secção 5. Não usam ainda as províncias que cada loja serve.
+- **Entregas por colportor** (decisão do dono, 2026-11-14): a oferta continua a ir por
+  proximidade — ao colportor mais perto do cliente —, e quem não tem os livros consigo levanta-os
+  **na sua loja**. Um colportor do Namibe levanta no Lubango (a Missão Sul tem a sede na Huíla),
+  mesmo a mais de 50 km; antes não tinha loja «ao alcance» e não recebia a oferta. Depois da loja
+  dele contam, como antes, a da sua província, a mais perto por GPS e a da província do cliente.
+  Ver [COLPORTAGEM.md](COLPORTAGEM.md), secção 5.
 
 ## «Temos / não temos» em cada loja
 
@@ -106,15 +112,16 @@ Em **Catálogo → Disponibilidade nas lojas** cada loja marca os produtos que t
     stock lê tudo), `public.store_stock_set`, `public.store_stock_my_stores`,
     `private.my_store_ids`, `private.can_edit_store_stock`;
   - a permissão `manage_store_stock` nas três listas de chaves (base de dados,
-    `app/web/src/lib/permissions.js`, `supabase/functions/app/permissions.ts`).
+    `app/web/src/lib/permissions.js`, `supabase/functions/app/permissions.ts`);
+  - `private.delivery_pickup_store` com a loja do colportor em primeiro lugar.
 - Site: `lib/storeStock.js` (regras e acesso aos dados), `lib/stores.js` (`lojaQueServe`,
   `provinciasServidas`, `conflitosDeZonas`, `cidadeDaLoja`), `components/admin/StoreStockTab.jsx`,
   `components/StoreAvailability.jsx`, e mudanças em `ShoppingCartPanel.jsx`, `StoresPage.jsx`,
   `admin/StoresTab.jsx`, `admin/colportagem/*` e `painel-vendas/adapter.js`.
 - O site funciona antes de a migração estar aplicada: sem as colunas, cada ecrã mostra o que
   mostrava (o painel de vendas conta pelo nome e pela província, como antes).
-- Testes: `scripts/pglite/lojas.mjs` (68 verificações com as migrações reais, incluindo o
-  preenchimento do que já existia) e testes unitários em `lib/storeStock.test.js`,
+- Testes: `scripts/pglite/lojas.mjs` (74 verificações com as migrações reais, incluindo o
+  preenchimento do que já existia e a loja onde o colportor levanta) e testes unitários em `lib/storeStock.test.js`,
   `lib/stores.test.js`, `components/StoreAvailability.test.jsx` e `lib/colporteurReports.test.js`.
 
 ## O que vem a seguir (plano das lojas)
@@ -124,4 +131,4 @@ Em **Catálogo → Disponibilidade nas lojas** cada loja marca os produtos que t
 2. **Localização** (fase 4): a loja de levantamento mais perto já escolhida no checkout; repor as
    coordenadas do Lubango e de Catumbela, apagadas a 2026-11-05 por estarem erradas.
 3. **Portal dos colportores num subdomínio** (fase 5), com pedidos de livros à sua loja.
-4. Decidir se as entregas por colportor passam a usar as províncias de cada loja.
+4. Abrir a loja do Bié quando estiver pronta (ver acima).

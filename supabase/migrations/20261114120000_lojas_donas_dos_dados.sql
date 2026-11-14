@@ -8,9 +8,10 @@
 --
 -- 0. physical_stores.service_provinces — as províncias que cada loja serve, como o dono as deu:
 --    Catumbela serve Benguela e o Cuanza Sul; a da Huíla (Lubango), a Huíla, o Namibe e o Cunene; a
---    do Huambo, só o Huambo. E há uma loja nova, a do Bié, que serve o Bié, o Cuando e o Cubango.
---    Entra escondida do site e sem levantamento, porque ainda não tem morada, telefone nem horário:
---    a equipa completa-a em Lojas e activa-a. Até lá, as encomendas dessas províncias já são dela.
+--    do Huambo, só o Huambo. E há uma loja nova, a do Bié, no Cuito, que serve o Bié, o Cuando e o
+--    Cubango. Ainda não abriu: entra escondida do site e sem levantamento, com o telefone e o
+--    horário das outras lojas e as coordenadas do centro do Cuito. Quando abrir, a equipa activa-a
+--    em Lojas. Até lá, as encomendas dessas províncias já são dela.
 -- 1. orders.store_id — a loja da encomenda: a do levantamento; numa entrega ao domicílio, a loja que
 --    serve a província de entrega; nenhuma numa encomenda só digital ou numa província que nenhuma
 --    loja serve (Luanda, por agora). Grava-se quando a encomenda entra, e outra vez se mudarem o
@@ -33,13 +34,18 @@
 --    listas de chaves (private.permission_keys, aqui; app/web/src/lib/permissions.js;
 --    supabase/functions/app/permissions.ts) mudam juntas: uma chave que falte numa delas é apagada ao
 --    gravar um gestor ou um cargo.
+-- 6. Entregas por colportor: a oferta continua a ir por proximidade, mas o colportor levanta os
+--    livros na sua loja (colporteurs.store_id) — um colportor do Namibe levanta no Lubango, a sede
+--    da Missão Sul, mesmo a mais de 50 km. Antes, sem loja na província dele, a menos de 50 km ou na
+--    do cliente, quem não tinha os livros consigo não recebia a oferta.
 --
 -- Reverter: drop de public.store_stock, de public.store_stock_set, public.store_stock_my_stores,
 -- private.loja_da_encomenda, private.loja_da_provincia, private.loja_da_provincia_nome,
 -- private.my_store_ids, private.can_edit_store_stock, dos gatilhos orders_loja, colporteurs_b_loja
 -- e colporteur_documents_loja (e das suas funções), das três colunas store_id e de
 -- physical_stores.service_provinces; apagar a loja do Bié no painel se ainda não tiver nada; repor
--- private.permission_keys sem manage_store_stock (20261108190000_funcionarios).
+-- private.permission_keys sem manage_store_stock (20261108190000_funcionarios) e
+-- private.delivery_pickup_store como em 20261108220000_entregas_loja_e_robustez.
 
 -- ---------------------------------------------------------------------------------------------
 -- 0. As províncias que cada loja serve
@@ -66,12 +72,27 @@ where (name ilike '%Lubango%' or private.plain_text(province) = 'huila') and ser
 update public.physical_stores set service_provinces = array['Huambo']
 where (name ilike '%Huambo%' or private.plain_text(province) = 'huambo') and service_provinces = '{}'::text[];
 
--- A loja do Bié. Se a equipa já a tiver criado, fica com a lista; se não, nasce escondida e sem
--- levantamento, com a província por morada (como a do Huambo em 20261101205332), à espera dos dados.
+-- A loja do Bié, no Cuito. Se a equipa já a tiver criado, fica com a lista e com o que lá escreveu.
+-- Se não, nasce escondida e sem levantamento — ainda não abriu —, com o telefone e o horário das
+-- outras lojas, como o dono pediu: o telefone da do Huambo (o único que as lojas têm) e o horário
+-- da porta da do Lubango. As coordenadas são as do centro do Cuito (12°23′S, 16°56′E, GeoNames):
+-- quando a loja abrir, a equipa afina o ponto no painel («Usar a minha localização»).
 update public.physical_stores set service_provinces = array['Bié', 'Cuando', 'Cubango']
 where (name ilike '%Bié%' or private.plain_text(province) = 'bie') and service_provinces = '{}'::text[];
-insert into public.physical_stores (name, province, address, active, pickup_enabled, service_provinces, sort_order)
-select 'Livraria Adventista — Bié', 'Bié', 'Bié', false, false, array['Bié', 'Cuando', 'Cubango'],
+insert into public.physical_stores (name, province, address, phone, whatsapp, hours, latitude, longitude, maps_url,
+                                    active, pickup_enabled, service_provinces, sort_order)
+select 'Livraria Adventista — Bié', 'Bié', 'Cuito',
+       coalesce((select s.phone from public.physical_stores s
+                 where (s.name ilike '%Huambo%' or private.plain_text(s.province) = 'huambo') and coalesce(s.phone, '') <> ''
+                 order by s.active desc, s.created limit 1), ''),
+       coalesce((select s.whatsapp from public.physical_stores s
+                 where (s.name ilike '%Huambo%' or private.plain_text(s.province) = 'huambo') and coalesce(s.whatsapp, '') <> ''
+                 order by s.active desc, s.created limit 1), ''),
+       coalesce((select s.hours from public.physical_stores s
+                 where (s.name ilike '%Lubango%' or private.plain_text(s.province) = 'huila') and coalesce(s.hours, '') <> ''
+                 order by s.active desc, s.created limit 1), 'Seg–Qui 8h–17h30 · Sex, Dom e feriados 8h–13h'),
+       -12.383333, 16.933333, 'https://www.google.com/maps?q=-12.383333,16.933333&z=16',
+       false, false, array['Bié', 'Cuando', 'Cubango'],
        coalesce((select max(s.sort_order) from public.physical_stores s), 0) + 1
 where not exists (select 1 from public.physical_stores s where s.name ilike '%Bié%' or private.plain_text(s.province) = 'bie');
 
@@ -370,3 +391,47 @@ as $$
 $$;
 revoke all on function private.permission_keys() from public, anon;
 grant execute on function private.permission_keys() to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------------------------
+-- 6. Entregas por colportor: a loja dele primeiro
+-- ---------------------------------------------------------------------------------------------
+-- Pedido do dono (2026-11-14): a oferta de uma entrega continua a ir por proximidade — ao colportor
+-- mais perto do cliente, como sempre (private.delivery_candidates não muda) —, e quem não tem os
+-- livros consigo levanta-os na sua loja, a da sua missão. Um colportor do Namibe levanta no
+-- Lubango: a Missão Sul tem a sede na Huíla. Antes só contava uma loja na província dele, a menos
+-- de 50 km ou na província do cliente; o do Namibe não tinha nenhuma e não recebia a oferta.
+-- A loja dele é colporteurs.store_id (por omissão a que serve a província; a equipa muda-a na
+-- ficha). Uma loja escondida não conta (a do Bié, até abrir). O resto fica como estava em
+-- 20261108220000_entregas_loja_e_robustez.
+create or replace function private.delivery_pickup_store(p_colporteur uuid, p_order_province text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with me as (
+    select c.latitude::double precision as lat, c.longitude::double precision as lng, p.name as province, c.store_id
+    from public.colporteurs c
+    left join public.angola_provinces p on p.id = c.province_id
+    where c.id = p_colporteur
+  ),
+  cfg as (select coalesce(max(delivery_max_km), 50) as max_km from public.colporteur_settings where id = 1),
+  s as (
+    select s.id, s.name, s.sort_order,
+      me.store_id is not null and s.id = me.store_id as is_his,
+      me.province is not null and private.plain_text(s.province) = private.plain_text(me.province) as in_mine,
+      private.plain_text(s.province) = private.plain_text(p_order_province) as in_order,
+      case when me.lat is not null and me.lng is not null and coalesce(s.latitude, 0) <> 0 and coalesce(s.longitude, 0) <> 0
+           then private.km_between(me.lat, me.lng, s.latitude, s.longitude) end as km
+    from public.physical_stores s, me
+    where s.active
+  )
+  select s.id
+  from s, cfg
+  where s.is_his or s.in_mine or s.in_order or (s.km is not null and s.km <= cfg.max_km)
+  order by case when s.is_his then 0 when s.in_mine then 1 when s.km is not null and s.km <= cfg.max_km then 2 else 3 end,
+           s.km asc nulls last, s.sort_order, s.name
+  limit 1;
+$$;
+revoke all on function private.delivery_pickup_store(uuid, text) from public, anon, authenticated;

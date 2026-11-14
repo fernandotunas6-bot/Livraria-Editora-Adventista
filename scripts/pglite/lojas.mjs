@@ -53,6 +53,10 @@ const C = 'lojacatumbela01';
 await q(`insert into public.physical_stores (id, name, province, address, active) values
   ($1, 'Livraria Adventista — Lubango', 'Huila', 'Lubango', true),
   ($2, 'Livraria Adventista — Catumbela', 'Benguela', 'Catumbela', true)`, [L, C]);
+// Como na produção: o telefone da do Huambo (20261113103000) e o horário da porta da do Lubango (20261113143000).
+const PORTA = 'Seg–Qui 8h–17h30 · Sex, Dom e feriados 8h–13h';
+await q(`update public.physical_stores set phone = '+244 923 428 459', whatsapp = '+244 923 428 459' where id = $1`, [H]);
+await q(`update public.physical_stores set hours = $2 where id = $1`, [L, PORTA]);
 
 let seq = 0;
 const encomenda = async (campos) => {
@@ -110,10 +114,13 @@ const areas = async (id) => (await q(`select service_provinces from public.physi
 check('Catumbela serve Benguela e o Cuanza Sul', JSON.stringify(await areas(C)) === JSON.stringify(['Benguela', 'Cuanza Sul']));
 check('a da Huíla serve a Huíla, o Namibe e o Cunene', JSON.stringify(await areas(L)) === JSON.stringify(['Huíla', 'Namibe', 'Cunene']));
 check('a do Huambo serve só o Huambo', JSON.stringify(await areas(H)) === JSON.stringify(['Huambo']));
-const [B] = await q(`select id, name, province, address, active, pickup_enabled, service_provinces from public.physical_stores where name ilike '%Bié%'`);
-check('a loja do Bié foi criada, escondida e sem levantamento até ter os dados',
-  !!B && B.name === 'Livraria Adventista — Bié' && B.active === false && B.pickup_enabled === false, B);
+const [B] = await q(`select id, name, province, address, phone, whatsapp, hours, latitude, longitude, maps_url, active, pickup_enabled, service_provinces
+  from public.physical_stores where name ilike '%Bié%'`);
+check('a loja do Bié foi criada no Cuito, escondida e sem levantamento (ainda não abriu)',
+  !!B && B.name === 'Livraria Adventista — Bié' && B.address === 'Cuito' && B.active === false && B.pickup_enabled === false, B);
 check('a do Bié serve o Bié, o Cuando e o Cubango', JSON.stringify(B?.service_provinces) === JSON.stringify(['Bié', 'Cuando', 'Cubango']));
+check('com o telefone e o horário das outras lojas', B.phone === '+244 923 428 459' && B.whatsapp === '+244 923 428 459' && B.hours === PORTA, B);
+check('com as coordenadas do centro do Cuito', Math.abs(B.latitude + 12.383333) < 1e-6 && Math.abs(B.longitude - 16.933333) < 1e-6 && /-12\.383333,16\.933333/.test(B.maps_url), B);
 await raises('uma província vazia na lista é recusada', () => q(`update public.physical_stores set service_provinces = array['Bié', ''] where id = $1`, [B.id]), /service_provinces_check/);
 
 // --- 1. A loja de cada encomenda ----------------------------------------------------------------------
@@ -179,6 +186,15 @@ await as('authenticated', colp, `update public.colporteurs set store_id = $2 whe
 check('a equipa da colportagem muda a loja na ficha', await lojaK(kLuanda) === C);
 await as('authenticated', cliente, `update public.colporteurs set store_id = $2 where id = $1`, [kLuanda, H]);
 check('um cliente não muda a loja de ninguém', await lojaK(kLuanda) === C);
+
+// Entregas por colportor: onde levanta os livros quem não os tem consigo. Antes, o do Namibe não
+// tinha loja na província nem a menos de 50 km, e não recebia a oferta.
+const levanta = async (k, provinciaDaEncomenda) => (await q(`select private.delivery_pickup_store($1, $2) as s`, [k, provinciaDaEncomenda]))[0].s;
+check('o colportor do Namibe levanta no Lubango (a sede da Missão Sul)', await levanta(kNamibe, 'Namibe') === L);
+check('quem a equipa pôs noutra loja levanta nessa', await levanta(kLuanda, 'Luanda') === C);
+const kSemLoja = await colportor('Zé de Luanda', '923100007', 'luanda');
+check('sem loja dele, nem na província, nem perto: nenhuma (a oferta não lhe chega)', await levanta(kSemLoja, 'Luanda') === null);
+check('a loja do Bié ainda não abriu: o colportor do Cuando não levanta lá', await levanta(kCuando, 'Cuando') === null);
 
 // --- 3. A loja de cada guia -----------------------------------------------------------------------------
 {

@@ -22,13 +22,15 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   de que loja é a compra (pela província de entrega), mostra as províncias de cada loja de
   levantamento e não deixa escolher a que disse «não temos»; /lojas mostra as províncias e filtra
   por elas.
-- **Testes:** `scripts/pglite/lojas.mjs` (68), 3 testes novos no fluxo de compra
+- **Testes:** `scripts/pglite/lojas.mjs` (74), 3 testes novos no fluxo de compra
   (`e2e/compra.spec.js`, nos dois tamanhos), testes unitários das regras e do ecrã novo. Os 15
   grupos de cenários, os 1 831 testes e o Playwright passam.
-- **Por decidir com o dono:** os dados da loja do Bié (morada, telefone, horário, fotografias) para a
-  activar; se as entregas por colportor passam a usar as províncias de cada loja (hoje usam a loja
-  da província do colportor ou a mais perto por GPS); as fases seguintes do plano (gerente de loja,
-  localização, portal dos colportores num subdomínio).
+- **Respostas do dono (2026-11-14):** a loja do Bié fica no Cuito, com o telefone e o horário das
+  outras lojas, e continua escondida até abrir (coordenadas do centro do Cuito, a afinar no local).
+  Nas entregas por colportor a oferta continua por proximidade, e o colportor levanta os livros na
+  sua loja: o do Namibe no Lubango, sede da Missão Sul (`private.delivery_pickup_store`).
+- **Por decidir:** as fases seguintes do plano (gerente de loja, localização, portal dos
+  colportores num subdomínio) e as fotografias da loja do Bié.
 - Neste ramo está também o rodapé do painel de vendas com a loja escolhida (commit `8ccb22f`).
 
 ## Fotografias das lojas (2026-11-13, ramo `claude/beautiful-maxwell-1q8dks`)
