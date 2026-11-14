@@ -64,8 +64,10 @@ check('nenhum gatilho corre como quem chama e usa uma função fechada', avariad
 // 3. Funções SECURITY DEFINER abertas pela API sem nenhuma verificação --------------------------------
 // É uma procura de palavras, por isso uma função pode ter a palavra e estar errada. Serve para que
 // uma função nova sem verificação não passe sem alguém decidir que é mesmo pública.
-const PUBLICAS = ['app_releases_published', 'church_directory', 'community_current_club', 'community_reader',
-  'community_reader_levels', 'community_sidebar', 'support_update_thread'];
+// colporteur_verify: a página pública do QR do cartão; só responde com o número e o código de
+// verificação certos (40 bits ao acaso) e nunca devolve o telefone.
+const PUBLICAS = ['app_releases_published', 'church_directory', 'colporteur_verify', 'community_current_club',
+  'community_reader', 'community_reader_levels', 'community_sidebar', 'support_update_thread'];
 const abertas = (await q(`
   select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.prosecdef

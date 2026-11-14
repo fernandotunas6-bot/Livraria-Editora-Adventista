@@ -274,6 +274,8 @@ as $$
 declare
   o public.orders;
 begin
+  -- Só o cliente com sessão (encomenda_do_cliente volta a exigi-lo e confere a conta).
+  if auth.uid() is null then return '[]'::jsonb; end if;
   o := private.encomenda_do_cliente(p_order_number);
   if o.id is null then return '[]'::jsonb; end if;
   return coalesce((
