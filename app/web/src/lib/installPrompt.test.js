@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { installPromptAllowed, installPromptOffsets } from './installPrompt';
+import { HOME_TOP_PX, installPromptAllowed, installPromptCoversHero, installPromptOffsets } from './installPrompt';
+
+describe('installPromptCoversHero', () => {
+  it('só no topo da página inicial', () => {
+    expect(installPromptCoversHero('/', 0)).toBe(true);
+    expect(installPromptCoversHero('/', HOME_TOP_PX - 1)).toBe(true);
+    expect(installPromptCoversHero('/', HOME_TOP_PX)).toBe(false);
+    expect(installPromptCoversHero('/shop', 0)).toBe(false);
+    expect(installPromptCoversHero('/colecoes', 0)).toBe(false);
+  });
+});
 
 describe('installPromptAllowed', () => {
   it('nunca na ficha do livro, no fim da compra nem nos ecrãs de tarefa', () => {

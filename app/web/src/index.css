@@ -647,8 +647,9 @@
      mede 3rem. Em quase todos os telemóveis o fundo do banner cai nessa zona: o assistente
      tapava a seta «anterior» (28 px num iPhone SE, 15 com a app instalada). A subida é o que
      o banner tem a mais em relação ao topo do assistente, mais 0.5rem de folga — num ecrã alto
-     ou no computador dá zero e nada se mexe. O aviso de instalação não entra na conta: quando
-     aparece já tapa a zona toda, e subir por cima dele levava a fila contra o botão do slide. */
+     ou no computador dá zero e nada se mexe. O aviso de instalação não entra na conta: subir
+     por cima dele levava a fila contra o botão do slide, por isso é ele que não aparece no topo
+     da página inicial (installPromptCoversHero, lib/installPrompt.js). */
   .heroi-subida {
     --heroi-subida: max(0px, calc(
       min(max(85svh, 520px), 900px) - 100svh + 1.5rem + env(safe-area-inset-bottom, 0px) +
