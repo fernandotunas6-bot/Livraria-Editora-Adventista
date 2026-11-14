@@ -4,6 +4,14 @@
  * `api` = { db, user, downloads }, a interface que o pacote esperava em window.claude.use() (ver adapter.js).
  */
 import * as d3 from 'd3';
+// O `.transition()` das selecções vem deste módulo, que o acrescenta ao `selection.prototype` só
+// por ser importado. O pacote `d3` declara-se sem efeitos secundários (`sideEffects: false`), por
+// isso o build de produção deixava-o de fora quando só se importava o `d3`: em produção cada
+// `.transition()` dava «transition is not a function», e o painel parava a meio do primeiro
+// desenho (sem o acumulado, o ganho mensal nem o quadro geral). Em desenvolvimento e nos testes
+// funcionava, porque aí o código corre sem tree-shaking. O teste e2e/painel-vendas.spec.js monta o
+// painel a partir do build para isto não voltar.
+import 'd3-transition';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
 import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';

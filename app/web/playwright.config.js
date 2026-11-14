@@ -12,6 +12,8 @@ import { SUPABASE_FALSO } from './e2e/lojaFalsa.js';
 // O build vai para `dist/e2e`, à parte do `dist/app/web` que o deploy publica: um build com o
 // Supabase falso nunca fica no sítio de onde o `npm run deploy:site` lê.
 const PORTA = 4173;
+/** A página de teste do Painel de Vendas (e2e/painel/; a mesma porta em e2e/painel-vendas.spec.js). */
+const PORTA_PAINEL = 4174;
 
 export default defineConfig({
   testDir: './e2e',
@@ -36,16 +38,30 @@ export default defineConfig({
     // recolhido, a barra de compra fixa), e é onde um botão tapado mais custa.
     { name: 'telemovel', use: { ...devices['Pixel 7'] } },
   ],
-  webServer: {
-    command: `vite build --outDir ../../dist/e2e --logLevel warn && vite preview --outDir ../../dist/e2e --port ${PORTA} --strictPort`,
-    url: `http://localhost:${PORTA}`,
-    timeout: 180_000,
-    reuseExistingServer: !process.env.CI,
-    // As variáveis do processo ganham ao `app/web/.env`: mesmo com o ficheiro local a apontar
-    // para produção, este build só conhece o Supabase falso.
-    env: {
-      VITE_SUPABASE_URL: SUPABASE_FALSO,
-      VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_apenas_para_e2e',
+  webServer: [
+    {
+      command: `vite build --outDir ../../dist/e2e --logLevel warn && vite preview --outDir ../../dist/e2e --port ${PORTA} --strictPort`,
+      url: `http://localhost:${PORTA}`,
+      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
+      // As variáveis do processo ganham ao `app/web/.env`: mesmo com o ficheiro local a apontar
+      // para produção, este build só conhece o Supabase falso.
+      env: {
+        VITE_SUPABASE_URL: SUPABASE_FALSO,
+        VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_apenas_para_e2e',
+      },
     },
-  },
+    // A página de teste do Painel de Vendas (e2e/painel/), compilada à parte: o painel corre no
+    // /admin, atrás de sessão e permissões, e o que se quer provar é o build, não o login.
+    {
+      command: `vite build --config e2e/painel/vite.config.js --logLevel warn && vite preview --config e2e/painel/vite.config.js --port ${PORTA_PAINEL} --strictPort`,
+      url: `http://localhost:${PORTA_PAINEL}`,
+      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
+      env: {
+        VITE_SUPABASE_URL: SUPABASE_FALSO,
+        VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_apenas_para_e2e',
+      },
+    },
+  ],
 });
