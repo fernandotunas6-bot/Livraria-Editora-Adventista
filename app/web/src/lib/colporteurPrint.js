@@ -82,7 +82,7 @@ body{margin:0;padding:12mm;color:#10233F;background:#fff}
 .par{display:flex;flex-wrap:wrap;gap:8mm}
 .card{width:85.6mm;height:54mm;border-radius:3.2mm;box-sizing:border-box;position:relative;overflow:hidden;border:0.3mm solid #C9D2DE;page-break-inside:avoid}
 .frente{background:linear-gradient(135deg,#FFFFFF 0%,#F2F5F9 62%,#E4ECF5 100%)}
-.frente .faixa{position:absolute;left:0;right:0;bottom:0;height:7mm;background:#10233F;color:#F2B705;font-size:2.4mm;font-weight:800;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;padding:0 4mm}
+.frente .faixa{position:absolute;left:0;right:0;bottom:0;height:7mm;background:#10233F;color:#F2B705;font-size:2.1mm;font-weight:800;letter-spacing:.08em;white-space:nowrap;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;padding:0 4mm}
 .frente .faixa span:last-child{color:#fff;letter-spacing:.04em}
 .logo{position:absolute;left:4mm;top:3.2mm;height:7.5mm}
 .foto{position:absolute;left:4mm;top:13mm;width:19mm;height:24mm;border:0.3mm dashed #9AA8BC;border-radius:1.5mm;display:grid;place-items:center;font-size:2.2mm;color:#7A8798;text-align:center;background:#fff}
@@ -95,7 +95,7 @@ body{margin:0;padding:12mm;color:#10233F;background:#fff}
 .verso{background:#10233F;color:#E9EEF5}
 .verso .qr{position:absolute;right:4mm;top:4mm;width:24mm;height:24mm;background:#fff;padding:1.4mm;border-radius:1.5mm}
 .verso .qr svg{width:100%;height:100%;display:block}
-.verso .txt{position:absolute;left:4mm;top:4mm;right:32mm;font-size:2.4mm;line-height:1.35}
+.verso .txt{position:absolute;left:4mm;top:4mm;right:32.5mm;font-size:2.3mm;line-height:1.35;overflow-wrap:anywhere}
 .verso .txt b{color:#F2B705}
 .verso .chk{position:absolute;left:4mm;bottom:9mm;font-size:2.2mm;color:#AEB9C7}
 .verso .chk b{display:block;font-size:4.4mm;letter-spacing:.14em;color:#fff;font-family:ui-monospace,monospace;margin-top:.6mm}
@@ -130,7 +130,7 @@ ${CARD_STYLE}</style></head><body>
     <div class="faixa"><span>Evangelismo pela literatura</span><span>Válido até ${esc(validade)}</span></div>
   </div>
   <div class="card verso">
-    <div class="txt">Este cartão identifica um colportor da <b>${esc(brandName)}</b>. Para confirmar que é válido, aponte a câmara ao código ou abra <b>${esc(String(verifyUrl).replace(/^https?:\/\//, '').replace(/\?.*$/, ''))}</b> e escreva o código de verificação.</div>
+    <div class="txt">Este cartão identifica um colportor da <b>${esc(brandName)}</b>. Para confirmar que é válido, aponte a câmara ao código ou abra <b>${esc(String(verifyUrl).replace(/^https?:\/\//, '').replace(/\/verificar\/.*$/, '/verificar'))}</b> e escreva os dois códigos do cartão.</div>
     <div class="qr">${qrSvg(verifyUrl)}</div>
     <div class="chk">Código de verificação<b>${esc(chk)}</b></div>
     <div class="val">Válido até<b>${esc(validade)}</b></div>
