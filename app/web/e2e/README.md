@@ -1,8 +1,11 @@
-# Testes de ponta a ponta — fluxo de compra
+# Testes de ponta a ponta — fluxo de compra e página das lojas
 
 Um navegador a sério (Chromium, pelo Playwright) faz o caminho de quem compra: catálogo → livro →
-carrinho → dados e pagamento → página de sucesso → rastreio → confirmação de recepção. Corre em
-dois tamanhos, computador e telemóvel (`playwright.config.js`).
+carrinho → dados e pagamento → página de sucesso → rastreio → confirmação de recepção
+(`compra.spec.js`). À parte, `lojas.spec.js` cobre a página das lojas físicas, onde o que
+interessa provar no navegador são as fotografias: que abrem em grande e que não são
+descarregadas em tamanho grande sem necessidade. Corre em dois tamanhos, computador e telemóvel
+(`playwright.config.js`).
 
 ```bash
 npm run test:e2e                      # na raiz do repositório
@@ -43,6 +46,8 @@ dependem da internet.
 | A rede cai depois de o servidor gravar | A segunda tentativa não cria outra encomenda |
 | Carregar duas vezes em «Confirmar» | Uma encomenda só |
 | Rastreio com o email de outra pessoa | Não abre |
+| Fotografias da loja | Abrem em grande, com legenda, e as setas andam na galeria |
+| Fotografias no rodapé | Só descem quando se chega ao rodapé, e na variante de 480 px |
 
 ## Ao mudar o fluxo de compra
 

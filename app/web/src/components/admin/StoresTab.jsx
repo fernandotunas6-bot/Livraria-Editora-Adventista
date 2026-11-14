@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Loader2, Plus, Pencil, Trash2, MapPin, Store, Search, ArrowUp, ArrowDown, Clock, Phone,
-  Navigation, LocateFixed, ExternalLink, PackageCheck, AlertTriangle, MessageCircle, Mail,
+  Navigation, LocateFixed, ExternalLink, PackageCheck, AlertTriangle, MessageCircle, Mail, Camera,
 } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import ImageField from '@/components/admin/ImageField';
+import StoreGalleryField from '@/components/admin/StoreGalleryField';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pbErrorMessage, saveRecordWithMedia } from '@/lib/mediaSave';
@@ -23,7 +24,7 @@ import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone, displayAngolaPhone } from '@/lib/angolaPhone';
 import { ANGOLA_PROVINCES_2024, avisoDeCoordenadas } from '@/lib/angolaGeo';
 import { distanciaKm } from '@/lib/localizacao';
-import { hasCoords, mapsUrl, mapEmbedUrl, parseCoords } from '@/lib/stores';
+import { erroDaGaleria, fotoDaLoja, galeriaParaGuardar, hasCoords, mapsUrl, mapEmbedUrl, parseCoords, storeGallery } from '@/lib/stores';
 
 const ANGOLA_PROVINCES = ANGOLA_PROVINCES_2024;
 
@@ -36,6 +37,7 @@ const emptyStore = {
   email: '',
   hours: 'Seg–Sex 9h–18h, Sáb 9h–13h',
   image_url: '',
+  gallery: [],
   latitude: '',
   longitude: '',
   maps_url: '',
@@ -88,13 +90,19 @@ export default function StoresTab() {
   useEffect(() => { load(); }, [load]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const imageOf = (s) => s.image_url || (s.image ? pb.files.getURL(s, s.image) : '');
+  // A miniatura mesmo guardada na loja — é esta que o formulário edita.
+  const miniaturaOf = (s) => s.image_url || (s.image ? pb.files.getURL(s, s.image) : '');
+  // No cartão da lista vê-se o que o site mostra: a miniatura ou, na falta dela, a primeira
+  // fotografia da galeria. Se o cartão mostrasse esta no campo do formulário, guardar a loja
+  // copiava para a miniatura uma fotografia que ninguém escolheu para isso.
+  const imageOf = (s) => miniaturaOf(s) || fotoDaLoja(s);
 
   const stats = useMemo(() => ({
     total: stores.length,
     active: stores.filter((s) => s.active).length,
     pickup: stores.filter((s) => s.active && s.pickup_enabled !== false).length,
     noGps: stores.filter((s) => !hasCoords(s)).length,
+    noFotos: stores.filter((s) => !storeGallery(s).length).length,
   }), [stores]);
 
   const filtered = useMemo(() => {
@@ -105,6 +113,7 @@ export default function StoresTab() {
       if (status === 'inactive' && s.active) return false;
       if (status === 'pickup' && !(s.active && s.pickup_enabled !== false)) return false;
       if (status === 'nogps' && hasCoords(s)) return false;
+      if (status === 'nofotos' && storeGallery(s).length) return false;
       if (!q) return true;
       return [s.name, s.address, s.province, s.phone, s.email].filter(Boolean).join(' ').toLowerCase().includes(q);
     });
@@ -136,7 +145,8 @@ export default function StoresTab() {
       whatsapp: s.whatsapp ? formatAngolaPhone(s.whatsapp) : '',
       email: s.email || '',
       hours: s.hours || '',
-      image_url: imageOf(s),
+      image_url: miniaturaOf(s),
+      gallery: storeGallery(s),
       latitude: hasCoords(s) ? s.latitude : '',
       longitude: hasCoords(s) ? s.longitude : '',
       maps_url: s.maps_url || '',
@@ -191,6 +201,11 @@ export default function StoresTab() {
       toast({ variant: 'destructive', title: 'Coordenadas GPS inválidas', description: 'Preencha latitude e longitude, ou deixe ambas vazias.' });
       return;
     }
+    const problemaGaleria = erroDaGaleria(form.gallery);
+    if (problemaGaleria) {
+      toast({ variant: 'destructive', title: 'Fotografias da loja', description: problemaGaleria });
+      return;
+    }
     setSaving(true);
     try {
       await saveRecordWithMedia({
@@ -198,6 +213,7 @@ export default function StoresTab() {
         recordId: editing?.id,
         data: {
           ...form,
+          gallery: galeriaParaGuardar(form.gallery),
           latitude: lat,
           longitude: lng,
           maps_url: form.maps_url || (lat !== null ? mapsUrl({ latitude: lat, longitude: lng }) : ''),
@@ -286,12 +302,13 @@ export default function StoresTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           { key: 'all', label: 'Lojas', value: stats.total, icon: Store },
           { key: 'active', label: 'Visíveis no site', value: stats.active, icon: MapPin },
           { key: 'pickup', label: 'Aceitam levantamento', value: stats.pickup, icon: PackageCheck },
           { key: 'nogps', label: 'Sem GPS', value: stats.noGps, icon: AlertTriangle, warn: stats.noGps > 0 },
+          { key: 'nofotos', label: 'Sem fotografias', value: stats.noFotos, icon: Camera, warn: stats.noFotos > 0 },
         ].map(({ key, label, value, icon: Icon, warn }) => (
           <button
             key={key}
@@ -344,6 +361,13 @@ export default function StoresTab() {
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur-sm">{s.province}</span>
                     {!hasCoords(s) && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem GPS</span>}
                     {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem telefone</span>}
+                    {storeGallery(s).length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur-sm">
+                        <Camera className="h-3 w-3" aria-hidden />
+                        {storeGallery(s).length}
+                        <span className="sr-only">fotografias na galeria</span>
+                      </span>
+                    )}
                   </div>
                   <div className="absolute top-2 right-2 flex gap-1">
                     <Button type="button" size="icon" variant="secondary" className="h-7 w-7" disabled={index <= 0 || busyId === s.id} onClick={() => move(s, -1)} aria-label="Subir">
@@ -493,6 +517,14 @@ export default function StoresTab() {
                 onFileChange={(f) => { setImageFile(f); if (f) setImageRemoved(false); }}
                 onClear={() => setImageRemoved(true)}
                 aspect="16:9"
+                driveConfig={driveImageConfig}
+              />
+            </FormSection>
+
+            <FormSection title="Fotografias da loja">
+              <StoreGalleryField
+                photos={form.gallery}
+                onChange={(fotos) => set('gallery', fotos)}
                 driveConfig={driveImageConfig}
               />
             </FormSection>

@@ -1,5 +1,6 @@
 import pb from '@/lib/dataClient';
 import { resolveShopBgMode } from '@/lib/shopTheme';
+import { storeGallery } from '@/lib/stores';
 import { APP_API_URL, supabase } from '@/lib/supabaseClient';
 
 const DEFAULT_SETTINGS = {
@@ -80,6 +81,7 @@ export async function getPhysicalStores() {
       whatsapp: r.whatsapp || '',
       hours: r.hours || '',
       image_url: r.image_url || (r.image ? pb.files.getURL(r, r.image) : ''),
+      gallery: storeGallery(r),
       latitude: r.latitude,
       longitude: r.longitude,
       maps_url: r.maps_url || '',

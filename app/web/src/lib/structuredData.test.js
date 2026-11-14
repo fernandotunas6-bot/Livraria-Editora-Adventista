@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SCHEMA_CURRENCY, breadcrumbJsonLd, isbn13, jsonLdString, languageCode, plainText, productJsonLd,
+  storeJsonLd,
 } from './structuredData.js';
 
 const ORIGIN = 'https://livrariaadventista.ao';
@@ -144,5 +145,69 @@ describe('auxiliares', () => {
   });
   it('plainText corta descrições enormes', () => {
     expect(plainText(`<p>${'a'.repeat(6000)}</p>`).length).toBeLessThanOrEqual(5000);
+  });
+});
+
+describe('storeJsonLd', () => {
+  const LOJA = {
+    id: 'loja-huambo',
+    name: 'Livraria Adventista — Huambo',
+    province: 'Huambo',
+    address: 'Rua da Missão, 12',
+    phone: '+244 923 428 459',
+    whatsapp: '+244 923 428 459',
+    image_url: '/images/lojas/huambo-1.webp',
+    gallery: [
+      { url: '/images/lojas/huambo-1.webp', caption: 'Balcão' },
+      { url: '/images/lojas/huambo-2.webp', caption: 'Equipa' },
+    ],
+    latitude: -12.7756,
+    longitude: 15.7396,
+  };
+  const origin = 'https://livrariaadventista.ao';
+
+  it('descreve a loja com morada, telefone, fotografias e coordenadas', () => {
+    expect(storeJsonLd(LOJA, { origin })).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'Store',
+      name: 'Livraria Adventista — Huambo',
+      url: 'https://livrariaadventista.ao/lojas#loja-huambo',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: 'Rua da Missão, 12',
+        addressRegion: 'Huambo',
+        addressCountry: 'AO',
+      },
+      telephone: '+244923428459',
+      image: [
+        'https://livrariaadventista.ao/images/lojas/huambo-1.webp',
+        'https://livrariaadventista.ao/images/lojas/huambo-2.webp',
+      ],
+      geo: { '@type': 'GeoCoordinates', latitude: -12.7756, longitude: 15.7396 },
+      parentOrganization: { '@id': 'https://livrariaadventista.ao/#organizacao' },
+    });
+  });
+
+  it('usa o WhatsApp quando não há telefone de chamadas', () => {
+    expect(storeJsonLd({ ...LOJA, phone: '' }, { origin }).telephone).toBe('+244923428459');
+  });
+
+  it('deixa de fora o que a loja não tem', () => {
+    const magra = { id: 'x', name: 'Loja Nova', province: 'Luanda', address: 'Rua 1' };
+    const dados = storeJsonLd(magra, { origin });
+    expect(dados.telephone).toBeUndefined();
+    expect(dados.image).toBeUndefined();
+    expect(dados.geo).toBeUndefined();
+    expect(dados.hasMap).toBeUndefined();
+  });
+
+  it('não inventa coordenadas a partir de um 0,0', () => {
+    expect(storeJsonLd({ ...LOJA, latitude: 0, longitude: 0 }, { origin }).geo).toBeUndefined();
+  });
+
+  it('não escreve nada sem loja, sem nome ou sem origem', () => {
+    expect(storeJsonLd(null, { origin })).toBeNull();
+    expect(storeJsonLd({ id: 'x' }, { origin })).toBeNull();
+    expect(storeJsonLd(LOJA, {})).toBeNull();
   });
 });

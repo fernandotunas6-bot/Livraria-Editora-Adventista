@@ -196,6 +196,8 @@ test('levantamento na loja: sem morada, com a loja escolhida e o pagamento no ba
   await expect(c.getByText('Escolha a loja onde vai levantar.')).toBeVisible();
   expect(loja.pedidosCheckout).toHaveLength(0);
 
+  // A loja mostra-se como quem vai lá a vê: fotografia, morada e horário.
+  await expect(c.getByText('Seg–Qui 8h–17h30 · Sex, Dom e feriados 8h–13h')).toBeVisible();
   await c.getByRole('radio', { name: /Loja do Huambo/ }).click();
   await c.getByRole('radio', { name: /Pagar no Balcão/ }).click();
   // Sem portes: o total é o preço do livro.
