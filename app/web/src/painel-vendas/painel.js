@@ -41,6 +41,28 @@ export function lojaDe(store) {
   return 'Loja ' + (COM_DA.has(k) ? 'da' : COM_DO.has(k) ? 'do' : 'de') + ' ' + cidade;
 }
 
+/**
+ * As fotografias da loja para o modo apresentação: as da galeria (separador Lojas), só com
+ * endereço do próprio site ou https, sem repetidas, até `n`.
+ */
+export function fotosDaLoja(store, n = 5) {
+  const vistas = new Set();
+  return ((store && store.fotos) || [])
+    .map((f) => (typeof f === 'string' ? { url: f, caption: '' } : { url: String((f && f.url) || ''), caption: String((f && f.caption) || '') }))
+    .filter((f) => /^(\/(?!\/)|https:\/\/)/.test(f.url.trim()) && !vistas.has(f.url) && vistas.add(f.url))
+    .slice(0, n);
+}
+
+/**
+ * A sequência dos diapositivos: capa, a loja (se houver fotografias), o resumo, os mais vendidos
+ * (se os houver), um por mês dentro do filtro, o quadro, o acumulado e a perspectiva.
+ */
+export function diapositivos(rows, { fotos = 0, maisVendidos = 0 } = {}) {
+  return [{ k: 'capa' }]
+    .concat(fotos ? [{ k: 'loja' }] : [], [{ k: 'resumo' }], maisVendidos ? [{ k: 'mv' }] : [])
+    .concat((rows || []).filter((r) => !r.fora).map((r) => ({ k: 'mes', r })), [{ k: 'quadro' }, { k: 'acum' }, { k: 'persp' }]);
+}
+
 export function mountPainel(root, api) {
   const short = (m) => m.slice(0, 3);
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -92,7 +114,7 @@ export function mountPainel(root, api) {
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
   // ---------- Estado ----------
-  const S = { db: null, user: null, uid: null, isOwner: false, canWrite: null, years: {}, note: null, cfg: undefined, hist: [],
+  const S = { db: null, user: null, uid: null, isOwner: false, canWrite: null, years: {}, note: null, cfg: undefined, hist: [], mv: null,
     ano: null, comp: null, model: null, sel: null, playing: false, timers: [], raf: null,
     admin: false, ed: { ano: null, dirty: false }, readOnly: false, downloads: null,
     store: null, sales: null, sys: { ano: null, data: null } };
@@ -603,6 +625,8 @@ export function mountPainel(root, api) {
         const itens = x && x.destaques ? x.destaques.ano || [] : [];
         pintar(itens);
         maisVendidos(itens, ano);
+        S.mv = { ano, itens };
+        if (!$('pres').hidden) actualizarLista();
       });
     }
   }
@@ -1185,8 +1209,30 @@ export function mountPainel(root, api) {
   // ---------- Modo apresentação ----------
   const P = { idx: 0, list: [], playing: false, timer: null, raf: null, steps: [] };
   const logoSrc = () => $('logo-img').src;
+  const mvDoAno = (ano) => (S.mv && S.mv.ano === ano ? S.mv.itens : []);
   function slideList(M) {
-    return [{ k: 'capa' }, { k: 'resumo' }].concat(M.rows.filter((r) => !r.fora).map((r) => ({ k: 'mes', r })), [{ k: 'quadro' }, { k: 'acum' }, { k: 'persp' }]);
+    return diapositivos(M.rows, { fotos: fotosDaLoja(S.store).length, maisVendidos: mvDoAno(M.ano).length });
+  }
+  // Os mais vendidos chegam depois de abrir: a lista cresce sem mudar o diapositivo à vista.
+  function actualizarLista() {
+    if (!S.model) return;
+    const cur = P.list[P.idx];
+    const nova = slideList(S.model);
+    if (nova.length === P.list.length) return;
+    P.list = nova;
+    const i = nova.findIndex((x) => x.k === cur.k && x.r === cur.r);
+    P.idx = i < 0 ? Math.min(P.idx, nova.length - 1) : i;
+    const num = $('pres-view').querySelector('.s-num'); if (num) num.textContent = (P.idx + 1) + ' / ' + P.list.length;
+    $('pr-cnt').textContent = (P.idx + 1) + ' / ' + P.list.length;
+    $('pr-prog').style.width = ((P.idx + 1) / P.list.length * 100) + '%';
+  }
+  /** Uma fotografia a cobrir uma caixa, com zoom lento; some se não carregar. */
+  function fotoEm(caixa, url, i) {
+    const im = el('img', 's-foto-im'); im.alt = ''; im.decoding = 'async'; im.src = url;
+    im.style.animationDelay = -(i * 3) + 's';
+    im.addEventListener('error', () => caixa.remove(), { once: true });
+    caixa.appendChild(im);
+    return caixa;
   }
   function fitSlide() {
     const v = $('pres-view'), s = v.querySelector('.slide'); if (!s) return;
@@ -1214,8 +1260,33 @@ export function mountPainel(root, api) {
       s.appendChild(abs('s-cover-glow'));
       // A capa é escura: o logótipo branco (PNG transparente), sem caixa.
       const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = $('logo-claro') ? $('logo-claro').src : logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
+      // À direita, a parede de capas do topo do painel: os mais vendidos e, a completar, o catálogo.
+      const parede = abs('s-cover-capas'); parede.setAttribute('aria-hidden', 'true');
+      pintarParede(parede, capasParaFundo(mvDoAno(A), { n: 16, chave: `${S.store ? S.store.name : ''}:${A}` }), { colunas: 4 });
+      s.append(parede, abs('s-cover-fade'));
       s.append(abs('s-cover-eye', null, lojaDe(S.store).toUpperCase()), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
         abs('s-cover-s', null, (B != null ? 'Comparativo ' + B + ' vs ' + A + ' · ' : '') + 'Livraria e Editora Adventista, S.A.'));
+    } else if (it.k === 'loja') {
+      s.classList.add('dark');
+      const fotos = fotosDaLoja(S.store);
+      s.append(abs('s-loja-eye', null, 'A LOJA'), abs('s-loja-t', null, lojaDe(S.store)));
+      const lg = el('img', 's-logo'); lg.src = $('logo-claro') ? $('logo-claro').src : logoSrc(); lg.alt = ''; s.appendChild(lg);
+      const grade = abs('s-loja-grade s-n' + Math.min(fotos.length, 3));
+      fotos.slice(0, 3).forEach((f, i) => {
+        const c = el('figure', 's-foto'); c.style.animationDelay = (0.15 + i * 0.18) + 's';
+        fotoEm(c, f.url, i);
+        if (f.caption) c.appendChild(el('figcaption', null, f.caption));
+        grade.appendChild(c);
+      });
+      s.appendChild(grade);
+      s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — ' + lojaDe(S.store)));
+    } else if (it.k === 'mv') {
+      head(s, M, 'Os mais vendidos de ' + A + ' · unidades vendidas no ano');
+      const itens = mvDoAno(A).slice(0, 6);
+      const lista = el('ol', 's-mv'); lista.style.setProperty('--n', String(itens.length));
+      pintarMaisVendidos(lista, itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+      lista.querySelectorAll('.mv-i').forEach((li, i) => { li.style.animationDelay = (0.2 + i * 0.12) + 's'; });
+      s.appendChild(lista);
     } else if (it.k === 'resumo') {
       head(s, M, 'Resumo do ano · ' + (R.ultimo ? 'até ' + R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : '') : 'sem dados'));
       const tiles = el('div', 's-tiles');
@@ -1316,6 +1387,8 @@ export function mountPainel(root, api) {
       requestAnimationFrame(() => drawAcumInto(box, 1150, 500, S.modelAno || M, true, { fs: 15, sw: 3, grid: '#ECEAE6', axis: '#C9C7C2', muted: '#6A7076', fg: '#1E2124', ok: '#1E8449', dur: 2000 }));
     } else if (it.k === 'persp') {
       s.classList.add('dark');
+      const fundo = fotosDaLoja(S.store)[0];
+      if (fundo) s.append(fotoEm(abs('s-bg-foto'), fundo.url, 0), abs('s-bg-veu'));
       s.appendChild(abs('s-rem-t', null, 'REMARQUE:'));
       s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista, S.A. — ' + lojaDe(S.store)));
       const c1 = abs('s-rem-card', { left: '80px' }); c1.appendChild(abs('k', null, 'PERSPECTIVA ANUAL'));

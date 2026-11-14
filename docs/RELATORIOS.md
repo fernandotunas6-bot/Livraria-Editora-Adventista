@@ -297,6 +297,19 @@ discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as uni
 
 Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
 
+**Imagens no modo apresentação** (`diapositivos` e `fotosDaLoja` em `painel.js`):
+
+| Diapositivo | Imagem |
+|---|---|
+| Capa | A parede de capas do topo, à direita: os mais vendidos da loja no ano e, a completar, o catálogo |
+| **A loja** (a seguir à capa) | Até 3 fotografias da galeria da loja (separador **Lojas**), com as legendas; só aparece se a loja tiver fotografias |
+| **Os mais vendidos** (a seguir ao resumo) | Os 6 primeiros do ano, com capa, unidades e valor; sem capa, uma capa com o título. Só aparece se houver mais vendidos |
+| Perspectiva (o fecho) | A primeira fotografia da loja, esbatida por trás dos números |
+
+As fotografias só entram com endereço do próprio site ou `https`. Sem fotografias nem mais vendidos, a
+sequência é a de sempre. Os mais vendidos chegam depois de o painel abrir: se a apresentação já
+estiver aberta, o diapositivo junta-se à lista sem mudar o que está à vista.
+
 **Filtros avançados** (barra «Filtros», por baixo do topo; `filtros.js` e `filtros-ui.js`):
 
 - **Período:** ano inteiro, 1.º a 4.º trimestre, 1.º e 2.º semestre, até ao último mês registado,

@@ -322,6 +322,44 @@ details.more[open] summary { margin-bottom: 10px; }
 .s-cover-logo { position: absolute; left: 80px; top: 96px; }
 .s-cover-logo img { height: 58px; display: block; opacity: .88; }
 .s-cover-glow { position: absolute; right: -160px; top: -160px; width: 620px; height: 620px; border-radius: 50%; background: radial-gradient(closest-side, rgba(18,137,140,.45), transparent); }
+/* Imagens no modo apresentação: a parede de capas na capa, as fotografias da loja, os mais
+   vendidos com capa e uma fotografia esbatida no fecho. */
+.s-cover-capas { position: absolute; top: -140px; bottom: -140px; right: -10px; width: 560px; display: flex; gap: 18px; justify-content: flex-end;
+  transform: perspective(1600px) rotateY(-10deg) rotateZ(-3deg); transform-origin: 100% 50%; pointer-events: none; }
+.s-cover-capas .hc-col { width: 128px; gap: 18px; }
+.s-cover-fade { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 80% at 100% 0%, rgba(18,137,140,.30), transparent 60%),
+    linear-gradient(90deg, #262626 0%, #262626 52%, rgba(38,38,38,.78) 62%, rgba(38,38,38,.2) 80%, rgba(38,38,38,.35) 100%); }
+.s-cover-logo, .s-cover-eye, .s-cover-t, .s-cover-s { z-index: 2; }
+.s-cover-t { text-shadow: 0 2px 24px rgba(0,0,0,.55); }
+.s-loja-eye { position: absolute; left: 80px; top: 52px; color: #F2B705; font-size: 16px; font-weight: 800; letter-spacing: .14em; }
+.s-loja-t { position: absolute; left: 80px; top: 76px; font-size: 44px; font-weight: 800; letter-spacing: -.01em; }
+.s-loja-grade { position: absolute; left: 80px; right: 80px; top: 158px; bottom: 64px; display: grid; gap: 18px; }
+.s-loja-grade.s-n2 { grid-template-columns: 1.4fr 1fr; }
+.s-loja-grade.s-n3 { grid-template-columns: 1.5fr 1fr; grid-template-rows: 1fr 1fr; }
+.s-loja-grade.s-n3 .s-foto:first-child { grid-row: span 2; }
+.s-foto { margin: 0; position: relative; overflow: hidden; border-radius: 14px; background: #333232; min-height: 0; box-shadow: 0 18px 40px -18px rgba(0,0,0,.7); }
+.s-foto-im { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.s-foto figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 34px 18px 14px; font-size: 15px; line-height: 1.35; color: #FFFFFF;
+  background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+.s-bg-foto { position: absolute; inset: 0; overflow: hidden; }
+.s-bg-foto .s-foto-im { filter: blur(5px) saturate(.9); opacity: .55; transform: scale(1.06); }
+.s-bg-veu { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(38,38,38,.62), rgba(38,38,38,.8)); }
+.s-mv { position: absolute; left: 48px; right: 48px; top: 196px; margin: 0; padding: 0; list-style: none; display: grid;
+  grid-template-columns: repeat(var(--n, 6), minmax(0, 176px)); justify-content: center; gap: 26px; }
+.s-mv .mv-i { gap: 14px; }
+.s-mv .hc { width: 100%; border-radius: 10px; box-shadow: 0 18px 32px -14px rgba(10,14,20,.55), 0 0 0 1px #E2E1DD; }
+.s-mv .hc-sem { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; color: #FFF4DA; font-family: var(--serif);
+  font-weight: 700; font-size: 18px; line-height: 1.25; background: linear-gradient(160deg, #3A4148, #1F2326); }
+.s-mv .mv-pos { left: 10px; top: 10px; min-width: 34px; height: 34px; font-size: 15px; }
+.s-mv .mv-t b { font-size: 17px; }
+.s-mv .mv-t span { font-size: 14px; color: #5A6067; }
+@media (prefers-reduced-motion: no-preference) {
+  .s-foto, .s-mv .mv-i { animation: sup .7s cubic-bezier(.22,1,.36,1) both; }
+  .s-foto-im { animation: kb 16s ease-in-out infinite alternate; }
+  .s-bg-foto .s-foto-im { animation: none; }
+}
+@keyframes kb { from { transform: scale(1); } to { transform: scale(1.08) translate(-1%, -1%); } }
 .s-tiles { position: absolute; left: 48px; right: 48px; top: 126px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .s-tile { background: #FFFFFF; border: 1px solid #E2E1DD; border-radius: 16px; padding: 18px 22px; display: grid; gap: 6px; min-height: 140px; align-content: start; }
 .s-tile .k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #4A5056; }

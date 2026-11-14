@@ -139,3 +139,43 @@ test('todas as livrarias: uma gravação recusada por conflito diz porquê', asy
   await expect(rel.locator('#ed-status')).toContainText('mudaram depois de os abrir');
   await expect(rel.locator('#ed-save')).toBeEnabled();
 });
+
+// O modo apresentação com imagens: a parede de capas na capa, as fotografias da loja, os mais
+// vendidos com capa e uma fotografia por trás do fecho. As imagens vêm de public/ (a página de
+// teste é compilada à parte e não as copia).
+test('o modo apresentação mostra as capas, as fotografias da loja e os mais vendidos', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  const publico = new URL('../public/', import.meta.url);
+  await page.route('**/images/**', (route) => route.fulfill({ path: new URL('.' + new URL(route.request().url()).pathname, publico).pathname }));
+  await page.goto(PAINEL + '?imagens=1');
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  // Os mais vendidos chegaram (o cartão do painel aparece) antes de abrir a apresentação.
+  await expect(painel.locator('#mv')).toBeVisible();
+  await painel.locator('#btn-pres').click();
+
+  const slide = painel.locator('#pres-view .slide');
+  await expect(slide.locator('.s-cover-capas .hc-c').first()).toBeVisible();
+  await expect(slide.locator('.s-num')).toHaveText(/^1 \/ /);
+
+  await painel.locator('#pr-next').click();
+  await expect(slide.locator('.s-loja-t')).toHaveText('Loja do Huambo');
+  await expect(slide.locator('.s-foto')).toHaveCount(3);
+  await expect.poll(() => slide.locator('.s-foto-im').evaluateAll((ims) => ims.filter((i) => i.complete && i.naturalWidth > 0).length)).toBe(3);
+  await expect(slide.locator('figcaption').first()).toContainText('Balcão');
+
+  await painel.locator('#pr-next').click();
+  await painel.locator('#pr-next').click();
+  await expect(slide.locator('.s-sub')).toContainText('Os mais vendidos de 2026');
+  await expect(slide.locator('.mv-i')).toHaveCount(6);
+  // O livro sem capa leva a capa tipográfica com o título.
+  await expect(slide.locator('.hc-sem')).toHaveText('Livro sem capa');
+
+  await painel.locator('#pr-next').press('End');
+  await expect(slide.locator('.s-rem-t')).toBeVisible();
+  await expect(slide.locator('.s-bg-foto .s-foto-im')).toHaveCount(1);
+
+  expect(erros, 'erros de JavaScript na página').toEqual([]);
+  expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
+});

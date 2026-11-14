@@ -73,7 +73,7 @@ export async function detectMultiStore() {
 
 /** Lojas físicas (a equipa vê também as inactivas). */
 export async function listStores() {
-  const { data } = await supabase.from('physical_stores').select('id, name, province, active').order('sort_order').order('name');
+  const { data } = await supabase.from('physical_stores').select('id, name, province, active, gallery').order('sort_order').order('name');
   return data || [];
 }
 

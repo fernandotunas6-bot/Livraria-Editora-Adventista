@@ -20,6 +20,14 @@ const ANOS = {
 // `?editar=1`: com permissão para gravar (as gravações ficam em window.__gravacoes, com o
 // `esperado` que o painel mandou) e com vendas do sistema (1 encomenda do site em Outubro).
 const editar = new URLSearchParams(window.location.search).has('editar');
+// `?imagens=1`: a loja com fotografias na galeria e os mais vendidos do ano com capa, para o modo
+// apresentação (as imagens são as de public/, servidas pelo próprio teste).
+const imagens = new URLSearchParams(window.location.search).has('imagens');
+const MAIS_VENDIDOS = [
+  ['O Desejado de Todas as Nações', 'LIV-004', 412, 2060000], ['O Grande Conflito', 'LIV-011', 380, 1900000],
+  ['Caminho a Cristo', 'LIV-021', 295, 590000], ['Patriarcas e Profetas', 'LIV-026', 210, 1470000],
+  ['Profetas e Reis', 'LIV-027', 188, 1316000], ['Livro sem capa', '', 120, 360000],
+].map(([titulo, c, unidades, valor]) => ({ titulo, capa: c ? `/images/capas/${c}.jpg` : '', unidades, valor }));
 window.__gravacoes = [];
 
 const snap = (id, data) => ({ id: String(id), exists: !!data, data: () => data, metadata: {} });
@@ -45,7 +53,14 @@ const api = {
   db,
   user: { id: async () => 'teste', isOwner: async () => false, canEdit: async () => editar, can: async () => editar, profiles: async () => ({}) },
   downloads: { save: async () => ({ status: 'saved' }) },
-  store: { id: 'loja-huambo', name: 'Livraria Adventista — Huambo', province: 'Huambo' },
+  store: {
+    id: 'loja-huambo', name: 'Livraria Adventista — Huambo', province: 'Huambo',
+    fotos: imagens ? [
+      { url: '/images/lojas/huambo-1.webp', caption: 'Balcão de atendimento e prateleiras de Bíblias e livros' },
+      { url: '/images/lojas/huambo-2.webp', caption: 'A equipa da loja do Huambo' },
+      { url: '/images/lojas/huambo-3.webp', caption: 'Prateleiras de literatura denominacional' },
+    ] : [],
+  },
   sales: editar
     ? {
       available: true,
@@ -53,7 +68,7 @@ const api = {
       fetch: async () => ({ months: [0, 0, 0, 0, 0, 0, 0, 0, 0, 21665, 0, 0], counts: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0], orders: 1 }),
     }
     : { available: false, reason: 'Página de teste.' },
-  extras: null,
+  extras: imagens ? async () => ({ destaques: { ano: MAIS_VENDIDOS }, fotos: [] }) : null,
   historico: async () => [],
 };
 

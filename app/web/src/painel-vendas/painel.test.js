@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cidadeDaLoja, lojaDe } from './painel.js';
+import { cidadeDaLoja, diapositivos, fotosDaLoja, lojaDe } from './painel.js';
 
 const loja = (name) => ({ id: 'x', name, province: '' });
 
@@ -42,5 +42,38 @@ describe('cidadeDaLoja', () => {
     expect(cidadeDaLoja(loja('Livraria Adventista'))).toBe('');
     expect(cidadeDaLoja(loja('Loja Central'))).toBe('');
     expect(cidadeDaLoja(null)).toBe('');
+  });
+});
+
+describe('fotosDaLoja', () => {
+  it('aceita a galeria com ou sem legendas e fica com as do site ou https', () => {
+    const store = { fotos: ['/images/lojas/huambo-1.webp', { url: 'https://x.supabase.co/a.webp', caption: 'A equipa' }, { url: 'http://inseguro/b.jpg' }, 'javascript:alert(1)', '//outro.site/c.jpg', ''] };
+    expect(fotosDaLoja(store)).toEqual([
+      { url: '/images/lojas/huambo-1.webp', caption: '' },
+      { url: 'https://x.supabase.co/a.webp', caption: 'A equipa' },
+    ]);
+  });
+
+  it('tira as repetidas e fica pelo limite', () => {
+    const fotos = ['/a.webp', '/a.webp', '/b.webp', '/c.webp'];
+    expect(fotosDaLoja({ fotos }, 2).map((f) => f.url)).toEqual(['/a.webp', '/b.webp']);
+  });
+
+  it('sem loja ou sem galeria, nenhuma', () => {
+    expect(fotosDaLoja(null)).toEqual([]);
+    expect(fotosDaLoja({ name: 'X' })).toEqual([]);
+  });
+});
+
+describe('diapositivos', () => {
+  const rows = [{ mes: 'Janeiro' }, { mes: 'Fevereiro', fora: true }, { mes: 'Março' }];
+  const ks = (l) => l.map((x) => (x.k === 'mes' ? x.r.mes : x.k));
+
+  it('sem imagens, a sequência de sempre', () => {
+    expect(ks(diapositivos(rows))).toEqual(['capa', 'resumo', 'Janeiro', 'Março', 'quadro', 'acum', 'persp']);
+  });
+
+  it('com fotografias da loja e mais vendidos, entram depois da capa e do resumo', () => {
+    expect(ks(diapositivos(rows, { fotos: 3, maisVendidos: 6 }))).toEqual(['capa', 'loja', 'resumo', 'mv', 'Janeiro', 'Março', 'quadro', 'acum', 'persp']);
   });
 });
