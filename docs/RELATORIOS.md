@@ -23,7 +23,7 @@ Contabilidade, ou a pessoa da loja): dá os dois ecrãs de vendas e não abre o 
 Ninguém a recebeu na migração — o administrador dá-a em Utilizadores › Equipa ou em Cargos.
 
 Quem protege os dados são as regras da base de dados (migração
-`20261114100000_relatorios_de_todas_as_livrarias`): `private.can_read_sales_reports()` para ler
+`20261114120000_relatorios_de_todas_as_livrarias`): `private.can_read_sales_reports()` para ler
 e `private.can_edit_reports()` para gravar. O painel só esconde os botões.
 
 ## 2. Como os números entram
@@ -160,7 +160,7 @@ PDF, no Excel e no fim do vídeo.
 | `app/web/src/painel-vendas/consolidado-ui.js`, `consolidado.html`, `consolidado.css` | O ecrã de Todas as livrarias. |
 | `app/web/src/painel-vendas/adapter.js` | Supabase: `createConsolidadoApi`, `fetchSystemSalesAll`. |
 | `app/web/src/components/admin/RelatoriosLojasTab.jsx` | O separador (Shadow DOM, como o `VendasHuamboTab`). |
-| `supabase/migrations/20261114100000_relatorios_de_todas_as_livrarias.sql` | Permissão, regras, histórico, `vendas_do_sistema`. |
+| `supabase/migrations/20261114120000_relatorios_de_todas_as_livrarias.sql` | Permissão, regras, histórico, `vendas_do_sistema`. |
 
 ## 8. Testes
 

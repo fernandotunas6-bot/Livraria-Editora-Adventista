@@ -245,7 +245,7 @@ A permissão **Ver relatórios** (`view_reports`, migração `20261108130000_car
 separa a facturação das encomendas: Vendas por loja, o relatório de vendas dentro das Encomendas e
 os números do mês no Início. Quem trata encomendas sem ela vê as encomendas, não a facturação.
 Os gestores que já geriam encomendas receberam-na na migração. **Editar relatórios de vendas**
-(`edit_reports`, migração `20261114100000_relatorios_de_todas_as_livrarias`) é a de quem lança os
+(`edit_reports`, migração `20261114120000_relatorios_de_todas_as_livrarias`) é a de quem lança os
 números do mês: abre os dois ecrãs de vendas (Todas as livrarias e Vendas por loja) e grava-os, sem
 abrir o caixa nem as finanças; apagar um ano inteiro continua só do administrador
 ([RELATORIOS.md](RELATORIOS.md)). As chaves das permissões estão em

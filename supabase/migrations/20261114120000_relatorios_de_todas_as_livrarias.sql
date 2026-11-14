@@ -274,19 +274,8 @@ alter table public.painel_vendas_docs add constraint painel_vendas_docs_path_che
 -- ---------------------------------------------------------------------------------------------
 -- 6. As vendas do sistema, por loja e por mês
 -- ---------------------------------------------------------------------------------------------
--- Nome e província comparados sem acentos nem maiúsculas («Huíla» = «huila»), como o painel.
-create or replace function private.texto_simples(p text)
-returns text
-language sql
-immutable
-set search_path = ''
-as $$
-  select btrim(translate(lower(coalesce(p, '')),
-    'áàâãäåéèêëíìîïóòôõöúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn'));
-$$;
-revoke all on function private.texto_simples(text) from public, anon;
-grant execute on function private.texto_simples(text) to authenticated, service_role;
-
+-- Nome e província comparados sem acentos nem maiúsculas («Huíla» = «huila»), como o painel:
+-- private.plain_text (migração entregas_loja_e_robustez).
 create or replace function public.vendas_do_sistema(p_ano integer, p_so_pagas boolean default true)
 returns table (loja_id text, mes integer, valor numeric, encomendas integer)
 language plpgsql
@@ -310,9 +299,9 @@ begin
   return query
   with lojas as (
     select s.id,
-           private.texto_simples(s.name) as nome,
-           private.texto_simples(s.province) as prov,
-           row_number() over (partition by private.texto_simples(s.province)
+           private.plain_text(s.name) as nome,
+           private.plain_text(s.province) as prov,
+           row_number() over (partition by private.plain_text(s.province)
                               order by s.active desc, s.sort_order nulls last, s.name, s.id) as ordem
     from public.physical_stores s
   ),
@@ -320,8 +309,8 @@ begin
     select
       case when p_so_pagas then o.paid_at else o.created end as quando,
       (coalesce(o.shipping_method, '') = 'pickup' or coalesce(o.pickup_store, '') <> '') as levanta,
-      private.texto_simples(o.pickup_store) as loja_nome,
-      private.texto_simples(o.delivery_province) as prov,
+      private.plain_text(o.pickup_store) as loja_nome,
+      private.plain_text(o.delivery_province) as prov,
       case when p_so_pagas
         then least(round(coalesce(o.amount_paid, 0) * 100) - round(coalesce(o.amount_refunded, 0) * 100),
                    round(coalesce(o.total, 0)::numeric * 100))

@@ -1,4 +1,4 @@
-// Cenários dos relatórios de vendas de todas as livrarias (migração 20261114100000): a permissão
+// Cenários dos relatórios de vendas de todas as livrarias (migração 20261114120000): a permissão
 // «Editar relatórios de vendas», quem lê, grava e apaga, o histórico no servidor, os documentos do
 // relatório conjunto e as vendas do sistema por loja (vendas_do_sistema), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/relatorios.mjs supabase/migrations
