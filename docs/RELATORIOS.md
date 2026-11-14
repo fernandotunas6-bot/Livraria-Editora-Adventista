@@ -357,6 +357,22 @@ diapositivo (pedido do dono, 14/11); continua no Mês em destaque do painel, ond
 animação. Nos cartões do painel, a letra do valor acompanha a largura do cartão
 (`container-type`), para «10 857 624,65 Kz» caber inteiro em vez de acabar em «…».
 
+**Mapa do ano** (painel de uma loja, por baixo do Comparativo mensal): o cartão do gráfico estica
+até à altura do Mês em destaque, e o espaço que ficava vazio tem agora uma grelha de cores dos 12
+meses (`fillMapa` em `painel.js`):
+
+| Linha | Cor |
+|---|---|
+| O ano de comparação (2025) | cinzento, mais forte quanto mais se vendeu |
+| O ano (2026) | rosa, mais forte quanto mais se vendeu; a estimativa com rebordo tracejado («≈3,8M») |
+| Crescimento | verde ou vermelho, mais forte quanto maior; acima de 100% sem casa decimal («+2158%») |
+| Peso no ano | azul-petróleo: a parte de cada mês nas vendas do ano |
+
+A escala de cor é a mesma para os dois anos, para se compararem. Clicar num mês (o nome ou uma
+célula) põe-no em destaque, e a coluna fica marcada; os meses fora do filtro ficam esbatidos; o
+valor exacto aparece ao passar o rato. Num ecrã estreito, os meses passam a uma letra e as células
+só têm a cor.
+
 **Animações e som no modo apresentação** (nos dois relatórios):
 
 - **Contador mecânico** (`odometro.js`): no diapositivo de cada mês, os valores do período e do

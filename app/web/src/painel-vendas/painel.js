@@ -208,7 +208,82 @@ export function mountPainel(root, api) {
       .on('click', (ev, r) => { stopPlay(); select(r.mes, true); });
     highlight();
   }
+  // ---------- Mapa do ano ----------
+  // Os 12 meses numa grelha de cores, por baixo do Comparativo mensal: o ano de comparação e o ano
+  // (quanto mais forte a cor, mais se vendeu), o crescimento (verde ou vermelho, mais forte quanto
+  // maior) e o peso de cada mês nas vendas do ano. Clicar num mês põe-no em destaque.
+  function fillMapa(M, animate) {
+    const g = $('mapa-g'); if (!g) return;
+    const rows = M.rows;
+    const B = M.comp, A = M.ano;
+    const max = Math.max(1, ...rows.map((r) => Math.max(r.v1 || 0, r.v2 || 0, r.est || 0)));
+    const totalA = rows.reduce((t, r) => t + (r.v2 || 0), 0);
+    const tom = (cor, f) => `color-mix(in srgb, ${cor} ${Math.round(14 + 70 * Math.min(1, Math.max(0, f)))}%, transparent)`;
+    const vazio = () => { const c = el('div', 'vazio'); c.append(el('span', null, '—')); return c; };
+    const pintado = (cor, f, texto) => {
+      const c = el('div', f > 0.62 ? 'claro' : '');
+      c.style.background = tom(cor, f);
+      c.append(el('span', null, texto));
+      return c;
+    };
+    const nodes = [el('span')];
+    rows.forEach((r) => {
+      const b = el('button', 'mapa-m' + (r.fora ? ' fora' : ''));
+      // «Jan» no computador; «J» num ecrã estreito (painel.css, @container).
+      b.append(el('span', 'l', short(r.mes)), el('span', 's', r.mes[0]));
+      b.type = 'button'; b.dataset.mes = r.mes; b.title = r.mes; b.setAttribute('aria-pressed', 'false');
+      nodes.push(b);
+    });
+    const linha = (rotulo, cell) => {
+      nodes.push(el('span', 'mapa-l', rotulo));
+      rows.forEach((r, i) => {
+        const c = cell(r);
+        c.className = ('mapa-c ' + c.className + (r.fora ? ' fora' : '')).trim();
+        c.dataset.mes = r.mes;
+        if (animate && !reduce) c.style.animationDelay = (i * 35) + 'ms'; else c.style.animation = 'none';
+        nodes.push(c);
+      });
+    };
+    const curto = (v) => mi(v).replace(' M', 'M');
+    if (B != null) {
+      linha(String(B), (r) => {
+        const c = r.v1 == null ? vazio() : pintado('var(--c25)', r.v1 / max, curto(r.v1));
+        c.title = `${r.mes} de ${B}: ${r.v1 != null ? kz(r.v1) : 'sem valor'}`;
+        return c;
+      });
+    }
+    linha(String(A), (r) => {
+      const v = r.v2 != null ? r.v2 : r.est;
+      let c;
+      if (v == null) c = vazio();
+      else if (r.v2 == null) { c = el('div', 'est'); c.append(el('span', null, '≈' + curto(v))); }
+      else c = pintado('var(--c26)', v / max, curto(v));
+      c.title = `${r.mes} de ${A}: ${r.v2 != null ? kz(r.v2) + (r.estado === 'Em curso' ? ' (em curso)' : '') : r.est != null ? 'estimativa ' + kz(r.est) : 'sem valor'}`;
+      return c;
+    });
+    if (B != null) {
+      linha('Crescimento', (r) => {
+        // Acima de 100%, sem casa decimal («+2158%»), para caber na célula; o valor exacto vai no título.
+        const curtoPct = (p) => (Math.abs(p) >= 1 ? (p >= 0 ? '+' : '−') + Math.round(Math.abs(p) * 100) + '%' : pct(p).replace(',0%', '%'));
+        const c = r.cresc == null ? vazio() : pintado(r.cresc >= 0 ? 'var(--ok)' : 'var(--bad)', Math.min(1, Math.abs(r.cresc)) * 0.85, curtoPct(r.cresc));
+        c.title = `${r.mes}: crescimento ${r.cresc == null ? '—' : pct(r.cresc)}`;
+        return c;
+      });
+    }
+    linha('Peso em ' + A, (r) => {
+      const p = r.v2 != null && totalA ? r.v2 / totalA : null;
+      const c = p == null ? vazio() : pintado('var(--teal)', p * 4, Math.round(p * 100) + '%');
+      c.title = `${r.mes}: ${p == null ? 'sem valor' : (p * 100).toFixed(1).replace('.', ',') + '% das vendas de ' + A}`;
+      return c;
+    });
+    g.style.setProperty('--linhas', String(B != null ? 4 : 2));
+    g.replaceChildren(...nodes);
+  }
   function highlight() {
+    root.querySelectorAll('#mapa-g [data-mes]').forEach((e) => {
+      if (e.classList.contains('mapa-m')) e.setAttribute('aria-pressed', String(e.dataset.mes === S.sel));
+      else e.classList.toggle('sel', e.dataset.mes === S.sel);
+    });
     d3.select($('chart-mensal')).selectAll('.mgrp').transition().duration(250).style('opacity', (r) => (r.fora ? 0.16 : !S.sel || r.mes === S.sel ? 1 : 0.38));
     root.querySelectorAll('#tbl-quadro tbody tr').forEach((tr) => tr.classList.toggle('rsel', tr.dataset.key === S.sel));
     root.querySelectorAll('#sp-chips .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mes === S.sel)));
@@ -546,6 +621,8 @@ export function mountPainel(root, api) {
   $('sp-prev').addEventListener('click', () => stepMonth(-1));
   $('sp-next').addEventListener('click', () => stepMonth(1));
   $('sp-chips').addEventListener('click', (ev) => { const b = ev.target.closest('.chip'); if (!b) return; stopPlay(); select(b.dataset.mes, true); });
+  // O Mapa do ano: um mês (o nome ou qualquer célula da coluna) vai para o destaque.
+  $('mapa-g').addEventListener('click', (ev) => { const c = ev.target.closest('[data-mes]'); if (!c) return; stopPlay(); select(c.dataset.mes, true); });
   root.querySelector('#tbl-quadro tbody').addEventListener('click', (ev) => {
     const tr = ev.target.closest('tr[data-key]'); if (!tr) return;
     stopPlay(); select(tr.dataset.key, true);
@@ -581,7 +658,7 @@ export function mountPainel(root, api) {
     const M = S.model;
     fillKpis(M, animate);
     // O acumulado é sempre o do ano inteiro (com a projecção do ano); o resto segue o filtro.
-    drawMensal(M, animate); drawAcum(S.modelAno, animate); drawVar(M, animate);
+    drawMensal(M, animate); fillMapa(M, animate); drawAcum(S.modelAno, animate); drawVar(M, animate);
     fillQuadro(M); fillConf(M); videoLabels(M); topoCapas(M.ano);
     $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : '') + (r.fora ? ' fora' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
     const naSel = S.sel ? M.rows.find((q) => q.mes === S.sel) : null;

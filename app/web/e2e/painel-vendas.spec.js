@@ -340,3 +340,25 @@ test('modo apresentação: som, números a rodar e o duplo traço dos totais', a
   await page.locator('#host').locator('#btn-pres').click();
   await expect(page.locator('#host').locator('#pr-som')).toHaveAttribute('aria-pressed', 'true');
 });
+
+// Pedido do dono (14/11): o espaço vazio por baixo do Comparativo mensal passa a ter o Mapa do ano,
+// uma grelha de cores dos 12 meses (cada ano, o crescimento e o peso no ano); clicar num mês põe-no
+// em destaque.
+test('o Mapa do ano ocupa o espaço por baixo do Comparativo mensal e põe o mês em destaque', async ({ page }) => {
+  await page.goto(PAINEL);
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  const mapa = painel.locator('#mapa-g');
+  await expect(mapa.locator('.mapa-m')).toHaveCount(12);
+  await expect(mapa.locator('.mapa-l')).toHaveText(['2025', '2026', 'Crescimento', 'Peso em 2026']);
+  await expect(mapa.locator('.mapa-c')).toHaveCount(48);
+  await expect(mapa.locator('.mapa-c[data-mes="Julho"]').nth(2)).toHaveText('+2158%');
+  await expect(mapa.locator('.mapa-c[data-mes="Novembro"]').nth(1)).toHaveClass(/\best\b/);
+  await mapa.locator('.mapa-c[data-mes="Março"]').first().click();
+  await expect(painel.locator('#sp-mes')).toHaveText('Março');
+  await expect(mapa.locator('.mapa-m[data-mes="Março"]')).toHaveAttribute('aria-pressed', 'true');
+  // No computador, o mapa chega ao fundo do cartão: não fica espaço vazio por baixo.
+  const vazio = await painel.locator('#card-mensal').evaluate((c) => c.getBoundingClientRect().bottom - c.querySelector('#mapa-ano').getBoundingClientRect().bottom);
+  if ((page.viewportSize()?.width || 0) >= 1000) expect(vazio).toBeLessThan(40);
+  expect(await mapa.locator('.mapa-c span, .mapa-m').evaluateAll((es) => es.filter((e) => e.offsetParent && e.scrollWidth > e.clientWidth + 1).length)).toBe(0);
+});
