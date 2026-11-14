@@ -1066,7 +1066,7 @@ export function mountConsolidado(root, api) {
     edHints();
   });
 
-  // ---------- Importar o PowerPoint da loja ----------
+  // ---------- Importar o Painel de Vendas da loja (.pptx) ----------
   const PPT = { r: null, nome: '' };
   function pptEstado() {
     const r = PPT.r;
@@ -1091,7 +1091,7 @@ export function mountConsolidado(root, api) {
     const f = ev.target.files && ev.target.files[0];
     if (!f) return;
     PPT.r = null; PPT.nome = f.name;
-    $('ed-ppt-st').textContent = 'A ler o PowerPoint…'; $('ed-ppt-st').className = 'st';
+    $('ed-ppt-st').textContent = 'A ler o ficheiro…'; $('ed-ppt-st').className = 'st';
     $('ed-ppt-av').hidden = true;
     try {
       if (f.size > 40 * 1024 * 1024) throw new Error('O ficheiro passa de 40 MB.');
@@ -1121,7 +1121,7 @@ export function mountConsolidado(root, api) {
     edHints();
     $('ed-ppt-st').textContent = mudou.length
       ? `${loja.name}, ${S.ed.ano}: ${mudou.length} ${mudou.length === 1 ? 'mês mudou' : 'meses mudaram'} (${mudou.map((m) => MESES_CURTOS[m.i]).join(', ')}). Reveja a verde e carregue em Guardar.`
-      : `${loja.name}, ${S.ed.ano}: a grelha já tem os valores do PowerPoint. Nada a mudar.`;
+      : `${loja.name}, ${S.ed.ano}: a grelha já tem os valores do ficheiro. Nada a mudar.`;
     $('ed-ppt-st').className = 'st' + (mudou.length ? ' okk' : '');
   });
 
@@ -1233,7 +1233,7 @@ export function mountConsolidado(root, api) {
     if (!lista.length) { ul.replaceChildren(el('li', null, `Sem gravações registadas para ${ano}.`)); return; }
     const nome = (id) => (S.lojas.find((l) => l.id === id) || {}).name || 'Loja ' + id;
     const accao = { insert: 'Criou', update: 'Alterou', delete: 'Apagou' };
-    const origem = { manual: ['à mão', 'm'], sistema: ['do sistema', 's'], misto: ['várias origens', 's'], importacao: ['importação (PowerPoint/Excel)', 'm'] };
+    const origem = { manual: ['à mão', 'm'], sistema: ['do sistema', 's'], misto: ['várias origens', 's'], importacao: ['importação de ficheiro', 'm'] };
     ul.replaceChildren(...lista.map((h) => {
       const li = el('li');
       li.appendChild(el('span', null, quando(h.em)));

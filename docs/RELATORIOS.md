@@ -79,8 +79,9 @@ migração não estiver aplicada.
 
 ### De onde vieram os números
 Cada gravação diz a origem (`vendas_anos.origem`), pelos meses que muda: **sistema** (das vendas do
-sistema), **importação** (do PowerPoint da loja), **manual**, ou **misto** quando há mais do que uma
-(`origemDasAlteracoes`, em `plausibilidade.js`). A origem é a que o ecrã declara; o servidor não a
+sistema), **importação** (do ficheiro «Painel de Vendas» da loja; no histórico, «importação de
+ficheiro»), **manual**, ou **misto** quando há mais do que uma (`origemDasAlteracoes`, em
+`plausibilidade.js`). A origem é a que o ecrã declara; o servidor não a
 confere com as encomendas.
 
 As linhas que entraram por migração (o Relatório Síntese, o PowerPoint e os Excel das lojas, em
@@ -393,8 +394,10 @@ período, proporcional aos meses. No conjunto, o crescimento continua a ser o da
 a quota e a posição de cada loja contam só o período. O recorte não mexe nas contas do modelo: com o
 ano inteiro dá exactamente os mesmos totais (testado). A escolha fica guardada no aparelho, por ecrã.
 
-**Importar o PowerPoint da loja** (Todas as livrarias › Lançar vendas › «A partir do PowerPoint da
-loja»). O ficheiro .pptx abre-se no browser, sem bibliotecas (`pptx.js`).
+**Importar o Painel de Vendas da loja** (Todas as livrarias › Lançar vendas › «A partir do Painel de
+Vendas da loja»). O ficheiro .pptx abre-se no browser, sem bibliotecas (`pptx.js`). Os ecrãs dos
+relatórios não usam a palavra «PowerPoint» (pedido do dono, 14/11): dizem «ficheiro» ou «Painel de
+Vendas da loja», e um teste e2e confirma-o.
 
 - Lê o «Quadro geral» e os diapositivos de cada mês, e encontra a loja pelo nome.
 - Preenche a grelha do ano aberto. Antes de gravar, revê-se e carrega-se em Guardar; a gravação fica

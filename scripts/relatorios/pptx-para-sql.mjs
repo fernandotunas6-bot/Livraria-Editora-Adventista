@@ -30,24 +30,24 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 
 /** O SQL da migração para o resultado de lerPainelPptx (puro, para os testes). */
 export function migracaoSql(r, { ficheiro }) {
-  if (!r.loja) throw new Error('O PowerPoint não diz de que loja é; não sei onde pôr os valores.');
+  if (!r.loja) throw new Error('O ficheiro não diz de que loja é; não sei onde pôr os valores.');
   const anos = Object.keys(r.anos).map(Number).sort((a, b) => a - b).filter((a) => r.anos[a].some((v) => v != null));
-  if (!anos.length) throw new Error('O PowerPoint não tem nenhum mês com valor.');
-  const fonte = `Painel de Vendas da Loja ${/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do '}${r.loja} (PowerPoint)`;
+  if (!anos.length) throw new Error('O ficheiro não tem nenhum mês com valor.');
+  const fonte = `Painel de Vendas da Loja ${/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do '}${r.loja} (ficheiro da loja)`;
   const linhas = anos.map((a) => `      (${sqlTexto('%' + r.loja + '%')}, ${sqlTexto(sem(r.loja))}, ${a},\n       '${JSON.stringify(r.anos[a]).replace(/,/g, ', ')}'::jsonb,\n       ${sqlTexto(fonte)})`);
   const resumo = anos.map((a) => {
     const soma = r.anos[a].reduce((s, v) => s + Math.round((v || 0) * 100), 0) / 100;
     return `--   ${a}: ${r.ultimo[a] >= 0 ? 'até ' + MESES[r.ultimo[a]] : 'sem valores'}, ${soma.toLocaleString('pt-PT')} Kz`;
   });
   const avisos = r.avisos.length ? ['--', '-- Avisos do leitor (confirmar com a loja):', ...r.avisos.map((a) => `--   - ${a}`)] : [];
-  return `-- Vendas da Loja ${/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do '}${r.loja}, do PowerPoint «${ficheiro}».
+  return `-- Vendas da Loja ${/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do '}${r.loja}, do ficheiro «${ficheiro}».
 -- Gerada por scripts/relatorios/pptx-para-sql.mjs (o mesmo leitor do painel).
 --
 ${resumo.join('\n')}
 ${avisos.join('\n')}${avisos.length ? '\n' : ''}--
 -- Regras (as da 20261114100000_vendas_das_lojas_ate_outubro): a loja encontra-se pelo nome ou pela
 -- província, e uma loja que não exista fica de fora; um mês em branco não apaga; um valor que,
--- arredondado ao kwanza, já é o do PowerPoint, fica com os cêntimos; um ano novo é criado.
+-- arredondado ao kwanza, já é o do ficheiro, fica com os cêntimos; um ano novo é criado.
 -- Correr duas vezes não muda nada. Reverter: o histórico (vendas_alteracoes) tem os valores de antes.
 
 do $$
@@ -114,7 +114,7 @@ async function main(argv) {
     process.exit(2);
   }
   const iNome = args.indexOf('--nome');
-  const nome = (iNome >= 0 && args[iNome + 1]) || 'vendas_do_powerpoint';
+  const nome = (iNome >= 0 && args[iNome + 1]) || 'vendas_da_loja';
   if (!/^[a-z0-9_]+$/.test(nome)) { console.error('O --nome só pode ter letras minúsculas, algarismos e _.'); process.exit(2); }
   const r = await lerPainelPptx(readFileSync(resolve(ficheiro)));
   for (const a of Object.keys(r.anos)) {

@@ -244,3 +244,39 @@ test('todas as livrarias: o ranking mostra o nome de cada loja por inteiro', asy
     expect(await nm.evaluate((e) => e.scrollWidth <= e.clientWidth), await nm.textContent()).toBe(true);
   }
 });
+
+// Pedido do dono (14/11): os relatórios não dizem «PowerPoint». O ficheiro que as lojas mandam é o
+// «Painel de Vendas» da loja. Conta todo o texto dos dois ecrãs, também o das secções escondidas
+// (a grelha de lançamento, as correcções), os títulos, as etiquetas e as mensagens da importação.
+const textoDoEcra = (host) => host.evaluate((h) => {
+  const raiz = h.shadowRoot || h;
+  const partes = [];
+  const andar = (n) => {
+    for (const f of n.childNodes) {
+      if (f.nodeType === 3) partes.push(f.textContent);
+      else if (f.nodeType === 1 && !['STYLE', 'SCRIPT'].includes(f.tagName)) {
+        for (const a of ['title', 'aria-label', 'placeholder', 'alt']) if (f.getAttribute(a)) partes.push(f.getAttribute(a));
+        andar(f);
+      }
+    }
+  };
+  andar(raiz);
+  return partes.join(' ');
+});
+
+test('os relatórios não usam a palavra PowerPoint', async ({ page }) => {
+  await page.goto(PAINEL);
+  await expect(page.locator('#host').locator('#tbl-quadro tbody tr')).toHaveCount(12);
+  expect(await textoDoEcra(page.locator('#host'))).not.toMatch(/power\s*point/i);
+
+  await page.goto(CONJUNTO);
+  const rel = page.locator('#host');
+  await rel.locator('#btn-edit').click();
+  await expect(rel.locator('#ed-ppt').locator('..')).toContainText('Escolher o ficheiro');
+  // O Painel de Vendas real do Huambo (raiz do repositório): 2026 já está na grelha, nada muda.
+  await rel.locator('#ed-ppt').setInputFiles('../../Loja Huambo - Painel-Vendas 2026S (1).pptx');
+  await expect(rel.locator('#ed-ppt-go')).toBeEnabled();
+  await rel.locator('#ed-ppt-go').click();
+  await expect(rel.locator('#ed-ppt-st')).toContainText('a grelha já tem os valores do ficheiro');
+  expect(await textoDoEcra(rel)).not.toMatch(/power\s*point/i);
+});
