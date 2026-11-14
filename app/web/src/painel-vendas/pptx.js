@@ -202,7 +202,7 @@ export function montar({ quadro, mensais = [], loja = null }) {
     anos = null;
     avisos.push('O ficheiro não tem o «Quadro geral»: os valores vêm dos diapositivos de cada mês.');
   } else {
-    throw new Error('Não encontrei o quadro de vendas neste PowerPoint. É o modelo «Painel de Vendas» da loja?');
+    throw new Error('Não encontrei o quadro de vendas neste ficheiro. É o «Painel de Vendas» da loja?');
   }
   // Os anos do quadro, ou os dois anos mais prováveis quando só há diapositivos mensais.
   const lista = anos ? Object.keys(anos).map(Number).sort((a, b) => a - b) : null;

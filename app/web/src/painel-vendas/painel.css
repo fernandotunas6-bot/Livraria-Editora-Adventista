@@ -175,7 +175,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .seq li.on.s1 b { background: var(--c25); border-color: var(--c25); color: #FFFFFF; }
 .seq li.on.s2 b { background: var(--c26); border-color: var(--c26); color: #FFFFFF; }
 .seq li.on.s3 b { background: var(--pos); border-color: var(--pos); color: #FFFFFF; }
-/* O período até ao mês (Mês em destaque), como no PowerPoint das lojas. */
+/* O período até ao mês (Mês em destaque), como no Painel de Vendas das lojas. */
 .per { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 10px; }
 .per-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .per-h span { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
