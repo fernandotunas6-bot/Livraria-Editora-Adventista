@@ -20,38 +20,9 @@ import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './fi
 import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
 import { avisosDePlausibilidade, textoDoAviso } from './plausibilidade.js';
+import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
 
-export { cidadeDaLoja };
-
-// Terras que se dizem com artigo («do Huambo», «da Huíla»); as outras levam «de» («de Catumbela»,
-// «de Benguela», «de Luanda»). Pela primeira palavra, sem acentos.
-const COM_DO = new Set(['huambo', 'lubango', 'lobito', 'uige', 'namibe', 'sumbe', 'soyo', 'dundo', 'luena', 'cuito', 'kuito', 'bie']);
-const COM_DA = new Set(['huila', 'lunda']);
-
-/**
- * Como o rodapé e os diapositivos dizem a loja escolhida: «Loja do Huambo», «Loja do Lubango», «Loja de
- * Catumbela». Sem cidade no nome fica o próprio nome da loja; sem loja (antes da migração
- * painel_vendas_por_loja só havia a do Huambo), a do Huambo, como sempre foi.
- */
-export function lojaDe(store) {
-  if (!store) return 'Loja do Huambo';
-  const cidade = cidadeDaLoja(store);
-  if (!cidade) return String(store.name || '').trim() || 'Loja do Huambo';
-  const k = cidade.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z]/)[0];
-  return 'Loja ' + (COM_DA.has(k) ? 'da' : COM_DO.has(k) ? 'do' : 'de') + ' ' + cidade;
-}
-
-/**
- * As fotografias da loja para o modo apresentação: as da galeria (separador Lojas), só com
- * endereço do próprio site ou https, sem repetidas, até `n`.
- */
-export function fotosDaLoja(store, n = 5) {
-  const vistas = new Set();
-  return ((store && store.fotos) || [])
-    .map((f) => (typeof f === 'string' ? { url: f, caption: '' } : { url: String((f && f.url) || ''), caption: String((f && f.caption) || '') }))
-    .filter((f) => /^(\/(?!\/)|https:\/\/)/.test(f.url.trim()) && !vistas.has(f.url) && vistas.add(f.url))
-    .slice(0, n);
-}
+export { cidadeDaLoja, fotosDaLoja, lojaDe };
 
 /**
  * A sequência dos diapositivos: capa, a loja (se houver fotografias), o resumo, os mais vendidos
@@ -626,7 +597,7 @@ export function mountPainel(root, api) {
         pintar(itens);
         maisVendidos(itens, ano);
         S.mv = { ano, itens };
-        if (!$('pres').hidden) actualizarLista();
+        PRES.actualizar();
       });
     }
   }
@@ -648,7 +619,7 @@ export function mountPainel(root, api) {
     S.sel = null; clearTimers(); stopPlay(); render(true);
   });
   $('sel-comp').addEventListener('change', (e) => { S.comp = e.target.value ? Number(e.target.value) : null; clearTimers(); stopPlay(); render(true); });
-  let rz; listen(window, 'resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.model) { drawMensal(S.model, false); drawAcum(S.model, false); drawVar(S.model, false); } if (!$('pres').hidden) fitSlide(); }, 150); });
+  let rz; listen(window, 'resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.model) { drawMensal(S.model, false); drawAcum(S.model, false); drawVar(S.model, false); } }, 150); });
 
   // ---------- Palavra-passe de administrador ----------
   const hex = (buf) => Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -1207,40 +1178,13 @@ export function mountPainel(root, api) {
   }
 
   // ---------- Modo apresentação ----------
-  const P = { idx: 0, list: [], playing: false, timer: null, raf: null, steps: [] };
+  // Os controlos (botões, teclado, toque, ecrã inteiro, reprodução) estão em apresentacao.js, iguais
+  // aos de Todas as livrarias; aqui fica a lista dos diapositivos e o desenho de cada um.
   const logoSrc = () => $('logo-img').src;
   const mvDoAno = (ano) => (S.mv && S.mv.ano === ano ? S.mv.itens : []);
   function slideList(M) {
     return diapositivos(M.rows, { fotos: fotosDaLoja(S.store).length, maisVendidos: mvDoAno(M.ano).length });
   }
-  // Os mais vendidos chegam depois de abrir: a lista cresce sem mudar o diapositivo à vista.
-  function actualizarLista() {
-    if (!S.model) return;
-    const cur = P.list[P.idx];
-    const nova = slideList(S.model);
-    if (nova.length === P.list.length) return;
-    P.list = nova;
-    const i = nova.findIndex((x) => x.k === cur.k && x.r === cur.r);
-    P.idx = i < 0 ? Math.min(P.idx, nova.length - 1) : i;
-    const num = $('pres-view').querySelector('.s-num'); if (num) num.textContent = (P.idx + 1) + ' / ' + P.list.length;
-    $('pr-cnt').textContent = (P.idx + 1) + ' / ' + P.list.length;
-    $('pr-prog').style.width = ((P.idx + 1) / P.list.length * 100) + '%';
-  }
-  /** Uma fotografia a cobrir uma caixa, com zoom lento; some se não carregar. */
-  function fotoEm(caixa, url, i) {
-    const im = el('img', 's-foto-im'); im.alt = ''; im.decoding = 'async'; im.src = url;
-    im.style.animationDelay = -(i * 3) + 's';
-    im.addEventListener('error', () => caixa.remove(), { once: true });
-    caixa.appendChild(im);
-    return caixa;
-  }
-  function fitSlide() {
-    const v = $('pres-view'), s = v.querySelector('.slide'); if (!s) return;
-    const sc = Math.min(v.clientWidth / 1280, v.clientHeight / 720) * 0.96;
-    s.style.transform = `translate(-50%, -50%) scale(${sc})`;
-  }
-  function pClear() { P.steps.forEach(clearTimeout); P.steps = []; }
-  const pLater = (fn, ms) => P.steps.push(setTimeout(fn, reduce ? 0 : ms));
   function abs(cls, css, text) { const e = el('div', cls, text); if (css) Object.assign(e.style, css); return e; }
   function head(s, M, sub) {
     const terra = S.store ? cidadeDaLoja(S.store) || S.store.name : 'Huambo';
@@ -1248,12 +1192,8 @@ export function mountPainel(root, api) {
     const lg = el('img', 's-logo'); lg.src = logoSrc(); lg.alt = ''; s.appendChild(lg);
     s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · ' + lojaDe(S.store) + ' · ' + M.ano));
   }
-  function renderSlide(dir) {
-    pClear();
-    const M = S.model, it = P.list[P.idx];
-    const view = $('pres-view');
-    view.querySelectorAll('.slide').forEach((x) => x.remove());
-    const s = el('div', 'slide enter' + (dir < 0 ? ' back' : ''));
+  function desenharDiapositivo(s, it, { depois }) {
+    const M = S.model;
     const B = M.comp, A = M.ano, R = M.R;
     if (it.k === 'capa') {
       s.classList.add('dark');
@@ -1352,9 +1292,9 @@ export function mountPainel(root, api) {
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      pLater(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
-      pLater(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
-      pLater(() => {
+      depois(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
+      depois(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
+      depois(() => {
         i3.classList.add('on'); gr.classList.add('on');
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
         gv.className = 'g ' + cls;
@@ -1375,7 +1315,7 @@ export function mountPainel(root, api) {
           el('td', r.v2 == null ? 's-mut' : null, r.v2 != null ? kz(r.v2) : (r.est != null ? '≈ ' + kz(r.est) : '—')),
           el('td', r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad', r.cresc == null ? '—' : pct(r.cresc)));
         body.appendChild(tr);
-        pLater(() => tr.classList.add('on'), 200 + i * 90);
+        depois(() => tr.classList.add('on'), 200 + i * 90);
       });
       const tf = el('tfoot'); const fr = el('tr');
       fr.append(el('td', null, 'Total comparável'), el('td', null, kz(R.ytd1)), el('td', null, kz(R.ytd2c)), el('td', R.cresc_ytd == null ? 's-mut' : R.cresc_ytd >= 0 ? 's-ok' : 's-bad', pct(R.cresc_ytd)));
@@ -1402,75 +1342,16 @@ export function mountPainel(root, api) {
       const va = el('div', 'big g', '—'); bx2.append(va);
       bx2.append(el('div', 'sm', M.meta ? Math.round(R.metaPct * 100) + '% da meta de ' + grp(M.meta) : (R.falta != null ? 'Faltam ' + grp(R.falta) + ' para a previsão' : '')));
       c2.appendChild(bx2); s.appendChild(c2);
-      pLater(() => { countUp(pv, R.projeccao, grp, 1400); }, 300);
-      pLater(() => { countUp(va, R.ytd2, grp, 1400); }, 700);
+      depois(() => { countUp(pv, R.projeccao, grp, 1400); }, 300);
+      depois(() => { countUp(va, R.ytd2, grp, 1400); }, 700);
     }
-    s.appendChild(abs('s-num', null, (P.idx + 1) + ' / ' + P.list.length));
-    view.appendChild(s);
-    fitSlide();
-    $('pr-cnt').textContent = (P.idx + 1) + ' / ' + P.list.length;
-    $('pr-prog').style.width = ((P.idx + 1) / P.list.length * 100) + '%';
-    if (P.playing) runPTimer();
   }
-  function go(k) {
-    const n = Math.max(0, Math.min(P.list.length - 1, P.idx + k));
-    if (n === P.idx) { if (P.playing && k > 0) setPPlay(false); return; }
-    P.idx = n; renderSlide(k);
-  }
-  function runPTimer() {
-    clearTimeout(P.timer); if (P.raf) cancelAnimationFrame(P.raf);
-    const ms = Number($('pr-speed').value) || 8000, t0 = performance.now(), bar = $('pres-timer');
-    const tick = (now) => { const t = Math.min(1, (now - t0) / ms); bar.style.width = t * 100 + '%'; if (t < 1 && P.playing) P.raf = requestAnimationFrame(tick); };
-    P.raf = requestAnimationFrame(tick);
-    P.timer = setTimeout(() => { if (!P.playing) return; if (P.idx >= P.list.length - 1) { setPPlay(false); return; } go(1); }, ms);
-  }
-  function setPPlay(on) {
-    P.playing = on; $('pr-play').textContent = on ? 'Pausar' : 'Reproduzir'; $('pr-play').classList.toggle('on', on);
-    if (on) runPTimer(); else { clearTimeout(P.timer); if (P.raf) cancelAnimationFrame(P.raf); $('pres-timer').style.width = '0'; }
-  }
-  function openPres(start) {
-    if (!S.model) return;
-    stopPlay(); clearTimers();
-    P.list = slideList(S.model); P.idx = start || 0;
-    $('pres').hidden = false; document.documentElement.style.overflow = 'hidden';
-    renderSlide(1);
-    $('pr-next').focus();
-  }
-  function closePres() {
-    setPPlay(false); pClear();
-    $('pres').hidden = true; document.documentElement.style.overflow = '';
-    $('pres-view').querySelectorAll('.slide').forEach((x) => x.remove());
-    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
-    $('btn-pres').focus();
-  }
-  $('btn-pres').addEventListener('click', () => openPres(0));
-  $('pr-next').addEventListener('click', () => go(1));
-  $('pr-prev').addEventListener('click', () => go(-1));
-  $('pr-play').addEventListener('click', () => setPPlay(!P.playing));
-  $('pr-speed').addEventListener('change', () => { if (P.playing) runPTimer(); });
-  $('pr-close').addEventListener('click', closePres);
-  $('pr-fs').addEventListener('click', async () => {
-    try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('pres').requestFullscreen(); }
-    catch (e) { $('pr-fs').textContent = 'Ecrã inteiro indisponível'; $('pr-fs').disabled = true; }
+  const PRES = montarApresentacao({
+    $, listen, reduce,
+    lista: () => (S.model ? slideList(S.model) : []),
+    desenhar: desenharDiapositivo,
+    aoAbrir: () => { stopPlay(); clearTimers(); },
   });
-  listen(document, 'fullscreenchange', () => { $('pr-fs').textContent = document.fullscreenElement ? 'Sair do ecrã inteiro' : 'Ecrã inteiro'; setTimeout(fitSlide, 60); });
-  $('pres-view').addEventListener('click', (e) => { const r = $('pres-view').getBoundingClientRect(); go(e.clientX - r.left < r.width / 3 ? -1 : 1); });
-  listen(document, 'keydown', (e) => {
-    if ($('pres').hidden) return;
-    // Fora do Shadow DOM, e.target é o separador; o elemento real é o primeiro do composedPath().
-    const tg = e.composedPath()[0];
-    if (tg && tg.tagName === 'SELECT') return;
-    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
-    else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
-    else if (e.key === 'Home') { P.idx = 0; renderSlide(-1); }
-    else if (e.key === 'End') { P.idx = P.list.length - 1; renderSlide(1); }
-    else if (e.key === 'Escape' && !document.fullscreenElement) closePres();
-    else if (e.key.toLowerCase() === 'f') $('pr-fs').click();
-    else if (e.key.toLowerCase() === 'p') setPPlay(!P.playing);
-  });
-  let tx = null;
-  $('pres-view').addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
-  $('pres-view').addEventListener('touchend', (e) => { if (tx == null) return; const d = e.changedTouches[0].clientX - tx; if (Math.abs(d) > 40) { go(d < 0 ? 1 : -1); e.preventDefault(); } tx = null; });
 
   // ---------- Filtros avançados ----------
   FIL = montarFiltros(root, {
@@ -1521,7 +1402,7 @@ export function mountPainel(root, api) {
   return () => {
     dead = true;
     clearTimers(); clearTimeout(rz); clearTimeout(idleT);
-    clearTimeout(P.timer); pClear(); if (P.raf) cancelAnimationFrame(P.raf);
+    PRES.desmontar();
     if (!$('pres').hidden) {
       document.documentElement.style.overflow = '';
       try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}

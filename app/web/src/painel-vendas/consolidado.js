@@ -36,8 +36,8 @@ export function anosDisponiveis(lojas) {
 const somaOuNulo = (vals) => (vals.some((v) => v != null) ? fromC(vals.reduce((s, v) => s + toC(v), 0)) : null);
 
 /**
- * `lojas` = [{ id, name, province, active, years: { [ano]: { meses, observacoes, mes_em_curso, meta_anual, criterio, fonte, actualizado } } }]
- * pela ordem em que devem aparecer (a do separador Lojas).
+ * `lojas` = [{ id, name, province, active, fotos?, years: { [ano]: { meses, observacoes, mes_em_curso, meta_anual, criterio, fonte, actualizado } } }]
+ * pela ordem em que devem aparecer (a do separador Lojas). `fotos` é a galeria da loja (modo apresentação).
  */
 export function buildConsolidado(lojas, ano, comp) {
   const todas = (lojas || []).map((l, idx) => {
@@ -46,7 +46,7 @@ export function buildConsolidado(lojas, ano, comp) {
     const temComp = M.comp != null && M.rows.some((r) => r.v1 != null);
     const Y = (l.years || {})[ano] || null;
     return {
-      id: l.id, nome: l.name || 'Loja', provincia: l.province || '', activa: l.active !== false,
+      id: l.id, nome: l.name || 'Loja', provincia: l.province || '', activa: l.active !== false, fotos: l.fotos || [],
       cor: CORES_LOJAS[idx % CORES_LOJAS.length], M, temDados, temComp,
       fonte: M.fonte, actualizado: Y ? Y.actualizado || null : null, temRegisto: !!Y,
     };
@@ -148,6 +148,23 @@ export function buildConsolidado(lojas, ano, comp) {
     melhorLoja: ordem[0] || null,
     maiorCrescimento: [...comDados].filter((l) => l.M.R.cresc_ytd != null).sort((a, b) => b.M.R.cresc_ytd - a.M.R.cresc_ytd)[0] || null,
   };
+}
+
+/**
+ * Os diapositivos do modo apresentação de todas as livrarias: a capa, as livrarias (uma fotografia
+ * de cada), o resumo da rede, o ranking (com mais de uma loja), um por livraria com vendas, os mais
+ * vendidos da rede (se os houver), o quadro e a perspectiva. Com o filtro de lojas, só as escolhidas.
+ */
+export function diapositivosConjunto(c, { maisVendidos = 0 } = {}) {
+  const comDados = (c && c.lojas ? c.lojas : []).filter((l) => l.temDados);
+  const lista = [{ k: 'capa' }];
+  if (c && c.lojas && c.lojas.length) lista.push({ k: 'livrarias' });
+  lista.push({ k: 'resumo' });
+  if (comDados.length > 1) lista.push({ k: 'ranking' });
+  [...comDados].sort((a, b) => (a.posicao || 99) - (b.posicao || 99)).forEach((l) => lista.push({ k: 'loja', l }));
+  if (maisVendidos) lista.push({ k: 'mv' });
+  lista.push({ k: 'quadro' }, { k: 'persp' });
+  return lista;
 }
 
 /** Linhas de todas as lojas e todos os anos (CSV e a folha «Todos os anos»). */

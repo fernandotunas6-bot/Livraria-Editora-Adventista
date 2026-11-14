@@ -179,3 +179,55 @@ test('o modo apresentação mostra as capas, as fotografias da loja e os mais ve
   expect(erros, 'erros de JavaScript na página').toEqual([]);
   expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
 });
+
+// Todas as livrarias no modo apresentação: cada loja com a sua fotografia (ou, sem fotografias, a
+// sua cor e a terra), o ranking com as fotografias em círculo e um diapositivo por loja.
+test('todas as livrarias: o modo apresentação mostra todas as lojas com as suas imagens', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  const publico = new URL('../public/', import.meta.url);
+  await page.route('**/images/**', (route) => route.fulfill({ path: new URL('.' + new URL(route.request().url()).pathname, publico).pathname }));
+  await page.goto(CONJUNTO + '?imagens=1');
+  const rel = page.locator('#host');
+  await expect(rel.locator('#mv')).toBeVisible();
+  await rel.locator('#btn-pres').click();
+  const slide = rel.locator('#pres-view .slide');
+
+  await expect(slide.locator('.s-cover-eye')).toHaveText('TODAS AS LIVRARIAS');
+  await expect(slide.locator('.s-cover-capas .hc-c').first()).toBeVisible();
+
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-loja-t')).toHaveText('As livrarias');
+  await expect(slide.locator('.s-rede-l')).toHaveCount(3);
+  await expect(slide.locator('.s-rede-l').nth(0)).toContainText('Loja do Huambo');
+  // O Huambo não tem fotografias: fica a cor da loja com a terra.
+  await expect(slide.locator('.s-rede-l').nth(0).locator('.s-sem-foto-t')).toHaveText('Huambo');
+  await expect.poll(() => slide.locator('.s-rede-l .s-foto-im').evaluateAll((ims) => ims.filter((i) => i.complete && i.naturalWidth > 0).length)).toBe(2);
+
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-sub')).toContainText('Resumo da rede');
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-rank-l')).toHaveCount(3);
+  await expect(slide.locator('.s-rank-l').first()).toContainText('Loja do Huambo');
+
+  // Um diapositivo por loja, pela posição: o Huambo primeiro, depois as outras com a fotografia.
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-lj-t')).toHaveText('Loja do Huambo');
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-lj-t')).toHaveText('Loja do Lubango');
+  await expect(slide.locator('.s-lj-leg')).toHaveText('A entrada da loja');
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-lj-t')).toHaveText('Loja de Catumbela');
+
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-sub')).toContainText('Os mais vendidos de 2026');
+  await expect(slide.locator('.mv-i')).toHaveCount(3);
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-table tbody tr')).toHaveCount(3);
+  await rel.locator('#pr-next').click();
+  await expect(slide.locator('.s-rem-t')).toHaveText('PERSPECTIVA DA REDE');
+  await expect(slide.locator('.s-bg-mosaico .m')).toHaveCount(2);
+
+  expect(erros, 'erros de JavaScript na página').toEqual([]);
+  expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
+});

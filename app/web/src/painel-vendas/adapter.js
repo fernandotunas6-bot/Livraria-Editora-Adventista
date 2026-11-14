@@ -8,6 +8,7 @@
  */
 import { supabase, mediaUrl } from '@/lib/supabaseClient';
 import { buildDestaques, capaDe } from './destaques.js';
+import { storeGallery } from '@/lib/stores';
 
 const subs = {};
 const fire = (key) => (subs[key] || []).forEach((fn) => fn());
@@ -396,7 +397,7 @@ const ANO_CAMPOS = 'loja_id, ano, meses, observacoes, mes_em_curso, meta_anual, 
 /** As lojas com os anos de cada uma, numa consulta por tabela (não uma por loja). */
 async function carregarLojas() {
   const [{ data: lojas, error: e1 }, anos] = await Promise.all([
-    supabase.from('physical_stores').select('id, name, province, active, sort_order').order('sort_order').order('name'),
+    supabase.from('physical_stores').select('id, name, province, active, sort_order, gallery').order('sort_order').order('name'),
     (async () => {
       // A coluna origem só existe com a migração relatorios_de_todas_as_livrarias.
       let r = await supabase.from('vendas_anos').select(ANO_CAMPOS + ', origem').order('ano');
@@ -410,7 +411,8 @@ async function carregarLojas() {
   (anos.data || []).forEach((r) => {
     (porLoja[r.loja_id] ||= {})[r.ano] = { ...yearRowToDoc(r), origem: r.origem || 'manual', actualizado_por: r.actualizado_por || null };
   });
-  return (lojas || []).map((l) => ({ id: l.id, name: l.name, province: l.province, active: l.active !== false, years: porLoja[l.id] || {} }));
+  // As fotografias de cada loja (separador Lojas) vão para o modo apresentação do relatório conjunto.
+  return (lojas || []).map((l) => ({ id: l.id, name: l.name, province: l.province, active: l.active !== false, fotos: storeGallery(l), years: porLoja[l.id] || {} }));
 }
 
 /** O histórico das gravações no servidor (vendas_alteracoes); null sem a migração. */

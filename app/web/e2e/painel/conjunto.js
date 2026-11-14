@@ -24,6 +24,16 @@ const LOJAS = [
 
 window.__gravacoes = [];
 window.__conflito = new URLSearchParams(window.location.search).has('conflito');
+// `?imagens=1`: as fotografias de cada loja (o Lubango e Catumbela com galeria; o Huambo sem, para
+// se ver a cor da loja) e os mais vendidos da rede, para o modo apresentação.
+const imagens = new URLSearchParams(window.location.search).has('imagens');
+if (imagens) {
+  LOJAS[1].fotos = [{ url: '/images/lojas/lubango-1.webp', caption: 'A entrada da loja' }, '/images/lojas/lubango-2.webp'];
+  LOJAS[2].fotos = ['/images/lojas/catumbela-1.webp'];
+}
+const MAIS_VENDIDOS = [
+  ['O Grande Conflito', 'LIV-011', 380, 1900000], ['Caminho a Cristo', 'LIV-021', 295, 590000], ['Patriarcas e Profetas', 'LIV-026', 210, 1470000],
+].map(([titulo, c, unidades, valor]) => ({ titulo, capa: `/images/capas/${c}.jpg`, unidades, valor }));
 const api = {
   canEdit: true,
   carregar: async () => JSON.parse(JSON.stringify(LOJAS)),
@@ -41,7 +51,7 @@ const api = {
   lerNota: async () => ({ texto: '', actualizado: null }),
   gravarNota: async () => {},
   downloads: { save: async () => ({ status: 'saved' }) },
-  extras: async () => ({ destaques: null, fotos: [] }),
+  extras: async () => (imagens ? { destaques: { rede: { ano: MAIS_VENDIDOS, meses: [] }, porLoja: {} }, fotos: [] } : { destaques: null, fotos: [] }),
 };
 
 window.__erros = [];

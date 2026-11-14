@@ -297,7 +297,8 @@ discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as uni
 
 Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
 
-**Imagens no modo apresentação** (`diapositivos` e `fotosDaLoja` em `painel.js`):
+**Imagens no modo apresentação** (`diapositivos` em `painel.js`; `fotosDaLoja` e os controlos em
+`apresentacao.js`, os mesmos nos dois relatórios):
 
 | Diapositivo | Imagem |
 |---|---|
@@ -309,6 +310,24 @@ Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Hu
 As fotografias só entram com endereço do próprio site ou `https`. Sem fotografias nem mais vendidos, a
 sequência é a de sempre. Os mais vendidos chegam depois de o painel abrir: se a apresentação já
 estiver aberta, o diapositivo junta-se à lista sem mudar o que está à vista.
+
+**Todas as livrarias** também tem modo apresentação (`diapositivosConjunto` em `consolidado.js`),
+com a galeria de cada loja:
+
+| Diapositivo | O que mostra |
+|---|---|
+| Capa | «Todas as livrarias», a parede de capas dos mais vendidos da rede |
+| **As livrarias** | Um cartão por loja com a primeira fotografia, a cor da loja, as vendas, a quota e o crescimento |
+| Resumo da rede | Vendas, média, melhor mês, projecção, ano anterior, a livraria líder e os 12 meses |
+| Ranking (com mais de uma loja) | As lojas pela posição, com a fotografia num círculo e a barra na cor da loja |
+| **Uma por livraria** (pela posição) | A fotografia à esquerda com a legenda; à direita as vendas, o crescimento, a quota, a média, o melhor mês, a projecção, os meses por registar e os 12 meses |
+| Os mais vendidos da rede | Se os houver |
+| Quadro das livrarias | Comparável, vendas, crescimento, quota e projecção, com o total da rede |
+| Perspectiva da rede | As fotografias das lojas esbatidas por trás da previsão e do valor actual |
+
+Uma loja sem fotografias (hoje o Bié) aparece com a sua cor e o nome da terra; para a ver com
+fotografia, juntam-se fotografias à galeria em **Admin → Lojas**. Com o filtro de lojas, só entram as
+escolhidas.
 
 **Filtros avançados** (barra «Filtros», por baixo do topo; `filtros.js` e `filtros-ui.js`):
 
