@@ -9,6 +9,8 @@ import markup from '@/painel-vendas/painel.html?raw';
 // O logotipo oficial (o mesmo de public/logo.png, mais leve): no ecrã, nas imagens e nos PDFs
 // que o painel exporta. Antes era o do Ministério de Publicações.
 import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
+// A versão branca, para o topo escuro e para os vídeos (PNG transparente, sem fundo branco).
+import logoClaroUrl from '@/painel-vendas/logo-livraria-adventista-claro.png';
 
 const STORE_KEY = 'painel-vendas:loja';
 
@@ -64,7 +66,7 @@ const VendasHuamboTab = () => {
     if (!stores) return undefined;
     const host = hostRef.current;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
-    root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl)}`;
+    root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
     const api = createPainelApi({ id: userId, role }, {
       lojaId: multi ? storeId || null : null,
       store: store ? { id: store.id, name: store.name, province: store.province } : null,

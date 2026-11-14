@@ -168,3 +168,37 @@ export function buildYearModel(years, ano, comp) {
     },
   };
 }
+
+/**
+ * O período até ao mês `i` (Janeiro a esse mês), como no Painel de Vendas em PowerPoint das lojas
+ * («Período em apresentação até …»): a venda periódica de cada ano, o crescimento periódico, a
+ * média mensal de cada ano no período e as diferenças mensal e periódica.
+ *
+ *  · A venda periódica soma os meses com valor de Janeiro até ao mês (cada ano os seus).
+ *  · A média mensal divide essa soma pelos meses com valor (Março de 2025: 1 151 725 / 3).
+ *  · O crescimento e a diferença periódicos comparam só os meses que têm valor nos dois anos:
+ *    um mês que um dos anos ainda não tem não entra (com os 12 meses preenchidos, dá o mesmo).
+ *  · A diferença mensal é a do próprio mês (ano − comparação), quando os dois têm valor.
+ */
+export function periodoAte(M, i) {
+  const ate = Math.max(0, Math.min(11, Number(i) || 0));
+  const rows = (M && M.rows ? M.rows : []).slice(0, ate + 1);
+  const com1 = rows.filter((r) => r.v1 != null);
+  const com2 = rows.filter((r) => r.v2 != null);
+  const pares = rows.filter((r) => r.v1 != null && r.v2 != null);
+  const venda1 = com1.length ? sumKz(com1, 'v1') : null;
+  const venda2 = com2.length ? sumKz(com2, 'v2') : null;
+  const venda1c = pares.length ? sumKz(pares, 'v1') : null;
+  const venda2c = pares.length ? sumKz(pares, 'v2') : null;
+  const r = M && M.rows ? M.rows[ate] : null;
+  return {
+    i: ate, ate: MESES[ate],
+    venda1, venda2, n1: com1.length, n2: com2.length,
+    media1: avgKz(venda1, com1.length), media2: avgKz(venda2, com2.length),
+    venda1c, venda2c, comparaveis: pares.length,
+    crescimento: growth(venda2c, venda1c),
+    difPeriodica: pares.length ? fromC(toC(venda2c) - toC(venda1c)) : null,
+    difMensal: r && r.v1 != null && r.v2 != null ? fromC(toC(r.v2) - toC(r.v1)) : null,
+    crescMensal: r && r.v2 != null && r.v1 ? r.v2 / r.v1 - 1 : null,
+  };
+}

@@ -115,6 +115,7 @@ export function mountConsolidado(root, api) {
     const c = buildConsolidado(S.lojas, S.ano, S.comp);
     c.geradoEm = new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
     c.logo = logoSrc();
+    c.logoClaro = $('logo-claro') ? $('logo-claro').src : '';
     c.nota = S.nota.ano === S.ano ? S.nota.texto : '';
     S.c = c;
     root.querySelectorAll('.lgA').forEach((e) => { e.textContent = c.comp != null ? String(c.comp) : '—'; });

@@ -57,7 +57,11 @@
 }
 @keyframes hcSobe { from { transform: translateY(0); } to { transform: translateY(-50%); } }
 @keyframes hcDesce { from { transform: translateY(-50%); } to { transform: translateY(0); } }
-.brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+/* O logótipo no topo: branco sobre transparente, pequeno e um pouco esbatido, sem pastilha. */
+.marca { height: 34px; width: auto; display: block; opacity: .85; }
+.brand .marca + .eyebrow { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.18); }
+@media (max-width: 700px) { .marca { height: 26px; } .brand .marca + .eyebrow { padding-left: 0; border-left: 0; } }
 .eyebrow { color: var(--amber); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-size: 13px; }
 .h1 { margin: 10px 0 0; font-family: var(--serif); font-size: clamp(30px, 4.4vw, 50px); line-height: 1.06; font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
 .take { margin: 12px 0 0; color: #C9CED4; max-width: 64ch; font-size: clamp(15px, 1.3vw, 17px); line-height: 1.6; min-height: 1.6em; }
@@ -171,6 +175,18 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .seq li.on.s1 b { background: var(--c25); border-color: var(--c25); color: #FFFFFF; }
 .seq li.on.s2 b { background: var(--c26); border-color: var(--c26); color: #FFFFFF; }
 .seq li.on.s3 b { background: var(--pos); border-color: var(--pos); color: #FFFFFF; }
+/* O período até ao mês (Mês em destaque), como no PowerPoint das lojas. */
+.per { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 10px; }
+.per-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.per-h span { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.per-h b { font-family: var(--serif); font-size: 20px; font-weight: 700; }
+.per-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: 8px; }
+.pk { display: grid; gap: 3px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+.pk span { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.pk b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk.a b { color: var(--muted); }
+.pk.b b { color: var(--c26); }
+.pk.g b.ok, .pk.d b.ok { color: var(--ok); } .pk.g b.bad, .pk.d b.bad { color: var(--bad); }
 .meta-l { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
 .meta-l b { color: var(--fg); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .obs { font-size: 12px; color: var(--muted); font-style: italic; min-height: 1em; }
@@ -262,7 +278,8 @@ details.more[open] summary { margin-bottom: 10px; }
 /* elementos dos slides (coordenadas em px de um palco 1280×720) */
 .s-h { position: absolute; left: 48px; top: 36px; font-size: 34px; font-weight: 800; letter-spacing: -.01em; }
 .s-sub { position: absolute; left: 48px; top: 82px; font-size: 17px; color: #5A6067; }
-.s-logo { position: absolute; right: 40px; top: 26px; height: 60px; background: #FFFFFF; border-radius: 8px; padding: 6px 10px; }
+/* O logótipo nos diapositivos: PNG transparente, sem caixa branca, discreto. */
+.s-logo { position: absolute; right: 44px; top: 30px; height: 46px; opacity: .9; }
 .s-foot { position: absolute; left: 48px; bottom: 22px; font-size: 12px; color: #8A9096; }
 .s-num { position: absolute; right: 48px; bottom: 22px; font-size: 12px; color: #8A9096; font-variant-numeric: tabular-nums; }
 .s-kpis { position: absolute; left: 48px; right: 48px; top: 122px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -291,9 +308,9 @@ details.more[open] summary { margin-bottom: 10px; }
 .s-growth .k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #5A6067; }
 .s-growth .g { font-family: var(--serif); font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .s-growth .d { font-size: 14px; color: #5A6067; font-variant-numeric: tabular-nums; }
-.s-det .row2 { position: absolute; left: 26px; right: 26px; display: flex; justify-content: space-between; font-size: 15px; color: #4A5056; }
+.s-det .row2 { position: absolute; left: 26px; right: 26px; display: flex; justify-content: space-between; gap: 10px; font-size: 14.5px; color: #4A5056; white-space: nowrap; }
 .s-det .row2 b { color: #1E2124; font-variant-numeric: tabular-nums; }
-.s-seq { position: absolute; left: 26px; right: 26px; top: 200px; display: grid; gap: 12px; }
+.s-seq { position: absolute; left: 26px; right: 26px; top: 214px; display: grid; gap: 10px; }
 .s-seq .h { font-size: 14px; color: #4A5056; font-weight: 600; }
 .s-seq div.i { font-size: 18px; font-weight: 700; color: #B8BCC0; transition: color .3s, transform .3s; }
 .s-seq div.i.on.a { color: #8A8F95; } .s-seq div.i.on.b { color: #9A7A00; } .s-seq div.i.on.c { color: #1E8449; }
@@ -302,8 +319,8 @@ details.more[open] summary { margin-bottom: 10px; }
 .s-cover-eye { position: absolute; left: 80px; top: 300px; color: #F2B705; font-size: 30px; font-weight: 800; letter-spacing: .02em; }
 .s-cover-t { position: absolute; left: 80px; top: 345px; font-size: 64px; font-weight: 800; letter-spacing: -.01em; }
 .s-cover-s { position: absolute; left: 82px; top: 440px; font-size: 20px; color: #AEB3B8; }
-.s-cover-logo { position: absolute; left: 80px; top: 90px; background: #FFFFFF; border-radius: 10px; padding: 10px 16px; }
-.s-cover-logo img { height: 70px; display: block; }
+.s-cover-logo { position: absolute; left: 80px; top: 96px; }
+.s-cover-logo img { height: 58px; display: block; opacity: .88; }
 .s-cover-glow { position: absolute; right: -160px; top: -160px; width: 620px; height: 620px; border-radius: 50%; background: radial-gradient(closest-side, rgba(18,137,140,.45), transparent); }
 .s-tiles { position: absolute; left: 48px; right: 48px; top: 126px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .s-tile { background: #FFFFFF; border: 1px solid #E2E1DD; border-radius: 16px; padding: 18px 22px; display: grid; gap: 6px; min-height: 140px; align-content: start; }

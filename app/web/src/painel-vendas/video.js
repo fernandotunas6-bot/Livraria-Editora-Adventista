@@ -15,8 +15,8 @@
  * (`planoVideo`, `planoVideoConjunto`), testada em video.test.js sem canvas.
  * A gravação é em tempo real: um vídeo de 3 minutos demora 3 minutos a gravar.
  */
-import { MESES, MESES_CURTOS } from './modelo.js';
-import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharMuralCapas, desenharPaisagem, veu } from './imagens-video.js';
+import { MESES, MESES_CURTOS, periodoAte } from './modelo.js';
+import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharMuralCapas, desenharPaisagem, rng, veu } from './imagens-video.js';
 import { capasParaFundo } from './capas-de-fundo.js';
 import { destaqueDe } from './destaques.js';
 import { carregarFontes, fonteCanvas } from '../lib/fontes.js';
@@ -226,7 +226,15 @@ function fundoImagem(ctx, f, at, n, lado = 'esquerda', { desfoque = 0 } = {}) {
 /** Fundo, logótipo (numa pastilha branca: é azul-escuro sobre transparente), título e subtítulo. */
 function cabecalho(ctx, f, titulo, sub, { semFundo = false, subMax = 0 } = {}) {
   if (!semFundo) fundoDados(ctx, f);
-  if (f.logo) {
+  if (f.logoClaro) {
+    // O logótipo branco, PNG transparente, discreto: sem pastilha e um pouco esbatido.
+    const h = 34;
+    const w = (f.logoClaro.width / f.logoClaro.height) * h;
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(f.logoClaro, 46, 30, w, h);
+    ctx.restore();
+  } else if (f.logo) {
     const h = 40;
     const w = (f.logo.width / f.logo.height) * h;
     ctx.fillStyle = '#FFFFFF';
@@ -609,6 +617,7 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) 
   card(ctx, rx, ly, rw, lh);
   const ate = (v) => (v == null ? '—' : kz(v));
   const media = r.v2 != null && R.media2 ? r.v2 / R.media2 - 1 : null;
+  const P = periodoAte(M, r.i);
   const rows = [
     ['Vendas ' + A, r.v2 != null ? kz(r.v2) : (r.est != null ? '≈ ' + kz(r.est) + ' (estimativa)' : '—'), r.v2 == null ? COL.mut : COL.fg],
     ['Vendas ' + (B != null ? B : '— (sem comparação)'), B != null ? kz(r.v1) : '—'],
@@ -617,8 +626,14 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) 
     ...(B != null && r.v1c != null && r.v1c !== r.v1 ? [[`${B} nas mesmas lojas (comparável)`, kz(r.v1c)]] : []),
     ['Diferença', r.dif != null ? kzs(r.dif) : (crescEst != null ? '≈ ' + kzs(r.est - r.v1) : '—'), r.dif != null ? corDe(r.dif) : COL.mut],
     ['Crescimento', r.cresc != null ? pct(r.cresc) : (crescEst != null ? '≈ ' + pct(crescEst) : '—'), r.cresc != null ? corDe(r.cresc) : COL.mut],
-    [`Acumulado ${A} até ${r.mes}`, r.acum2 != null ? kz(r.acum2) : (acumEst != null ? '≈ ' + kz(acumEst) + ' (com estimativas)' : '—'), r.acum2 != null ? COL.fg : COL.mut],
-    [`Acumulado ${B != null ? B : '—'} até ${r.mes}`, B != null ? ate(r.acum1) : '—'],
+    // O período até ao mês, como no PowerPoint das lojas: vendas, crescimento, diferença e médias.
+    [`Venda periódica ${A} (até ${MESES_CURTOS[r.i]})`, r.acum2 != null ? kz(r.acum2) : (acumEst != null ? '≈ ' + kz(acumEst) + ' (com estimativas)' : '—'), r.acum2 != null ? COL.fg : COL.mut],
+    [`Venda periódica ${B != null ? B : '—'} (até ${MESES_CURTOS[r.i]})`, B != null ? ate(r.acum1) : '—'],
+    ...(B != null ? [
+      ['Crescimento periódico', P.crescimento != null ? pct(P.crescimento) : '—', P.crescimento != null ? corDe(P.crescimento) : COL.mut],
+      [`Diferença periódica ${B}/${String(A).slice(-2)}`, P.difPeriodica != null ? kzs(P.difPeriodica) : '—', P.difPeriodica != null ? corDe(P.difPeriodica) : COL.mut],
+      [`Média mensal ${B} · ${A} (até ${MESES_CURTOS[r.i]})`, `${P.media1 != null ? grp(P.media1) : '—'} · ${P.media2 != null ? grp(P.media2) : '—'} Kz`],
+    ] : [[`Média mensal ${A} (até ${MESES_CURTOS[r.i]})`, P.media2 != null ? kz(P.media2) : '—']]),
     ['Peso no ano registado', r.peso == null ? '—' : pctSimples(r.peso) + ' de ' + kz(R.ytd2)],
     ['Posição', r.posicao ? `${ord(r.posicao)} de ${r.deMeses} meses fechados` : (r.estado === 'Em curso' ? 'mês em curso' : '—')],
     ['Face à média mensal de ' + A, media == null ? '—' : pct(media) + ' (média ' + kz(R.media2) + ')', corDe(media)],
@@ -1029,13 +1044,134 @@ function escolherFormato() {
  * Grava o plano num vídeo. `desenhar(ctx, at)` desenha o instante `at` = { i, cena, s, p, t }.
  * onProgress(segundos, total, cena). `signal` (AbortSignal) pára a gravação a meio.
  */
+// ---------- Montagem: transições e acabamento de cinema (estilo Premiere) ----------
+//
+// Entre dois quadros, em vez de um corte seco: o quadro que sai aproxima-se e esbate-se com rasto
+// de zoom (zoom blur), o que entra chega de mais perto até ao lugar, e um clarão de luz quente
+// atravessa o ecrã. Por cima de tudo, um grão de filme muito leve e uma luz que respira num canto.
+// As transições desenham os dois quadros ao mesmo tempo, só durante TRANSICAO segundos.
+
+export const TRANSICAO = 0.8;
+const suave = (t) => { const x = clamp01(t); return x * x * (3 - 2 * x); };
+
+/**
+ * Se `sec` está no início de um quadro (depois do primeiro), a transição: { k (0→1), anterior }
+ * com o instante final do quadro anterior. Senão, null. Puro (testado em video.test.js).
+ */
+export function estadoDaTransicao(plano, sec) {
+  const at = cenaNoTempo(plano, sec);
+  const dur = Math.min(TRANSICAO, (at.cena.dur || 1) * 0.35);
+  if (at.i === 0 || at.s >= dur) return null;
+  const inicio = sec - at.s;
+  return { k: suave(at.s / dur), anterior: cenaNoTempo(plano, Math.max(0, inicio - 1e-3)) };
+}
+
+const tela = () => {
+  const c = Object.assign(document.createElement('canvas'), { width: W, height: H });
+  return { c, ctx: c.getContext('2d') };
+};
+
+/** Desenha `img` (o quadro inteiro) com zoom `z` à volta do centro. */
+function comZoom(ctx, img, z) {
+  const w = W * z;
+  const h = H * z;
+  ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+}
+
+let graosFilme = null;
+const padroesGrao = new WeakMap();
+function graoDoFilme(ctx, sec) {
+  if (!graosFilme) {
+    graosFilme = Array.from({ length: 4 }, (_, n) => {
+      const c = Object.assign(document.createElement('canvas'), { width: 160, height: 160 });
+      const g = c.getContext('2d');
+      const img = g.createImageData(160, 160);
+      const r = rng(4049 + n * 7);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = 96 + Math.floor(r() * 64);
+        img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v; img.data[i + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      return c;
+    });
+  }
+  let padroes = padroesGrao.get(ctx);
+  if (!padroes) { padroes = graosFilme.map((c) => ctx.createPattern(c, 'repeat')); padroesGrao.set(ctx, padroes); }
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle = padroes[Math.floor(sec * 24) % padroes.length];
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+/** Uma luz quente que respira num canto (sempre) e o clarão que atravessa o ecrã na transição. */
+function luzes(ctx, sec, clarao = 0) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const a = 0.05 + 0.035 * Math.sin(sec * 0.6);
+  const x = W * (0.92 + 0.04 * Math.sin(sec * 0.17));
+  const g = ctx.createRadialGradient(x, -H * 0.05, 0, x, -H * 0.05, W * 0.55);
+  g.addColorStop(0, `rgba(255,186,120,${a})`);
+  g.addColorStop(1, 'rgba(255,186,120,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  if (clarao > 0) {
+    const b = Math.sin(Math.PI * clarao);
+    const cx = W * (-0.1 + 1.2 * clarao);
+    const cg = ctx.createRadialGradient(cx, H * 0.4, 0, cx, H * 0.4, W * 0.65);
+    cg.addColorStop(0, `rgba(255,214,160,${0.5 * b})`);
+    cg.addColorStop(0.35, `rgba(240,120,160,${0.22 * b})`);
+    cg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = cg;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
+}
+
+/**
+ * Um instante do vídeo: o quadro (ou a transição entre dois) e o acabamento. `desenhar(ctx, at)`
+ * desenha um quadro; `telas` são dois canvas de trabalho (criados uma vez por vídeo).
+ */
+function montar(ctx, plano, sec, desenhar, telas) {
+  const at = { ...cenaNoTempo(plano, sec), t: sec };
+  const tr = estadoDaTransicao(plano, sec);
+  if (tr) {
+    const [a, b] = telas;
+    desenhar(a.ctx, { ...tr.anterior, t: sec });
+    desenhar(b.ctx, at);
+    const k = tr.k;
+    ctx.fillStyle = COL.bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    // Sai: aproxima-se e esbate-se, com dois rastos de zoom.
+    const z = 1 + 0.16 * k;
+    ctx.globalAlpha = 1 - k;
+    comZoom(ctx, a.c, z);
+    ctx.globalAlpha = (1 - k) * 0.22;
+    comZoom(ctx, a.c, z + 0.035 * k);
+    comZoom(ctx, a.c, z + 0.07 * k);
+    // Entra: vem de mais perto até ao lugar.
+    ctx.globalAlpha = k;
+    comZoom(ctx, b.c, 1 + 0.1 * (1 - k));
+    ctx.restore();
+    luzes(ctx, sec, k);
+  } else {
+    desenhar(ctx, at);
+    luzes(ctx, sec, 0);
+  }
+  graoDoFilme(ctx, sec);
+  return at;
+}
+
 async function gravar(plano, desenhar, { onProgress, signal } = {}) {
   const mime = escolherFormato();
   const FPS = 30;
   const canvas = Object.assign(document.createElement('canvas'), { width: W, height: H });
   const ctx = canvas.getContext('2d');
   const total = duracaoPlano(plano);
-  const frame = (sec) => { const at = cenaNoTempo(plano, sec); desenhar(ctx, { ...at, t: sec }); return at; };
+  const telas = [tela(), tela()];
+  const frame = (sec) => montar(ctx, plano, sec, desenhar, telas);
   frame(0);
   const stream = canvas.captureStream(FPS);
   // O conteúdo é quase sempre parado: 5 Mb/s chegam para os números ficarem nítidos.
@@ -1085,16 +1221,17 @@ function capasDe(...ambitos) {
 async function preparar(base, plano, { capas = [], fotos = [], fundo = 'capas' } = {}) {
   // «Capas animadas»: as capas dos mais vendidos e, a completar, as do catálogo (do próprio site).
   const doMural = fundo === 'capas' ? capasParaFundo(capas, { n: 18, chave: base.etiqueta }) : [];
-  const [logo, , imgs, fts, mural] = await Promise.all([
+  const [logo, , imgs, fts, mural, logoClaro] = await Promise.all([
     carregarImagem(base.logoSrc),
     // A Inter e a Fraunces têm de estar prontas antes do primeiro quadro: o canvas não espera.
     carregarFontes(),
     Promise.all(capas.map((u) => carregarImagem(u).then((img) => [u, img]))),
     fundo === 'biblioteca' ? Promise.all(fotos.slice(0, 8).map((u) => carregarImagem(u))) : Promise.resolve([]),
     Promise.all(doMural.map((u) => carregarImagem(u))),
+    carregarImagem(base.logoClaroSrc),
   ]);
   return {
-    ...base, plano, total: duracaoPlano(plano), logo, fundo,
+    ...base, plano, total: duracaoPlano(plano), logo, logoClaro, fundo,
     imagens: new Map(imgs.filter(([, img]) => img)),
     fotos: fts.filter(Boolean),
     mural: mural.filter(Boolean),
@@ -1110,7 +1247,7 @@ export async function renderVideo(d, onProgress, opts = {}) {
   const plano = planoVideo(d, opts.ritmo);
   const f = await preparar({
     ano: d.ano, comp: d.comp, critTxt: d.critTxt, fonte: d.fonte, fonteTxt: fonteTxtDe(d.fonte), geradoEm: d.geradoEm,
-    etiqueta: `${d.loja} · ${d.ano}${d.comp ? ' vs ' + d.comp : ''}`, logoSrc: d.logo,
+    etiqueta: `${d.loja} · ${d.ano}${d.comp ? ' vs ' + d.comp : ''}`, logoSrc: d.logo, logoClaroSrc: d.logoClaro,
   }, plano, { capas: capasDe(d.destaques), fotos: d.fotos || [], fundo: fundoDe(d.fundo) });
   return gravar(plano, (ctx, at) => desenharLoja(ctx, f, at, d), { onProgress, signal: opts.signal });
 }
@@ -1124,7 +1261,7 @@ export async function renderVideoConjunto(c, onProgress, opts = {}) {
   const D = c.destaques || {};
   const f = await preparar({
     ano: c.ano, comp: c.comp, critTxt: c.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: c.geradoEm,
-    etiqueta: `Todas as livrarias · ${c.ano}${c.comp ? ' vs ' + c.comp : ''}`, logoSrc: c.logo,
+    etiqueta: `Todas as livrarias · ${c.ano}${c.comp ? ' vs ' + c.comp : ''}`, logoSrc: c.logo, logoClaroSrc: c.logoClaro,
   }, plano, { capas: capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))), fotos: c.fotos || [], fundo: fundoDe(c.fundo) });
   return gravar(plano, (ctx, at) => desenharConjunto(ctx, f, at, c), { onProgress, signal: opts.signal });
 }
@@ -1139,12 +1276,11 @@ export async function quadroDoVideo(tipo, dados, sec, opts = {}) {
   const D = dados.destaques || {};
   const capas = conjunto ? capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))) : capasDe(D);
   const f = await preparar(conjunto
-    ? { ano: dados.ano, comp: dados.comp, critTxt: dados.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: dados.geradoEm, etiqueta: `Todas as livrarias · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo }
-    : { ano: dados.ano, comp: dados.comp, critTxt: dados.critTxt, fonte: dados.fonte, fonteTxt: fonteTxtDe(dados.fonte), geradoEm: dados.geradoEm, etiqueta: `${dados.loja} · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo },
+    ? { ano: dados.ano, comp: dados.comp, critTxt: dados.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: dados.geradoEm, etiqueta: `Todas as livrarias · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo, logoClaroSrc: dados.logoClaro }
+    : { ano: dados.ano, comp: dados.comp, critTxt: dados.critTxt, fonte: dados.fonte, fonteTxt: fonteTxtDe(dados.fonte), geradoEm: dados.geradoEm, etiqueta: `${dados.loja} · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo, logoClaroSrc: dados.logoClaro },
   plano, { capas, fotos: dados.fotos || [], fundo: fundoDe(dados.fundo) });
   const canvas = opts.canvas || Object.assign(document.createElement('canvas'), { width: W, height: H });
   const ctx = canvas.getContext('2d');
-  const at = { ...cenaNoTempo(plano, sec), t: sec };
-  if (conjunto) desenharConjunto(ctx, f, at, dados); else desenharLoja(ctx, f, at, dados);
+  const at = montar(ctx, plano, sec, (c, a) => (conjunto ? desenharConjunto(c, f, a, dados) : desenharLoja(c, f, a, dados)), [tela(), tela()]);
   return { canvas, plano, at };
 }

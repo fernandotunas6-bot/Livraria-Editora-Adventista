@@ -6,7 +6,7 @@
 import * as d3 from 'd3';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
-import { MESES, CRIT, buildYearModel } from './modelo.js';
+import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 
 export function mountPainel(root, api) {
@@ -425,6 +425,7 @@ export function mountPainel(root, api) {
     $('sp-estado').textContent = r.estado;
     $('sp-obs').textContent = r.obs ? '“' + r.obs + '”' : '';
     $('sp-mA').textContent = kz(M.R.media1); $('sp-mB').textContent = kz(M.R.media2);
+    fillPeriodo(M, r);
     const b1 = $('sp-b1'), b2 = $('sp-b2'), v1 = $('sp-v1'), v2 = $('sp-v2'), g = $('sp-g'), dd = $('sp-d');
     const sq = [1, 2, 3].map((i) => $('sq' + i));
     const val2 = r.v2 != null ? r.v2 : r.est;
@@ -454,6 +455,22 @@ export function mountPainel(root, api) {
       later(() => step(1, true), 150); later(() => step(2, true), 1050); later(() => step(3, true), 1950);
     } else { step(1, false); step(2, false); step(3, false); }
     highlight();
+  }
+  /** O período até ao mês: vendas e médias de cada ano, crescimento e diferenças (como no PowerPoint). */
+  function fillPeriodo(M, r) {
+    const P = periodoAte(M, r.i);
+    const A = M.ano, B = M.comp;
+    $('sp-ate').textContent = P.ate;
+    root.querySelectorAll('.lgAB').forEach((e) => { e.textContent = B != null ? `${B}/${String(A).slice(-2)}` : String(A); });
+    $('sp-pA').textContent = B != null ? kz(P.venda1) : '—';
+    $('sp-pB').textContent = kz(P.venda2);
+    $('sp-pmA').textContent = B != null ? kz(P.media1) : '—';
+    $('sp-pmB').textContent = kz(P.media2);
+    const sinal = (e, v, txt) => { e.textContent = txt; e.classList.remove('ok', 'bad'); if (v != null) e.classList.add(v >= 0 ? 'ok' : 'bad'); };
+    sinal($('sp-pG'), P.crescimento, pct(P.crescimento));
+    sinal($('sp-dM'), P.difMensal, P.difMensal != null ? kzs(P.difMensal) : '—');
+    sinal($('sp-dP'), P.difPeriodica, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
+    $('sp-pG').title = P.comparaveis ? `${P.comparaveis} ${P.comparaveis === 1 ? 'mês' : 'meses'} com valor nos dois anos` : '';
   }
   function runTimer(ms) {
     const e = $('sp-timer'); const t0 = performance.now();
@@ -877,7 +894,7 @@ export function mountPainel(root, api) {
       loja: lojaNome(), ano: M.ano, comp: M.comp, crit: M.crit, critTxt: CRIT[M.crit], meta: M.meta,
       fonte: (S.years[M.ano] && S.years[M.ano].fonte) || '',
       geradoEm: new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }),
-      logo: logoSrc(), rows: M.rows, R: M.R,
+      logo: logoSrc(), logoClaro: $('logo-claro') ? $('logo-claro').src : '', rows: M.rows, R: M.R,
       sys: S.sys.data && S.sys.ano === M.ano ? { counts: S.sys.data.counts } : null,
     };
   }
@@ -1066,7 +1083,8 @@ export function mountPainel(root, api) {
     if (it.k === 'capa') {
       s.classList.add('dark');
       s.appendChild(abs('s-cover-glow'));
-      const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
+      // A capa é escura: o logótipo branco (PNG transparente), sem caixa.
+      const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = $('logo-claro') ? $('logo-claro').src : logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
       s.append(abs('s-cover-eye', null, 'LOJA DO HUAMBO'), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
         abs('s-cover-s', null, (B != null ? 'Comparativo ' + B + ' vs ' + A + ' · ' : '') + 'Livraria e Editora Adventista, S.A.'));
     } else if (it.k === 'resumo') {
@@ -1100,27 +1118,32 @@ export function mountPainel(root, api) {
       head(s, M, r.mes + ' · Comparativo ' + (B != null ? B + ' vs ' : '') + A);
       const kp = el('div', 's-kpis');
       const K = (k, v, cls) => { const c = el('div', 's-kpi ' + (cls || '')); c.append(el('div', 'k', k)); const vv = el('div', 'v', v); c.append(vv); kp.appendChild(c); return vv; };
-      K('Mês em apresentação', r.mes, 'mes');
-      const k1 = K('Vendas ' + (B != null ? B : '—'), '—');
-      const k2 = K('Vendas ' + A, '—');
-      const k3 = K('Crescimento do mês', '—');
+      // Como no PowerPoint das lojas: o período até ao mês, em cima; o mês, no gráfico.
+      const P = periodoAte(M, r.i);
+      K('Período em apresentação até', r.mes, 'mes');
+      const k1 = K('Venda periódica ' + (B != null ? B : '—'), '—');
+      const k2 = K('Venda periódica ' + A, '—');
+      const k3 = K('Crescimento periódico', '—');
       s.appendChild(kp);
       const card = abs('s-card', { left: '48px', top: '256px', width: '780px', height: '400px' });
-      card.appendChild(abs('s-ct', null, 'Comparativo mensal'));
+      card.appendChild(abs('s-ct', null, 'Venda mensal'));
       const bars = el('div', 's-bars');
       const mx = d3.max(M.rows, (q) => Math.max(q.v1 || 0, q.v2 || 0, q.est || 0)) || 1;
       const mk = (cls, label, yr) => { const b = el('div', 's-bar ' + cls); const v = el('div', 'v', ''); const bb = el('div', 'b'); const l = el('div', 'l'); l.append(document.createTextNode(label + ' - ')); l.append(el('em', null, String(yr))); b.append(v, bb, l); bars.appendChild(b); return { b, v, bb }; };
       const b1 = mk('y1', r.mes, B != null ? B : '—');
       const b2 = mk('y2' + (r.estado === 'Em curso' ? ' partial' : r.estado === 'Por preencher' ? ' est' : ''), r.mes, A);
       card.appendChild(bars);
-      const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento do mês')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
+      const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento mensal')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
       s.appendChild(card);
       const det = abs('s-card s-det', { left: '852px', top: '256px', width: '380px', height: '400px' });
       det.appendChild(abs('s-ct', null, 'Detalhe de ' + r.mes));
       const row2 = (top, k, v) => { const d = abs('row2', { top: top + 'px' }); d.append(el('span', null, k), el('b', null, v)); det.appendChild(d); };
-      row2(78, 'Média mensal ' + (B != null ? B : '—'), kz(R.media1));
-      row2(108, 'Média mensal ' + A, kz(R.media2));
-      row2(138, 'Estado do mês', r.estado);
+      const ab = B != null ? `${String(B).slice(-2)}/${String(A).slice(-2)}` : String(A);
+      row2(66, 'Média mensal ' + (B != null ? B : '—'), B != null ? kz(P.media1) : '—');
+      row2(94, 'Média mensal ' + A, kz(P.media2));
+      row2(122, 'Diferença mensal ' + ab, P.difMensal != null ? kzs(P.difMensal) : '—');
+      row2(150, 'Diferença periódica ' + ab, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
+      row2(178, 'Estado do mês', r.estado);
       const sq = el('div', 's-seq'); sq.append(el('div', 'h', 'Sequência de apresentação'));
       const i1 = el('div', 'i a', '1º  ' + (B != null ? B : '—')), i2 = el('div', 'i b', '2º  ' + A), i3 = el('div', 'i c', '3º  Crescimento');
       sq.append(i1, i2, i3); det.appendChild(sq);
@@ -1129,14 +1152,16 @@ export function mountPainel(root, api) {
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      pLater(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); countUp(k1, r.v1, kz, 800); }, 400);
-      pLater(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, val2, f2, 800); }, 1400);
+      pLater(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
+      pLater(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
       pLater(() => {
         i3.classList.add('on'); gr.classList.add('on');
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
-        gv.className = 'g ' + cls; k3.className = 'v ' + cls;
-        if (r.cresc != null) { countUp(gv, r.cresc, pct, 1000); countUp(k3, r.cresc, pct, 1000); }
-        else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; k3.textContent = '—'; }
+        gv.className = 'g ' + cls;
+        k3.className = 'v ' + (P.crescimento == null ? 's-mut' : P.crescimento >= 0 ? 's-ok' : 's-bad');
+        if (P.crescimento != null) countUp(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
+        if (r.cresc != null) countUp(gv, r.cresc, pct, 1000);
+        else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; }
         gd.textContent = r.dif != null ? kzs(r.dif) + (r.estado === 'Em curso' ? ' · mês em curso' : '') : (r.est != null ? 'Estimativa: ' + CRIT[M.crit] : '');
       }, 2400);
     } else if (it.k === 'quadro') {

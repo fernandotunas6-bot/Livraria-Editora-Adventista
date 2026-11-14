@@ -7,6 +7,8 @@ import cssPainel from '@/painel-vendas/painel.css?inline';
 import cssConjunto from '@/painel-vendas/consolidado.css?inline';
 import markup from '@/painel-vendas/consolidado.html?raw';
 import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
+// A versão branca, para o topo escuro e para os vídeos (PNG transparente, sem fundo branco).
+import logoClaroUrl from '@/painel-vendas/logo-livraria-adventista-claro.png';
 
 // A mesma chave do separador Vendas por loja: abrir uma loja daqui deixa-a escolhida lá.
 const STORE_KEY = 'painel-vendas:loja';
@@ -37,7 +39,7 @@ const RelatoriosLojasTab = ({ onOpenStore }) => {
     if (!multi) return undefined;
     const host = hostRef.current;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
-    root.innerHTML = `<style>${cssPainel}\n${cssConjunto}</style>${markup.replace('__LOGO__', logoUrl)}`;
+    root.innerHTML = `<style>${cssPainel}\n${cssConjunto}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
     const api = createConsolidadoApi({ canEdit });
     api.abrirLoja = (id) => {
       try { localStorage.setItem(STORE_KEY, id); } catch { /* sem localStorage: abre a loja de omissão */ }

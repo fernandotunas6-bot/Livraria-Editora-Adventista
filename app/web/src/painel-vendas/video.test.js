@@ -152,3 +152,18 @@ describe('fundos dos vídeos', () => {
     expect(ehCapa(300, 520)).toBe(false);
   });
 });
+
+describe('transições entre quadros (estilo Premiere)', () => {
+  it('só no início de cada quadro, a partir do segundo, e com o quadro anterior no fim', async () => {
+    const { TRANSICAO, estadoDaTransicao } = await import('./video');
+    const p = planoVideo(d, 'lento');
+    expect(estadoDaTransicao(p, 0)).toBeNull(); // o primeiro quadro entra sem transição
+    const inicio2 = p[0].dur;
+    const meio = estadoDaTransicao(p, inicio2 + TRANSICAO / 2);
+    expect(meio.k).toBeGreaterThan(0.3);
+    expect(meio.k).toBeLessThan(0.7);
+    expect(meio.anterior.i).toBe(0);
+    expect(meio.anterior.p).toBeGreaterThan(0.99);
+    expect(estadoDaTransicao(p, inicio2 + TRANSICAO + 0.01)).toBeNull();
+  });
+});
