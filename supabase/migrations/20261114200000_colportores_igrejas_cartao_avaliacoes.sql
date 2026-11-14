@@ -221,7 +221,9 @@ drop policy if exists "colporteur_reviews: equipa ou o autor lê" on public.colp
 create policy "colporteur_reviews: equipa ou o autor lê" on public.colporteur_reviews for select to authenticated
   using ((select private.can_manage_colporteurs()) or user_id = (select auth.uid()));
 
--- A encomenda do cliente com sessão, pelo número: dele pela conta ou pelo email.
+-- A encomenda do cliente com sessão, pelo número: dele pela conta, ou pelo email da conta só se
+-- estiver confirmado (private.order_belongs_to, a regra dos livros digitais). Um email por
+-- confirmar não avalia em nome de quem comprou sem conta.
 create or replace function private.encomenda_do_cliente(p_order_number text)
 returns public.orders
 language sql
@@ -231,9 +233,7 @@ set search_path = ''
 as $$
   select o.* from public.orders o
   where o.order_number = btrim(coalesce(p_order_number, ''))
-    and auth.uid() is not null
-    and (o.customer_id = auth.uid()
-         or (coalesce(auth.jwt() ->> 'email', '') <> '' and lower(o.customer_email) = lower(auth.jwt() ->> 'email')))
+    and private.order_belongs_to(o, auth.uid())
   order by o.created desc
   limit 1;
 $$;

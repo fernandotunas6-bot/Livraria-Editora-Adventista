@@ -134,8 +134,9 @@ await q(`insert into public.payment_methods (name, code, type, enabled) values (
 // depois muda de estado como faria a equipa.
 const encomenda = async (n, extra = {}) => {
   const [o] = await q(`insert into public.orders (order_number, customer_email, customer_name, customer_id, items, total, colporteur_code, shipping_method)
-    values ($1, 'cliente@exemplo.ao', 'Maria Cliente', $2, $3::jsonb, 10000, $4, 'delivery') returning id, order_number`,
-  [n, cliente.id, JSON.stringify([{ book_id: livro.id, quantity: 2 }]), extra.codigo || null]);
+    values ($1, $5, 'Maria Cliente', $2, $3::jsonb, 10000, $4, 'delivery') returning id, order_number`,
+  [n, extra.semConta ? null : cliente.id, JSON.stringify([{ book_id: livro.id, quantity: 2 }]), extra.codigo || null,
+    extra.email || 'cliente@exemplo.ao']);
   if (extra.pago !== false) {
     // O pagamento regista-se como no painel (o estado «pago» resulta dele); depois, a entrega.
     await svc(`select public.order_payment_record($1, 10000::numeric, 'transferencia', $2)`, [o.id, `TRF-${n}`], admin.id);
@@ -162,6 +163,22 @@ const [{ t: alheia }] = await as(outro, `select public.colporteur_review_targets
 check('outra pessoa não vê os colportores da encomenda', alheia.length === 0);
 const [{ t: anonimo }] = await anon(`select public.colporteur_review_targets('ENC-R1') as t`).catch(() => [{ t: null }]);
 check('sem sessão não há avaliação', anonimo === null || anonimo.length === 0);
+
+// E4: comprada sem conta, com o código de A. A conta com o mesmo email só a avalia depois de
+// confirmar o email (a regra dos livros digitais), mesmo que o token traga esse email.
+await encomenda('ENC-R4', { codigo: 'cpt1', email: 'convidado@exemplo.ao', semConta: true });
+const [conv] = await q(`insert into auth.users (email) values ('convidado@exemplo.ao') returning id`);
+const convidado = { id: conv.id, email: 'convidado@exemplo.ao' };
+const [{ t: porConfirmar }] = await as(convidado, `select public.colporteur_review_targets('ENC-R4') as t`);
+check('email por confirmar: não vê os colportores da compra sem conta', porConfirmar.length === 0, porConfirmar);
+await raises('email por confirmar: não avalia a compra sem conta', () => as(convidado, `select public.colporteur_review_save('ENC-R4', $1::uuid, 1, 'mau')`, [A]), /não encontrada/);
+await q(`update auth.users set email_confirmed_at = now() where id = $1`, [conv.id]);
+const [{ t: confirmado }] = await as(convidado, `select public.colporteur_review_targets('ENC-R4') as t`);
+check('email confirmado: avalia a compra que fez sem conta', confirmado.length === 1 && confirmado[0].colporteur_id === A, confirmado);
+// Cancelada, sai das avaliações e das vendas de A (as contas abaixo não a contam).
+await q(`update public.orders set status = 'cancelled' where order_number = 'ENC-R4'`);
+const [{ t: cancelada }] = await as(convidado, `select public.colporteur_review_targets('ENC-R4') as t`);
+check('encomenda cancelada: já não se avalia o colportor do código', cancelada.length === 0, cancelada);
 
 await as(cliente, `select public.colporteur_review_save('ENC-R1', $1::uuid, 4, '  Muito simpática  ')`, [A]);
 await as(cliente, `select public.colporteur_review_save('ENC-R1', $1::uuid, 5, 'Muito simpática e pontual')`, [A]);
