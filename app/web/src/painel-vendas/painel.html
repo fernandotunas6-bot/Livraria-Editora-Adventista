@@ -1,8 +1,10 @@
 <div class="wrap">
   <section class="hero" id="topo">
+    <!-- Capas de livros ao fundo (capas-de-fundo.js): as dos mais vendidos e, a completar, as do catálogo. -->
+    <div class="hero-capas" id="hero-capas" aria-hidden="true" hidden></div>
     <div>
       <div class="brand">
-        <span class="logo"><img alt="Livraria &amp; Editora Adventista" src="__LOGO__" id="logo-img"></span>
+        <img alt="" src="__LOGO__" id="logo-img" hidden>
         <span class="eyebrow" id="eyebrow">Livraria e Editora Adventista · Loja do Huambo</span>
       </div>
       <h1 class="h1" id="titulo">Painel de Vendas</h1>
@@ -80,6 +82,18 @@
       <div class="progress" aria-hidden="true"><span id="proj-bar"></span></div>
     </div>
   </section>
+
+  <!-- Os mais vendidos do ano, com as capas em moldura (capas-de-fundo.js: pintarMaisVendidos). -->
+  <section class="card mv" id="mv" hidden>
+    <div class="head">
+      <div>
+        <h2>Os mais vendidos de <span id="mv-ano">—</span></h2>
+        <p class="note" id="mv-note">Unidades vendidas no ano: encomendas do site e o que se lançou à mão.</p>
+      </div>
+    </div>
+    <ol class="mv-lista" id="mv-lista"></ol>
+  </section>
+
 
   <section class="row">
     <div class="card" id="card-mensal">

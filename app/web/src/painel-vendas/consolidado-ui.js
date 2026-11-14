@@ -12,6 +12,7 @@ import { MESES, MESES_CURTOS } from './modelo.js';
 import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
 import { buildXlsx, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
+import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
 import { estiloBaseImpressao } from '../lib/fontes.js';
 
@@ -123,8 +124,28 @@ export function mountConsolidado(root, api) {
     $('ro-badge').hidden = !!api.canEdit;
     fillTake(c); fillKpis(c, animate); fillPend(c);
     drawRede(c, animate); fillRank(c); drawAcum(c); drawCresc(c);
-    fillMx(c); fillLojas(c); fillSys(); videoLabels(c);
+    fillMx(c); fillLojas(c); fillSys(); videoLabels(c); topoCapas(c.ano);
     if (S.ed.open) edRender();
+  }
+
+  const grpUn = (n) => { const v = Number(n) || 0; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+  /** As capas do topo: os mais vendidos da rede no ano e, a completar, as do catálogo. */
+  function topoCapas(ano) {
+    const pintar = (itens) => {
+      if (dead) return;
+      const n = window.innerWidth < 700 ? 12 : 20;
+      pintarParede($('hero-capas'), capasParaFundo(itens, { n, chave: `rede:${ano}` }), { colunas: n > 12 ? 5 : 3 });
+    };
+    pintar([]);
+    $('mv').hidden = true;
+    extrasDe(ano).then((x) => {
+      if (dead || S.ano !== ano) return;
+      const itens = x && x.destaques && x.destaques.rede ? x.destaques.rede.ano || [] : [];
+      pintar(itens);
+      $('mv-ano').textContent = String(ano);
+      pintarMaisVendidos($('mv-lista'), itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+      $('mv').hidden = !itens.length;
+    });
   }
 
   function fillTake(c) {
@@ -371,14 +392,23 @@ export function mountConsolidado(root, api) {
     const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Crescimento de cada livraria');
     const lw = Math.min(170, W * 0.36);
     const vals = lista.map((l) => l.M.R.cresc_ytd).concat([c.total.R.cresc_ytd || 0, 0]);
-    const x = d3.scaleLinear().domain([Math.min(0, d3.min(vals)), Math.max(0, d3.max(vals))]).nice().range([lw + 10, W - 70]);
+    const x = d3.scaleLinear().domain([Math.min(0, d3.min(vals)), Math.max(0, d3.max(vals))]).nice().range([lw + 16, W - 70]);
     svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', 4).attr('y2', H - 20).style('stroke', 'var(--axis)');
     lista.forEach((l, i) => {
       const yy = 10 + i * rh;
       const v = l.M.R.cresc_ytd;
-      svg.append('text').attr('x', lw).attr('y', yy + 14).attr('text-anchor', 'end').style('fill', 'var(--fg)').style('font-weight', 700).text(l.nome.length > 26 ? l.nome.slice(0, 25) + '…' : l.nome);
+      const nome = svg.append('text').attr('x', lw).attr('y', yy + 15).attr('text-anchor', 'end').style('fill', 'var(--fg)').style('font-weight', 700).text(l.nome);
+      // O nome nunca entra na zona das barras: encurta-se até caber (o nome inteiro fica na dica).
+      const n0 = nome.node();
+      if (n0.getComputedTextLength) {
+        let t = l.nome;
+        while (t.length > 4 && n0.getComputedTextLength() > lw - 4) { t = t.slice(0, -1); nome.text(t.trimEnd() + '…'); }
+      }
+      nome.append('title').text(l.nome);
       svg.append('rect').attr('x', Math.min(x(0), x(v))).attr('y', yy + 2).attr('width', Math.max(1, Math.abs(x(v) - x(0)))).attr('height', 18).attr('rx', 4).attr('fill', v >= 0 ? 'var(--pos)' : 'var(--neg)');
-      svg.append('text').attr('x', v >= 0 ? x(v) + 6 : x(v) - 6).attr('y', yy + 15).attr('text-anchor', v >= 0 ? 'start' : 'end').style('font-weight', 700).style('fill', v >= 0 ? 'var(--ok)' : 'var(--bad)').text(pct(v));
+      // Valor do lado de fora da barra positiva; na negativa, do outro lado do zero (à esquerda
+      // ficava por cima do nome da loja).
+      svg.append('text').attr('x', v >= 0 ? x(v) + 6 : x(0) + 6).attr('y', yy + 15).attr('text-anchor', 'start').style('font-weight', 700).style('fill', v >= 0 ? 'var(--ok)' : 'var(--bad)').text(pct(v));
     });
     const R = c.total.R;
     if (R.cresc_ytd != null) {

@@ -7,6 +7,7 @@ import * as d3 from 'd3';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
 import { MESES, CRIT, buildYearModel } from './modelo.js';
+import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 
 export function mountPainel(root, api) {
   const short = (m) => m.slice(0, 3);
@@ -511,13 +512,38 @@ export function mountPainel(root, api) {
     const M = S.model;
     fillKpis(M, animate);
     drawMensal(M, animate); drawAcum(M, animate); drawVar(M, animate);
-    fillQuadro(M); fillConf(M); videoLabels(M);
+    fillQuadro(M); fillConf(M); videoLabels(M); topoCapas(M.ano);
     $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
     if (!S.sel) S.sel = (M.R.ultimoFech || M.R.ultimo || M.rows[0]).mes;
     if (!S.playing) select(S.sel, animate); else highlight();
   }
+  const grpUn = (n) => { const v = Number(n) || 0; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+  /** As capas do topo: os mais vendidos da loja no ano e, a completar, as do catálogo. */
+  function topoCapas(ano) {
+    const pintar = (itens) => {
+      if (dead) return;
+      const n = window.innerWidth < 700 ? 12 : 20;
+      pintarParede($('hero-capas'), capasParaFundo(itens, { n, chave: `${S.store ? S.store.name : ''}:${ano}` }), { colunas: n > 12 ? 5 : 3 });
+    };
+    pintar([]);
+    $('mv').hidden = true;
+    if (S.extras) {
+      extrasDe(ano).then((x) => {
+        if (dead || S.ano !== ano) return;
+        const itens = x && x.destaques ? x.destaques.ano || [] : [];
+        pintar(itens);
+        maisVendidos(itens, ano);
+      });
+    }
+  }
+  function maisVendidos(itens, ano) {
+    $('mv-ano').textContent = String(ano);
+    pintarMaisVendidos($('mv-lista'), itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+    $('mv').hidden = !itens.length;
+  }
   function showEmpty(msg) {
     S.model = null;
+    topoCapas(new Date().getFullYear());
     $('takeaway').textContent = msg || 'Ainda não há anos registados. Entre na Administração para adicionar o primeiro ano.';
     ['k1', 'k2', 'k3', 'k4', 'k5'].forEach((id) => { $(id).textContent = '—'; });
     ['chart-mensal', 'chart-acum', 'chart-var'].forEach((id) => clearBox($(id), 'Sem dados para mostrar.'));
