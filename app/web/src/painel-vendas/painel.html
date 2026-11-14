@@ -55,6 +55,22 @@
     </div>
   </section>
 
+  <!-- Filtros avançados (filtros-ui.js): o período, só os meses fechados. -->
+  <section class="card filtros" id="filtros" aria-label="Filtros do relatório">
+    <div class="f-row">
+      <span class="f-t"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 2h12L8.5 7.5V12l-3-1.5v-3z" fill="currentColor"/></svg>Filtros</span>
+      <label class="f-sel" for="f-periodo">Período<select id="f-periodo"></select></label>
+      <span class="f-pers" id="f-pers" hidden>
+        <label class="f-sel" for="f-de">De<select id="f-de"></select></label>
+        <label class="f-sel" for="f-ate">Até<select id="f-ate"></select></label>
+      </span>
+      <label class="f-chk"><input type="checkbox" id="f-fech">Só meses fechados</label>
+      
+      <button class="btn line sm" id="f-limpar" type="button" hidden>Limpar filtros</button>
+    </div>
+    <p class="f-resumo" id="f-resumo" role="status"></p>
+  </section>
+
   <section class="kpis" id="kpis">
     <div class="card kpi">
       <span class="accent"></span>

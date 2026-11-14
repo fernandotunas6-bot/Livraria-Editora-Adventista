@@ -9,10 +9,12 @@
  */
 import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
-import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
+import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
 import { buildXlsx, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
+import { filtroActivo, mesesDoPeriodo, recortarConsolidado, rotuloFiltro } from './filtros.js';
+import { montarFiltros } from './filtros-ui.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
 import { estiloBaseImpressao } from '../lib/fontes.js';
 
@@ -83,6 +85,7 @@ export function mountConsolidado(root, api) {
     }
     if (dead) return;
     S.anos = anosDisponiveis(S.lojas);
+    if (FIL) FIL.actualizar();
     if (S.ano == null || (!S.anos.includes(S.ano) && S.ano !== anoActual)) {
       S.ano = S.anos.includes(anoActual) ? anoActual : (S.anos.length ? S.anos[S.anos.length - 1] : anoActual);
     }
@@ -111,8 +114,30 @@ export function mountConsolidado(root, api) {
   $('sel-comp').addEventListener('change', () => { S.comp = $('sel-comp').value ? Number($('sel-comp').value) : null; render(false); });
 
   // ---------- Desenhar tudo ----------
+  // Filtros avançados (filtros-ui.js): S.cAno é o ano inteiro das lojas escolhidas; S.c, o recortado.
+  let FIL = null;
+  function consolidadoFiltrado() {
+    const F = FIL ? FIL.filtro() : null;
+    const lojas = F && F.lojas ? S.lojas.filter((l) => F.lojas.includes(l.id)) : S.lojas;
+    const cAno = buildConsolidado(lojas.length ? lojas : S.lojas, S.ano, S.comp);
+    // Cada loja fica com a sua cor mesmo quando outras saem do filtro (a cor é a da ordem de todas).
+    if (lojas.length !== S.lojas.length) {
+      const corDe = Object.fromEntries(S.lojas.map((l, i) => [l.id, CORES_LOJAS[i % CORES_LOJAS.length]]));
+      cAno.lojas.forEach((l) => { l.cor = corDe[l.id] || l.cor; });
+      cAno.meses.forEach((m) => m.porLoja.forEach((p) => { p.cor = corDe[p.id] || p.cor; }));
+    }
+    if (!F || !filtroActivo(F, S.lojas.length) || (F.periodo === 'ano' && !F.soFechados)) {
+      if (F && F.lojas) cAno.filtro = { rotulo: 'Jan–Dez', texto: rotuloFiltro(F, { nLojas: S.lojas.length }) };
+      return { c: cAno, cAno };
+    }
+    const ult = cAno.total.R.ultimo ? cAno.total.R.ultimo.i : 11;
+    const c = recortarConsolidado(cAno, mesesDoPeriodo(F, ult), { soFechados: F.soFechados });
+    c.filtro = { ...c.filtro, texto: rotuloFiltro(F, { ultimo: ult, nLojas: S.lojas.length }) };
+    return { c, cAno };
+  }
   function render(animate) {
-    const c = buildConsolidado(S.lojas, S.ano, S.comp);
+    const { c, cAno } = consolidadoFiltrado();
+    S.cAno = cAno;
     c.geradoEm = new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
     c.logo = logoSrc();
     c.logoClaro = $('logo-claro') ? $('logo-claro').src : '';
@@ -124,7 +149,8 @@ export function mountConsolidado(root, api) {
     $('btn-edit').hidden = !api.canEdit;
     $('ro-badge').hidden = !!api.canEdit;
     fillTake(c); fillKpis(c, animate); fillPend(c);
-    drawRede(c, animate); fillRank(c); drawAcum(c); drawCresc(c);
+    // O acumulado da rede é sempre o do ano inteiro (com a projecção do ano).
+    drawRede(c, animate); fillRank(c); drawAcum(cAno); drawCresc(c);
     fillMx(c); fillLojas(c); fillSys(); videoLabels(c); topoCapas(c.ano);
     if (S.ed.open) edRender();
   }
@@ -158,7 +184,8 @@ export function mountConsolidado(root, api) {
       return;
     }
     const b = (s) => el('b', null, s);
-    t.append(`Em ${c.ano}, ${c.nComDados === 1 ? 'a livraria registou' : `as ${c.nComDados} livrarias registaram`} `, b(kz(R.ytd2)));
+    if (c.filtro && c.filtro.texto) t.append('Filtro ', b(c.filtro.texto), ': ');
+    t.append(`${c.filtro && c.filtro.texto ? 'em' : 'Em'} ${c.ano}, ${c.nComDados === 1 ? 'a livraria registou' : `as ${c.nComDados} livrarias registaram`} `, b(kz(R.ytd2)));
     if (R.ultimo) t.append(` até ${R.ultimo.mes}`);
     if (R.cresc_ytd != null) {
       const s = el('span', R.cresc_ytd >= 0 ? 'up' : 'dn', ` ${pct(R.cresc_ytd)}`);
@@ -166,7 +193,7 @@ export function mountConsolidado(root, api) {
     }
     t.append('. ');
     if (c.melhorLoja && c.nComDados > 1) t.append(b(c.melhorLoja.nome), ` lidera com ${pctS(c.melhorLoja.quota)} das vendas. `);
-    if (R.projeccao != null) t.append('Projecção da rede: ', b(kz(R.projeccao)), '. ');
+    if (R.projeccao != null) t.append(c.filtro && c.filtro.meses ? `Projecção da rede (${c.filtro.rotulo}): ` : 'Projecção da rede: ', b(kz(R.projeccao)), '. ');
     if (c.pendentes.length) t.append(`Faltam registar meses em ${c.pendentes.length} ${c.pendentes.length === 1 ? 'loja' : 'lojas'}.`);
   }
 
@@ -187,12 +214,12 @@ export function mountConsolidado(root, api) {
       R.cresc_ytd != null ? [pill(R.cresc_ytd), `vs ${B}, lojas comparáveis`] : (B != null ? `sem meses comparáveis com ${B}` : 'sem ano de comparação'),
       { animate, raw: R.ytd2 });
     setKpi(2, 'Diferença nas lojas comparáveis', kzs(R.dif_ytd), R.ytd1 != null ? `${kz(R.ytd2c)} contra ${kz(R.ytd1)} em ${B} · ${R.lojasComparaveis} ${R.lojasComparaveis === 1 ? 'loja' : 'lojas'}` : '—', { animate, raw: R.dif_ytd, fmt: kzs });
-    setKpi(3, 'Média mensal da rede', kz(R.media2),
+    setKpi(3, 'Média mensal da rede' + (c.filtro && c.filtro.meses ? ' · ' + c.filtro.rotulo : ''), kz(R.media2),
       [R.cresc_media != null ? pill(R.cresc_media) : '', `${R.nfech} ${R.nfech === 1 ? 'mês completo' : 'meses completos'}${R.media1 != null ? ' · ' + kz(R.media1) + ' em ' + B : ''}`],
       { animate, raw: R.media2 });
     const L = c.melhorLoja;
     setKpi(4, 'Livraria com mais vendas', L ? L.nome : '—', L ? `${kz(L.M.R.ytd2)} · ${pctS(L.quota)} da rede` : '—', { small: true });
-    setKpi(5, 'Projecção da rede ' + c.ano, kz(R.projeccao),
+    setKpi(5, 'Projecção da rede ' + (c.filtro && c.filtro.meses ? c.filtro.rotulo + ' ' : '') + c.ano, kz(R.projeccao),
       R.cresc_proj != null ? [pill(R.cresc_proj), `vs total de ${B} (${kz(R.total1)})`] : (R.falta != null ? `faltam ${kz(R.falta)}` : 'soma das projecções de cada loja'),
       { animate, raw: R.projeccao });
     $('proj-bar').style.width = Math.min(100, Math.round((R.progresso || 0) * 100)) + '%';
@@ -274,7 +301,8 @@ export function mountConsolidado(root, api) {
     const bw = Math.min(30, xi.bandwidth());
     const off = (xi.bandwidth() - bw) / 2;
     const base = y(0);
-    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(${x(r.mes)},0)`);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(${x(r.mes)},0)`)
+      .style('opacity', (r) => (r.fora ? 0.22 : null));
     // A animação é CSS (consolidado.css, .grow): o pacote d3 declara-se sem efeitos secundários e
     // o selection.transition() do d3-transition não vinha neste pedaço do site compilado.
     const grow = (sel, y0, y1, i) => {
@@ -444,6 +472,10 @@ export function mountConsolidado(root, api) {
       return tr;
     });
     t.tBodies[0].replaceChildren(...linhas);
+    // Os meses fora do filtro, esbatidos (a coluna 0 é a do nome da loja).
+    const foraCols = c.total.rows.filter((r) => r.fora).map((r) => r.i + 1);
+    const esbater = (tr) => foraCols.forEach((k) => { const cel = tr.children[k]; if (cel) cel.classList.add('fora'); });
+    linhas.forEach(esbater);
     const R = c.total.R;
     const rede = el('tr');
     rede.append(td('Rede ' + c.ano));
@@ -459,6 +491,7 @@ export function mountConsolidado(root, api) {
       r2.append(td('Rede ' + c.comp), ...c.total.rows.map((r) => td(r.v1 != null ? grp(r.v1) : '—')), td(grp(R.total1), 'tot'), td('', 'tot'), td(''));
       foot.push(r2);
     }
+    foot.forEach(esbater);
     t.tFoot.replaceChildren(...foot);
   }
   root.querySelectorAll('#quadro .tab').forEach((b) => b.addEventListener('click', () => {
@@ -958,6 +991,7 @@ export function mountConsolidado(root, api) {
       ['Indicador', 'Valor', 'Notas'],
       ['Relatório', 'Todas as livrarias', c.nComDados + (c.nComDados === 1 ? ' loja com vendas' : ' lojas com vendas')],
       ['Ano', String(A), B != null ? 'comparado com ' + B : 'sem comparação'],
+      ...(c.filtro && c.filtro.texto ? [['Filtro', c.filtro.texto, 'os totais contam só o filtro']] : []),
       ['Vendas da rede ' + A + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''), R.ytd2, ''],
       ['Lojas comparáveis ' + A, R.ytd2c, `lojas e meses com valor nos dois anos (${R.lojasComparaveis || 0} lojas)`],
       ['Lojas comparáveis ' + (B ?? '—'), R.ytd1, ''],
@@ -1122,6 +1156,16 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
   listen(window, 'resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.c && !dead) { drawRede(S.c, false); drawAcum(S.c); drawCresc(S.c); } }, 150); });
   // Aviso ao sair com lançamentos por guardar.
   listen(window, 'beforeunload', (e) => { if (S.ed.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- Filtros avançados ----------
+  FIL = montarFiltros(root, {
+    chave: 'relatorios:filtros:conjunto',
+    lojas: () => S.lojas.map((l, i) => ({ id: l.id, nome: l.name, cor: CORES_LOJAS[i % CORES_LOJAS.length], conta: l.active || Object.keys(l.years || {}).length }))
+      .filter((l) => l.conta),
+    ultimo: () => (S.cAno && S.cAno.total.R.ultimo ? S.cAno.total.R.ultimo.i : 11),
+    onChange: () => { if (S.lojas.length) render(true); },
+  });
+  offs.push(() => FIL.desmontar());
 
   carregar();
 

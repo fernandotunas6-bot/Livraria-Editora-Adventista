@@ -63,7 +63,8 @@ export function planoVideo(d, ritmoId = 'lento') {
     { k: 'resumo', nome: 'Resumo do ano' },
     { k: 'mensal', nome: 'Vendas por mês' },
   ];
-  if (ritmo.detalhe) d.rows.forEach((r) => cenas.push({ k: 'mes', nome: r.mes, r }));
+  // Com um filtro de período, só os meses do filtro têm quadro próprio.
+  if (ritmo.detalhe) d.rows.filter((r) => !r.fora).forEach((r) => cenas.push({ k: 'mes', nome: r.mes, r }));
   cenas.push(
     { k: 'quadro', nome: 'Quadro geral' },
     { k: 'acum', nome: 'Acumulado e projecção' },
