@@ -20,7 +20,9 @@ const NOT_COLUMNS = new Set(['constraint', 'primary', 'unique', 'check', 'foreig
 export function columnsFromMigrations(files) {
   const cols = new Map();
   const set = (t) => { if (!cols.has(t)) cols.set(t, new Set()); return cols.get(t); };
-  for (const sql of files) {
+  for (const original of files) {
+    // Sem os comentários: um «-- Reverter: alter table … drop column x» não apaga a coluna x.
+    const sql = original.replace(/--[^\n]*/g, '');
     for (const m of sql.matchAll(/create table (?:if not exists )?(?:public\.)?"?(\w+)"?\s*\(([\s\S]*?)\n\);/gi)) {
       const t = set(m[1]);
       for (const line of m[2].split('\n')) {

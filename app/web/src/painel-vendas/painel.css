@@ -328,6 +328,10 @@ details.more[open] summary { margin-bottom: 10px; }
 .exp button:hover { background: rgba(255,255,255,.14); }
 .exp button:disabled { opacity: .5; cursor: default; }
 .exp-st { margin: 0; color: var(--band-muted); text-align: right; position: relative; z-index: 1; min-height: 1em; }
+/* A escolha do fundo dos vídeos, no topo do menu Exportar. */
+.exp .exp-opt { flex-basis: 100%; display: flex; gap: 8px; align-items: center; justify-content: flex-end; font-size: 12px; font-weight: 700; color: var(--band-muted); }
+.exp .exp-opt select { font: inherit; font-size: 12px; font-weight: 600; color: var(--band-fg); background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 4px 8px; color-scheme: dark; }
+@media (max-width: 700px) { .exp .exp-opt { justify-content: flex-start; } }
 @media (max-width: 700px) { .exp { justify-content: flex-start; } .exp-st { text-align: left; } }
 
 /* Vendas registadas no sistema (editor) */

@@ -198,7 +198,9 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | | Equipas e alertas (`equipas`) | `manage_users` ou `manage_orders` |
 | | Métodos de pagamento (`payments`) | `manage_payments` |
 | | Lojas (`stores`) | `manage_settings` |
-| Relatórios | Vendas por loja (`vendas-huambo`) | `view_reports` (Ver relatórios) |
+| Relatórios | Todas as livrarias (`relatorios-lojas`): o relatório conjunto da rede, com vídeo, exportações e o lançamento das vendas de todas as lojas — [RELATORIOS.md](RELATORIOS.md) | `view_reports` ou `edit_reports` (só de leitura sem `edit_reports`) |
+| | Vendas por loja (`vendas-huambo`) | `view_reports` ou `edit_reports` (só de leitura sem `edit_reports`) |
+| | Imagens dos vídeos (`imagens-videos`): a biblioteca de imagens dos vídeos e os mais vendidos lançados à mão | `view_reports`, `edit_reports` ou `manage_catalog` (este só a biblioteca); altera com `edit_reports` ou `manage_catalog` |
 | | Pagamentos e caixa (`pagamentos-caixa`) | `view_reports` ou `confirm_payments` |
 | Clientes | Utilizadores (`users`) | `manage_users` |
 | | Contactos e campanhas (`contacts`) | `manage_marketing` |
@@ -226,6 +228,8 @@ Só o que **pede acção**, nunca totais:
 | Secção | Vistas (`vista`) | Quem vê |
 |---|---|---|
 | Utilizadores | Clientes (`customers`), Equipa (`team`) | quem vê a secção (alterar a equipa é só do administrador) |
+| Imagens dos vídeos | Biblioteca de imagens (`imagens`) | quem vê a secção |
+| | Mais vendidos (`mais-vendidos`) | `view_reports` ou `edit_reports` (lançar: `edit_reports`) |
 | | Cargos (`cargos`) | administrador |
 | Contactos e campanhas | Contactos, Grupos, Campanhas, Histórico (`contacts`, `groups`, `campaigns`, `history`) | quem vê a secção |
 | Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados, Níveis dos leitores (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`, `niveis`) | quem vê a secção |
@@ -243,7 +247,11 @@ não vê a Colportagem vai às Encomendas).
 A permissão **Ver relatórios** (`view_reports`, migração `20261108130000_cargos_e_ver_relatorios`)
 separa a facturação das encomendas: Vendas por loja, o relatório de vendas dentro das Encomendas e
 os números do mês no Início. Quem trata encomendas sem ela vê as encomendas, não a facturação.
-Os gestores que já geriam encomendas receberam-na na migração. As chaves das permissões estão em
+Os gestores que já geriam encomendas receberam-na na migração. **Editar relatórios de vendas**
+(`edit_reports`, migração `20261114120000_relatorios_de_todas_as_livrarias`) é a de quem lança os
+números do mês: abre os dois ecrãs de vendas (Todas as livrarias e Vendas por loja) e grava-os, sem
+abrir o caixa nem as finanças; apagar um ano inteiro continua só do administrador
+([RELATORIOS.md](RELATORIOS.md)). As chaves das permissões estão em
 três sítios (`lib/permissions.js`, `supabase/functions/app/permissions.ts` e
 `private.permission_keys()`), e um teste (`lib/permissions.test.js`) obriga-os a bater certo.
 

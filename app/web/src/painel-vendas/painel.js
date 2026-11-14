@@ -4,10 +4,11 @@
  * `api` = { db, user, downloads }, a interface que o pacote esperava em window.claude.use() (ver adapter.js).
  */
 import * as d3 from 'd3';
-import { toCsv, buildXlsx, renderSummaryPng, renderVideo, printReport } from './exportar.js';
+import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
+import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
+import { MESES, CRIT, buildYearModel } from './modelo.js';
 
 export function mountPainel(root, api) {
-  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const short = (m) => m.slice(0, 3);
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const C1 = '#9A9EA5', C2 = '#E0679A', POS = '#2F9E6E', NEG = '#D64545', TEAL = '#12898C';
@@ -16,7 +17,6 @@ export function mountPainel(root, api) {
   const offs = [];
   const listen = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); offs.push(() => target.removeEventListener(type, fn, opts)); };
   let dead = false;
-  const CRIT = { media: 'média dos meses fechados', tendencia: 'tendência face ao ano anterior', meta: 'meta anual' };
 
   // ---------- Formatação ----------
   // Valores sempre com cêntimos: os totais mostrados têm de bater com a soma das linhas.
@@ -60,71 +60,8 @@ export function mountPainel(root, api) {
     store: null, sales: null, sys: { ano: null, data: null } };
 
   // ---------- Modelo ----------
-  function build(ano, comp) {
-    const A = S.years[ano], B = comp != null ? S.years[comp] : null;
-    const curso = A && A.mes_em_curso ? A.mes_em_curso : null;
-    const rows = MESES.map((mes, i) => {
-      const v2 = A && A.meses ? A.meses[i] : null;
-      const v1 = B && B.meses ? B.meses[i] : null;
-      const estado = v2 == null ? 'Por preencher' : (curso === i + 1 ? 'Em curso' : 'Fechado');
-      const obs = A && Array.isArray(A.observacoes) ? (A.observacoes[i] || '') : '';
-      return { i, mes, v1: v1 == null ? null : Number(v1), v2: v2 == null ? null : Number(v2), estado, obs };
-    });
-    // Somas em cêntimos inteiros, para não acumular erros de vírgula flutuante (ex.: 551 909,65 Kz).
-    const toC = (v) => (v == null ? 0 : Math.round(Number(v) * 100));
-    const sum = (a, f) => a.reduce((s, r) => s + toC(f(r)), 0) / 100;
-    const avg = (total, n) => (n ? Math.round((total * 100) / n) / 100 : null);
-    const round2 = (v) => (v == null || !isFinite(v) ? null : Math.round(v * 100) / 100);
-    const fech = rows.filter((r) => r.estado === 'Fechado');
-    const com2 = rows.filter((r) => r.v2 != null);
-    const naoF = rows.filter((r) => r.estado !== 'Fechado');
-    const media2 = avg(sum(fech, (r) => r.v2), fech.length);
-    const fechC = fech.filter((r) => r.v1 != null);
-    const fech2 = sum(fech, (r) => r.v2);
-    // O crescimento dos meses fechados compara só os meses que existem nos dois anos.
-    const fech2c = sum(fechC, (r) => r.v2);
-    const fech1 = fechC.length ? sum(fechC, (r) => r.v1) : null;
-    const meta = A && A.meta_anual ? Number(A.meta_anual) : null;
-    let crit = (A && A.criterio) || 'media';
-    if (crit === 'meta' && !meta) crit = 'media';
-    if (crit === 'tendencia' && !(B && fech1)) crit = 'media';
-    const ratio = fech1 ? fech2c / fech1 : null;
-    const metaRest = meta && naoF.length ? round2(Math.max(0, meta - fech2) / naoF.length) : null;
-    rows.forEach((r) => {
-      let e = null;
-      if (r.estado !== 'Fechado') {
-        if (crit === 'tendencia') e = r.v1 != null ? r.v1 * ratio : media2;
-        else if (crit === 'meta') e = metaRest;
-        else e = media2;
-        // Mês em curso: o valor já registado é o mínimo garantido desse mês.
-        if (r.estado === 'Em curso' && r.v2 != null) e = e == null ? r.v2 : Math.max(e, r.v2);
-      }
-      r.projMes = round2(e);
-      r.est = r.v2 == null ? r.projMes : null;
-      r.dif = (r.v2 != null && r.v1 != null) ? (toC(r.v2) - toC(r.v1)) / 100 : null;
-      r.cresc = (r.v2 != null && r.v1) ? r.v2 / r.v1 - 1 : null;
-    });
-    let a1 = 0, a2 = 0;
-    rows.forEach((r) => { a1 += toC(r.v1); r.acum1 = (B ? a1 / 100 : null); if (r.v2 != null) { a2 += toC(r.v2); r.acum2 = a2 / 100; } else r.acum2 = null; });
-    const temB = rows.filter((r) => r.v1 != null);
-    const total1 = temB.length ? sum(temB, (r) => r.v1) : null;
-    const comp1 = com2.filter((r) => r.v1 != null);
-    const ytd2 = sum(com2, (r) => r.v2), ytd1 = comp1.length ? sum(comp1, (r) => r.v1) : null;
-    const ytd2c = sum(comp1, (r) => r.v2);
-    const media1 = avg(total1, temB.length);
-    const melhor = fech.length ? fech.reduce((b, r) => (r.v2 > b.v2 ? r : b), fech[0]) : null;
-    const projeccao = !naoF.length ? fech2 : (naoF.every((r) => r.projMes != null) ? (toC(fech2) + naoF.reduce((t, r) => t + toC(r.projMes), 0)) / 100 : null);
-    let acc = 0, ultrapassa = null;
-    if (total1) for (const r of com2) { acc += toC(r.v2); if (!ultrapassa && acc > toC(total1)) ultrapassa = r.mes; }
-    const ultimo = com2.length ? com2[com2.length - 1] : null;
-    const g = (a, b) => (a != null && b) ? a / b - 1 : null;
-    return { ano, comp: B ? comp : null, rows, fech, com2, crit, meta,
-      R: { total1, ytd1, ytd2, ytd2c, dif_ytd: ytd1 != null ? (toC(ytd2c) - toC(ytd1)) / 100 : null, cresc_ytd: g(ytd2c, ytd1),
-        fech1, fech2, fech2c, cresc_fech: g(fech2c, fech1), media1, media2, cresc_media: g(media2, media1),
-        melhor, projeccao, cresc_proj: g(projeccao, total1), progresso: projeccao ? ytd2 / projeccao : null,
-        metaPct: meta ? ytd2 / meta : null, falta: projeccao != null ? Math.max(0, toC(projeccao) - toC(ytd2)) / 100 : null,
-        ultrapassa, ultimo, nfech: fech.length, ultimoFech: fech.length ? fech[fech.length - 1] : null } };
-  }
+  // O cálculo está em modelo.js (puro e testado), partilhado com o painel de todas as livrarias.
+  const build = (ano, comp) => buildYearModel(S.years, ano, comp);
 
   // ---------- Tooltip ----------
   function tip(box, lines, x, y, obs) {
@@ -574,7 +511,7 @@ export function mountPainel(root, api) {
     const M = S.model;
     fillKpis(M, animate);
     drawMensal(M, animate); drawAcum(M, animate); drawVar(M, animate);
-    fillQuadro(M); fillConf(M);
+    fillQuadro(M); fillConf(M); videoLabels(M);
     $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
     if (!S.sel) S.sel = (M.R.ultimoFech || M.R.ultimo || M.rows[0]).mes;
     if (!S.playing) select(S.sel, animate); else highlight();
@@ -689,6 +626,7 @@ export function mountPainel(root, api) {
     $('ed-add').dataset.ano = String(next);
   }
   function edFill() {
+    S.ed.sysUsed = false;
     const Y = S.years[S.ed.ano] || {};
     const grid = $('ed-grid');
     grid.replaceChildren(...MESES.map((mes, i) => {
@@ -766,8 +704,16 @@ export function mountPainel(root, api) {
     edCheckDirty();
   });
   async function writeYear(ano, body) { if (!S.db) throw { code: 'unavailable' }; await S.db.doc('anos/' + ano).set(body); }
+  // De onde vieram os números (o servidor guarda-o no histórico): sistema, se todos os meses com
+  // valor são os das vendas do sistema; misto, se só alguns; manual, se não se usou o sistema.
+  function origemDe(ano, meses) {
+    const D = S.sys.data;
+    if (!S.ed.sysUsed || !D || S.sys.ano !== ano) return 'manual';
+    const todos = meses.every((v, i) => v == null || (D.counts[i] && Math.round(v * 100) === Math.round(D.months[i] * 100)));
+    return todos ? 'sistema' : 'misto';
+  }
   function errMsg(e) {
-    if (e && e.code === 'invalid_argument') { S.readOnly = true; return 'Não tem permissão para editar estes dados. Peça acesso de Contribuidor ao dono do painel.'; }
+    if (e && e.code === 'invalid_argument') { S.readOnly = true; return 'Não tem permissão para editar estes dados. Peça a um administrador a permissão «Editar relatórios de vendas».'; }
     if (e && e.code === 'quota_exceeded') return 'O espaço de dados do painel está cheio.';
     return 'Não foi possível guardar agora. Tente de novo dentro de instantes.';
   }
@@ -779,7 +725,8 @@ export function mountPainel(root, api) {
     root.querySelectorAll('#ed-grid input.ob').forEach((o) => { obs[Number(o.dataset.i)] = o.value.trim(); });
     const metaP = parseKz($('ed-meta').value);
     const body = Object.assign({}, cur, { ano, meses, observacoes: obs, mes_em_curso: $('ed-curso').value ? Number($('ed-curso').value) : null,
-      meta_anual: metaP.ok ? metaP.v : null, criterio: $('ed-crit').value, fonte: $('ed-fonte').value.trim(), actualizado: new Date().toISOString() });
+      meta_anual: metaP.ok ? metaP.v : null, criterio: $('ed-crit').value, fonte: $('ed-fonte').value.trim(), actualizado: new Date().toISOString(),
+      origem: origemDe(ano, meses) });
     const changes = [];
     MESES.forEach((m, i) => {
       const a = cur.meses ? cur.meses[i] : null, b = meses[i];
@@ -877,6 +824,7 @@ export function mountPainel(root, api) {
       if (onlyEmpty && inp.value.trim()) return;
       inp.value = inField(v); n++;
     });
+    if (n) S.ed.sysUsed = true;
     $('ed-sys-st').textContent = n ? n + (n === 1 ? ' mês preenchido' : ' meses preenchidos') + ' com as vendas do sistema. Reveja e carregue em Guardar.' : 'Nenhum mês alterado.';
     $('ed-sys-st').className = 'st';
     edCheckDirty();
@@ -904,6 +852,7 @@ export function mountPainel(root, api) {
       fonte: (S.years[M.ano] && S.years[M.ano].fonte) || '',
       geradoEm: new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }),
       logo: logoSrc(), rows: M.rows, R: M.R,
+      sys: S.sys.data && S.sys.ano === M.ano ? { counts: S.sys.data.counts } : null,
     };
   }
   function allYearsRows() {
@@ -947,7 +896,8 @@ export function mountPainel(root, api) {
     ];
   }
   let exporting = false;
-  async function doExport(fmt, statusEl) {
+  let videoAbort = null;
+  async function doExport(fmt, statusEl, opts = {}) {
     const st = statusEl || $('exp-st');
     const say = (t, cls) => { st.textContent = t; st.className = 'st' + (statusEl ? '' : ' exp-st') + (cls ? ' ' + cls : ''); };
     if (!S.model) { say('Ainda não há dados para exportar.', 'err'); return; }
@@ -983,25 +933,57 @@ export function mountPainel(root, api) {
         await printReport(d);
         say('Relatório aberto noutra janela: escolha “Guardar como PDF” na impressão.', 'okk');
       } else if (fmt === 'video') {
-        say('A gravar o vídeo… mantenha este separador aberto.');
-        const { blob, ext } = await renderVideo(d, (t, total) => say('A gravar o vídeo… ' + Math.floor(t) + ' de ' + Math.round(total) + ' s'));
-        await S.downloads.save({ filename: base + '.' + ext, data: blob });
-        say('Vídeo pronto (' + ext.toUpperCase() + ').', 'okk');
+        const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
+        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
+        Object.assign(d, await extrasDe(d.ano), { fundo: $('vid-fundo').value });
+        videoAbort = new AbortController();
+        $('exp-cancel').hidden = false;
+        const { blob, ext, duracao } = await renderVideo(d, (t, total, cena) => say('A gravar o vídeo ' + RITMOS[ritmo].nome.replace('Vídeo ', '') + ': '
+          + fmtDuracao(t) + ' de ' + fmtDuracao(total) + (cena ? ' · ' + cena.nome : '') + '. Mantenha este separador aberto.'), { ritmo, signal: videoAbort.signal });
+        await S.downloads.save({ filename: base + '-video-' + ritmo + '.' + ext, data: blob });
+        say('Vídeo pronto (' + ext.toUpperCase() + ', ' + fmtDuracao(duracao) + ').', 'okk');
       }
     } catch (e) {
-      say((e && e.message) || 'Não foi possível exportar agora.', 'err');
+      say((e && e.message) || 'Não foi possível exportar agora.', e && e.name === 'AbortError' ? '' : 'err');
     } finally {
       exporting = false;
+      videoAbort = null;
+      $('exp-cancel').hidden = true;
       root.querySelectorAll('#exp-menu button').forEach((b) => { b.disabled = false; });
     }
   }
+  // Os mais vendidos da loja e as fotografias da biblioteca (para os vídeos), uma vez por ano.
+  const extrasCache = {};
+  const destaquesPorAno = {};
+  async function extrasDe(ano) {
+    if (!S.extras) return { destaques: null, fotos: [] };
+    if (!extrasCache[ano]) extrasCache[ano] = S.extras(ano).catch(() => ({ destaques: null, fotos: [] }));
+    return extrasCache[ano];
+  }
+  // A duração de cada vídeo, calculada do plano (o lento tem um quadro por mês, de Janeiro a Dezembro).
+  function videoLabels(M, destaques = destaquesPorAno[M.ano] || null) {
+    const d = { rows: M.rows, destaques };
+    const n = M.rows.length;
+    $('vid-lento').textContent = fmtDuracao(duracaoPlano(planoVideo(d, 'lento'))) + ' · para analisar: os ' + n + ' meses, um a um';
+    $('vid-normal').textContent = fmtDuracao(duracaoPlano(planoVideo(d, 'normal'))) + ' · os mesmos quadros, mais depressa';
+    $('vid-curto').textContent = fmtDuracao(duracaoPlano(planoVideo(d, 'curto'))) + ' · só o resumo do ano';
+  }
+  $('exp-cancel').addEventListener('click', () => { if (videoAbort) videoAbort.abort(); });
   $('btn-exp').addEventListener('click', () => {
     const menu = $('exp-menu'); menu.hidden = !menu.hidden;
     $('btn-exp').setAttribute('aria-expanded', String(!menu.hidden));
+    // Ao abrir, a duração dos vídeos passa a contar com os quadros dos mais vendidos (se os houver).
+    if (!menu.hidden && S.model) {
+      const M = S.model;
+      extrasDe(M.ano).then((x) => { destaquesPorAno[M.ano] = x.destaques; if (S.model === M) videoLabels(M); });
+    }
   });
+  // O fundo dos vídeos fica lembrado neste aparelho.
+  try { const f = localStorage.getItem('relatorios:video:fundo'); if (f) $('vid-fundo').value = f; } catch (e) { /* sem armazenamento */ }
+  $('vid-fundo').addEventListener('change', () => { try { localStorage.setItem('relatorios:video:fundo', $('vid-fundo').value); } catch (e) { /* idem */ } });
   $('exp-menu').addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-fmt]'); if (!b) return;
-    doExport(b.dataset.fmt);
+    doExport(b.dataset.fmt, null, { ritmo: b.dataset.ritmo });
   });
 
   // ---------- Histórico ----------
@@ -1239,8 +1221,9 @@ export function mountPainel(root, api) {
 
   // ---------- Ligação aos dados ----------
   (async () => {
-    const { db, user, downloads, store, sales } = api;
+    const { db, user, downloads, store, sales, extras } = api;
     S.downloads = downloads;
+    S.extras = extras || null;
     S.store = store || null; S.sales = sales || null;
     if (S.store) $('eyebrow').textContent = 'Livraria e Editora Adventista · ' + S.store.name;
     if (!S.sales || !S.sales.available) $('ed-sys-note').textContent = (S.sales && S.sales.reason) || 'As vendas do sistema não estão disponíveis nesta vista.';
