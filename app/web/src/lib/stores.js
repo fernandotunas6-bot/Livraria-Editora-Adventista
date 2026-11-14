@@ -1,12 +1,20 @@
 /** Utilitários das lojas físicas (mapas, direcções e coordenadas GPS). */
 
+import { safeLinkUrl } from './safeLink';
+
 export const hasCoords = (store) =>
   Number.isFinite(Number(store?.latitude)) && Number.isFinite(Number(store?.longitude))
   && !(Number(store.latitude) === 0 && Number(store.longitude) === 0);
 
-/** Link para abrir a loja no Google Maps. */
+/**
+ * Link para abrir a loja no Google Maps. O `maps_url` escrito no painel passa pelo
+ * `safeLinkUrl`, como as outras ligações vindas da configuração: um `javascript:` ou um endereço
+ * sem esquema (`maps.google.com/…`, que o navegador tratava como caminho do site) dão lugar ao
+ * link pelas coordenadas ou pela morada.
+ */
 export function mapsUrl(store) {
-  if (store?.maps_url) return store.maps_url;
+  const proprio = safeLinkUrl(store?.maps_url);
+  if (/^https?:/i.test(proprio)) return proprio;
   if (hasCoords(store)) return `https://www.google.com/maps?q=${store.latitude},${store.longitude}&z=16`;
   const q = [store?.name, store?.address, store?.province, 'Angola'].filter(Boolean).join(', ');
   return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : '';
