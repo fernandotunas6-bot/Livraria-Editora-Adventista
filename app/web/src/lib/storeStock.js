@@ -1,6 +1,6 @@
 /**
  * Disponibilidade por loja: cada loja marca nos produtos «temos» ou «não temos» (tabela
- * public.store_stock, migração 20261114120000_lojas_donas_dos_dados).
+ * public.store_stock, migração 20261114180000_lojas_donas_dos_dados).
  *
  * Sem marca é «por marcar»: não se sabe, e o site nunca o mostra como «não temos». Por isso, no
  * levantamento, uma loja só deixa de se poder escolher quando disse «não temos» a algum livro do

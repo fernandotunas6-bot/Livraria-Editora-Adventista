@@ -26,8 +26,14 @@ export const isBookType = (value) => !!productType(value).isBook;
 /**
  * Como se chamam as variantes deste tipo na loja: tamanhos (vestuário, uniformes), edições
  * (livros) ou opções (o resto). Uma t-shirt em M e L não tem "edições".
+ *
+ * Com `versions`, as variantes marcadas `tipo: 'cor'` (todas) são cores: a mesma bíblia em capa
+ * azul, rosa ou verde não são "edições", e o cliente procura a palavra "cor".
  */
-export function variantNames(value) {
+export function variantNames(value, versions) {
+  if (Array.isArray(versions) && versions.length > 0 && versions.every((v) => v?.tipo === 'cor')) {
+    return { one: 'Cor', many: 'Cores', pick: 'Escolher a cor', ask: 'escolha a cor', soldOut: 'Esta cor esgotou. Escolha outra.' };
+  }
   const t = productType(value);
   if (t.sized) return { one: 'Tamanho', many: 'Tamanhos', pick: 'Escolher o tamanho', ask: 'escolha o tamanho', soldOut: 'Este tamanho esgotou. Escolha outro.' };
   if (t.isBook) return { one: 'Edição', many: 'Edições', pick: 'Escolher a edição', ask: 'escolha a edição', soldOut: 'Esta edição esgotou. Escolha outra.' };

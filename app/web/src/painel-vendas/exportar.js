@@ -1,7 +1,7 @@
 /**
- * Exportações do Painel de Vendas: Excel (.xlsx), CSV, JSON, PDF (impressão), imagem PNG e vídeo.
- * Sem bibliotecas externas: o .xlsx é um ZIP sem compressão escrito aqui; a imagem e o vídeo são
- * desenhados num <canvas> a partir dos números do painel (o vídeo grava o canvas com MediaRecorder).
+ * Exportações do Painel de Vendas: Excel (.xlsx), CSV, JSON, PDF (impressão) e imagem PNG.
+ * Sem bibliotecas externas: o .xlsx é um ZIP sem compressão escrito aqui; a imagem é desenhada
+ * num <canvas> a partir dos números do painel. Os vídeos estão em video.js.
  *
  * `data` vem de exportData() em painel.js:
  *   { loja, ano, comp, critTxt, meta, fonte, geradoEm, logo,
@@ -191,7 +191,12 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function header(ctx, d, W, logo, title) {
   ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, W, ctx.canvas.height);
-  if (logo) { const h = 54; ctx.drawImage(logo, 48, 32, (logo.width / logo.height) * h, h); }
+  // O logótipo é azul-escuro sobre transparente: sem a pastilha branca não se via no fundo escuro.
+  if (logo) {
+    const h = 48; const w = (logo.width / logo.height) * h;
+    ctx.fillStyle = '#FFFFFF'; roundRect(ctx, 40, 28, w + 24, h + 14, 8); ctx.fill();
+    ctx.drawImage(logo, 52, 35, w, h);
+  }
   ctx.fillStyle = COL.mut; ctx.font = FONT(600, 18); ctx.textAlign = 'right';
   ctx.fillText(`${d.loja} · ${d.ano}${d.comp ? ' vs ' + d.comp : ''}`, W - 48, 64);
   ctx.textAlign = 'left'; ctx.fillStyle = COL.fg; ctx.font = FONT(800, 38);
@@ -245,46 +250,6 @@ function barChart(ctx, d, x, y, w, h, progress) {
   ctx.fillStyle = COL.mut; ctx.fillText('estimativa', lx + 20, ly);
 }
 
-function lineChart(ctx, d, x, y, w, h, progress) {
-  const rows = d.rows;
-  const proj = d.R.projeccao || 0;
-  const max = Math.max(1, d.R.total1 || 0, proj, ...rows.map((r) => r.acum2 || 0));
-  const px = (i) => x + (w * i) / 11;
-  const py = (v) => y + h - (v / max) * h;
-  ctx.strokeStyle = COL.line; ctx.lineWidth = 1;
-  for (let g = 0; g <= 4; g++) {
-    const gy = y + h - (h * g) / 4;
-    ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke();
-    ctx.fillStyle = COL.mut; ctx.font = FONT(500, 13); ctx.textAlign = 'right'; ctx.fillText(mi((max * g) / 4), x - 8, gy + 4);
-  }
-  ctx.textAlign = 'center';
-  rows.forEach((r, i) => { ctx.fillStyle = COL.mut; ctx.font = FONT(600, 14); ctx.fillText(MESES_CURTOS[i], px(i), y + h + 22); });
-  ctx.textAlign = 'left';
-  const upto = progress * 11;
-  const draw = (vals, color, dash) => {
-    ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.setLineDash(dash || []);
-    ctx.beginPath();
-    let started = false;
-    vals.forEach((v, i) => {
-      if (v == null || i > upto + 1) return;
-      const t = Math.min(1, Math.max(0, upto - i + 1));
-      const prev = i > 0 ? vals[i - 1] : null;
-      const xx = prev != null && t < 1 ? px(i - 1) + (px(i) - px(i - 1)) * t : px(i);
-      const yy = prev != null && t < 1 ? py(prev) + (py(v) - py(prev)) * t : py(v);
-      if (!started) { ctx.moveTo(xx, yy); started = true; } else ctx.lineTo(xx, yy);
-    });
-    ctx.stroke(); ctx.setLineDash([]);
-  };
-  if (d.comp) draw(rows.map((r) => r.acum1), COL.comp);
-  draw(rows.map((r) => r.acum2), COL.main);
-  if (proj && progress >= 1) {
-    ctx.strokeStyle = COL.teal; ctx.setLineDash([8, 8]); ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x, py(proj)); ctx.lineTo(x + w, py(proj)); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = COL.teal; ctx.font = FONT(700, 15); ctx.textAlign = 'right';
-    ctx.fillText('Projecção ' + kz2(proj), x + w, py(proj) - 8); ctx.textAlign = 'left';
-  }
-}
-
 function kpis(d) {
   const R = d.R;
   const color = (v) => (v == null ? COL.mut : v >= 0 ? COL.pos : COL.neg);
@@ -309,106 +274,6 @@ export async function renderSummaryPng(d) {
   ctx.fillStyle = COL.mut; ctx.font = FONT(500, 15);
   ctx.fillText(`Critério da projecção: ${d.critTxt}${d.fonte ? ' · Fonte: ' + d.fonte : ''} · Gerado em ${d.geradoEm}`, 48, H - 36);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-}
-
-/** Vídeo animado (1280×720, ~28 s) gravado do canvas. onProgress(segundos, total). */
-export async function renderVideo(d, onProgress) {
-  if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
-    throw new Error('Este navegador não consegue gravar vídeo. Use o Chrome, o Edge ou o Firefox actualizados.');
-  }
-  const mime = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-    .find((m) => MediaRecorder.isTypeSupported(m));
-  if (!mime) throw new Error('Este navegador não tem nenhum formato de vídeo disponível para gravar.');
-  const W = 1280, H = 720, FPS = 30;
-  const canvas = Object.assign(document.createElement('canvas'), { width: W, height: H });
-  const ctx = canvas.getContext('2d');
-  const logo = await loadImage(d.logo);
-  const R = d.R;
-  const top = d.rows.filter((r) => r.v2 != null && r.estado === 'Fechado').sort((a, b) => b.v2 - a.v2).slice(0, 3);
-  const scenes = [
-    { dur: 3.5, draw: (t) => {
-      header(ctx, d, W, logo, '');
-      ctx.globalAlpha = ease(t * 2);
-      ctx.fillStyle = COL.fg; ctx.font = FONT(800, 64); ctx.textAlign = 'center';
-      ctx.fillText('Painel de Vendas', W / 2, 330);
-      ctx.fillStyle = COL.main; ctx.font = FONT(700, 34); ctx.fillText(d.loja, W / 2, 390);
-      ctx.fillStyle = COL.mut; ctx.font = FONT(600, 26); ctx.fillText(`${d.ano}${d.comp ? ' comparado com ' + d.comp : ''}`, W / 2, 440);
-      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
-    } },
-    { dur: 5, draw: (t) => {
-      header(ctx, d, W, logo, 'Resumo do ano');
-      const cw = (W - 96 - 20) / 2;
-      kpis(d).forEach(([l, , delta, c, raw], i) => {
-        const k = ease(t * 1.6 - i * 0.15);
-        const v = raw == null ? '—' : kz2(Math.round(raw * k * 100) / 100);
-        kpiCard(ctx, 48 + (i % 2) * (cw + 20), 180 + Math.floor(i / 2) * 170, cw, 150, l, v, k >= 1 ? delta : '', c);
-      });
-    } },
-    { dur: 7, draw: (t) => {
-      header(ctx, d, W, logo, 'Vendas por mês');
-      barChart(ctx, d, 110, 230, W - 158, 380, ease(t * 1.2));
-    } },
-    { dur: 6, draw: (t) => {
-      header(ctx, d, W, logo, 'Vendas acumuladas');
-      lineChart(ctx, d, 110, 210, W - 158, 400, Math.min(1, t * 1.25));
-    } },
-    { dur: 4.5, draw: (t) => {
-      header(ctx, d, W, logo, 'Melhores meses');
-      top.forEach((r, i) => {
-        const k = ease(t * 2 - i * 0.25);
-        const y = 220 + i * 130;
-        ctx.globalAlpha = k;
-        ctx.fillStyle = COL.card; roundRect(ctx, 48, y, W - 96, 110, 16); ctx.fill();
-        ctx.fillStyle = COL.main; ctx.font = FONT(800, 40); ctx.fillText(String(i + 1) + 'º', 80, y + 70);
-        ctx.fillStyle = COL.fg; ctx.font = FONT(700, 30); ctx.fillText(r.mes, 170, y + 68);
-        ctx.textAlign = 'right'; ctx.fillText(kz2(r.v2), W - 300, y + 68);
-        ctx.fillStyle = r.cresc == null ? COL.mut : r.cresc >= 0 ? COL.pos : COL.neg; ctx.font = FONT(700, 24);
-        ctx.fillText(r.cresc == null ? 's/ comparação' : pct1(r.cresc), W - 80, y + 68);
-        ctx.textAlign = 'left'; ctx.globalAlpha = 1;
-      });
-      if (!top.length) { ctx.fillStyle = COL.mut; ctx.font = FONT(600, 26); ctx.fillText('Ainda não há meses fechados.', 48, 260); }
-    } },
-    { dur: 2.5, draw: (t) => {
-      header(ctx, d, W, logo, '');
-      ctx.globalAlpha = ease(t * 2);
-      ctx.fillStyle = COL.fg; ctx.font = FONT(800, 44); ctx.textAlign = 'center';
-      ctx.fillText(R.projeccao != null ? 'Projecção ' + d.ano + ': ' + kz2(R.projeccao) : 'Painel de Vendas ' + d.ano, W / 2, 340);
-      ctx.fillStyle = COL.mut; ctx.font = FONT(500, 20);
-      ctx.fillText(`${d.critTxt}${d.fonte ? ' · Fonte: ' + d.fonte : ''} · Gerado em ${d.geradoEm}`, W / 2, 390);
-      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
-    } },
-  ];
-  const total = scenes.reduce((s, sc) => s + sc.dur, 0);
-  const frame = (sec) => {
-    let acc = 0;
-    for (const sc of scenes) {
-      if (sec < acc + sc.dur) { sc.draw((sec - acc) / sc.dur); return; }
-      acc += sc.dur;
-    }
-    scenes[scenes.length - 1].draw(1);
-  };
-  frame(0);
-  const stream = canvas.captureStream(FPS);
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
-  const chunks = [];
-  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  const done = new Promise((resolve) => { rec.onstop = resolve; });
-  rec.start(500);
-  const t0 = performance.now();
-  await new Promise((resolve) => {
-    // setInterval continua (mais devagar) com o separador em segundo plano; requestAnimationFrame pararia.
-    const id = setInterval(() => {
-      const sec = (performance.now() - t0) / 1000;
-      frame(Math.min(sec, total));
-      onProgress?.(Math.min(sec, total), total);
-      if (sec >= total + 0.3) { clearInterval(id); resolve(); }
-    }, 1000 / FPS);
-  });
-  rec.stop();
-  await done;
-  stream.getTracks().forEach((tr) => tr.stop());
-  const type = mime.split(';')[0];
-  return { blob: new Blob(chunks, { type }), ext: type === 'video/mp4' ? 'mp4' : 'webm' };
 }
 
 // ---------- PDF (relatório para imprimir / guardar como PDF) ----------

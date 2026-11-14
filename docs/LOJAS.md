@@ -2,7 +2,7 @@
 
 Guia do que cada loja tem de seu no sistema: as províncias que serve, as suas vendas, os seus
 colportores, as suas guias e os produtos que tem. Migração
-`supabase/migrations/20261114120000_lojas_donas_dos_dados.sql` (fases 1 e 2 do plano das lojas,
+`supabase/migrations/20261114180000_lojas_donas_dos_dados.sql` (fases 1 e 2 do plano das lojas,
 pedidas pelo dono a 2026-11-14).
 
 ## As províncias que cada loja serve
@@ -44,7 +44,8 @@ Muda se mudarem o envio, a loja ou a província da encomenda. O nome da loja esc
 (`pickup_store`) fica como o cliente o escolheu; mudar o nome de uma loja já não lhe tira as
 encomendas. As encomendas antigas receberam a loja pela mesma regra.
 
-- O painel **Relatórios → Vendas por loja** conta as vendas do sistema por esta loja.
+- O painel **Relatórios → Vendas por loja** e o relatório de todas as livrarias contam as vendas do
+  sistema por esta loja (no servidor, `private.vendas_encomendas`; ver [RELATORIOS.md](RELATORIOS.md)).
 - **As vendas ao balcão** não passam pelo sistema: entram no mesmo painel como totais do mês
   (os relatórios que as lojas mandam).
 
@@ -100,7 +101,7 @@ Em **Catálogo → Disponibilidade nas lojas** cada loja marca os produtos que t
 
 ## Técnico
 
-- Migração `20261114120000_lojas_donas_dos_dados`:
+- Migração `20261114180000_lojas_donas_dos_dados`:
   - colunas `physical_stores.service_provinces`, `orders.store_id`, `colporteurs.store_id`,
     `colporteur_documents.store_id`, com índices;
   - `private.loja_da_provincia_nome` (a loja que serve uma província: a que a tem na lista, depois

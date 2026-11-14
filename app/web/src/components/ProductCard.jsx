@@ -33,7 +33,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
   // `-default`, e um uniforme entrava no carrinho sem tamanho.
   const mustChoose = needsVariantChoice(product);
   const buyLabel = mustChoose ? 'Escolher' : 'Comprar';
-  const buyAria = mustChoose ? `${variantNames(product.product_type).pick} de ${product.title}` : undefined;
+  const buyAria = mustChoose ? `${variantNames(product.product_type, product.versions).pick} de ${product.title}` : undefined;
 
   const variant = product.variants?.[0];
   // Com a edição digital à venda, o livro esgotado em papel não está esgotado (lib/digitalEditions.js).

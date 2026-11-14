@@ -19,7 +19,7 @@ def cruza(v, h):
     y = (a2*b1 + b2) / (1 - a2*a1)
     return a1*y + b1, y
 
-def achatar(src, fundo='preto', thr=14, dr=None, db=None, inset=1.5, out=None, dbg=None, quad=None, faixa=True, lombada=0.0, topo=0.0):
+def achatar(src, fundo='preto', thr=14, dr=None, db=None, inset=1.5, out=None, dbg=None, quad=None, faixa=True, lombada=0.0, topo=0.0, tam=(340, 510)):
     """Devolve os quatro cantos da frente do livro (sup. esq., sup. dir., inf. dir., inf. esq.).
 
     fundo:   'preto' ou 'branco' (cor do fundo da maqueta) ou 'alfa' (PNG com transparência).
@@ -29,7 +29,7 @@ def achatar(src, fundo='preto', thr=14, dr=None, db=None, inset=1.5, out=None, d
     topo:    idem para a aresta de cima (páginas visíveis por cima da capa).
     quad:    cantos dados à mão, quando a detecção não acerta.
     inset:   píxeis a recolher para dentro, para não apanhar a orla do fundo.
-    out/dbg: grava a frente endireitada (340×510) e a imagem com o contorno detectado.
+    out/dbg: grava a frente endireitada (tam, 340×510 por omissão) e a imagem com o contorno detectado.
     """
     im = Image.open(src).convert('RGBA')
     bgc = (0, 0, 0) if fundo == 'preto' else (255, 255, 255)
@@ -89,10 +89,11 @@ def achatar(src, fundo='preto', thr=14, dr=None, db=None, inset=1.5, out=None, d
     if quad is not None: q = np.array(quad, np.float32)
     # recolhe ligeiramente para dentro (borda anti-aliasing)
     c = q.mean(0); q = q + (c - q) / np.linalg.norm(c - q, axis=1, keepdims=True) * inset
-    dst = np.array([[0, 0], [339, 0], [339, 509], [0, 509]], np.float32)
+    tw, th = tam
+    dst = np.array([[0, 0], [tw - 1, 0], [tw - 1, th - 1], [0, th - 1]], np.float32)
     M = cv2.getPerspectiveTransform(q, dst)
     rgb = np.asarray(base.convert('RGB'))
-    flat = cv2.warpPerspective(rgb, M, (340, 510), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REPLICATE)
+    flat = cv2.warpPerspective(rgb, M, (tw, th), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REPLICATE)
     if out: Image.fromarray(flat).save(out)
     if dbg:
         d = rgb.copy()

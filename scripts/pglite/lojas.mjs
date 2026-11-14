@@ -1,4 +1,4 @@
-// Cenários das lojas donas dos seus dados (migração 20261114120000_lojas_donas_dos_dados): a loja
+// Cenários das lojas donas dos seus dados (migração 20261114180000_lojas_donas_dos_dados): a loja
 // de cada encomenda, de cada colportor e de cada guia, e o «temos / não temos» por loja. Corre as
 // migrações reais até à anterior, põe dados como os da produção, e só então aplica esta e as
 // seguintes — para provar também o preenchimento do que já existia:
@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { freshDb, migrationFiles, migrationSql } from './base.mjs';
 
 const dir = process.argv[2];
-const VERSAO = '20261114120000';
+const VERSAO = '20261114180000';
 let ok = 0;
 let fail = 0;
 const check = (name, cond, extra) => {
@@ -269,6 +269,25 @@ check('apagar um produto apaga as suas marcas', (await q(`select count(*)::int n
   await as('authenticated', admin, `select public.users_admin_update($1, null, null, 'manager', '{"manage_store_stock":true,"inventada":true}'::jsonb)`, [semFicha]);
   const [p] = await q(`select permissions from public.profiles where id = $1`, [semFicha]);
   check('users_admin_update guarda manage_store_stock e deita fora chaves inventadas', p.permissions.manage_store_stock === true && !('inventada' in p.permissions), p.permissions);
+}
+
+// --- 7. As vendas de cada loja nos relatórios, pela loja gravada ---------------------------------------------------
+// private.vendas_encomendas (relatorios_de_todas_as_livrarias) contava pelo nome da loja do levantamento e, nas
+// entregas, pela loja da mesma província: a entrega no Namibe não era de nenhuma. Agora é orders.store_id.
+{
+  const [{ ano }] = await q(`select extract(year from now() + interval '1 hour')::int as ano`);
+  const porEnc = Object.fromEntries((await q(`select encomenda, loja_id from private.vendas_encomendas($1, false)`, [ano]))
+    .map((r) => [r.encomenda, r.loja_id]));
+  check('vendas: entrega no Namibe conta para o Lubango', porEnc[antes.namibe] === L, porEnc[antes.namibe]);
+  check('vendas: entrega no Cuanza Sul conta para Catumbela', porEnc[antes.cuanzaSul] === C, porEnc[antes.cuanzaSul]);
+  check('vendas: levantamento no Lubango conta para o Lubango', porEnc[antes.pickupL] === L, porEnc[antes.pickupL]);
+  check('vendas: só digital e Luanda não são de loja nenhuma', porEnc[antes.digital] === null && porEnc[antes.entregaLuanda] === null);
+  const gravadas = await q(`select id, store_id from public.orders where id = any ($1)`, [Object.keys(porEnc)]);
+  check('vendas: cada encomenda conta para a loja gravada nela', gravadas.every((o) => porEnc[o.id] === o.store_id),
+    gravadas.filter((o) => porEnc[o.id] !== o.store_id));
+  const totais = await as('authenticated', admin, `select loja_id, sum(encomendas)::int as n from public.vendas_do_sistema($1, false) group by loja_id`, [ano]);
+  const doLubango = Object.values(porEnc).filter((l) => l === L).length;
+  check('vendas_do_sistema bate com as encomendas do Lubango', (totais.find((t) => t.loja_id === L) || {}).n === doLubango, totais);
 }
 
 console.log(`lojas: ${ok} ok, ${fail} falhas`);

@@ -24,7 +24,8 @@ const isHuambo = (s) => /huambo/i.test(`${s?.province || ''} ${s?.name || ''}`);
 /**
  * Separador "Vendas por loja" do Painel Admin: o painel do pacote painel-vendas-huambo com o design original.
  * Corre num Shadow DOM, para que o Tailwind do sistema não altere o painel e o CSS do painel não altere o sistema.
- * Ler exige papel de administrador ou gestor e gravar exige administrador (RLS em vendas_anos e painel_vendas_docs).
+ * Ler exige «Ver relatórios» ou «Editar relatórios de vendas»; gravar exige «Editar relatórios de vendas» ou
+ * administrador (RLS em vendas_anos e painel_vendas_docs, migração relatorios_de_todas_as_livrarias).
  * Com a migração painel_vendas_por_loja cada loja tem os seus dados; antes dela há só os da Loja do Huambo.
  */
 const VendasHuamboTab = () => {
@@ -34,6 +35,8 @@ const VendasHuamboTab = () => {
   const userId = user?.id;
   const role = user?.role;
   const canReadOrders = isAdmin || hasPermission('manage_orders');
+  const canEdit = isAdmin || hasPermission('edit_reports');
+  const canReadSales = isAdmin || hasPermission('view_reports') || hasPermission('edit_reports');
 
   const [stores, setStores] = useState(null);
   const [multi, setMulti] = useState(false);
@@ -74,6 +77,8 @@ const VendasHuamboTab = () => {
       lojaId: multi ? storeId || null : null,
       store: store ? { id: store.id, name: store.name, province: store.province } : null,
       canReadOrders,
+      canEdit,
+      canReadSales,
     });
     const unmount = mountPainel(root, api);
     return () => {
@@ -82,7 +87,7 @@ const VendasHuamboTab = () => {
     };
     // store muda sempre que storeId muda; as restantes dependências são estáveis durante a visita.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stores, multi, storeId, userId, role, canReadOrders]);
+  }, [stores, multi, storeId, userId, role, canReadOrders, canEdit, canReadSales]);
 
   return (
     <div className="space-y-3">

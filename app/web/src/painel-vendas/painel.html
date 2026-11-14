@@ -29,14 +29,24 @@
         </button>
       </div>
       <div class="exp" id="exp-menu" role="menu" hidden>
+        <label class="exp-opt" for="vid-fundo">Fundo dos vídeos
+          <select id="vid-fundo">
+            <option value="natureza">Paisagens animadas</option>
+            <option value="biblioteca">Fotografias da biblioteca</option>
+            <option value="simples">Simples (escuro)</option>
+          </select>
+        </label>
         <button type="button" role="menuitem" data-fmt="xlsx">Excel (.xlsx)<span>resumo, meses e todos os anos</span></button>
         <button type="button" role="menuitem" data-fmt="pdf">PDF<span>relatório para imprimir ou guardar</span></button>
         <button type="button" role="menuitem" data-fmt="png">Imagem (.png)<span>resumo com gráfico</span></button>
-        <button type="button" role="menuitem" data-fmt="video">Vídeo<span>relatório animado (~28 s)</span></button>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="lento">Vídeo lento<span id="vid-lento">para analisar: os 12 meses, um a um</span></button>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="normal">Vídeo normal<span id="vid-normal">os mesmos quadros, mais depressa</span></button>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="curto">Vídeo curto<span id="vid-curto">só o resumo do ano</span></button>
         <button type="button" role="menuitem" data-fmt="csv">CSV<span>todos os anos da loja</span></button>
         <button type="button" role="menuitem" data-fmt="json">JSON<span>dados completos</span></button>
       </div>
       <p class="st exp-st" id="exp-st" role="status"></p>
+      <button class="btn ghost sm" id="exp-cancel" type="button" hidden>Cancelar a gravação</button>
     </div>
   </section>
 

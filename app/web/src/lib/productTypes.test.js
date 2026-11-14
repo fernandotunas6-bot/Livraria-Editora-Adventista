@@ -55,6 +55,18 @@ describe('variantNames', () => {
     expect(variantNames('uniforme').soldOut).toMatch(/tamanho esgotou/);
     expect(variantNames('livro').ask).toBe('escolha a edição');
   });
+
+  it('cores quando todas as variantes são cores (a mesma bíblia em várias capas)', () => {
+    const cores = [{ label: 'Capa azul', tipo: 'cor' }, { label: 'Capa rosa', tipo: 'cor' }];
+    expect(variantNames('biblia', cores).one).toBe('Cor');
+    expect(variantNames('biblia', cores).many).toBe('Cores');
+    expect(variantNames('biblia', cores).ask).toBe('escolha a cor');
+    expect(variantNames('biblia', cores).soldOut).toMatch(/cor esgotou/);
+    // basta uma que não seja cor para voltar ao nome do tipo
+    expect(variantNames('biblia', [...cores, { label: 'Digital' }]).one).toBe('Edição');
+    expect(variantNames('uniforme', [{ label: 'M' }]).one).toBe('Tamanho');
+    expect(variantNames('biblia', []).one).toBe('Edição');
+  });
 });
 
 describe('needsVariantChoice', () => {

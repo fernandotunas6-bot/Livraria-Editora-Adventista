@@ -1,0 +1,259 @@
+<div class="wrap">
+  <section class="hero" id="topo">
+    <div>
+      <div class="brand">
+        <span class="logo"><img alt="Livraria &amp; Editora Adventista" src="__LOGO__" id="logo-img"></span>
+        <span class="eyebrow">Livraria e Editora Adventista · Todas as livrarias</span>
+      </div>
+      <h1 class="h1">Relatório conjunto das livrarias</h1>
+      <p class="take" id="takeaway"><span class="loading">A carregar as vendas de todas as lojas…</span></p>
+    </div>
+    <div class="side">
+      <div class="sels">
+        <label class="sel" for="sel-ano">Ano<select id="sel-ano" disabled></select></label>
+        <label class="sel" for="sel-comp">Comparar com<select id="sel-comp" disabled></select></label>
+      </div>
+      <div class="btns">
+        <span class="ro-badge" id="ro-badge" hidden title="Pode ver e exportar. Para lançar vendas é preciso a permissão «Editar relatórios de vendas».">Só leitura</span>
+        <button class="btn ghost" id="btn-edit" type="button" hidden>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M8.5 1 11 3.5 4 10.5H1.5V8z" fill="currentColor"/></svg>
+          Lançar vendas
+        </button>
+        <button class="btn" id="btn-exp" type="button" aria-haspopup="menu" aria-expanded="false" disabled>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M5 1h2v5h2L6 9 3 6h2zM1 10h10v1.5H1z" fill="currentColor"/></svg>
+          Exportar
+        </button>
+      </div>
+      <div class="exp" id="exp-menu" role="menu" hidden>
+        <label class="exp-opt" for="vid-fundo">Fundo dos vídeos
+          <select id="vid-fundo">
+            <option value="natureza">Paisagens animadas</option>
+            <option value="biblioteca">Fotografias da biblioteca</option>
+            <option value="simples">Simples (escuro)</option>
+          </select>
+        </label>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="lento">Vídeo lento<span id="vid-lento">para analisar: cada loja e cada mês</span></button>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="normal">Vídeo normal<span id="vid-normal">os mesmos quadros, mais depressa</span></button>
+        <button type="button" role="menuitem" data-fmt="video" data-ritmo="curto">Vídeo curto<span id="vid-curto">só o resumo da rede</span></button>
+        <button type="button" role="menuitem" data-fmt="xlsx">Excel (.xlsx)<span>resumo, lojas × meses, cada loja, todos os anos</span></button>
+        <button type="button" role="menuitem" data-fmt="pdf">PDF<span>relatório para imprimir ou guardar</span></button>
+        <button type="button" role="menuitem" data-fmt="png">Imagem (.png)<span>resumo da rede</span></button>
+        <button type="button" role="menuitem" data-fmt="csv">CSV<span>todas as lojas, todos os anos</span></button>
+        <button type="button" role="menuitem" data-fmt="json">JSON<span>dados completos</span></button>
+      </div>
+      <p class="st exp-st" id="exp-st" role="status"></p>
+      <button class="btn ghost sm" id="exp-cancel" type="button" hidden>Cancelar a gravação</button>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis">
+    <div class="card kpi">
+      <span class="accent"></span>
+      <span class="lab" id="k1-lab">Vendas da rede</span>
+      <span class="val" id="k1"><span class="sk"></span></span>
+      <span class="delta" id="k1-d">&nbsp;</span>
+      <svg class="spark" id="spark" viewBox="0 0 200 34" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <div class="card kpi">
+      <span class="lab" id="k2-lab">Diferença comparável</span>
+      <span class="val" id="k2"><span class="sk"></span></span>
+      <span class="delta" id="k2-d">&nbsp;</span>
+    </div>
+    <div class="card kpi">
+      <span class="lab" id="k3-lab">Média mensal da rede</span>
+      <span class="val" id="k3"><span class="sk"></span></span>
+      <span class="delta" id="k3-d">&nbsp;</span>
+    </div>
+    <div class="card kpi">
+      <span class="lab" id="k4-lab">Livraria com mais vendas</span>
+      <span class="val" id="k4"><span class="sk"></span></span>
+      <span class="delta" id="k4-d">&nbsp;</span>
+    </div>
+    <div class="card kpi">
+      <span class="lab" id="k5-lab">Projecção da rede</span>
+      <span class="val" id="k5"><span class="sk"></span></span>
+      <span class="delta" id="k5-d">&nbsp;</span>
+      <div class="progress" aria-hidden="true"><span id="proj-bar"></span></div>
+    </div>
+  </section>
+
+  <section class="card pend" id="pend" hidden>
+    <div class="head">
+      <div>
+        <h2>Meses por registar</h2>
+        <p class="note" id="pend-note">Sem estes meses, os totais da rede ficam abaixo do real e os meses aparecem como parciais.</p>
+      </div>
+    </div>
+    <ul class="pend-list" id="pend-list"></ul>
+  </section>
+
+  <section class="row">
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Vendas por mês · todas as livrarias</h2>
+          <p class="note">Cada cor é uma loja; a cinzento, a rede no ano de comparação. Passe o rato por um mês para ver cada loja.</p>
+        </div>
+        <div class="legend" id="lg-lojas"></div>
+      </div>
+      <div class="box" id="chart-rede"><div class="tip"></div></div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Ranking das livrarias</h2>
+          <p class="note" id="note-rank">Vendas registadas no ano, quota na rede e crescimento no período comparável.</p>
+        </div>
+      </div>
+      <ol class="rank" id="rank"></ol>
+    </div>
+  </section>
+
+  <section class="row even">
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Acumulado da rede e projecção</h2>
+          <p class="note" id="note-acum">Vendas somadas mês a mês até Dezembro. A projecção é a soma das projecções de cada loja.</p>
+        </div>
+        <div class="legend"><span><i style="background:var(--c25)"></i><span class="lgA">—</span></span><span><i style="background:var(--c26)"></i><span class="lgB">—</span></span><span><i class="dash"></i>Projecção</span></div>
+      </div>
+      <div class="box" id="chart-acum"><div class="tip"></div></div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Crescimento de cada livraria</h2>
+          <p class="note">No período comparável: os meses com valor nos dois anos, loja a loja. A linha da rede é o crescimento das lojas comparáveis.</p>
+        </div>
+      </div>
+      <div class="box" id="chart-cresc"><div class="tip"></div></div>
+    </div>
+  </section>
+
+  <section class="card" id="quadro">
+    <div class="head">
+      <div>
+        <h2>Quadro das livrarias · mês a mês</h2>
+        <p class="note">Valores em Kwanzas (AOA). ≈ = estimativa; a tracejado, os meses por registar. A última linha é a rede: o seu crescimento é o das lojas comparáveis (as que têm o mês nos dois anos).</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="O que mostrar">
+        <button class="tab" type="button" role="tab" data-modo="valor" aria-selected="true">Vendas</button>
+        <button class="tab" type="button" role="tab" data-modo="cresc" aria-selected="false">Crescimento</button>
+        <button class="tab" type="button" role="tab" data-modo="quota" aria-selected="false">Quota no mês</button>
+      </div>
+    </div>
+    <div class="tw">
+      <table class="t mx" id="tbl-mx"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <div>
+        <h2>Resumo de cada livraria</h2>
+        <p class="note">Cada loja pelo seu critério de projecção. Carregue numa loja para abrir o painel dela.</p>
+      </div>
+    </div>
+    <div class="tw">
+      <table class="t" id="tbl-lojas">
+        <thead><tr><th>Livraria</th><th>Vendas <span class="lgB">—</span></th><th>Comparável <span class="lgA">—</span></th><th>Crescimento</th><th>Média mensal</th><th>Melhor mês</th><th>Projecção</th><th>Quota</th><th>Meses</th><th class="o">Fonte · actualizado</th></tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="sistema">
+    <div class="head">
+      <div>
+        <h2>Conferir com as vendas do sistema</h2>
+        <p class="note" id="sys-note">As encomendas registadas no site, por loja: levantamentos na loja e entregas na província da loja, sem portes e sem as canceladas. Só totais, sem dados dos clientes.</p>
+      </div>
+      <div class="ed-actions">
+        <label class="st" for="sys-modo">Contar</label>
+        <select id="sys-modo" class="sys-sel">
+          <option value="paid">Só o dinheiro recebido (pelo mês do pagamento)</option>
+          <option value="all">Todas, excepto canceladas (pelo mês da encomenda)</option>
+        </select>
+        <button class="btn line sm" id="sys-load" type="button">Carregar vendas do sistema</button>
+      </div>
+    </div>
+    <p class="st" id="sys-st" role="status"></p>
+    <div class="tw" id="sys-box" hidden>
+      <table class="t mx" id="tbl-sys"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+  </section>
+
+  <section class="card editor" id="editar" hidden>
+    <div class="ed-top">
+      <div>
+        <h2 class="h2">Lançar vendas · <span id="ed-ano">—</span></h2>
+        <p class="note">Escreva os valores em Kz (ex.: 2 171 368 ou 2.171.368,50). Deixe vazio o mês que ainda não tem vendas. Nada é gravado até carregar em Guardar; cada gravação fica no histórico, com o seu nome.</p>
+      </div>
+      <div class="ed-actions">
+        <div class="tabs" id="ed-tabs" role="tablist" aria-label="Ano a lançar"></div>
+        <label class="st" for="ed-novo">Outro ano</label>
+        <input id="ed-novo" class="mini" type="text" inputmode="numeric" maxlength="4" placeholder="2027" autocomplete="off">
+        <button class="btn line sm" id="ed-novo-go" type="button">Abrir</button>
+      </div>
+    </div>
+
+    <div class="sys">
+      <div class="sys-h"><b>A partir das vendas do sistema</b><span class="note">Carregue as vendas do sistema (acima) para o ano que está a lançar. Os meses sem encomendas ficam como estão.</span></div>
+      <div class="ed-actions">
+        <button class="btn line sm" id="ed-fill" type="button" disabled>Preencher meses vazios</button>
+        <button class="btn line sm" id="ed-all" type="button" disabled>Substituir os meses com vendas</button>
+      </div>
+      <p class="st" id="ed-sys-st" role="status"></p>
+    </div>
+
+    <div class="tw">
+      <table class="t grid" id="ed-grid"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+
+    <details class="more">
+      <summary>Colar do Excel</summary>
+      <div class="fld">
+        <label for="ed-paste">Uma linha por loja, pela ordem da grelha, com 12 colunas (Janeiro a Dezembro) separadas por tabulação — como sai ao copiar do Excel. Uma célula vazia deixa o mês vazio.</label>
+        <textarea id="ed-paste" placeholder="218675&#9;189500&#9;743550&#9;…&#10;300000&#9;280000&#9;410000&#9;…"></textarea>
+      </div>
+      <div class="ed-actions" style="margin-top:8px"><button class="btn line sm" id="ed-paste-go" type="button">Aplicar à grelha</button><span class="st" id="ed-paste-st"></span></div>
+    </details>
+
+    <div class="ed-bottom">
+      <span class="st" id="ed-status" role="status"></span>
+      <div class="ed-actions">
+        <button class="btn line" id="ed-cancel" type="button">Descartar alterações</button>
+        <button class="btn" id="ed-save" type="button" disabled>Guardar</button>
+        <button class="btn line" id="ed-close" type="button">Fechar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="nota-card">
+    <div class="head">
+      <div>
+        <h2>Nota do relatório de <span class="lgB">—</span></h2>
+        <p class="note">Aparece no PDF, no Excel e no fim do vídeo: o que explica os números (uma loja nova, uma campanha, um mês de obras…).</p>
+      </div>
+    </div>
+    <p class="nota-txt" id="nota-txt"></p>
+    <div id="nota-ed" hidden>
+      <div class="fld"><textarea id="nota-in" maxlength="4000" placeholder="Ex.: A loja do Lubango abriu em Março; Outubro ainda é parcial no Huambo."></textarea></div>
+      <div class="ed-actions" style="margin-top:8px"><button class="btn line sm" id="nota-save" type="button" disabled>Guardar a nota</button><span class="st" id="nota-st" role="status"></span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <div>
+        <h2>Histórico das gravações</h2>
+        <p class="note" id="hist-note">Registado pelo servidor: quem gravou, quando, que meses mudaram e de onde vieram os números.</p>
+      </div>
+    </div>
+    <ul class="hist" id="hist"><li>A carregar…</li></ul>
+  </section>
+
+  <div class="foot">Livraria e Editora Adventista, S.A. · Relatório conjunto das livrarias</div>
+</div>

@@ -90,6 +90,7 @@ flowchart LR
 - Painel `/admin` com permissões por função
 - Gestão de livros, slides, lojas e pagamentos
 - Relatórios de vendas e alertas de stock
+- **Relatórios das livrarias**: o painel de cada loja e o relatório conjunto de todas as livrarias (ranking, cada loja e cada mês, meses por registar), com vídeos lentos para análise (paisagens animadas, o livro mais vendido em 3D e uma biblioteca de imagens), Excel, PDF, CSV e JSON; os números lançam-se à mão ou a partir das vendas do sistema, com permissões e histórico no servidor ([docs/RELATORIOS.md](docs/RELATORIOS.md))
 - **Produção da Editora**: ordens de produção com etapas, responsáveis, prazos e custos; a tiragem entra no stock ao concluir
 - **Funcionários e finanças**: fichas (com ou sem conta), salários do mês, pagamentos a fornecedores e o relatório de entradas e saídas
 - Integrações (Google Drive, OAuth)

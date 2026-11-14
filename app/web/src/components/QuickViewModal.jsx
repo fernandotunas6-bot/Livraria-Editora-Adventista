@@ -177,7 +177,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
                       // Tamanhos ou edições escolhem-se na página do produto: daqui só ia a variante base.
                       <Button asChild className="btn-primary w-full">
                         <Link to={`/product/${product.id}`} onClick={onClose}>
-                          <ShoppingCart className="h-4 w-4 mr-2" /> {variantNames(product.product_type).pick}
+                          <ShoppingCart className="h-4 w-4 mr-2" /> {variantNames(product.product_type, product.versions).pick}
                         </Link>
                       </Button>
                     ) : inStock ? (

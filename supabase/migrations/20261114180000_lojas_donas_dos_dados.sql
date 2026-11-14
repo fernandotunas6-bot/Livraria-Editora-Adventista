@@ -38,14 +38,26 @@
 --    livros na sua loja (colporteurs.store_id) — um colportor do Namibe levanta no Lubango, a sede
 --    da Missão Sul, mesmo a mais de 50 km. Antes, sem loja na província dele, a menos de 50 km ou na
 --    do cliente, quem não tinha os livros consigo não recebia a oferta.
+-- 7. As vendas de cada loja nos relatórios (private.vendas_encomendas, que public.vendas_do_sistema
+--    e public.produtos_mais_vendidos leem) passam a contar pela loja gravada em cada encomenda
+--    (orders.store_id), como o painel já fazia no navegador. Antes contavam pelo nome da loja do
+--    levantamento e, nas entregas, pela loja da mesma província — uma entrega no Namibe não era de
+--    loja nenhuma; agora é da do Lubango, que serve o Namibe.
+--
+-- Esta migração foi escrita como 20261114120000, a mesma versão de relatorios_de_todas_as_livrarias,
+-- que entrou primeiro e já está aplicada: o supabase db push, que conhece as migrações pela versão,
+-- dava esta por aplicada e nunca a corria. Passou a 20261114180000, depois de todas as do main, e
+-- por isso a lista de chaves (5) mantém a edit_reports que relatorios_de_todas_as_livrarias criou, e
+-- a função das vendas (7) parte da que ela escreveu.
 --
 -- Reverter: drop de public.store_stock, de public.store_stock_set, public.store_stock_my_stores,
 -- private.loja_da_encomenda, private.loja_da_provincia, private.loja_da_provincia_nome,
 -- private.my_store_ids, private.can_edit_store_stock, dos gatilhos orders_loja, colporteurs_b_loja
 -- e colporteur_documents_loja (e das suas funções), das três colunas store_id e de
 -- physical_stores.service_provinces; apagar a loja do Bié no painel se ainda não tiver nada; repor
--- private.permission_keys sem manage_store_stock (20261108190000_funcionarios) e
--- private.delivery_pickup_store como em 20261108220000_entregas_loja_e_robustez.
+-- private.permission_keys sem manage_store_stock e private.vendas_encomendas como em
+-- 20261114120000_relatorios_de_todas_as_livrarias, e private.delivery_pickup_store como em
+-- 20261108220000_entregas_loja_e_robustez.
 
 -- ---------------------------------------------------------------------------------------------
 -- 0. As províncias que cada loja serve
@@ -387,7 +399,7 @@ set search_path = ''
 as $$
   select array['manage_catalog','manage_orders','manage_settings','manage_users','manage_payments',
                'confirm_payments','view_reports','manage_marketing','manage_church_registry','manage_colporteurs',
-               'manage_production','manage_staff','manage_finance','manage_store_stock'];
+               'manage_production','manage_staff','manage_finance','edit_reports','manage_store_stock'];
 $$;
 revoke all on function private.permission_keys() from public, anon;
 grant execute on function private.permission_keys() to authenticated, service_role;
@@ -435,3 +447,53 @@ as $$
   limit 1;
 $$;
 revoke all on function private.delivery_pickup_store(uuid, text) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- 7. As vendas de cada loja nos relatórios, pela loja gravada em cada encomenda
+-- ---------------------------------------------------------------------------------------------
+-- A mesma função de 20261114120000_relatorios_de_todas_as_livrarias (as encomendas de um ano, com a
+-- loja, o mês na hora de Luanda, o valor em cêntimos e os itens), com uma diferença só: a loja é
+-- orders.store_id (1), em vez do nome da loja do levantamento ou da loja da mesma província. Uma
+-- encomenda sem loja (só digital, ou de uma província que nenhuma loja serve) não é de nenhuma, como
+-- no painel. public.vendas_do_sistema e public.produtos_mais_vendidos continuam a ler esta função, e
+-- os dois números continuam a bater.
+create or replace function private.vendas_encomendas(p_ano integer, p_so_pagas boolean)
+returns table (encomenda text, loja_id text, mes integer, centimos numeric, itens jsonb)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with limites as (
+    -- Luanda está em UTC+1 todo o ano: o ano começa às 23:00 UTC de 31 de Dezembro.
+    select make_timestamptz(p_ano, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour' as de,
+           make_timestamptz(p_ano + 1, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour' as ate
+  ),
+  enc as (
+    select
+      o.id,
+      o.store_id,
+      case when p_so_pagas then o.paid_at else o.created end as quando,
+      case when p_so_pagas
+        then least(round(coalesce(o.amount_paid, 0) * 100) - round(coalesce(o.amount_refunded, 0) * 100),
+                   round(coalesce(o.total, 0)::numeric * 100))
+             - round(coalesce(o.shipping_cost, 0)::numeric * 100)
+        else round(coalesce(o.total, 0)::numeric * 100) - round(coalesce(o.shipping_cost, 0)::numeric * 100)
+      end as centimos,
+      case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end as itens
+    from public.orders o, limites l
+    where (case when p_so_pagas then o.paid_at else o.created end) >= l.de
+      and (case when p_so_pagas then o.paid_at else o.created end) < l.ate
+      and coalesce(o.status, '') <> 'cancelled'
+      and coalesce(o.delivery_status, '') <> 'cancelled'
+  )
+  select
+    e.id,
+    e.store_id,
+    extract(month from (e.quando + interval '1 hour') at time zone 'UTC')::integer,
+    e.centimos,
+    e.itens
+  from enc e
+  where not p_so_pagas or e.centimos > 0;
+$$;
+revoke all on function private.vendas_encomendas(integer, boolean) from public, anon, authenticated;

@@ -28,7 +28,7 @@ export const ADMIN_GROUPS = [
   { id: 'catalogo', label: 'Catálogo', sections: ['books', 'disponibilidade', 'collections', 'slides', 'downloads'] },
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
-  { id: 'relatorios', label: 'Relatórios', sections: ['vendas-huambo', 'pagamentos-caixa', 'financas'] },
+  { id: 'relatorios', label: 'Relatórios', sections: ['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
@@ -132,11 +132,32 @@ export const ADMIN_SECTIONS = {
     description: 'Aparecem em /lojas, no rodapé, no menu e no levantamento das encomendas.',
     allowed: (p) => p.settings,
   },
+  // O relatório conjunto: todas as livrarias num só sítio (consolidado-ui.js, docs/RELATORIOS.md).
+  'relatorios-lojas': {
+    label: 'Todas as livrarias', title: 'Relatório conjunto das livrarias', icon: Building2,
+    keywords: 'conjunto consolidado rede todas lojas estatisticas video ranking comparativo meses por registar',
+    description: 'As vendas de todas as lojas num só sítio: totais da rede, ranking, cada loja e cada mês, vídeo e exportações. Os números lançam-se à mão ou a partir das vendas do sistema.',
+    allowed: (p) => p.salesReports,
+    readOnly: (p) => !p.salesReportsEdit,
+  },
   'vendas-huambo': {
     label: 'Vendas por loja', title: 'Vendas por loja', icon: BarChart3,
     keywords: 'faturacao facturacao relatorio vendas lojas',
-    description: 'Facturação de cada loja, por período, com os produtos mais vendidos.',
-    allowed: (p) => p.reports,
+    description: 'O painel de cada loja: os 12 meses, a comparação com o ano anterior, a projecção, a apresentação e o vídeo.',
+    allowed: (p) => p.salesReports,
+    readOnly: (p) => !p.salesReportsEdit,
+  },
+  // As imagens e os mais vendidos dos vídeos dos relatórios (ImagensVideosTab.jsx, docs/RELATORIOS.md).
+  'imagens-videos': {
+    label: 'Imagens dos vídeos', title: 'Imagens e mais vendidos dos vídeos', icon: Image,
+    keywords: 'biblioteca imagens fotografias paisagens natureza livros capas mais vendidos destaque videos',
+    description: 'As fotografias que os vídeos dos relatórios usam de fundo e os mais vendidos de cada loja lançados à mão (as vendas do balcão).',
+    allowed: (p) => p.salesReports || p.catalog,
+    readOnly: (p) => !p.salesReportsEdit && !p.catalog,
+    views: [
+      { id: 'imagens', label: 'Biblioteca de imagens', icon: Image, keywords: 'fotografias paisagens natureza enviar fundo', description: 'Paisagens, livros e lojas para o fundo dos vídeos.' },
+      { id: 'mais-vendidos', label: 'Mais vendidos', icon: TrendingUp, keywords: 'destaque produto balcao kigest top', description: 'Os mais vendidos de cada loja, por mês ou no ano, lançados à mão.', allowed: (p) => p.salesReports },
+    ],
   },
   'pagamentos-caixa': {
     label: 'Pagamentos e caixa', title: 'Pagamentos e caixa', icon: Wallet,
@@ -309,6 +330,10 @@ export function adminPermissions({ isAdmin = false, hasPermission = () => false 
     confirmPayments: has('confirm_payments'),
     // A facturação (vendas por loja, caixa, números do mês): separada das encomendas.
     reports: has('view_reports'),
+    // Os relatórios de vendas (Vendas por loja e Todas as livrarias): quem vê a facturação ou quem
+    // lança os números do mês («Editar relatórios de vendas», que não abre o caixa).
+    salesReports: has('view_reports') || has('edit_reports'),
+    salesReportsEdit: has('edit_reports'),
     marketing: has('manage_marketing'),
     // Quem gere colportores também vê as igrejas e os pastores (só leitura).
     churchRegistry: has('manage_church_registry') || has('manage_colporteurs'),

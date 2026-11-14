@@ -204,7 +204,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                     {currentBook.purchasable ? (
                       <Button onClick={handleAddToCart} className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-white">
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        {needsVariantChoice(currentBook) ? variantNames(currentBook.product_type).pick : 'Comprar Agora'}
+                        {needsVariantChoice(currentBook) ? variantNames(currentBook.product_type, currentBook.versions).pick : 'Comprar Agora'}
                       </Button>
                     ) : (
                       <Button disabled className="bg-slate-800 text-slate-500">

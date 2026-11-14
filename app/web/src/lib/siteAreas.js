@@ -64,7 +64,7 @@ export const colporteurHref = (view) => (!view || view === DEFAULT_COLPORTEUR_VI
 // "Gestão" do cabeçalho, o menu do telemóvel e o perfil). Só as que a pessoa pode abrir.
 const SHORTCUT_ORDER = [
   'orders', 'books', 'support', 'colportagem', 'acompanhamento', 'pagamentos-caixa', 'contacts', 'igreja',
-  'collections', 'slides', 'community', 'downloads', 'vendas-huambo', 'users', 'equipas', 'payments', 'stores',
+  'collections', 'slides', 'community', 'downloads', 'relatorios-lojas', 'vendas-huambo', 'users', 'equipas', 'payments', 'stores',
   'settings', 'notices', 'versoes', 'apps', 'seguranca',
 ];
 

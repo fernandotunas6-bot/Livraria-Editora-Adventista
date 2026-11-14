@@ -10,7 +10,7 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
   (Lubango), a Huíla, o Namibe e o Cunene; a do Huambo, só o Huambo; e uma **loja nova no Bié**, que
   serve o Bié, o Cuando e o Cubango. Decisões tomadas por omissão (o dono não respondeu): «temos /
   não temos» sem quantidades; cada colportor com a loja da sua província, que a equipa muda.
-- **Guia:** [LOJAS.md](LOJAS.md). Migração `20261114120000_lojas_donas_dos_dados`, **por aplicar**
+- **Guia:** [LOJAS.md](LOJAS.md). Migração `20261114180000_lojas_donas_dos_dados`, **por aplicar**
   (vai no merge): `physical_stores.service_provinces`, a loja do Bié (escondida e sem levantamento,
   à espera de morada, telefone e horário), `orders.store_id`, `colporteurs.store_id`,
   `colporteur_documents.store_id`, `store_stock` e a permissão nova `manage_store_stock`
