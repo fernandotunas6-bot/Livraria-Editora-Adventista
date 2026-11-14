@@ -79,7 +79,7 @@ da tipográfica, **com o mesmo nome de ficheiro**, em `app/web/public/images/cap
 Como os nomes não mudaram, **a base de dados não muda** para 108 deles. A migração
 `20261114160000_capas_da_internet.sql` trata dos dois que não tinham imagem nenhuma (estão
 ocultos e continuam ocultos): «Mensageiro» e «Por que Não Mas Estpita». Escreve só onde a capa
-está vazia.
+está vazia, e corrige o nome do segundo para «Por Que Não Sou Mais Espírita».
 
 Quem já tinha visitado a loja vê a capa tipográfica mais uma vez: o service worker serve as
 imagens da cache e actualiza-as em segundo plano, por isso na visita seguinte já aparece a nova.
@@ -88,7 +88,7 @@ imagens da cache e actualiza-as em segundo plano, por isso na visita seguinte j�
 
 | Produto | Nota |
 |---|---|
-| «Por que Não Mas Estpita» (KiGest 000163, oculto) | Pelo ISBN 9788534509305 é **«Por Que Não Sou Mais Espírita»**, de Maurício Braga. Corrigindo o nome no painel, pode publicar-se. |
+| «Por que Não Mas Estpita» (KiGest 000163, oculto) | Pelo ISBN 9788534509305 é **«Por Que Não Sou Mais Espírita»**, de Maurício Braga: a migração corrige o nome e o autor. Continua oculto porque não tem descrição; escrevendo-a, pode publicar-se. |
 | «Testemunhos para a Igreja» (000217) | O ISBN é o do **Vol. 7**; o nome no site não diz o volume. |
 | «Princípios sobre Aposentadoria» (000209) | O ISBN na base de dados tem uma gralha: `9788732534895`; o da CPB é `9788534534895`. |
 | «O Último Convite» (000500) | A descrição chama-lhe folheto; é o livro missionário de Clifford Goldstein. |

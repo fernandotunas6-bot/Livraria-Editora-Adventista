@@ -13,7 +13,8 @@
 --
 --   14159  «Mensageiro» (CPB 14159, a referência do KiGest é o código do produto na CPB)
 --   000163 «Por que Não Mas Estpita» no KiGest: pelo ISBN 9788534509305 é «Por Que Não Sou Mais
---          Espírita», de Maurício Braga. O nome fica como está até alguém o corrigir no painel.
+--          Espírita», de Maurício Braga (o nome e o autor estão na capa). Corrige-se o nome no
+--          fim desta migração. Continua oculto: falta-lhe a descrição.
 
 with capas(kigest_ref, capa) as (values
   ('14159'::text, 'https://livrariaadventista.com/images/capas/kigest/mensageiro.webp'::text),
@@ -26,3 +27,13 @@ update public.stock_books b
  where b.kigest_ref = c.kigest_ref
    and coalesce(btrim(b.cover), '') = ''
    and coalesce(btrim(b.cover_image), '') = '';
+
+-- O nome do 000163 vinha truncado e com gralhas do KiGest («POR QUE NAO MAS ESTPITA»). Pelo ISBN
+-- 9788534509305 é este livro da CPB. Só se troca se o nome ainda for o do KiGest, para não pisar
+-- uma correcção feita entretanto no painel; o autor só se escreve se estiver vazio.
+update public.stock_books
+   set title = 'Por Que Não Sou Mais Espírita',
+       author = case when coalesce(btrim(author), '') = '' then 'Maurício Braga' else author end,
+       updated = now()
+ where kigest_ref = '000163'
+   and title = 'Por que Não Mas Estpita';
