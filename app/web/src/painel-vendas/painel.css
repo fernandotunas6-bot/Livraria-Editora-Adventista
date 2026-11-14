@@ -287,7 +287,7 @@ details.more[open] summary { margin-bottom: 10px; }
 .s-kpi { background: #FFFFFF; border: 1px solid #E2E1DD; border-radius: 14px; padding: 16px 18px; height: 110px; display: grid; align-content: start; gap: 8px; }
 .s-kpi.mes { background: #DCE3F0; border-color: #DCE3F0; }
 .s-kpi .k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #4A5056; }
-.s-kpi .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.s-kpi .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.15; }
 .s-kpi.mes .v { font-family: var(--serif); font-weight: 600; }
 .s-card { position: absolute; background: #FFFFFF; border: 1px solid #E2E1DD; border-radius: 16px; }
 .s-ct { position: absolute; left: 26px; top: 20px; font-family: var(--serif); font-size: 24px; font-weight: 600; }
@@ -313,9 +313,21 @@ details.more[open] summary { margin-bottom: 10px; }
    («Período em apresentação até»), um por linha, para os valores caberem inteiros. */
 .s-dk { position: absolute; left: 26px; right: 26px; top: 66px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
 .s-dkc { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 14px; border-radius: 12px; background: #F3F4F6; border: 1px solid #E4E6E9; }
-.s-dkc span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6067; }
+.s-dkc > span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5A6067; }
 .s-dkc b { font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; color: #1E2124; }
 .s-dkc.a b { color: #6A7076; } .s-dkc.b b { color: #E0679A; }
+/* O contador mecânico (odometro.js): cada algarismo é uma fita de 0 a 9 que sobe dentro da sua
+   janela de uma linha; o resto do texto fica parado. A altura da linha é a do ALTURA do módulo. */
+.odo { display: inline-flex; white-space: nowrap; line-height: 1.15; vertical-align: top; }
+.odo-d { display: inline-block; height: 1.15em; overflow: hidden; }
+.odo-f { display: block; white-space: pre; line-height: 1.15em; will-change: transform; }
+.odo-c { white-space: pre; }
+.odo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* O duplo traço dos totais, como nos balancetes: desenha-se da esquerda para a direita. */
+.dupla { position: relative; justify-self: start; align-self: flex-start; }
+.dupla::after { content: ''; position: absolute; left: 0; right: 0; bottom: -5px; height: 4px; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  opacity: .5; transform: scaleX(0); transform-origin: left; transition: transform .7s cubic-bezier(.22,1,.36,1); }
+.dupla.on::after { transform: scaleX(1); }
 /* As diferenças a verde ou a vermelho, como no painel (a regra de cima, mais específica, ganhava). */
 .s-dkc b.s-ok { color: #1E8449; } .s-dkc b.s-bad { color: #C0392B; } .s-dkc b.s-mut { color: #8A9096; }
 .s-dk.com-obs .s-dkc b { font-size: 19px; }
@@ -460,6 +472,10 @@ details.more[open] summary { margin-bottom: 10px; }
   .slide.enter { animation: sin .55s cubic-bezier(.22,1,.36,1); }
   .slide.enter.back { animation-name: sinb; }
   .s-kpi, .s-tile, .s-card, .s-chart, .s-table, .s-rem-card { animation: sup .6s cubic-bezier(.22,1,.36,1) both; }
+  /* Os cartões do detalhe do mês entram um a um, como linhas a acrescentar a um livro de contas. */
+  .s-dkc, .s-dst { animation: sup .5s cubic-bezier(.22,1,.36,1) both; }
+  .s-dkc:nth-child(1) { animation-delay: .35s; } .s-dkc:nth-child(2) { animation-delay: .5s; }
+  .s-dkc:nth-child(3) { animation-delay: .65s; } .s-dkc:nth-child(4) { animation-delay: .8s; } .s-dst { animation-delay: .95s; }
   .s-kpi:nth-child(2), .s-tile:nth-child(2) { animation-delay: 80ms; } .s-kpi:nth-child(3), .s-tile:nth-child(3) { animation-delay: 160ms; }
   .s-kpi:nth-child(4), .s-tile:nth-child(4) { animation-delay: 240ms; } .s-tile:nth-child(5) { animation-delay: 320ms; } .s-tile:nth-child(6) { animation-delay: 400ms; }
   .s-cover-t, .s-cover-eye, .s-cover-s { animation: sup .8s cubic-bezier(.22,1,.36,1) both; }

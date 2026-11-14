@@ -357,6 +357,22 @@ diapositivo (pedido do dono, 14/11); continua no Mês em destaque do painel, ond
 animação. Nos cartões do painel, a letra do valor acompanha a largura do cartão
 (`container-type`), para «10 857 624,65 Kz» caber inteiro em vez de acabar em «…».
 
+**Animações e som no modo apresentação** (nos dois relatórios):
+
+- **Contador mecânico** (`odometro.js`): no diapositivo de cada mês, os valores do período e do
+  detalhe rodam algarismo a algarismo até ao número, como num conta-quilómetros ou numa máquina de
+  calcular (os da esquerda param primeiro). No fim, fica só o texto.
+- **Duplo traço dos totais**, como nos balancetes: desenha-se por baixo da venda periódica do ano e
+  da diferença periódica, depois de o número parar. Os cartões do detalhe entram um a um.
+- **Som** (`som-apresentacao.js`), com os sons do Estúdio de vídeo, gerados no navegador (sem
+  ficheiros): a página a virar em cada diapositivo, os tiques de máquina de calcular enquanto os
+  números contam (nos dois relatórios), as barras a subir e, no crescimento do mês, a caixa
+  registadora (subiu) ou a queda (desceu). O botão **Som** na barra (ou a tecla **M**) liga e
+  desliga; a escolha fica no aparelho. Ao mudar de diapositivo, o som do anterior cala-se. Com
+  «reduzir movimento» no sistema, os números aparecem logo.
+- O **logótipo** da Livraria continua no canto de cada diapositivo (um teste e2e confirma-o; as
+  páginas de teste usam agora os logótipos verdadeiros, como o separador).
+
 **Imagens no modo apresentação** (`diapositivos` em `painel.js`; `fotosDaLoja` e os controlos em
 `apresentacao.js`, os mesmos nos dois relatórios):
 

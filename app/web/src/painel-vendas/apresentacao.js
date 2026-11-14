@@ -6,15 +6,17 @@
  * Quem o usa dá só a lista dos diapositivos e a função que desenha cada um; o resto é daqui.
  * O HTML é o mesmo nos dois (#pres, #pres-view, #pres-timer, #pr-*, e o botão #btn-pres).
  *
- * montarApresentacao({ $, listen, reduce, lista, desenhar, aoAbrir })
+ * montarApresentacao({ $, listen, reduce, lista, desenhar, aoAbrir, som })
  *  · lista() → os diapositivos (pedida ao abrir e em actualizar());
- *  · desenhar(s, item, { depois }) desenha o diapositivo `item` no elemento `s` (já com a classe
- *    .slide); `depois(fn, ms)` marca um passo da animação, cancelado ao mudar de diapositivo;
- *  · aoAbrir() corre antes de abrir (por exemplo, parar as animações do painel por baixo).
+ *  · desenhar(s, item, { depois, som }) desenha o diapositivo `item` no elemento `s` (já com a
+ *    classe .slide); `depois(fn, ms)` marca um passo da animação, cancelado ao mudar de diapositivo;
+ *  · aoAbrir() corre antes de abrir (por exemplo, parar as animações do painel por baixo);
+ *  · som (opcional): o de criarSomDaApresentacao() (som-apresentacao.js). Toca a página a virar em
+ *    cada diapositivo, cala o anterior, e o botão «Som» (ou a tecla M) liga e desliga.
  */
 import { cidadeDaLoja } from '@/lib/stores';
 
-export function montarApresentacao({ $, listen, reduce = false, lista, desenhar, aoAbrir }) {
+export function montarApresentacao({ $, listen, reduce = false, lista, desenhar, aoAbrir, som = null }) {
   const P = { idx: 0, list: [], playing: false, timer: null, raf: null, steps: [] };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -36,7 +38,9 @@ export function montarApresentacao({ $, listen, reduce = false, lista, desenhar,
     const view = $('pres-view');
     view.querySelectorAll('.slide').forEach((x) => x.remove());
     const s = el('div', 'slide enter' + (dir < 0 ? ' back' : ''));
-    desenhar(s, P.list[P.idx], { depois });
+    // O som do diapositivo anterior cala-se; este entra com a página a virar.
+    if (som) { som.novaCena(); som.tocar('pagina', 0.5); }
+    desenhar(s, P.list[P.idx], { depois, som });
     s.appendChild(el('div', 's-num', ''));
     view.appendChild(s);
     fit();
@@ -65,12 +69,15 @@ export function montarApresentacao({ $, listen, reduce = false, lista, desenhar,
     if (!l || !l.length) return;
     if (aoAbrir) aoAbrir();
     P.list = l; P.idx = Math.max(0, Math.min(l.length - 1, inicio));
+    // O clique que abre deixa o navegador tocar som; a primeira vez, os sons demoram um instante.
+    if (som) som.iniciar();
     $('pres').hidden = false; document.documentElement.style.overflow = 'hidden';
     mostrar(1);
     $('pr-next').focus();
   }
   function fechar() {
     tocar(false); limparPassos();
+    if (som) som.novaCena();
     $('pres').hidden = true; document.documentElement.style.overflow = '';
     $('pres-view').querySelectorAll('.slide').forEach((x) => x.remove());
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) { /* sem ecrã inteiro */ }
@@ -97,6 +104,20 @@ export function montarApresentacao({ $, listen, reduce = false, lista, desenhar,
   $('pr-play').addEventListener('click', () => tocar(!P.playing));
   $('pr-speed').addEventListener('change', () => { if (P.playing) correr(); });
   $('pr-close').addEventListener('click', fechar);
+  // O botão do som: «Som ligado» / «Som desligado», com a escolha guardada no aparelho.
+  const somBtn = $('pr-som');
+  const somEstado = () => {
+    if (!somBtn) return;
+    const on = !!(som && som.ligado());
+    somBtn.textContent = on ? '🔊 Som ligado' : '🔇 Som desligado';
+    somBtn.setAttribute('aria-pressed', String(on));
+    somBtn.classList.toggle('on', on);
+  };
+  if (somBtn) {
+    if (!som || !som.disponivel) { somBtn.hidden = !som; somBtn.disabled = true; somBtn.title = 'Este navegador não consegue tocar som.'; }
+    somBtn.addEventListener('click', () => { if (som) { som.ligar(!som.ligado()); somEstado(); } });
+    somEstado();
+  }
   $('pr-fs').addEventListener('click', async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('pres').requestFullscreen(); } catch (e) { $('pr-fs').textContent = 'Ecrã inteiro indisponível'; $('pr-fs').disabled = true; }
   });
@@ -116,6 +137,7 @@ export function montarApresentacao({ $, listen, reduce = false, lista, desenhar,
     else if (e.key === 'Escape' && !document.fullscreenElement) fechar();
     else if (e.key.toLowerCase() === 'f') $('pr-fs').click();
     else if (e.key.toLowerCase() === 'p') tocar(!P.playing);
+    else if (e.key.toLowerCase() === 'm' && somBtn && !somBtn.disabled) somBtn.click();
   });
   let tx = null;
   $('pres-view').addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
@@ -123,7 +145,7 @@ export function montarApresentacao({ $, listen, reduce = false, lista, desenhar,
 
   return {
     abrir, fechar, actualizar, aberta, fit,
-    desmontar() { tocar(false); limparPassos(); clearTimeout(rz); },
+    desmontar() { tocar(false); limparPassos(); clearTimeout(rz); if (som) som.fechar(); },
   };
 }
 

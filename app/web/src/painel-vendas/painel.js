@@ -22,6 +22,8 @@ import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
 import { avisosDePlausibilidade, textoDoAviso } from './plausibilidade.js';
 import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
+import { criarSomDaApresentacao } from './som-apresentacao.js';
+import { rolar } from './odometro.js';
 
 export { cidadeDaLoja, fotosDaLoja, lojaDe };
 
@@ -69,11 +71,16 @@ export function mountPainel(root, api) {
   }
   // Cada elemento tem uma contagem de cada vez: uma nova (ou um valor escrito sem animação)
   // cancela a anterior, que senão continuava a escrever por cima (ao mudar de filtro ou de mês).
+  // O som do modo apresentação (som-apresentacao.js); presAberta passa a ser a do PRES quando existe.
+  const SOM = criarSomDaApresentacao();
+  let presAberta = () => false;
   const contagens = new WeakMap();
   function countUp(e, to, fmt, dur, delay) {
     const id = {};
     contagens.set(e, id);
     if (reduce || !dur || to == null || !isFinite(to)) { e.textContent = fmt(to); return; }
+    // No modo apresentação, os tiques da máquina de calcular enquanto o número conta.
+    if (presAberta()) SOM.contar(dur, delay || 0);
     const t0 = performance.now() + (delay || 0);
     const tick = (now) => {
       if (!e.isConnected || contagens.get(e) !== id) return;
@@ -1196,7 +1203,7 @@ export function mountPainel(root, api) {
     const lg = el('img', 's-logo'); lg.src = logoSrc(); lg.alt = ''; s.appendChild(lg);
     s.appendChild(abs('s-foot', null, 'Livraria e Editora Adventista · ' + lojaDe(S.store) + ' · ' + M.ano));
   }
-  function desenharDiapositivo(s, it, { depois }) {
+  function desenharDiapositivo(s, it, { depois, som }) {
     const M = S.model;
     const B = M.comp, A = M.ano, R = M.R;
     if (it.k === 'capa') {
@@ -1256,6 +1263,7 @@ export function mountPainel(root, api) {
         .attr('fill', (r) => r.v2 != null ? '#EF8DB8' : 'rgba(224,103,154,.1)').attr('stroke', (r) => r.v2 != null ? 'none' : C2).attr('stroke-dasharray', '4 3').attr('y', 150).attr('height', 0);
       const tr = (sel, f, d0) => sel.transition().delay((r) => (reduce ? 0 : d0 + r.i * 60)).duration(reduce ? 0 : 800).ease(d3.easeCubicOut).attr('y', (r) => y(f(r))).attr('height', (r) => 150 - y(f(r)));
       tr(r1, (r) => r.v1, 700); tr(r2, (r) => r.v2 != null ? r.v2 : r.est, 800);
+      if (som) som.tocar('subida', 0.45, 700);
       g.append('text').attr('x', x.bandwidth() / 2).attr('y', 170).attr('text-anchor', 'middle').style('font-size', '13px').style('fill', '#6A7076').style('font-family', 'var(--font)').text((r) => short(r.mes));
     } else if (it.k === 'mes') {
       const r = it.r;
@@ -1299,17 +1307,33 @@ export function mountPainel(root, api) {
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      const sinal = (e, v) => { e.className = v == null ? 's-mut' : v >= 0 ? 's-ok' : 's-bad'; if (v != null) countUp(e, v, kzs, 900); };
-      depois(() => { b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) { countUp(k1, P.venda1, kz, 800); countUp(dm1, P.media1, kz, 800); } }, 400);
-      depois(() => { b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); countUp(dm2, P.media2, kz, 800); }, 1400);
+      const sinal = (e, v) => { e.classList.remove('s-mut', 's-ok', 's-bad'); e.classList.add(v == null ? 's-mut' : v >= 0 ? 's-ok' : 's-bad'); if (v != null) roda(e, v, kzs); };
+      // Os números rodam como num contador de máquina de calcular, com os tiques; as barras sobem
+      // com som; os totais do período ficam com o duplo traço dos balancetes.
+      const roda = (e, v, fmt, dur = 900) => { if (v == null || !isFinite(v)) { e.textContent = fmt(v); return; } rolar(e, fmt(v), { dur, reduce }); if (som) som.contar(dur); };
+      k2.classList.add('dupla'); dd2.classList.add('dupla');
+      depois(() => {
+        b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800);
+        if (som && r.v1 != null) som.tocar('subida_curta', 0.4);
+        if (B != null) { roda(k1, P.venda1, kz); roda(dm1, P.media1, kz); }
+      }, 400);
+      depois(() => {
+        b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800);
+        if (som && val2 != null) som.tocar('subida_curta', 0.55);
+        roda(k2, P.venda2, kz); roda(dm2, P.media2, kz);
+      }, 1400);
+      depois(() => k2.classList.add('on'), 2450);
+      depois(() => dd2.classList.add('on'), 3400);
       depois(() => {
         gr.classList.add('on');
         sinal(dd1, P.difMensal);
         sinal(dd2, P.difPeriodica);
+        // O crescimento do mês: a caixa registadora se subiu, a queda se desceu.
+        if (som && r.cresc != null) som.tocar(r.cresc >= 0 ? 'caixa' : 'queda', r.cresc >= 0 ? 0.7 : 0.55, 350);
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
         gv.className = 'g ' + cls;
         k3.className = 'v ' + (P.crescimento == null ? 's-mut' : P.crescimento >= 0 ? 's-ok' : 's-bad');
-        if (P.crescimento != null) countUp(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
+        if (P.crescimento != null) roda(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
         if (r.cresc != null) countUp(gv, r.cresc, pct, 1000);
         else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; }
         gd.textContent = r.dif != null ? kzs(r.dif) + (r.estado === 'Em curso' ? ' · mês em curso' : '') : (r.est != null ? 'Estimativa: ' + CRIT[M.crit] : '');
@@ -1361,7 +1385,9 @@ export function mountPainel(root, api) {
     lista: () => (S.model ? slideList(S.model) : []),
     desenhar: desenharDiapositivo,
     aoAbrir: () => { stopPlay(); clearTimers(); },
+    som: SOM,
   });
+  presAberta = PRES.aberta;
 
   // ---------- Filtros avançados ----------
   FIL = montarFiltros(root, {

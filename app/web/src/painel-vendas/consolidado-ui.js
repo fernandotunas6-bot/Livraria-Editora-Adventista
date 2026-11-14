@@ -11,6 +11,7 @@ import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
 import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, diapositivosConjunto, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
 import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
+import { criarSomDaApresentacao } from './som-apresentacao.js';
 import { buildXlsx, imprimirJanela, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
@@ -55,8 +56,13 @@ export function mountConsolidado(root, api) {
   const dot = (cor) => { const d = el('span', 'dot'); d.style.background = cor; return d; };
   const quando = (iso) => (iso ? new Date(iso).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—');
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+  // O som do modo apresentação (som-apresentacao.js), como no painel de cada loja.
+  const SOM = criarSomDaApresentacao();
+  let presAberta = () => false;
   function countUp(e, to, fmt, dur = 900) {
     if (reduce || to == null || !isFinite(to)) { e.textContent = fmt(to); return; }
+    // No modo apresentação, os tiques da máquina de calcular enquanto o número conta.
+    if (presAberta()) SOM.contar(dur);
     const t0 = performance.now();
     const tick = (now) => {
       if (!e.isConnected || dead) return;
@@ -385,7 +391,9 @@ export function mountConsolidado(root, api) {
     $, listen, reduce,
     lista: () => (S.c && S.c.lojas.length ? diapositivosConjunto(S.c, { maisVendidos: mvRede(S.c.ano).length }) : []),
     desenhar: desenharDiapositivo,
+    som: SOM,
   });
+  presAberta = PRES.aberta;
 
   function fillTake(c) {
     const R = c.total.R;

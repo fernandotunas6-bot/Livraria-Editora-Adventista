@@ -10,6 +10,9 @@
 import { mountPainel } from '@/painel-vendas/painel.js';
 import css from '@/painel-vendas/painel.css?inline';
 import markup from '@/painel-vendas/painel.html?raw';
+// Os logótipos verdadeiros, como no separador: os diapositivos têm de os mostrar (pedido do dono).
+import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
+import logoClaroUrl from '@/painel-vendas/logo-livraria-adventista-claro.png';
 
 const vazio = () => Array(12).fill('');
 const ANOS = {
@@ -78,6 +81,6 @@ window.addEventListener('error', (e) => window.__erros.push(String(e.message)));
 window.addEventListener('unhandledrejection', (e) => window.__erros.push(String((e.reason && e.reason.message) || e.reason)));
 
 const root = document.getElementById('host').attachShadow({ mode: 'open' });
-root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', '')}`;
+root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
 window.__painel = root;
 mountPainel(root, api);
