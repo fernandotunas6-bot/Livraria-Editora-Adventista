@@ -35,7 +35,7 @@ pedidas pelo dono a 2026-11-14).
   porta do Lubango (fotografia `lubango-1.webp`). Ao sábado não abrem. No Huambo não há registo do
   horário verdadeiro: tinha o de omissão do formulário, com o sábado aberto, e a 2026-11-14
   decidiu-se pôr o mesmo das outras, como o dono pediu para o Bié. Migração
-  `20261114210000_horario_das_lojas_e_texto_do_destaque.sql`.
+  `20261114223000_horario_das_lojas_e_texto_do_destaque.sql`.
 - **Catumbela:** «Seg–Sex 9h–18h», escrito no painel.
 - Uma loja nova já vem com o horário da porta preenchido. Muda-se em **Vendas → Lojas → editar →
   Horário**, e o que lá se escrever é o que o site mostra.
