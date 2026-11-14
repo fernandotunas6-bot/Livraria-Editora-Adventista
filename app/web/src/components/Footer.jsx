@@ -10,7 +10,7 @@ import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
 import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
-import { fotoDaLoja, lojaSrcSet } from '@/lib/stores';
+import { fotoDaLoja, lojaSrcSet, mapsUrl } from '@/lib/stores';
 import SafeLink from '@/components/SafeLink.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -439,9 +439,12 @@ const Footer = () => {
                           <p className="font-medium text-sm">{store.name}</p>
                           <p className="text-xs text-background/60 mt-1">{store.address}</p>
                           {store.hours && <p className="text-xs text-background/70 mt-1">{store.hours}</p>}
-                          {safeLinkUrl(store.maps_url) && (
+                          {/* Todas as lojas têm «Ver no mapa»: sem `maps_url`, vai pelas coordenadas
+                              ou pela morada (mapsUrl). Antes só aparecia nas que tinham o link
+                              escrito, e os cartões ficavam com alturas diferentes. */}
+                          {mapsUrl(store) && (
                             <a
-                              href={safeLinkUrl(store.maps_url)}
+                              href={mapsUrl(store)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="-mb-1.5 inline-flex items-center gap-1 py-1.5 text-xs text-[#22d3ee] hover:underline mt-0.5"

@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, GALERIA_MOSAICO, conflitosDeZonas, erroDaGaleria, fotoDaLoja,
-  galeriaParaGuardar, juntarNomes, lojaQueServe, lojaSrcSet, mosaicoDaGaleria, provinciasServidas, storeGallery,
+  galeriaParaGuardar, juntarNomes, lojaQueServe, lojaSrcSet, mapsUrl, mosaicoDaGaleria, provinciasServidas, storeGallery,
 } from './stores';
+
+describe('mapsUrl', () => {
+  it('usa o link do painel quando é um endereço web', () => {
+    expect(mapsUrl({ maps_url: 'https://maps.app.goo.gl/abc', latitude: -8.8, longitude: 13.2 })).toBe('https://maps.app.goo.gl/abc');
+  });
+
+  it('recusa o que não é um endereço web e vai pelas coordenadas', () => {
+    for (const maps_url of ['javascript:alert(1)', 'maps.google.com/x', '/lojas', '  ']) {
+      expect(mapsUrl({ maps_url, latitude: -8.8, longitude: 13.2 }), maps_url).toBe('https://www.google.com/maps?q=-8.8,13.2&z=16');
+    }
+  });
+
+  it('sem link nem coordenadas, procura pelo nome e pela morada', () => {
+    const url = mapsUrl({ name: 'Livraria do Lubango', address: 'Rua Principal', province: 'Huíla' });
+    expect(url).toMatch(/^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=/);
+    expect(decodeURIComponent(url)).toContain('Livraria do Lubango, Rua Principal, Huíla, Angola');
+  });
+});
 
 describe('lojaSrcSet', () => {
   it('dá as duas variantes de uma fotografia do próprio site', () => {
