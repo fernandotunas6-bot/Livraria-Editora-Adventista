@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FONTE_TEXTO, FONTE_TITULOS, estiloBaseImpressao, fonteCanvas, fontesParaImpressao, urlsAbsolutos } from './fontes';
+import { FAMILIA_TEXTO, FAMILIA_TITULOS, FONTE_TEXTO, FONTE_TITULOS, estiloBaseImpressao, fonteCanvas, fontesParaImpressao, urlsAbsolutos } from './fontes';
 
 const SRC = path.resolve(__dirname, '..');
 
@@ -14,11 +14,13 @@ function ficheiros(dir) {
 }
 
 describe('fontes do sistema', () => {
-  it('canvas e impressão usam a Inter e a Fraunces', () => {
+  it('canvas e impressão usam a Inter e a Source Serif 4', () => {
     expect(fonteCanvas(700, 30)).toBe(`700 30px ${FONTE_TEXTO}`);
     expect(fonteCanvas(600, 20, { titulo: true })).toBe(`600 20px ${FONTE_TITULOS}`);
     expect(FONTE_TEXTO).toMatch(/^'Inter Variable'/);
-    expect(FONTE_TITULOS).toMatch(/^'Fraunces Variable'/);
+    expect(FONTE_TITULOS).toMatch(/^'Source Serif 4 Variable'/);
+    expect(FAMILIA_TEXTO).toBe('Inter Variable');
+    expect(FAMILIA_TITULOS).toBe('Source Serif 4 Variable');
     expect(estiloBaseImpressao()).toContain(`body{font-family:${FONTE_TEXTO}}`);
   });
 
@@ -26,16 +28,19 @@ describe('fontes do sistema', () => {
     let estilo;
     afterEach(() => { estilo?.remove(); estilo = null; });
 
-    it('copia as @font-face da Inter e da Fraunces, e mais nenhuma', () => {
+    it('copia as @font-face da Inter e da Source Serif 4, e mais nenhuma', () => {
       estilo = document.createElement('style');
       estilo.textContent = `
         @font-face { font-family: 'Inter Variable'; src: url(/assets/inter.woff2) format('woff2'); }
+        @font-face { font-family: 'Source Serif 4 Variable'; src: url(/assets/source-serif.woff2) format('woff2'); }
         @font-face { font-family: 'Fraunces Variable'; src: url(/assets/fraunces.woff2) format('woff2'); }
         @font-face { font-family: 'Outra'; src: url(/assets/outra.woff2); }`;
       document.head.appendChild(estilo);
       const css = fontesParaImpressao();
       expect(css).toContain('Inter Variable');
-      expect(css).toContain('Fraunces Variable');
+      expect(css).toContain('Source Serif 4 Variable');
+      // A antiga fonte dos títulos já não vai para as impressões, mesmo que alguma folha a declare.
+      expect(css).not.toContain('Fraunces');
       expect(css).not.toContain('Outra');
     });
 
@@ -50,8 +55,9 @@ describe('fontes do sistema', () => {
 
   // Uma fonte avulsa num componente desfaz a coerência: o painel de relatórios usou Manrope e Lora
   // do Google Fonts, e font-serif dava Georgia. Tudo passa por index.css, painel.css ou fontes.js.
+  // A Fraunces foi a fonte dos títulos até Novembro de 2026; saiu por ser demasiado vistosa.
   it('nenhum ficheiro de src usa outra família de letra', () => {
-    const PROIBIDAS = /\b(Manrope|Lora|Roboto|Montserrat|Poppins|Open Sans|Lato|Playfair|Merriweather|Nunito|Raleway|Oswald)\b/;
+    const PROIBIDAS = /\b(Fraunces|Manrope|Lora|Roboto|Montserrat|Poppins|Open Sans|Lato|Playfair|Merriweather|Nunito|Raleway|Oswald)\b/;
     const PERMITIDOS = new Set(['index.css', 'painel.css', 'fontes.js']);
     const problemas = [];
     for (const f of ficheiros(SRC)) {

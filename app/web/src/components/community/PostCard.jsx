@@ -228,7 +228,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
   );
 }
 
-/** Citação em destaque, como numa revista: Fraunces itálico, filete dourado, livro e página. */
+/** Citação em destaque, como numa revista: serifa em itálico, filete dourado, livro e página. */
 function PullQuote({ post }) {
   return (
     <figure className="relative rounded-r-xl border-l-[3px] border-editorial-ouro bg-editorial-tela/70 py-3 pl-4 pr-3">

@@ -17,7 +17,7 @@ export function GoldRule({ className = '' }) {
   );
 }
 
-/** Topo editorial: marinho, Fraunces, filete dourado e os números da comunidade. */
+/** Topo editorial: marinho, serifa dos títulos, filete dourado e os números da comunidade. */
 export function CommunityHero({ stats, onWrite }) {
   return (
     <section className="relative overflow-hidden bg-editorial-marinho pb-6 pt-20 text-white sm:pb-10 sm:pt-28">

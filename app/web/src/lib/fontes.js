@@ -3,7 +3,8 @@
  *
  * O site usa dois, servidos pela própria loja (@fontsource-variable, importados em main.jsx):
  *   - Inter: o texto, os números, os botões e as tabelas;
- *   - Fraunces: os títulos e os números grandes de destaque.
+ *   - Source Serif 4: os títulos. Uma serifa sóbria, de pouco contraste, que acompanha o texto
+ *     sem chamar a atenção (a anterior, mais decorativa, está proibida em fontes.test.js).
  * Mais nenhum. As mesmas pilhas estão em index.css (@theme: --font-sans e --font-serif, que dão as
  * classes font-sans e font-serif do Tailwind) e em painel-vendas/painel.css (--font e --serif).
  *
@@ -12,10 +13,14 @@
  * herda as @font-face da página. Para isso: carregarFontes() e fontesParaImpressao().
  */
 
-export const FONTE_TEXTO = "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-export const FONTE_TITULOS = "'Fraunces Variable', 'Fraunces', Georgia, serif";
+/** Os nomes das famílias nas @font-face do @fontsource-variable. */
+export const FAMILIA_TEXTO = 'Inter Variable';
+export const FAMILIA_TITULOS = 'Source Serif 4 Variable';
 
-/** A propriedade `font` do canvas, com as fontes do sistema. `titulo` usa a Fraunces. */
+export const FONTE_TEXTO = `'${FAMILIA_TEXTO}', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+export const FONTE_TITULOS = `'${FAMILIA_TITULOS}', 'Source Serif 4', Georgia, serif`;
+
+/** A propriedade `font` do canvas, com as fontes do sistema. `titulo` usa a dos títulos. */
 export const fonteCanvas = (peso, px, { titulo = false } = {}) => `${peso} ${px}px ${titulo ? FONTE_TITULOS : FONTE_TEXTO}`;
 
 const PESOS_TEXTO = [400, 500, 600, 700, 800];
@@ -28,8 +33,8 @@ const PESOS_TITULOS = [600, 700];
 export async function carregarFontes(limite = 2500) {
   if (typeof document === 'undefined' || !document.fonts || typeof document.fonts.load !== 'function') return false;
   const pedidos = [
-    ...PESOS_TEXTO.map((p) => document.fonts.load(`${p} 16px 'Inter Variable'`)),
-    ...PESOS_TITULOS.map((p) => document.fonts.load(`${p} 16px 'Fraunces Variable'`)),
+    ...PESOS_TEXTO.map((p) => document.fonts.load(`${p} 16px '${FAMILIA_TEXTO}'`)),
+    ...PESOS_TITULOS.map((p) => document.fonts.load(`${p} 16px '${FAMILIA_TITULOS}'`)),
   ];
   const tempo = new Promise((ok) => { setTimeout(() => ok(false), limite); });
   try {
@@ -47,7 +52,7 @@ export function urlsAbsolutos(css, base) {
 }
 
 /**
- * As regras @font-face da Inter e da Fraunces desta página, com os URLs absolutos, para pôr no
+ * As regras @font-face da Inter e da Source Serif 4 desta página, com os URLs absolutos, para pôr no
  * <style> de uma janela de impressão (guias, extractos, recibos, relatórios em PDF). '' se não
  * houver (testes, folhas de outro domínio).
  */
@@ -63,7 +68,7 @@ export function fontesParaImpressao() {
         if (r.cssRules && r.type !== 5) ver(r.cssRules); // @media, @supports, @layer
         if (r.type !== 5 && !(r.constructor && r.constructor.name === 'CSSFontFaceRule')) continue;
         const familia = String(r.style?.getPropertyValue('font-family') || '').replace(/["']/g, '').trim();
-        if (familia !== 'Inter Variable' && familia !== 'Fraunces Variable') continue;
+        if (familia !== FAMILIA_TEXTO && familia !== FAMILIA_TITULOS) continue;
         regras.push(urlsAbsolutos(r.cssText, base));
       }
     };

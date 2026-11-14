@@ -92,7 +92,7 @@ de três linhas e o botão do som em largura inteira: no telemóvel tapava o ecr
 páginas. "Ver" leva ao Acompanhamento ou ao Atendimento.
 
 ### 1.6 Cabeçalho da secção — `AdminSectionHeader.jsx`
-Igual em todas as secções: **grupo** (12 px, maiúsculas), **título** (`h1`, 28 px, Fraunces),
+Igual em todas as secções: **grupo** (12 px, maiúsculas), **título** (`h1`, 28 px, Source Serif 4),
 **descrição** (14 px, até 48 rem) e, à direita, as **acções** da secção (ex.: "Adicionar produto").
 Os textos vêm do registo (§3). Os separadores internos não repetem o título; mostram só o seu
 estado e os seus botões (ex.: "3 no ar agora", "Actualizar", "Nova loja").

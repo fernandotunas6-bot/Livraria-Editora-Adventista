@@ -1288,7 +1288,7 @@ async function preparar(base, plano, { capas = [], fotos = [], fundo = 'capas' }
   const doMural = fundo === 'capas' ? capasParaFundo(capas, { n: 18, chave: base.etiqueta }) : [];
   const [logo, , imgs, fts, mural, logoClaro] = await Promise.all([
     carregarImagem(base.logoSrc),
-    // A Inter e a Fraunces têm de estar prontas antes do primeiro quadro: o canvas não espera.
+    // As fontes do sistema têm de estar prontas antes do primeiro quadro: o canvas não espera.
     carregarFontes(),
     Promise.all(capas.map((u) => carregarImagem(u).then((img) => [u, img]))),
     fundo === 'biblioteca' ? Promise.all(fotos.slice(0, 8).map((u) => carregarImagem(u))) : Promise.resolve([]),

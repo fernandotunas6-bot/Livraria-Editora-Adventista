@@ -3,9 +3,13 @@ import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App';
-// Os tipos de letra da loja, servidos daqui (antes vinham da Google; ver index.html). Os eixos
-// são os que o pedido à Google usava: Fraunces com tamanho óptico e peso, Inter com peso.
-import '@fontsource-variable/fraunces/opsz.css';
+// Os tipos de letra da loja, servidos daqui (antes vinham da Google; ver index.html): a Source
+// Serif 4 nos títulos e a Inter no texto, as duas só com o eixo do peso. O tamanho óptico da
+// Source Serif 4 mais do que duplicava o ficheiro (122 KB contra 51 KB no alfabeto latino) por uma
+// diferença que mal se vê. O itálico verdadeiro serve as citações e o browser só o descarrega
+// quando há texto em itálico na página.
+import '@fontsource-variable/source-serif-4/wght.css';
+import '@fontsource-variable/source-serif-4/wght-italic.css';
 import '@fontsource-variable/inter/wght.css';
 import '@/index.css';
 import { initFeatureFlags } from '@/lib/featureFlags';

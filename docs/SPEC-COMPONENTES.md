@@ -109,7 +109,7 @@ O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A r
 
 **Visual:**
 - Paleta editorial dos emails, com os tokens `editorial-*` do Tailwind: `papel`, `tela`, `filete`, `ouro`, `ouro-texto`, `tinta`, `tinta-suave`, `marinho`, `petroleo`.
-- Títulos em Fraunces e filete dourado (`GoldRule`).
+- Títulos em Source Serif 4 e filete dourado (`GoldRule`).
 - Contraste verificado: o dourado só aparece em texto como `ouro-texto`.
 
 **Filtros:** ficam no endereço (`?tema=&tipo=&ordem=&q=&livro=`), por isso um filtro partilha-se com o link. As ordenações são Recentes (as fixadas primeiro), Em alta e Sem resposta.
