@@ -49,7 +49,7 @@ export default function ReviewsPanel({ data, run }) {
       if (rec.error) throw rec.error;
       setRecentes(rec.data || []);
     } catch (e) {
-      setErro(/colporteur_reviews|could not find/i.test(e.message || '') ? 'As avaliações ainda não estão na base de dados (migração 20261114160000 por aplicar).' : (e.message || 'Não foi possível ler as avaliações.'));
+      setErro(/colporteur_reviews|could not find/i.test(e.message || '') ? 'As avaliações ainda não estão na base de dados (migração 20261114200000 por aplicar).' : (e.message || 'Não foi possível ler as avaliações.'));
       setRecentes([]);
     }
     if (catalogo) {

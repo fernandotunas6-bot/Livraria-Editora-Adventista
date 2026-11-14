@@ -96,6 +96,7 @@ export default function ColporteurVerifyPage() {
                   <div><dt className="opacity-70">Código</dt><dd className="font-mono font-semibold">{r.code}</dd></div>
                   <div><dt className="opacity-70">Categoria</dt><dd className="font-semibold">{CATEGORIES[r.category]?.label || r.category}</dd></div>
                   <div><dt className="opacity-70">Igreja</dt><dd className="font-semibold">{[r.church, r.district, r.field].filter(Boolean).join(' · ') || '—'}</dd></div>
+                  {r.store && <div><dt className="opacity-70">Loja</dt><dd className="font-semibold">{r.store}</dd></div>}
                   <div><dt className="opacity-70">Cartão válido até</dt><dd className="font-semibold">{dataPt(r.valid_until)}</dd></div>
                   {r.start_date && <div><dt className="opacity-70">Colportor desde</dt><dd className="font-semibold">{dataPt(r.start_date)}</dd></div>}
                 </dl>

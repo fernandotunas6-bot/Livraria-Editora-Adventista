@@ -125,7 +125,7 @@ ${CARD_STYLE}</style></head><body>
       <p class="nome">${esc(card.full_name)}</p>
       <p class="linha"><span class="cod">${esc(card.code)}</span><span class="cat">${esc(CATEGORIES[card.category]?.label || card.category)}</span></p>
       <p class="linha">${igreja || '&nbsp;'}</p>
-      ${card.province ? `<p class="linha">${esc(card.province)}</p>` : ''}
+      ${card.store || card.province ? `<p class="linha">${esc([card.store, card.province].filter(Boolean).join(' · '))}</p>` : ''}
     </div>
     <div class="faixa"><span>Evangelismo pela literatura</span><span>Válido até ${esc(validade)}</span></div>
   </div>

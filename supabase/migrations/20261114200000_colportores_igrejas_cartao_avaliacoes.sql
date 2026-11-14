@@ -20,6 +20,11 @@
 -- 6. Avaliações dos livros: a equipa do catálogo pode ocultar uma avaliação (com motivo); fica
 --    visível só para quem a escreveu e para a equipa. O autor não a consegue voltar a mostrar.
 --
+-- A loja de cada colportor (colporteurs.store_id, de 20261114180000_lojas_donas_dos_dados) vai no
+-- cartão, na verificação e na lista de cada igreja: é a loja onde ele levanta os livros e presta
+-- contas. Por isso esta migração corre depois dela (foi escrita como 20261114160000, a mesma versão
+-- de capas_cores_e_nomes_do_catalogo, que já está aplicada: o supabase db push dava-a por aplicada).
+--
 -- Reverter: apagar as funções e a tabela colporteur_reviews; as colunas novas podem ficar.
 
 -- 1. Igrejas ---------------------------------------------------------------------------------
@@ -110,7 +115,8 @@ as $$
     'district', (select d.name from public.churches c join public.church_districts d on d.id = c.district_id where c.id = v.church_id),
     'field', (select coalesce(nullif(f.short_name, ''), f.name) from public.churches c join public.church_fields f on f.id = c.field_id where c.id = v.church_id),
     'church_other', v.church_other,
-    'province', (select name from public.angola_provinces where id = v.province_id)
+    'province', (select name from public.angola_provinces where id = v.province_id),
+    'store', (select s.name from public.physical_stores s where s.id = v.store_id)
   );
 $$;
 revoke all on function private.cartao_json(public.colporteurs) from public, anon, authenticated;
@@ -180,6 +186,7 @@ begin
     'status', v.status,
     'code', v.code, 'full_name', v.full_name, 'category', v.category,
     'church', j ->> 'church', 'district', j ->> 'district', 'field', j ->> 'field',
+    'store', j ->> 'store',
     'valid_until', v_ate, 'start_date', v.start_date
   );
 end;
@@ -423,6 +430,7 @@ begin
         select coalesce(jsonb_agg(jsonb_build_object(
           'id', c.id, 'code', c.code, 'full_name', c.full_name, 'category', c.category, 'status', c.status,
           'phone', c.phone, 'start_date', c.start_date,
+          'store', (select s.name from public.physical_stores s where s.id = c.store_id),
           'rating_avg', (select round(avg(r.rating)::numeric, 2) from public.colporteur_reviews r where r.colporteur_id = c.id and not r.hidden),
           'rating_count', (select count(*) from public.colporteur_reviews r where r.colporteur_id = c.id and not r.hidden))
           order by (c.status = 'activo') desc, c.full_name), '[]'::jsonb)

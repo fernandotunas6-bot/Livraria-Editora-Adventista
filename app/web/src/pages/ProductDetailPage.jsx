@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   ShoppingCart as ShoppingCartIcon, Loader2, ChevronLeft, ChevronRight, CheckCircle, 
   XCircle, Minus, Plus, BookOpen, User, Layers, Eye, MessageCircle, Heart, Star, Sparkles, Trash2, ThumbsUp, MessagesSquare,
-  Truck, Wallet, Store, Youtube, Share2,
+  Truck, Wallet, Youtube, Share2,
 } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,6 +41,7 @@ import { hasReadingSample, productType, variantNames } from '@/lib/productTypes'
 import { breadcrumbJsonLd, jsonLdString, productJsonLd } from '@/lib/structuredData';
 import CommunityFeed from '@/components/community/CommunityFeed';
 import ProductDownloads from '@/components/downloads/ProductDownloads';
+import StoreAvailability from '@/components/StoreAvailability';
 import { variantIndexOf } from '@/lib/digitalEditions';
 import { loadMyLibrary } from '@/lib/digitalLibrary';
 
@@ -218,7 +219,11 @@ function ProductDetailPage() {
         if (fetchedProduct.variants && fetchedProduct.variants.length > 0) {
           // Começa na primeira variante com stock: abrir num tamanho esgotado parecia o produto todo esgotado.
           const vs = fetchedProduct.variants;
-          setSelectedVariant(vs.find((v) => v.inventory_quantity > 0) || vs[0]);
+          const first = vs.find((v) => v.inventory_quantity > 0) || vs[0];
+          setSelectedVariant(first);
+          // A imagem acompanha a variante: se a primeira com stock for outra cor, mostra essa.
+          const img = (fetchedProduct.images || []).findIndex((i) => i.url === first?.image_url);
+          setCurrentImageIndex(img > 0 ? img : 0);
         }
       } catch (err) {
         setError(err.message || 'Não foi possível carregar o livro');
@@ -328,7 +333,7 @@ function ProductDetailPage() {
     : isStockManaged && availableStock <= 0
       // Com variantes, a mensagem do tipo ("Este tamanho esgotou. Escolha outro." numa t-shirt,
       // "Esta edição esgotou…" num livro, auditoria 9.11); sem variantes, o produto esgotou.
-      ? { ok: false, label: product.variants?.length > 1 ? variantNames(product.product_type).soldOut : 'Esgotado', tone: 'text-destructive' }
+      ? { ok: false, label: product.variants?.length > 1 ? variantNames(product.product_type, product.versions).soldOut : 'Esgotado', tone: 'text-destructive' }
       : isStockManaged && !canAddToCart
         ? { ok: false, label: `Só ${availableStock} disponíve${availableStock === 1 ? 'l' : 'is'}`, tone: 'text-destructive' }
         : isStockManaged && product.stock_low
@@ -550,7 +555,7 @@ function ProductDetailPage() {
 
             {product.variants.length > 1 && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold mb-3 text-foreground">{variantNames(product.product_type).one}</h3>
+                <h3 className="text-sm font-semibold mb-3 text-foreground">{variantNames(product.product_type, product.versions).one}</h3>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map(variant => (
                     <Button
@@ -688,10 +693,8 @@ function ProductDetailPage() {
                 <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span><strong className="font-medium text-foreground">Pagamento na entrega</strong> <span className="text-muted-foreground">ou por transferência.</span></span>
               </li>
-              <li className="flex items-start gap-2.5">
-                <Store className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span><strong className="font-medium text-foreground">Levantamento nas lojas,</strong> <Link to="/lojas" className="text-primary underline underline-offset-2 hover:no-underline">ver moradas</Link>.</span>
-              </li>
+              {/* As lojas que marcaram «temos» neste produto; sem nenhuma, a linha de sempre. */}
+              <StoreAvailability bookId={product.id} />
             </ul>
 
             {/* Resumo da descrição depois do botão de compra: o texto completo, em "Detalhes",
@@ -749,7 +752,7 @@ function ProductDetailPage() {
                 <TabsTrigger value="author"><User className="h-4 w-4 mr-1.5" />Sobre o Autor</TabsTrigger>
               )}
               {product.variants?.length > 1 && (
-                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type).many}</TabsTrigger>
+                <TabsTrigger value="versions"><Layers className="h-4 w-4 mr-1.5" />{variantNames(product.product_type, product.versions).many}</TabsTrigger>
               )}
               <TabsTrigger value="reviews"><MessageCircle className="h-4 w-4 mr-1.5" />Avaliações ({stats.total})</TabsTrigger>
               <TabsTrigger value="discussion"><MessagesSquare className="h-4 w-4 mr-1.5" />Discussão</TabsTrigger>

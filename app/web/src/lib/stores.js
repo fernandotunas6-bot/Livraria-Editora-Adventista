@@ -188,3 +188,64 @@ export function mosaicoDaGaleria(total) {
   if (resto === 3) pecas[n - 1] = 'col-span-2 row-span-1';
   return pecas;
 }
+
+/**
+ * A cidade no nome da loja, como o separador Lojas o escreve: «Livraria Adventista — Lubango» →
+ * «Lubango». Vazia quando o nome não segue esse modelo. Serve ao rodapé do painel de vendas e à
+ * página do produto («Disponível em: Huambo · Lubango»).
+ */
+export function cidadeDaLoja(store) {
+  const m = String(store?.name || '').match(/^\s*livraria\s+(?:e\s+editora\s+)?adventista\b[\s—–-]*(\S.*)$/i);
+  return m ? m[1].trim() : '';
+}
+
+const semAcentos = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+/**
+ * As províncias que a loja serve, para mostrar ao cliente: a lista do painel (Lojas →
+ * «Províncias que serve»; migração lojas_donas_dos_dados) ou, sem lista, a da própria loja.
+ */
+export function provinciasServidas(store) {
+  const lista = Array.isArray(store?.service_provinces) ? store.service_provinces.filter(Boolean) : [];
+  if (lista.length) return lista;
+  return store?.province ? [store.province] : [];
+}
+
+/**
+ * A loja que serve uma província — a mesma regra que private.loja_da_provincia_nome na base de
+ * dados, que é quem grava a loja de cada encomenda: a que tem a província na sua lista; depois, a
+ * que fica nela. Entre várias, a primeira (as lojas vêm pela ordem do painel). Sem nenhuma, null.
+ */
+export function lojaQueServe(stores, province) {
+  const p = semAcentos(province);
+  if (!p) return null;
+  const lista = stores || [];
+  return lista.find((s) => (s.service_provinces || []).some((sp) => semAcentos(sp) === p))
+    || lista.find((s) => semAcentos(s.province) === p)
+    || null;
+}
+
+/** «Huíla, Namibe e Cunene». */
+export function juntarNomes(nomes) {
+  const t = (nomes || []).filter(Boolean);
+  if (t.length <= 1) return t[0] || '';
+  return `${t.slice(0, -1).join(', ')} e ${t[t.length - 1]}`;
+}
+
+/**
+ * Para o painel das lojas: as províncias que mais do que uma loja diz servir (a encomenda fica com
+ * a primeira, e a outra nunca a recebe) e as que nenhuma serve. `todas` = a lista das províncias.
+ */
+export function conflitosDeZonas(stores, todas = []) {
+  const donos = new Map();
+  for (const s of stores || []) {
+    for (const p of provinciasServidas(s)) {
+      const k = semAcentos(p);
+      if (!donos.has(k)) donos.set(k, { provincia: p, lojas: [] });
+      if (!donos.get(k).lojas.includes(s.name)) donos.get(k).lojas.push(s.name);
+    }
+  }
+  const repetidas = [...donos.values()].filter((d) => d.lojas.length > 1);
+  const semLoja = todas.filter((p) => !donos.has(semAcentos(p)));
+  return { repetidas, semLoja };
+}

@@ -73,21 +73,27 @@ export async function submitApplication(form) {
 // --- Painel ------------------------------------------------------------------------------------
 
 export async function loadColporteurAdmin() {
-  const [colporteurs, events, rules, overrides, settingsRes] = await Promise.all([
+  const [colporteurs, events, rules, overrides, settingsRes, storesRes] = await Promise.all([
     all('colporteurs'),
     all('colporteur_events'),
     all('colporteur_commission_rules', 'valid_from'),
     all('colporteur_commission_overrides', 'valid_from'),
     supabase.from('colporteur_settings').select('*').eq('id', 1).maybeSingle(),
+    // A loja de cada colportor (migração lojas_donas_dos_dados): a equipa vê também as inactivas.
+    supabase.from('physical_stores').select('id, name, province, active').order('sort_order').order('name'),
   ]);
   if (settingsRes.error) throw new Error(colporteurError(settingsRes.error));
-  return { colporteurs, events, rules, overrides, settings: settingsRes.data || { base_pct: 0 } };
+  return {
+    colporteurs, events, rules, overrides,
+    settings: settingsRes.data || { base_pct: 0 },
+    stores: storesRes.error ? [] : storesRes.data || [],
+  };
 }
 
 /** Campos que a equipa edita directamente na ficha (o resto vai pelas funções). */
 const EDITABLE = ['full_name', 'phone', 'email', 'church_id', 'church_other', 'province_id', 'municipality_id', 'territory',
   'requested_category', 'weekly_hours', 'is_student', 'school', 'recommended_by_pastor_id', 'recommended_by_name',
-  'recommendation_ok', 'credit_limit', 'notes', 'accepts_deliveries'];
+  'recommendation_ok', 'credit_limit', 'notes', 'accepts_deliveries', 'store_id'];
 
 export async function saveColporteur(row) {
   const body = Object.fromEntries(EDITABLE.filter((k) => k in row).map((k) => {
@@ -253,7 +259,7 @@ export const DELIVERY_OFFER_STATUS = {
   cancelled: { label: 'Cancelada', tone: 'muted' },
 };
 
-// --- Cartão, verificação, avaliações e igrejas (migração 20261114160000) ---------------------
+// --- Cartão, verificação, avaliações e igrejas (migração 20261114200000) ---------------------
 
 /** O cartão de um colportor (equipa) ou o do próprio (sem id). `reissue` dá um código novo. */
 export const colporteurCard = (id = null, reissue = false) => rpc('colporteur_card', { p_id: id, p_reissue: !!reissue });

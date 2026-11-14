@@ -85,7 +85,7 @@ export default function ChurchColporteurs({ church, idx, onClose }) {
                   {info.colporteurs.map((c) => (
                     <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                       <span className="flex flex-wrap items-center gap-2"><CodeChip code={c.code} /><span className="font-medium">{c.full_name}</span>
-                        <span className="text-muted-foreground">{CATEGORIES[c.category]?.label}{c.phone ? ` · ${displayAngolaPhone(c.phone)}` : ''}</span></span>
+                        <span className="text-muted-foreground">{CATEGORIES[c.category]?.label}{c.store ? ` · ${c.store}` : ''}{c.phone ? ` · ${displayAngolaPhone(c.phone)}` : ''}</span></span>
                       <span className="flex items-center gap-2">
                         {c.rating_count > 0 && <span className="text-amber-600 dark:text-amber-400">{ratingText(c.rating_avg, c.rating_count)}</span>}
                         <Pill tone={STATUSES[c.status]?.tone}>{STATUSES[c.status]?.label || c.status}</Pill>

@@ -61,7 +61,7 @@ export const CartProvider = ({ children }) => {
       const silent = !!finalOptions.silent;
       // Produto com tamanhos ou edições: só entra com um escolhido (o servidor recusa sem ele).
       if (needsVariantChoice(product) && !/-v\d+$/.test(String(variant?.id || ''))) {
-        const errMsg = `Para comprar "${product.title}", ${variantNames(product.product_type).ask} na página do produto.`;
+        const errMsg = `Para comprar "${product.title}", ${variantNames(product.product_type, product.versions).ask} na página do produto.`;
         if (!silent) toast.error(errMsg);
         reject(new Error(errMsg));
         return;
@@ -195,7 +195,7 @@ export const CartProvider = ({ children }) => {
       // Entrou sem variante (pelo cartão, antes desta regra) num produto que passou a ter: o
       // servidor recusa-o, por isso sai já, com o aviso do que falta.
       if (!extra && needsVariantChoice(book)) {
-        changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type).ask} na página do produto.`);
+        changes.push(`"${title}" saiu do carrinho: ${variantNames(book.product_type, book.versions).ask} na página do produto.`);
         updates.set(item.variant.id, null);
         continue;
       }

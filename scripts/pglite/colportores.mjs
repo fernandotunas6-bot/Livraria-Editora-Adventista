@@ -1,4 +1,4 @@
-// Cenários da migração 20261114160000_colportores_igrejas_cartao_avaliacoes, com as migrações reais:
+// Cenários da migração 20261114200000_colportores_igrejas_cartao_avaliacoes, com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/colportores.mjs supabase/migrations
 // Instruções em base.mjs e em docs/COLPORTAGEM.md (secções 6 a 9).
 import { freshDb } from './base.mjs';
@@ -56,6 +56,11 @@ await raises('telefone da igreja com 8 algarismos', () => q(`update public.churc
 await raises('latitude sem longitude', () => q(`update public.churches set longitude = null where id = $1`, [igreja.id]), /coordenadas_juntas/);
 await raises('coordenadas fora de Angola', () => q(`update public.churches set latitude = 38.7, longitude = -9.1 where id = $1`, [igreja.id]));
 
+// A loja do Huambo (a migração 20261114180000 dá a cada colportor a loja que serve a sua província).
+let [lojaHuambo] = await q(`select id from public.physical_stores where name ilike '%Huambo%' or province ilike 'Huambo' limit 1`);
+if (!lojaHuambo) [lojaHuambo] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria Adventista — Huambo', 'Huambo', 'Huambo', true) returning id`);
+await q(`update public.physical_stores set service_provinces = array['Huambo'] where id = $1`, [lojaHuambo.id]);
+
 // Colportores: A activo da igreja central, B activo sem igreja (só texto), C candidato.
 const colportor = async (code, nome, telefone, conta, church = null, outra = '') => {
   const [c] = await q(`insert into public.colporteurs (code, full_name, phone, status, profile_id, church_id, church_other, start_date)
@@ -72,6 +77,7 @@ const [{ c: c1 }] = await as(gestor, `select public.colporteur_card($1::uuid) as
 check('o cartão tem o código de verificação de 8 símbolos', /^[A-HJ-NP-Z2-9]{8}$/.test(c1.card_check), c1);
 check('o cartão diz a igreja, o distrito e o campo', c1.church === 'Igreja Central do Huambo' && c1.district === 'Distrito Centro' && c1.field === 'MCA', c1);
 check('o cartão vale até 31 de Dezembro do ano em que foi emitido', /^\d{4}-12-31$/.test(c1.valid_until), c1);
+check('o cartão diz a loja do colportor (a da sua província)', /Huambo/.test(c1.store || ''), c1);
 const [{ c: c2 }] = await as(gestor, `select public.colporteur_card($1::uuid) as c`, [A]);
 check('abrir o cartão outra vez não muda o código', c2.card_check === c1.card_check);
 const [{ c: c3 }] = await as(gestor, `select public.colporteur_card($1::uuid, true) as c`, [A]);
@@ -95,7 +101,7 @@ check('o cartão reemitido invalida o anterior', velho.found === false);
 const [{ v: certo }] = await anon(`select public.colporteur_verify('cpt1', $1) as v`, [c3.card_check.toLowerCase().replace(/(.{4})/, '$1-')]);
 check('aceita «cpt1» e o código em minúsculas com hífen', certo.found === true && certo.valid === true && certo.code === 'CPT-0001', certo);
 check('a verificação não mostra o telefone nem o email', !('phone' in certo) && !('email' in certo) && !JSON.stringify(certo).includes('923000001'), certo);
-check('a verificação diz o nome, a categoria e a igreja', certo.full_name === 'Ana Colportora' && certo.category === 'aspirante' && certo.church === 'Igreja Central do Huambo', certo);
+check('a verificação diz o nome, a categoria, a igreja e a loja', certo.full_name === 'Ana Colportora' && certo.category === 'aspirante' && certo.church === 'Igreja Central do Huambo' && /Huambo/.test(certo.store || ''), certo);
 await q(`select set_config('app.colporteur_rpc', '1', false)`);
 await q(`update public.colporteurs set status = 'suspenso', status_reason = 'teste' where id = $1`, [A]);
 const [{ v: susp }] = await anon(`select public.colporteur_verify('CPT-0001', $1) as v`, [c3.card_check]);
@@ -204,6 +210,7 @@ const baixa = todas.find((x) => x.church_id === igreja2.id);
 check('uma igreja sem colportores aparece a zeros', baixa.active_count === 0 && Number(baixa.hours) === 0 && baixa.rating_avg === null, baixa);
 const [{ r: uma }] = await as(gestor, `select public.church_colporteurs($1::uuid) as r`, [igreja.id]);
 check('com uma igreja, a lista dos seus colportores (sem os recusados)', uma.length === 1 && uma[0].colporteurs.length === 2 && uma[0].colporteurs[0].code === 'CPT-0001', uma);
+check('na lista da igreja, a loja de cada colportor', /Huambo/.test(uma[0].colporteurs[0].store || ''), uma[0].colporteurs[0]);
 await raises('um cliente não vê as igrejas', () => as(cliente, `select public.church_colporteurs()`), /Sem permissão/);
 const [{ d: directorio }] = await anon(`select public.church_directory() as d`);
 check("a lista pública diz o campo de cada igreja e não tem contactos", directorio.churches[0].field === "MCA" && !JSON.stringify(directorio).includes("central@igreja.ao") && !JSON.stringify(directorio).includes("923456789"), directorio.churches[0]);

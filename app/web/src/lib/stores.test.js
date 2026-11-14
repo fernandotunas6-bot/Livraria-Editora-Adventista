@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, GALERIA_MOSAICO, erroDaGaleria, fotoDaLoja,
-  galeriaParaGuardar, lojaSrcSet, mosaicoDaGaleria, storeGallery,
+  GALERIA_MAX_FOTOS, GALERIA_MAX_LEGENDA, GALERIA_MOSAICO, conflitosDeZonas, erroDaGaleria, fotoDaLoja,
+  galeriaParaGuardar, juntarNomes, lojaQueServe, lojaSrcSet, mosaicoDaGaleria, provinciasServidas, storeGallery,
 } from './stores';
 
 describe('lojaSrcSet', () => {
@@ -153,5 +153,48 @@ describe('mosaicoDaGaleria', () => {
     expect(mosaicoDaGaleria(0)).toEqual([]);
     expect(mosaicoDaGaleria(undefined)).toEqual([]);
     expect(mosaicoDaGaleria(-3)).toEqual([]);
+  });
+});
+
+describe('as províncias que cada loja serve', () => {
+  const lojas = [
+    { id: 'hua', name: 'Livraria Adventista — Huambo', province: 'Huambo', service_provinces: ['Huambo'] },
+    { id: 'lub', name: 'Livraria Adventista — Lubango', province: 'Huila', service_provinces: ['Huíla', 'Namibe', 'Cunene'] },
+    { id: 'cat', name: 'Livraria Adventista — Catumbela', province: 'Benguela', service_provinces: ['Benguela', 'Cuanza Sul'] },
+    { id: 'bie', name: 'Livraria Adventista — Bié', province: 'Bié', service_provinces: [] },
+  ];
+
+  it('lojaQueServe: a que tem a província na lista, sem ligar a acentos', () => {
+    expect(lojaQueServe(lojas, 'Cuanza Sul').id).toBe('cat');
+    expect(lojaQueServe(lojas, 'namibe').id).toBe('lub');
+    expect(lojaQueServe(lojas, 'Huíla').id).toBe('lub');
+    expect(lojaQueServe(lojas, 'Huambo').id).toBe('hua');
+  });
+
+  it('lojaQueServe: sem lista, a loja serve a sua província; sem loja nenhuma, null', () => {
+    expect(lojaQueServe(lojas, 'Bie').id).toBe('bie');
+    expect(lojaQueServe(lojas, 'Luanda')).toBeNull();
+    expect(lojaQueServe(lojas, '')).toBeNull();
+    expect(lojaQueServe(undefined, 'Huambo')).toBeNull();
+  });
+
+  it('lojaQueServe: a lista ganha à província da loja', () => {
+    const duas = [{ id: 'a', province: 'Benguela', service_provinces: [] }, { id: 'b', province: 'Huambo', service_provinces: ['Benguela'] }];
+    expect(lojaQueServe(duas, 'Benguela').id).toBe('b');
+  });
+
+  it('provinciasServidas e juntarNomes', () => {
+    expect(juntarNomes(provinciasServidas(lojas[1]))).toBe('Huíla, Namibe e Cunene');
+    expect(provinciasServidas(lojas[3])).toEqual(['Bié']);
+    expect(provinciasServidas({})).toEqual([]);
+    expect(juntarNomes(['Huambo'])).toBe('Huambo');
+    expect(juntarNomes([])).toBe('');
+  });
+
+  it('conflitosDeZonas: províncias com duas lojas e províncias sem nenhuma', () => {
+    const comRepetida = [...lojas, { id: 'x', name: 'Loja X', province: 'Luanda', service_provinces: ['Luanda', 'Namibe'] }];
+    const { repetidas, semLoja } = conflitosDeZonas(comRepetida, ['Luanda', 'Namibe', 'Cuando', 'Huambo']);
+    expect(repetidas).toEqual([{ provincia: 'Namibe', lojas: ['Livraria Adventista — Lubango', 'Loja X'] }]);
+    expect(semLoja).toEqual(['Cuando']);
   });
 });

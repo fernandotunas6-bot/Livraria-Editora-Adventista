@@ -194,6 +194,7 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 |---|---|---|
 | — | Início (`inicio`) | toda a equipa com acesso ao painel |
 | Catálogo | Produtos (`books`), Coleções (`collections`), Slider (`slides`), Materiais (`downloads`: vistas Materiais e Acessos e pagamentos — [LIVROS_DIGITAIS.md](LIVROS_DIGITAIS.md)) | `manage_catalog` |
+| | Disponibilidade nas lojas (`disponibilidade`): «temos / não temos» por loja ([LOJAS.md](LOJAS.md)) | `manage_catalog` (qualquer loja) ou `manage_store_stock` (só a loja da ficha de funcionário) |
 | Vendas | Encomendas (`orders`), Acompanhamento (`acompanhamento`) | `manage_orders` |
 | | Equipas e alertas (`equipas`) | `manage_users` ou `manage_orders` |
 | | Métodos de pagamento (`payments`) | `manage_payments` |

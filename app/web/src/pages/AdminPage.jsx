@@ -57,6 +57,7 @@ const AppsTab = lazy(() => import('@/components/admin/AppsTab'));
 const SecurityLogTab = lazy(() => import('@/components/admin/SecurityLogTab'));
 const PaymentsReportTab = lazy(() => import('@/components/admin/PaymentsReportTab'));
 const StoresTab = lazy(() => import('@/components/admin/StoresTab'));
+const StoreStockTab = lazy(() => import('@/components/admin/StoreStockTab'));
 const CommunityTab = lazy(() => import('@/components/admin/CommunityTab'));
 const DownloadsTab = lazy(() => import('@/components/admin/DownloadsTab'));
 const NoticesTab = lazy(() => import('@/components/admin/NoticesTab'));
@@ -688,6 +689,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="saude">
                 <Suspense fallback={spinner}>
                   <SiteHealthTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {(canManageCatalog || perms.storeStock) && (
+              <AdminSection active={activeTab} value="disponibilidade">
+                <Suspense fallback={spinner}>
+                  <StoreStockTab />
                 </Suspense>
               </AdminSection>
             )}

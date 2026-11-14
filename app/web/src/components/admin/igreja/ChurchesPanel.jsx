@@ -14,7 +14,7 @@ const EMPTY = {
   cn: '', name: '', kind: 'igreja', district_id: '', province_id: '', municipality_id: '', address: '',
   delegate_name: '', delegate_pastor_id: '', congress_label: '', active: true, notes: '',
 };
-// Contactos e localização (migração 20261114160000): só entram no formulário com as colunas na base de dados.
+// Contactos e localização (migração 20261114200000): só entram no formulário com as colunas na base de dados.
 const CONTACTO = { phone: '', email: '', responsible_name: '', members_count: '', latitude: '', longitude: '' };
 const temContacto = (churches) => churches.some((c) => 'phone' in c);
 const KINDS = { igreja: 'Igreja', grupo: 'Grupo', companhia: 'Companhia' };

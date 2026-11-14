@@ -15,7 +15,7 @@ import {
   Activity, ArrowLeftRight, Award, Ban, Banknote, BarChart3, Bell, Bike, BookHeart, BookOpen, Brush, Building2, CalendarClock,
   Church, ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, KeyRound,
   LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
-  MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
+  MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageCheck, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Star, Store, TrendingUp, Truck, UserCheck,
   UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
 } from 'lucide-react';
@@ -25,7 +25,7 @@ export const DEFAULT_SECTION = 'inicio';
 /** Grupos, pela ordem em que aparecem. O Início fica sozinho, antes dos grupos. */
 export const ADMIN_GROUPS = [
   { id: 'inicio', label: '', sections: ['inicio'] },
-  { id: 'catalogo', label: 'Catálogo', sections: ['books', 'collections', 'slides', 'downloads'] },
+  { id: 'catalogo', label: 'Catálogo', sections: ['books', 'disponibilidade', 'collections', 'slides', 'downloads'] },
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
   { id: 'relatorios', label: 'Relatórios', sections: ['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
@@ -59,6 +59,14 @@ export const ADMIN_SECTIONS = {
     keywords: 'livros produtos stock inventario catalogo precos bíblias revistas uniformes',
     description: 'Livros, Bíblias, revistas, uniformes, t-shirts e materiais: tudo gerido aqui.',
     allowed: (p) => p.catalog,
+  },
+  // Migração lojas_donas_dos_dados: «temos / não temos» por loja. Quem gere o catálogo marca qualquer
+  // loja; quem tem «Stock da loja», só a da sua ficha de funcionário.
+  disponibilidade: {
+    label: 'Disponibilidade nas lojas', title: 'Disponibilidade nas lojas', icon: PackageCheck,
+    keywords: 'stock loja lojas temos nao temos existencias prateleira lubango catumbela huambo levantamento',
+    description: 'Cada loja marca os produtos que tem. O site mostra em que lojas está cada produto.',
+    allowed: (p) => p.catalog || p.storeStock,
   },
   collections: {
     label: 'Coleções', title: 'Coleções', icon: Layers,
@@ -314,6 +322,8 @@ export function adminPermissions({ isAdmin = false, hasPermission = () => false 
   return {
     isAdmin: !!isAdmin,
     catalog: has('manage_catalog'),
+    // Só o «temos / não temos» da sua loja (migração lojas_donas_dos_dados).
+    storeStock: has('manage_store_stock'),
     orders: has('manage_orders'),
     settings: has('manage_settings'),
     users: has('manage_users'),

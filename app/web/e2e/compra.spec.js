@@ -376,3 +376,61 @@ test('rastreio pelo rodapé com o email mal escrito: corrige-se na página e enc
   await page.getByRole('main').getByRole('button', { name: 'Rastrear' }).click();
   await expect(page.getByText(CLIENTE.nome)).toBeVisible();
 });
+
+// --- Lojas: de que loja é a compra e que lojas têm o livro (migração lojas_donas_dos_dados) ---------
+
+test('entrega: o checkout diz de que loja é a compra, pela província escolhida', async ({ page, loja }) => {
+  loja.lojas.find((l) => l.id === 'loja-luanda').service_provinces = ['Luanda', 'Bengo'];
+  loja.lojas.find((l) => l.id === 'loja-huambo').service_provinces = ['Huambo', 'Bié'];
+  await comprarLivro(page, 'livro-caminho');
+  const c = carrinho(page);
+  await c.getByRole('button', { name: 'Continuar para finalizar a compra' }).click();
+
+  await escolher(page, 'Província *', 'Bié');
+  await expect(c.getByText('Compra na Loja do Huambo')).toBeVisible();
+  await expect(c.getByText(/Serve Huambo e Bié: é ela que prepara e envia a sua encomenda/)).toBeVisible();
+  await expect(c.getByText(/923 428 459/)).toBeVisible();
+
+  await escolher(page, 'Província *', 'Cabinda');
+  await expect(c.getByText('Ainda não há loja a servir Cabinda: a encomenda é preparada pela equipa central da Livraria.')).toBeVisible();
+  await expect(c.getByText(/^Compra na /)).toHaveCount(0);
+});
+
+test('página do livro: as lojas que o têm, com as províncias que servem', async ({ page, loja }) => {
+  loja.lojas.find((l) => l.id === 'loja-huambo').service_provinces = ['Huambo', 'Bié'];
+  loja.disponibilidade.push(
+    { store_id: 'loja-huambo', book_id: 'livro-caminho', available: true },
+    { store_id: 'loja-luanda', book_id: 'livro-caminho', available: false },
+  );
+  await page.goto('/product/livro-caminho');
+  await expect(page.getByRole('heading', { level: 1, name: 'O Caminho a Cristo' })).toBeVisible();
+  const linha = page.getByText('Disponível nas lojas:').locator('xpath=..');
+  await expect(linha).toContainText('Loja do Huambo (Huambo e Bié).');
+  // «Não temos» nunca aparece ao cliente.
+  await expect(linha).not.toContainText('Luanda');
+
+  // Um livro que nenhuma loja marcou fica com a linha de sempre.
+  await page.goto('/product/livro-conflito');
+  await expect(page.getByRole('heading', { level: 1, name: 'O Grande Conflito' })).toBeVisible();
+  await expect(page.getByText('Levantamento nas lojas,', { exact: true })).toBeVisible();
+  await expect(page.getByText('Disponível nas lojas:')).toHaveCount(0);
+});
+
+test('levantamento: a loja que disse «não temos» não se escolhe, e diz o que falta', async ({ page, loja }) => {
+  loja.disponibilidade.push(
+    { store_id: 'loja-luanda', book_id: 'livro-caminho', available: false },
+    { store_id: 'loja-huambo', book_id: 'livro-caminho', available: true },
+  );
+  await comprarLivro(page, 'livro-caminho');
+  const c = carrinho(page);
+  await c.getByRole('button', { name: 'Continuar para finalizar a compra' }).click();
+  await c.getByRole('radio', { name: /Levantamento na loja/ }).click();
+
+  await expect(c.getByRole('radio', { name: /Loja de Luanda/ })).toBeDisabled();
+  await expect(c.getByText('Não tem: O Caminho a Cristo')).toBeVisible();
+  await expect(c.getByRole('radio', { name: /Loja do Huambo/ })).toBeEnabled();
+  await expect(c.getByText('Tem todos os livros')).toBeVisible();
+
+  await c.getByRole('radio', { name: /Loja do Huambo/ }).click();
+  await expect(c.getByRole('radio', { name: /Loja do Huambo/ })).toBeChecked();
+});
