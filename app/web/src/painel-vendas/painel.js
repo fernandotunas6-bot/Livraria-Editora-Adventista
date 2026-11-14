@@ -4,6 +4,14 @@
  * `api` = { db, user, downloads }, a interface que o pacote esperava em window.claude.use() (ver adapter.js).
  */
 import * as d3 from 'd3';
+// O `.transition()` das selecções vem deste módulo, que o acrescenta ao `selection.prototype` só
+// por ser importado. O pacote `d3` declara-se sem efeitos secundários (`sideEffects: false`), por
+// isso o build de produção deixava-o de fora quando só se importava o `d3`: em produção cada
+// `.transition()` dava «transition is not a function», e o painel parava a meio do primeiro
+// desenho (sem o acumulado, o ganho mensal nem o quadro geral). Em desenvolvimento e nos testes
+// funcionava, porque aí o código corre sem tree-shaking. O teste e2e/painel-vendas.spec.js monta o
+// painel a partir do build para isto não voltar.
+import 'd3-transition';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
 import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';
@@ -11,6 +19,7 @@ import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fun
 import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './filtros.js';
 import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
+import { avisosDePlausibilidade, textoDoAviso } from './plausibilidade.js';
 
 export { cidadeDaLoja };
 
@@ -714,6 +723,8 @@ export function mountPainel(root, api) {
   }
   function edFill() {
     S.ed.sysUsed = false;
+    S.ed.avisos = null;
+    sysSubstituirCancelar();
     const Y = S.years[S.ed.ano] || {};
     const grid = $('ed-grid');
     grid.replaceChildren(...MESES.map((mes, i) => {
@@ -767,7 +778,7 @@ export function mountPainel(root, api) {
   }
   $('ed-close').addEventListener('click', () => { if (S.ed.dirty) { edStatus('Guarde ou descarte as alterações antes de fechar.', 'err'); return; } $('editar').hidden = true; });
   $('ed-cancel').addEventListener('click', () => { if (S.ed.ano != null) edFill(); });
-  $('editar').addEventListener('input', (ev) => { if (ev.target.closest('#ed-grid, .ed-set')) edCheckDirty(); });
+  $('editar').addEventListener('input', (ev) => { if (ev.target.closest('#ed-grid, .ed-set')) { S.ed.avisos = null; sysSubstituirCancelar(); edCheckDirty(); } });
   $('editar').addEventListener('change', (ev) => { if (ev.target.closest('.ed-set')) edCheckDirty(); });
   $('editar').addEventListener('blur', (ev) => {
     const inp = ev.target; if (!(inp.matches && inp.matches('#ed-grid input.v, #ed-meta'))) return;
@@ -790,7 +801,13 @@ export function mountPainel(root, api) {
     st.textContent = (vals.length > 12 ? 'Só usei as primeiras 12 linhas. ' : '') + (bad ? bad + ' valores não foram reconhecidos. ' : '') + 'Valores aplicados à grelha. Reveja e carregue em Guardar.';
     edCheckDirty();
   });
-  async function writeYear(ano, body) { if (!S.db) throw { code: 'unavailable' }; await S.db.doc('anos/' + ano).set(body); }
+  // `esperado` = o `actualizado` do ano quando o editor o leu (null para um ano novo): se outra
+  // pessoa o gravou entretanto, o servidor recusa (código `conflict`) em vez de repor por cima os
+  // meses dela. Devolve { actualizado } do servidor, o `esperado` da gravação seguinte.
+  async function writeYear(ano, body, esperado) {
+    if (!S.db) throw { code: 'unavailable' };
+    return (await S.db.doc('anos/' + ano).set(body, { esperado: esperado || null })) || null;
+  }
   // De onde vieram os números (o servidor guarda-o no histórico): sistema, se todos os meses com
   // valor são os das vendas do sistema; misto, se só alguns; manual, se não se usou o sistema.
   function origemDe(ano, meses) {
@@ -800,6 +817,7 @@ export function mountPainel(root, api) {
     return todos ? 'sistema' : 'misto';
   }
   function errMsg(e) {
+    if (e && e.code === 'conflict') return (e.message || 'Outra pessoa gravou este ano entretanto.') + ' Copie o que escreveu antes de recarregar a página.';
     if (e && e.code === 'invalid_argument') { S.readOnly = true; return 'Não tem permissão para editar estes dados. Peça a um administrador a permissão «Editar relatórios de vendas».'; }
     if (e && e.code === 'quota_exceeded') return 'O espaço de dados do painel está cheio.';
     return 'Não foi possível guardar agora. Tente de novo dentro de instantes.';
@@ -825,10 +843,21 @@ export function mountPainel(root, api) {
     if ((cur.meta_anual == null ? null : Number(cur.meta_anual)) !== body.meta_anual) changes.push('Meta anual: ' + (body.meta_anual ? kz(body.meta_anual) : 'sem meta'));
     if ((cur.criterio || 'media') !== body.criterio) changes.push('Critério: ' + CRIT[body.criterio]);
     if ((cur.fonte || '') !== body.fonte) changes.push('Fonte: ' + (body.fonte || '—'));
+    // Valores invulgares nos meses mudados (plausibilidade.js): mostram-se uma vez; a segunda carga
+    // em Guardar grava-os. Não são erros — podem estar certos —, mas mudam o crescimento e a projecção.
+    const mudados = MESES.map((_, i) => i).filter((i) => (cur.meses && cur.meses[i] != null ? Number(cur.meses[i]) : null) !== meses[i]);
+    const ant = S.years[ano - 1];
+    const avisos = avisosDePlausibilidade(meses, ant ? ant.meses : null, mudados).map((a) => textoDoAviso(a, ano - 1));
+    if (avisos.length && S.ed.avisos !== avisos.join('|')) {
+      S.ed.avisos = avisos.join('|');
+      edStatus('Confirme estes valores invulgares antes de gravar — ' + avisos.join(' · ') + '. Se estão certos, carregue outra vez em Guardar e, se puder, explique-os na observação do mês.', 'err');
+      return;
+    }
     $('ed-save').disabled = true; edStatus('A guardar…');
     try {
-      await writeYear(ano, body);
-      S.years[ano] = body; S.ed.dirty = false;
+      const feito = await writeYear(ano, body, cur.actualizado);
+      if (feito && feito.actualizado) body.actualizado = feito.actualizado;
+      S.years[ano] = body; S.ed.dirty = false; S.ed.avisos = null;
       edFill(); edStatus('Guardado. O painel foi actualizado.', 'okk');
       logHist(ano, 'Dados de ' + ano + ' actualizados', changes.join(' · '));
       if (ano === S.ano || ano === S.comp) render(false); else fillSelectors();
@@ -842,7 +871,8 @@ export function mountPainel(root, api) {
     const body = { ano, meses: MESES.map(() => null), observacoes: MESES.map(() => ''), mes_em_curso: null, meta_anual: null, criterio: 'media', fonte: '', actualizado: new Date().toISOString() };
     $('ed-add').disabled = true; edStatus('A criar ' + ano + '…');
     try {
-      await writeYear(ano, body);
+      const feito = await writeYear(ano, body, null);
+      if (feito && feito.actualizado) body.actualizado = feito.actualizado;
       S.years[ano] = body; S.ed.ano = ano; edTabs(); edFill(); fillSelectors();
       edStatus(ano + ' adicionado. Preencha os meses e carregue em Guardar.', 'okk');
       logHist(ano, 'Ano ' + ano + ' adicionado', '');
@@ -895,15 +925,39 @@ export function mountPainel(root, api) {
       st.textContent = n
         ? n + (n === 1 ? ' encomenda' : ' encomendas') + ' de ' + S.sales.storeName + ' em ' + ano + ': ' + kz(tot) + ' (sem portes). Use os botões por mês ou preencha de uma vez; nada é gravado até carregar em Guardar.'
         : 'Não há encomendas de ' + S.sales.storeName + ' em ' + ano + ' com este critério.';
+      if (n) st.textContent += ' Só o site: as vendas ao balcão (KiGest) não entram, por isso o registado da loja é normalmente maior.';
       st.className = 'st' + (n ? ' okk' : '');
       sysHints();
     } catch (e) {
       st.textContent = 'Não foi possível ler as encomendas agora. Tente de novo.'; st.className = 'st err';
     } finally { $('ed-sys-load').disabled = false; }
   }
+  function sysSubstituirCancelar() {
+    if (!S.ed.substituir) return;
+    S.ed.substituir = false;
+    $('ed-sys-all').textContent = 'Substituir meses com vendas';
+  }
   function sysApply(onlyEmpty) {
     const D = S.sys.data;
     if (!D || S.sys.ano !== S.ed.ano || S.readOnly) return;
+    // As vendas do sistema são só as do site: trocar por elas um mês já registado (que inclui o
+    // balcão) quase sempre o baixa. Primeiro diz-se o que muda; só a segunda carga aplica.
+    if (!onlyEmpty && !S.ed.substituir) {
+      const trocas = [];
+      D.months.forEach((v, i) => {
+        if (!D.counts[i]) return;
+        const p = parseKz($('ed-m' + i).value);
+        if (p.ok && p.v != null && Math.round(p.v * 100) !== Math.round(v * 100)) trocas.push(short(MESES[i]) + ': ' + kz(p.v) + ' → ' + kz(v));
+      });
+      if (trocas.length) {
+        S.ed.substituir = true;
+        $('ed-sys-all').textContent = 'Confirmar: substituir ' + trocas.length + (trocas.length === 1 ? ' mês registado' : ' meses registados');
+        $('ed-sys-st').textContent = 'Atenção: o sistema só conhece as encomendas do site; as vendas ao balcão (KiGest) ficam de fora. Vai trocar ' + trocas.join(' · ') + '. Carregue outra vez para confirmar.';
+        $('ed-sys-st').className = 'st err';
+        return;
+      }
+    }
+    sysSubstituirCancelar();
     let n = 0;
     D.months.forEach((v, i) => {
       if (!D.counts[i]) return; // meses sem encomendas ficam como estão (podem ter valores manuais)
@@ -918,7 +972,7 @@ export function mountPainel(root, api) {
   }
   $('ed-sys-load').addEventListener('click', sysLoad);
   $('ed-sys-modo').addEventListener('change', () => { S.sys = { ano: null, data: null }; sysHints(); $('ed-sys-st').textContent = ''; });
-  $('ed-sys-fill').addEventListener('click', () => sysApply(true));
+  $('ed-sys-fill').addEventListener('click', () => { sysSubstituirCancelar(); sysApply(true); });
   $('ed-sys-all').addEventListener('click', () => sysApply(false));
   $('ed-grid').addEventListener('click', (ev) => {
     const b = ev.target.closest('.sysv'); if (!b || S.readOnly) return;
@@ -1079,12 +1133,40 @@ export function mountPainel(root, api) {
   let histWriting = Promise.resolve();
   function logHist(ano, accao, detalhe) {
     if (!S.db) return;
+    // Com o histórico do servidor (vendas_alteracoes), quem gravou e o que mudou ficam lá, escritos
+    // pelo gatilho na mesma transacção. O documento <loja>/historico/registo, que este painel
+    // escrevia, podia ser reescrito por quem grava: deixou de ser escrito e de ser mostrado.
+    if (S.historico) { renderHist(); return; }
     const entry = { em: new Date().toISOString(), por: S.uid || null, ano: ano || null, accao, detalhe: String(detalhe || '').slice(0, 900) };
     S.hist = [entry].concat(S.hist || []).slice(0, 150); renderHist();
     const list = S.hist;
     histWriting = histWriting.then(() => S.db.doc('historico/registo').set({ entradas: list })).catch(() => {});
   }
+  async function renderHistServidor() {
+    const ul = $('ed-hist');
+    let lista = null;
+    try { lista = await S.historico(null); } catch (e) { lista = null; }
+    if (dead) return;
+    if (lista == null) { ul.replaceChildren(el('li', null, 'Não foi possível ler o histórico agora.')); return; }
+    if (!lista.length) { ul.replaceChildren(el('li', null, 'Sem gravações registadas no servidor para esta loja.')); return; }
+    const accao = { insert: 'Criou', update: 'Alterou', delete: 'Apagou' };
+    const origem = { manual: 'à mão', sistema: 'do sistema', misto: 'várias origens', importacao: 'importação' };
+    const nomes = { mes_em_curso: 'mês em curso', meta_anual: 'meta', criterio: 'critério', fonte: 'fonte', observacoes: 'observações' };
+    ul.replaceChildren(...lista.slice(0, 40).map((h) => {
+      const li = el('li');
+      li.appendChild(el('span', null, new Date(h.em).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })));
+      const t = el('span');
+      t.appendChild(el('b', null, (accao[h.accao] || h.accao) + ' ' + h.ano));
+      t.appendChild(document.createTextNode(' · ' + h.quem + (h.origem && origem[h.origem] ? ' · ' + origem[h.origem] : '')));
+      li.appendChild(t);
+      const det = (h.meses || []).map((m) => short(MESES[m.mes - 1]) + ': ' + (m.de == null ? 'vazio' : kz(Number(m.de))) + ' → ' + (m.para == null ? 'vazio' : kz(Number(m.para))))
+        .concat(Object.keys(h.outros || {}).map((k) => (nomes[k] || k) + ' alterado'));
+      if (det.length) li.appendChild(el('span', 'd', det.join(' · ')));
+      return li;
+    }));
+  }
   async function renderHist() {
+    if (S.historico) return renderHistServidor();
     const ul = $('ed-hist');
     const items = (S.hist || []).slice(0, 40);
     if (!items.length) { ul.replaceChildren(el('li', null, 'Sem alterações registadas.')); return; }
@@ -1327,7 +1409,8 @@ export function mountPainel(root, api) {
 
   // ---------- Ligação aos dados ----------
   (async () => {
-    const { db, user, downloads, store, sales, extras } = api;
+    const { db, user, downloads, store, sales, extras, historico } = api;
+    S.historico = historico || null;
     S.downloads = downloads;
     S.extras = extras || null;
     S.store = store || null; S.sales = sales || null;
@@ -1352,7 +1435,7 @@ export function mountPainel(root, api) {
       if (!$('editar').hidden) { edTabs(); if (!S.ed.dirty && S.ed.ano != null && S.years[S.ed.ano]) edFill(); }
     }, () => { if (!S.model) showEmpty('Não foi possível ler os dados agora. Recarregue a página.'); }));
     offs.push(db.doc('notas/relatorio-2025-26').onSnapshot((d) => { S.note = d.exists ? d.data() : null; if (S.model) fillConf(S.model); }, () => {}));
-    offs.push(db.doc('historico/registo').onSnapshot((d) => { const v = d.exists ? d.data() : null; S.hist = v && Array.isArray(v.entradas) ? v.entradas : []; if (!$('editar').hidden) renderHist(); }, () => {}));
+    if (!S.historico) offs.push(db.doc('historico/registo').onSnapshot((d) => { const v = d.exists ? d.data() : null; S.hist = v && Array.isArray(v.entradas) ? v.entradas : []; if (!$('editar').hidden) renderHist(); }, () => {}));
     offs.push(db.doc('config/admin').onSnapshot((d) => {
       S.cfg = d.exists ? d.data() : null;
       if (!S.admin && S.cfg && S.cfg.hash) {

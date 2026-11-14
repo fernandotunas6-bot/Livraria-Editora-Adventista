@@ -83,7 +83,13 @@ Riscos aceites:
 
 ## 4. Por resolver
 
-Pelo dono (actualizado a 2026-11-07; o detalhe e o porquê estão na secção 5):
+Pelo dono (actualizado a 2026-11-07; o detalhe e o porquê estão na secção 5).
+
+> **Verificado em produção a 2026-11-14:** os itens 1 e 3 continuam abertos — 4 contas de
+> administrador, nenhum gestor, **nenhuma** com verificação em dois passos; 145 emails «skipped»
+> nos últimos 7 dias e nenhum administrador com push (a única subscrição é de um cliente). Os
+> avisos de segurança (IBAN, permissões, segredos) ficam só no sino do painel. Ver
+> [docs/AUDITORIA.md](docs/AUDITORIA.md) §9.23.
 
 | # | O quê | Onde | Porquê |
 |---|---|---|---|

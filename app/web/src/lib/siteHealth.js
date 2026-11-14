@@ -37,7 +37,7 @@ export function formatMetric(name, value) {
 
 /** Nome legível de uma página agrupada: '/' → 'Página inicial', '/product/:id' → 'Ficha de produto'. */
 const PAGE_NAMES = {
-  '*': 'Todas as páginas',
+  '*': 'Toda a loja (sem o painel)',
   '/': 'Página inicial',
   '/shop': 'Loja',
   '/product/:id': 'Ficha de produto',

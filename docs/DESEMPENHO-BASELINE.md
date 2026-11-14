@@ -345,3 +345,62 @@ seguinte via o site com as configurações de omissão (tema, ordenação da loj
   a ser de 5 em 5 minutos com o canal ligado. Ver `docs/PAINEL_ADMIN.md` §1.7.
 - Verificado em produção: o canal público `comunidade` liga-se (`phx_reply` com `status: ok`), sem
   erros na consola; a CSP aceita o `wss://` do projecto.
+
+---
+
+# 2026-11-14 — o campo desmente o laboratório, e o primeiro desenho
+
+## O que dizem os telemóveis de quem visita
+
+A Saúde do site (telemetria própria, desde 10–11/11) já tem dados de campo, e não batem com as
+tabelas acima. p75 de 10 a 14/11, 45 a 86 medições por métrica (pouco, e com visitas da equipa ao
+painel misturadas no total — ver abaixo):
+
+| p75 | Telemóvel | Computador | Objectivo |
+|---|---:|---:|---:|
+| LCP | 13,2 s | 10,1 s | ≤ 2,5 s |
+| FCP | 8,3 s | 8,8 s | ≤ 1,8 s |
+| INP | 352 ms | 720 ms | ≤ 200 ms |
+| CLS | 0,019 | 0,067 | ≤ 0,1 ✅ |
+| TTFB | 1,25 s | 0,65 s | ≤ 0,8 s |
+
+Os ✅ de LCP acima são verdadeiros **naquela máquina**: o build sem limites de rede pinta aos
+0,38 s, como foi medido. O que faltava medir era o caminho até lá numa rede como a de Angola.
+
+## Reproduzir no laboratório
+
+Build de produção (`dist/e2e`, com a loja falsa dos testes e2e a responder logo e imagens de um
+píxel — portanto o melhor caso possível), servido com brotli, Chromium com rede e CPU limitadas,
+página inicial, três corridas (mediana):
+
+| Perfil | FCP antes | FCP depois | LCP |
+|---|---:|---:|---:|
+| Sem limites | 384 ms | 72 ms | ~370 ms |
+| 4G lento (1,6 Mbps, 150 ms, CPU 4×; o perfil móvel do Lighthouse) | 3 824 ms | **1 224 ms** | ~4 650 ms |
+| 3G lento (400 kbps, 400 ms, CPU 4×) | 11 176 ms | **4 124 ms** | ~12 300 ms |
+
+**Porquê.** O `index.html` chegava com `<div id="root"></div>` vazio: nada aparecia antes de
+chegarem e correrem ~280 kB comprimidos de JS e CSS (o código principal 86 kB, o React 60 kB, o
+Supabase 59 kB, o framer-motion 38 kB, o CSS 36 kB) e ~115 kB de tipos de letra, em ~60 ficheiros.
+
+**O que mudou.** O `index.html` traz um esqueleto da página (a barra com o logótipo e «A
+carregar…»), só HTML e CSS embutido, que o React substitui ao arrancar. Antes do primeiro desenho
+passam a ir 34 kB em 3 ficheiros (o HTML, o CSS e o logótipo), em vez de ~390 kB em ~60.
+
+**O que não mudou: o LCP.** O conteúdo verdadeiro (as capas, o texto da página) continua a
+depender do JavaScript, e o LCP mede isso. Baixá-lo pede outra ordem de trabalho — HTML já
+desenhado no build para a página inicial e a loja, ou menos código antes do primeiro ecrã (o
+framer-motion e o Supabase vão hoje em todas as páginas, pré-carregados) — e fica por fazer.
+
+**O catálogo não é o problema.** As listas pedem o catálogo inteiro (`select *`, 358 livros,
+~0,5 MB de JSON antes da compressão), mas o peso são as descrições (155 kB), que a visualização
+rápida e a pesquisa usam; o resto são nomes de colunas repetidos, que a compressão quase apaga.
+Cortar colunas ganharia pouco e partiria essas duas funções.
+
+## A medição de campo, mais limpa
+
+- A linha de topo da Saúde do site («Toda a loja (sem o painel)») deixou de contar o `/admin`
+  (migração `20261114212000_saude_loja_sem_o_painel`): o painel tem a sua linha, mas não desvia o
+  número de quem compra.
+- Os erros das extensões de carteiras (MetaMask), que chegavam como promessas rejeitadas sem
+  ficheiro de origem, deixaram de contar (`lib/telemetry.js`): eram 6 dos 38 erros registados.

@@ -71,6 +71,13 @@ check('telemóvel e computador em separado', vitals.some((r) => r.device === 'de
 const total = vitals.find((r) => r.page === '*' && r.device === 'mobile' && r.name === 'LCP');
 check('uma linha com todas as páginas de cada aparelho', total && Number(total.samples) === 5 && Math.round(total.p75) === 3000, total);
 check('os totais vêm primeiro', vitals[0]?.page === '*', vitals[0]);
+// O painel da equipa tem a sua linha, mas não entra na da loja (migração saude_loja_sem_o_painel).
+await svc(`select public.site_health_record($1::jsonb)`, [JSON.stringify([vital('LCP', 11000, '/admin', 'desktop'), vital('LCP', 9000, '/admin/x', 'desktop')])]);
+const comPainel = await as('authenticated', gestor, `select * from public.site_health_vitals(7)`);
+const lojaPc = comPainel.find((r) => r.page === '*' && r.device === 'desktop' && r.name === 'LCP');
+const painelPc = comPainel.find((r) => r.page === '/admin' && r.device === 'desktop' && r.name === 'LCP');
+check('a linha da loja não conta o painel da equipa', lojaPc && Number(lojaPc.samples) === 1 && Math.round(lojaPc.p75) === 900, lojaPc);
+check('o painel continua com a sua linha', painelPc && Number(painelPc.samples) === 1 && Math.round(painelPc.p75) === 11000, painelPc);
 const erros = await as('authenticated', gestor, `select * from public.site_health_errors(7)`);
 check('os erros agrupam-se pela mensagem', erros.length === 1 && Number(erros[0].occurrences) === 2, erros);
 check('com as páginas onde aconteceram', erros[0] && erros[0].pages.includes('/shop') && erros[0].pages.includes('/product/:id'), erros[0]?.pages);
@@ -92,6 +99,19 @@ await q(`update private.site_events set created_at = now() - interval '31 days' 
 await q(job.command);
 const [{ n }] = await q(`select count(*)::int n from private.site_events where name = 'CLS'`);
 check('a limpeza apaga o que passou dos 30 dias', n === 0, n);
+
+// O registo das execuções do pg_cron (migração limpeza_do_registo_do_cron): fica só duas semanas.
+{
+  const [cron] = await q(`select schedule, command from cron.job where jobname = 'limpeza-cron'`);
+  check('a limpeza do registo do pg_cron está agendada, uma vez por dia', cron && cron.schedule === '53 3 * * *' && /14 days/.test(cron.command), cron);
+  await q(`insert into cron.job_run_details (jobid, status, start_time, end_time) values
+             (1, 'succeeded', now() - interval '20 days', now() - interval '20 days'),
+             (1, 'failed', now() - interval '3 days', now() - interval '3 days'),
+             (1, 'running', now(), null)`);
+  await q(cron.command);
+  const linhas = await q(`select status from cron.job_run_details order by runid`);
+  check('apaga só as execuções com mais de 14 dias (e nunca as que estão a correr)', linhas.map((l) => l.status).join() === 'failed,running', linhas);
+}
 
 console.log(`saude: ${ok} certos, ${fail} falhados`);
 if (fail) process.exit(1);

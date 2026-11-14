@@ -317,7 +317,24 @@ export async function printReport(d) {
 <tr><td>Total registado ${d.ano}</td><td class="n">${kz2(R.total1)}</td><td class="n">${kz2(R.ytd2)}</td><td></td><td></td><td></td><td></td></tr>
 <tr><td>Projecção anual</td><td></td><td class="n">${kz2(R.projeccao)}</td><td></td><td class="n">${pct1(R.cresc_proj)}</td><td></td><td>${d.meta ? 'Meta: ' + kz2(d.meta) : ''}</td></tr>
 </tfoot></table>
-<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
 </body></html>`);
   win.document.close();
+  await imprimirJanela(win);
+}
+
+/**
+ * Abre a impressão da janela do relatório (window.open + document.write), depois de ela acabar de
+ * carregar as imagens. Pede-se daqui e não com um <script> escrito na janela: o CSP do site
+ * (`script-src` sem 'unsafe-inline') também vale para ela, e esse script nunca corria — a janela
+ * abria com o relatório, mas a impressão não aparecia.
+ */
+export async function imprimirJanela(win) {
+  await new Promise((resolve) => {
+    if (win.document.readyState === 'complete') { resolve(); return; }
+    win.addEventListener('load', resolve, { once: true });
+    setTimeout(resolve, 2000);
+  });
+  if (win.closed) return;
+  win.focus();
+  win.print();
 }

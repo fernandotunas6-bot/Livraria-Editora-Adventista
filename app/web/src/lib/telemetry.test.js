@@ -52,6 +52,13 @@ describe('erros', () => {
     expect(t.reportError('')).toBe(false);
   });
 
+  it('ignora o ruído das extensões que só se vê na pilha ou na mensagem (MetaMask)', () => {
+    const t = createTelemetry({ win: janela(), send: () => {} });
+    expect(t.reportError('Failed to connect to MetaMask')).toBe(false);
+    expect(t.reportError('Cannot read properties of undefined', { stack: 'TypeError: x\n    at chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/inpage.js:1:2' })).toBe(false);
+    expect(t.reportError('E.attr(...).attr(...).transition is not a function', { stack: 'TypeError\n    at https://livrariaadventista.ao/assets/VendasHuamboTab-x.js:1:2' })).toBe(true);
+  });
+
   it('apanha os erros e as promessas rejeitadas da janela, mas não as imagens que falham', () => {
     const w = janela();
     const t = createTelemetry({ win: w, send });

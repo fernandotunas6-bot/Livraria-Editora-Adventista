@@ -48,6 +48,13 @@ dependem da internet.
 | Rastreio com o email de outra pessoa | Não abre |
 | Fotografias da loja | Abrem em grande, com legenda, e as setas andam na galeria |
 | Fotografias no rodapé | Só descem quando se chega ao rodapé, e na variante de 480 px |
+| Painel de Vendas de uma loja (`painel-vendas.spec.js`) | Compilado como em produção, desenha os três gráficos, o quadro geral e os meses, com e sem «reduzir movimento», sem erros |
+
+O Painel de Vendas corre no `/admin`, atrás de sessão e permissões. O teste não passa pelo login:
+abre a página de teste `e2e/painel/`, que monta o mesmo `mountPainel` com uma api em memória e é
+compilada à parte pelo `vite build` (segundo servidor no `playwright.config.js`, porta 4174). O que
+se prova é o build: em Novembro de 2026 o painel parou em produção porque o tree-shaking tirou o
+`.transition()` do d3, com todos os testes unitários verdes.
 
 ## Ao mudar o fluxo de compra
 

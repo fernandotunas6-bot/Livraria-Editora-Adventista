@@ -2007,3 +2007,50 @@ de melhoria: [audits/livraria-premium-360.md](audits/livraria-premium-360.md). R
 - **Para o dono, por ordem**: email (nenhum dos 106 envios saiu), MFA nos 4 administradores, as 5
   encomendas entregues com o pagamento por confirmar, telefone e WhatsApp da loja, e o gateway de
   pagamento.
+
+## 9.23 Análise crítica: desempenho, credibilidade dos relatórios, segurança e eficiência (2026-11-14)
+
+Feita sobre o código (`main` em `1eed054` e `6532078`), os testes e o build, e sobre a produção:
+base de dados, telemetria de quem visita, registos do Supabase e GitHub Actions. Ramo
+`claude/busy-davinci-y5mkgn`.
+
+### Achados
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| C1 | **O painel «Vendas por loja» estava partido em produção** pelo menos desde 11/11: 32 dos 38 erros da Saúde do site eram «…transition is not a function». O d3 declara-se sem efeitos secundários e o build tirava o `d3-transition`; só os KPIs apareciam (sem gráficos, quadro geral nem meses). Os testes unitários correm o código fonte e não o apanhavam | Alta | ✅ import explícito + teste no navegador sobre o build (`e2e/painel-vendas.spec.js`) |
+| C2 | «Vendas do sistema» são só o site (6 encomendas, 21 665 Kz pagos em 2026, contra 47,6 M Kz registados): todos os meses a vermelho, e «Substituir» trocava o total de uma loja pelo do site, com origem «sistema» | Alta (credibilidade) | ✅ aviso nos dois ecrãs; a substituição de um mês já registado pede confirmação com a lista do que muda |
+| C3 | Duas pessoas a gravar a mesma loja e ano: a segunda repunha os meses da primeira, sem aviso | Média | ✅ `vendas_anos_gravar` com bloqueio optimista (tudo ou nada); erro claro no ecrã |
+| C4 | Origem e histórico: as 6 linhas com números estavam «manual» sem autor (vieram de importações); o histórico do servidor estava vazio; o painel de cada loja mostrava um histórico escrito pelo navegador e editável por quem grava; o PowerPoint gravava como «manual» | Média | ✅ «importação» nas linhas importadas e na importação do PowerPoint; o painel mostra o histórico do servidor |
+| C5 | Sem verificação de plausibilidade: Huambo +278,8% (Setembro +1 440,9%) mostrado em destaque, sem aviso | Média | ✅ «Valores a confirmar» no relatório conjunto e confirmação ao gravar (4× acima/abaixo do ano anterior ou da mediana) |
+| C6 | O CSP bloqueava o script da janela de impressão: o PDF abria mas a impressão não | Baixa | ✅ a impressão é pedida a partir do site |
+| C7 | Todas as falhas de gravação diziam «sem permissão», até uma falha de rede | Baixa | ✅ conflito, permissão e rede distinguem-se |
+| S1 | **4 administradores, 0 gestores, 0 com verificação em dois passos** | Alta | ⏳ dono |
+| S2 | **Os alertas de segurança não saem do painel**: 145 emails «skipped» em 7 dias (SMTP por configurar) e nenhum administrador com push | Alta | ⏳ dono |
+| S3 | Migrações para produção sem backup antes (6 publicações a 14/11; um só backup, de 8/11; restauro nunca testado) | Média | ✅ backup cifrado antes de cada publicação com migrações; ⏳ teste de restauro (dono) |
+| S4 | `npx --yes wrangler@3` com o token da Cloudflare; Supabase CLI `latest` no CI | Média | ✅ versões fixas |
+| P1 | Campo vs laboratório: LCP p75 13,2 s no telemóvel (campo) contra 1,85 s (laboratório); com rede limitada, 3,8 s de ecrã branco em 4G lento | Alta | ✅ esqueleto no `index.html` (FCP 3,8 → 1,2 s); ⏳ LCP (HTML já desenhado ou menos JS antes do primeiro ecrã) |
+| P2 | A Saúde do site misturava o `/admin` no total da loja e contava erros da MetaMask | Baixa | ✅ |
+| E1 | `cron.job_run_details` sem limpeza: a maior tabela (23 mil linhas em 12 dias) | Baixa | ✅ limpeza diária (14 dias) |
+
+### Verificado sem problemas
+
+RLS activo nas 90 tabelas públicas (234 políticas); funções `SECURITY DEFINER` com `search_path`
+vazio e o teste `seguranca.mjs` contra as que ficam abertas sem verificação (as 7 sem guarda
+aparente são leituras públicas de propósito ou delegam numa com guarda); `npm audit --omit=dev`
+sem vulnerabilidades; nenhum segredo nos ficheiros; 13 tarefas agendadas sem falhas em 7 dias.
+
+### Corrigido no catálogo? Não
+
+A primeira leitura apontava ~0,5 MB de JSON do catálogo por visita. Medido coluna a coluna, o
+peso são as descrições (155 kB), que a visualização rápida e a pesquisa usam; cortar colunas
+ganharia pouco depois da compressão e partiria essas funções. Ficou como está.
+
+### Por fazer (dono)
+
+1. Verificação em dois passos nas 4 contas; quem só lança números passa a gestor com «Editar
+   relatórios de vendas».
+2. SMTP (ou API de email) e push nos telemóveis dos administradores.
+3. Restaurar um backup num projecto à parte (`docs/BACKUPS.md`).
+4. Confirmar com a loja do Huambo o âmbito dos números de 2025 (o crescimento de +278,8% assenta
+   neles).

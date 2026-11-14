@@ -2,8 +2,15 @@
 
 O projecto Supabase está no **plano Free** (confirmado a 2026-11-04): não há backups que se
 possam descarregar nem recuperação pontual (PITR), e um projecto Free pode ser pausado depois de
-uma semana sem actividade. O backup é feito pelo GitHub Actions
-(`.github/workflows/backup-base-dados.yml`).
+uma semana sem actividade. O backup é feito pelo GitHub Actions, em dois sítios:
+
+- **semanal**, `.github/workflows/backup-base-dados.yml`;
+- **antes de cada publicação com migrações**, no `.github/workflows/deploy-supabase.yml` (desde
+  2026-11-14): se o `supabase db push --dry-run` diz que há migrações por aplicar, tira-se o mesmo
+  dump cifrado, guardado como artefacto `backup-antes-do-deploy-<data>` dessa execução (30 dias), e
+  só depois se aplicam. Se o backup falhar, produção não é tocada. Antes disto, uma migração de
+  dados com erro (há várias que mexem em encomendas e vendas) podia custar até uma semana de dados:
+  no dia 14/11 houve seis publicações da base de dados e o último backup era de 8/11.
 
 ## O que existe
 
@@ -13,7 +20,7 @@ uma semana sem actividade. O backup é feito pelo GitHub Actions
 | Conteúdo | `roles.sql`, `schema.sql`, `data.sql` (dump do `supabase db dump`) e `SHA256SUMS` |
 | Protecção | `tar.gz` cifrado com AES-256 (GPG, frase em `BACKUP_PASSPHRASE`); nada fica em claro |
 | Retenção | 90 dias, como artefacto do repositório privado |
-| **RPO** | até 7 dias de dados perdidos no pior caso |
+| **RPO** | até 7 dias de dados perdidos no pior caso; uma migração com erro já não, porque há backup imediatamente antes |
 | **RTO** | ~1 hora: criar projecto novo, restaurar, apontar o site e a função |
 
 Com as vendas a crescer, um RPO de 7 dias deixa de chegar. A alternativa sem custo é correr o
@@ -56,4 +63,4 @@ entrar com uma conta de teste; abrir o painel. Registar a data e o resultado aqu
 
 | Data | Backup | Resultado |
 |---|---|---|
-| — | — | Ainda nenhum: o workflow precisa dos segredos acima para correr pela primeira vez. |
+| — | — | **Ainda nenhum.** O primeiro backup semanal correu a 2026-11-08 (com sucesso); falta restaurá-lo num projecto à parte para saber se serve. |
