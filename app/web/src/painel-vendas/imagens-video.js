@@ -12,6 +12,7 @@
  * CORS «sujava» o canvas e a gravação falhava. Uma imagem que não carregue não aparece — o livro
  * passa a ter uma capa tipográfica desenhada aqui.
  */
+import { fonteCanvas } from '../lib/fontes.js';
 
 // ---------- Utilitários ----------
 export function rng(seed) {
@@ -351,6 +352,27 @@ function desfocada(img, px) {
  * `desfoque` (px) desfoca-a, para os livros à frente se destacarem.
  */
 export function desenharFoto(ctx, W, H, foto, p, semente = 0, { desfoque = 0 } = {}) {
+  const fw = foto.naturalWidth || foto.width;
+  const fh = foto.naturalHeight || foto.height;
+  // Uma fotografia estreita (ao alto, quadrada) cortada para 16:9 perdia o essencial: vai inteira,
+  // ao centro, sobre uma cópia dela desfocada que enche o quadro.
+  if (fw / fh < 1.3) {
+    desenharDesfocadaCobrir(ctx, W, H, foto, 1.08 + 0.06 * clamp01(p));
+    const r = rng(semente + 11);
+    const z = 1 + 0.05 * clamp01(p);
+    const esc = Math.min((W * 0.86) / fw, (H * 0.9) / fh) * z;
+    const w = fw * esc;
+    const h = fh * esc;
+    const x = (W - w) / 2 + (r() > 0.5 ? 1 : -1) * 18 * (clamp01(p) - 0.5);
+    const y = (H - h) / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 14;
+    ctx.drawImage(desfoque ? desfocada(foto, Math.min(desfoque, 4)) : foto, x, y, w, h);
+    ctx.restore();
+    return;
+  }
   const img = desfoque ? desfocada(foto, desfoque) : foto;
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
@@ -374,6 +396,283 @@ export function veu(ctx, W, H, lado = 'esquerda', forca = 0.78) {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(8,14,26,0.18)';
   ctx.fillRect(0, 0, W, H);
+}
+
+// ---------- Capas em moldura 2:3 ----------
+
+/**
+ * Uma cópia muito pequena da imagem (a cobrir w×h), que ao ser desenhada em grande fica desfocada.
+ * Funciona em todos os browsers (o ctx.filter = 'blur()' não existe no Safari) e é barato.
+ */
+const miniaturas = new WeakMap();
+function miniatura(img, w, h) {
+  let porTam = miniaturas.get(img);
+  if (!porTam) { porTam = new Map(); miniaturas.set(img, porTam); }
+  const k = `${w}x${h}`;
+  if (porTam.has(k)) return porTam.get(k);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  // Em dois passos (metade, depois o tamanho final), para a redução não dar serrilhado.
+  const meio = novoCanvas(Math.max(w * 4, 8), Math.max(h * 4, 8));
+  const gm = meio.getContext('2d');
+  gm.imageSmoothingQuality = 'high';
+  const em = Math.max(meio.width / iw, meio.height / ih);
+  gm.drawImage(img, (meio.width - iw * em) / 2, (meio.height - ih * em) / 2, iw * em, ih * em);
+  const c = novoCanvas(w, h);
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(meio, 0, 0, w, h);
+  porTam.set(k, c);
+  return c;
+}
+
+/** A imagem a cobrir o quadro, desfocada e um pouco escurecida (o fundo de uma moldura). */
+function desenharDesfocadaCobrir(ctx, W, H, img, zoom = 1.1) {
+  const mini = miniatura(img, 32, Math.max(8, Math.round(32 * (H / W))));
+  ctx.save();
+  ctx.imageSmoothingQuality = 'high';
+  const w = W * zoom;
+  const h = H * zoom;
+  ctx.drawImage(mini, (W - w) / 2, (H - h) / 2, w, h);
+  ctx.fillStyle = 'rgba(8,14,26,0.35)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+const PROP_CAPA = 2 / 3;
+const enquadradas = new WeakMap();
+
+/** Se uma imagem já tem a proporção de uma capa (2:3, com 3% de folga). */
+export const ehCapa = (w, h) => Math.abs(w / h - PROP_CAPA) / PROP_CAPA <= 0.03;
+
+/**
+ * A capa numa moldura 2:3: inteira (contain), sem esticar nem cortar, sobre uma cópia desfocada
+ * dela que preenche o resto. Uma capa que já é 2:3 volta tal como está. Fica em memória.
+ */
+export function capaEnquadrada(img) {
+  if (!img) return null;
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return null;
+  if (ehCapa(iw, ih)) return img;
+  if (enquadradas.has(img)) return enquadradas.get(img);
+  const CW = 360;
+  const CH = 540;
+  const c = novoCanvas(CW, CH);
+  const g = c.getContext('2d');
+  desenharDesfocadaCobrir(g, CW, CH, img, 1.15);
+  const esc = Math.min(CW / iw, CH / ih);
+  const w = iw * esc;
+  const h = ih * esc;
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.45)';
+  g.shadowBlur = 18;
+  g.drawImage(img, (CW - w) / 2, (CH - h) / 2, w, h);
+  g.restore();
+  enquadradas.set(img, c);
+  return c;
+}
+
+// ---------- Capas animadas (o fundo «Capas animadas» dos vídeos) ----------
+//
+// Um mural de capas a flutuar em três planos, como nos vídeos gerados por IA: ao fundo pequenas e
+// desfocadas, ao meio maiores, à frente grandes e nítidas. Cada plano anda à sua velocidade
+// (paralaxe), as capas sobem e descem devagar e viram um pouco (3D), a câmara aproxima-se e
+// desliza, há raios de luz, partículas de luz desfocadas (bokeh) e uma correcção de cor. Tudo
+// depende só de `t` (segundos do vídeo) e da semente: o mesmo vídeo sai sempre igual, e o
+// movimento continua de um quadro para o seguinte.
+
+const PLANOS = [
+  { n: 12, alt: 0.30, par: 0.35, alpha: 0.42, vel: 7, mini: [40, 60] },
+  { n: 9, alt: 0.45, par: 0.65, alpha: 0.7, vel: 12, mini: [110, 165] },
+  { n: 6, alt: 0.64, par: 1, alpha: 0.95, vel: 19, mini: null },
+];
+const murais = new Map();
+
+function planoDoMural(W, H, semente) {
+  const k = `${W}x${H}:${semente}`;
+  if (murais.has(k)) return murais.get(k);
+  const r = rng(semente * 7919 + 13);
+  const largura = W * 1.7;
+  const planos = PLANOS.map((P, pi) => {
+    const passo = largura / P.n;
+    return Array.from({ length: P.n }, (_, i) => ({
+      x0: i * passo + (r() - 0.5) * passo * 0.6,
+      y0: H * (-0.05 + r() * 1.1),
+      fase: r() * Math.PI * 2,
+      rot: (r() - 0.5) * 0.16,
+      giro: 0.25 + r() * 0.5,
+      img: Math.floor(r() * 997) + pi * 31 + i,
+      esc: 0.85 + r() * 0.3,
+    }));
+  });
+  const luzes = Array.from({ length: 46 }, () => ({
+    x0: r() * W, y0: r() * H, vx: (r() - 0.5) * 10, vy: 6 + r() * 16, raio: 2 + r() * r() * 16, fase: r() * Math.PI * 2, brilho: 0.15 + r() * 0.45,
+  }));
+  const raios = Array.from({ length: 5 }, (_, i) => ({ ang: 0.42 + i * 0.13 + (r() - 0.5) * 0.05, larg: 0.05 + r() * 0.07, fase: r() * Math.PI * 2 }));
+  const m = { largura, planos, luzes, raios };
+  murais.set(k, m);
+  return m;
+}
+
+let spriteLuz = null;
+function luzSprite() {
+  if (spriteLuz) return spriteLuz;
+  const c = novoCanvas(64, 64);
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,236,200,1)');
+  gr.addColorStop(0.35, 'rgba(255,214,170,0.55)');
+  gr.addColorStop(1, 'rgba(255,200,150,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  spriteLuz = c;
+  return c;
+}
+
+let spriteSombra = null;
+function sombraSprite() {
+  if (spriteSombra) return spriteSombra;
+  const c = novoCanvas(80, 110);
+  const g = c.getContext('2d');
+  // Com shadowBlur, e não com filter (que o Safari não tem no canvas).
+  g.shadowColor = 'rgba(0,0,0,0.9)';
+  g.shadowBlur = 12;
+  g.fillStyle = 'rgba(0,0,0,0.7)';
+  g.fillRect(18, 18, 44, 74);
+  spriteSombra = c;
+  return c;
+}
+
+/**
+ * Desenha o mural de capas animadas. `capas` = imagens (ou canvas) já carregadas; `t` = segundos.
+ * opts: `semente` (o mesmo mural para o mesmo número), `foco` = 'frente' (as da frente nítidas) ou
+ * 'fundo' (tudo desfocado: há um livro ou texto à frente), `intensidade` (0–1; os quadros de
+ * números usam pouco) e `efeitos` (luz, raios e cor; desligados por baixo dos números).
+ */
+export function desenharMuralCapas(ctx, W, H, capas, t, { semente = 1, foco = 'frente', intensidade = 1, efeitos = true } = {}) {
+  const lista = (capas || []).map(capaEnquadrada).filter(Boolean);
+  // O fundo: escuro, com a cor das próprias capas.
+  const base = ctx.createLinearGradient(0, 0, W, H);
+  base.addColorStop(0, '#0B1322');
+  base.addColorStop(0.55, '#101B2E');
+  base.addColorStop(1, '#1A1426');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, W, H);
+  if (!lista.length) return;
+  const m = planoDoMural(W, H, semente);
+  // A câmara: aproxima-se e afasta-se devagar e desliza para o lado.
+  const zoom = 1.04 + 0.05 * Math.sin(t * 0.07);
+  const panX = Math.sin(t * 0.045) * 60;
+  const panY = Math.cos(t * 0.05) * 18;
+  const cx = W / 2;
+  const cy = H / 2;
+  ctx.save();
+  m.planos.forEach((plano, pi) => {
+    const P = PLANOS[pi];
+    if (foco === 'fundo' && pi === 2 && intensidade < 1) return;
+    const nitido = pi === 2 && foco !== 'fundo';
+    const alturaBase = H * P.alt;
+    plano.forEach((it) => {
+      const capa = lista[it.img % lista.length];
+      const h = alturaBase * it.esc;
+      const w = h * PROP_CAPA;
+      // Anda para a esquerda e volta pela direita (a faixa é mais larga do que o quadro).
+      let x = (it.x0 - t * P.vel * P.par) % m.largura;
+      if (x < 0) x += m.largura;
+      x -= (m.largura - W) / 2;
+      const y = it.y0 + Math.sin(t * 0.32 + it.fase) * 14 * P.par;
+      const zx = cx + (x - cx) * zoom * (1 + 0.04 * P.par) + panX * P.par;
+      const zy = cy + (y - cy) * zoom * (1 + 0.04 * P.par) + panY * P.par;
+      const zh = h * zoom * (1 + 0.04 * P.par);
+      const zw = w * zoom * (1 + 0.04 * P.par);
+      if (zx + zw < -40 || zx - zw > W + 40 || zy + zh < -40 || zy - zh > H + 40) return;
+      // Vira um pouco à volta do eixo vertical: a largura encolhe e cresce (efeito 3D).
+      const vira = 0.84 + 0.16 * Math.cos(t * 0.21 * it.giro + it.fase);
+      ctx.save();
+      ctx.translate(zx, zy);
+      ctx.rotate(it.rot + Math.sin(t * 0.18 + it.fase) * 0.025);
+      ctx.scale(vira, 1);
+      const a = P.alpha * intensidade * (foco === 'fundo' ? 0.78 : 1);
+      // A sombra por baixo (as do plano do fundo não se vêem: poupa-se o desenho).
+      if (pi > 0) {
+        ctx.globalAlpha = a * 0.55;
+        ctx.drawImage(sombraSprite(), -zw * 0.62, -zh * 0.5 + zh * 0.06 * P.par, zw * 1.24, zh * 1.1);
+      }
+      // Com foco ao fundo (um livro ou texto à frente), as da frente também ficam desfocadas e
+      // mais ténues: profundidade de campo, como numa câmara.
+      const desfocadaFrente = pi === 2 && !nitido;
+      ctx.globalAlpha = desfocadaFrente ? a * 0.6 : a;
+      const fonte = nitido ? capa : miniatura(capa, ...(desfocadaFrente ? [64, 96] : P.mini));
+      // Qualidade normal do browser: a 'high' pesa em cada imagem e aqui não se nota.
+      ctx.drawImage(fonte, -zw / 2, -zh / 2, zw, zh);
+      if (nitido) {
+        // A orla de luz e um brilho que atravessa a capa de vez em quando.
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-zw / 2, -zh / 2, zw, zh);
+        const fase = ((t * 0.18 + it.fase) % (Math.PI * 2)) / (Math.PI * 2);
+        const bx = -zw / 2 + zw * (fase * 3 - 1);
+        const brilho = ctx.createLinearGradient(bx - zw * 0.4, -zh / 2, bx + zw * 0.4, zh / 2);
+        brilho.addColorStop(0, 'rgba(255,255,255,0)');
+        brilho.addColorStop(0.5, 'rgba(255,255,255,0.20)');
+        brilho.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = brilho;
+        ctx.fillRect(-zw / 2, -zh / 2, zw, zh);
+      }
+      ctx.restore();
+    });
+  });
+  ctx.restore();
+  if (!efeitos) return;
+  ctx.save();
+  // Raios de luz a entrar pelo canto de cima.
+  ctx.globalCompositeOperation = 'lighter';
+  const ox = W * 0.18;
+  const oy = -H * 0.25;
+  m.raios.forEach((rr) => {
+    const a = (0.035 + 0.03 * Math.sin(t * 0.4 + rr.fase)) * intensidade;
+    const ang = rr.ang + Math.sin(t * 0.06 + rr.fase) * 0.04;
+    const comp = Math.hypot(W, H) * 1.3;
+    const g = ctx.createLinearGradient(ox, oy, ox + Math.cos(ang) * comp, oy + Math.sin(ang) * comp);
+    g.addColorStop(0, `rgba(255,230,190,${a * 2})`);
+    g.addColorStop(1, 'rgba(255,230,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + Math.cos(ang - rr.larg) * comp, oy + Math.sin(ang - rr.larg) * comp);
+    ctx.lineTo(ox + Math.cos(ang + rr.larg) * comp, oy + Math.sin(ang + rr.larg) * comp);
+    ctx.closePath();
+    ctx.fill();
+  });
+  // Partículas de luz desfocadas a subir devagar e a cintilar.
+  const sp = luzSprite();
+  m.luzes.forEach((l) => {
+    let x = (l.x0 + t * l.vx) % (W + 60);
+    if (x < -30) x += W + 60;
+    let y = (l.y0 - t * l.vy) % (H + 60);
+    if (y < -30) y += H + 60;
+    const tw = 0.55 + 0.45 * Math.sin(t * 1.3 + l.fase);
+    ctx.globalAlpha = l.brilho * tw * intensidade;
+    const d = l.raio * 2;
+    ctx.drawImage(sp, x - d / 2, y - d / 2, d, d);
+  });
+  ctx.globalAlpha = 1;
+  // A cor: azul-petróleo em cima, rosa em baixo, como no resto dos relatórios.
+  ctx.globalCompositeOperation = 'soft-light';
+  const cor = ctx.createLinearGradient(0, 0, 0, H);
+  cor.addColorStop(0, `rgba(34,166,169,${0.35 * intensidade})`);
+  cor.addColorStop(1, `rgba(224,103,154,${0.3 * intensidade})`);
+  ctx.fillStyle = cor;
+  ctx.fillRect(0, 0, W, H);
+  // Vinheta.
+  ctx.globalCompositeOperation = 'source-over';
+  const vin = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+  vin.addColorStop(0, 'rgba(5,9,18,0)');
+  vin.addColorStop(1, `rgba(5,9,18,${0.55 * intensidade})`);
+  ctx.fillStyle = vin;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
 }
 
 // ---------- O livro em 3D ----------
@@ -410,10 +709,10 @@ export function capaTipografica(titulo) {
   g.strokeRect(16, 16, 268, 418);
   g.fillStyle = '#FFF4DA';
   g.textAlign = 'center';
-  g.font = '700 30px Lora, Georgia, serif';
+  g.font = fonteCanvas(700, 30, { titulo: true });
   const linhas = partir(g, k || 'Livro', 230, 5);
   linhas.forEach((l, i) => g.fillText(l, 150, 170 + i * 38 - (linhas.length - 1) * 19));
-  g.font = '700 12px Manrope, Arial, sans-serif';
+  g.font = fonteCanvas(700, 12);
   g.fillStyle = 'rgba(255,244,218,0.8)';
   g.fillText('LIVRARIA ADVENTISTA', 150, 410);
   capasTipograficas.set(k, c);
@@ -443,7 +742,9 @@ function corMedia(img) {
  * tipográfica com `titulo`). `t` = segundos, para flutuar e o reflexo passar.
  */
 export function desenharLivro(ctx, { img, titulo = '', cx, cy, h, t = 0, giro = 0.42, flutuar = true, reflexo = true, alpha = 1 }) {
-  const capa = img || capaTipografica(titulo);
+  // A capa vai sempre numa moldura 2:3 (capaEnquadrada): antes, uma capa larga ou quadrada era
+  // esticada para caber no livro.
+  const capa = capaEnquadrada(img) || capaTipografica(titulo);
   const iw = capa.naturalWidth || capa.width;
   const ih = capa.naturalHeight || capa.height;
   const prop = Math.min(0.82, Math.max(0.6, iw / ih));

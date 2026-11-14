@@ -145,18 +145,28 @@ perspectiva da rede, com a nota do relatório. Cada loja mostra o seu mais vendi
 ### As imagens nos vídeos
 
 `app/web/src/painel-vendas/imagens-video.js`. A capa, os dois quadros dos mais vendidos e o fecho
-têm imagem por fundo; os quadros de números ficam escuros (com duas manchas de luz a mexer devagar),
-para se lerem. Entre quadros, o anterior desvanece.
+têm imagem por fundo; os quadros de números ficam escuros (com duas manchas de luz a mexer devagar
+e, com «Capas animadas», as capas a passar muito ténues), para se lerem.
+
+**Montagem (estilo Premiere).** Entre dois quadros não há corte seco: o quadro que sai aproxima-se e
+esbate-se com rasto de zoom, o que entra chega de mais perto até ao lugar, e um clarão de luz quente
+atravessa o ecrã (0,8 s; `estadoDaTransicao` em `video.js`, testada). Por cima de tudo, uma luz que
+respira num canto e um grão de filme muito leve. O logótipo é a versão branca em PNG transparente,
+discreta e sem pastilha.
 
 O **fundo** escolhe-se no menu Exportar (fica lembrado no aparelho):
 
 | Fundo | O que é |
 |---|---|
-| **Paisagens animadas** (o de omissão) | Desenhadas pelo próprio vídeo, com movimento: amanhecer nas montanhas (o sol a subir), floresta (raios de luz e pirilampos), campo (nuvens, erva a ondular e flores) e lago ao entardecer (a paisagem reflectida na água a ondular). Camadas com paralaxe, névoa a passar. Não dependem da rede nem de licenças, e saem sempre iguais. |
+| **Capas animadas** (o de omissão) | Um mural de capas a flutuar em três planos, como nos vídeos gerados por IA: ao fundo pequenas e desfocadas, à frente grandes e nítidas, cada plano à sua velocidade (paralaxe); as capas sobem, descem e viram um pouco, a câmara aproxima-se e desliza, há raios e partículas de luz e a cor dos relatórios. Com um livro ou texto à frente, o fundo desfoca-se (profundidade de campo). Usa as capas dos mais vendidos e, a completar, capas do catálogo (`capas-de-fundo.js`); cada capa vai numa moldura 2:3, inteira. |
+| **Paisagens animadas** | Desenhadas pelo próprio vídeo, com movimento: amanhecer nas montanhas (o sol a subir), floresta (raios de luz e pirilampos), campo (nuvens, erva a ondular e flores) e lago ao entardecer (a paisagem reflectida na água a ondular). Camadas com paralaxe, névoa a passar. Não dependem da rede nem de licenças, e saem sempre iguais. |
 | **Fotografias da biblioteca** | As imagens activas da biblioteca (§6), primeiro as de natureza, com zoom e deslocamento lentos. Atrás dos livros ficam desfocadas, para os livros se destacarem. Sem fotografias activas, vale a paisagem. |
 | **Simples (escuro)** | Sem imagem; os livros aparecem na mesma. |
 
-**O livro em 3D** é desenhado a partir da capa do catálogo (as capas já tratadas com IA de
+**O livro em 3D** nunca estica a capa: cada uma vai numa moldura 2:3, inteira, sobre uma cópia
+desfocada dela (`capaEnquadrada`); antes, uma capa larga ou quadrada era esticada. As fotografias
+estreitas da biblioteca vão inteiras, ao centro, sobre uma cópia desfocada, em vez de cortadas. É
+desenhado a partir da capa do catálogo (as capas já tratadas com IA de
 `docs/catalogo/capas-refinadas.json`): a capa em perspectiva, a lombada da cor da capa, o corte
 das folhas, a sombra no chão e um reflexo de luz que atravessa a capa; flutua devagar. Um produto
 sem capa (ou fora do catálogo) leva uma capa tipográfica com o título.
@@ -168,7 +178,7 @@ enviadas ficam no Storage, que manda CORS. Uma imagem que não carregue não est
 capa tipográfica, ou a paisagem.
 
 Medido no Chromium: cada imagem do vídeo desenha-se em menos de 25 ms (o limite são 33 ms, para 30
-por segundo). Um vídeo curto com paisagens e livros gravou 1217 imagens em 40,9 s.
+por segundo); o fundo «Capas animadas» leva cerca de 19 ms sem aceleração gráfica. Um vídeo curto com paisagens e livros gravou 1217 imagens em 40,9 s.
 
 O plano de cada vídeo (`planoVideo`, `planoVideoConjunto`) é uma função pura, testada em
 `video.test.js`; `quadroDoVideo()` desenha um instante sem gravar (serve à imagem PNG e ao PDF do
@@ -226,7 +236,68 @@ números. **Os mais vendidos** mostra os cinco primeiros lado a lado.
 A **nota do relatório** (uma por ano, `painel_vendas_docs` `consolidado/notas/ano-AAAA`) aparece no
 PDF, no Excel e no fim do vídeo.
 
-## 8. Ficheiros
+## 8. O painel: topo, mês em destaque, filtros e PowerPoint
+
+**Topo.** Maior, com o título em Fraunces e os controlos por baixo dele. À direita, uma parede de
+capas em movimento lento: as dos mais vendidos do ano (da loja ou da rede) e, a completar, capas do
+catálogo do próprio site (`public/images/capas`, sem temas sensíveis). Cada capa vai numa moldura
+2:3, inteira, sobre uma cópia desfocada dela. O logótipo é a versão branca em PNG transparente,
+discreta. Por baixo dos KPI, o cartão **Os mais vendidos** com as capas, as unidades e o valor.
+
+**Mês em destaque, modo apresentação e vídeo: o período até ao mês**, como no PowerPoint das lojas
+(«Período em apresentação até …»), por `periodoAte` em `modelo.js`:
+
+| Componente | Conta |
+|---|---|
+| Venda periódica de cada ano | soma dos meses com valor de Janeiro até ao mês |
+| Média mensal de cada ano | venda periódica ÷ meses com valor (Fevereiro de 2025 no Huambo: 204 087,5 Kz) |
+| Crescimento e diferença periódicos | só os meses com valor nos dois anos (com tudo preenchido, igual ao PowerPoint) |
+| Diferença e crescimento mensais | o próprio mês, ano − comparação |
+
+Os testes usam os valores dos diapositivos de Janeiro, Fevereiro e Outubro do Huambo.
+
+**Filtros avançados** (barra «Filtros», por baixo do topo; `filtros.js` e `filtros-ui.js`):
+
+- **Período:** ano inteiro, 1.º a 4.º trimestre, 1.º e 2.º semestre, até ao último mês registado,
+  ou de um mês a outro.
+- **Só meses fechados:** sai o mês em curso (e os por preencher).
+- **Lojas** (só em Todas as livrarias): as que entram; cada loja mantém a sua cor.
+
+Os KPI, o texto do topo, o mês em destaque, o ganho mensal, os quadros, o Excel (linha «Filtro») e
+os meses do vídeo e do modo apresentação contam só o filtro. Os meses de fora ficam esbatidos e o
+**acumulado continua o do ano inteiro**, com a projecção do ano. No filtro, a projecção é a do
+período (o que está fechado mais a estimativa dos meses por fechar do período) e a meta é a parte do
+período, proporcional aos meses. No conjunto, o crescimento continua a ser o das lojas comparáveis e
+a quota e a posição de cada loja contam só o período. O recorte não mexe nas contas do modelo: com o
+ano inteiro dá exactamente os mesmos totais (testado). A escolha fica guardada no aparelho, por ecrã.
+
+**Importar o PowerPoint da loja** (Todas as livrarias › Lançar vendas › «A partir do PowerPoint da
+loja»). O ficheiro .pptx abre-se no browser, sem bibliotecas (`pptx.js`).
+
+- Lê o «Quadro geral» e os diapositivos de cada mês, e encontra a loja pelo nome.
+- Preenche a grelha do ano aberto. Antes de gravar, revê-se e carrega-se em Guardar; a gravação fica
+  no histórico.
+- Regras: um mês em branco no PowerPoint não apaga o que está no painel, e um valor igual ao kwanza
+  guarda os cêntimos.
+- **Avisos:**
+  - quando o quadro geral e o diapositivo do mês não batem (no PowerPoint de Outubro, Julho de 2025
+    diz 211 650 Kz no quadro e 221 650 Kz no diapositivo);
+  - quando o TOTAL do quadro não é a soma dos meses;
+  - quando um mês só vem no diapositivo, que é o que acontece quando o diapositivo de Novembro chega
+    antes do quadro geral.
+
+Para pôr os valores numa migração, o mesmo leitor em Node:
+
+```bash
+node scripts/relatorios/pptx-para-sql.mjs "Loja Huambo - Painel-Vendas 2026S.pptx" --nome vendas_ate_novembro --escrever
+```
+
+**Fontes.** O sistema todo usa Inter no texto e Fraunces nos títulos: `src/lib/fontes.js` e os
+tokens `--font-sans`/`--font-serif` de `index.css`. O painel usa as @font-face da página (sem o
+Google Fonts), o canvas espera que as fontes carreguem e as janelas de impressão recebem-nas. Um
+teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
+
+## 9. Ficheiros
 
 | Ficheiro | Papel |
 |---|---|
@@ -241,12 +312,20 @@ PDF, no Excel e no fim do vídeo.
 | `app/web/src/painel-vendas/adapter.js` | Supabase: `createConsolidadoApi`, `fetchSystemSalesAll`. |
 | `app/web/src/components/admin/RelatoriosLojasTab.jsx` | O separador (Shadow DOM, como o `VendasHuamboTab`). |
 | `supabase/migrations/20261114120000_relatorios_de_todas_as_livrarias.sql` | Permissão, regras, histórico, `vendas_do_sistema`. |
+| `app/web/src/painel-vendas/capas-de-fundo.js` | As capas do topo, do cartão dos mais vendidos e do fundo «Capas animadas». |
+| `app/web/src/painel-vendas/filtros.js`, `filtros-ui.js` | Os filtros avançados (o recorte é puro e testado; a barra no ecrã). |
+| `app/web/src/painel-vendas/pptx.js` | O leitor do PowerPoint «Painel de Vendas» das lojas. |
+| `scripts/relatorios/pptx-para-sql.mjs` | A migração a partir do PowerPoint, com o mesmo leitor. |
+| `app/web/src/painel-vendas/logo-livraria-adventista-claro.png` | O logótipo branco, PNG transparente (topo, capa do modo apresentação e vídeos). |
+| `app/web/src/lib/fontes.js` | As duas fontes do sistema, para o canvas e as impressões. |
 | `supabase/migrations/20261114140000_imagens_e_mais_vendidos_dos_videos.sql` | `biblioteca_imagens`, `vendas_produtos`, `produtos_mais_vendidos`, `capas_dos_produtos` e a pasta `biblioteca/` no Storage. |
 
-## 9. Testes
+## 10. Testes
 
-- `npm test`: `modelo.test.js` (as contas, com os números reais do Huambo), `consolidado.test.js`,
-  `video.test.js`, `destaques.test.js`, `ImagensVideosTab.test.jsx`, `permissions.test.js` (as três
+- `npm test`: `modelo.test.js` (as contas, com os números reais do Huambo, e o período até ao mês
+  com os valores do PowerPoint), `consolidado.test.js`, `filtros.test.js`, `pptx.test.js` (o
+  PowerPoint real do repositório), `capas-de-fundo.test.js`, `video.test.js` (com as transições),
+  `destaques.test.js`, `fontes.test.js`, `scripts/relatorios/pptx-para-sql.test.mjs`, `ImagensVideosTab.test.jsx`, `permissions.test.js` (as três
   listas de permissões), `adminSections.test.js`.
 - Base de dados, com as migrações reais (80 cenários: quem lê, grava e apaga, o histórico, os
   valores inválidos, os documentos, as vendas do sistema, os mais vendidos por produto, os lançados

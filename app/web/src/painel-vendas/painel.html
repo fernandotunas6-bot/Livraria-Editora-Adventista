@@ -1,8 +1,12 @@
 <div class="wrap">
   <section class="hero" id="topo">
+    <!-- Capas de livros ao fundo (capas-de-fundo.js): as dos mais vendidos e, a completar, as do catálogo. -->
+    <div class="hero-capas" id="hero-capas" aria-hidden="true" hidden></div>
     <div>
       <div class="brand">
-        <span class="logo"><img alt="Livraria &amp; Editora Adventista" src="__LOGO__" id="logo-img"></span>
+        <!-- O logótipo branco, em PNG transparente, discreto. O azul (logo-img) fica para as exportações em fundo branco. -->
+        <img class="marca" id="logo-claro" alt="Livraria &amp; Editora Adventista" src="__LOGO_CLARO__">
+        <img alt="" src="__LOGO__" id="logo-img" hidden>
         <span class="eyebrow" id="eyebrow">Livraria e Editora Adventista · Loja do Huambo</span>
       </div>
       <h1 class="h1" id="titulo">Painel de Vendas</h1>
@@ -31,6 +35,7 @@
       <div class="exp" id="exp-menu" role="menu" hidden>
         <label class="exp-opt" for="vid-fundo">Fundo dos vídeos
           <select id="vid-fundo">
+            <option value="capas">Capas animadas</option>
             <option value="natureza">Paisagens animadas</option>
             <option value="biblioteca">Fotografias da biblioteca</option>
             <option value="simples">Simples (escuro)</option>
@@ -48,6 +53,22 @@
       <p class="st exp-st" id="exp-st" role="status"></p>
       <button class="btn ghost sm" id="exp-cancel" type="button" hidden>Cancelar a gravação</button>
     </div>
+  </section>
+
+  <!-- Filtros avançados (filtros-ui.js): o período, só os meses fechados. -->
+  <section class="card filtros" id="filtros" aria-label="Filtros do relatório">
+    <div class="f-row">
+      <span class="f-t"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 2h12L8.5 7.5V12l-3-1.5v-3z" fill="currentColor"/></svg>Filtros</span>
+      <label class="f-sel" for="f-periodo">Período<select id="f-periodo"></select></label>
+      <span class="f-pers" id="f-pers" hidden>
+        <label class="f-sel" for="f-de">De<select id="f-de"></select></label>
+        <label class="f-sel" for="f-ate">Até<select id="f-ate"></select></label>
+      </span>
+      <label class="f-chk"><input type="checkbox" id="f-fech">Só meses fechados</label>
+      
+      <button class="btn line sm" id="f-limpar" type="button" hidden>Limpar filtros</button>
+    </div>
+    <p class="f-resumo" id="f-resumo" role="status"></p>
   </section>
 
   <section class="kpis" id="kpis">
@@ -80,6 +101,18 @@
       <div class="progress" aria-hidden="true"><span id="proj-bar"></span></div>
     </div>
   </section>
+
+  <!-- Os mais vendidos do ano, com as capas em moldura (capas-de-fundo.js: pintarMaisVendidos). -->
+  <section class="card mv" id="mv" hidden>
+    <div class="head">
+      <div>
+        <h2>Os mais vendidos de <span id="mv-ano">—</span></h2>
+        <p class="note" id="mv-note">Unidades vendidas no ano: encomendas do site e o que se lançou à mão.</p>
+      </div>
+    </div>
+    <ol class="mv-lista" id="mv-lista"></ol>
+  </section>
+
 
   <section class="row">
     <div class="card" id="card-mensal">
@@ -127,9 +160,22 @@
         </div>
       </div>
       <div class="obs" id="sp-obs"></div>
+      <!-- O período até ao mês, como no PowerPoint das lojas («Período em apresentação até …»). -->
+      <div class="per" id="sp-per">
+        <div class="per-h"><span>Período em apresentação até</span><b id="sp-ate">—</b></div>
+        <div class="per-g">
+          <div class="pk a"><span>Venda periódica <span class="lgA">—</span></span><b id="sp-pA">—</b></div>
+          <div class="pk b"><span>Venda periódica <span class="lgB">—</span></span><b id="sp-pB">—</b></div>
+          <div class="pk g"><span>Crescimento periódico</span><b id="sp-pG">—</b></div>
+          <div class="pk a"><span>Média mensal <span class="lgA">—</span></span><b id="sp-pmA">—</b></div>
+          <div class="pk b"><span>Média mensal <span class="lgB">—</span></span><b id="sp-pmB">—</b></div>
+          <div class="pk d"><span>Diferença mensal <span class="lgAB">—</span></span><b id="sp-dM">—</b></div>
+          <div class="pk d"><span>Diferença periódica <span class="lgAB">—</span></span><b id="sp-dP">—</b></div>
+        </div>
+      </div>
       <div class="meta-l">
-        <span>Média mensal <span class="lgA">—</span></span><b id="sp-mA">—</b>
-        <span>Média mensal <span class="lgB">—</span> (meses fechados)</span><b id="sp-mB">—</b>
+        <span>Média mensal do ano <span class="lgA">—</span></span><b id="sp-mA">—</b>
+        <span>Média mensal do ano <span class="lgB">—</span> (meses fechados)</span><b id="sp-mB">—</b>
         <span>Estado do mês</span><b id="sp-estado">—</b>
       </div>
     </div>

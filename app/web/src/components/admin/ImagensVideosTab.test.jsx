@@ -80,8 +80,10 @@ describe('Biblioteca de imagens', () => {
     await mount();
     expect(host.querySelectorAll('canvas')).toHaveLength(4);
     expect(host.textContent).toContain('Lago ao entardecer');
-    expect(host.querySelectorAll('li img')).toHaveLength(2);
-    expect(host.textContent).toContain('Estreita: fica cortada');
+    // A estreita leva também a cópia desfocada por trás (aria-hidden), como no vídeo.
+    expect(host.querySelectorAll('li img:not([aria-hidden])')).toHaveLength(2);
+    expect(host.querySelectorAll('li img[aria-hidden]')).toHaveLength(1);
+    expect(host.textContent).toContain('Estreita: vai inteira, sobre fundo desfocado');
     expect(host.textContent).toContain('1 activa');
   });
 

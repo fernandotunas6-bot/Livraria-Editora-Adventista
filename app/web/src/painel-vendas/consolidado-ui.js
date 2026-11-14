@@ -9,9 +9,14 @@
  */
 import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
-import { aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
+import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
 import { buildXlsx, toCsv } from './exportar.js';
+import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
+import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
+import { filtroActivo, mesesDoPeriodo, recortarConsolidado, rotuloFiltro } from './filtros.js';
+import { montarFiltros } from './filtros-ui.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
+import { estiloBaseImpressao } from '../lib/fontes.js';
 
 export function mountConsolidado(root, api) {
   const $ = (id) => root.getElementById(id);
@@ -80,6 +85,7 @@ export function mountConsolidado(root, api) {
     }
     if (dead) return;
     S.anos = anosDisponiveis(S.lojas);
+    if (FIL) FIL.actualizar();
     if (S.ano == null || (!S.anos.includes(S.ano) && S.ano !== anoActual)) {
       S.ano = S.anos.includes(anoActual) ? anoActual : (S.anos.length ? S.anos[S.anos.length - 1] : anoActual);
     }
@@ -108,10 +114,33 @@ export function mountConsolidado(root, api) {
   $('sel-comp').addEventListener('change', () => { S.comp = $('sel-comp').value ? Number($('sel-comp').value) : null; render(false); });
 
   // ---------- Desenhar tudo ----------
+  // Filtros avançados (filtros-ui.js): S.cAno é o ano inteiro das lojas escolhidas; S.c, o recortado.
+  let FIL = null;
+  function consolidadoFiltrado() {
+    const F = FIL ? FIL.filtro() : null;
+    const lojas = F && F.lojas ? S.lojas.filter((l) => F.lojas.includes(l.id)) : S.lojas;
+    const cAno = buildConsolidado(lojas.length ? lojas : S.lojas, S.ano, S.comp);
+    // Cada loja fica com a sua cor mesmo quando outras saem do filtro (a cor é a da ordem de todas).
+    if (lojas.length !== S.lojas.length) {
+      const corDe = Object.fromEntries(S.lojas.map((l, i) => [l.id, CORES_LOJAS[i % CORES_LOJAS.length]]));
+      cAno.lojas.forEach((l) => { l.cor = corDe[l.id] || l.cor; });
+      cAno.meses.forEach((m) => m.porLoja.forEach((p) => { p.cor = corDe[p.id] || p.cor; }));
+    }
+    if (!F || !filtroActivo(F, S.lojas.length) || (F.periodo === 'ano' && !F.soFechados)) {
+      if (F && F.lojas) cAno.filtro = { rotulo: 'Jan–Dez', texto: rotuloFiltro(F, { nLojas: S.lojas.length }) };
+      return { c: cAno, cAno };
+    }
+    const ult = cAno.total.R.ultimo ? cAno.total.R.ultimo.i : 11;
+    const c = recortarConsolidado(cAno, mesesDoPeriodo(F, ult), { soFechados: F.soFechados });
+    c.filtro = { ...c.filtro, texto: rotuloFiltro(F, { ultimo: ult, nLojas: S.lojas.length }) };
+    return { c, cAno };
+  }
   function render(animate) {
-    const c = buildConsolidado(S.lojas, S.ano, S.comp);
+    const { c, cAno } = consolidadoFiltrado();
+    S.cAno = cAno;
     c.geradoEm = new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
     c.logo = logoSrc();
+    c.logoClaro = $('logo-claro') ? $('logo-claro').src : '';
     c.nota = S.nota.ano === S.ano ? S.nota.texto : '';
     S.c = c;
     root.querySelectorAll('.lgA').forEach((e) => { e.textContent = c.comp != null ? String(c.comp) : '—'; });
@@ -120,9 +149,30 @@ export function mountConsolidado(root, api) {
     $('btn-edit').hidden = !api.canEdit;
     $('ro-badge').hidden = !!api.canEdit;
     fillTake(c); fillKpis(c, animate); fillPend(c);
-    drawRede(c, animate); fillRank(c); drawAcum(c); drawCresc(c);
-    fillMx(c); fillLojas(c); fillSys(); videoLabels(c);
+    // O acumulado da rede é sempre o do ano inteiro (com a projecção do ano).
+    drawRede(c, animate); fillRank(c); drawAcum(cAno); drawCresc(c);
+    fillMx(c); fillLojas(c); fillSys(); videoLabels(c); topoCapas(c.ano);
     if (S.ed.open) edRender();
+  }
+
+  const grpUn = (n) => { const v = Number(n) || 0; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+  /** As capas do topo: os mais vendidos da rede no ano e, a completar, as do catálogo. */
+  function topoCapas(ano) {
+    const pintar = (itens) => {
+      if (dead) return;
+      const n = window.innerWidth < 700 ? 12 : 20;
+      pintarParede($('hero-capas'), capasParaFundo(itens, { n, chave: `rede:${ano}` }), { colunas: n > 12 ? 5 : 3 });
+    };
+    pintar([]);
+    $('mv').hidden = true;
+    extrasDe(ano).then((x) => {
+      if (dead || S.ano !== ano) return;
+      const itens = x && x.destaques && x.destaques.rede ? x.destaques.rede.ano || [] : [];
+      pintar(itens);
+      $('mv-ano').textContent = String(ano);
+      pintarMaisVendidos($('mv-lista'), itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+      $('mv').hidden = !itens.length;
+    });
   }
 
   function fillTake(c) {
@@ -134,7 +184,8 @@ export function mountConsolidado(root, api) {
       return;
     }
     const b = (s) => el('b', null, s);
-    t.append(`Em ${c.ano}, ${c.nComDados === 1 ? 'a livraria registou' : `as ${c.nComDados} livrarias registaram`} `, b(kz(R.ytd2)));
+    if (c.filtro && c.filtro.texto) t.append('Filtro ', b(c.filtro.texto), ': ');
+    t.append(`${c.filtro && c.filtro.texto ? 'em' : 'Em'} ${c.ano}, ${c.nComDados === 1 ? 'a livraria registou' : `as ${c.nComDados} livrarias registaram`} `, b(kz(R.ytd2)));
     if (R.ultimo) t.append(` até ${R.ultimo.mes}`);
     if (R.cresc_ytd != null) {
       const s = el('span', R.cresc_ytd >= 0 ? 'up' : 'dn', ` ${pct(R.cresc_ytd)}`);
@@ -142,7 +193,7 @@ export function mountConsolidado(root, api) {
     }
     t.append('. ');
     if (c.melhorLoja && c.nComDados > 1) t.append(b(c.melhorLoja.nome), ` lidera com ${pctS(c.melhorLoja.quota)} das vendas. `);
-    if (R.projeccao != null) t.append('Projecção da rede: ', b(kz(R.projeccao)), '. ');
+    if (R.projeccao != null) t.append(c.filtro && c.filtro.meses ? `Projecção da rede (${c.filtro.rotulo}): ` : 'Projecção da rede: ', b(kz(R.projeccao)), '. ');
     if (c.pendentes.length) t.append(`Faltam registar meses em ${c.pendentes.length} ${c.pendentes.length === 1 ? 'loja' : 'lojas'}.`);
   }
 
@@ -163,12 +214,12 @@ export function mountConsolidado(root, api) {
       R.cresc_ytd != null ? [pill(R.cresc_ytd), `vs ${B}, lojas comparáveis`] : (B != null ? `sem meses comparáveis com ${B}` : 'sem ano de comparação'),
       { animate, raw: R.ytd2 });
     setKpi(2, 'Diferença nas lojas comparáveis', kzs(R.dif_ytd), R.ytd1 != null ? `${kz(R.ytd2c)} contra ${kz(R.ytd1)} em ${B} · ${R.lojasComparaveis} ${R.lojasComparaveis === 1 ? 'loja' : 'lojas'}` : '—', { animate, raw: R.dif_ytd, fmt: kzs });
-    setKpi(3, 'Média mensal da rede', kz(R.media2),
+    setKpi(3, 'Média mensal da rede' + (c.filtro && c.filtro.meses ? ' · ' + c.filtro.rotulo : ''), kz(R.media2),
       [R.cresc_media != null ? pill(R.cresc_media) : '', `${R.nfech} ${R.nfech === 1 ? 'mês completo' : 'meses completos'}${R.media1 != null ? ' · ' + kz(R.media1) + ' em ' + B : ''}`],
       { animate, raw: R.media2 });
     const L = c.melhorLoja;
     setKpi(4, 'Livraria com mais vendas', L ? L.nome : '—', L ? `${kz(L.M.R.ytd2)} · ${pctS(L.quota)} da rede` : '—', { small: true });
-    setKpi(5, 'Projecção da rede ' + c.ano, kz(R.projeccao),
+    setKpi(5, 'Projecção da rede ' + (c.filtro && c.filtro.meses ? c.filtro.rotulo + ' ' : '') + c.ano, kz(R.projeccao),
       R.cresc_proj != null ? [pill(R.cresc_proj), `vs total de ${B} (${kz(R.total1)})`] : (R.falta != null ? `faltam ${kz(R.falta)}` : 'soma das projecções de cada loja'),
       { animate, raw: R.projeccao });
     $('proj-bar').style.width = Math.min(100, Math.round((R.progresso || 0) * 100)) + '%';
@@ -250,7 +301,8 @@ export function mountConsolidado(root, api) {
     const bw = Math.min(30, xi.bandwidth());
     const off = (xi.bandwidth() - bw) / 2;
     const base = y(0);
-    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(${x(r.mes)},0)`);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(${x(r.mes)},0)`)
+      .style('opacity', (r) => (r.fora ? 0.22 : null));
     // A animação é CSS (consolidado.css, .grow): o pacote d3 declara-se sem efeitos secundários e
     // o selection.transition() do d3-transition não vinha neste pedaço do site compilado.
     const grow = (sel, y0, y1, i) => {
@@ -369,14 +421,23 @@ export function mountConsolidado(root, api) {
     const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Crescimento de cada livraria');
     const lw = Math.min(170, W * 0.36);
     const vals = lista.map((l) => l.M.R.cresc_ytd).concat([c.total.R.cresc_ytd || 0, 0]);
-    const x = d3.scaleLinear().domain([Math.min(0, d3.min(vals)), Math.max(0, d3.max(vals))]).nice().range([lw + 10, W - 70]);
+    const x = d3.scaleLinear().domain([Math.min(0, d3.min(vals)), Math.max(0, d3.max(vals))]).nice().range([lw + 16, W - 70]);
     svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', 4).attr('y2', H - 20).style('stroke', 'var(--axis)');
     lista.forEach((l, i) => {
       const yy = 10 + i * rh;
       const v = l.M.R.cresc_ytd;
-      svg.append('text').attr('x', lw).attr('y', yy + 14).attr('text-anchor', 'end').style('fill', 'var(--fg)').style('font-weight', 700).text(l.nome.length > 26 ? l.nome.slice(0, 25) + '…' : l.nome);
+      const nome = svg.append('text').attr('x', lw).attr('y', yy + 15).attr('text-anchor', 'end').style('fill', 'var(--fg)').style('font-weight', 700).text(l.nome);
+      // O nome nunca entra na zona das barras: encurta-se até caber (o nome inteiro fica na dica).
+      const n0 = nome.node();
+      if (n0.getComputedTextLength) {
+        let t = l.nome;
+        while (t.length > 4 && n0.getComputedTextLength() > lw - 4) { t = t.slice(0, -1); nome.text(t.trimEnd() + '…'); }
+      }
+      nome.append('title').text(l.nome);
       svg.append('rect').attr('x', Math.min(x(0), x(v))).attr('y', yy + 2).attr('width', Math.max(1, Math.abs(x(v) - x(0)))).attr('height', 18).attr('rx', 4).attr('fill', v >= 0 ? 'var(--pos)' : 'var(--neg)');
-      svg.append('text').attr('x', v >= 0 ? x(v) + 6 : x(v) - 6).attr('y', yy + 15).attr('text-anchor', v >= 0 ? 'start' : 'end').style('font-weight', 700).style('fill', v >= 0 ? 'var(--ok)' : 'var(--bad)').text(pct(v));
+      // Valor do lado de fora da barra positiva; na negativa, do outro lado do zero (à esquerda
+      // ficava por cima do nome da loja).
+      svg.append('text').attr('x', v >= 0 ? x(v) + 6 : x(0) + 6).attr('y', yy + 15).attr('text-anchor', 'start').style('font-weight', 700).style('fill', v >= 0 ? 'var(--ok)' : 'var(--bad)').text(pct(v));
     });
     const R = c.total.R;
     if (R.cresc_ytd != null) {
@@ -411,6 +472,10 @@ export function mountConsolidado(root, api) {
       return tr;
     });
     t.tBodies[0].replaceChildren(...linhas);
+    // Os meses fora do filtro, esbatidos (a coluna 0 é a do nome da loja).
+    const foraCols = c.total.rows.filter((r) => r.fora).map((r) => r.i + 1);
+    const esbater = (tr) => foraCols.forEach((k) => { const cel = tr.children[k]; if (cel) cel.classList.add('fora'); });
+    linhas.forEach(esbater);
     const R = c.total.R;
     const rede = el('tr');
     rede.append(td('Rede ' + c.ano));
@@ -426,6 +491,7 @@ export function mountConsolidado(root, api) {
       r2.append(td('Rede ' + c.comp), ...c.total.rows.map((r) => td(r.v1 != null ? grp(r.v1) : '—')), td(grp(R.total1), 'tot'), td('', 'tot'), td(''));
       foot.push(r2);
     }
+    foot.forEach(esbater);
     t.tFoot.replaceChildren(...foot);
   }
   root.querySelectorAll('#quadro .tab').forEach((b) => b.addEventListener('click', () => {
@@ -614,6 +680,7 @@ export function mountConsolidado(root, api) {
     edHints();
     edCheck();
     edSysButtons();
+    if (typeof pptEstado === 'function' && PPT.r) pptEstado();
   }
 
   function edInputs() { return [...root.querySelectorAll('#ed-grid input.v')]; }
@@ -723,6 +790,65 @@ export function mountConsolidado(root, api) {
       + (bad ? `${bad} valores não foram reconhecidos. ` : '') + `${n} meses aplicados à grelha. Reveja e carregue em Guardar.`;
     edCheck();
     edHints();
+  });
+
+  // ---------- Importar o PowerPoint da loja ----------
+  const PPT = { r: null, nome: '' };
+  function pptEstado() {
+    const r = PPT.r;
+    const go = $('ed-ppt-go');
+    if (!r) { go.disabled = true; return; }
+    const loja = lojaDoPptx(r.loja, ED.lojas);
+    const anos = Object.keys(r.anos).map(Number);
+    const temAno = anos.includes(S.ed.ano) && r.anos[S.ed.ano].some((v) => v != null);
+    go.disabled = !loja || !temAno;
+    go.textContent = `Aplicar ${S.ed.ano} à grelha`;
+    const ate = (a) => (r.ultimo[a] >= 0 ? `até ${MESES[r.ultimo[a]]}` : 'sem valores');
+    const partes = [`«${PPT.nome}»: ${r.loja ? 'Loja ' + (/^d[eoa]s?\s/i.test(r.loja) ? '' : 'do ') + r.loja : 'loja sem nome'}`, anos.map((a) => `${a} ${ate(a)}`).join(', ')];
+    if (!loja) partes.push(r.loja ? `não há no painel uma loja com o nome «${r.loja}»` : 'não consegui ler o nome da loja');
+    else if (!temAno) partes.push(`não tem ${S.ed.ano}: abra ${anos.join(' ou ')} nos separadores acima`);
+    $('ed-ppt-st').textContent = partes.join(' · ') + '.';
+    $('ed-ppt-st').className = 'st' + (!loja ? ' err' : '');
+    const av = $('ed-ppt-av');
+    av.replaceChildren(...r.avisos.map((a) => el('li', null, a)));
+    av.hidden = !r.avisos.length;
+  }
+  $('ed-ppt').addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    PPT.r = null; PPT.nome = f.name;
+    $('ed-ppt-st').textContent = 'A ler o PowerPoint…'; $('ed-ppt-st').className = 'st';
+    $('ed-ppt-av').hidden = true;
+    try {
+      if (f.size > 40 * 1024 * 1024) throw new Error('O ficheiro passa de 40 MB.');
+      PPT.r = await lerPainelPptx(await f.arrayBuffer());
+    } catch (e) {
+      if (dead) return;
+      $('ed-ppt-st').textContent = (e && e.message) || 'Não foi possível ler este ficheiro.';
+      $('ed-ppt-st').className = 'st err';
+      $('ed-ppt-go').disabled = true;
+      return;
+    }
+    if (dead) return;
+    pptEstado();
+    ev.target.value = '';
+  });
+  $('ed-ppt-go').addEventListener('click', () => {
+    const r = PPT.r;
+    if (!r || !r.anos[S.ed.ano]) return;
+    const loja = lojaDoPptx(r.loja, ED.lojas);
+    const li = ED.lojas.indexOf(loja);
+    if (li < 0) return;
+    const inps = edInputs().filter((x) => Number(x.dataset.l) === li).sort((a, b) => a.dataset.i - b.dataset.i);
+    const atual = inps.map((x) => { const p = parseKz(x.value); return p.ok ? p.v : null; });
+    const { meses, mudou } = aplicarPptx(atual, r.anos[S.ed.ano]);
+    mudou.forEach((m) => { inps[m.i].value = inField(meses[m.i]); inps[m.i].classList.remove('sis'); inps[m.i].classList.add('ppt'); });
+    edCheck();
+    edHints();
+    $('ed-ppt-st').textContent = mudou.length
+      ? `${loja.name}, ${S.ed.ano}: ${mudou.length} ${mudou.length === 1 ? 'mês mudou' : 'meses mudaram'} (${mudou.map((m) => MESES_CURTOS[m.i]).join(', ')}). Reveja a verde e carregue em Guardar.`
+      : `${loja.name}, ${S.ed.ano}: a grelha já tem os valores do PowerPoint. Nada a mudar.`;
+    $('ed-ppt-st').className = 'st' + (mudou.length ? ' okk' : '');
   });
 
   $('ed-cancel').addEventListener('click', () => { edRender(); edStatus('Alterações descartadas.'); });
@@ -865,6 +991,7 @@ export function mountConsolidado(root, api) {
       ['Indicador', 'Valor', 'Notas'],
       ['Relatório', 'Todas as livrarias', c.nComDados + (c.nComDados === 1 ? ' loja com vendas' : ' lojas com vendas')],
       ['Ano', String(A), B != null ? 'comparado com ' + B : 'sem comparação'],
+      ...(c.filtro && c.filtro.texto ? [['Filtro', c.filtro.texto, 'os totais contam só o filtro']] : []),
       ['Vendas da rede ' + A + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''), R.ytd2, ''],
       ['Lojas comparáveis ' + A, R.ytd2c, `lojas e meses com valor nos dois anos (${R.lojasComparaveis || 0} lojas)`],
       ['Lojas comparáveis ' + (B ?? '—'), R.ytd1, ''],
@@ -922,7 +1049,8 @@ export function mountConsolidado(root, api) {
     win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8">
 <title>Relatório conjunto das livrarias — ${c.ano}</title>
 <style>
-  body{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#111;margin:24px}
+  ${estiloBaseImpressao()}
+  body{color:#111;margin:24px}
   h1{font-size:22px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px} p{margin:2px 0;color:#555;font-size:12px}
   img{width:100%;margin:10px 0;border-radius:8px;break-inside:avoid}
   table{width:100%;border-collapse:collapse;font-size:10px;margin-top:6px}
@@ -1028,6 +1156,16 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
   listen(window, 'resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S.c && !dead) { drawRede(S.c, false); drawAcum(S.c); drawCresc(S.c); } }, 150); });
   // Aviso ao sair com lançamentos por guardar.
   listen(window, 'beforeunload', (e) => { if (S.ed.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- Filtros avançados ----------
+  FIL = montarFiltros(root, {
+    chave: 'relatorios:filtros:conjunto',
+    lojas: () => S.lojas.map((l, i) => ({ id: l.id, nome: l.name, cor: CORES_LOJAS[i % CORES_LOJAS.length], conta: l.active || Object.keys(l.years || {}).length }))
+      .filter((l) => l.conta),
+    ultimo: () => (S.cAno && S.cAno.total.R.ultimo ? S.cAno.total.R.ultimo.i : 11),
+    onChange: () => { if (S.lojas.length) render(true); },
+  });
+  offs.push(() => FIL.desmontar());
 
   carregar();
 

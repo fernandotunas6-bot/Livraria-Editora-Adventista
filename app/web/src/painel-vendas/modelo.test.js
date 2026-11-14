@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildYearModel, estadoDoMes, mesesDoAno, sumKz } from './modelo';
+import { buildYearModel, estadoDoMes, mesesDoAno, sumKz, periodoAte } from './modelo';
 
 // Os dados reais da Loja do Huambo (migração painel_vendas, Relatório Síntese 2025/26):
 // 2025 completo e 2026 até Outubro, com Novembro em curso.
@@ -152,5 +152,58 @@ describe('mesesDoAno e estadoDoMes', () => {
     expect(estadoDoMes(Y, 2)).toBe('Em curso');
     const M = buildYearModel({ 2026: Y }, 2026, null);
     expect(M.rows.slice(0, 3).map((r) => r.estado)).toEqual(['Fechado', 'Por preencher', 'Em curso']);
+  });
+});
+
+describe('periodoAte (o «período em apresentação» do PowerPoint)', () => {
+  // Os valores dos diapositivos de Janeiro a Outubro do «Painel de Vendas» do Huambo.
+  const H25 = [218675, 189500, 743550, 1053650, 1018225, 551910, 211650, 2904902, 430902, 2623345, null, null];
+  const H26 = [2171368, 1976988, 4956455, 3624705, 2917373, 2472331, 4779202, 3232271, 6639756, 4908704, null, null];
+  const MH = buildYearModel({ 2025: { meses: H25 }, 2026: { meses: H26 } }, 2026, 2025);
+
+  it('Janeiro: vendas, médias, crescimento e diferenças como no diapositivo', () => {
+    const p = periodoAte(MH, 0);
+    expect(p.ate).toBe('Janeiro');
+    expect([p.venda1, p.venda2, p.media1, p.media2]).toEqual([218675, 2171368, 218675, 2171368]);
+    expect(p.crescimento * 100).toBeCloseTo(893.0, 1);
+    expect(p.difMensal).toBe(1952693);
+    expect(p.difPeriodica).toBe(1952693);
+  });
+
+  it('Fevereiro: a média do período (204 087,5 Kz em 2025)', () => {
+    const p = periodoAte(MH, 1);
+    expect(p.media1).toBe(204087.5);
+    expect(p.media2).toBe(2074178);
+    expect(p.venda2).toBe(4148356);
+    expect(p.crescimento * 100).toBeCloseTo(916.3, 1);
+    expect(p.difMensal).toBe(1787488);
+    expect(p.difPeriodica).toBe(3740181);
+  });
+
+  it('Outubro: o diapositivo do mês fechado', () => {
+    const p = periodoAte(MH, 9);
+    expect([p.venda1, p.venda2]).toEqual([9946309, 37679153]);
+    expect(p.media1).toBe(994630.9);
+    expect(p.media2).toBe(3767915.3);
+    expect(p.crescimento * 100).toBeCloseTo(278.8, 1);
+    expect(p.crescMensal * 100).toBeCloseTo(87.1, 1);
+    expect(p.difMensal).toBe(2285359);
+    expect(p.difPeriodica).toBe(27732844);
+  });
+
+  it('um mês sem valor num dos anos não entra na comparação periódica', () => {
+    const M = buildYearModel({ 2025: { meses: [100, null, 300] }, 2026: { meses: [150, 200, 330] } }, 2026, 2025);
+    const p = periodoAte(M, 2);
+    expect([p.venda1, p.venda2, p.n1, p.n2]).toEqual([400, 680, 2, 3]);
+    expect([p.venda1c, p.venda2c, p.comparaveis]).toEqual([400, 480, 2]);
+    expect(p.crescimento).toBeCloseTo(0.2, 6);
+    expect(p.difPeriodica).toBe(80);
+    expect(p.media1).toBe(200);
+  });
+
+  it('sem ano de comparação, só o ano', () => {
+    const M = buildYearModel({ 2026: { meses: [10, 20] } }, 2026, null);
+    const p = periodoAte(M, 1);
+    expect([p.venda1, p.venda2, p.crescimento, p.difPeriodica, p.difMensal]).toEqual([null, 30, null, null, null]);
   });
 });

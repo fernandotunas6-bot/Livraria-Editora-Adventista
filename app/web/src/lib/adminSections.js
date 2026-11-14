@@ -16,7 +16,7 @@ import {
   Church, ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, KeyRound,
   LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
   MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageCheck, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
-  Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Store, TrendingUp, Truck, UserCheck,
+  Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Star, Store, TrendingUp, Truck, UserCheck,
   UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
 } from 'lucide-react';
 
@@ -239,6 +239,7 @@ export const ADMIN_SECTIONS = {
       { id: 'guias', label: 'Guias e stock', icon: Truck, keywords: 'consignacao entrega devolucao compra', description: 'Guias de entrega, devolução e compra, com o stock da loja e o do colportor.' },
       { id: 'contas', label: 'Contas', icon: Scale, keywords: 'conta corrente saldo extracto acertos pagamentos', description: 'O saldo de cada colportor, o extracto, os pagamentos e as correcções.' },
       { id: 'reclassificacao', label: 'Reclassificação', icon: TrendingUp, keywords: 'categoria anual subir', description: 'A sugestão anual de categoria de cada colportor; a equipa aplica uma a uma.' },
+      { id: 'avaliacoes', label: 'Avaliações', icon: Star, keywords: 'estrelas clientes comentarios moderar ocultar livros colportor cartao', description: 'Os colportores pela média das avaliações dos clientes, as avaliações recentes (ocultar com motivo) e as avaliações dos livros.' },
       { id: 'percentagens', label: 'Percentagens', icon: Percent, keywords: 'comissoes regras simular', description: 'As percentagens por categoria e modo de venda, as regras por tipo de produto e uma simulação.' },
       { id: 'links', label: 'Links', icon: Link2, keywords: 'candidatura convite igreja', description: 'O link de candidatura geral e um por igreja, com a igreja já escolhida.' },
       { id: 'definicoes', label: 'Definições', icon: Settings2, keywords: 'candidaturas abertas nota formulario entregas percentagem base requisitos categoria', description: 'Candidaturas abertas ou fechadas, a nota do formulário, as entregas por colportor, a percentagem base e os requisitos de cada categoria.' },

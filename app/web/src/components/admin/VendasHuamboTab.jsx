@@ -9,15 +9,10 @@ import markup from '@/painel-vendas/painel.html?raw';
 // O logotipo oficial (o mesmo de public/logo.png, mais leve): no ecrã, nas imagens e nos PDFs
 // que o painel exporta. Antes era o do Ministério de Publicações.
 import logoUrl from '@/painel-vendas/logo-livraria-adventista.png';
+// A versão branca, para o topo escuro e para os vídeos (PNG transparente, sem fundo branco).
+import logoClaroUrl from '@/painel-vendas/logo-livraria-adventista-claro.png';
 
-const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lora:wght@600;700&display=swap';
 const STORE_KEY = 'painel-vendas:loja';
-
-// Dentro de um Shadow DOM as fontes só funcionam se forem carregadas no documento.
-function loadFonts() {
-  if (document.querySelector(`link[href="${FONTS_HREF}"]`)) return;
-  document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: FONTS_HREF }));
-}
 
 const isHuambo = (s) => /huambo/i.test(`${s?.province || ''} ${s?.name || ''}`);
 
@@ -69,10 +64,9 @@ const VendasHuamboTab = () => {
   const storeId = store?.id || '';
   useEffect(() => {
     if (!stores) return undefined;
-    loadFonts();
     const host = hostRef.current;
     const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
-    root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl)}`;
+    root.innerHTML = `<style>${css}</style>${markup.replace('__LOGO__', logoUrl).replace('__LOGO_CLARO__', logoClaroUrl)}`;
     const api = createPainelApi({ id: userId, role }, {
       lojaId: multi ? storeId || null : null,
       store: store ? { id: store.id, name: store.name, province: store.province } : null,

@@ -15,6 +15,7 @@ import GuidesPanel from './GuidesPanel';
 import { AccountsPanel, ReclassPanel } from './AccountsPanel';
 import SummaryPanel from './SummaryPanel';
 import DeliveriesPanel, { countToPrepare } from './DeliveriesPanel';
+import ReviewsPanel from './ReviewsPanel';
 
 const EMPTY_REG = { fields: [], districts: [], churches: [], pastors: [], assignments: [], provinces: [], municipalities: [] };
 
@@ -122,6 +123,7 @@ export default function ColportagemTab() {
       {view === 'guias' && needsOps(<GuidesPanel {...opsProps} />)}
       {view === 'contas' && needsOps(<AccountsPanel {...opsProps} />)}
       {view === 'reclassificacao' && needsOps(<ReclassPanel {...opsProps} />)}
+      {view === 'avaliacoes' && <ReviewsPanel data={data} run={run} />}
       {view === 'percentagens' && <CommissionPanel data={data} run={run} />}
       {view === 'links' && <LinksPanel reg={reg} idx={idx} />}
       {view === 'definicoes' && <SettingsPanel data={data} run={run} />}

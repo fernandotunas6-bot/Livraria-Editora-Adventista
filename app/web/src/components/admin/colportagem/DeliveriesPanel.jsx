@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CodeChip } from '@/components/admin/users/userFormat';
 import { DataTable, NativeSelect, Pill, Spinner, Toolbar } from '@/components/admin/igreja/registryUi';
 import { downloadCsv } from '@/lib/churchRegistryApi';
-import { DELIVERY_OFFER_STATUS, handoverDelivery, loadDeliveriesBoard } from '@/lib/colporteurApi';
+import { DELIVERY_OFFER_STATUS, colporteurRatings, handoverDelivery, loadDeliveriesBoard, ratingText } from '@/lib/colporteurApi';
 import { kz } from '@/lib/colporteurCommission';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString('pt-AO', { dateStyle: 'short', timeStyle: 'short' }) : '');
@@ -48,6 +48,13 @@ export default function DeliveriesPanel({ onCount }) {
   const [board, setBoard] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  // A média das avaliações dos clientes de cada colportor (sem a migração, a coluna fica a «—»).
+  const [ratings, setRatings] = useState(() => new Map());
+  useEffect(() => {
+    let vivo = true;
+    colporteurRatings().then((m) => { if (vivo) setRatings(m); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
 
   // Mudar de período depressa não deixa uma resposta antiga por cima da mais recente.
   const lastRequest = useRef(0);
@@ -188,7 +195,7 @@ export default function DeliveriesPanel({ onCount }) {
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={!board.by_colporteur.length}><Download className="mr-1.5 h-4 w-4" />Excel</Button>
         </div>
         <DataTable count={board.by_colporteur.length} empty="Ainda nenhum colportor recebeu entregas neste período."
-          head={['Colportor', 'Oferecidas', 'Entregues', 'Recusadas', 'Sem resposta', 'Devolvidas', 'Em curso', 'Ganhou']}>
+          head={['Colportor', 'Oferecidas', 'Entregues', 'Recusadas', 'Sem resposta', 'Devolvidas', 'Em curso', 'Ganhou', 'Avaliação']}>
           {board.by_colporteur.map((c) => (
             <tr key={c.id}>
               <td className="px-3 py-2 font-medium"><CodeChip code={c.code} /> {c.name}</td>
@@ -199,6 +206,7 @@ export default function DeliveriesPanel({ onCount }) {
               <td className="px-3 py-2 tabular-nums">{c.released}</td>
               <td className="px-3 py-2 tabular-nums">{c.active}</td>
               <td className="px-3 py-2 tabular-nums">{kz(c.fees || 0)}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-amber-600 dark:text-amber-400">{ratings.get(c.id) ? ratingText(ratings.get(c.id).avg, ratings.get(c.id).count) : <span className="text-muted-foreground">—</span>}</td>
             </tr>
           ))}
         </DataTable>

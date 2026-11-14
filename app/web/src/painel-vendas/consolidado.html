@@ -1,8 +1,12 @@
 <div class="wrap">
   <section class="hero" id="topo">
+    <!-- Capas de livros ao fundo (capas-de-fundo.js): as dos mais vendidos e, a completar, as do catálogo. -->
+    <div class="hero-capas" id="hero-capas" aria-hidden="true" hidden></div>
     <div>
       <div class="brand">
-        <span class="logo"><img alt="Livraria &amp; Editora Adventista" src="__LOGO__" id="logo-img"></span>
+        <!-- O logótipo branco, em PNG transparente, discreto. O azul (logo-img) fica para as exportações em fundo branco. -->
+        <img class="marca" id="logo-claro" alt="Livraria &amp; Editora Adventista" src="__LOGO_CLARO__">
+        <img alt="" src="__LOGO__" id="logo-img" hidden>
         <span class="eyebrow">Livraria e Editora Adventista · Todas as livrarias</span>
       </div>
       <h1 class="h1">Relatório conjunto das livrarias</h1>
@@ -27,6 +31,7 @@
       <div class="exp" id="exp-menu" role="menu" hidden>
         <label class="exp-opt" for="vid-fundo">Fundo dos vídeos
           <select id="vid-fundo">
+            <option value="capas">Capas animadas</option>
             <option value="natureza">Paisagens animadas</option>
             <option value="biblioteca">Fotografias da biblioteca</option>
             <option value="simples">Simples (escuro)</option>
@@ -44,6 +49,22 @@
       <p class="st exp-st" id="exp-st" role="status"></p>
       <button class="btn ghost sm" id="exp-cancel" type="button" hidden>Cancelar a gravação</button>
     </div>
+  </section>
+
+  <!-- Filtros avançados (filtros-ui.js): o período, só os meses fechados e as lojas. -->
+  <section class="card filtros" id="filtros" aria-label="Filtros do relatório">
+    <div class="f-row">
+      <span class="f-t"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 2h12L8.5 7.5V12l-3-1.5v-3z" fill="currentColor"/></svg>Filtros</span>
+      <label class="f-sel" for="f-periodo">Período<select id="f-periodo"></select></label>
+      <span class="f-pers" id="f-pers" hidden>
+        <label class="f-sel" for="f-de">De<select id="f-de"></select></label>
+        <label class="f-sel" for="f-ate">Até<select id="f-ate"></select></label>
+      </span>
+      <label class="f-chk"><input type="checkbox" id="f-fech">Só meses fechados</label>
+      <div class="f-lojas" id="f-lojas" role="group" aria-label="Lojas que entram" hidden></div>
+      <button class="btn line sm" id="f-limpar" type="button" hidden>Limpar filtros</button>
+    </div>
+    <p class="f-resumo" id="f-resumo" role="status"></p>
   </section>
 
   <section class="kpis" id="kpis">
@@ -76,6 +97,18 @@
       <div class="progress" aria-hidden="true"><span id="proj-bar"></span></div>
     </div>
   </section>
+
+  <!-- Os mais vendidos do ano, com as capas em moldura (capas-de-fundo.js: pintarMaisVendidos). -->
+  <section class="card mv" id="mv" hidden>
+    <div class="head">
+      <div>
+        <h2>Os mais vendidos de <span id="mv-ano">—</span></h2>
+        <p class="note" id="mv-note">Unidades vendidas no ano: encomendas do site e o que se lançou à mão.</p>
+      </div>
+    </div>
+    <ol class="mv-lista" id="mv-lista"></ol>
+  </section>
+
 
   <section class="card pend" id="pend" hidden>
     <div class="head">
@@ -206,6 +239,16 @@
         <button class="btn line sm" id="ed-all" type="button" disabled>Substituir os meses com vendas</button>
       </div>
       <p class="st" id="ed-sys-st" role="status"></p>
+    </div>
+
+    <div class="sys ppt">
+      <div class="sys-h"><b>A partir do PowerPoint da loja</b><span class="note">O «Painel de Vendas» que a loja manda (.pptx). Lê o Quadro geral e os diapositivos de cada mês, encontra a loja pelo nome e preenche a grelha do ano aberto. Um mês em branco no PowerPoint não apaga o que já está aqui.</span></div>
+      <div class="ed-actions">
+        <label class="btn line sm file" for="ed-ppt">Escolher o PowerPoint…<input id="ed-ppt" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"></label>
+        <button class="btn line sm" id="ed-ppt-go" type="button" disabled>Aplicar à grelha</button>
+      </div>
+      <p class="st" id="ed-ppt-st" role="status"></p>
+      <ul class="ppt-avisos" id="ed-ppt-av" hidden></ul>
     </div>
 
     <div class="tw">

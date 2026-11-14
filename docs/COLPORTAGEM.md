@@ -263,6 +263,82 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
 - avisos do tipo `colportagem` (`dispatchColporteurNotifications`);
 - testes: 111 cenários em PGlite, em `scripts/pglite/entregas.mjs`; ecrãs em `ColporteurDeliveries.screen.test.jsx` e `DeliveriesPanel.test.jsx`.
 
+## 6. Igrejas e colportores
+
+Cada colportor pertence a uma igreja do **Registo da Igreja** (a lista é a das igrejas já
+registadas). Em **Igreja → Registo da Igreja → Igrejas**:
+
+- a coluna **Colportores** diz quantos estão activos, as candidaturas por decidir e a média das
+  avaliações;
+- carregar nela abre a **ficha da igreja**:
+  - os seus colportores, com o estado, a categoria e a média de cada um;
+  - as horas e as vendas validadas no ano, e as entregas feitas no ano;
+  - as categorias;
+  - os livros mais vendidos pelos colportores da igreja;
+- no formulário da igreja entram também o telefone, o email, o responsável (ancião ou secretário),
+  o número de membros e a localização (latitude e longitude, com «Ver no mapa» na ficha).
+
+Na lista de **Colportores**, o filtro por igreja tem a opção «Sem igreja ligada (só texto)»: são os
+que se candidataram com uma igreja que não está no registo. Ligue-os na ficha (campo Igreja). Cada
+um mostra o selo «sem igreja ligada». A lista pública do formulário de candidatura passa a dizer o
+campo de cada igreja, e continua sem contactos.
+
+## 7. Cartão de identificação
+
+Cada colportor activo tem um cartão do tamanho de um cartão bancário (85,6 × 54 mm), para imprimir
+e plastificar.
+
+- **Frente:** o logótipo, o espaço para a fotografia tipo passe, o nome, o código `CPT-`, a
+  categoria, a igreja, o distrito, o campo e a validade.
+- **Verso:** o QR, o **código de verificação** (8 letras e algarismos, sem I, O, 0 nem 1, por
+  exemplo `K7QM-4XPA`), a validade e o espaço para a assinatura.
+
+Como funciona:
+
+- **Emitir:** na ficha do colportor (Colportagem), botão **Imprimir cartão**. A primeira vez emite o
+  código de verificação. O colportor também imprime o seu na área dele (`/colportor`).
+- **Validade:** até 31 de Dezembro do ano em que foi emitido.
+- **Reemitir** (cartão perdido, ou um ano novo): dá outro código de verificação, e o cartão antigo
+  deixa de ser válido. Fica no histórico da ficha.
+- **Verificar:** qualquer pessoa aponta a câmara ao QR, ou abre
+  `livrariaadventista.ao/colportor/verificar` e escreve os dois códigos. A página diz:
+  - **válido**;
+  - **caducado**: o colportor continua activo, mas o cartão é de um ano anterior;
+  - **não activo**: suspenso ou inactivo;
+  - **não reconhecido**.
+  Mostra o nome, a categoria e a igreja, nunca o telefone. Sem o código de verificação certo não
+  diz nada: com os códigos CPT seguidos, qualquer pessoa podia listar todos os colportores.
+- Ninguém muda o código de verificação à mão: um trigger só deixa a função do cartão fazê-lo.
+
+## 8. Avaliações dos colportores
+
+- **Quem avalia:** o cliente, com sessão, na página da encomenda (Seguir encomenda), depois de a
+  receber. Pode avaliar quem lhe fez a entrega (entrega feita) e o colportor do código usado na
+  compra (encomenda paga e entregue). Dá de 1 a 5 estrelas e, se quiser, um comentário.
+- **De quem é a encomenda:** da conta que a fez ou, se foi feita sem conta, da conta com o mesmo
+  email, só depois de esse email estar confirmado (a mesma regra dos livros digitais).
+- **Uma avaliação por encomenda e colportor.** O cliente pode mudá-la.
+- **O colportor** vê na sua área a média e os comentários, sem saber quem os escreveu.
+- **A equipa:**
+  - na ficha de cada colportor vê as avaliações, com o primeiro nome do cliente e o número da
+    encomenda, e pode **ocultar** uma (com o motivo) ou voltar a mostrá-la;
+  - a vista **Colportagem → Avaliações** tem o ranking dos colportores pela média e as avaliações
+    recentes;
+  - a média aparece também na lista de colportores e na das igrejas.
+- Uma avaliação oculta não conta para a média e o colportor não a vê.
+
+## 9. Livros mais vendidos e avaliações dos livros
+
+- **Livros mais vendidos:** na ficha do colportor, na ficha da igreja e na área do colportor, os
+  livros mais vendidos no ano. Contam os relatórios semanais validados (vendas à consignação e de
+  livros comprados) e as vendas no site com o código do colportor, pagas e não canceladas. Cada um
+  mostra a média das avaliações desse livro no site.
+- **Avaliações dos livros:** em Colportagem → Avaliações, quem tem a permissão «Gerir Catálogo» vê
+  as avaliações recentes que os leitores escrevem na página de cada livro, e pode ocultar uma (com o
+  motivo). A oculta deixa de aparecer no site e de contar para a média, também para a equipa que
+  abre a página do livro. O autor continua a vê-la em «A sua avaliação», com o aviso de que a
+  equipa a ocultou (sem o motivo), e não a volta a mostrar.
+
 ## Técnico
 
 - Migração `supabase/migrations/20261107100000_registo_igreja.sql`:
@@ -289,3 +365,12 @@ Em cada nível, primeiro quem tem todos os livros à consignação, depois o mai
   - `colporteur_overview` passa a trazer as vendas no site.
 - O checkout (`POST /checkout`) aceita `colporteurCode`. Sem a migração, o `place_order` ignora a coluna, e por isso a Edge Function pode ser publicada antes.
 - Migração `20261107110000_colportagem_avisos.sql`: tipos `colporteur_application` e `colporteur_report` em `staff_notifications`, avisados por triggers em `colporteurs` (inserção) e `colporteur_reports` (passagem a enviado).
+- Migração `20261114200000_colportores_igrejas_cartao_avaliacoes.sql`:
+  - `churches`: `phone`, `email`, `responsible_name`, `members_count`, `latitude` e `longitude` (as coordenadas vão juntas e dentro de Angola);
+  - `church_colporteurs(p_church_id, p_year)` (equipa da colportagem ou do registo) e `church_directory()` com o campo;
+  - cartão: `colporteurs.card_check` e `card_issued_at`, só por `colporteur_card(p_id, p_reissue)` (trigger `colporteurs_b_cartao`); `colporteur_verify(p_code, p_check)` é público e responde `{found:false}` sem o código certo; tipo de evento `cartao`;
+  - `colporteur_reviews` (RLS: a equipa e o autor lêem; escreve-se só por `colporteur_review_save`), `colporteur_review_targets`, `colporteur_review_hide`, `colporteur_reviews_list` (o colportor sem dados do cliente) e `colporteur_ratings`;
+  - `colporteur_top_books(p_colporteur_id, p_church_id, p_year, p_limit)`;
+  - `book_reviews.hidden` e `hidden_reason`, com a guarda `book_reviews_oculta_guarda` (o autor não os muda), a política de leitura nova, `book_review_hide` e `book_reviews_recent` (permissão `manage_catalog`).
+- Ecrãs: `ColporteurExtras.jsx` (cartão, avaliações e livros na ficha), `ReviewsPanel.jsx` (vista Avaliações), `igreja/ChurchColporteurs.jsx` (ficha da igreja), `colportagem/MyCardReviews.jsx` (área do colportor), `ColporteurReviewPanel.jsx` (página da encomenda) e `pages/ColporteurVerifyPage.jsx` (`/colportor/verificar`). O cartão é `cardHtml` em `lib/colporteurPrint.js`, com o QR de `qrcode-generator`.
+- Testes: 73 cenários em PGlite, em `scripts/pglite/colportores.mjs`.

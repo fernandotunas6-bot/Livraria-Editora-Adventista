@@ -51,6 +51,7 @@ const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
 const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
 const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
 const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx'));
+const ColporteurVerifyPage = lazy(() => import('@/pages/ColporteurVerifyPage.jsx'));
 const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
 
@@ -270,6 +271,9 @@ function App() {
               {/* Colportagem: o link de candidatura é próprio, para quem se quer tornar colportor. */}
               <Route path="/colportor" element={<ColporteurAreaPage />} />
               <Route path="/colportor/candidatura" element={<ColporteurApplyPage />} />
+              {/* O QR do cartão de colportor abre aqui (verificação pública, sem dados de contacto). */}
+              <Route path="/colportor/verificar" element={<ColporteurVerifyPage />} />
+              <Route path="/colportor/verificar/:codigo" element={<ColporteurVerifyPage />} />
               <Route path="/ser-colportor" element={<Navigate to="/colportor/candidatura" replace />} />
               <Route path="/colportores" element={<Navigate to="/colportor/candidatura" replace />} />
 

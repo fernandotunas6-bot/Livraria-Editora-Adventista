@@ -7,6 +7,7 @@
  *   { loja, ano, comp, critTxt, meta, fonte, geradoEm, logo,
  *     rows: [{ mes, v1, v2, est, estado, dif, cresc, obs, acum1, acum2 }], R: { ...totais do build() } }
  */
+import { carregarFontes, estiloBaseImpressao, fonteCanvas } from '../lib/fontes.js';
 
 const MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -166,7 +167,7 @@ export function buildXlsx(sheets) {
 
 // ---------- Desenho no canvas (imagem e vídeo) ----------
 const COL = { bg: '#0F1B2D', card: '#16263D', fg: '#F4F6FA', mut: '#9AA8BC', comp: '#9A9EA5', main: '#E0679A', pos: '#2F9E6E', neg: '#D64545', teal: '#12898C', line: 'rgba(255,255,255,.12)' };
-const FONT = (w, px) => `${w} ${px}px Manrope, "Segoe UI", Arial, sans-serif`;
+const FONT = (w, px) => fonteCanvas(w, px);
 const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
 function loadImage(src) {
@@ -266,7 +267,7 @@ export async function renderSummaryPng(d) {
   const W = 1600, H = 1000;
   const canvas = Object.assign(document.createElement('canvas'), { width: W, height: H });
   const ctx = canvas.getContext('2d');
-  const logo = await loadImage(d.logo);
+  const [logo] = await Promise.all([loadImage(d.logo), carregarFontes()]);
   header(ctx, d, W, logo, 'Painel de Vendas');
   const cw = (W - 96 - 3 * 20) / 4;
   kpis(d).forEach(([l, v, delta, c], i) => kpiCard(ctx, 48 + i * (cw + 20), 180, cw, 140, l, v, delta, c));
@@ -296,7 +297,8 @@ export async function printReport(d) {
   win.document.write(`<!doctype html><html lang="pt"><head><meta charset="utf-8">
 <title>Painel de Vendas — ${htmlEsc(d.loja)} ${d.ano}</title>
 <style>
-  body{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#111;margin:24px}
+  ${estiloBaseImpressao()}
+  body{color:#111;margin:24px}
   h1{font-size:22px;margin:0 0 4px} p{margin:2px 0;color:#555;font-size:12px}
   img{width:100%;margin:14px 0;border-radius:8px}
   table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}

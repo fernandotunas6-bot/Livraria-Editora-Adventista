@@ -6,7 +6,10 @@
 import * as d3 from 'd3';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { renderVideo, planoVideo, duracaoPlano, fmtDuracao, RITMOS } from './video.js';
-import { MESES, CRIT, buildYearModel } from './modelo.js';
+import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';
+import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
+import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './filtros.js';
+import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
 
 export { cidadeDaLoja };
@@ -61,11 +64,16 @@ export function mountPainel(root, api) {
     const v = Number(t);
     return (isFinite(v) && v >= 0) ? { ok: true, v: Math.round(v * 100) / 100 } : { ok: false };
   }
+  // Cada elemento tem uma contagem de cada vez: uma nova (ou um valor escrito sem animação)
+  // cancela a anterior, que senão continuava a escrever por cima (ao mudar de filtro ou de mês).
+  const contagens = new WeakMap();
   function countUp(e, to, fmt, dur, delay) {
+    const id = {};
+    contagens.set(e, id);
     if (reduce || !dur || to == null || !isFinite(to)) { e.textContent = fmt(to); return; }
     const t0 = performance.now() + (delay || 0);
     const tick = (now) => {
-      if (!e.isConnected) return;
+      if (!e.isConnected || contagens.get(e) !== id) return;
       const t = Math.min(1, Math.max(0, (now - t0) / dur));
       e.textContent = fmt(to * easeOut(t));
       if (t < 1) requestAnimationFrame(tick); else e.textContent = fmt(to);
@@ -83,6 +91,16 @@ export function mountPainel(root, api) {
   // ---------- Modelo ----------
   // O cálculo está em modelo.js (puro e testado), partilhado com o painel de todas as livrarias.
   const build = (ano, comp) => buildYearModel(S.years, ano, comp);
+  // Filtros avançados (filtros-ui.js): S.modelAno é o ano inteiro; S.model, o recortado ao filtro.
+  let FIL = null;
+  const ultimoDe = (MA) => (MA && MA.R.ultimo ? MA.R.ultimo.i : 11);
+  function filtrar(MA) {
+    const F = FIL ? FIL.filtro() : null;
+    if (!MA || !F || !filtroActivo(F)) return MA;
+    const MF = recortarModelo(MA, mesesDoPeriodo(F, ultimoDe(MA)), { soFechados: F.soFechados });
+    MF.filtro.texto = rotuloFiltro(F, { ultimo: ultimoDe(MA) });
+    return MF;
+  }
 
   // ---------- Tooltip ----------
   function tip(box, lines, x, y, obs) {
@@ -135,7 +153,8 @@ export function mountPainel(root, api) {
     gr.append('stop').attr('offset', 1).style('stop-color', C2);
     svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (d) => y(d)).attr('y2', (d) => y(d)).style('stroke', 'var(--grid)');
     svg.append('g').selectAll('text').data(ticks).join('text').attr('x', m.l - 8).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text((d) => d === 0 ? '0' : mi(d));
-    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('class', 'mgrp').attr('transform', (r) => `translate(${x(r.mes)},0)`);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('class', 'mgrp').attr('transform', (r) => `translate(${x(r.mes)},0)`)
+      .style('opacity', (r) => (r.fora ? 0.28 : null));
     const bw = Math.min(32, xi.bandwidth()), off = (xi.bandwidth() - bw) / 2, base = y(0), rx = Math.min(4, bw / 2);
     const b1 = g.filter((r) => r.v1 != null).append('rect').attr('x', xi('1') + off).attr('width', bw).attr('rx', rx).attr('fill', C1);
     const b2 = g.filter((r) => r.v2 != null).append('rect').attr('x', xi('2') + off).attr('width', bw).attr('rx', rx).attr('fill', (r) => r.estado === 'Fechado' ? 'url(#g2)' : 'url(#hatch)');
@@ -180,7 +199,7 @@ export function mountPainel(root, api) {
     highlight();
   }
   function highlight() {
-    d3.select($('chart-mensal')).selectAll('.mgrp').transition().duration(250).style('opacity', (r) => !S.sel || r.mes === S.sel ? 1 : 0.38);
+    d3.select($('chart-mensal')).selectAll('.mgrp').transition().duration(250).style('opacity', (r) => (r.fora ? 0.16 : !S.sel || r.mes === S.sel ? 1 : 0.38));
     root.querySelectorAll('#tbl-quadro tbody tr').forEach((tr) => tr.classList.toggle('rsel', tr.dataset.key === S.sel));
     root.querySelectorAll('#sp-chips .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mes === S.sel)));
   }
@@ -287,7 +306,7 @@ export function mountPainel(root, api) {
   // ---------- Ganho mensal ----------
   function drawVar(M, animate) {
     const box = $('chart-var'); clearBox(box);
-    const data = M.rows.filter((r) => r.dif != null);
+    const data = M.rows.filter((r) => r.dif != null && !r.fora);
     if (!data.length) { box.style.minHeight = '300px'; clearBox(box, M.comp == null ? 'Escolha um ano de comparação para ver o ganho mensal.' : 'Sem meses com vendas nos dois anos.'); return; }
     const W = Math.max(280, box.clientWidth), rowH = 24, H = Math.max(data.length * rowH + 16, 120);
     box.style.minHeight = H + 'px';
@@ -333,20 +352,21 @@ export function mountPainel(root, api) {
     $('k1-lab').textContent = 'Vendas ' + A + (ult ? ' · até ' + ult : '');
     countUp($('k1'), R.ytd2, kz, animate ? 1100 : 0, 150);
     setPill($('k1-d'), R.cresc_ytd, B != null && R.ytd1 != null ? 'vs ' + kz(R.ytd1) + ' em ' + B + ' (mesmos meses)' : '');
-    $('k2-lab').textContent = 'Meses fechados' + (R.ultimoFech ? ' · Jan–' + short(R.ultimoFech.mes) : '');
+    const primeiro = M.filtro ? (M.rows.find((q) => !q.fora) || M.rows[0]).mes : 'Janeiro';
+    $('k2-lab').textContent = 'Meses fechados' + (R.ultimoFech ? ' · ' + short(primeiro) + '–' + short(R.ultimoFech.mes) : '');
     countUp($('k2'), R.fech2, kz, animate ? 1100 : 0, 200);
     setPill($('k2-d'), R.cresc_fech, R.fech1 != null ? 'vs ' + kz(R.fech1) + (R.fech2c !== R.fech2 ? ' (mesmos meses)' : '') : '');
-    $('k3-lab').textContent = 'Média mensal ' + A;
+    $('k3-lab').textContent = 'Média mensal ' + A + (M.filtro ? ' · ' + M.filtro.rotulo : '');
     countUp($('k3'), R.media2, kz, animate ? 1100 : 0, 250);
     setPill($('k3-d'), R.cresc_media, R.media1 != null ? 'vs ' + kz(R.media1) + ' (' + B + ')' : '');
-    $('k4-lab').textContent = 'Melhor mês ' + A;
+    $('k4-lab').textContent = 'Melhor mês ' + A + (M.filtro ? ' · ' + M.filtro.rotulo : '');
     countUp($('k4'), R.melhor ? R.melhor.v2 : null, kz, animate ? 1100 : 0, 300);
     if (R.melhor) { setPill($('k4-d'), R.melhor.cresc, 'vs ' + short(R.melhor.mes) + (B != null ? ' ' + B : '')); $('k4-d').prepend(document.createTextNode(R.melhor.mes + ' · ')); }
     else $('k4-d').textContent = 'Sem meses fechados';
-    $('k5-lab').textContent = 'Projecção anual ' + A;
+    $('k5-lab').textContent = (M.filtro ? 'Projecção ' + M.filtro.rotulo + ' ' : 'Projecção anual ') + A;
     countUp($('k5'), R.projeccao, kz, animate ? 1100 : 0, 350);
     const parts = [];
-    if (R.total1 != null) parts.push('vs total ' + B);
+    if (R.total1 != null) parts.push(M.filtro ? 'vs ' + M.filtro.rotulo + ' ' + B : 'vs total ' + B);
     if (M.meta) parts.push('meta ' + mi(M.meta) + ' · ' + Math.round(R.metaPct * 100) + '% atingido');
     else if (R.progresso != null) parts.push(Math.round(R.progresso * 100) + '% realizado');
     setPill($('k5-d'), R.cresc_proj, parts.join(' · '));
@@ -368,11 +388,12 @@ export function mountPainel(root, api) {
     const tk = $('takeaway'); tk.replaceChildren();
     const add = (t, cls) => { tk.appendChild(el(cls ? 'b' : 'span', cls && cls !== 'b' ? cls : null, t)); };
     if (!R.ultimo) { add('Ainda não há vendas registadas para ' + A + '. Entre na Administração para preencher os meses.'); return; }
-    add('Até '); add(R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : ''), 'b'); add(', a loja faturou '); add(kz(R.ytd2), 'b'); add(' em ' + A);
+    if (M.filtro) { add('Filtro '); add(M.filtro.rotulo, 'b'); add(': '); }
+    add(M.filtro ? 'até ' : 'Até '); add(R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : ''), 'b'); add(', a loja faturou '); add(kz(R.ytd2), 'b'); add(' em ' + A);
     if (R.cresc_ytd != null) { add(', '); add(pct(R.cresc_ytd), R.cresc_ytd >= 0 ? 'up' : 'dn'); add(' face aos mesmos meses de ' + B + '.'); } else add('.');
-    if (R.ultrapassa) { add(' Em '); add(R.ultrapassa, 'b'); add(' o acumulado já superava todo o ano de ' + B + '.'); }
-    const falta = M.rows.filter((r) => r.estado === 'Por preencher').length;
-    if (falta) { add(' Faltam '); add(falta + (falta === 1 ? ' mês' : ' meses'), 'b'); add(' por preencher até Dezembro.'); }
+    if (R.ultrapassa) { add(' Em '); add(R.ultrapassa, 'b'); add(' o acumulado já superava ' + (M.filtro ? 'todo o mesmo período de ' : 'todo o ano de ') + B + '.'); }
+    const falta = M.rows.filter((r) => r.estado === 'Por preencher' && !r.fora).length;
+    if (falta) { add(' Faltam '); add(falta + (falta === 1 ? ' mês' : ' meses'), 'b'); add(M.filtro ? ' por preencher no filtro.' : ' por preencher até Dezembro.'); }
   }
 
   // ---------- Tabelas ----------
@@ -381,7 +402,7 @@ export function mountPainel(root, api) {
     const max = d3.max(M.rows, (r) => r.v2 || 0) || 1;
     const td = (txt, cls) => el('td', cls, txt);
     tb.replaceChildren(...M.rows.map((r) => {
-      const tr = el('tr'); tr.dataset.key = r.mes;
+      const tr = el('tr', r.fora ? 'fora' : null); tr.dataset.key = r.mes;
       const c2 = r.v2 != null ? td(kz(r.v2), 'bar2') : td(r.est != null ? '≈ ' + kz(r.est) : '—', 'est');
       if (r.v2 != null) { c2.style.backgroundImage = 'linear-gradient(90deg, #EC8DB5, #E0679A)'; c2.style.backgroundSize = `${(r.v2 / max * 100).toFixed(1)}% 3px`; }
       const cE = el('td'); cE.appendChild(el('span', 'tag ' + (r.estado === 'Fechado' ? 'f' : r.estado === 'Em curso' ? 'c' : 'p'), r.estado));
@@ -392,9 +413,9 @@ export function mountPainel(root, api) {
     }));
     const R = M.R, tf = root.querySelector('#tbl-quadro tfoot');
     const r1 = el('tr');
-    r1.append(td('Período comparável' + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : '')), td(kz(R.ytd1)), td(kz(R.ytd2c)), td(kzs(R.dif_ytd)), td(pct(R.cresc_ytd), R.cresc_ytd == null ? 'mut' : R.cresc_ytd >= 0 ? 'pos' : 'neg'), td(''), td('', 'o'));
+    r1.append(td((M.filtro ? 'Filtro ' + M.filtro.rotulo + ' · comparável' : 'Período comparável') + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : '')), td(kz(R.ytd1)), td(kz(R.ytd2c)), td(kzs(R.dif_ytd)), td(pct(R.cresc_ytd), R.cresc_ytd == null ? 'mut' : R.cresc_ytd >= 0 ? 'pos' : 'neg'), td(''), td('', 'o'));
     const r2 = el('tr');
-    r2.append(td('Ano completo / projecção'), td(kz(R.total1)), td(R.projeccao != null ? '≈ ' + kz(R.projeccao) : '—'), td(''), td(pct(R.cresc_proj)), td(''), td(M.meta ? 'Meta: ' + kz(M.meta) : '', 'o'));
+    r2.append(td(M.filtro ? 'Período filtrado / projecção' : 'Ano completo / projecção'), td(kz(R.total1)), td(R.projeccao != null ? '≈ ' + kz(R.projeccao) : '—'), td(''), td(pct(R.cresc_proj)), td(''), td(M.meta ? 'Meta: ' + kz(M.meta) : '', 'o'));
     tf.replaceChildren(r1, r2);
   }
   function correctedValue(chave, M) {
@@ -445,6 +466,7 @@ export function mountPainel(root, api) {
     $('sp-estado').textContent = r.estado;
     $('sp-obs').textContent = r.obs ? '“' + r.obs + '”' : '';
     $('sp-mA').textContent = kz(M.R.media1); $('sp-mB').textContent = kz(M.R.media2);
+    fillPeriodo(M, r);
     const b1 = $('sp-b1'), b2 = $('sp-b2'), v1 = $('sp-v1'), v2 = $('sp-v2'), g = $('sp-g'), dd = $('sp-d');
     const sq = [1, 2, 3].map((i) => $('sq' + i));
     const val2 = r.v2 != null ? r.v2 : r.est;
@@ -468,12 +490,28 @@ export function mountPainel(root, api) {
     };
     if (animate && !reduce) {
       [b1, b2].forEach((b) => { b.classList.remove('on'); b.querySelector('.b').style.height = '0'; });
-      v1.textContent = kz(0); v2.textContent = kz(0);
-      g.classList.remove('on', 'ok', 'bad', 'na'); g.textContent = pct(0); dd.textContent = ' ';
+      contagens.set(v1, {}); contagens.set(v2, {}); v1.textContent = kz(0); v2.textContent = kz(0);
+      g.classList.remove('on', 'ok', 'bad', 'na'); contagens.set(g, {}); g.textContent = pct(0); dd.textContent = ' ';
       sq.forEach((li) => li.classList.remove('on'));
       later(() => step(1, true), 150); later(() => step(2, true), 1050); later(() => step(3, true), 1950);
     } else { step(1, false); step(2, false); step(3, false); }
     highlight();
+  }
+  /** O período até ao mês: vendas e médias de cada ano, crescimento e diferenças (como no PowerPoint). */
+  function fillPeriodo(M, r) {
+    const P = periodoAte(M, r.i);
+    const A = M.ano, B = M.comp;
+    $('sp-ate').textContent = P.ate;
+    root.querySelectorAll('.lgAB').forEach((e) => { e.textContent = B != null ? `${B}/${String(A).slice(-2)}` : String(A); });
+    $('sp-pA').textContent = B != null ? kz(P.venda1) : '—';
+    $('sp-pB').textContent = kz(P.venda2);
+    $('sp-pmA').textContent = B != null ? kz(P.media1) : '—';
+    $('sp-pmB').textContent = kz(P.media2);
+    const sinal = (e, v, txt) => { e.textContent = txt; e.classList.remove('ok', 'bad'); if (v != null) e.classList.add(v >= 0 ? 'ok' : 'bad'); };
+    sinal($('sp-pG'), P.crescimento, pct(P.crescimento));
+    sinal($('sp-dM'), P.difMensal, P.difMensal != null ? kzs(P.difMensal) : '—');
+    sinal($('sp-dP'), P.difPeriodica, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
+    $('sp-pG').title = P.comparaveis ? `${P.comparaveis} ${P.comparaveis === 1 ? 'mês' : 'meses'} com valor nos dois anos` : '';
   }
   function runTimer(ms) {
     const e = $('sp-timer'); const t0 = performance.now();
@@ -528,17 +566,45 @@ export function mountPainel(root, api) {
   function render(animate) {
     defaultYears(); fillSelectors();
     if (S.ano == null) { showEmpty(); return; }
-    S.model = build(S.ano, S.comp);
+    S.modelAno = build(S.ano, S.comp);
+    S.model = filtrar(S.modelAno);
     const M = S.model;
     fillKpis(M, animate);
-    drawMensal(M, animate); drawAcum(M, animate); drawVar(M, animate);
-    fillQuadro(M); fillConf(M); videoLabels(M);
-    $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
-    if (!S.sel) S.sel = (M.R.ultimoFech || M.R.ultimo || M.rows[0]).mes;
+    // O acumulado é sempre o do ano inteiro (com a projecção do ano); o resto segue o filtro.
+    drawMensal(M, animate); drawAcum(S.modelAno, animate); drawVar(M, animate);
+    fillQuadro(M); fillConf(M); videoLabels(M); topoCapas(M.ano);
+    $('sp-chips').replaceChildren(...M.rows.map((r) => { const b = el('button', 'chip' + (r.v2 == null ? ' miss' : '') + (r.fora ? ' fora' : ''), short(r.mes)); b.type = 'button'; b.dataset.mes = r.mes; b.setAttribute('aria-pressed', 'false'); return b; }));
+    const naSel = S.sel ? M.rows.find((q) => q.mes === S.sel) : null;
+    if (!S.sel || (naSel && naSel.fora)) S.sel = (M.R.ultimoFech || M.R.ultimo || M.rows.find((q) => !q.fora) || M.rows[0]).mes;
     if (!S.playing) select(S.sel, animate); else highlight();
+  }
+  const grpUn = (n) => { const v = Number(n) || 0; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); };
+  /** As capas do topo: os mais vendidos da loja no ano e, a completar, as do catálogo. */
+  function topoCapas(ano) {
+    const pintar = (itens) => {
+      if (dead) return;
+      const n = window.innerWidth < 700 ? 12 : 20;
+      pintarParede($('hero-capas'), capasParaFundo(itens, { n, chave: `${S.store ? S.store.name : ''}:${ano}` }), { colunas: n > 12 ? 5 : 3 });
+    };
+    pintar([]);
+    $('mv').hidden = true;
+    if (S.extras) {
+      extrasDe(ano).then((x) => {
+        if (dead || S.ano !== ano) return;
+        const itens = x && x.destaques ? x.destaques.ano || [] : [];
+        pintar(itens);
+        maisVendidos(itens, ano);
+      });
+    }
+  }
+  function maisVendidos(itens, ano) {
+    $('mv-ano').textContent = String(ano);
+    pintarMaisVendidos($('mv-lista'), itens, { n: 6, fmt: { unid: (n) => `${grpUn(n)} ${Number(n) === 1 ? 'unidade' : 'unidades'}`, kz } });
+    $('mv').hidden = !itens.length;
   }
   function showEmpty(msg) {
     S.model = null;
+    topoCapas(new Date().getFullYear());
     $('takeaway').textContent = msg || 'Ainda não há anos registados. Entre na Administração para adicionar o primeiro ano.';
     ['k1', 'k2', 'k3', 'k4', 'k5'].forEach((id) => { $(id).textContent = '—'; });
     ['chart-mensal', 'chart-acum', 'chart-var'].forEach((id) => clearBox($(id), 'Sem dados para mostrar.'));
@@ -872,7 +938,8 @@ export function mountPainel(root, api) {
       loja: lojaNome(), ano: M.ano, comp: M.comp, crit: M.crit, critTxt: CRIT[M.crit], meta: M.meta,
       fonte: (S.years[M.ano] && S.years[M.ano].fonte) || '',
       geradoEm: new Date().toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }),
-      logo: logoSrc(), rows: M.rows, R: M.R,
+      logo: logoSrc(), logoClaro: $('logo-claro') ? $('logo-claro').src : '', rows: M.rows, R: M.R,
+      filtro: M.filtro ? M.filtro.texto || M.filtro.rotulo : '',
       sys: S.sys.data && S.sys.ano === M.ano ? { counts: S.sys.data.counts } : null,
     };
   }
@@ -890,6 +957,7 @@ export function mountPainel(root, api) {
       ['Indicador', 'Valor', 'Notas'],
       ['Loja', d.loja, ''],
       ['Ano', String(A), B ? 'comparado com ' + B : 'sem comparação'],
+      ...(d.filtro ? [['Filtro', d.filtro, 'os totais contam só os meses do filtro']] : []),
       ['Vendas ' + A + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''), R.ytd2, ''],
       ['Período comparável ' + A, R.ytd2c, 'meses com valor nos dois anos'],
       ['Período comparável ' + (B || '—'), R.ytd1, ''],
@@ -1036,7 +1104,7 @@ export function mountPainel(root, api) {
   const P = { idx: 0, list: [], playing: false, timer: null, raf: null, steps: [] };
   const logoSrc = () => $('logo-img').src;
   function slideList(M) {
-    return [{ k: 'capa' }, { k: 'resumo' }].concat(M.rows.map((r) => ({ k: 'mes', r })), [{ k: 'quadro' }, { k: 'acum' }, { k: 'persp' }]);
+    return [{ k: 'capa' }, { k: 'resumo' }].concat(M.rows.filter((r) => !r.fora).map((r) => ({ k: 'mes', r })), [{ k: 'quadro' }, { k: 'acum' }, { k: 'persp' }]);
   }
   function fitSlide() {
     const v = $('pres-view'), s = v.querySelector('.slide'); if (!s) return;
@@ -1062,7 +1130,8 @@ export function mountPainel(root, api) {
     if (it.k === 'capa') {
       s.classList.add('dark');
       s.appendChild(abs('s-cover-glow'));
-      const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
+      // A capa é escura: o logótipo branco (PNG transparente), sem caixa.
+      const lg = el('div', 's-cover-logo'); const im = el('img'); im.src = $('logo-claro') ? $('logo-claro').src : logoSrc(); im.alt = ''; lg.appendChild(im); s.appendChild(lg);
       s.append(abs('s-cover-eye', null, lojaDe(S.store).toUpperCase()), abs('s-cover-t', null, 'PAINEL DE VENDAS ' + A),
         abs('s-cover-s', null, (B != null ? 'Comparativo ' + B + ' vs ' + A + ' · ' : '') + 'Livraria e Editora Adventista, S.A.'));
     } else if (it.k === 'resumo') {
@@ -1096,27 +1165,32 @@ export function mountPainel(root, api) {
       head(s, M, r.mes + ' · Comparativo ' + (B != null ? B + ' vs ' : '') + A);
       const kp = el('div', 's-kpis');
       const K = (k, v, cls) => { const c = el('div', 's-kpi ' + (cls || '')); c.append(el('div', 'k', k)); const vv = el('div', 'v', v); c.append(vv); kp.appendChild(c); return vv; };
-      K('Mês em apresentação', r.mes, 'mes');
-      const k1 = K('Vendas ' + (B != null ? B : '—'), '—');
-      const k2 = K('Vendas ' + A, '—');
-      const k3 = K('Crescimento do mês', '—');
+      // Como no PowerPoint das lojas: o período até ao mês, em cima; o mês, no gráfico.
+      const P = periodoAte(M, r.i);
+      K('Período em apresentação até', r.mes, 'mes');
+      const k1 = K('Venda periódica ' + (B != null ? B : '—'), '—');
+      const k2 = K('Venda periódica ' + A, '—');
+      const k3 = K('Crescimento periódico', '—');
       s.appendChild(kp);
       const card = abs('s-card', { left: '48px', top: '256px', width: '780px', height: '400px' });
-      card.appendChild(abs('s-ct', null, 'Comparativo mensal'));
+      card.appendChild(abs('s-ct', null, 'Venda mensal'));
       const bars = el('div', 's-bars');
       const mx = d3.max(M.rows, (q) => Math.max(q.v1 || 0, q.v2 || 0, q.est || 0)) || 1;
       const mk = (cls, label, yr) => { const b = el('div', 's-bar ' + cls); const v = el('div', 'v', ''); const bb = el('div', 'b'); const l = el('div', 'l'); l.append(document.createTextNode(label + ' - ')); l.append(el('em', null, String(yr))); b.append(v, bb, l); bars.appendChild(b); return { b, v, bb }; };
       const b1 = mk('y1', r.mes, B != null ? B : '—');
       const b2 = mk('y2' + (r.estado === 'Em curso' ? ' partial' : r.estado === 'Por preencher' ? ' est' : ''), r.mes, A);
       card.appendChild(bars);
-      const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento do mês')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
+      const gr = el('div', 's-growth'); gr.append(el('div', 'k', 'Crescimento mensal')); const gv = el('div', 'g', '—'); gr.append(gv); const gd = el('div', 'd', ''); gr.append(gd); card.appendChild(gr);
       s.appendChild(card);
       const det = abs('s-card s-det', { left: '852px', top: '256px', width: '380px', height: '400px' });
       det.appendChild(abs('s-ct', null, 'Detalhe de ' + r.mes));
       const row2 = (top, k, v) => { const d = abs('row2', { top: top + 'px' }); d.append(el('span', null, k), el('b', null, v)); det.appendChild(d); };
-      row2(78, 'Média mensal ' + (B != null ? B : '—'), kz(R.media1));
-      row2(108, 'Média mensal ' + A, kz(R.media2));
-      row2(138, 'Estado do mês', r.estado);
+      const ab = B != null ? `${String(B).slice(-2)}/${String(A).slice(-2)}` : String(A);
+      row2(66, 'Média mensal ' + (B != null ? B : '—'), B != null ? kz(P.media1) : '—');
+      row2(94, 'Média mensal ' + A, kz(P.media2));
+      row2(122, 'Diferença mensal ' + ab, P.difMensal != null ? kzs(P.difMensal) : '—');
+      row2(150, 'Diferença periódica ' + ab, P.difPeriodica != null ? kzs(P.difPeriodica) : '—');
+      row2(178, 'Estado do mês', r.estado);
       const sq = el('div', 's-seq'); sq.append(el('div', 'h', 'Sequência de apresentação'));
       const i1 = el('div', 'i a', '1º  ' + (B != null ? B : '—')), i2 = el('div', 'i b', '2º  ' + A), i3 = el('div', 'i c', '3º  Crescimento');
       sq.append(i1, i2, i3); det.appendChild(sq);
@@ -1125,14 +1199,16 @@ export function mountPainel(root, api) {
       const val2 = r.v2 != null ? r.v2 : r.est;
       const hh = (v) => v == null ? '0' : (v / mx * 86) + '%';
       const f2 = (v) => (r.v2 == null && v != null ? '≈ ' : '') + kz(v);
-      pLater(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); countUp(k1, r.v1, kz, 800); }, 400);
-      pLater(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, val2, f2, 800); }, 1400);
+      pLater(() => { i1.classList.add('on'); b1.b.classList.add('on'); b1.bb.style.height = hh(r.v1); countUp(b1.v, r.v1, kz, 800); if (B != null) countUp(k1, P.venda1, kz, 800); }, 400);
+      pLater(() => { i2.classList.add('on'); b2.b.classList.add('on'); b2.bb.style.height = hh(val2); countUp(b2.v, val2, f2, 800); countUp(k2, P.venda2, kz, 800); }, 1400);
       pLater(() => {
         i3.classList.add('on'); gr.classList.add('on');
         const cls = r.cresc == null ? 's-mut' : r.cresc >= 0 ? 's-ok' : 's-bad';
-        gv.className = 'g ' + cls; k3.className = 'v ' + cls;
-        if (r.cresc != null) { countUp(gv, r.cresc, pct, 1000); countUp(k3, r.cresc, pct, 1000); }
-        else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; k3.textContent = '—'; }
+        gv.className = 'g ' + cls;
+        k3.className = 'v ' + (P.crescimento == null ? 's-mut' : P.crescimento >= 0 ? 's-ok' : 's-bad');
+        if (P.crescimento != null) countUp(k3, P.crescimento, pct, 1000); else k3.textContent = '—';
+        if (r.cresc != null) countUp(gv, r.cresc, pct, 1000);
+        else { gv.textContent = r.estado === 'Por preencher' ? 'Por preencher' : '—'; gv.style.fontSize = '30px'; }
         gd.textContent = r.dif != null ? kzs(r.dif) + (r.estado === 'Em curso' ? ' · mês em curso' : '') : (r.est != null ? 'Estimativa: ' + CRIT[M.crit] : '');
       }, 2400);
     } else if (it.k === 'quadro') {
@@ -1155,7 +1231,7 @@ export function mountPainel(root, api) {
     } else if (it.k === 'acum') {
       head(s, M, 'Acumulado do ano e projecção · critério: ' + CRIT[M.crit]);
       const box = el('div', 's-chart'); s.appendChild(box);
-      requestAnimationFrame(() => drawAcumInto(box, 1150, 500, M, true, { fs: 15, sw: 3, grid: '#ECEAE6', axis: '#C9C7C2', muted: '#6A7076', fg: '#1E2124', ok: '#1E8449', dur: 2000 }));
+      requestAnimationFrame(() => drawAcumInto(box, 1150, 500, S.modelAno || M, true, { fs: 15, sw: 3, grid: '#ECEAE6', axis: '#C9C7C2', muted: '#6A7076', fg: '#1E2124', ok: '#1E8449', dur: 2000 }));
     } else if (it.k === 'persp') {
       s.classList.add('dark');
       s.appendChild(abs('s-rem-t', null, 'REMARQUE:'));
@@ -1241,6 +1317,14 @@ export function mountPainel(root, api) {
   $('pres-view').addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
   $('pres-view').addEventListener('touchend', (e) => { if (tx == null) return; const d = e.changedTouches[0].clientX - tx; if (Math.abs(d) > 40) { go(d < 0 ? 1 : -1); e.preventDefault(); } tx = null; });
 
+  // ---------- Filtros avançados ----------
+  FIL = montarFiltros(root, {
+    chave: 'relatorios:filtros:loja',
+    ultimo: () => ultimoDe(S.modelAno),
+    onChange: () => { if (S.ano != null && $('pres').hidden) { clearTimers(); stopPlay(); render(true); } },
+  });
+  offs.push(() => FIL.desmontar());
+
   // ---------- Ligação aos dados ----------
   (async () => {
     const { db, user, downloads, store, sales, extras } = api;
@@ -1263,7 +1347,7 @@ export function mountPainel(root, api) {
       const ys = {};
       snap.docs.forEach((d) => { if (!d.exists) return; const v = d.data(); const n = Number(v.ano || d.id); if (isFinite(n)) ys[n] = { ...v, ano: n, meses: Array.isArray(v.meses) ? v.meses.slice(0, 12).concat(Array(12).fill(null)).slice(0, 12) : MESES.map(() => null) }; });
       S.years = ys;
-      if ($('pres').hidden) render(first); else S.model = build(S.ano, S.comp);
+      if ($('pres').hidden) render(first); else { S.modelAno = build(S.ano, S.comp); S.model = filtrar(S.modelAno); }
       first = false;
       if (!$('editar').hidden) { edTabs(); if (!S.ed.dirty && S.ed.ano != null && S.years[S.ed.ano]) edFill(); }
     }, () => { if (!S.model) showEmpty('Não foi possível ler os dados agora. Recarregue a página.'); }));

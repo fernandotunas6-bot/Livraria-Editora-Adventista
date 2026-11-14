@@ -258,3 +258,52 @@ export const DELIVERY_OFFER_STATUS = {
   released: { label: 'Devolvida', tone: 'muted' },
   cancelled: { label: 'Cancelada', tone: 'muted' },
 };
+
+// --- Cartão, verificação, avaliações e igrejas (migração 20261114200000) ---------------------
+
+/** O cartão de um colportor (equipa) ou o do próprio (sem id). `reissue` dá um código novo. */
+export const colporteurCard = (id = null, reissue = false) => rpc('colporteur_card', { p_id: id, p_reissue: !!reissue });
+
+/** Verificação pública de um cartão: { found, valid, expired, status, code, full_name, … }. */
+export const verifyColporteur = (code, check) => rpc('colporteur_verify', { p_code: String(code || ''), p_check: String(check || '') });
+
+/** O endereço que vai no QR do cartão (abre a página de verificação já com os dois códigos). */
+export function cardVerifyLink(card, origin = window.location.origin) {
+  return `${origin}/colportor/verificar/${encodeURIComponent(card.code)}?k=${encodeURIComponent(card.card_check || '')}`;
+}
+
+/** Os colportores que o cliente pode avaliar numa encomenda sua (paga e entregue). */
+export const colporteurReviewTargets = (orderNumber) => rpc('colporteur_review_targets', { p_order_number: String(orderNumber || '') });
+export const saveColporteurReview = ({ orderNumber, colporteurId, rating, comment = '' }) =>
+  rpc('colporteur_review_save', { p_order_number: String(orderNumber || ''), p_colporteur_id: colporteurId, p_rating: Number(rating), p_comment: comment });
+export const hideColporteurReview = (id, hidden, reason = '') => rpc('colporteur_review_hide', { p_id: id, p_hidden: !!hidden, p_reason: reason });
+/** Com id: as avaliações de um colportor (equipa); sem id: as do próprio colportor. */
+export const colporteurReviews = (id = null) => rpc('colporteur_reviews_list', { p_colporteur_id: id });
+
+/** A média de cada colportor, para as listas: Map id → { avg, count }. */
+export async function colporteurRatings() {
+  const { data, error } = await supabase.rpc('colporteur_ratings');
+  if (error) {
+    // Sem a migração, as listas mostram-se sem a média.
+    if (error.code === 'PGRST202' || /could not find/i.test(error.message || '')) return new Map();
+    throw new Error(colporteurError(error));
+  }
+  return new Map((data || []).map((r) => [r.colporteur_id, { avg: Number(r.rating_avg), count: Number(r.rating_count) }]));
+}
+
+/** Por igreja: activos, candidaturas, categorias, horas, vendas, entregas e média; com churchId, a lista. */
+export const churchColporteurs = (churchId = null, year = null) => rpc('church_colporteurs', { p_church_id: churchId, p_year: year });
+
+/** Os livros mais vendidos por um colportor ou por uma igreja, com a média das avaliações. */
+export const colporteurTopBooks = ({ colporteurId = null, churchId = null, year = null, limit = 6 } = {}) =>
+  rpc('colporteur_top_books', { p_colporteur_id: colporteurId, p_church_id: churchId, p_year: year, p_limit: limit });
+
+/** Avaliações dos livros: as recentes (equipa do catálogo) e ocultar/mostrar. */
+export const recentBookReviews = (onlyHidden = false, limit = 60) => rpc('book_reviews_recent', { p_limit: limit, p_only_hidden: !!onlyHidden });
+export const hideBookReview = (id, hidden, reason = '') => rpc('book_review_hide', { p_id: id, p_hidden: !!hidden, p_reason: reason });
+
+/** «★ 4,5 (12)» — a média de avaliações, em texto. */
+export function ratingText(avg, count) {
+  if (!count) return 'sem avaliações';
+  return `★ ${Number(avg).toFixed(1).replace('.', ',')} (${count})`;
+}
