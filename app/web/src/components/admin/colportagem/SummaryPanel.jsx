@@ -15,24 +15,26 @@ const PERIODS = {
   tudo: { label: 'Desde o início', from: '' },
 };
 
-/** Resumo: quanto se trabalhou, vendeu e ganhou, por colportor, igreja, distrito, província ou campo. */
+/** Resumo: quanto se trabalhou, vendeu e ganhou, por colportor, loja, igreja, distrito, província ou campo. */
 export default function SummaryPanel({ data, ops, reg, idx }) {
   const [groupBy, setGroupBy] = useState('colportor');
   const [period, setPeriod] = useState('ano');
   // As vendas no site somam-se só no ano (o resumo da base de dados traz o total do ano).
   const withSite = period === 'ano';
 
+  const storeNames = useMemo(() => new Map((data.stores || []).map((s) => [s.id, s.name])), [data.stores]);
   const where = useMemo(() => (c) => {
     const church = idx.churchesById.get(c.church_id);
     const districtId = church?.district_id || '';
     return {
+      storeId: c.store_id || '', storeLabel: storeNames.get(c.store_id) || '',
       churchKey: c.church_id || `outra:${c.church_other}`,
       churchLabel: church?.name || (c.church_other ? `${c.church_other} (fora do registo)` : ''),
       districtId, districtLabel: districtId ? `${idx.districtName(districtId)} · ${idx.provinceName(idx.districts.get(districtId)?.province_id)}` : '',
       provinceId: c.province_id || '', provinceLabel: idx.provinceName(c.province_id),
       fieldId: church?.field_id || '', fieldLabel: idx.fieldName(church?.field_id),
     };
-  }, [idx]);
+  }, [idx, storeNames]);
 
   const { rows, totals } = useMemo(() => summarize({
     colporteurs: data.colporteurs, reports: ops.reports, overview: ops.overview, groupBy, from: PERIODS[period].from, withSite, where,

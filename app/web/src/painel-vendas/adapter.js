@@ -56,7 +56,8 @@ const LUANDA_OFFSET_MS = 3600 * 1000;
 
 /**
  * Vendas registadas no sistema (encomendas) de uma loja, por mês, em Kz sem portes.
- * Conta para a loja: levantamentos nessa loja e entregas ao domicílio na província da loja.
+ * Conta para a loja: levantamentos nessa loja e entregas ao domicílio na província da loja (a loja
+ * gravada em cada encomenda, orders.store_id).
  * Exclui encomendas canceladas.
  *
  * Com `paidOnly` (o normal), conta o dinheiro que entrou, pelo mês em que entrou: encomendas com
@@ -68,10 +69,15 @@ async function fetchSystemSales(store, ano, { paidOnly = true } = {}) {
   const from = new Date(Date.UTC(ano, 0, 1) - LUANDA_OFFSET_MS).toISOString();
   const to = new Date(Date.UTC(ano + 1, 0, 1) - LUANDA_OFFSET_MS).toISOString();
   const dateField = paidOnly ? 'paid_at' : 'created';
+  // A loja de cada encomenda (orders.store_id, migração lojas_donas_dos_dados) fica gravada quando
+  // ela entra: mudar o nome de uma loja já não lhe tira as vendas. Antes da migração, conta-se como
+  // antes, pelo nome da loja e pela província.
+  const comLoja = !(await supabase.from('orders').select('store_id').limit(1)).error;
+  const cols = 'created, paid_at, total, shipping_cost, amount_paid, amount_refunded, status, delivery_status, payment_status, shipping_method, pickup_store, delivery_province';
   const rows = [];
   for (let page = 0; ; page++) {
     const { data, error } = await supabase.from('orders')
-      .select('created, paid_at, total, shipping_cost, amount_paid, amount_refunded, status, delivery_status, payment_status, shipping_method, pickup_store, delivery_province')
+      .select(comLoja ? `${cols}, store_id` : cols)
       .gte(dateField, from).lt(dateField, to)
       .order(dateField)
       .range(page * 1000, page * 1000 + 999);
@@ -84,7 +90,9 @@ async function fetchSystemSales(store, ano, { paidOnly = true } = {}) {
   for (const o of rows) {
     if (o.status === 'cancelled' || o.delivery_status === 'cancelled') continue;
     const pickup = o.shipping_method === 'pickup' || !!o.pickup_store;
-    const mine = pickup ? norm(o.pickup_store) === norm(store.name) : norm(o.delivery_province) === norm(store.province);
+    const mine = comLoja
+      ? o.store_id === store.id
+      : (pickup ? norm(o.pickup_store) === norm(store.name) : norm(o.delivery_province) === norm(store.province));
     if (!mine) continue;
     // Pago: o que ficou (pago − reembolsado), até ao total, sem os portes. Vendido: o total.
     const value = paidOnly

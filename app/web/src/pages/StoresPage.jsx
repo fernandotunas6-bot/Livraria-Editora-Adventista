@@ -10,7 +10,8 @@ import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { pageTitle } from '@/lib/brand';
 import { displayAngolaPhone, localDigits } from '@/lib/angolaPhone';
-import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink, storeGallery } from '@/lib/stores';
+import { mapsUrl, directionsUrl, mapEmbedUrl, whatsappLink, storeGallery, juntarNomes, provinciasServidas } from '@/lib/stores';
+import { ANGOLA_PROVINCES_2024 } from '@/lib/angolaGeo';
 import PageBannerSlider from '@/components/PageBannerSlider';
 import StoreThumb from '@/components/StoreThumb';
 import StoreGallery from '@/components/StoreGallery';
@@ -36,12 +37,18 @@ export default function StoresPage() {
     });
   }, []);
 
-  const provinces = useMemo(() => [...new Set((stores || []).map((s) => s.province).filter(Boolean))], [stores]);
+  // As províncias que as lojas servem (migração lojas_donas_dos_dados), pela ordem do país: quem
+  // é do Namibe escolhe o Namibe e encontra a loja do Lubango, que é a que o serve.
+  const provinces = useMemo(() => {
+    const servidas = [...new Set((stores || []).flatMap(provinciasServidas))];
+    const ordem = (p) => { const i = ANGOLA_PROVINCES_2024.indexOf(p); return i < 0 ? 99 : i; };
+    return servidas.sort((a, b) => ordem(a) - ordem(b) || a.localeCompare(b, 'pt'));
+  }, [stores]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = (stores || []).filter((s) => (!province || s.province === province)
-      && (!q || [s.name, s.address, s.province].join(' ').toLowerCase().includes(q)));
+    const list = (stores || []).filter((s) => (!province || provinciasServidas(s).includes(province))
+      && (!q || [s.name, s.address, s.province, ...provinciasServidas(s)].join(' ').toLowerCase().includes(q)));
     return posicao ? ordenarPorDistancia(list, posicao) : list;
   }, [stores, query, province, posicao]);
 
@@ -99,7 +106,7 @@ export default function StoresPage() {
               <div className="flex flex-wrap gap-3 mb-6">
                 <div className="relative flex-1 min-w-[220px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome ou morada" className="pl-9 bg-background" aria-label="Pesquisar lojas" />
+                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Pesquisar por nome, morada ou província" className="pl-9 bg-background" aria-label="Pesquisar lojas" />
                 </div>
                 {provinces.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por província">
@@ -186,6 +193,12 @@ export default function StoresPage() {
                               <h2 className="text-base md:text-lg/7 font-semibold leading-snug">{s.name}</h2>
                               <p className="text-sm text-muted-foreground flex items-start gap-1 mt-1"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{s.address}</p>
                               {s.hours && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Clock className="h-3.5 w-3.5 shrink-0" />{s.hours}</p>}
+                              {s.service_provinces?.length > 0 && (
+                                <p className="text-xs text-muted-foreground flex items-start gap-1 mt-1">
+                                  <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  <span>Serve {juntarNomes(provinciasServidas(s))}</span>
+                                </p>
+                              )}
                             </div>
                           </button>
                           {active && (

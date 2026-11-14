@@ -222,7 +222,9 @@ describe('permissões arrumadas pelas áreas do painel', () => {
 
   it('o que cada permissão abre sai do registo das secções', () => {
     const labels = (key) => sectionsOpenedBy(key).map((s) => s.id);
-    expect(labels('manage_catalog')).toEqual(['books', 'collections', 'slides', 'downloads', 'community']);
+    expect(labels('manage_catalog')).toEqual(['books', 'disponibilidade', 'collections', 'slides', 'downloads', 'community']);
+    // «Stock da loja» abre só a disponibilidade (migração lojas_donas_dos_dados).
+    expect(labels('manage_store_stock')).toEqual(['disponibilidade']);
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
     expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes', 'saude']);
     expect(labels('manage_settings')).not.toContain('apps');

@@ -7,6 +7,7 @@
 // divergir.
 export const PERMISSIONS = {
   manage_catalog: { area: 'catalogo', label: 'Gerir Catálogo', description: 'Produtos, coleções, slider, materiais em PDF e a moderação da comunidade' },
+  manage_store_stock: { area: 'catalogo', label: 'Stock da loja', description: 'Marcar «temos» ou «não temos» nos produtos da sua loja (a da ficha de funcionário), sem mexer em preços nem textos' },
   manage_production: { area: 'producao', label: 'Produção da Editora', description: 'Ordens de produção, etapas e responsáveis, custos e fornecedores; concluir põe a tiragem no stock' },
   manage_orders: { area: 'vendas', label: 'Gerir Encomendas', description: 'Ver e actualizar encomendas, acompanhá-las e falar com os clientes' },
   manage_payments: { area: 'vendas', label: 'Pagamentos', description: 'Métodos de pagamento (IBAN, links, QR)' },
@@ -29,6 +30,7 @@ export const ROLES = {
 
 export const DEFAULT_PERMISSIONS = {
   manage_catalog: false,
+  manage_store_stock: false,
   manage_production: false,
   manage_staff: false,
   manage_finance: false,
@@ -45,6 +47,7 @@ export const DEFAULT_PERMISSIONS = {
 
 export const MANAGER_PERMISSIONS = {
   manage_catalog: true,
+  manage_store_stock: false,
   manage_production: false,
   manage_staff: false,
   manage_finance: false,

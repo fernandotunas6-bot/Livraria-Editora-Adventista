@@ -38,7 +38,7 @@ const atendente = await user('atendente@loja.ao', 'manager', { manage_orders: tr
 
 {
   const keys = (await q(`select private.permission_keys() as k`))[0].k;
-  check('a lista de chaves tem view_reports', keys.includes('view_reports') && keys.length === 13, keys); // 10 + produção, funcionários e finanças (migração funcionarios)
+  check('a lista de chaves tem view_reports', keys.includes('view_reports') && keys.length === 14, keys); // 10 + produção, funcionários e finanças (migração funcionarios) + stock da loja (lojas_donas_dos_dados)
   const cargos = await q(`select name, permissions from public.staff_roles order by position`);
   check('oito cargos de partida', cargos.length === 8, cargos.map((c) => c.name));
   check('o cargo Atendimento não vê relatórios', cargos.find((c) => c.name === 'Atendimento').permissions.view_reports === false);

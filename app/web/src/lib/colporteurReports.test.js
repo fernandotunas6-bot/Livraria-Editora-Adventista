@@ -124,4 +124,11 @@ describe('summarize', () => {
     const { rows } = summarize({ colporteurs, reports, where, groupBy: 'distrito', from: '2026-06-01', withSite: true, overview: [{ colporteur_id: 'b', site_year_value: 8000 }] });
     expect(rows.map((r) => [r.label, r.hours, r.site, r.total])).toEqual([['Distrito Centro (Huambo)', 30, 0, 10000], ['Distrito Centro (Bié)', 0, 8000, 8000]]);
   });
+  it('por loja: quantos colportores tem cada uma, e os sem loja à parte', () => {
+    const lojas = { a: ['hua', 'Livraria Adventista — Huambo'], b: ['hua', 'Livraria Adventista — Huambo'] };
+    const comLoja = (c) => ({ ...where(c), storeId: lojas[c.id]?.[0] || '', storeLabel: lojas[c.id]?.[1] || '' });
+    const outro = [...colporteurs, { id: 'c', code: 'CPT-0003', full_name: 'Carla', status: 'activo', church_id: 'c2' }];
+    const { rows } = summarize({ colporteurs: outro, reports, where: comLoja, groupBy: 'loja' });
+    expect(rows.map((r) => [r.label, r.count, r.hours])).toEqual(expect.arrayContaining([['Livraria Adventista — Huambo', 2, 50], ['Sem loja', 1, 0]]));
+  });
 });

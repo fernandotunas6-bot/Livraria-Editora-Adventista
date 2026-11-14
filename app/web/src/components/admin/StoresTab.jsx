@@ -24,7 +24,11 @@ import PhoneInput from '@/components/PhoneInput';
 import { formatAngolaPhone, displayAngolaPhone } from '@/lib/angolaPhone';
 import { ANGOLA_PROVINCES_2024, avisoDeCoordenadas } from '@/lib/angolaGeo';
 import { distanciaKm } from '@/lib/localizacao';
-import { erroDaGaleria, fotoDaLoja, galeriaParaGuardar, hasCoords, mapsUrl, mapEmbedUrl, parseCoords, storeGallery } from '@/lib/stores';
+import {
+  conflitosDeZonas, erroDaGaleria, fotoDaLoja, galeriaParaGuardar, hasCoords, juntarNomes, mapsUrl, mapEmbedUrl, parseCoords,
+  provinciasServidas, storeGallery,
+} from '@/lib/stores';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ANGOLA_PROVINCES = ANGOLA_PROVINCES_2024;
 
@@ -120,10 +124,22 @@ export default function StoresTab() {
   }, [stores, query, province, status]);
 
   const usedProvinces = useMemo(() => ANGOLA_PROVINCES.filter((p) => stores.some((s) => s.province === p)), [stores]);
+  // As províncias que cada loja serve (migração lojas_donas_dos_dados). Antes da migração a coluna
+  // não existe e o formulário não a mostra nem a grava.
+  const temZonas = useMemo(() => stores.some((s) => 'service_provinces' in s), [stores]);
+  const zonas = useMemo(() => conflitosDeZonas(stores, ANGOLA_PROVINCES), [stores]);
+  const zonasDeOutras = useMemo(
+    () => stores.filter((s) => s.id !== editing?.id).map((s) => ({ name: s.name, zonas: provinciasServidas(s) })),
+    [stores, editing],
+  );
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyStore, sort_order: stores.length ? Math.max(...stores.map((s) => Number(s.sort_order) || 0)) + 1 : 0 });
+    setForm({
+      ...emptyStore,
+      sort_order: stores.length ? Math.max(...stores.map((s) => Number(s.sort_order) || 0)) + 1 : 0,
+      ...(temZonas ? { service_provinces: [] } : {}),
+    });
     setImageFile(null);
     setImageRemoved(false);
     setHadImageFile(false);
@@ -153,6 +169,7 @@ export default function StoresTab() {
       sort_order: s.sort_order ?? 0,
       active: !!s.active,
       pickup_enabled: s.pickup_enabled !== false,
+      ...('service_provinces' in s ? { service_provinces: Array.isArray(s.service_provinces) ? s.service_provinces : [] } : {}),
     });
     setShowForm(true);
   };
@@ -323,6 +340,22 @@ export default function StoresTab() {
         ))}
       </div>
 
+      {temZonas && (zonas.repetidas.length > 0 || zonas.semLoja.length > 0) && (
+        <div className="space-y-1 rounded-xl border border-border bg-muted/30 p-3 text-xs">
+          {zonas.repetidas.map((r) => (
+            <p key={r.provincia} className="flex items-start gap-1.5 text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span><strong>{r.provincia}</strong> está em mais do que uma loja ({juntarNomes(r.lojas)}): as encomendas ficam com a primeira da lista. Deixe-a só numa.</span>
+            </p>
+          ))}
+          {zonas.semLoja.length > 0 && (
+            <p className="text-muted-foreground">
+              <strong className="font-medium text-foreground">Províncias sem loja</strong> (as encomendas ficam com a equipa central): {juntarNomes(zonas.semLoja)}.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -389,6 +422,12 @@ export default function StoresTab() {
                   <p className="text-sm text-muted-foreground flex items-start gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />{s.address}</p>
                   {s.hours && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{s.hours}</p>}
                   {s.phone && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{displayAngolaPhone(s.phone)}</p>}
+                  {temZonas && (
+                    <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                      <PackageCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>{s.service_provinces?.length ? `Serve ${juntarNomes(s.service_provinces)}` : `Serve só ${s.province} (sem lista de províncias)`}</span>
+                    </p>
+                  )}
                   <a href={mapsUrl(s)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
                     <ExternalLink className="h-3 w-3" /> Abrir no mapa
                   </a>
@@ -445,6 +484,36 @@ export default function StoresTab() {
                 <Input value={form.address} onChange={(e) => set('address', e.target.value)} required placeholder="Rua, bairro, município" />
               </div>
             </FormSection>
+
+            {'service_provinces' in form && (
+              <FormSection title="Províncias que serve">
+                <p className="text-xs text-muted-foreground">
+                  Uma encomenda com entrega numa destas províncias é desta loja: o cliente vê-o no checkout, e conta nas
+                  vendas da loja. Marque também a província da própria loja.
+                </p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+                  {ANGOLA_PROVINCES.map((p) => {
+                    const marcada = form.service_provinces.includes(p);
+                    const outra = zonasDeOutras.find((o) => o.zonas.includes(p));
+                    return (
+                      <label key={p} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={marcada}
+                          onCheckedChange={(v) => set('service_provinces', v
+                            ? ANGOLA_PROVINCES.filter((x) => x === p || form.service_provinces.includes(x))
+                            : form.service_provinces.filter((x) => x !== p))}
+                        />
+                        <span>
+                          {p}
+                          {outra && <span className={`block text-[11px] ${marcada ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>{marcada ? 'também em ' : ''}{outra.name}</span>}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </FormSection>
+            )}
 
             <FormSection title="Contactos">
               <div className="grid sm:grid-cols-2 gap-3">

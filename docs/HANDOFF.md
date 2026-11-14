@@ -2,6 +2,35 @@
 
 Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegue neste projecto.
 
+## Lojas donas dos seus dados (2026-11-14, ramo `claude/confident-newton-ckke76`)
+
+- **Pedido do dono:** saber para onde vai uma venda de Catumbela, quantos colportores tem cada
+  loja, que cada loja marque nos produtos «temos / não temos», e que o cliente saiba de que loja
+  compra. Depois, as províncias de cada loja: Catumbela serve Benguela e o Cuanza Sul; a da Huíla
+  (Lubango), a Huíla, o Namibe e o Cunene; a do Huambo, só o Huambo; e uma **loja nova no Bié**, que
+  serve o Bié, o Cuando e o Cubango. Decisões tomadas por omissão (o dono não respondeu): «temos /
+  não temos» sem quantidades; cada colportor com a loja da sua província, que a equipa muda.
+- **Guia:** [LOJAS.md](LOJAS.md). Migração `20261114120000_lojas_donas_dos_dados`, **por aplicar**
+  (vai no merge): `physical_stores.service_provinces`, a loja do Bié (escondida e sem levantamento,
+  à espera de morada, telefone e horário), `orders.store_id`, `colporteurs.store_id`,
+  `colporteur_documents.store_id`, `store_stock` e a permissão nova `manage_store_stock`
+  («Stock da loja»).
+- **Painel:** Catálogo → Disponibilidade nas lojas (novo); Lojas → «Províncias que serve», com
+  avisos de províncias repetidas e sem loja; Colportagem → Resumo «por loja», filtro e coluna da
+  loja na lista, e a loja na ficha; Vendas por loja conta pela loja gravada na encomenda.
+- **Site:** a página do livro diz em que lojas está e que províncias serve cada uma; o checkout diz
+  de que loja é a compra (pela província de entrega), mostra as províncias de cada loja de
+  levantamento e não deixa escolher a que disse «não temos»; /lojas mostra as províncias e filtra
+  por elas.
+- **Testes:** `scripts/pglite/lojas.mjs` (68), 3 testes novos no fluxo de compra
+  (`e2e/compra.spec.js`, nos dois tamanhos), testes unitários das regras e do ecrã novo. Os 15
+  grupos de cenários, os 1 831 testes e o Playwright passam.
+- **Por decidir com o dono:** os dados da loja do Bié (morada, telefone, horário, fotografias) para a
+  activar; se as entregas por colportor passam a usar as províncias de cada loja (hoje usam a loja
+  da província do colportor ou a mais perto por GPS); as fases seguintes do plano (gerente de loja,
+  localização, portal dos colportores num subdomínio).
+- Neste ramo está também o rodapé do painel de vendas com a loja escolhida (commit `8ccb22f`).
+
 ## Fotografias das lojas (2026-11-13, ramo `claude/beautiful-maxwell-1q8dks`)
 
 - **Pedido do dono:** as fotografias da loja do Huambo e os contactos dela; as das outras lojas

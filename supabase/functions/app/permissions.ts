@@ -42,6 +42,9 @@ export const PERMISSION_KEYS = [
   "manage_production",
   "manage_staff",
   "manage_finance",
+  // «Temos / não temos» nos produtos da sua loja, a da ficha de funcionário (migração
+  // lojas_donas_dos_dados). Sem o resto do catálogo: preços e textos continuam centrais.
+  "manage_store_stock",
 ];
 
 /** Faz parte da equipa — distinto de ter uma permissão concreta. */

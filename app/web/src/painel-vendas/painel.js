@@ -5,17 +5,14 @@
  */
 import * as d3 from 'd3';
 import { toCsv, buildXlsx, renderSummaryPng, renderVideo, printReport } from './exportar.js';
+import { cidadeDaLoja } from '@/lib/stores';
+
+export { cidadeDaLoja };
 
 // Terras que se dizem com artigo («do Huambo», «da Huíla»); as outras levam «de» («de Catumbela»,
 // «de Benguela», «de Luanda»). Pela primeira palavra, sem acentos.
 const COM_DO = new Set(['huambo', 'lubango', 'lobito', 'uige', 'namibe', 'sumbe', 'soyo', 'dundo', 'luena', 'cuito', 'kuito', 'bie']);
 const COM_DA = new Set(['huila', 'lunda']);
-
-/** A cidade no nome da loja, como o separador Lojas o escreve: «Livraria Adventista — Lubango» → «Lubango». */
-export function cidadeDaLoja(store) {
-  const m = String(store?.name || '').match(/^\s*livraria\s+(?:e\s+editora\s+)?adventista\b[\s—–-]*(\S.*)$/i);
-  return m ? m[1].trim() : '';
-}
 
 /**
  * Como o rodapé e os diapositivos dizem a loja escolhida: «Loja do Huambo», «Loja do Lubango», «Loja de

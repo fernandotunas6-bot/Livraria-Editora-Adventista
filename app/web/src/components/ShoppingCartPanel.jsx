@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine, Copy,
-  Library,
+  Library, Store,
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,9 @@ import { calcShippingCents, DIGITAL_SHIPPING, SHIPPING_METHODS, getShippingLabel
 import { isDigitalCartItem, titleList } from '@/lib/digitalEditions';
 import { accuracyLabel, betterFix } from '@/lib/deliveryTracking';
 import { cartItemTitle, cartVariantLabel } from '@/lib/productTypes';
+import { itensParaLevantar, levantamentoPorLoja, marcasDosProdutos } from '@/lib/storeStock';
+import { juntarNomes, lojaQueServe, provinciasServidas } from '@/lib/stores';
+import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { isPaidUpfront, paymentMethodsFor, paymentMoment } from '@/lib/paymentMethods';
 import { saveLastOrder } from '@/lib/receipt';
 import AngolaAddressSelector, { validateAngolaAddress, angolaAddressToPayload } from '@/components/AngolaAddressSelector';
@@ -70,6 +73,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
 
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [physicalStores, setPhysicalStores] = useState([]);
+  // Todas as lojas à vista, também as que não fazem levantamento: a que serve a província de
+  // entrega é a loja da compra (migração lojas_donas_dos_dados).
+  const [allStores, setAllStores] = useState([]);
   const [shippingOpen, setShippingOpen] = useState(false);
   const cartScrollRef = useRef(null);
 
@@ -221,7 +227,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     }).catch(() => setPaymentMethods([]));
 
     // Só as lojas que aceitam levantamento aparecem no checkout.
-    getPhysicalStores().then((list) => setPhysicalStores(list.filter((st) => st.pickup_enabled))).catch(() => setPhysicalStores([]));
+    getPhysicalStores().then((list) => {
+      setAllStores(list);
+      setPhysicalStores(list.filter((st) => st.pickup_enabled));
+    }).catch(() => { setAllStores([]); setPhysicalStores([]); });
   }, [isCartOpen]);
 
   const subtotalCents = getCartTotalCents();
@@ -285,6 +294,42 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       setForm((f) => ({ ...f, paymentMethod: availableMethods[0].code, paymentReference: '' }));
     }
   }, [availableMethods, form.paymentMethod]);
+
+  // Levantamento: o que cada loja marcou nos livros impressos do carrinho (painel → Disponibilidade
+  // nas lojas; lib/storeStock.js). A loja que disse «não temos» a algum deixa de se poder escolher;
+  // a que ainda não marcou continua como antes.
+  const itensLevantar = useMemo(
+    () => itensParaLevantar(cartItems, { isDigital: isDigitalCartItem, titleOf: (i) => i.product?.title || cartItemTitle(i) }),
+    [cartItems],
+  );
+  const idsLevantar = itensLevantar.map((i) => i.bookId).join(',');
+  const [marcasLevantamento, setMarcasLevantamento] = useState([]);
+  useEffect(() => {
+    if (shipping !== 'pickup' || !idsLevantar) { setMarcasLevantamento([]); return undefined; }
+    let vivo = true;
+    marcasDosProdutos(idsLevantar.split(',')).then((m) => { if (vivo) setMarcasLevantamento(m); });
+    return () => { vivo = false; };
+  }, [shipping, idsLevantar]);
+  const levantamento = useMemo(
+    () => levantamentoPorLoja(physicalStores, marcasLevantamento, itensLevantar),
+    [physicalStores, marcasLevantamento, itensLevantar],
+  );
+  const nenhumaLojaServe = physicalStores.length > 0 && marcasLevantamento.length > 0
+    && physicalStores.every((st) => levantamento.get(st.id)?.podeEscolher === false);
+  // A loja da compra, para o cliente saber de onde compra: a do levantamento, ou a que serve a
+  // província de entrega (a mesma regra com que a base de dados grava orders.store_id).
+  const lojaDaCompra = useMemo(() => {
+    if (digitalOnly) return null;
+    if (shipping === 'pickup') return physicalStores.find((st) => st.name === form.pickupStore) || null;
+    return lojaQueServe(allStores, deliveryAddress.provinceName);
+  }, [digitalOnly, shipping, physicalStores, form.pickupStore, allStores, deliveryAddress.provinceName]);
+  // A loja escolhida deixou de servir (o carrinho mudou, ou a loja marcou «não temos»): escolhe-se outra.
+  useEffect(() => {
+    const escolhida = physicalStores.find((st) => st.name === form.pickupStore);
+    if (escolhida && levantamento.get(escolhida.id)?.podeEscolher === false) {
+      setForm((f) => ({ ...f, pickupStore: '' }));
+    }
+  }, [levantamento, physicalStores, form.pickupStore]);
 
   const copyText = async (text, what) => {
     try {
@@ -775,23 +820,35 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           aria-labelledby="checkout-loja-rotulo"
                           {...fieldError('pickupStore')}
                         >
-                          {physicalStores.map((store) => (
+                          {physicalStores.map((store) => {
                             // A fotografia e o horário ao lado do nome: quem escolhe levantar
                             // está a dizer a que porta vai bater, e a morada sozinha não chega
                             // para a reconhecer nem diz a que horas a loja está aberta.
-                            <div key={store.id} className="flex items-center gap-2 p-2 rounded-lg border text-sm">
-                              <RadioGroupItem value={store.name} id={`store-${store.id}`} />
-                              <Label htmlFor={`store-${store.id}`} className="cursor-pointer flex flex-1 items-center gap-3">
-                                <StoreThumb store={store} className="h-11 w-14 shrink-0 rounded-md" />
-                                <span className="min-w-0 flex-1">
-                                  <span className="font-medium">{store.name}</span>
-                                  {store.address && <span className="block text-xs text-muted-foreground">{store.address}</span>}
-                                  {store.hours && <span className="block text-xs text-muted-foreground">{store.hours}</span>}
-                                </span>
-                              </Label>
-                            </div>
-                          ))}
+                            const disp = levantamento.get(store.id);
+                            const fora = disp?.podeEscolher === false;
+                            return (
+                              <div key={store.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm${fora ? ' opacity-70' : ''}`}>
+                                <RadioGroupItem value={store.name} id={`store-${store.id}`} disabled={fora} />
+                                <Label htmlFor={`store-${store.id}`} className={`flex flex-1 items-center gap-3 ${fora ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                  <StoreThumb store={store} className="h-11 w-14 shrink-0 rounded-md" />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="font-medium">{store.name}</span>
+                                    {store.address && <span className="block text-xs text-muted-foreground">{store.address}</span>}
+                                    {store.hours && <span className="block text-xs text-muted-foreground">{store.hours}</span>}
+                                    {store.service_provinces?.length > 0 && <span className="block text-xs text-muted-foreground">Serve {juntarNomes(provinciasServidas(store))}</span>}
+                                    {fora && <span className="block text-xs font-medium text-destructive">Não tem: {titleList(disp.faltam)}</span>}
+                                    {!fora && disp?.temTudo && <span className="block text-xs font-medium text-emerald-700 dark:text-emerald-400">Tem todos os livros</span>}
+                                  </span>
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </RadioGroup>
+                        {nenhumaLojaServe && (
+                          <p className="text-xs text-muted-foreground" role="status">
+                            Nenhuma loja tem todos estes livros para levantar. Escolha a entrega, ou tire do carrinho o que falta.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -832,6 +889,27 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           <AngolaAddressSelector value={deliveryAddress} onChange={(v) => { setDeliveryAddress(v); clearError('address'); }} />
                           {errors.address && <p id="checkout-morada-erro" className="text-xs font-medium text-destructive" role="alert">{errors.address}</p>}
                         </div>
+                        {/* De que loja é a compra: a que serve a província escolhida. */}
+                        {deliveryAddress.provinceName && (
+                          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs" role="status" aria-live="polite">
+                            {lojaDaCompra ? (
+                              <>
+                                <p className="flex items-center gap-1.5 font-medium text-foreground">
+                                  <Store className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                                  Compra na {lojaDaCompra.name}
+                                </p>
+                                <p className="mt-0.5 text-muted-foreground">
+                                  Serve {juntarNomes(provinciasServidas(lojaDaCompra))}: é ela que prepara e envia a sua encomenda
+                                  {lojaDaCompra.phone ? <>, e é a ela que pode ligar: <span className="whitespace-nowrap">{displayAngolaPhone(lojaDaCompra.phone)}</span></> : ''}.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-muted-foreground">
+                                Ainda não há loja a servir {deliveryAddress.provinceName}: a encomenda é preparada pela equipa central da Livraria.
+                              </p>
+                            )}
+                          </div>
+                        )}
                         {/* O ponto no mapa, como na página das lojas. A morada em Angola é
                             muitas vezes uma referência; isto dá ao estafeta o sítio exacto. */}
                         <div className="rounded-lg border border-border p-3 space-y-2">
@@ -1149,6 +1227,9 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                           ? (form.pickupStore ? `Levantamento: ${form.pickupStore}` : 'Levantamento na loja')
                           : (deliveryAddress.street.trim() ? angolaAddressToPayload(deliveryAddress).deliveryAddressFull : 'Entrega ao domicílio')}
                         </p>
+                        {shipping !== 'pickup' && lojaDaCompra && (
+                          <p className="truncate sm:whitespace-normal">Compra na <strong>{lojaDaCompra.name}</strong></p>
+                        )}
                       </div>
                     )}
                     <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode || noDigitalPayment}>
