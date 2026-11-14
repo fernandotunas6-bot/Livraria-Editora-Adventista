@@ -39,7 +39,9 @@ const emptyStore = {
   phone: '',
   whatsapp: '',
   email: '',
-  hours: 'Seg–Sex 9h–18h, Sáb 9h–13h',
+  // O horário das lojas é o da porta do Lubango (o dono pediu para o Bié «o horário das outras
+  // lojas»). O de antes, com o sábado aberto, ficava gravado sem ninguém o escrever (o Huambo).
+  hours: 'Seg–Qui 8h–17h30 · Sex, Dom e feriados 8h–13h',
   image_url: '',
   gallery: [],
   latitude: '',
@@ -476,7 +478,7 @@ export default function StoresTab() {
                 </div>
                 <div className="space-y-2">
                   <Label>Horário</Label>
-                  <Input value={form.hours} onChange={(e) => set('hours', e.target.value)} placeholder="Seg–Sex 9h–18h, Sáb 9h–13h" />
+                  <Input value={form.hours} onChange={(e) => set('hours', e.target.value)} placeholder="Seg–Qui 8h–17h30 · Sex, Dom e feriados 8h–13h" />
                 </div>
               </div>
               <div className="space-y-2">
