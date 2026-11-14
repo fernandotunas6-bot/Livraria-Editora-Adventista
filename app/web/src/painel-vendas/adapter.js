@@ -55,7 +55,37 @@ const cents = (v) => Math.round((Number(v) || 0) * 100);
 const LUANDA_OFFSET_MS = 3600 * 1000;
 
 /**
+ * As vendas do sistema de TODAS as lojas, por mês, calculadas no servidor (função
+ * public.vendas_do_sistema, migração relatorios_de_todas_as_livrarias): só totais, sem dados dos
+ * clientes, para quem vê ou edita os relatórios. Devolve null quando a função ainda não existe
+ * (migração por aplicar), para o painel de uma loja voltar ao cálculo antigo.
+ *   { porLoja: { [lojaId]: { months[12], counts[12] } }, semLoja: { months, counts }, orders }
+ */
+export async function fetchSystemSalesAll(ano, { paidOnly = true } = {}) {
+  const { data, error } = await supabase.rpc('vendas_do_sistema', { p_ano: ano, p_so_pagas: paidOnly });
+  if (error) {
+    if (error.code === 'PGRST202' || /vendas_do_sistema/.test(error.message || '')) return null;
+    throw error;
+  }
+  const vazio = () => ({ months: Array(12).fill(0), counts: Array(12).fill(0) });
+  const porLoja = {};
+  const semLoja = vazio();
+  let orders = 0;
+  for (const r of data || []) {
+    const alvo = r.loja_id ? (porLoja[r.loja_id] ||= vazio()) : semLoja;
+    const m = Number(r.mes) - 1;
+    if (m < 0 || m > 11) continue;
+    alvo.months[m] = Math.round((alvo.months[m] + Number(r.valor || 0)) * 100) / 100;
+    alvo.counts[m] += Number(r.encomendas || 0);
+    orders += Number(r.encomendas || 0);
+  }
+  return { porLoja, semLoja, orders };
+}
+
+/**
  * Vendas registadas no sistema (encomendas) de uma loja, por mês, em Kz sem portes.
+ * Primeiro pela função do servidor (fetchSystemSalesAll); sem ela, pelo cálculo antigo abaixo,
+ * que lê as encomendas no navegador e só funciona a quem gere encomendas.
  * Conta para a loja: levantamentos nessa loja e entregas ao domicílio na província da loja.
  * Exclui encomendas canceladas.
  *
@@ -65,6 +95,15 @@ const LUANDA_OFFSET_MS = 3600 * 1000;
  * 31 de Janeiro paga a 3 de Fevereiro entrava em Janeiro, e um reembolso não descontava nada.
  */
 async function fetchSystemSales(store, ano, { paidOnly = true } = {}) {
+  const all = await fetchSystemSalesAll(ano, { paidOnly });
+  if (all) {
+    const s = all.porLoja[store.id] || { months: Array(12).fill(0), counts: Array(12).fill(0) };
+    return { months: s.months, counts: s.counts, orders: s.counts.reduce((a, b) => a + b, 0) };
+  }
+  return fetchSystemSalesFromOrders(store, ano, { paidOnly });
+}
+
+async function fetchSystemSalesFromOrders(store, ano, { paidOnly = true } = {}) {
   const from = new Date(Date.UTC(ano, 0, 1) - LUANDA_OFFSET_MS).toISOString();
   const to = new Date(Date.UTC(ano + 1, 0, 1) - LUANDA_OFFSET_MS).toISOString();
   const dateField = paidOnly ? 'paid_at' : 'created';
@@ -149,9 +188,16 @@ function makeDb(lojaId) {
               criterio: value.criterio || 'media',
               fonte: value.fonte || '',
               actualizado: value.actualizado || new Date().toISOString(),
+              origem: value.origem || 'manual',
             };
             if (multi) row.loja_id = lojaId;
-            ({ error } = await supabase.from('vendas_anos').upsert(row, { onConflict: multi ? 'loja_id,ano' : 'ano' }));
+            const conflito = { onConflict: multi ? 'loja_id,ano' : 'ano' };
+            ({ error } = await supabase.from('vendas_anos').upsert(row, conflito));
+            // Sem a migração relatorios_de_todas_as_livrarias não há a coluna origem.
+            if (error && /origem/.test(error.message || '')) {
+              delete row.origem;
+              ({ error } = await supabase.from('vendas_anos').upsert(row, conflito));
+            }
           } else {
             ({ error } = await supabase.from('painel_vendas_docs').upsert({ path: docPath(path), data: value, actualizado: new Date().toISOString() }));
           }
@@ -203,19 +249,114 @@ const downloads = {
  */
 export function createPainelApi(profile, opts = {}) {
   const isAdmin = profile?.role === 'admin';
-  const { lojaId = null, store = null, canReadOrders = false } = opts;
+  // canEdit: «Editar relatórios de vendas» (ou administrador); canReadSales: ver os relatórios.
+  const { lojaId = null, store = null, canReadOrders = false, canEdit = isAdmin, canReadSales = false } = opts;
   const user = {
     id: async () => profile?.id || null,
     isOwner: async () => false,
-    canEdit: async () => isAdmin,
-    can: async () => isAdmin,
+    canEdit: async () => !!canEdit,
+    can: async () => !!canEdit,
     async profiles(ids) {
       const { data } = await supabase.from('profiles').select('id, name, email').in('id', ids);
       return Object.fromEntries((data || []).map((p) => [p.id, { name: p.name || p.email }]));
     },
   };
-  const sales = store && canReadOrders
+  const sales = store && (canReadSales || canReadOrders)
     ? { available: true, storeName: store.name, fetch: (ano, o) => fetchSystemSales(store, ano, o) }
-    : { available: false, reason: !store ? 'Esta loja ainda não existe no separador Lojas.' : 'Precisa da permissão de encomendas para ver as vendas do sistema.' };
+    : { available: false, reason: !store ? 'Esta loja ainda não existe no separador Lojas.' : 'Precisa da permissão «Ver relatórios» ou «Editar relatórios de vendas» para ver as vendas do sistema.' };
   return { db: makeDb(lojaId), user, downloads, store, sales };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Relatório conjunto (todas as livrarias): consolidado-ui.js
+// ---------------------------------------------------------------------------------------------
+
+const ANO_CAMPOS = 'loja_id, ano, meses, observacoes, mes_em_curso, meta_anual, criterio, fonte, actualizado, actualizado_por';
+
+/** As lojas com os anos de cada uma, numa consulta por tabela (não uma por loja). */
+async function carregarLojas() {
+  const [{ data: lojas, error: e1 }, anos] = await Promise.all([
+    supabase.from('physical_stores').select('id, name, province, active, sort_order').order('sort_order').order('name'),
+    (async () => {
+      // A coluna origem só existe com a migração relatorios_de_todas_as_livrarias.
+      let r = await supabase.from('vendas_anos').select(ANO_CAMPOS + ', origem').order('ano');
+      if (r.error) r = await supabase.from('vendas_anos').select(ANO_CAMPOS).order('ano');
+      return r;
+    })(),
+  ]);
+  if (e1) throw e1;
+  if (anos.error) throw anos.error;
+  const porLoja = {};
+  (anos.data || []).forEach((r) => {
+    (porLoja[r.loja_id] ||= {})[r.ano] = { ...yearRowToDoc(r), origem: r.origem || 'manual', actualizado_por: r.actualizado_por || null };
+  });
+  return (lojas || []).map((l) => ({ id: l.id, name: l.name, province: l.province, active: l.active !== false, years: porLoja[l.id] || {} }));
+}
+
+/** O histórico das gravações no servidor (vendas_alteracoes); null sem a migração. */
+async function carregarHistorico(ano, limite = 120) {
+  let q = supabase.from('vendas_alteracoes').select('id, em, loja_id, ano, accao, por, origem, meses, outros').order('em', { ascending: false }).limit(limite);
+  if (ano != null) q = q.eq('ano', ano);
+  const { data, error } = await q;
+  if (error) return null;
+  const ids = [...new Set((data || []).map((h) => h.por).filter(Boolean))];
+  let nomes = {};
+  if (ids.length) {
+    const { data: ps } = await supabase.from('profiles').select('id, name, email').in('id', ids);
+    nomes = Object.fromEntries((ps || []).map((p) => [p.id, p.name || p.email]));
+  }
+  return (data || []).map((h) => ({ ...h, quem: (h.por && nomes[h.por]) || (h.por ? 'Alguém da equipa' : 'Directamente na base de dados') }));
+}
+
+/**
+ * Grava os meses (e o mês em curso) de várias lojas num ano, num pedido só.
+ * `linhas` = [{ lojaId, meses: [12], mes_em_curso, origem }]. As restantes colunas do ano
+ * (meta, critério, fonte, observações) não se tocam: o upsert só escreve as que leva.
+ */
+async function gravarMeses(ano, linhas) {
+  if (!linhas.length) return;
+  const rows = linhas.map((l) => ({
+    loja_id: l.lojaId,
+    ano: Number(ano),
+    meses: l.meses.map((v) => (v == null ? null : Math.round(Number(v) * 100) / 100)),
+    mes_em_curso: l.mes_em_curso ?? null,
+    origem: l.origem || 'manual',
+  }));
+  let { error } = await supabase.from('vendas_anos').upsert(rows, { onConflict: 'loja_id,ano', defaultToNull: false });
+  // Sem a migração relatorios_de_todas_as_livrarias não há a coluna origem.
+  if (error && /origem/.test(error.message || '')) {
+    ({ error } = await supabase.from('vendas_anos').upsert(rows.map(({ origem, ...r }) => r), { onConflict: 'loja_id,ano', defaultToNull: false }));
+  }
+  if (error) rejectWrite(error);
+}
+
+const NOTA = (ano) => `consolidado/notas/ano-${Number(ano)}`;
+
+async function lerNota(ano) {
+  const { data } = await supabase.from('painel_vendas_docs').select('data, actualizado').eq('path', NOTA(ano)).maybeSingle();
+  return data ? { texto: String(data.data?.texto || ''), actualizado: data.actualizado } : { texto: '', actualizado: null };
+}
+
+async function gravarNota(ano, texto) {
+  const { error } = await supabase.from('painel_vendas_docs').upsert({
+    path: NOTA(ano), data: { texto: String(texto || '').slice(0, 4000) }, actualizado: new Date().toISOString(),
+  });
+  if (error) rejectWrite(error);
+}
+
+/**
+ * Interface do relatório conjunto para a sessão actual.
+ * opts = { canEdit: «Editar relatórios de vendas» ou administrador }.
+ */
+export function createConsolidadoApi(opts = {}) {
+  return {
+    canEdit: !!opts.canEdit,
+    carregar: carregarLojas,
+    sistema: (ano, o) => fetchSystemSalesAll(ano, o),
+    gravarMeses,
+    historico: carregarHistorico,
+    lerNota,
+    gravarNota,
+    downloads,
+  };
 }

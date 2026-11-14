@@ -34,6 +34,9 @@ export const PERMISSION_KEYS = [
   // A facturação (vendas por loja, caixa, números do mês), separada de "Gerir encomendas"
   // (migração cargos_e_ver_relatorios): o atendimento trata encomendas sem ver a facturação.
   "view_reports",
+  // Gravar os relatórios de vendas (vendas_anos e os documentos do painel), com «Ver relatórios»
+  // (migração relatorios_de_todas_as_livrarias). Apagar um ano inteiro continua só do administrador.
+  "edit_reports",
   "manage_marketing",
   "manage_church_registry",
   "manage_colporteurs",
