@@ -1,17 +1,19 @@
 {
+  "id": "/",
   "name": "Livraria Adventista",
-  "short_name": "LA",
+  "short_name": "Livraria",
   "description": "Livraria online — literatura cristã adventista",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0c4a6e",
   "orientation": "portrait-primary",
-  "lang": "pt",
+  "lang": "pt-AO",
   "icons": [
     {
       "src": "/icons/icon-192.svg",
-      "sizes": "192x192",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },

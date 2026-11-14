@@ -1543,7 +1543,7 @@ route("GET", "/settings", async () => {
     youtube: rec.youtube || "",
     pwa_enabled: !!rec.pwa_enabled,
     pwa_name: rec.pwa_name || rec.site_name,
-    pwa_short_name: rec.pwa_short_name || "LA",
+    pwa_short_name: rec.pwa_short_name || "Livraria",
     pwa_theme_color: rec.pwa_theme_color || "#0c4a6e",
     shipping_free_threshold: settingNumber(rec.shipping_free_threshold, 20000),
     shipping_cost: settingNumber(rec.shipping_cost, 1500),
