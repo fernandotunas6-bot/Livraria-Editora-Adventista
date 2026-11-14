@@ -133,7 +133,7 @@ function BibliotecaPanel() {
         <div>
           <h2 className="text-base font-semibold">Paisagens desenhadas no vídeo</h2>
           <p className="text-sm text-muted-foreground">
-            O fundo de omissão dos vídeos («Paisagens animadas» no menu Exportar). São desenhadas pelo próprio vídeo, com movimento: não precisam de ser enviadas.
+            Com «Paisagens animadas» no menu Exportar. O fundo de omissão é agora «Capas animadas»: as capas dos mais vendidos e do catálogo a flutuar em profundidade. As paisagens são desenhadas pelo próprio vídeo, com movimento: não precisam de ser enviadas.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -170,7 +170,7 @@ function BibliotecaPanel() {
               {aEnviar || 'Enviar fotografias'}
             </Button>
             <Button variant="outline" onClick={abrirSite}><Images className="mr-1.5 h-4 w-4" /> Juntar imagens do site</Button>
-            <p className="w-full text-xs text-muted-foreground">PNG, JPG, WebP ou GIF até 8 MB. As largas (paisagem, 16:9) enchem melhor o vídeo; as estreitas ficam cortadas.</p>
+            <p className="w-full text-xs text-muted-foreground">PNG, JPG, WebP ou GIF até 8 MB. As largas (paisagem, 16:9) enchem o vídeo; as estreitas vão inteiras, ao centro, sobre uma cópia desfocada delas.</p>
           </div>
         )}
 
@@ -195,9 +195,12 @@ function BibliotecaPanel() {
               const estreita = img.largura && img.altura && img.largura / img.altura < 1.3;
               return (
                 <li key={img.id} className={`space-y-2 rounded-xl border border-border p-2 ${img.activa ? '' : 'opacity-60'}`}>
-                  <div className="relative">
-                    <img src={img.url} alt="" loading="lazy" className="aspect-video w-full rounded-lg border border-border object-cover" />
-                    {estreita && <span className="absolute left-2 top-2 rounded bg-amber-500/90 px-1.5 py-0.5 text-[11px] font-semibold text-black">Estreita: fica cortada</span>}
+                  {/* Como fica no vídeo: a larga enche o quadro; a estreita vai inteira, ao centro,
+                      sobre uma cópia dela desfocada (desenharFoto, em imagens-video.js). */}
+                  <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-slate-900">
+                    {estreita && <img src={img.url} alt="" aria-hidden="true" loading="lazy" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-xl" />}
+                    <img src={img.url} alt="" loading="lazy" className={`relative h-full w-full ${estreita ? 'object-contain py-1 drop-shadow-xl' : 'object-cover'}`} />
+                    {estreita && <span className="absolute left-2 top-2 rounded bg-slate-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">Estreita: vai inteira, sobre fundo desfocado</span>}
                   </div>
                   <Input aria-label="Título" defaultValue={img.titulo} maxLength={120} disabled={!podeGerir} placeholder="Título"
                     onBlur={(e) => { if (e.target.value !== img.titulo) alterar(img, { titulo: e.target.value }); }} />

@@ -135,3 +135,20 @@ describe('os quadros dos mais vendidos', () => {
     expect(ks.slice(-3)).toEqual(['destaque', 'maisVendidos', 'fecho']);
   });
 });
+
+describe('fundos dos vídeos', () => {
+  it('«Capas animadas» é o primeiro fundo da lista (o de omissão)', async () => {
+    const { FUNDOS } = await import('./video');
+    expect(Object.keys(FUNDOS)[0]).toBe('capas');
+    expect(FUNDOS.capas).toBe('Capas animadas');
+  });
+
+  it('uma imagem com a proporção de capa (2:3) não precisa de moldura; outra precisa', async () => {
+    const { ehCapa } = await import('./imagens-video');
+    expect(ehCapa(340, 510)).toBe(true);
+    expect(ehCapa(400, 590)).toBe(true); // 3% de folga
+    expect(ehCapa(600, 600)).toBe(false);
+    expect(ehCapa(1600, 900)).toBe(false);
+    expect(ehCapa(300, 520)).toBe(false);
+  });
+});

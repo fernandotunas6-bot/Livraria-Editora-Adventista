@@ -16,7 +16,8 @@
  * A gravação é em tempo real: um vídeo de 3 minutos demora 3 minutos a gravar.
  */
 import { MESES, MESES_CURTOS } from './modelo.js';
-import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharPaisagem, veu } from './imagens-video.js';
+import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharMuralCapas, desenharPaisagem, veu } from './imagens-video.js';
+import { capasParaFundo } from './capas-de-fundo.js';
 import { destaqueDe } from './destaques.js';
 import { carregarFontes, fonteCanvas } from '../lib/fontes.js';
 
@@ -37,6 +38,7 @@ export const DUR = {
 
 /** Os fundos dos quadros com imagem (capa, mais vendidos, fecho). */
 export const FUNDOS = {
+  capas: 'Capas animadas',
   natureza: 'Paisagens animadas',
   biblioteca: 'Fotografias da biblioteca',
   simples: 'Simples (escuro)',
@@ -187,6 +189,13 @@ function fundoDados(ctx, f) {
   ctx.fillRect(0, 0, W, H);
   if (f.fundo === 'simples') return;
   const t = f.t || 0;
+  // Com «Capas animadas», as capas continuam a passar ao fundo dos números, desfocadas e muito
+  // ténues: o vídeo não muda de mundo entre os quadros de imagem e os de números.
+  if (f.fundo === 'capas' && f.mural && f.mural.length) {
+    desenharMuralCapas(ctx, W, H, f.mural, t, { semente: 1, foco: 'fundo', intensidade: 0.22, efeitos: false });
+    ctx.fillStyle = 'rgba(15,27,45,0.55)';
+    ctx.fillRect(0, 0, W, H);
+  }
   [[0.85, 0.15, 'rgba(34,166,169,0.10)', 0.11], [0.12, 0.92, 'rgba(224,103,154,0.09)', 0.07]].forEach(([x, y, cor, v], i) => {
     const cx = W * (x + Math.sin(t * v + i) * 0.05);
     const cy = H * (y + Math.cos(t * v * 0.8 + i) * 0.05);
@@ -205,10 +214,13 @@ function fundoDados(ctx, f) {
  */
 function fundoImagem(ctx, f, at, n, lado = 'esquerda', { desfoque = 0 } = {}) {
   const fotos = f.fotos || [];
-  if (f.fundo === 'biblioteca' && fotos.length) desenharFoto(ctx, W, H, fotos[n % fotos.length], at.p, n, { desfoque });
+  if (f.fundo === 'capas' && f.mural && f.mural.length) {
+    // O tempo do vídeo (e não o do quadro): o movimento continua de um quadro para o outro.
+    desenharMuralCapas(ctx, W, H, f.mural, at.t != null ? at.t : at.s, { semente: 1, foco: desfoque ? 'fundo' : 'frente' });
+  } else if (f.fundo === 'biblioteca' && fotos.length) desenharFoto(ctx, W, H, fotos[n % fotos.length], at.p, n, { desfoque });
   else if (f.fundo !== 'simples') desenharPaisagem(ctx, W, H, TEMAS[n % TEMAS.length], at.s);
   else { fundoDados(ctx, f); return; }
-  veu(ctx, W, H, lado, 0.82);
+  veu(ctx, W, H, lado, f.fundo === 'capas' ? 0.9 : 0.82);
 }
 
 /** Fundo, logótipo (numa pastilha branca: é azul-escuro sobre transparente), título e subtítulo. */
@@ -1070,21 +1082,25 @@ function capasDe(...ambitos) {
  * e as fotografias da biblioteca (carregadas antes de gravar: a gravação é em tempo real e não
  * pode esperar pela rede a meio). Uma imagem que não carregue fica de fora.
  */
-async function preparar(base, plano, { capas = [], fotos = [], fundo = 'natureza' } = {}) {
-  const [logo, , imgs, fts] = await Promise.all([
+async function preparar(base, plano, { capas = [], fotos = [], fundo = 'capas' } = {}) {
+  // «Capas animadas»: as capas dos mais vendidos e, a completar, as do catálogo (do próprio site).
+  const doMural = fundo === 'capas' ? capasParaFundo(capas, { n: 18, chave: base.etiqueta }) : [];
+  const [logo, , imgs, fts, mural] = await Promise.all([
     carregarImagem(base.logoSrc),
     // A Inter e a Fraunces têm de estar prontas antes do primeiro quadro: o canvas não espera.
     carregarFontes(),
     Promise.all(capas.map((u) => carregarImagem(u).then((img) => [u, img]))),
     fundo === 'biblioteca' ? Promise.all(fotos.slice(0, 8).map((u) => carregarImagem(u))) : Promise.resolve([]),
+    Promise.all(doMural.map((u) => carregarImagem(u))),
   ]);
   return {
     ...base, plano, total: duracaoPlano(plano), logo, fundo,
     imagens: new Map(imgs.filter(([, img]) => img)),
     fotos: fts.filter(Boolean),
+    mural: mural.filter(Boolean),
   };
 }
-const fundoDe = (v) => (FUNDOS[v] ? v : 'natureza');
+const fundoDe = (v) => (FUNDOS[v] ? v : 'capas');
 
 /**
  * Vídeo de uma loja (1280×720). `d` vem de exportData() em painel.js.
