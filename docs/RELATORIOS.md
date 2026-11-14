@@ -328,7 +328,7 @@ PDF, no Excel e no fim do vídeo.
 
 ## 8. O painel: topo, mês em destaque, filtros e PowerPoint
 
-**Topo.** Maior, com o título em Fraunces e os controlos por baixo dele. À direita, uma parede de
+**Topo.** Maior, com o título em Source Serif 4 e os controlos por baixo dele. À direita, uma parede de
 capas em movimento lento: as dos mais vendidos do ano (da loja ou da rede) e, a completar, capas do
 catálogo do próprio site (`public/images/capas`, sem temas sensíveis). Cada capa vai numa moldura
 2:3, inteira, sobre uma cópia desfocada dela. O logótipo é a versão branca em PNG transparente,
@@ -414,10 +414,11 @@ Para pôr os valores numa migração, o mesmo leitor em Node:
 node scripts/relatorios/pptx-para-sql.mjs "Loja Huambo - Painel-Vendas 2026S.pptx" --nome vendas_ate_novembro --escrever
 ```
 
-**Fontes.** O sistema todo usa Inter no texto e Fraunces nos títulos: `src/lib/fontes.js` e os
-tokens `--font-sans`/`--font-serif` de `index.css`. O painel usa as @font-face da página (sem o
+**Fontes.** O sistema todo usa Inter no texto e Source Serif 4 nos títulos: `src/lib/fontes.js` e os
+tokens `--font-sans`/`--font-serif` de `index.css`. A Source Serif 4 substituiu a Fraunces em
+Novembro de 2026: é uma serifa mais sóbria, de pouco contraste, que não chama a atenção. O painel usa as @font-face da página (sem o
 Google Fonts), o canvas espera que as fontes carreguem e as janelas de impressão recebem-nas. Um
-teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
+teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família, a Fraunces incluída.
 
 ## 9. Ficheiros
 

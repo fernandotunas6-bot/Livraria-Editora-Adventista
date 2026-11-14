@@ -579,9 +579,12 @@ export function mountConsolidado(root, api) {
     const sem = c.lojas.filter((l) => !l.temDados);
     const max = lista.length ? lista[0].M.R.ytd2 || 1 : 1;
     $('note-rank').textContent = `Vendas registadas em ${c.ano}, quota na rede e crescimento no período comparável${c.comp != null ? ' face a ' + c.comp : ''}.`;
+    // O nome curto, como no modo apresentação («Loja de Catumbela»): «Livraria Adventista —
+    // Catumbela» não cabia ao lado do valor e saía cortado. O nome inteiro fica no título.
+    const nome = (l) => { const nm = el('span', 'nm'); nm.title = l.nome; nm.append(dot(l.cor), nomeDe(l)); return nm; };
     const items = lista.map((l) => {
       const li = el('li');
-      const nm = el('span', 'nm'); nm.append(dot(l.cor), l.nome);
+      const nm = nome(l);
       const bar = el('span', 'bar'); const fill = el('span'); fill.style.background = l.cor; bar.appendChild(fill);
       const sub = el('span', 'sub');
       sub.append(pctS(l.quota) + ' · ', el('span', cls(l.M.R.cresc_ytd), pct(l.M.R.cresc_ytd)));
@@ -591,7 +594,7 @@ export function mountConsolidado(root, api) {
     });
     sem.forEach((l) => {
       const li = el('li');
-      const nm = el('span', 'nm'); nm.append(dot(l.cor), l.nome);
+      const nm = nome(l);
       li.append(el('span', 'pos', '—'), nm, el('span', 'vl', '—'), el('span'), el('span', 'sem', `Sem vendas registadas em ${c.ano}`));
       items.push(li);
     });

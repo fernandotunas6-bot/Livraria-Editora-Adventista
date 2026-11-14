@@ -232,3 +232,15 @@ test('todas as livrarias: o modo apresentação mostra todas as lojas com as sua
   expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
 });
 
+
+// O ranking cortava «Livraria Adventista — Catumbela» com «…» ao lado do valor. Agora leva o nome
+// curto, como o modo apresentação, e nenhum nome fica escondido.
+test('todas as livrarias: o ranking mostra o nome de cada loja por inteiro', async ({ page }) => {
+  await page.goto(CONJUNTO);
+  const nomes = page.locator('#host').locator('#rank .nm');
+  await expect(nomes).toHaveText(['Loja do Huambo', 'Loja do Lubango', 'Loja de Catumbela']);
+  await expect(nomes.nth(2)).toHaveAttribute('title', 'Livraria Adventista — Catumbela');
+  for (const nm of await nomes.all()) {
+    expect(await nm.evaluate((e) => e.scrollWidth <= e.clientWidth), await nm.textContent()).toBe(true);
+  }
+});

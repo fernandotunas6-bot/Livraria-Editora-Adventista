@@ -36,7 +36,7 @@ const PAPER = "#fffdf8";
 const CANVAS = "#f6f1e6";
 const PANEL = "#f8f3e8";
 const FONT = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const SERIF = "Fraunces,Georgia,'Times New Roman',serif";
+const SERIF = "'Source Serif 4',Georgia,'Times New Roman',serif";
 
 /** Imagens dos emails, no bucket público `media` (geradas por `scripts/email/render-heroes.cjs`). */
 const EMAIL_ASSETS = "https://bggqkjjqbjhbjsckzopj.supabase.co/storage/v1/object/public/media/email";

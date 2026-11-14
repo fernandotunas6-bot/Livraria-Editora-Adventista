@@ -7,10 +7,10 @@
   --pos: #2F9E6E; --neg: #D64545;
   --band: #1F2326; --band-fg: #F3F2EF; --band-muted: #AEB3B8;
   --input: #FFFFFF; --scrim: rgba(15,18,21,.55);
-  /* As fontes do sistema (src/lib/fontes.js): Inter no texto, Fraunces nos títulos. Vêm do
+  /* As fontes do sistema (src/lib/fontes.js): Inter no texto, Source Serif 4 nos títulos. Vêm do
      documento (main.jsx), e o Shadow DOM usa as @font-face da página. */
   --font: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
   --r: 12px;
 }
 @media (prefers-color-scheme: dark) { :host(:not([data-theme="light"])) {
@@ -118,7 +118,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .row.even { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
 @media (max-width: 980px) { .row, .row.even { grid-template-columns: minmax(0, 1fr); } }
 .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-/* Os títulos dos cartões em Fraunces, como os títulos do resto do sistema. */
+/* Os títulos dos cartões em Source Serif 4, como os títulos do resto do sistema. */
 .head h2, .h2 { margin: 0; font-family: var(--serif); font-size: 18px; line-height: 1.25; font-weight: 600; letter-spacing: -.01em; }
 .note { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }

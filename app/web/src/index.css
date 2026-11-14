@@ -16,11 +16,11 @@
 }
 
 @theme {
-  /* Os dois tipos de letra do sistema (ver src/lib/fontes.js): Inter no texto e Fraunces nos
-     títulos. Com estes tokens, as classes font-sans e font-serif do Tailwind dão as fontes da
+  /* Os dois tipos de letra do sistema (ver src/lib/fontes.js): Inter no texto e Source Serif 4
+     nos títulos. Com estes tokens, as classes font-sans e font-serif do Tailwind dão as fontes da
      casa, e não as do sistema operativo (a font-serif dava Georgia). */
   --font-sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
 
   /* Alturas de linha dos tamanhos de texto como no Tailwind 3: valores absolutos. O 4 usa
      proporções sem unidade (1,43 no text-sm), e um filho com tamanho próprio — `text-[11px]`,

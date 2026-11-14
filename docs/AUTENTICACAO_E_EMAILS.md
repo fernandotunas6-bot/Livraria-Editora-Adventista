@@ -595,7 +595,7 @@ de a fila ficar manual é muito menor do que o de o `db push` parar.
 
 ## 7.1. Visual da loja e sugestões de livros
 
-**Moldura** (`emails.ts`): cabeçalho no azul-escuro do site com o logótipo branco, faixa de livros a toda a largura, corpo marfim com títulos em Fraunces e um filete dourado, botão azul-petróleo e rodapé escuro. As regras de compatibilidade de cima mantêm-se (tabelas, CSS em linha, legível sem imagens).
+**Moldura** (`emails.ts`): cabeçalho no azul-escuro do site com o logótipo branco, faixa de livros a toda a largura, corpo marfim com títulos em serifa (Source Serif 4 onde estiver instalada, senão Georgia) e um filete dourado, botão azul-petróleo e rodapé escuro. As regras de compatibilidade de cima mantêm-se (tabelas, CSS em linha, legível sem imagens).
 
 **Faixas de livros** (`doc.banner`): recortes dos banners da galeria da loja, no bucket público `media`, em `email/`: `hero-encomenda.jpg` (encomendas, pagamento, entrega), `hero-conta.jpg` (boas-vindas e conta) e `hero-mensagem.jpg` (campanhas, contactos, teste). O logótipo do cabeçalho é `email/logo-light.png` quando o painel não tem outro. Para trocar as faixas: mudar a lista em `scripts/email/render-heroes.cjs`, correr `node scripts/email/render-heroes.cjs <pasta>` e enviar os JPEG para o mesmo caminho.
 
