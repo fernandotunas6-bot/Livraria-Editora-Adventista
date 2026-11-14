@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { mergeReviewHelpfulness } from '@/hooks/useReviews';
+import { mergeReviewHelpfulness, splitReviews } from '@/hooks/useReviews';
+
+describe('splitReviews', () => {
+  const lista = [
+    { id: 'a', userId: 'u1', rating: 5, hidden: false },
+    { id: 'b', userId: 'u2', rating: 1, hidden: true },
+    { id: 'c', userId: 'u3', rating: 4, hidden: false },
+  ];
+
+  it('a oculta sai da lista pública (e da média), também para a equipa que a lê', () => {
+    expect(splitReviews(lista, null).reviews.map((r) => r.id)).toEqual(['a', 'c']);
+  });
+
+  it('o autor continua a ver a sua oculta em «A sua avaliação», fora da lista', () => {
+    const { reviews, userReview } = splitReviews(lista, 'u2');
+    expect(userReview).toMatchObject({ id: 'b', hidden: true });
+    expect(reviews.some((r) => r.id === 'b')).toBe(false);
+  });
+
+  it('sem sessão não há avaliação própria', () => {
+    expect(splitReviews(lista, null).userReview).toBeNull();
+    expect(splitReviews(undefined, 'u1')).toEqual({ reviews: [], userReview: null });
+  });
+});
 
 describe('mergeReviewHelpfulness', () => {
   it('associa contagem pública e voto do utilizador à avaliação certa', () => {

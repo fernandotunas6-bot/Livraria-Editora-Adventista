@@ -934,6 +934,11 @@ function ProductDetailPage() {
                               ★ Compra Verificada
                             </span>
                           )}
+                          {userReview.hidden && (
+                            <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              A equipa ocultou esta avaliação: só você a vê e não conta para a média do livro.
+                            </p>
+                          )}
                         </div>
                       </div>
                     ) : isAuthed ? (

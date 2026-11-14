@@ -16,8 +16,24 @@ function toReview(row) {
     comment: row.comment,
     isVerified: row.is_verified,
     createdAt: row.created,
+    hidden: Boolean(row.hidden),
   };
 }
+
+/**
+ * A base de dados devolve as ocultas pela equipa do catálogo a quem as escreveu e à própria
+ * equipa. No site não aparecem nem contam para a média (docs/COLPORTAGEM.md); o autor continua
+ * a ver a sua em «A sua avaliação», com o aviso.
+ */
+export function splitReviews(all, userId) {
+  const list = all || [];
+  return {
+    reviews: list.filter((r) => !r.hidden),
+    userReview: (userId && list.find((r) => r.userId === userId)) || null,
+  };
+}
+
+const REVIEW_COLUMNS = 'id, user_id, user_name, user_avatar, book_id, rating, comment, is_verified, created';
 
 export function mergeReviewHelpfulness(reviews, voteRows) {
   const votesByReview = new Map((voteRows || []).map((row) => [row.review_id, row]));
@@ -37,7 +53,7 @@ export function mergeReviewHelpfulness(reviews, voteRows) {
  */
 export const useReviews = (bookId) => {
   const { user, isAuthed, fetchUserOrders } = useAuth();
-  const [reviews, setReviews] = useState([]);
+  const [allReviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [votingReviewId, setVotingReviewId] = useState(null);
@@ -51,11 +67,14 @@ export const useReviews = (bookId) => {
       setReviews([]);
       return;
     }
-    const { data, error } = await supabase
+    const read = (columns) => supabase
       .from('book_reviews')
-      .select('id, user_id, user_name, user_avatar, book_id, rating, comment, is_verified, created')
+      .select(columns)
       .eq('book_id', bookId)
       .order('created', { ascending: false });
+    let { data, error } = await read(`${REVIEW_COLUMNS}, hidden`);
+    // Antes da migração 20261114200000 a coluna «hidden» não existe: lê sem ela.
+    if (error?.code === '42703') ({ data, error } = await read(REVIEW_COLUMNS));
     if (error) throw error;
     const mappedReviews = (data || []).map(toReview);
     const { data: voteRows, error: voteError } = await supabase
@@ -98,7 +117,13 @@ export const useReviews = (bookId) => {
     [userOrders, bookId, isAuthed],
   );
 
-  // 4. Calculate stats (Average Rating, etc)
+  // 4. As visíveis (lista e média) e a do próprio, mesmo oculta.
+  const { reviews, userReview } = useMemo(
+    () => splitReviews(allReviews, isAuthed ? user?.id : null),
+    [allReviews, isAuthed, user?.id],
+  );
+
+  // 5. Calculate stats (Average Rating, etc)
   const stats = useMemo(() => {
     if (reviews.length === 0) return { average: 0, total: 0, counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
     const sum = reviews.reduce((acc, r) => acc + (r.rating || 0), 0);
@@ -219,12 +244,6 @@ export const useReviews = (bookId) => {
     setReviews((prev) => prev.filter((r) => r.userId !== user.id));
     return true;
   };
-
-  // Check if current user has already reviewed
-  const userReview = useMemo(() => {
-    if (!isAuthed || !user?.id) return null;
-    return reviews.find(r => r.userId === user.id) || null;
-  }, [reviews, user?.id, isAuthed]);
 
   return {
     reviews,
