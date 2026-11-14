@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Facebook, Instagram, Youtube, Mail, MapPin, ExternalLink, Sparkles, CheckCircle2, PackageSearch, Truck, CreditCard, Store, MessageCircle } from 'lucide-react';
+import { Facebook, Instagram, Youtube, Mail, MapPin, ExternalLink, CheckCircle2, PackageSearch, Truck, CreditCard, Store, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -171,7 +171,7 @@ const Footer = () => {
       setSubscribed(true);
       toast({
         title: 'Subscrição realizada!',
-        description: 'Obrigado por se juntar à nossa comunidade de leitores.',
+        description: 'Vai receber as nossas novidades neste email.',
       });
       setEmail('');
     } catch (err) {
@@ -249,19 +249,12 @@ const Footer = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-4"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-7 px-2.5 items-center justify-center rounded-full text-[10px] font-bold bg-marca/20 text-[#22d3ee] border border-marca/30">
-                        <Sparkles className="h-3 w-3 mr-1" /> OFERTA
-                      </span>
-                      <span className="text-xs text-[#22d3ee] font-medium">-10% no 1º livro</span>
-                    </div>
-
                     <div>
                       <h4 className="text-lg font-extrabold text-background flex items-center gap-2">
-                        Newsletter Premium
+                        Newsletter
                       </h4>
                       <p className="text-xs text-background/70 mt-1">
-                        Junte-se à nossa lista exclusiva para receber lançamentos, devocionais semanais e ofertas especiais.
+                        Receba por email os lançamentos e as novidades da livraria.
                       </p>
                     </div>
 
@@ -306,7 +299,7 @@ const Footer = () => {
                     <div>
                       <h4 className="text-lg font-bold text-background">Inscrição Confirmada!</h4>
                       <p className="text-xs text-background/70 mt-2 leading-relaxed">
-                        Seja bem-vindo(a) à nossa comunidade. Enviámos um cupão de **10% de desconto** para a sua caixa de entrada.
+                        Obrigado. Vai receber as nossas novidades neste email, e pode deixar de as receber quando quiser.
                       </p>
                     </div>
                     <Button 
@@ -476,8 +469,9 @@ const Footer = () => {
 
         <div className="flex flex-col items-center gap-2 border-t border-background/20 pt-8 text-center sm:flex-row sm:justify-center sm:gap-4">
           <p className="text-sm text-background/70">{copyright}</p>
-          {/* Fora das colunas, que o painel pode mudar: a política fica sempre ligada. */}
+          {/* Fora das colunas, que o painel pode mudar: as páginas legais ficam sempre ligadas. */}
           <Link to="/privacidade" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Política de privacidade</Link>
+          <Link to="/termos" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Termos e condições</Link>
         </div>
       </div>
     </footer>
