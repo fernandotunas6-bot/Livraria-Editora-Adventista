@@ -91,6 +91,30 @@ ${STYLE}
   </body></html>`;
 }
 
+/**
+ * A lista de interessados para os pastores: uma página por distrito, com o pastor, e uma linha
+ * por pessoa (nome, telefone, bairro, pedido, quem a encontrou e quando). `groups` é o de
+ * groupByDistrict() em colporteurInterests.js; `formatPhone` e `weekLabel` dão o texto.
+ */
+export function interestsHtml({ groups, period, formatPhone, weekLabel, brandName = 'Livraria Adventista' }) {
+  const page = (g, i) => `<section${i ? ' style="break-before:page"' : ''}>
+  <h1>Interessados · ${esc(g.label)}</h1>
+  <p class="muted">${esc(brandName)} · Colportagem · ${esc(period)} · impresso a ${new Date().toLocaleString('pt-AO')}</p>
+  <p><strong>Pastor:</strong> ${g.pastor ? `${esc(g.pastor.label)}${g.pastor.phone ? ` · ${esc(formatPhone(g.pastor.phone))}` : ''}${g.pastor.titular ? '' : ' (associado)'}` : 'sem pastor no registo'}</p>
+  <table><thead><tr><th>Nome</th><th>Telefone</th><th>Bairro / local</th><th>Pedido</th><th>Colportor</th><th>Igreja</th><th>Semana</th></tr></thead><tbody>${
+    g.rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(formatPhone(r.phone))}</td><td>${esc(r.place)}</td><td>${esc(r.request)}</td>
+    <td>${esc(r.colporteur ? `${r.colporteur.code} ${r.colporteur.name}` : '')}</td><td>${esc(r.churchLabel)}</td><td>${esc(weekLabel(r.weekStart))}</td></tr>`).join('')
+  }</tbody></table>
+  <p class="muted" style="margin-top:8px">${g.rows.length} ${g.rows.length === 1 ? 'pessoa' : 'pessoas'}. Para a igreja contactar e visitar.</p>
+  <div class="sig"><div>Pela Livraria</div><div>O pastor do distrito</div></div>
+  </section>`;
+  return `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Interessados · ${esc(period)}</title><style>${estiloBaseImpressao()}
+${STYLE}
+@page{size:A4 landscape}body{font-size:12px}th,td{padding:5px 4px}</style></head><body>
+  ${groups.length ? groups.map(page).join('') : `<h1>Interessados · ${esc(period)}</h1><p>Não há interessados neste período.</p>`}
+  </body></html>`;
+}
+
 /** Abre a janela de impressão. Devolve false se o browser bloqueou a janela. */
 export function openPrint(html) {
   const w = window.open('', '_blank', 'width=900,height=700');

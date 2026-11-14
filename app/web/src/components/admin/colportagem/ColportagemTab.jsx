@@ -11,6 +11,7 @@ import ColporteursPanel from './ColporteursPanel';
 import CommissionPanel from './CommissionPanel';
 import { LinksPanel, SettingsPanel } from './SettingsPanel';
 import ReportsPanel from './ReportsPanel';
+import InterestsPanel from './InterestsPanel';
 import GuidesPanel from './GuidesPanel';
 import { AccountsPanel, ReclassPanel } from './AccountsPanel';
 import SummaryPanel from './SummaryPanel';
@@ -119,6 +120,7 @@ export default function ColportagemTab() {
       {view === 'candidaturas' && <ColporteursPanel mode="candidaturas" {...props} />}
       {view === 'colportores' && <ColporteursPanel mode="colportores" {...props} />}
       {view === 'relatorios' && needsOps(<ReportsPanel {...opsProps} />)}
+      {view === 'interessados' && needsOps(<InterestsPanel data={data} ops={ops} idx={idx} />)}
       {view === 'entregas' && <DeliveriesPanel onCount={setToPrepare} />}
       {view === 'guias' && needsOps(<GuidesPanel {...opsProps} />)}
       {view === 'contas' && needsOps(<AccountsPanel {...opsProps} />)}
