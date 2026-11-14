@@ -594,15 +594,17 @@ export function desenharMuralCapas(ctx, W, H, capas, t, { semente = 1, foco = 'f
       ctx.rotate(it.rot + Math.sin(t * 0.18 + it.fase) * 0.025);
       ctx.scale(vira, 1);
       const a = P.alpha * intensidade * (foco === 'fundo' ? 0.78 : 1);
-      // A sombra por baixo.
-      ctx.globalAlpha = a * 0.55;
-      ctx.drawImage(sombraSprite(), -zw * 0.62, -zh * 0.5 + zh * 0.06 * P.par, zw * 1.24, zh * 1.1);
+      // A sombra por baixo (as do plano do fundo não se vêem: poupa-se o desenho).
+      if (pi > 0) {
+        ctx.globalAlpha = a * 0.55;
+        ctx.drawImage(sombraSprite(), -zw * 0.62, -zh * 0.5 + zh * 0.06 * P.par, zw * 1.24, zh * 1.1);
+      }
       // Com foco ao fundo (um livro ou texto à frente), as da frente também ficam desfocadas e
       // mais ténues: profundidade de campo, como numa câmara.
       const desfocadaFrente = pi === 2 && !nitido;
       ctx.globalAlpha = desfocadaFrente ? a * 0.6 : a;
       const fonte = nitido ? capa : miniatura(capa, ...(desfocadaFrente ? [64, 96] : P.mini));
-      ctx.imageSmoothingQuality = 'high';
+      // Qualidade normal do browser: a 'high' pesa em cada imagem e aqui não se nota.
       ctx.drawImage(fonte, -zw / 2, -zh / 2, zw, zh);
       if (nitido) {
         // A orla de luz e um brilho que atravessa a capa de vez em quando.
