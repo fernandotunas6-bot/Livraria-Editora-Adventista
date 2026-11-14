@@ -6,7 +6,8 @@
  *   config/admin              → não usado: a edição exige sessão de administrador da livraria (RLS no servidor)
  * Antes da migração painel_vendas_por_loja não há loja_id: o painel mostra os dados que existem (Loja do Huambo).
  */
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, mediaUrl } from '@/lib/supabaseClient';
+import { buildDestaques, capaDe } from './destaques.js';
 
 const subs = {};
 const fire = (key) => (subs[key] || []).forEach((fn) => fn());
@@ -137,6 +138,54 @@ async function fetchSystemSalesFromOrders(store, ano, { paidOnly = true } = {}) 
   return { months: months.map((c) => c / 100), counts, orders: rows.length };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Imagens e mais vendidos dos vídeos (migração imagens_e_mais_vendidos_dos_videos)
+// ---------------------------------------------------------------------------------------------
+const semFuncao = (e) => e && (e.code === 'PGRST202' || e.code === '42P01' || e.code === 'PGRST205' || /does not exist|Could not find/i.test(e.message || ''));
+
+/**
+ * Os mais vendidos de um ano: as encomendas do site (produtos_mais_vendidos) e os lançados à mão
+ * (vendas_produtos), juntos por buildDestaques. Sem a migração, devolve null (o vídeo sai sem os
+ * quadros dos mais vendidos).
+ */
+export async function carregarDestaques(ano, { paidOnly = true } = {}) {
+  const [sis, man] = await Promise.all([
+    supabase.rpc('produtos_mais_vendidos', { p_ano: ano, p_so_pagas: paidOnly }),
+    supabase.from('vendas_produtos').select('id, loja_id, ano, mes, book_id, titulo, unidades, valor, nota').eq('ano', ano),
+  ]);
+  if (sis.error && !semFuncao(sis.error)) throw sis.error;
+  if (sis.error && man.error) return null;
+  const manual = man.error ? [] : man.data || [];
+  const ids = [...new Set(manual.map((r) => r.book_id).filter(Boolean))];
+  let capas = {};
+  if (ids.length) {
+    const { data } = await supabase.rpc('capas_dos_produtos', { p_ids: ids });
+    capas = Object.fromEntries((data || []).map((b) => [b.id, capaDe({ book_id: b.id, capa: b.capa, capa_ficheiro: b.capa_ficheiro }, mediaUrl)]));
+  }
+  return buildDestaques({ sistema: sis.error ? [] : sis.data || [], manual, capas, mediaUrl });
+}
+
+const ORDEM_TEMAS = ['natureza', 'livros', 'lojas', 'pessoas', 'outro'];
+
+/** As fotografias activas da biblioteca, primeiro as de natureza. [] sem a migração. */
+export async function carregarFotos() {
+  const { data, error } = await supabase.from('biblioteca_imagens').select('url, tema, posicao').eq('activa', true).order('posicao').limit(40);
+  if (error) return [];
+  return (data || []).sort((a, b) => ORDEM_TEMAS.indexOf(a.tema) - ORDEM_TEMAS.indexOf(b.tema)).map((r) => r.url);
+}
+
+/** O que os vídeos precisam além dos números, guardado por ano durante a visita. */
+function extrasDoVideo() {
+  const cache = new Map();
+  return (ano) => {
+    if (!cache.has(ano)) {
+      cache.set(ano, Promise.all([carregarDestaques(ano).catch(() => null), carregarFotos().catch(() => [])])
+        .then(([destaques, fotos]) => ({ destaques, fotos })));
+    }
+    return cache.get(ano);
+  };
+}
+
 function makeDb(lojaId) {
   const multi = !!lojaId;
   const key = (k) => `${lojaId || '-'}:${k}`;
@@ -264,7 +313,15 @@ export function createPainelApi(profile, opts = {}) {
   const sales = store && (canReadSales || canReadOrders)
     ? { available: true, storeName: store.name, fetch: (ano, o) => fetchSystemSales(store, ano, o) }
     : { available: false, reason: !store ? 'Esta loja ainda não existe no separador Lojas.' : 'Precisa da permissão «Ver relatórios» ou «Editar relatórios de vendas» para ver as vendas do sistema.' };
-  return { db: makeDb(lojaId), user, downloads, store, sales };
+  // Os mais vendidos desta loja e as fotografias da biblioteca, para o vídeo.
+  const todos = extrasDoVideo();
+  const extras = canReadSales || canEdit
+    ? async (ano) => {
+      const x = await todos(ano);
+      return { destaques: x.destaques && store ? x.destaques.porLoja[store.id] || null : null, fotos: x.fotos };
+    }
+    : null;
+  return { db: makeDb(lojaId), user, downloads, store, sales, extras };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -358,5 +415,6 @@ export function createConsolidadoApi(opts = {}) {
     lerNota,
     gravarNota,
     downloads,
+    extras: extrasDoVideo(),
   };
 }

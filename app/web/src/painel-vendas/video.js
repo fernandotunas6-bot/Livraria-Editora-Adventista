@@ -15,7 +15,9 @@
  * (`planoVideo`, `planoVideoConjunto`), testada em video.test.js sem canvas.
  * A gravação é em tempo real: um vídeo de 3 minutos demora 3 minutos a gravar.
  */
-import { MESES_CURTOS } from './modelo.js';
+import { MESES, MESES_CURTOS } from './modelo.js';
+import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharPaisagem, veu } from './imagens-video.js';
+import { destaqueDe } from './destaques.js';
 
 // ---------- Ritmos e planos ----------
 
@@ -29,8 +31,23 @@ export const RITMOS = {
 /** Segundos de cada quadro no ritmo lento. */
 export const DUR = {
   capa: 5, resumo: 12, mensal: 11, mes: 9, quadro: 14, acum: 10, ranking: 11, fecho: 8,
-  lojas: 12, loja: 10, mesRede: 10, pendentes: 9,
+  lojas: 12, loja: 10, mesRede: 10, pendentes: 9, destaque: 10, maisVendidos: 11,
 };
+
+/** Os fundos dos quadros com imagem (capa, mais vendidos, fecho). */
+export const FUNDOS = {
+  natureza: 'Paisagens animadas',
+  biblioteca: 'Fotografias da biblioteca',
+  simples: 'Simples (escuro)',
+};
+
+/** Os quadros dos mais vendidos, quando há dados de produtos para o âmbito do vídeo. */
+function cenasMaisVendidos(ambito, ritmo) {
+  if (!ambito || !ambito.ano || !ambito.ano.length) return [];
+  const cenas = [{ k: 'destaque', nome: 'O mais vendido do ano' }];
+  if (ritmo.detalhe && ambito.ano.length > 1) cenas.push({ k: 'maisVendidos', nome: 'Os mais vendidos' });
+  return cenas;
+}
 
 const durDe = (k, ritmo) => Math.round(DUR[k] * ritmo.fator * 10) / 10;
 const ritmoDe = (id) => RITMOS[id] || RITMOS.lento;
@@ -48,6 +65,7 @@ export function planoVideo(d, ritmoId = 'lento') {
     { k: 'quadro', nome: 'Quadro geral' },
     { k: 'acum', nome: 'Acumulado e projecção' },
     { k: 'ranking', nome: 'Meses do melhor ao pior' },
+    ...cenasMaisVendidos(d.destaques, ritmo),
     { k: 'fecho', nome: 'Perspectiva do ano' },
   );
   return cenas.map((c) => ({ ...c, dur: durDe(c.k, ritmo) }));
@@ -72,6 +90,7 @@ export function planoVideoConjunto(c, ritmoId = 'lento') {
     c.total.rows.forEach((r) => cenas.push({ k: 'mesRede', nome: r.mes, r }));
   }
   cenas.push({ k: 'quadro', nome: 'Quadro das livrarias' }, { k: 'acum', nome: 'Acumulado e projecção' });
+  cenas.push(...cenasMaisVendidos(c.destaques && c.destaques.rede, ritmo));
   if (c.pendentes && c.pendentes.length) cenas.push({ k: 'pendentes', nome: 'Meses por registar' });
   cenas.push({ k: 'fecho', nome: 'Perspectiva do ano' });
   return cenas.map((x) => ({ ...x, dur: durDe(x.k, ritmo) }));
@@ -127,15 +146,6 @@ const ease = (t) => 1 - Math.pow(1 - clamp01(t), 3);
 const animDe = (cena) => Math.min(1.4, cena.dur * 0.3);
 const corDe = (v) => (v == null || !isFinite(v) ? COL.mut : v >= 0 ? COL.pos : COL.neg);
 
-function loadImage(src) {
-  return new Promise((resolve) => {
-    if (!src) { resolve(null); return; }
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
-}
 
 function roundRect(ctx, x, y, w, h, r) {
   const rr = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -167,10 +177,42 @@ function card(ctx, x, y, w, h, fill = COL.card) {
   ctx.fill();
 }
 
-/** Fundo, logótipo (numa pastilha branca: é azul-escuro sobre transparente), título e subtítulo. */
-function cabecalho(ctx, f, titulo, sub) {
+/**
+ * O fundo dos quadros de números: escuro, com duas manchas de luz a mexer devagar (não tiram a
+ * leitura). `f.t` é o segundo do vídeo, para a luz continuar de um quadro para o outro.
+ */
+function fundoDados(ctx, f) {
   ctx.fillStyle = COL.bg;
   ctx.fillRect(0, 0, W, H);
+  if (f.fundo === 'simples') return;
+  const t = f.t || 0;
+  [[0.85, 0.15, 'rgba(34,166,169,0.10)', 0.11], [0.12, 0.92, 'rgba(224,103,154,0.09)', 0.07]].forEach(([x, y, cor, v], i) => {
+    const cx = W * (x + Math.sin(t * v + i) * 0.05);
+    const cy = H * (y + Math.cos(t * v * 0.8 + i) * 0.05);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.45);
+    g.addColorStop(0, cor);
+    g.addColorStop(1, 'rgba(15,27,45,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  });
+}
+
+/**
+ * O fundo dos quadros com imagem: uma paisagem animada, uma fotografia da biblioteca (com
+ * movimento lento) ou o escuro, conforme `f.fundo`; `n` escolhe qual. Depois o véu, para o
+ * texto se ler.
+ */
+function fundoImagem(ctx, f, at, n, lado = 'esquerda', { desfoque = 0 } = {}) {
+  const fotos = f.fotos || [];
+  if (f.fundo === 'biblioteca' && fotos.length) desenharFoto(ctx, W, H, fotos[n % fotos.length], at.p, n, { desfoque });
+  else if (f.fundo !== 'simples') desenharPaisagem(ctx, W, H, TEMAS[n % TEMAS.length], at.s);
+  else { fundoDados(ctx, f); return; }
+  veu(ctx, W, H, lado, 0.82);
+}
+
+/** Fundo, logótipo (numa pastilha branca: é azul-escuro sobre transparente), título e subtítulo. */
+function cabecalho(ctx, f, titulo, sub, { semFundo = false, subMax = 0 } = {}) {
+  if (!semFundo) fundoDados(ctx, f);
   if (f.logo) {
     const h = 40;
     const w = (f.logo.width / f.logo.height) * h;
@@ -181,7 +223,7 @@ function cabecalho(ctx, f, titulo, sub) {
   }
   txt(ctx, f.etiqueta, W - 48, 56, { w: 600, size: 17, color: COL.mut, align: 'right', max: 640 });
   if (titulo) txt(ctx, titulo, 48, 128, { w: 800, size: 36, max: W - 96 });
-  if (sub) txt(ctx, sub, 48, 158, { w: 600, size: 18, color: COL.mut, max: W - 96 });
+  if (sub) txt(ctx, sub, 48, 158, { w: 600, size: 18, color: semFundo ? '#C9D3E2' : COL.mut, max: subMax || W - 96 });
 }
 
 /** Rodapé: o quadro, o tempo e a barra de progresso do vídeo — para parar e voltar a um ponto. */
@@ -330,15 +372,118 @@ function linhaAcumulada(ctx, f, M, x, y, w, h, prog) {
 
 // ---------- Quadros do vídeo de uma loja ----------
 
-function cenaCapa(ctx, f, at, titulo, linha2, linha3) {
-  cabecalho(ctx, f, '', '');
+// ---------- Livros (capas do catálogo) ----------
+const imagemDe = (f, item) => (item && item.capa && f.imagens ? f.imagens.get(item.capa) || null : null);
+const unid = (n) => {
+  const v = Math.round(Number(n) * 100) / 100;
+  return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (v === 1 ? ' unidade' : ' unidades');
+};
+const ORIGEM = { sistema: 'encomendas do site', manual: 'lançado à mão', misto: 'site e lançado à mão' };
+
+/** Até `n` livros em leque (os mais vendidos), a entrar um a um. */
+function leque(ctx, f, at, lista, cx, cy, h, n = 3) {
+  const itens = (lista || []).slice(0, n);
+  const ordem = itens.map((it, i) => ({ it, i })).reverse(); // o primeiro fica à frente
+  ordem.forEach(({ it, i }) => {
+    const k = ease((at.s - 0.3 - i * 0.25) / 0.9);
+    if (k <= 0) return;
+    const dx = (i === 0 ? 0 : i === 1 ? -1 : 1) * h * 0.46;
+    const esc = i === 0 ? 1 : 0.82;
+    desenharLivro(ctx, { img: imagemDe(f, it), titulo: it.titulo, cx: cx + dx, cy: cy + (1 - k) * 40 + (i ? h * 0.06 : 0), h: h * esc, t: at.s + i, giro: 0.36 + i * 0.05, alpha: k });
+  });
+}
+
+function cenaCapa(ctx, f, at, titulo, linha2, linha3, livros) {
+  fundoImagem(ctx, f, at, 0, 'esquerda', { desfoque: livros && livros.length ? 6 : 0 });
+  cabecalho(ctx, f, '', '', { semFundo: true });
   const k = ease(at.s / animDe(at.cena));
+  const temLivros = livros && livros.length;
+  const x = temLivros ? 64 : W / 2;
+  const al = temLivros ? 'left' : 'center';
+  const max = temLivros ? 640 : W - 140;
   ctx.globalAlpha = k;
-  txt(ctx, titulo, W / 2, 300, { w: 800, size: 60, align: 'center', max: W - 140 });
-  txt(ctx, linha2, W / 2, 364, { w: 700, size: 32, color: COL.main, align: 'center', max: W - 140 });
-  txt(ctx, linha3, W / 2, 414, { w: 600, size: 24, color: COL.mut, align: 'center', max: W - 140 });
-  txt(ctx, 'Valores em Kwanzas (AOA), com cêntimos · Gerado em ' + f.geradoEm, W / 2, 470, { w: 500, size: 17, color: COL.dim, align: 'center', max: W - 140 });
+  txt(ctx, titulo, x, 300 + (1 - k) * 20, { w: 800, size: 58, align: al, max });
+  txt(ctx, linha2, x, 362, { w: 700, size: 32, color: COL.main, align: al, max });
+  txt(ctx, linha3, x, 410, { w: 600, size: 24, color: '#D5DCE8', align: al, max });
+  txt(ctx, 'Valores em Kwanzas (AOA), com cêntimos · Gerado em ' + f.geradoEm, x, 462, { w: 500, size: 17, color: '#B7C2D3', align: al, max });
   ctx.globalAlpha = 1;
+  if (temLivros) {
+    leque(ctx, f, at, livros, 960, 380, 330);
+    ctx.globalAlpha = ease((at.s - 1.2) / 0.8);
+    txt(ctx, 'Os mais vendidos do ano', 960, 600, { w: 700, size: 16, color: '#E6ECF5', align: 'center' });
+    ctx.globalAlpha = 1;
+  }
+}
+
+/** O mais vendido do ano: o livro grande à direita e os seus números à esquerda. */
+function cenaDestaque(ctx, f, at, ambito, rotulo) {
+  const d = destaqueDe(ambito);
+  fundoImagem(ctx, f, at, 1, 'esquerda', { desfoque: 10 });
+  cabecalho(ctx, f, '', '', { semFundo: true });
+  if (!d) return;
+  const k = ease(at.s / animDe(at.cena));
+  const kb = ease((at.s - 0.2) / 1.1);
+  desenharLivro(ctx, { img: imagemDe(f, d), titulo: d.titulo, cx: 940, cy: 380 + (1 - kb) * 60, h: 440, t: at.s, giro: 0.4, alpha: kb });
+  ctx.globalAlpha = k;
+  const linhas = partirTexto(ctx, d.titulo, 556, FONT(800, 38), 3);
+  const y0 = 222 + linhas.length * 46 + 8;
+  // O cartão à medida do que leva (o título pode ter uma a três linhas).
+  const alto = y0 + 178 + 34 - 120;
+  const topoCartao = Math.max(110, 360 - alto / 2);
+  const dy = topoCartao - 120;
+  ctx.save();
+  ctx.translate(0, dy);
+  ctx.fillStyle = 'rgba(10,18,32,0.62)';
+  roundRect(ctx, 48, 120, 620, alto, 20); ctx.fill();
+  txt(ctx, `O MAIS VENDIDO DE ${f.ano}${rotulo ? ' · ' + rotulo.toUpperCase() : ''}`, 80, 170, { w: 800, size: 17, color: COL.main, max: 560 });
+  linhas.forEach((l, i) => txt(ctx, l, 80, 222 + i * 46, { w: 800, size: 38, max: 556 }));
+  const quadro = [
+    ['Unidades vendidas', unid(d.unidades)],
+    ['Valor das vendas', d.valor != null ? kz(d.valor) : '—'],
+    ['Melhor mês', d.melhorMes != null ? `${MESES[d.melhorMes]} · ${unid(d.melhorUnid)}` : '—'],
+    ['Meses em 1.º lugar', `${d.mesesNoTopo} de 12`],
+  ];
+  quadro.forEach(([rot, val], i) => {
+    const x = 80 + (i % 2) * 290;
+    const y = y0 + Math.floor(i / 2) * 84;
+    txt(ctx, rot, x, y + 20, { w: 700, size: 15, color: '#AEBBCD', max: 270 });
+    txt(ctx, val, x, y + 52, { w: 800, size: 25, max: 270 });
+  });
+  const yb = y0 + 178;
+  const extras = [
+    d.pesoTop != null ? `${pctSimples(d.pesoTop)} das unidades dos ${Math.min(ambito.ano.length, 10)} mais vendidos` : '',
+    d.lojas && d.lojas.length > 1 ? `vendido em ${d.lojas.length} lojas` : '',
+    'fonte: ' + (ORIGEM[d.origem] || ORIGEM.sistema),
+  ].filter(Boolean).join(' · ');
+  txt(ctx, extras, 80, yb, { w: 600, size: 15, color: '#C9D3E2', max: 556 });
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+/** Os mais vendidos (até cinco), lado a lado, a subir um a um. */
+function cenaMaisVendidos(ctx, f, at, ambito, rotulo) {
+  const lista = (ambito && ambito.ano ? ambito.ano : []).slice(0, 5);
+  fundoImagem(ctx, f, at, 2, 'baixo', { desfoque: 10 });
+  cabecalho(ctx, f, `Os mais vendidos de ${f.ano}`, `${rotulo ? rotulo + ' · ' : ''}unidades vendidas no ano`, { semFundo: true });
+  const n = lista.length;
+  const passo = Math.min(236, (W - 96) / Math.max(1, n));
+  const x0 = W / 2 - (passo * (n - 1)) / 2;
+  lista.forEach((it, i) => {
+    const k = ease((at.s - 0.25 - i * 0.22) / 0.9);
+    if (k <= 0) return;
+    const cx = x0 + passo * i;
+    desenharLivro(ctx, { img: imagemDe(f, it), titulo: it.titulo, cx, cy: 360 + (1 - k) * 70, h: 250, t: at.s + i * 0.7, giro: 0.38, alpha: k });
+    ctx.globalAlpha = k;
+    // O lugar, num círculo.
+    ctx.fillStyle = i === 0 ? COL.main : 'rgba(10,18,32,0.75)';
+    ctx.beginPath(); ctx.arc(cx - 70, 232, 22, 0, Math.PI * 2); ctx.fill();
+    txt(ctx, `${i + 1}º`, cx - 70, 240, { w: 800, size: 18, align: 'center' });
+    const linhas = partirTexto(ctx, it.titulo, passo - 24, FONT(700, 17), 2);
+    linhas.forEach((l, j) => txt(ctx, l, cx, 528 + j * 22, { w: 700, size: 17, align: 'center', max: passo - 20 }));
+    txt(ctx, unid(it.unidades), cx, 528 + linhas.length * 22 + 8, { w: 800, size: 17, color: '#F7C8DB', align: 'center', max: passo - 20 });
+    if (it.valor != null) txt(ctx, kz(it.valor), cx, 528 + linhas.length * 22 + 32, { w: 600, size: 15, color: '#C9D3E2', align: 'center', max: passo - 20 });
+    ctx.globalAlpha = 1;
+  });
 }
 
 function tilesResumo(ctx, at, tiles) {
@@ -375,7 +520,7 @@ function cenaMensal(ctx, f, at, M, titulo) {
 }
 
 /** Um mês com tudo o que tem. `M` é o modelo do ano; `extra` acrescenta linhas (encomendas, lojas). */
-function cenaMes(ctx, f, at, M, r, { esquerda, extra = [] } = {}) {
+function cenaMes(ctx, f, at, M, r, { esquerda, extra = [], livro = null } = {}) {
   const R = M.R;
   const B = f.comp;
   const A = f.ano;
@@ -432,6 +577,16 @@ function cenaMes(ctx, f, at, M, r, { esquerda, extra = [] } = {}) {
       txt(ctx, r.estado === 'Por preencher' ? 'Por preencher' : 'Sem comparação', gx, ly + 116, { w: 800, size: 22, color: COL.mut, max: gmax });
     }
     if (r.estado === 'Em curso') txt(ctx, 'Mês em curso: o valor ainda pode subir', gx, ly + 186, { w: 600, size: 14, color: COL.amber, max: gmax });
+    if (livro) {
+      // O mais vendido do mês, com a capa.
+      const kl = ease((at.s - 0.6) / 0.8);
+      desenharLivro(ctx, { img: imagemDe(f, livro), titulo: livro.titulo, cx: gx + 30, cy: ly + 262 + (1 - kl) * 16, h: 92, t: at.s, giro: 0.36, alpha: kl, reflexo: false });
+      ctx.globalAlpha = kl;
+      txt(ctx, 'MAIS VENDIDO', gx + 70, ly + 232, { w: 800, size: 11, color: COL.main });
+      partirTexto(ctx, livro.titulo, gmax - 72, FONT(700, 13), 3).forEach((l, i) => txt(ctx, l, gx + 70, ly + 252 + i * 17, { w: 700, size: 13, max: gmax - 72 }));
+      txt(ctx, unid(livro.unidades), gx + 70, ly + 310, { w: 600, size: 12, color: COL.mut, max: gmax - 72 });
+      ctx.globalAlpha = 1;
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -535,18 +690,20 @@ function cenaRanking(ctx, f, at, M) {
 
 function cenaFecho(ctx, f, at, M, titulo, nota) {
   const R = M.R;
-  cabecalho(ctx, f, titulo || 'Perspectiva do ano ' + f.ano, '');
+  fundoImagem(ctx, f, at, 3, 'baixo');
+  cabecalho(ctx, f, titulo || 'Perspectiva do ano ' + f.ano, '', { semFundo: true });
   const k = ease(at.s / animDe(at.cena));
   ctx.globalAlpha = k;
   const cw = (W - 96 - 20) / 2;
-  card(ctx, 48, 190, cw, 320, COL.card2);
+  const vidro = f.fundo === 'simples' ? COL.card2 : 'rgba(16,30,52,0.84)';
+  card(ctx, 48, 190, cw, 320, vidro);
   txt(ctx, 'PROJECÇÃO ' + f.ano, 76, 236, { w: 800, size: 16, color: COL.main });
   txt(ctx, kz(R.projeccao), 76, 300, { w: 800, size: 40, max: cw - 56 });
   txt(ctx, R.cresc_proj != null ? pct(R.cresc_proj) + ' face ao total de ' + f.comp + ' (' + kz(R.total1) + ')' : 'sem ano de comparação', 76, 344, { w: 700, size: 17, color: corDe(R.cresc_proj), max: cw - 56 });
   txt(ctx, 'Critério: ' + f.critTxt, 76, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
   if (R.ultrapassa) txt(ctx, 'O total de ' + f.comp + ' foi ultrapassado em ' + R.ultrapassa + '.', 76, 416, { w: 600, size: 16, color: COL.pos, max: cw - 56 });
   const x2 = 48 + cw + 20;
-  card(ctx, x2, 190, cw, 320, COL.card2);
+  card(ctx, x2, 190, cw, 320, vidro);
   txt(ctx, M.meta ? 'META ' + f.ano : 'SITUAÇÃO ACTUAL', x2 + 28, 236, { w: 800, size: 16, color: COL.teal });
   txt(ctx, kz(R.ytd2), x2 + 28, 300, { w: 800, size: 40, max: cw - 56 });
   txt(ctx, 'Vendido' + (R.ultimo ? ' de Janeiro a ' + R.ultimo.mes : ''), x2 + 28, 344, { w: 700, size: 17, color: COL.mut, max: cw - 56 });
@@ -556,7 +713,7 @@ function cenaFecho(ctx, f, at, M, titulo, nota) {
     ctx.fillStyle = COL.line; roundRect(ctx, x2 + 28, 410, cw - 56, 12, 6); ctx.fill();
     ctx.fillStyle = COL.teal; roundRect(ctx, x2 + 28, 410, (cw - 56) * clamp01(pr) * k, 12, 6); ctx.fill();
   }
-  txt(ctx, `${f.fonte ? 'Fonte: ' + f.fonte + ' · ' : ''}Gerado em ${f.geradoEm}`, W / 2, 570, { w: 500, size: 16, color: COL.mut, align: 'center', max: W - 96 });
+  txt(ctx, `${f.fonte ? 'Fonte: ' + f.fonte + ' · ' : ''}Gerado em ${f.geradoEm}`, W / 2, 570, { w: 600, size: 16, color: '#D5DCE8', align: 'center', max: W - 96 });
   if (nota) {
     // A nota do relatório (até duas linhas): o que explica os números.
     const linhasNota = partirTexto(ctx, 'Nota: ' + nota, W - 140, FONT(600, 16), 2);
@@ -585,19 +742,35 @@ function partirTexto(ctx, texto, max, font, nLinhas) {
   return linhas;
 }
 
+/** Ao entrar num quadro, o anterior desvanece (0,35 s). */
+function transicao(ctx, at) {
+  if (at.i === 0 || at.s >= 0.35) return;
+  ctx.fillStyle = `rgba(15,27,45,${(1 - at.s / 0.35) * 0.7})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
 function desenharLoja(ctx, f, at, d) {
   const M = { rows: d.rows, R: d.R, meta: d.meta };
   const c = at.cena;
-  if (c.k === 'capa') cenaCapa(ctx, f, at, 'Relatório de vendas ' + d.ano, d.loja, d.comp ? 'Comparado com ' + d.comp + ' · Janeiro a Dezembro' : 'Janeiro a Dezembro');
+  const dest = d.destaques || null;
+  f.t = at.t;
+  if (c.k === 'capa') cenaCapa(ctx, f, at, 'Relatório de vendas ' + d.ano, d.loja, d.comp ? 'Comparado com ' + d.comp + ' · Janeiro a Dezembro' : 'Janeiro a Dezembro', dest && dest.ano);
   else if (c.k === 'resumo') cenaResumo(ctx, f, at, M);
   else if (c.k === 'mensal') cenaMensal(ctx, f, at, M);
   else if (c.k === 'mes') {
     const n = d.sys && d.sys.counts ? d.sys.counts[c.r.i] : null;
-    cenaMes(ctx, f, at, M, c.r, { extra: n != null ? [['Encomendas no sistema', String(n)]] : [] });
+    const top = dest && dest.meses ? (dest.meses[c.r.i] || [])[0] : null;
+    const extra = [];
+    if (n != null) extra.push(['Encomendas no sistema', String(n)]);
+    if (top) extra.push(['Mais vendido do mês', `${top.titulo} · ${unid(top.unidades)}`]);
+    cenaMes(ctx, f, at, M, c.r, { extra, livro: top });
   } else if (c.k === 'quadro') cenaQuadro(ctx, f, at, M);
   else if (c.k === 'acum') cenaAcum(ctx, f, at, M);
   else if (c.k === 'ranking') cenaRanking(ctx, f, at, M);
+  else if (c.k === 'destaque') cenaDestaque(ctx, f, at, dest, d.loja);
+  else if (c.k === 'maisVendidos') cenaMaisVendidos(ctx, f, at, dest, d.loja);
   else cenaFecho(ctx, f, at, M);
+  transicao(ctx, at);
   rodape(ctx, f, at);
 }
 
@@ -685,8 +858,20 @@ function cenaLoja(ctx, f, at, c, l) {
   const M = l.M;
   const R = M.R;
   const B = c.comp;
-  cabecalho(ctx, f, l.nome, `${l.provincia ? l.provincia + ' · ' : ''}${ord(l.posicao)} de ${c.lojas.filter((x) => x.temDados).length} livrarias · ${pctSimples(l.quota)} das vendas da rede${l.fonte ? ' · Fonte: ' + l.fonte : ''}`);
+  const dl = c.destaques && c.destaques.porLoja ? c.destaques.porLoja[l.id] : null;
+  const top = dl && dl.ano ? dl.ano[0] : null;
+  cabecalho(ctx, f, l.nome, `${l.provincia ? l.provincia + ' · ' : ''}${ord(l.posicao)} de ${c.lojas.filter((x) => x.temDados).length} livrarias · ${pctSimples(l.quota)} das vendas da rede${l.fonte ? ' · Fonte: ' + l.fonte : ''}`, { subMax: top ? W - 96 - 420 : 0 });
   ctx.fillStyle = l.cor; ctx.fillRect(48, 172, 64, 4);
+  if (top) {
+    // O mais vendido da loja, ao lado do título.
+    const kl = ease((at.s - 0.4) / 0.8);
+    desenharLivro(ctx, { img: imagemDe(f, top), titulo: top.titulo, cx: 1186, cy: 128, h: 96, t: at.s, giro: 0.36, alpha: kl, reflexo: false });
+    ctx.globalAlpha = kl;
+    txt(ctx, 'MAIS VENDIDO DA LOJA', 1132, 108, { w: 800, size: 11, color: COL.main, align: 'right' });
+    txt(ctx, top.titulo, 1132, 130, { w: 700, size: 15, align: 'right', max: 360 });
+    txt(ctx, unid(top.unidades) + (top.valor != null ? ' · ' + kz(top.valor) : ''), 1132, 151, { w: 600, size: 13, color: COL.mut, align: 'right', max: 360 });
+    ctx.globalAlpha = 1;
+  }
   tilesResumo(ctx, at, [
     ['Vendas ' + c.ano + (R.ultimo ? ' · até ' + R.ultimo.mes : ''), R.ytd2, kz, R.cresc_ytd != null ? pct(R.cresc_ytd) + ' vs mesmos meses de ' + B : 'sem comparação', corDe(R.cresc_ytd)],
     ['Média mensal (meses fechados)', R.media2, kz, R.media1 != null ? 'vs ' + kz(R.media1) + ' em ' + B : '', corDe(R.cresc_media)],
@@ -704,6 +889,8 @@ function cenaMesRede(ctx, f, at, c, r) {
   const lojas = mes.porLoja;
   const comValor = lojas.filter((p) => p.v2 != null);
   const extra = [['Lojas com o mês registado', `${comValor.length} de ${lojas.length}`, comValor.length < lojas.length ? COL.amber : COL.fg]];
+  const top = c.destaques && c.destaques.rede ? (c.destaques.rede.meses[r.i] || [])[0] : null;
+  if (top) extra.push(['Mais vendido na rede', `${top.titulo} · ${unid(top.unidades)}`]);
   cenaMes(ctx, f, at, c.total, r, {
     extra,
     esquerda: (x, y, w, h, k) => {
@@ -795,7 +982,9 @@ function desenharConjunto(ctx, f, at, c) {
   const M = c.total;
   const cena = at.cena;
   const nLojas = c.lojas.filter((l) => l.temDados).length;
-  if (cena.k === 'capa') cenaCapa(ctx, f, at, 'Relatório conjunto ' + c.ano, 'Todas as livrarias' + (nLojas ? ' · ' + nLojas + (nLojas === 1 ? ' loja' : ' lojas') : ''), c.comp ? 'Comparado com ' + c.comp + ' · Janeiro a Dezembro' : 'Janeiro a Dezembro');
+  const rede = c.destaques && c.destaques.rede ? c.destaques.rede : null;
+  f.t = at.t;
+  if (cena.k === 'capa') cenaCapa(ctx, f, at, 'Relatório conjunto ' + c.ano, 'Todas as livrarias' + (nLojas ? ' · ' + nLojas + (nLojas === 1 ? ' loja' : ' lojas') : ''), c.comp ? 'Comparado com ' + c.comp + ' · Janeiro a Dezembro' : 'Janeiro a Dezembro', rede && rede.ano);
   else if (cena.k === 'resumo') cenaResumo(ctx, f, at, M);
   else if (cena.k === 'lojas') cenaLojas(ctx, f, at, c);
   else if (cena.k === 'mensal') cenaMensalRede(ctx, f, at, c);
@@ -804,7 +993,10 @@ function desenharConjunto(ctx, f, at, c) {
   else if (cena.k === 'quadro') cenaQuadroRede(ctx, f, at, c);
   else if (cena.k === 'acum') cenaAcum(ctx, f, at, M);
   else if (cena.k === 'pendentes') cenaPendentes(ctx, f, at, c);
+  else if (cena.k === 'destaque') cenaDestaque(ctx, f, at, rede, 'Rede');
+  else if (cena.k === 'maisVendidos') cenaMaisVendidos(ctx, f, at, rede, 'Todas as livrarias');
   else cenaFecho(ctx, f, at, M, 'Perspectiva da rede · ' + c.ano, c.nota);
+  transicao(ctx, at);
   rodape(ctx, f, at);
 }
 
@@ -861,10 +1053,35 @@ async function gravar(plano, desenhar, { onProgress, signal } = {}) {
 
 const fonteTxtDe = (fonte) => (fonte ? 'Fonte: ' + fonte : 'Livraria e Editora Adventista');
 
-/** Prepara o que todos os quadros de um vídeo precisam (logótipo, plano, etiqueta do topo). */
-async function preparar(base, plano) {
-  return { ...base, plano, total: duracaoPlano(plano), logo: await loadImage(base.logoSrc) };
+/** As capas que um vídeo vai mostrar: os mais vendidos do âmbito e de cada mês (e de cada loja). */
+function capasDe(...ambitos) {
+  const urls = new Set();
+  const juntar = (lista, n) => (lista || []).slice(0, n).forEach((it) => { if (it && it.capa) urls.add(it.capa); });
+  ambitos.filter(Boolean).forEach((a) => {
+    juntar(a.ano, 5);
+    (a.meses || []).forEach((l) => juntar(l, 1));
+  });
+  return [...urls];
 }
+
+/**
+ * Prepara o que todos os quadros de um vídeo precisam: o logótipo, o plano, as capas dos livros
+ * e as fotografias da biblioteca (carregadas antes de gravar: a gravação é em tempo real e não
+ * pode esperar pela rede a meio). Uma imagem que não carregue fica de fora.
+ */
+async function preparar(base, plano, { capas = [], fotos = [], fundo = 'natureza' } = {}) {
+  const [logo, imgs, fts] = await Promise.all([
+    carregarImagem(base.logoSrc),
+    Promise.all(capas.map((u) => carregarImagem(u).then((img) => [u, img]))),
+    fundo === 'biblioteca' ? Promise.all(fotos.slice(0, 8).map((u) => carregarImagem(u))) : Promise.resolve([]),
+  ]);
+  return {
+    ...base, plano, total: duracaoPlano(plano), logo, fundo,
+    imagens: new Map(imgs.filter(([, img]) => img)),
+    fotos: fts.filter(Boolean),
+  };
+}
+const fundoDe = (v) => (FUNDOS[v] ? v : 'natureza');
 
 /**
  * Vídeo de uma loja (1280×720). `d` vem de exportData() em painel.js.
@@ -875,7 +1092,7 @@ export async function renderVideo(d, onProgress, opts = {}) {
   const f = await preparar({
     ano: d.ano, comp: d.comp, critTxt: d.critTxt, fonte: d.fonte, fonteTxt: fonteTxtDe(d.fonte), geradoEm: d.geradoEm,
     etiqueta: `${d.loja} · ${d.ano}${d.comp ? ' vs ' + d.comp : ''}`, logoSrc: d.logo,
-  }, plano);
+  }, plano, { capas: capasDe(d.destaques), fotos: d.fotos || [], fundo: fundoDe(d.fundo) });
   return gravar(plano, (ctx, at) => desenharLoja(ctx, f, at, d), { onProgress, signal: opts.signal });
 }
 
@@ -885,10 +1102,11 @@ export async function renderVideo(d, onProgress, opts = {}) {
  */
 export async function renderVideoConjunto(c, onProgress, opts = {}) {
   const plano = planoVideoConjunto(c, opts.ritmo);
+  const D = c.destaques || {};
   const f = await preparar({
     ano: c.ano, comp: c.comp, critTxt: c.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: c.geradoEm,
     etiqueta: `Todas as livrarias · ${c.ano}${c.comp ? ' vs ' + c.comp : ''}`, logoSrc: c.logo,
-  }, plano);
+  }, plano, { capas: capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))), fotos: c.fotos || [], fundo: fundoDe(c.fundo) });
   return gravar(plano, (ctx, at) => desenharConjunto(ctx, f, at, c), { onProgress, signal: opts.signal });
 }
 
@@ -899,10 +1117,12 @@ export async function renderVideoConjunto(c, onProgress, opts = {}) {
 export async function quadroDoVideo(tipo, dados, sec, opts = {}) {
   const conjunto = tipo === 'conjunto';
   const plano = conjunto ? planoVideoConjunto(dados, opts.ritmo) : planoVideo(dados, opts.ritmo);
+  const D = dados.destaques || {};
+  const capas = conjunto ? capasDe(D.rede, ...Object.values(D.porLoja || {}).map((x) => ({ ano: x.ano }))) : capasDe(D);
   const f = await preparar(conjunto
     ? { ano: dados.ano, comp: dados.comp, critTxt: dados.total.critTxt, fonte: '', fonteTxt: 'Relatório conjunto das livrarias', geradoEm: dados.geradoEm, etiqueta: `Todas as livrarias · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo }
     : { ano: dados.ano, comp: dados.comp, critTxt: dados.critTxt, fonte: dados.fonte, fonteTxt: fonteTxtDe(dados.fonte), geradoEm: dados.geradoEm, etiqueta: `${dados.loja} · ${dados.ano}${dados.comp ? ' vs ' + dados.comp : ''}`, logoSrc: dados.logo },
-  plano);
+  plano, { capas, fotos: dados.fotos || [], fundo: fundoDe(dados.fundo) });
   const canvas = opts.canvas || Object.assign(document.createElement('canvas'), { width: W, height: H });
   const ctx = canvas.getContext('2d');
   const at = { ...cenaNoTempo(plano, sec), t: sec };

@@ -844,6 +844,13 @@ export function mountConsolidado(root, api) {
   }
 
   // ---------- Exportar ----------
+  // Os mais vendidos de todas as lojas e as fotografias da biblioteca (para os vídeos), uma vez por ano.
+  const extrasCache = {};
+  function extrasDe(ano) {
+    if (!api.extras) return Promise.resolve({ destaques: null, fotos: [] });
+    if (!extrasCache[ano]) extrasCache[ano] = api.extras(ano).catch(() => ({ destaques: null, fotos: [] }));
+    return extrasCache[ano];
+  }
   function videoLabels(c) {
     $('vid-lento').textContent = `${fmtDuracao(duracaoPlano(planoVideoConjunto(c, 'lento')))} · para analisar: cada loja e cada mês`;
     $('vid-normal').textContent = `${fmtDuracao(duracaoPlano(planoVideoConjunto(c, 'normal')))} · os mesmos quadros, mais depressa`;
@@ -983,7 +990,8 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
         const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
         videoAbort = new AbortController();
         $('exp-cancel').hidden = false;
-        say('A preparar o vídeo… mantenha este separador aberto até ao fim.');
+        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
+        Object.assign(c, await extrasDe(c.ano), { fundo: $('vid-fundo').value });
         const { blob, ext, duracao } = await renderVideoConjunto(c, (t, total, cena) => say(`A gravar o vídeo ${RITMOS[ritmo].nome.replace('Vídeo ', '')}: ${fmtDuracao(t)} de ${fmtDuracao(total)}${cena ? ' · ' + cena.nome : ''}. Mantenha este separador aberto.`), { ritmo, signal: videoAbort.signal });
         await api.downloads.save({ filename: `${base}-video-${ritmo}.${ext}`, data: blob });
         say(`Vídeo pronto (${ext.toUpperCase()}, ${fmtDuracao(duracao)}).`, 'okk');
@@ -1001,7 +1009,14 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
     const menu = $('exp-menu');
     menu.hidden = !menu.hidden;
     $('btn-exp').setAttribute('aria-expanded', String(!menu.hidden));
+    // Ao abrir, a duração dos vídeos passa a contar com os quadros dos mais vendidos (se os houver).
+    if (!menu.hidden && S.c) {
+      const c = S.c;
+      extrasDe(c.ano).then((x) => { if (S.c === c) { c.destaques = x.destaques; videoLabels(c); } });
+    }
   });
+  try { const f = localStorage.getItem('relatorios:video:fundo'); if (f) $('vid-fundo').value = f; } catch (e) { /* sem armazenamento */ }
+  $('vid-fundo').addEventListener('change', () => { try { localStorage.setItem('relatorios:video:fundo', $('vid-fundo').value); } catch (e) { /* idem */ } });
   $('exp-menu').addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-fmt]');
     if (b) doExport(b.dataset.fmt, { ritmo: b.dataset.ritmo });

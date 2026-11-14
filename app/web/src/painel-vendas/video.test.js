@@ -105,3 +105,33 @@ describe('maxRedondo', () => {
     }
   });
 });
+
+describe('os quadros dos mais vendidos', () => {
+  const um = { titulo: 'Apocalipse Verso por Verso', unidades: 16, chave: 'id:a' };
+  const dois = { titulo: 'Daniel Verso por Verso', unidades: 9, chave: 'id:b' };
+  const destaques = { ano: [um, dois], meses: Array.from({ length: 12 }, () => [um]) };
+
+  it('com dados, o vídeo da loja ganha o mais vendido do ano e os mais vendidos, antes do fecho', () => {
+    const p = planoVideo({ ...d, destaques }, 'lento');
+    const ks = p.map((c) => c.k);
+    expect(ks.slice(-3)).toEqual(['destaque', 'maisVendidos', 'fecho']);
+    expect(duracaoPlano(p)).toBe(179 + DUR.destaque + DUR.maisVendidos);
+  });
+
+  it('sem dados de produtos, o vídeo fica como estava', () => {
+    expect(planoVideo({ ...d, destaques: null }).map((c) => c.k)).toEqual(planoVideo(d).map((c) => c.k));
+    expect(planoVideo({ ...d, destaques: { ano: [], meses: [] } }).some((c) => c.k === 'destaque')).toBe(false);
+  });
+
+  it('o curto só leva o mais vendido; com um produto só, não há a lista', () => {
+    expect(planoVideo({ ...d, destaques }, 'curto').map((c) => c.k)).toContain('destaque');
+    expect(planoVideo({ ...d, destaques }, 'curto').map((c) => c.k)).not.toContain('maisVendidos');
+    expect(planoVideo({ ...d, destaques: { ano: [um], meses: [] } }).map((c) => c.k)).not.toContain('maisVendidos');
+  });
+
+  it('o vídeo de todas as livrarias usa os mais vendidos da rede', () => {
+    const c = { ano: 2026, comp: 2025, total: M, lojas: [{ nome: 'H', temDados: true, M }], pendentes: [], destaques: { rede: destaques, porLoja: {} } };
+    const ks = planoVideoConjunto(c, 'lento').map((x) => x.k);
+    expect(ks.slice(-3)).toEqual(['destaque', 'maisVendidos', 'fecho']);
+  });
+});

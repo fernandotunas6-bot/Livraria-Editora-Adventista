@@ -6,6 +6,7 @@ Dois ecrãs no grupo **Relatórios** do painel (`/admin`), com o mesmo desenho e
 |---|---|---|
 | **Todas as livrarias** (`relatorios-lojas`) | `/admin?tab=relatorios-lojas` | O relatório conjunto: a rede inteira num só sítio — totais, ranking, cada loja, cada mês, meses por registar, vídeo e exportações. É aqui que se **lançam** as vendas de todas as lojas de uma vez. |
 | **Vendas por loja** (`vendas-huambo`) | `/admin?tab=vendas-huambo` | O painel de uma loja: os 12 meses, a comparação com o ano anterior, a projecção, a apresentação e o vídeo dessa loja. |
+| **Imagens dos vídeos** (`imagens-videos`) | `/admin?tab=imagens-videos` | A biblioteca de imagens que os vídeos usam de fundo e os mais vendidos de cada loja lançados à mão (§6). |
 
 Os dois leem os mesmos números (`public.vendas_anos`, um registo por loja e por ano, com os 12 meses).
 Carregar numa loja no «Resumo de cada livraria» abre o painel dessa loja.
@@ -14,8 +15,9 @@ Carregar numa loja no «Resumo de cada livraria» abre o painel dessa loja.
 
 | Permissão | Vê | Lança (grava) |
 |---|---|---|
-| **Ver relatórios** (`view_reports`) | os dois ecrãs (só de leitura), o caixa e os números do mês no Início | — |
-| **Editar relatórios de vendas** (`edit_reports`) | os dois ecrãs | os meses, o mês em curso, as metas, o critério, as observações e a nota do relatório |
+| **Ver relatórios** (`view_reports`) | os três ecrãs (só de leitura), o caixa e os números do mês no Início | — |
+| **Editar relatórios de vendas** (`edit_reports`) | os três ecrãs | os meses, o mês em curso, as metas, o critério, as observações, a nota do relatório, os mais vendidos e a biblioteca de imagens |
+| **Gerir catálogo** (`manage_catalog`) | a biblioteca de imagens | a biblioteca de imagens |
 | Administrador | tudo | tudo, e é o único que **apaga** um ano inteiro |
 
 «Editar relatórios de vendas» é a permissão de quem lança os números do mês (por exemplo, o cargo
@@ -118,25 +120,97 @@ a um ponto.
 | **Normal** | 1 min 47 s | ~2 min 19 s |
 | **Curto** (só o resumo) | 36 s | 41 s |
 
+Com dados de produtos, os quadros dos mais vendidos (§6) juntam 21 s no lento (o mais vendido do
+ano, 10 s, e os cinco mais vendidos, 11 s), 12,6 s no normal e 5 s no curto (só o mais vendido).
+
 **Vídeo de uma loja**: capa · resumo do ano (6 indicadores) · vendas por mês · **um quadro por mês,
-de Janeiro a Dezembro** · quadro geral · acumulado e projecção · meses do melhor ao pior · perspectiva.
+de Janeiro a Dezembro** · quadro geral · acumulado e projecção · meses do melhor ao pior · **o mais
+vendido do ano** · **os mais vendidos** · perspectiva.
 
 Cada mês mostra: as vendas dos dois anos (barras), o crescimento e a diferença; as vendas do ano e
 do ano anterior, a diferença, o crescimento, o acumulado dos dois anos até esse mês, o peso no ano,
 a posição entre os meses fechados, a comparação com a média mensal, as encomendas no sistema (se
-carregadas) e a observação; e os 12 meses em pequeno, com este em destaque. Num mês **por
-preencher** aparecem a estimativa, o crescimento e o acumulado estimados (≈), e o critério.
+carregadas), **o mais vendido do mês** (com a capa) e a observação; e os 12 meses em pequeno, com
+este em destaque. Num mês **por preencher** aparecem a estimativa, o crescimento e o acumulado
+estimados (≈), e o critério.
 
 **Vídeo de todas as livrarias**: capa · resumo da rede · ranking das livrarias · vendas por mês
 (empilhadas por loja) · **um quadro por loja** · **um quadro por mês** (o que cada loja vendeu nesse
-mês, com os números da rede e quantas lojas o registaram) · quadro das livrarias · acumulado ·
-meses por registar · perspectiva da rede, com a nota do relatório.
+mês, com os números da rede, quantas lojas o registaram e o mais vendido na rede) · quadro das
+livrarias · acumulado · **o mais vendido da rede** · **os mais vendidos** · meses por registar ·
+perspectiva da rede, com a nota do relatório. Cada loja mostra o seu mais vendido ao lado do nome.
+
+### As imagens nos vídeos
+
+`app/web/src/painel-vendas/imagens-video.js`. A capa, os dois quadros dos mais vendidos e o fecho
+têm imagem por fundo; os quadros de números ficam escuros (com duas manchas de luz a mexer devagar),
+para se lerem. Entre quadros, o anterior desvanece.
+
+O **fundo** escolhe-se no menu Exportar (fica lembrado no aparelho):
+
+| Fundo | O que é |
+|---|---|
+| **Paisagens animadas** (o de omissão) | Desenhadas pelo próprio vídeo, com movimento: amanhecer nas montanhas (o sol a subir), floresta (raios de luz e pirilampos), campo (nuvens, erva a ondular e flores) e lago ao entardecer (a paisagem reflectida na água a ondular). Camadas com paralaxe, névoa a passar. Não dependem da rede nem de licenças, e saem sempre iguais. |
+| **Fotografias da biblioteca** | As imagens activas da biblioteca (§6), primeiro as de natureza, com zoom e deslocamento lentos. Atrás dos livros ficam desfocadas, para os livros se destacarem. Sem fotografias activas, vale a paisagem. |
+| **Simples (escuro)** | Sem imagem; os livros aparecem na mesma. |
+
+**O livro em 3D** é desenhado a partir da capa do catálogo (as capas já tratadas com IA de
+`docs/catalogo/capas-refinadas.json`): a capa em perspectiva, a lombada da cor da capa, o corte
+das folhas, a sombra no chão e um reflexo de luz que atravessa a capa; flutua devagar. Um produto
+sem capa (ou fora do catálogo) leva uma capa tipográfica com o título.
+
+As capas do catálogo estão em `https://livrariaadventista.com/images/capas/…` e o painel corre em
+`livrariaadventista.ao`: o vídeo não pode desenhar uma imagem de outra origem sem CORS, por isso
+as do próprio site carregam-se pelo caminho (`/images/capas/…`, mesma origem). As fotografias
+enviadas ficam no Storage, que manda CORS. Uma imagem que não carregue não estraga o vídeo: fica a
+capa tipográfica, ou a paisagem.
+
+Medido no Chromium: cada imagem do vídeo desenha-se em menos de 25 ms (o limite são 33 ms, para 30
+por segundo). Um vídeo curto com paisagens e livros gravou 1217 imagens em 40,9 s.
 
 O plano de cada vídeo (`planoVideo`, `planoVideoConjunto`) é uma função pura, testada em
 `video.test.js`; `quadroDoVideo()` desenha um instante sem gravar (serve à imagem PNG e ao PDF do
 relatório conjunto, e para conferir o desenho num navegador).
 
-## 6. Exportações do relatório conjunto
+## 6. Imagens e mais vendidos — a secção «Imagens dos vídeos»
+
+`/admin?tab=imagens-videos`, no grupo Relatórios (`ImagensVideosTab.jsx`), com duas vistas.
+
+### Biblioteca de imagens (`vista=imagens`)
+- As quatro **paisagens desenhadas**, para ver (passe o rato para as ver mexer). Não se enviam.
+- **Enviar fotografias** (PNG, JPG, WebP ou GIF até 8 MB, várias de uma vez), com o tema
+  (natureza, livros, lojas, pessoas, outro) e os créditos (quem tirou, a licença). Ficam no bucket
+  `media`, pasta `biblioteca/`.
+- **Juntar imagens do site**: as composições já feitas com as capas do catálogo (a galeria do site,
+  tema Livros) e as fotografias das lojas (tema Lojas). Já estão no site — junta-se o caminho, não
+  se envia nada.
+- Cada imagem: título, tema, créditos, **usar nos vídeos** (activa) e tirar da biblioteca (a
+  enviada é apagada também do Storage). As estreitas levam um aviso: no vídeo (16:9) ficam cortadas.
+
+Este ambiente não tinha acesso aos bancos de imagens (Unsplash, Pexels, Wikimedia), por isso a
+biblioteca não vem com fotografias descarregadas: as paisagens são desenhadas e as fotografias
+juntam-se aqui (as da equipa, ou as que já estão no site).
+
+### Mais vendidos (`vista=mais-vendidos`)
+De onde vêm os mais vendidos dos vídeos (`destaques.js`, testado em `destaques.test.js`):
+- **Do site, automático**: `public.produtos_mais_vendidos(ano, so_pagas)` soma as encomendas por
+  loja, mês e produto — as mesmas encomendas, lojas e meses das vendas do sistema
+  (`private.vendas_encomendas`), só totais, sem dados de clientes. O valor é o preço de venda vezes a
+  quantidade (um reembolso parcial não se reparte pelos produtos). Sem `book_id` (encomendas antigas,
+  WhatsApp), junta pelo título.
+- **À mão** (`public.vendas_produtos`): as vendas do balcão, que o site não vê (o KiGest das
+  lojas). Escolhe-se a loja, o ano e o período (um mês ou o ano todo), procura-se o produto no
+  catálogo (traz a capa) ou escreve-se o título, e as unidades (e, se quiser, o valor e uma nota).
+  Ao lado, o que o site vendeu nesse período, para conferir — **Copiar os 5** passa-os para aqui.
+- **A regra**: para uma loja e um mês, se há lançamentos à mão para esse mês, valem esses; senão, o
+  site. Para o ano, se há lançamentos para o ano todo, valem esses; senão, a soma dos 12 meses. A
+  rede soma as lojas (e as encomendas do site sem loja).
+
+O quadro **O mais vendido do ano** mostra o livro grande, as unidades, o valor, o mês em que mais
+vendeu, quantos meses foi o primeiro, a sua parte nas unidades dos mais vendidos e de onde vêm os
+números. **Os mais vendidos** mostra os cinco primeiros lado a lado.
+
+## 7. Exportações do relatório conjunto
 
 | Formato | Conteúdo |
 |---|---|
@@ -145,29 +219,36 @@ relatório conjunto, e para conferir o desenho num navegador).
 | **Imagem (.png)** | O quadro do resumo da rede |
 | **CSV** | Todas as lojas, todos os anos, mês a mês |
 | **JSON** | Tudo: a rede, cada mês loja a loja, cada loja e todos os anos |
-| **Vídeo** | Lento, normal ou curto (§5) |
+| **Vídeo** | Lento, normal ou curto, com o fundo escolhido (§5) |
 
 A **nota do relatório** (uma por ano, `painel_vendas_docs` `consolidado/notas/ano-AAAA`) aparece no
 PDF, no Excel e no fim do vídeo.
 
-## 7. Ficheiros
+## 8. Ficheiros
 
 | Ficheiro | Papel |
 |---|---|
 | `app/web/src/painel-vendas/modelo.js` | As contas de um ano (puro). Antes vivia dentro de `painel.js`. |
 | `app/web/src/painel-vendas/consolidado.js` | As contas da rede (puro). |
 | `app/web/src/painel-vendas/video.js` | Os vídeos. |
+| `app/web/src/painel-vendas/imagens-video.js` | As paisagens desenhadas, as fotografias com movimento e o livro em 3D. |
+| `app/web/src/painel-vendas/destaques.js` | Os mais vendidos: o site e o lançado à mão, por loja, mês e ano, e a rede (puro). |
+| `app/web/src/painel-vendas/biblioteca.js` | Supabase: a biblioteca de imagens e os mais vendidos à mão. |
+| `app/web/src/components/admin/ImagensVideosTab.jsx` | A secção Imagens dos vídeos. |
 | `app/web/src/painel-vendas/consolidado-ui.js`, `consolidado.html`, `consolidado.css` | O ecrã de Todas as livrarias. |
 | `app/web/src/painel-vendas/adapter.js` | Supabase: `createConsolidadoApi`, `fetchSystemSalesAll`. |
 | `app/web/src/components/admin/RelatoriosLojasTab.jsx` | O separador (Shadow DOM, como o `VendasHuamboTab`). |
 | `supabase/migrations/20261114120000_relatorios_de_todas_as_livrarias.sql` | Permissão, regras, histórico, `vendas_do_sistema`. |
+| `supabase/migrations/20261114140000_imagens_e_mais_vendidos_dos_videos.sql` | `biblioteca_imagens`, `vendas_produtos`, `produtos_mais_vendidos`, `capas_dos_produtos` e a pasta `biblioteca/` no Storage. |
 
-## 8. Testes
+## 9. Testes
 
 - `npm test`: `modelo.test.js` (as contas, com os números reais do Huambo), `consolidado.test.js`,
-  `video.test.js`, `permissions.test.js` (as três listas de permissões), `adminSections.test.js`.
-- Base de dados, com as migrações reais (47 cenários: quem lê, grava e apaga, o histórico, os
-  valores inválidos, os documentos e as vendas do sistema):
+  `video.test.js`, `destaques.test.js`, `ImagensVideosTab.test.jsx`, `permissions.test.js` (as três
+  listas de permissões), `adminSections.test.js`.
+- Base de dados, com as migrações reais (80 cenários: quem lê, grava e apaga, o histórico, os
+  valores inválidos, os documentos, as vendas do sistema, os mais vendidos por produto, os lançados
+  à mão, a biblioteca de imagens e a pasta do Storage):
 
   ```bash
   npm i --prefix /tmp/pglite @electric-sql/pglite@0.2.17

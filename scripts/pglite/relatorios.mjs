@@ -1,6 +1,7 @@
-// Cenários dos relatórios de vendas de todas as livrarias (migração 20261114120000): a permissão
-// «Editar relatórios de vendas», quem lê, grava e apaga, o histórico no servidor, os documentos do
-// relatório conjunto e as vendas do sistema por loja (vendas_do_sistema), com as migrações reais:
+// Cenários dos relatórios de vendas de todas as livrarias (migrações 20261114120000 e 20261114140000):
+// a permissão «Editar relatórios de vendas», quem lê, grava e apaga, o histórico no servidor, os
+// documentos do relatório conjunto, as vendas do sistema por loja (vendas_do_sistema), os mais
+// vendidos por produto, os lançados à mão e a biblioteca de imagens dos vídeos, com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/relatorios.mjs supabase/migrations
 // Instruções em base.mjs e em docs/PAGAMENTOS.md ("Testes").
 import { freshDb } from './base.mjs';
@@ -187,6 +188,89 @@ const meses = (vals) => JSON.stringify([...vals, ...Array(12 - vals.length).fill
   await raises('o atendimento não as lê', () => as(atendente, `select * from public.vendas_do_sistema(2026)`), /Sem permissão/);
   await raises('um cliente não as lê', async () => { const c = await user('cliente2@exemplo.ao'); await as(c, `select * from public.vendas_do_sistema(2026)`); }, /Sem permissão/);
   await raises('um ano absurdo é recusado', () => as(contab, `select * from public.vendas_do_sistema(1900)`), /Ano inválido/);
+}
+
+// --- 6. Os mais vendidos por produto, os lançados à mão e a biblioteca de imagens -----------
+{
+  const catalogo = await user('catalogo@loja.ao', 'manager', { manage_catalog: true });
+  const [livro] = await q(`insert into public.stock_books (title, book_code, price, stock, cover, active)
+                           values ('O Desejado de Todas as Nações', 'TESTE-VID-1', 8500, 10, 'https://exemplo.supabase.co/storage/v1/object/public/media/stock_books/x/capa.jpg', false) returning id`);
+  const [biblia] = await q(`insert into public.stock_books (title, book_code, price, stock, active) values ('Bíblia de Estudo', 'TESTE-VID-2', 25000, 5, true) returning id`);
+  const [huNome] = await q(`select name from public.physical_stores where id = $1`, [hu.id]);
+  let n = 100;
+  const venda = async ({ itens, pagoEm, loja = huNome.name, prov = '', total }) => {
+    n++;
+    const t = total ?? itens.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
+    const [o] = await q(`insert into public.orders (order_number, customer_email, customer_name, items, total, shipping_cost, status, shipping_method, pickup_store, delivery_province)
+      values ($1, 'cliente@exemplo.ao', 'Cliente Secreto', $2::jsonb, $3, 0, 'pending', $4, $5, $6) returning id`,
+      [`PROD-${n}`, JSON.stringify(itens), t, loja ? 'pickup' : 'standard', loja, prov]);
+    await db.exec('set session_replication_role = replica');
+    await q(`update public.orders set amount_paid = $2, amount_refunded = 0, paid_at = $3, status = 'confirmed', delivery_status = 'confirmed' where id = $1`, [o.id, t, pagoEm]);
+    await db.exec('set session_replication_role = origin');
+  };
+  await venda({ pagoEm: '2027-02-10T10:00:00Z', itens: [{ book_id: livro.id, title: 'O Desejado', quantity: 3, price: 8500 }, { book_id: biblia.id, title: 'Bíblia de Estudo', quantity: 1, price: 25000 }] });
+  await venda({ pagoEm: '2027-02-12T10:00:00Z', itens: [{ book_id: livro.id, title: 'O Desejado', quantity: 2, price: 8500 }] });
+  await venda({ pagoEm: '2027-03-01T10:00:00Z', itens: [{ title: 'Revista da Escola Sabatina', quantity: 4, price: 1500 }] });
+  await venda({ pagoEm: '2027-03-02T10:00:00Z', itens: [{ title: 'revista da escola sabatina', quantity: '2', price: '1500' }, 'lixo'] });
+  // Uma encomenda com itens estragados não rebenta a soma.
+  await venda({ pagoEm: '2027-03-03T10:00:00Z', itens: [{ title: 'Caneta', quantity: 'muitas', price: 'x' }], total: 100 });
+
+  const pv = await as(contab, `select * from public.produtos_mais_vendidos(2027)`);
+  const de = (titulo, mes) => pv.find((r) => r.titulo === titulo && r.mes === mes);
+  const fev = de('O Desejado de Todas as Nações', 2);
+  check('o mais vendido de Fevereiro: unidades, valor e encomendas', fev && Number(fev.unidades) === 5 && Number(fev.valor) === 42500 && fev.encomendas === 2 && fev.loja_id === hu.id, pv);
+  check('o título vem do catálogo e a capa também, mesmo do produto oculto', fev && fev.capa.includes('capa.jpg') && fev.codigo === 'TESTE-VID-1', fev);
+  const rev = pv.filter((r) => r.mes === 3 && /revista/i.test(r.titulo));
+  check('sem book_id, junta pelo título (sem maiúsculas)', rev.length === 1 && Number(rev[0].unidades) === 6 && Number(rev[0].valor) === 9000, rev);
+  check('um item estragado conta como 1 unidade sem valor', Number(de('Caneta', 3)?.unidades) === 1 && Number(de('Caneta', 3)?.valor) === 0, pv);
+  check('os totais por produto batem com as encomendas de vendas_do_sistema',
+    (await as(contab, `select sum(encomendas)::int as n from public.vendas_do_sistema(2027)`))[0].n === 5);
+  check('só totais, sem dados dos clientes', !Object.keys(pv[0]).some((k) => /email|nome|cliente|phone|customer/.test(k)), Object.keys(pv[0]));
+  await raises('o atendimento não vê os mais vendidos', () => as(atendente, `select * from public.produtos_mais_vendidos(2027)`), /Sem permissão/);
+  check('quem só edita os relatórios vê os mais vendidos', (await as(soEdita, `select count(*)::int as n from public.produtos_mais_vendidos(2027)`))[0].n > 0);
+
+  const capas = await as(leitor, `select * from public.capas_dos_produtos($1::text[])`, [[livro.id, biblia.id, 'naoexiste']]);
+  check('as capas chegam a quem vê os relatórios, também do produto oculto', capas.length === 2 && capas.some((c) => c.id === livro.id && c.capa.includes('capa.jpg')), capas);
+  check('quem gere o catálogo também lê as capas', (await as(catalogo, `select count(*)::int as n from public.capas_dos_produtos($1::text[])`, [[livro.id]]))[0].n === 1);
+  await raises('o atendimento não lê as capas por aqui', () => as(atendente, `select * from public.capas_dos_produtos($1::text[])`, [[livro.id]]), /Sem permissão/);
+
+  // Mais vendidos à mão.
+  await as(contab, `insert into public.vendas_produtos (loja_id, ano, mes, book_id, titulo, unidades, valor) values ($1, 2027, 2, $2, '  O   Desejado  ', 40, 340000)`, [hu.id, livro.id]);
+  const [vp] = await q(`select * from public.vendas_produtos where loja_id = $1`, [hu.id]);
+  check('o lançamento à mão grava-se, com o título arrumado e quem o fez', vp && vp.titulo === 'O Desejado' && vp.actualizado_por === contab, vp);
+  check('quem só vê lê os lançamentos', (await as(leitor, `select count(*)::int as n from public.vendas_produtos`))[0].n === 1);
+  await raises('quem só vê não lança', () => as(leitor, `insert into public.vendas_produtos (loja_id, ano, titulo, unidades) values ($1, 2027, 'X', 1)`, [hu.id]), /row-level security/);
+  await raises('o mês 13 é recusado', () => as(contab, `insert into public.vendas_produtos (loja_id, ano, mes, titulo, unidades) values ($1, 2027, 13, 'X', 1)`, [hu.id]), /vendas_produtos_mes_check/);
+  await raises('unidades negativas são recusadas', () => as(contab, `insert into public.vendas_produtos (loja_id, ano, titulo, unidades) values ($1, 2027, 'X', -1)`, [hu.id]), /vendas_produtos_unidades_check/);
+  await raises('título vazio é recusado', () => as(contab, `insert into public.vendas_produtos (loja_id, ano, titulo, unidades) values ($1, 2027, '   ', 1)`, [hu.id]), /vendas_produtos_titulo_check/);
+  check('o atendimento não lê os lançamentos', (await as(atendente, `select count(*)::int as n from public.vendas_produtos`))[0].n === 0);
+  const apagado = await as(contab, `delete from public.vendas_produtos where id = $1 returning id`, [vp.id]);
+  check('quem edita apaga um lançamento', apagado.length === 1);
+
+  // A biblioteca de imagens.
+  const url = 'https://exemplo.supabase.co/storage/v1/object/public/media/biblioteca/uploads/serra.jpg';
+  await as(catalogo, `insert into public.biblioteca_imagens (url, caminho, titulo, tema, creditos) values ($1, 'biblioteca/uploads/serra.jpg', ' Serra da Leba ', 'natureza', 'Foto da equipa')`, [url]);
+  const [img] = await q(`select * from public.biblioteca_imagens where url like 'https://%'`);
+  check('quem gere o catálogo junta imagens à biblioteca', img && img.titulo === 'Serra da Leba' && img.criado_por === catalogo, img);
+  check('quem vê os relatórios lê a biblioteca', (await as(leitor, `select count(*)::int as n from public.biblioteca_imagens`))[0].n >= 1);
+  check('o atendimento não lê a biblioteca', (await as(atendente, `select count(*)::int as n from public.biblioteca_imagens`))[0].n === 0);
+  await raises('quem só vê não junta imagens', () => as(leitor, `insert into public.biblioteca_imagens (url) values ($1)`, [url]), /row-level security/);
+  await raises('um endereço que não é https é recusado', () => as(contab, `insert into public.biblioteca_imagens (url) values ('javascript:alert(1)')`), /biblioteca_imagens_url_check/);
+  await as(contab, `insert into public.biblioteca_imagens (url, tema, titulo) values ('/images/site/opcoes/slide-familia-leque.webp', 'livros', 'Família · leque')`);
+  check('uma imagem do próprio site junta-se pelo caminho', (await q(`select 1 from public.biblioteca_imagens where url like '/images/%'`)).length === 1);
+  await raises('um caminho do site fora de /images é recusado', () => as(contab, `insert into public.biblioteca_imagens (url) values ('/admin?x=1')`), /biblioteca_imagens_url_check/);
+  await raises('um tema inventado é recusado', () => as(contab, `insert into public.biblioteca_imagens (url, tema) values ($1, 'praia')`, [url]), /biblioteca_imagens_tema_check/);
+  await raises('um caminho fora da pasta biblioteca é recusado', () => as(contab, `insert into public.biblioteca_imagens (url, caminho) values ($1, 'stock_books/x.jpg')`, [url]), /biblioteca_imagens_caminho_check/);
+  await as(contab, `update public.biblioteca_imagens set activa = false, criado_por = $2 where id = $1`, [img.id, contab]);
+  const [img2] = await q(`select activa, criado_por from public.biblioteca_imagens where id = $1`, [img.id]);
+  check('quem edita os relatórios desactiva; quem criou não se muda', img2.activa === false && img2.criado_por === catalogo, img2);
+
+  // O Storage: a pasta biblioteca/ é de quem gere as imagens dos vídeos.
+  const pode = async (id, nome) => (await as(id, `select private.can_write_media($1) as p`, [nome]))[0].p;
+  check('quem edita os relatórios envia para biblioteca/', await pode(contab, 'biblioteca/uploads/a.jpg'));
+  check('quem gere o catálogo envia para biblioteca/', await pode(catalogo, 'biblioteca/uploads/a.jpg'));
+  check('quem só vê não envia para biblioteca/', !(await pode(leitor, 'biblioteca/uploads/a.jpg')));
+  check('as outras pastas continuam como estavam', (await pode(catalogo, 'stock_books/x/a.jpg')) && !(await pode(contab, 'stock_books/x/a.jpg')) && !(await pode(catalogo, 'site_settings/a.jpg')));
 }
 
 console.log(`\n${ok} certos, ${fail} falhados`);

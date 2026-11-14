@@ -28,7 +28,7 @@ export const ADMIN_GROUPS = [
   { id: 'catalogo', label: 'Catálogo', sections: ['books', 'collections', 'slides', 'downloads'] },
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
-  { id: 'relatorios', label: 'Relatórios', sections: ['relatorios-lojas', 'vendas-huambo', 'pagamentos-caixa', 'financas'] },
+  { id: 'relatorios', label: 'Relatórios', sections: ['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
@@ -138,6 +138,18 @@ export const ADMIN_SECTIONS = {
     description: 'O painel de cada loja: os 12 meses, a comparação com o ano anterior, a projecção, a apresentação e o vídeo.',
     allowed: (p) => p.salesReports,
     readOnly: (p) => !p.salesReportsEdit,
+  },
+  // As imagens e os mais vendidos dos vídeos dos relatórios (ImagensVideosTab.jsx, docs/RELATORIOS.md).
+  'imagens-videos': {
+    label: 'Imagens dos vídeos', title: 'Imagens e mais vendidos dos vídeos', icon: Image,
+    keywords: 'biblioteca imagens fotografias paisagens natureza livros capas mais vendidos destaque videos',
+    description: 'As fotografias que os vídeos dos relatórios usam de fundo e os mais vendidos de cada loja lançados à mão (as vendas do balcão).',
+    allowed: (p) => p.salesReports || p.catalog,
+    readOnly: (p) => !p.salesReportsEdit && !p.catalog,
+    views: [
+      { id: 'imagens', label: 'Biblioteca de imagens', icon: Image, keywords: 'fotografias paisagens natureza enviar fundo', description: 'Paisagens, livros e lojas para o fundo dos vídeos.' },
+      { id: 'mais-vendidos', label: 'Mais vendidos', icon: TrendingUp, keywords: 'destaque produto balcao kigest top', description: 'Os mais vendidos de cada loja, por mês ou no ano, lançados à mão.', allowed: (p) => p.salesReports },
+    ],
   },
   'pagamentos-caixa': {
     label: 'Pagamentos e caixa', title: 'Pagamentos e caixa', icon: Wallet,

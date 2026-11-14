@@ -276,27 +276,17 @@ alter table public.painel_vendas_docs add constraint painel_vendas_docs_path_che
 -- ---------------------------------------------------------------------------------------------
 -- Nome e província comparados sem acentos nem maiúsculas («Huíla» = «huila»), como o painel:
 -- private.plain_text (migração entregas_loja_e_robustez).
-create or replace function public.vendas_do_sistema(p_ano integer, p_so_pagas boolean default true)
-returns table (loja_id text, mes integer, valor numeric, encomendas integer)
-language plpgsql
+-- As encomendas de um ano que contam para os relatórios, cada uma com a sua loja, o seu mês (na
+-- hora de Luanda), o valor em cêntimos e os itens. As regras estão só aqui: vendas_do_sistema
+-- (totais) e produtos_mais_vendidos (por produto, migração imagens_e_mais_vendidos_dos_videos) leem
+-- ambas esta função, para os dois números baterem sempre.
+create or replace function private.vendas_encomendas(p_ano integer, p_so_pagas boolean)
+returns table (encomenda text, loja_id text, mes integer, centimos numeric, itens jsonb)
+language sql
 stable
 security definer
 set search_path = ''
 as $$
-declare
-  v_de timestamptz;
-  v_ate timestamptz;
-begin
-  if not private.can_read_sales_reports() then
-    raise exception 'Sem permissão para ver as vendas.' using errcode = '42501';
-  end if;
-  if p_ano is null or p_ano < 2000 or p_ano > 2100 then
-    raise exception 'Ano inválido.' using errcode = '22023';
-  end if;
-  -- Luanda está em UTC+1 todo o ano: o ano começa às 23:00 UTC de 31 de Dezembro.
-  v_de := make_timestamptz(p_ano, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour';
-  v_ate := make_timestamptz(p_ano + 1, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour';
-  return query
   with lojas as (
     select s.id,
            private.plain_text(s.name) as nome,
@@ -305,8 +295,14 @@ begin
                               order by s.active desc, s.sort_order nulls last, s.name, s.id) as ordem
     from public.physical_stores s
   ),
+  limites as (
+    -- Luanda está em UTC+1 todo o ano: o ano começa às 23:00 UTC de 31 de Dezembro.
+    select make_timestamptz(p_ano, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour' as de,
+           make_timestamptz(p_ano + 1, 1, 1, 0, 0, 0, 'UTC') - interval '1 hour' as ate
+  ),
   enc as (
     select
+      o.id,
       case when p_so_pagas then o.paid_at else o.created end as quando,
       (coalesce(o.shipping_method, '') = 'pickup' or coalesce(o.pickup_store, '') <> '') as levanta,
       private.plain_text(o.pickup_store) as loja_nome,
@@ -316,28 +312,47 @@ begin
                    round(coalesce(o.total, 0)::numeric * 100))
              - round(coalesce(o.shipping_cost, 0)::numeric * 100)
         else round(coalesce(o.total, 0)::numeric * 100) - round(coalesce(o.shipping_cost, 0)::numeric * 100)
-      end as centimos
-    from public.orders o
-    where (case when p_so_pagas then o.paid_at else o.created end) >= v_de
-      and (case when p_so_pagas then o.paid_at else o.created end) < v_ate
+      end as centimos,
+      case when jsonb_typeof(o.items) = 'array' then o.items else '[]'::jsonb end as itens
+    from public.orders o, limites l
+    where (case when p_so_pagas then o.paid_at else o.created end) >= l.de
+      and (case when p_so_pagas then o.paid_at else o.created end) < l.ate
       and coalesce(o.status, '') <> 'cancelled'
       and coalesce(o.delivery_status, '') <> 'cancelled'
-  ),
-  atribuidas as (
-    select
-      case when e.levanta
-        then (select l.id from lojas l where l.nome = e.loja_nome order by l.ordem limit 1)
-        else (select l.id from lojas l where l.prov = e.prov and l.ordem = 1)
-      end as loja,
-      extract(month from (e.quando + interval '1 hour') at time zone 'UTC')::integer as m,
-      e.centimos
-    from enc e
-    where not p_so_pagas or e.centimos > 0
   )
-  select a.loja, a.m, (sum(greatest(a.centimos, 0)) / 100.0)::numeric(16, 2), count(*)::integer
-  from atribuidas a
-  group by a.loja, a.m
-  order by a.loja nulls last, a.m;
+  select
+    e.id,
+    case when e.levanta
+      then (select l.id from lojas l where l.nome = e.loja_nome order by l.ordem limit 1)
+      else (select l.id from lojas l where l.prov = e.prov and l.ordem = 1)
+    end,
+    extract(month from (e.quando + interval '1 hour') at time zone 'UTC')::integer,
+    e.centimos,
+    e.itens
+  from enc e
+  where not p_so_pagas or e.centimos > 0;
+$$;
+revoke all on function private.vendas_encomendas(integer, boolean) from public, anon, authenticated;
+
+create or replace function public.vendas_do_sistema(p_ano integer, p_so_pagas boolean default true)
+returns table (loja_id text, mes integer, valor numeric, encomendas integer)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.can_read_sales_reports() then
+    raise exception 'Sem permissão para ver as vendas.' using errcode = '42501';
+  end if;
+  if p_ano is null or p_ano < 2000 or p_ano > 2100 then
+    raise exception 'Ano inválido.' using errcode = '22023';
+  end if;
+  return query
+  select e.loja_id, e.mes, (sum(greatest(e.centimos, 0)) / 100.0)::numeric(16, 2), count(*)::integer
+  from private.vendas_encomendas(p_ano, p_so_pagas) e
+  group by e.loja_id, e.mes
+  order by e.loja_id nulls last, e.mes;
 end;
 $$;
 comment on function public.vendas_do_sistema(integer, boolean) is

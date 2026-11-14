@@ -934,7 +934,8 @@ export function mountPainel(root, api) {
         say('Relatório aberto noutra janela: escolha “Guardar como PDF” na impressão.', 'okk');
       } else if (fmt === 'video') {
         const ritmo = RITMOS[opts.ritmo] ? opts.ritmo : 'lento';
-        say('A preparar o vídeo… mantenha este separador aberto até ao fim.');
+        say('A preparar o vídeo (capas e imagens)… mantenha este separador aberto até ao fim.');
+        Object.assign(d, await extrasDe(d.ano), { fundo: $('vid-fundo').value });
         videoAbort = new AbortController();
         $('exp-cancel').hidden = false;
         const { blob, ext, duracao } = await renderVideo(d, (t, total, cena) => say('A gravar o vídeo ' + RITMOS[ritmo].nome.replace('Vídeo ', '') + ': '
@@ -951,9 +952,17 @@ export function mountPainel(root, api) {
       root.querySelectorAll('#exp-menu button').forEach((b) => { b.disabled = false; });
     }
   }
+  // Os mais vendidos da loja e as fotografias da biblioteca (para os vídeos), uma vez por ano.
+  const extrasCache = {};
+  const destaquesPorAno = {};
+  async function extrasDe(ano) {
+    if (!S.extras) return { destaques: null, fotos: [] };
+    if (!extrasCache[ano]) extrasCache[ano] = S.extras(ano).catch(() => ({ destaques: null, fotos: [] }));
+    return extrasCache[ano];
+  }
   // A duração de cada vídeo, calculada do plano (o lento tem um quadro por mês, de Janeiro a Dezembro).
-  function videoLabels(M) {
-    const d = { rows: M.rows };
+  function videoLabels(M, destaques = destaquesPorAno[M.ano] || null) {
+    const d = { rows: M.rows, destaques };
     const n = M.rows.length;
     $('vid-lento').textContent = fmtDuracao(duracaoPlano(planoVideo(d, 'lento'))) + ' · para analisar: os ' + n + ' meses, um a um';
     $('vid-normal').textContent = fmtDuracao(duracaoPlano(planoVideo(d, 'normal'))) + ' · os mesmos quadros, mais depressa';
@@ -963,7 +972,15 @@ export function mountPainel(root, api) {
   $('btn-exp').addEventListener('click', () => {
     const menu = $('exp-menu'); menu.hidden = !menu.hidden;
     $('btn-exp').setAttribute('aria-expanded', String(!menu.hidden));
+    // Ao abrir, a duração dos vídeos passa a contar com os quadros dos mais vendidos (se os houver).
+    if (!menu.hidden && S.model) {
+      const M = S.model;
+      extrasDe(M.ano).then((x) => { destaquesPorAno[M.ano] = x.destaques; if (S.model === M) videoLabels(M); });
+    }
   });
+  // O fundo dos vídeos fica lembrado neste aparelho.
+  try { const f = localStorage.getItem('relatorios:video:fundo'); if (f) $('vid-fundo').value = f; } catch (e) { /* sem armazenamento */ }
+  $('vid-fundo').addEventListener('change', () => { try { localStorage.setItem('relatorios:video:fundo', $('vid-fundo').value); } catch (e) { /* idem */ } });
   $('exp-menu').addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-fmt]'); if (!b) return;
     doExport(b.dataset.fmt, null, { ritmo: b.dataset.ritmo });
@@ -1204,8 +1221,9 @@ export function mountPainel(root, api) {
 
   // ---------- Ligação aos dados ----------
   (async () => {
-    const { db, user, downloads, store, sales } = api;
+    const { db, user, downloads, store, sales, extras } = api;
     S.downloads = downloads;
+    S.extras = extras || null;
     S.store = store || null; S.sales = sales || null;
     if (S.store) $('eyebrow').textContent = 'Livraria e Editora Adventista · ' + S.store.name;
     if (!S.sales || !S.sales.available) $('ed-sys-note').textContent = (S.sales && S.sales.reason) || 'As vendas do sistema não estão disponíveis nesta vista.';

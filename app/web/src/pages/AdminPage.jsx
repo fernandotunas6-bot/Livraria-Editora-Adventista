@@ -66,6 +66,7 @@ const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const RelatoriosLojasTab = lazy(() => import('@/components/admin/RelatoriosLojasTab'));
+const ImagensVideosTab = lazy(() => import('@/components/admin/ImagensVideosTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
 const StaffAlertBar = lazy(() => import('@/components/admin/StaffAlertBar'));
@@ -780,6 +781,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="relatorios-lojas">
                 <Suspense fallback={spinner}>
                   <RelatoriosLojasTab onOpenStore={() => goToSection('vendas-huambo')} />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canAccessAdmin && (
+              <AdminSection active={activeTab} value="imagens-videos">
+                <Suspense fallback={spinner}>
+                  <ImagensVideosTab />
                 </Suspense>
               </AdminSection>
             )}

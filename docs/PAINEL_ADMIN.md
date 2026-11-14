@@ -200,6 +200,7 @@ ligações para eles nos alertas, nos emails e noutras páginas.
 | | Lojas (`stores`) | `manage_settings` |
 | Relatórios | Todas as livrarias (`relatorios-lojas`): o relatório conjunto da rede, com vídeo, exportações e o lançamento das vendas de todas as lojas — [RELATORIOS.md](RELATORIOS.md) | `view_reports` ou `edit_reports` (só de leitura sem `edit_reports`) |
 | | Vendas por loja (`vendas-huambo`) | `view_reports` ou `edit_reports` (só de leitura sem `edit_reports`) |
+| | Imagens dos vídeos (`imagens-videos`): a biblioteca de imagens dos vídeos e os mais vendidos lançados à mão | `view_reports`, `edit_reports` ou `manage_catalog` (este só a biblioteca); altera com `edit_reports` ou `manage_catalog` |
 | | Pagamentos e caixa (`pagamentos-caixa`) | `view_reports` ou `confirm_payments` |
 | Clientes | Utilizadores (`users`) | `manage_users` |
 | | Contactos e campanhas (`contacts`) | `manage_marketing` |
@@ -227,6 +228,8 @@ Só o que **pede acção**, nunca totais:
 | Secção | Vistas (`vista`) | Quem vê |
 |---|---|---|
 | Utilizadores | Clientes (`customers`), Equipa (`team`) | quem vê a secção (alterar a equipa é só do administrador) |
+| Imagens dos vídeos | Biblioteca de imagens (`imagens`) | quem vê a secção |
+| | Mais vendidos (`mais-vendidos`) | `view_reports` ou `edit_reports` (lançar: `edit_reports`) |
 | | Cargos (`cargos`) | administrador |
 | Contactos e campanhas | Contactos, Grupos, Campanhas, Histórico (`contacts`, `groups`, `campaigns`, `history`) | quem vê a secção |
 | Comunidade | Denúncias, Publicações, Temas, Clube do livro, Sites bloqueados, Níveis dos leitores (`denuncias`, `publicacoes`, `temas`, `clube`, `sites`, `niveis`) | quem vê a secção |
