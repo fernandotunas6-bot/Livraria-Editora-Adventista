@@ -38,3 +38,104 @@ for (const movimento of ['no-preference', 'reduce']) {
     expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
   });
 }
+
+test('ao gravar, o painel pede confirmação de um valor invulgar e manda o actualizado que leu', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  await page.goto(PAINEL + '?editar=1');
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  await painel.locator('#btn-admin').click();
+  await expect(painel.locator('#editar')).toBeVisible();
+
+  // Agosto com um zero a mais: dez vezes o Agosto de 2025.
+  await painel.locator('#ed-m7').fill('29 042 000');
+  await painel.locator('#ed-save').click();
+  await expect(painel.locator('#ed-status')).toContainText('valores invulgares');
+  await expect(painel.locator('#ed-status')).toContainText('Ago: +900% face a Ago de 2025');
+  expect(await page.evaluate(() => window.__gravacoes.length), 'nada gravado antes de confirmar').toBe(0);
+
+  // A segunda carga grava, com o `actualizado` que o painel leu (o servidor recusa se mudou).
+  await painel.locator('#ed-save').click();
+  await expect(painel.locator('#ed-status')).toContainText('Guardado');
+  const [g] = await page.evaluate(() => window.__gravacoes);
+  expect(g.path).toBe('anos/2026');
+  expect(g.opts).toEqual({ esperado: '2026-11-01T10:00:00.222222+00:00' });
+  expect(g.value.meses[7]).toBe(29042000);
+  expect(erros).toEqual([]);
+});
+
+test('substituir um mês registado pelas vendas do sistema pede confirmação', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  await page.goto(PAINEL + '?editar=1');
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  await painel.locator('#btn-admin').click();
+  await painel.locator('#ed-sys-load').click();
+  await expect(painel.locator('#ed-sys-st')).toContainText('Só o site');
+
+  // O sistema só tem 21 665 Kz em Outubro (uma encomenda do site); a loja registou 4 908 704 Kz.
+  await painel.locator('#ed-sys-all').click();
+  await expect(painel.locator('#ed-sys-st')).toContainText('Atenção');
+  await expect(painel.locator('#ed-sys-st')).toContainText('Out:');
+  await expect(painel.locator('#ed-m9')).toHaveValue('4 908 704');
+  await expect(painel.locator('#ed-sys-all')).toContainText('Confirmar');
+
+  await painel.locator('#ed-sys-all').click();
+  await expect(painel.locator('#ed-m9')).toHaveValue('21 665');
+  await expect(painel.locator('#ed-sys-all')).toHaveText('Substituir meses com vendas');
+  expect(erros).toEqual([]);
+});
+
+// --- O relatório de todas as livrarias (e2e/painel/conjunto.html) -------------------------------
+const CONJUNTO = 'http://localhost:4174/conjunto.html';
+
+test('todas as livrarias: mostra os valores a confirmar e protege a substituição pelo sistema', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  await page.goto(CONJUNTO);
+  const rel = page.locator('#host');
+
+  // Os meses invulgares de cada loja (o Huambo face a 2025, Julho no Lubango), sem gravar nada.
+  await expect(rel.locator('#conf')).toBeVisible();
+  await expect(rel.locator('#conf-list')).toContainText('Huambo');
+  await expect(rel.locator('#conf-list')).toContainText('Set: +1 441% face a Set de 2025');
+  await expect(rel.locator('#conf-list')).not.toContainText('Catumbela');
+  await expect(rel.locator('#sys-note')).toContainText('não passam pelo site');
+
+  // A grelha de lançamento, com as vendas do sistema carregadas.
+  await rel.locator('#btn-edit').click();
+  await rel.locator('#sys-load').click();
+  await expect(rel.locator('#sys-st')).toContainText('do site');
+  await rel.locator('#ed-all').click();
+  await expect(rel.locator('#ed-sys-st')).toContainText('Atenção');
+  await expect(rel.locator('#ed-sys-st')).toContainText('4 908 704,00 → 21 665,00');
+  const outubro = rel.getByLabel('Livraria Adventista — Huambo, Outubro de 2026');
+  await expect(outubro).toHaveValue('4 908 704');
+  await rel.locator('#ed-all').click();
+  await expect(outubro).toHaveValue('21 665');
+
+  // Gravar: 21 665 Kz em vez de 4 908 704 Kz é invulgar, e o ecrã pede confirmação primeiro.
+  await rel.locator('#ed-save').click();
+  await expect(rel.locator('#ed-status')).toContainText('Out: −99% face a Out de 2025');
+  expect(await page.evaluate(() => window.__gravacoes.length)).toBe(0);
+  // A segunda carga grava: a linha leva o actualizado que a grelha leu e a origem «sistema».
+  await rel.locator('#ed-save').click();
+  await expect(rel.locator('#ed-status')).toContainText('Guardado');
+  const [g] = await page.evaluate(() => window.__gravacoes);
+  expect(g.linhas).toHaveLength(1);
+  expect(g.linhas[0]).toMatchObject({ lojaId: 'huambo', esperado: '2026-11-01T10:00:00.202600+00:00', origem: 'sistema' });
+  expect(g.linhas[0].meses[9]).toBe(21665);
+  expect(erros).toEqual([]);
+});
+
+test('todas as livrarias: uma gravação recusada por conflito diz porquê', async ({ page }) => {
+  await page.goto(CONJUNTO + '?conflito=1');
+  const rel = page.locator('#host');
+  await rel.locator('#btn-edit').click();
+  await rel.getByLabel('Livraria Adventista — Lubango, Novembro de 2026').fill('400 000');
+  await rel.locator('#ed-save').click();
+  await expect(rel.locator('#ed-status')).toContainText('mudaram depois de os abrir');
+  await expect(rel.locator('#ed-save')).toBeEnabled();
+});

@@ -273,5 +273,57 @@ const meses = (vals) => JSON.stringify([...vals, ...Array(12 - vals.length).fill
   check('as outras pastas continuam como estavam', (await pode(catalogo, 'stock_books/x/a.jpg')) && !(await pode(contab, 'stock_books/x/a.jpg')) && !(await pode(catalogo, 'site_settings/a.jpg')));
 }
 
+// --- Gravação protegida (vendas_anos_gravar, migração relatorios_gravacao_protegida) -------------
+// Uma gravação leva o `actualizado` que o ecrã leu ao abrir; se alguém gravou entretanto, é recusada.
+{
+  const ler = async (loja, ano) => (await q(`select meses, mes_em_curso, fonte, origem, actualizado::text as a from public.vendas_anos where loja_id = $1 and ano = $2`, [loja, ano]))[0];
+  const gravar = (id, ano, linhas) => as(id, `select loja_id, actualizado::text as a from public.vendas_anos_gravar($1, $2::jsonb)`, [ano, JSON.stringify(linhas)]);
+
+  const criado = await gravar(contab, 2031, [{ loja_id: lu.id, esperado: null, meses: JSON.parse(meses([100000, 200000])), mes_em_curso: 2, fonte: 'Excel da loja', origem: 'importacao' }]);
+  const r0 = await ler(lu.id, 2031);
+  check('a gravação cria um ano novo e devolve o actualizado', criado.length === 1 && r0 && r0.origem === 'importacao' && r0.mes_em_curso === 2 && criado[0].a === r0.a, { criado, r0 });
+
+  // Duas pessoas abrem o mesmo ano; a primeira grava, a segunda (com o que leu antes) é recusada.
+  const lido = r0.a;
+  await gravar(contab, 2031, [{ loja_id: lu.id, esperado: lido, meses: JSON.parse(meses([100000, 250000, 300000])) }]);
+  const r1 = await ler(lu.id, 2031);
+  check('quem grava com o ano actual grava, e só os campos que mandou', r1.meses[2] === 300000 && r1.mes_em_curso === 2 && r1.fonte === 'Excel da loja' && r1.a !== lido, r1);
+  await raises('a segunda pessoa, com o que leu antes, é recusada', () => gravar(soEdita, 2031, [{ loja_id: lu.id, esperado: lido, meses: JSON.parse(meses([1, 2])) }]), /mudaram depois de os abrir/);
+  const r2 = await ler(lu.id, 2031);
+  check('e os números da primeira ficam', r2.meses[2] === 300000 && r2.meses[0] === 100000 && r2.a === r1.a, r2);
+  await raises('criar um ano que alguém criou entretanto é recusado', () => gravar(soEdita, 2031, [{ loja_id: lu.id, esperado: null, meses: JSON.parse(meses([1])) }]), /criou/);
+
+  // Várias lojas no mesmo pedido: ou gravam todas ou nenhuma.
+  const h0 = await gravar(contab, 2031, [{ loja_id: hu.id, esperado: null, meses: JSON.parse(meses([5])) }]);
+  await raises('uma loja desactualizada no pedido recusa o pedido inteiro', () => gravar(contab, 2031, [
+    { loja_id: hu.id, esperado: h0[0].a, meses: JSON.parse(meses([6])) },
+    { loja_id: lu.id, esperado: lido, meses: JSON.parse(meses([7])) },
+  ]), /mudaram depois de os abrir/);
+  check('…e a loja que estava certa não mudou', (await ler(hu.id, 2031)).meses[0] === 5);
+  const juntos = await gravar(contab, 2031, [
+    { loja_id: hu.id, esperado: h0[0].a, meses: JSON.parse(meses([6])), mes_em_curso: null },
+    { loja_id: lu.id, esperado: r2.a, meses: JSON.parse(meses([7])), mes_em_curso: null, origem: 'sistema' },
+  ]);
+  const [hu1, lu1] = [await ler(hu.id, 2031), await ler(lu.id, 2031)];
+  check('duas lojas actuais gravam juntas', juntos.length === 2 && hu1.meses[0] === 6 && lu1.meses[0] === 7 && lu1.mes_em_curso === null && lu1.origem === 'sistema', { juntos, hu1, lu1 });
+  await raises('a mesma loja duas vezes no pedido é recusada', () => gravar(contab, 2031, [{ loja_id: hu.id, esperado: hu1.a }, { loja_id: hu.id, esperado: hu1.a }]), /duas vezes/);
+
+  await raises('quem só vê não grava pela função', () => gravar(leitor, 2031, [{ loja_id: hu.id, esperado: hu1.a, meses: JSON.parse(meses([1])) }]), /Sem permissão/);
+  await raises('o atendimento não grava pela função', () => gravar(atendente, 2031, [{ loja_id: hu.id, esperado: hu1.a, meses: JSON.parse(meses([1])) }]), /Sem permissão/);
+  await raises('meses negativos continuam recusados', () => gravar(contab, 2031, [{ loja_id: hu.id, esperado: hu1.a, meses: JSON.parse(meses([-1])) }]), /vendas_anos_meses_validos/);
+  await raises('um anónimo não chama a função', () => db.transaction(async (tx) => {
+    await tx.exec('set local role anon');
+    await tx.query(`select public.vendas_anos_gravar(2031, '[]'::jsonb)`);
+  }), /permission denied/);
+
+  const hist = await q(`select accao, por, origem from public.vendas_alteracoes where ano = 2031 order by id`);
+  check('cada gravação pela função fica no histórico, com o autor', hist.length === 5 && hist.every((h) => h.por === contab), hist);
+
+  // As linhas que vieram das importações (migrações) ficaram com a origem «importacao».
+  const imp = await q(`select origem, fonte from public.vendas_anos where actualizado_por is null and (fonte = 'Relatório Síntese 2025/26' or fonte like 'Painel de Vendas da Loja %')
+                         and exists (select 1 from jsonb_array_elements(meses) e where jsonb_typeof(e) = 'number')`);
+  check('os anos importados por migração estão marcados como importação', imp.length > 0 && imp.every((r) => r.origem === 'importacao'), imp);
+}
+
 console.log(`\n${ok} certos, ${fail} falhados`);
 process.exit(fail ? 1 : 0);

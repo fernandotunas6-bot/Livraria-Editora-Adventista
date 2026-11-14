@@ -10,13 +10,14 @@
 import * as d3 from 'd3';
 import { MESES, MESES_CURTOS } from './modelo.js';
 import { CORES_LOJAS, aplicarSistema, anosDisponiveis, buildConsolidado, linhasTodosOsAnos, matrizLojasMeses } from './consolidado.js';
-import { buildXlsx, toCsv } from './exportar.js';
+import { buildXlsx, imprimirJanela, toCsv } from './exportar.js';
 import { aplicarPptx, lerPainelPptx, lojaDoPptx } from './pptx.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { filtroActivo, mesesDoPeriodo, recortarConsolidado, rotuloFiltro } from './filtros.js';
 import { montarFiltros } from './filtros-ui.js';
 import { RITMOS, duracaoPlano, fmtDuracao, planoVideoConjunto, quadroDoVideo, renderVideoConjunto } from './video.js';
 import { estiloBaseImpressao } from '../lib/fontes.js';
+import { avisosDePlausibilidade, origemDasAlteracoes, substituicoesComValor, textoDoAviso } from './plausibilidade.js';
 
 export function mountConsolidado(root, api) {
   const $ = (id) => root.getElementById(id);
@@ -234,7 +235,30 @@ export function mountConsolidado(root, api) {
     if (pts.length > 1) sp.append('path').attr('d', d3.line().x((p) => x(p[0])).y((p) => y(p[1]))(pts)).attr('fill', 'none').attr('stroke', C2).attr('stroke-width', 2);
   }
 
+  /** Os meses invulgares de cada loja no ano (plausibilidade.js): para confirmar, não são erros. */
+  function fillConfirmar(c) {
+    const box = $('conf');
+    if (!box) return;
+    const linhas = [];
+    S.lojas.forEach((l) => {
+      const Y = (l.years || {})[c.ano];
+      if (!Y) return;
+      const ant = (l.years || {})[c.ano - 1];
+      const av = avisosDePlausibilidade(Y.meses, ant ? ant.meses : null);
+      if (av.length) linhas.push({ nome: l.name, av });
+    });
+    box.hidden = !linhas.length;
+    if (!linhas.length) return;
+    $('conf-list').replaceChildren(...linhas.map(({ nome, av }) => {
+      const li = el('li');
+      li.append(el('b', null, nome));
+      av.forEach((a) => li.append(el('span', 'm', textoDoAviso(a, c.ano - 1))));
+      return li;
+    }));
+  }
+
   function fillPend(c) {
+    fillConfirmar(c);
     $('pend').hidden = !c.pendentes.length;
     if (!c.pendentes.length) return;
     $('pend-note').textContent = `Até ${c.ultimoMesRede}, o último mês que alguma livraria já registou. Sem estes meses, os totais da rede ficam abaixo do real e os meses aparecem como parciais.`;
@@ -541,7 +565,7 @@ export function mountConsolidado(root, api) {
         return;
       }
       S.sys = { ano, modo, data };
-      $('sys-st').textContent = `${data.orders} ${data.orders === 1 ? 'encomenda' : 'encomendas'} em ${ano}. A vermelho, os meses em que o registado não bate com o sistema.`;
+      $('sys-st').textContent = `${data.orders} ${data.orders === 1 ? 'encomenda' : 'encomendas'} do site em ${ano}. A vermelho, os meses em que o registado não bate com o sistema — o normal, enquanto as vendas ao balcão (KiGest) não passarem pelo site: o registado inclui-as, o sistema não.`;
       fillSys();
       edSysButtons();
     } catch (e) {
@@ -602,7 +626,10 @@ export function mountConsolidado(root, api) {
   }
 
   // ---------- Lançar vendas (grelha lojas × meses) ----------
-  const ED = { lojas: [] };
+  // `esperado`: o `actualizado` de cada loja quando a grelha abriu. A gravação só passa se ninguém
+  // tiver gravado essa loja entretanto (public.vendas_anos_gravar). `avisos`: os valores invulgares
+  // já mostrados — a segunda carga em Guardar grava-os. `substituir`: a substituição por confirmar.
+  const ED = { lojas: [], esperado: [], avisos: null, substituir: null };
   function lojasDoEditor(ano) {
     return S.lojas.filter((l) => l.active || (l.years || {})[ano] || Object.keys(l.years || {}).length);
   }
@@ -642,6 +669,9 @@ export function mountConsolidado(root, api) {
     $('ed-ano').textContent = String(ano);
     edTabs();
     ED.lojas = lojasDoEditor(ano);
+    ED.esperado = ED.lojas.map((l) => ((l.years || {})[ano] || {}).actualizado || null);
+    ED.avisos = null;
+    edSubstituirCancelar();
     const t = $('ed-grid');
     const hr = el('tr');
     hr.append(th('Livraria'), ...MESES_CURTOS.map((m) => th(m)), th('Mês em curso'), th('Total', 'tot'));
@@ -712,7 +742,9 @@ export function mountConsolidado(root, api) {
     else edStatus('');
   }
   $('ed-grid').addEventListener('input', (e) => {
-    if (e.target.matches && e.target.matches('input.v')) e.target.classList.remove('sis');
+    if (e.target.matches && e.target.matches('input.v')) e.target.classList.remove('sis', 'ppt');
+    ED.avisos = null;
+    edSubstituirCancelar();
     edCheck();
   });
   $('ed-grid').addEventListener('change', edCheck);
@@ -750,18 +782,46 @@ export function mountConsolidado(root, api) {
       else $('ed-sys-st').textContent = '';
     }
   }
-  function edAplicarSistema(modo) {
+  /** O que a substituição pelas vendas do sistema mudaria em cada loja (sem mexer na grelha). */
+  function edPlanoSistema(modo) {
     const D = S.sys.data;
-    if (!D || S.sys.ano !== S.ed.ano) return;
-    let n = 0;
-    ED.lojas.forEach((l, li) => {
+    return ED.lojas.map((l, li) => {
       const s = D.porLoja[l.id];
-      if (!s) return;
+      if (!s) return null;
       const inps = edInputs().filter((x) => Number(x.dataset.l) === li).sort((a, b) => a.dataset.i - b.dataset.i);
       const atual = inps.map((x) => { const p = parseKz(x.value); return p.ok ? p.v : null; });
       const sistema = s.months.map((v, i) => (s.counts[i] ? v : null));
-      const { meses, mudou } = aplicarSistema(atual, sistema, modo);
-      mudou.forEach((m) => { inps[m.i].value = inField(meses[m.i]); inps[m.i].classList.add('sis'); n++; });
+      return { l, inps, ...aplicarSistema(atual, sistema, modo) };
+    }).filter(Boolean);
+  }
+  function edSubstituirCancelar() {
+    if (!ED.substituir) return;
+    ED.substituir = null;
+    const b = $('ed-all');
+    if (b) b.textContent = 'Substituir os meses com vendas';
+  }
+  function edAplicarSistema(modo) {
+    const D = S.sys.data;
+    if (!D || S.sys.ano !== S.ed.ano) return;
+    const plano = edPlanoSistema(modo);
+    // As vendas do sistema são só as do site: trocar por elas um mês já registado (que inclui o
+    // balcão) quase sempre o baixa. Primeiro diz-se o que muda; só a segunda carga aplica.
+    if (modo === 'todos' && !ED.substituir) {
+      const trocas = plano.flatMap((p) => substituicoesComValor(p.mudou).map((m) => `${p.l.name} ${MESES_CURTOS[m.i]}: ${grp(m.de)} → ${grp(m.para)}`));
+      if (trocas.length) {
+        ED.substituir = true;
+        $('ed-all').textContent = `Confirmar: substituir ${trocas.length} ${trocas.length === 1 ? 'mês registado' : 'meses registados'}`;
+        $('ed-sys-st').textContent = 'Atenção: o sistema só conhece as encomendas do site; as vendas ao balcão (KiGest) ficam de fora. '
+          + `Vai trocar ${trocas.length === 1 ? 'este valor' : 'estes valores'}: ${trocas.join(' · ')}. Carregue outra vez para confirmar.`;
+        $('ed-sys-st').className = 'st err';
+        return;
+      }
+    }
+    edSubstituirCancelar();
+    $('ed-sys-st').className = 'st';
+    let n = 0;
+    plano.forEach(({ inps, meses, mudou }) => {
+      mudou.forEach((m) => { inps[m.i].value = inField(meses[m.i]); inps[m.i].classList.remove('ppt'); inps[m.i].classList.add('sis'); n++; });
     });
     edCheck();
     edHints();
@@ -869,19 +929,32 @@ export function mountConsolidado(root, api) {
       const meses = inps.map((x) => { const p = parseKz(x.value); if (!p.ok) invalido = true; return p.ok ? p.v : null; });
       const mudados = inps.filter((x) => x.classList.contains('changed'));
       if (!mudados.length && sel.value === sel.dataset.orig) return;
-      const doSistema = mudados.filter((x) => x.classList.contains('sis')).length;
-      const origem = !mudados.length ? 'manual' : doSistema === mudados.length ? 'sistema' : doSistema ? 'misto' : 'manual';
-      linhas.push({ lojaId: l.id, meses, mes_em_curso: sel.value ? Number(sel.value) : null, origem, nome: l.name });
+      const sistema = mudados.filter((x) => x.classList.contains('sis')).length;
+      const importacao = mudados.filter((x) => x.classList.contains('ppt') && !x.classList.contains('sis')).length;
+      const origem = origemDasAlteracoes({ sistema, importacao, manual: mudados.length - sistema - importacao });
+      const ant = (l.years || {})[ano - 1];
+      const avisos = avisosDePlausibilidade(meses, ant ? ant.meses : null, mudados.map((x) => Number(x.dataset.i)));
+      linhas.push({ lojaId: l.id, meses, mes_em_curso: sel.value ? Number(sel.value) : null, origem, nome: l.name, esperado: ED.esperado[li] || null, avisos });
     });
     if (invalido) { edCheck(); return; }
+    // Valores invulgares (plausibilidade.js): mostram-se uma vez; a segunda carga em Guardar grava.
+    const avisos = linhas.filter((x) => x.avisos.length).map((x) => `${x.nome}: ${x.avisos.map((a) => textoDoAviso(a, ano - 1)).join(', ')}`);
+    const chave = avisos.join('|');
+    if (avisos.length && ED.avisos !== chave) {
+      ED.avisos = chave;
+      edStatus(`Confirme estes valores invulgares antes de gravar — ${avisos.join(' · ')}. Se estão certos, carregue outra vez em Guardar (e, se puder, deixe uma observação no painel da loja).`, 'err');
+      return;
+    }
     $('ed-save').disabled = true;
     edStatus(`A guardar ${linhas.length} ${linhas.length === 1 ? 'loja' : 'lojas'}…`);
     try {
-      await api.gravarMeses(ano, linhas);
+      await api.gravarMeses(ano, linhas.map(({ avisos: _a, ...l }) => l));
     } catch (e) {
-      edStatus(e && e.code === 'invalid_argument'
-        ? 'Não tem permissão para gravar. Peça a um administrador a permissão «Editar relatórios de vendas».'
-        : 'Não foi possível guardar agora. Tente de novo dentro de instantes.', 'err');
+      edStatus(e && e.code === 'conflict'
+        ? `${e.message} Para não perder o que escreveu, copie os valores antes de recarregar (ou use «Colar do Excel» depois).`
+        : e && e.code === 'invalid_argument'
+          ? 'Não tem permissão para gravar. Peça a um administrador a permissão «Editar relatórios de vendas».'
+          : 'Não foi possível guardar agora. Tente de novo dentro de instantes.', 'err');
       $('ed-save').disabled = false;
       return;
     }
@@ -946,7 +1019,7 @@ export function mountConsolidado(root, api) {
     if (!lista.length) { ul.replaceChildren(el('li', null, `Sem gravações registadas para ${ano}.`)); return; }
     const nome = (id) => (S.lojas.find((l) => l.id === id) || {}).name || 'Loja ' + id;
     const accao = { insert: 'Criou', update: 'Alterou', delete: 'Apagou' };
-    const origem = { manual: ['à mão', 'm'], sistema: ['do sistema', 's'], misto: ['sistema e à mão', 's'], importacao: ['importação', 'm'] };
+    const origem = { manual: ['à mão', 'm'], sistema: ['do sistema', 's'], misto: ['várias origens', 's'], importacao: ['importação (PowerPoint/Excel)', 'm'] };
     ul.replaceChildren(...lista.map((h) => {
       const li = el('li');
       li.appendChild(el('span', null, quando(h.em)));
@@ -1070,9 +1143,9 @@ ${c.pendentes.length ? `<h2>Meses por registar</h2><p>${c.pendentes.map((p) => h
 <img alt="Vendas por mês" src="${img2}">
 <h2>Lojas × meses (Kz)</h2>
 <table><thead><tr><th>Livraria</th>${MESES_CURTOS.map((m) => `<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>${mx}${rede}</tbody></table>
-<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
 </body></html>`);
     win.document.close();
+    await imprimirJanela(win);
   }
 
   let exporting = false;

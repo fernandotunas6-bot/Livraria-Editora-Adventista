@@ -110,6 +110,16 @@
   </section>
 
 
+  <section class="card pend conf" id="conf" hidden>
+    <div class="head">
+      <div>
+        <h2>Valores a confirmar</h2>
+        <p class="note">Meses que valem 4 vezes ou mais o mesmo mês do ano anterior (ou um quarto ou menos), ou que se afastam tanto dos outros meses do ano. Podem estar certos; confirme-os com a loja antes de os usar — um ano anterior com outro âmbito, ou um zero a mais, mudam o crescimento e a projecção.</p>
+      </div>
+    </div>
+    <ul class="pend-list" id="conf-list"></ul>
+  </section>
+
   <section class="card pend" id="pend" hidden>
     <div class="head">
       <div>
@@ -201,7 +211,7 @@
     <div class="head">
       <div>
         <h2>Conferir com as vendas do sistema</h2>
-        <p class="note" id="sys-note">As encomendas registadas no site, por loja: levantamentos na loja e entregas na província da loja, sem portes e sem as canceladas. Só totais, sem dados dos clientes.</p>
+        <p class="note" id="sys-note">As encomendas registadas no site, por loja: levantamentos na loja e entregas na província da loja, sem portes e sem as canceladas. Só totais, sem dados dos clientes. <b>As vendas ao balcão (KiGest) não passam pelo site e não entram aqui</b>: enquanto for assim, o registado de cada loja é maior do que o sistema, e isso não é um erro.</p>
       </div>
       <div class="ed-actions">
         <label class="st" for="sys-modo">Contar</label>
@@ -233,7 +243,7 @@
     </div>
 
     <div class="sys">
-      <div class="sys-h"><b>A partir das vendas do sistema</b><span class="note">Carregue as vendas do sistema (acima) para o ano que está a lançar. Os meses sem encomendas ficam como estão.</span></div>
+      <div class="sys-h"><b>A partir das vendas do sistema</b><span class="note">Carregue as vendas do sistema (acima) para o ano que está a lançar. Os meses sem encomendas ficam como estão. O sistema só conhece o site: substituir um mês já registado pelo valor do sistema tira-lhe as vendas ao balcão, por isso pede confirmação.</span></div>
       <div class="ed-actions">
         <button class="btn line sm" id="ed-fill" type="button" disabled>Preencher meses vazios</button>
         <button class="btn line sm" id="ed-all" type="button" disabled>Substituir os meses com vendas</button>

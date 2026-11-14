@@ -32,11 +32,38 @@ function yearRowToDoc(row) {
   };
 }
 
+/**
+ * Uma gravação recusada, com um código que os ecrãs sabem dizer:
+ *  · `conflict` — alguém gravou o mesmo ano entretanto (40001, de public.vendas_anos_gravar);
+ *  · `invalid_argument` — sem permissão (as regras da tabela recusaram, 42501);
+ *  · `unavailable` — o resto (rede, servidor). Antes, tudo era «sem permissão», até uma falha de rede.
+ */
 function rejectWrite(error) {
+  const code = error?.code === '40001' ? 'conflict'
+    : (!error || error.code === '42501' || /row-level security|permiss/i.test(error.message || '')) ? 'invalid_argument'
+      : 'unavailable';
   const err = new Error(error?.message || 'Sem permissão para gravar.');
-  err.code = 'invalid_argument';
+  err.code = code;
   throw err;
 }
+
+/**
+ * Grava pela função com bloqueio optimista (public.vendas_anos_gravar, migração
+ * relatorios_gravacao_protegida): cada linha leva o `actualizado` que o ecrã leu ao abrir
+ * (`esperado`; nulo = o ano ainda não existe) e a gravação é recusada se alguém gravou entretanto.
+ * Todas as linhas gravam juntas ou nenhuma grava. Devolve { [lojaId]: actualizado } — o novo
+ * `esperado` de cada loja —, ou null quando a função ainda não existe (migração por aplicar).
+ */
+async function gravarPelaFuncao(ano, linhas) {
+  const { data, error } = await supabase.rpc('vendas_anos_gravar', { p_ano: Number(ano), p_linhas: linhas });
+  if (error) {
+    if (error.code === 'PGRST202') return null;
+    rejectWrite(error);
+  }
+  return Object.fromEntries((data || []).map((r) => [r.loja_id, r.actualizado]));
+}
+
+const kz2 = (v) => (v == null || v === '' ? null : Math.round(Number(v) * 100) / 100);
 
 /** true quando vendas_anos já tem loja_id (migração painel_vendas_por_loja aplicada). */
 export async function detectMultiStore() {
@@ -232,9 +259,33 @@ function makeDb(lojaId) {
         onSnapshot(next, onError) {
           return listen(key(path), () => read().then(next).catch((e) => onError?.(e)));
         },
-        async set(value) {
+        /**
+         * Grava o documento. Para um ano (`anos/<ano>`), `opts.esperado` é o `actualizado` lido ao
+         * abrir (null para um ano novo): com ele a gravação é protegida contra a de outra pessoa
+         * entretanto, e devolve { actualizado } — o do servidor, para a gravação seguinte.
+         */
+        async set(value, opts = {}) {
           if (col === 'config') rejectWrite();
           let error;
+          if (col === 'anos' && multi && Object.prototype.hasOwnProperty.call(opts, 'esperado')) {
+            const ano = Number(value.ano ?? id);
+            const feito = await gravarPelaFuncao(ano, [{
+              loja_id: lojaId,
+              esperado: opts.esperado || null,
+              meses: (value.meses || []).map(kz2),
+              observacoes: value.observacoes,
+              mes_em_curso: value.mes_em_curso ?? null,
+              meta_anual: value.meta_anual ?? null,
+              criterio: value.criterio || 'media',
+              fonte: value.fonte || '',
+              origem: value.origem || 'manual',
+            }]);
+            if (feito) {
+              fire(key(path));
+              fire(key(col));
+              return { actualizado: feito[lojaId] || null };
+            }
+          }
           if (col === 'anos') {
             const row = {
               ano: Number(value.ano ?? id),
@@ -329,7 +380,11 @@ export function createPainelApi(profile, opts = {}) {
       return { destaques: x.destaques && store ? x.destaques.porLoja[store.id] || null : null, fotos: x.fotos };
     }
     : null;
-  return { db: makeDb(lojaId), user, downloads, store, sales, extras };
+  // O histórico das gravações desta loja no servidor (vendas_alteracoes), o mesmo do relatório
+  // conjunto. O documento <loja>/historico/registo, que o próprio painel escrevia, era editável por
+  // quem grava e deixou de ser o histórico mostrado.
+  const historico = lojaId && (canReadSales || canEdit) ? (ano) => carregarHistorico(ano, 80, lojaId) : null;
+  return { db: makeDb(lojaId), user, downloads, store, sales, extras, historico };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -359,9 +414,10 @@ async function carregarLojas() {
 }
 
 /** O histórico das gravações no servidor (vendas_alteracoes); null sem a migração. */
-async function carregarHistorico(ano, limite = 120) {
+async function carregarHistorico(ano, limite = 120, lojaId = null) {
   let q = supabase.from('vendas_alteracoes').select('id, em, loja_id, ano, accao, por, origem, meses, outros').order('em', { ascending: false }).limit(limite);
   if (ano != null) q = q.eq('ano', ano);
+  if (lojaId) q = q.eq('loja_id', lojaId);
   const { data, error } = await q;
   if (error) return null;
   const ids = [...new Set((data || []).map((h) => h.por).filter(Boolean))];
@@ -375,11 +431,22 @@ async function carregarHistorico(ano, limite = 120) {
 
 /**
  * Grava os meses (e o mês em curso) de várias lojas num ano, num pedido só.
- * `linhas` = [{ lojaId, meses: [12], mes_em_curso, origem }]. As restantes colunas do ano
- * (meta, critério, fonte, observações) não se tocam: o upsert só escreve as que leva.
+ * `linhas` = [{ lojaId, meses: [12], mes_em_curso, origem, esperado }], com `esperado` = o
+ * `actualizado` do ano dessa loja quando a grelha abriu (null se ainda não havia ano). As restantes
+ * colunas (meta, critério, fonte, observações) não se tocam. Se alguém gravou uma destas lojas
+ * entretanto, nada é gravado e o erro tem o código `conflict`.
  */
 async function gravarMeses(ano, linhas) {
-  if (!linhas.length) return;
+  if (!linhas.length) return {};
+  const feito = await gravarPelaFuncao(ano, linhas.map((l) => ({
+    loja_id: l.lojaId,
+    esperado: l.esperado || null,
+    meses: l.meses.map(kz2),
+    mes_em_curso: l.mes_em_curso ?? null,
+    origem: l.origem || 'manual',
+  })));
+  if (feito) return feito;
+  // Sem a migração relatorios_gravacao_protegida: como antes, sem bloqueio.
   const rows = linhas.map((l) => ({
     loja_id: l.lojaId,
     ano: Number(ano),
@@ -393,6 +460,7 @@ async function gravarMeses(ano, linhas) {
     ({ error } = await supabase.from('vendas_anos').upsert(rows.map(({ origem, ...r }) => r), { onConflict: 'loja_id,ano', defaultToNull: false }));
   }
   if (error) rejectWrite(error);
+  return {};
 }
 
 const NOTA = (ano) => `consolidado/notas/ano-${Number(ano)}`;

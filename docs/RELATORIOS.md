@@ -60,10 +60,17 @@ nenhum dado de clientes chega ao navegador. Regras (as mesmas do painel de cada 
 - Antes desta migração contava-se pelo nome da loja do levantamento e, nas entregas, pela loja da
   mesma província (uma entrega no Namibe não era de nenhuma).
 
+> **O sistema só conhece o site.** As vendas ao balcão passam pelo KiGest e não entram aqui: em
+> 2026, até Novembro, o site tinha 6 encomendas (395 710 Kz, só uma paga, de 21 665 Kz) e as lojas
+> registaram 47,6 M Kz. Enquanto for assim, o registado de cada loja é maior do que o sistema e os
+> meses aparecem a vermelho — não é um erro. Os dois ecrãs dizem-no junto ao botão.
+
 A tabela mostra o sistema ao lado do que está registado; a **vermelho** os meses em que não batem.
 Com a grelha aberta no mesmo ano, **Preencher meses vazios** copia o sistema para os meses vazios e
 **Substituir os meses com vendas** copia-o para todos os meses com encomendas; um mês sem
-encomendas no sistema nunca apaga o que está gravado. Os valores vindos do sistema ficam a azul, e
+encomendas no sistema nunca apaga o que está gravado. Quando a substituição troca um mês **que já
+tinha valor**, o botão primeiro lista o que vai mudar (`Huambo Out: 4 908 704,00 → 21 665,00`) e
+passa a «Confirmar: substituir N meses registados»; só a segunda carga aplica (nos dois ecrãs). Os valores vindos do sistema ficam a azul, e
 debaixo de cada mês aparece o valor do sistema («sist. …»), a laranja quando não bate.
 
 Antes desta função o painel de cada loja descarregava as encomendas todas do ano e só funcionava a
@@ -71,8 +78,36 @@ quem gere encomendas. Hoje usa a mesma função, e o cálculo antigo só serve d
 migração não estiver aplicada.
 
 ### De onde vieram os números
-Cada gravação diz a origem (`vendas_anos.origem`): **manual**, **sistema** (todos os meses mudados
-vieram do sistema), **misto** ou **importação**.
+Cada gravação diz a origem (`vendas_anos.origem`), pelos meses que muda: **sistema** (das vendas do
+sistema), **importação** (do PowerPoint da loja), **manual**, ou **misto** quando há mais do que uma
+(`origemDasAlteracoes`, em `plausibilidade.js`). A origem é a que o ecrã declara; o servidor não a
+confere com as encomendas.
+
+As linhas que entraram por migração (o Relatório Síntese, o PowerPoint e os Excel das lojas, em
+`20261101143448_painel_vendas` e `20261114100000_vendas_das_lojas_ate_outubro`) ficaram «manual»,
+porque a coluna ainda não existia; a migração `20261114210000_relatorios_gravacao_protegida` passou
+a «importação» as que ainda têm essa fonte, nenhum autor e algum mês com valor.
+
+### Duas pessoas a gravar a mesma loja
+Os dois ecrãs gravam por `public.vendas_anos_gravar(ano, linhas)` (migração
+`20261114210000_relatorios_gravacao_protegida`). Cada linha leva o `actualizado` que o ecrã leu ao
+abrir; se alguém gravou essa loja e esse ano entretanto, **nada é gravado** e o ecrã diz «Os números
+de … mudaram depois de os abrir … Recarregue» (erro 40001). Antes, a segunda gravação repunha por
+cima, sem aviso, os meses que a primeira tinha mudado. Várias lojas num pedido gravam todas ou
+nenhuma. A função corre com as regras da tabela (quem grava continua a ser
+`private.can_edit_reports()`), e só muda os campos que a linha traz.
+
+### Valores a confirmar
+Um mês que vale **4 vezes ou mais** o mesmo mês do ano anterior, ou **um quarto ou menos** — ou,
+sem ano anterior, 4 vezes acima ou abaixo da mediana dos outros meses do ano — é invulgar
+(`avisosDePlausibilidade`, em `plausibilidade.js`). Não é um erro: pode estar certo. Mas um ano
+anterior registado com outro âmbito, ou um zero a mais, mudam o crescimento e a projecção.
+
+- **Ao gravar** (os dois ecrãs), os meses mudados que forem invulgares aparecem no estado
+  («Set: +1 441% face a Set de 2025»), e só a segunda carga em Guardar grava.
+- **No relatório de todas as livrarias**, o cartão «Valores a confirmar» lista os meses invulgares
+  de cada loja no ano escolhido. Com os números de Novembro de 2026: seis meses do Huambo (2026
+  face a 2025) e Julho do Lubango.
 
 ## 3. Histórico
 
@@ -82,8 +117,14 @@ meta, critério, fonte, observações) e a origem. Uma gravação que não muda 
 escreve nem apaga no histórico pela API. O `actualizado` e o `actualizado_por` de cada ano passam a
 vir do servidor (antes vinham do navegador, e o `actualizado_por` só se preenchia ao criar).
 
-O histórico aparece em **Todas as livrarias › Histórico das gravações** (o do ano escolhido). O
-painel de cada loja continua com o seu histórico próprio (o documento `<loja>/historico/registo`).
+O histórico aparece em **Todas as livrarias › Histórico das gravações** (o do ano escolhido) e, no
+**painel de cada loja**, no editor (as gravações dessa loja). O documento `<loja>/historico/registo`,
+que o painel de cada loja escrevia a partir do navegador, podia ser reescrito por quem grava: deixou
+de ser escrito e de ser mostrado (fica só como recurso enquanto a migração do histórico não estiver
+aplicada).
+
+Nota: os números que hoje estão no painel entraram por migração, antes de haver histórico no
+servidor; o histórico deles é o das próprias migrações, no repositório.
 
 ## 4. As contas da rede
 
@@ -303,6 +344,7 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
 |---|---|
 | `app/web/src/painel-vendas/modelo.js` | As contas de um ano (puro). Antes vivia dentro de `painel.js`. |
 | `app/web/src/painel-vendas/consolidado.js` | As contas da rede (puro). |
+| `app/web/src/painel-vendas/plausibilidade.js` | Os valores a confirmar e a origem de cada gravação (puro). |
 | `app/web/src/painel-vendas/video.js` | Os vídeos. |
 | `app/web/src/painel-vendas/imagens-video.js` | As paisagens desenhadas, as fotografias com movimento e o livro em 3D. |
 | `app/web/src/painel-vendas/destaques.js` | Os mais vendidos: o site e o lançado à mão, por loja, mês e ano, e a rede (puro). |
@@ -319,6 +361,7 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
 | `app/web/src/painel-vendas/logo-livraria-adventista-claro.png` | O logótipo branco, PNG transparente (topo, capa do modo apresentação e vídeos). |
 | `app/web/src/lib/fontes.js` | As duas fontes do sistema, para o canvas e as impressões. |
 | `supabase/migrations/20261114140000_imagens_e_mais_vendidos_dos_videos.sql` | `biblioteca_imagens`, `vendas_produtos`, `produtos_mais_vendidos`, `capas_dos_produtos` e a pasta `biblioteca/` no Storage. |
+| `supabase/migrations/20261114210000_relatorios_gravacao_protegida.sql` | `vendas_anos_gravar` (gravação com bloqueio optimista) e a origem das linhas importadas. |
 
 ## 10. Testes
 
@@ -327,9 +370,20 @@ teste (`fontes.test.js`) falha se um ficheiro voltar a usar outra família.
   PowerPoint real do repositório), `capas-de-fundo.test.js`, `video.test.js` (com as transições),
   `destaques.test.js`, `fontes.test.js`, `scripts/relatorios/pptx-para-sql.test.mjs`, `ImagensVideosTab.test.jsx`, `permissions.test.js` (as três
   listas de permissões), `adminSections.test.js`.
-- Base de dados, com as migrações reais (80 cenários: quem lê, grava e apaga, o histórico, os
+- `plausibilidade.test.js` (os valores a confirmar, com os números reais das três lojas, e a
+  origem de cada gravação) e `adapter.test.js` (o que a gravação manda ao servidor e os códigos de
+  erro: conflito, permissão, o resto).
+- No navegador, sobre o **build de produção** (`app/web/e2e/painel-vendas.spec.js`, páginas de
+  teste em `app/web/e2e/painel/`): o painel de uma loja desenha os gráficos e o quadro (com e sem
+  «reduzir movimento»), pede confirmação dos valores invulgares e da substituição pelo sistema, e
+  manda o `actualizado` que leu; o relatório de todas as livrarias mostra os valores a confirmar e
+  diz porquê quando uma gravação é recusada. Em Novembro de 2026 o painel de cada loja esteve
+  partido em produção (o tree-shaking tirou o `.transition()` do d3) com todos os testes unitários
+  verdes: é isto que o apanha.
+- Base de dados, com as migrações reais (95 cenários: quem lê, grava e apaga, o histórico, os
   valores inválidos, os documentos, as vendas do sistema, os mais vendidos por produto, os lançados
-  à mão, a biblioteca de imagens e a pasta do Storage):
+  à mão, a biblioteca de imagens, a pasta do Storage e a gravação protegida — duas pessoas no mesmo
+  ano, várias lojas num pedido, a origem das linhas importadas):
 
   ```bash
   npm i --prefix /tmp/pglite @electric-sql/pglite@0.2.17
