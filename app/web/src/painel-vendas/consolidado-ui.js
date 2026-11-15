@@ -1256,7 +1256,7 @@ export function mountConsolidado(root, api) {
         ms.appendChild(el('span', null, `${MESES_CURTOS[m.mes - 1]}: ${de} → ${para}`));
       });
       Object.keys(h.outros || {}).forEach((k) => {
-        const nomes = { mes_em_curso: 'mês em curso', meta_anual: 'meta', criterio: 'critério', fonte: 'fonte', observacoes: 'observações' };
+        const nomes = { mes_em_curso: 'mês em curso', meta_anual: 'previsão', criterio: 'critério', fonte: 'fonte', observacoes: 'observações' };
         ms.appendChild(el('span', null, (nomes[k] || k) + ' alterado'));
       });
       if (ms.childNodes.length) li.appendChild(ms);

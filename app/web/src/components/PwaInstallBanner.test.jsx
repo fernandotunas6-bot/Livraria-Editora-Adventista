@@ -90,7 +90,27 @@ describe('PwaInstallBanner', () => {
     await scroll(700);
     await act(async () => document.querySelector('[aria-label="Fechar o aviso de instalação"]').click());
     expect(banner()).toBeNull();
-    expect(localStorage.getItem('pwa-dismissed')).toBe('1');
+    // Adiado, não para sempre: guarda quando foi fechado.
+    expect(Number(localStorage.getItem('pwa-dismissed'))).toBeGreaterThan(1e12);
     expect(document.documentElement.style.getPropertyValue('--aviso-instalar')).toBe('0px');
+  });
+
+  it('fechado há mais de 14 dias (ou com o valor antigo «1»), volta a aparecer', async () => {
+    localStorage.setItem('pwa-dismissed', String(Date.now() - 15 * 86_400_000));
+    await mount('/shop');
+    await scroll(700);
+    expect(banner()).not.toBeNull();
+    act(() => root.unmount()); host.remove();
+    localStorage.setItem('pwa-dismissed', '1');
+    await mount('/shop');
+    await scroll(700);
+    expect(banner()).not.toBeNull();
+  });
+
+  it('fechado há pouco, não aparece', async () => {
+    localStorage.setItem('pwa-dismissed', String(Date.now() - 86_400_000));
+    await mount('/shop');
+    await scroll(700);
+    expect(banner()).toBeNull();
   });
 });

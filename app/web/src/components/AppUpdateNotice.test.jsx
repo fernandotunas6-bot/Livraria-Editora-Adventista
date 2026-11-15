@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -16,18 +16,26 @@ const latestPublishedRelease = vi.fn(async () => latest);
 vi.mock('@/lib/appReleases', async (orig) => ({ ...(await orig()), latestPublishedRelease }));
 vi.mock('@/lib/supabaseClient', () => ({ supabase: {} }));
 vi.mock('@/lib/dataClient', () => ({ default: {} }));
+const applyUpdate = vi.fn();
+vi.mock('@/lib/appVersion', async (orig) => ({ ...(await orig()), applyUpdate: (...a) => applyUpdate(...a) }));
 
 const { default: AppUpdateNotice } = await import('./AppUpdateNotice');
 const { UPDATED_KEY } = await import('@/lib/appVersion');
 
 let root;
 let host;
-async function mount() {
+let navegar;
+function Navegar() { navegar = useNavigate(); return null; }
+async function mount(path = '/') {
   host = document.createElement('div');
   root = createRoot(host);
-  await act(async () => root.render(<MemoryRouter><AppUpdateNotice /></MemoryRouter>));
+  await act(async () => root.render(<MemoryRouter initialEntries={[path]}><AppUpdateNotice /><Navegar /></MemoryRouter>));
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
+const voltarAApp = async () => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+};
 
 beforeEach(() => {
   available = '';
@@ -35,6 +43,8 @@ beforeEach(() => {
   toast.mockClear();
   toast.success.mockClear();
   latestPublishedRelease.mockClear();
+  applyUpdate.mockClear();
+  document.body.innerHTML = '';
   localStorage.clear();
   sessionStorage.clear();
 });
@@ -47,7 +57,7 @@ describe('AppUpdateNotice', () => {
     await mount();
     const [title, opts] = toast.mock.calls[0];
     expect(title).toBe('Nova versão da app disponível');
-    expect(opts).toMatchObject({ id: 'nova-versao', duration: Infinity, action: { label: 'Actualizar' } });
+    expect(opts).toMatchObject({ id: 'nova-versao', duration: Infinity, action: { label: 'Actualizar já' } });
   });
 
   it('sem nada a dizer, nem pergunta pelas novidades', async () => {
@@ -83,5 +93,40 @@ describe('AppUpdateNotice', () => {
     const [, opts] = toast.success.mock.calls[0];
     expect(opts.description).toBe('Já tem a versão mais recente.');
     expect(opts.action).toBeUndefined();
+  });
+
+  it('com versão nova, instala-se sozinha ao mudar de página', async () => {
+    localStorage.setItem('livraria:novidades-vistas', '2026-11-01T00:00:00Z');
+    available = '2026.11.09-bbbbbbb';
+    await mount('/shop');
+    expect(applyUpdate).not.toHaveBeenCalled();
+    await act(async () => navegar('/product/abc'));
+    expect(applyUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('não se instala sozinha com uma janela aberta (o carrinho, um formulário…)', async () => {
+    localStorage.setItem('livraria:novidades-vistas', '2026-11-01T00:00:00Z');
+    available = '2026.11.09-bbbbbbb';
+    await mount('/shop');
+    const janela = document.createElement('div');
+    janela.setAttribute('role', 'dialog');
+    document.body.appendChild(janela);
+    await act(async () => navegar('/faq'));
+    expect(applyUpdate).not.toHaveBeenCalled();
+  });
+
+  it('ao voltar à app com uma versão nova: instala-se já; no painel, espera pela mudança de secção', async () => {
+    localStorage.setItem('livraria:novidades-vistas', '2026-11-01T00:00:00Z');
+    available = '2026.11.09-bbbbbbb';
+    await mount('/shop');
+    await voltarAApp();
+    expect(applyUpdate).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    applyUpdate.mockClear();
+    await mount('/admin');
+    await voltarAApp();
+    expect(applyUpdate).not.toHaveBeenCalled();
+    await act(async () => navegar('/admin?tab=encomendas'));
+    expect(applyUpdate).toHaveBeenCalledTimes(1);
   });
 });

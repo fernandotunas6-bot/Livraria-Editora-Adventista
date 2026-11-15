@@ -74,3 +74,43 @@ export function takeUpdatedFrom(win = globalThis.window) {
     return '';
   }
 }
+
+// ---------- Actualizar sozinha ----------
+//
+// A versão nova instala-se sozinha num momento em que recarregar não estraga nada:
+//  · ao voltar à app (estava em segundo plano): a pessoa ainda não começou a fazer nada;
+//  · ao mudar de página dentro da app: o recarregamento é a própria mudança de página.
+// Nunca com uma janela aberta, com uma caixa de texto a ser escrita, com alterações por gravar
+// (lib/unsavedWork.js) nem nas páginas de um passo que não se pode repetir. Fora disso, fica o
+// aviso «Nova versão disponível — Actualizar».
+
+/** Logo depois de voltar à app (ms): uma versão nova encontrada nesse intervalo instala-se já. */
+export const REGRESSO_MS = 20_000;
+
+/** Páginas onde nunca se recarrega sozinha (um link de email só funciona uma vez, um pagamento…). */
+const NUNCA = [/^\/success/, /^\/login/, /^\/forgot-password/, /^\/reset-password/, /^\/confirmar-encomenda/, /^\/unsubscribe/, /^\/cancelar-subscricao/];
+/** Páginas com formulários: ao voltar à app não se recarrega (só ao sair delas). */
+const COM_FORMULARIO = [/^\/admin/, /^\/contact/, /^\/sugestoes/, /^\/colportor/, /^\/comunidade/, /^\/profile/, /^\/track/];
+
+function aEscrever(doc) {
+  const el = doc?.activeElement;
+  if (!el || el === doc.body) return false;
+  if (el.isContentEditable) return true;
+  const tag = (el.tagName || '').toLowerCase();
+  if (tag === 'textarea' || tag === 'select') return true;
+  if (tag !== 'input') return false;
+  return !['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'image'].includes((el.type || 'text').toLowerCase());
+}
+
+/**
+ * Pode recarregar agora para a versão nova sem estragar nada?
+ * `momento`: 'regresso' (voltou à app) ou 'navegacao' (mudou de página dentro da app).
+ */
+export function podeActualizarSozinha({ momento = 'navegacao', pathname = '/', doc = globalThis.document, porGravar = false } = {}) {
+  if (porGravar) return false;
+  if (NUNCA.some((re) => re.test(pathname))) return false;
+  if (momento === 'regresso' && COM_FORMULARIO.some((re) => re.test(pathname))) return false;
+  if (doc?.querySelector?.('[role="dialog"], [role="alertdialog"], [aria-modal="true"]')) return false;
+  if (aEscrever(doc)) return false;
+  return true;
+}

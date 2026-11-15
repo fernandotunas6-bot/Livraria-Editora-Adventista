@@ -202,3 +202,52 @@ export function periodoAte(M, i) {
     crescMensal: r && r.v2 != null && r.v1 ? r.v2 / r.v1 - 1 : null,
   };
 }
+
+/**
+ * A previsão do ano, a do diapositivo «REMARQUE» do PowerPoint das lojas («Previsão para 2026:
+ * 31 294 120» e, ao lado, o valor actual e quanto já a passa).
+ *
+ *  · Com previsão gravada no ano (o campo `meta_anual`, «Previsão anual» no editor), é essa: um
+ *    número fixo, decidido no início do ano, que não sobe nem desce com as vendas. Foi o erro que
+ *    a loja do Huambo apontou: o diapositivo mostrava 45 milhões (a projecção pela média dos meses
+ *    fechados) onde a previsão do ano era 31 294 120, já atingida em Setembro.
+ *  · Sem previsão gravada, é a projecção calculada pelo critério do ano (`R.projeccao`).
+ *
+ * Funciona com o modelo recortado por um filtro (a previsão vem proporcional aos meses do filtro).
+ * Devolve null quando não há nem uma nem outra; senão:
+ *   { valor, declarada, actual, pct (actual ÷ valor), atingida, acima, acimaPct, falta,
+ *     mes (o mês em que o acumulado a atingiu), cresc (face ao total do ano de comparação),
+ *     projeccao (a calculada, para se mostrar ao lado da declarada) }
+ * `atingida` só existe para a previsão declarada: a calculada inclui sempre o que já se vendeu.
+ */
+export function previsaoDoAno(M) {
+  if (!M || !M.R) return null;
+  const R = M.R;
+  const declarada = Number(M.meta) > 0;
+  const valor = declarada ? Number(M.meta) : R.projeccao;
+  if (valor == null || !isFinite(valor)) return null;
+  const actual = R.ytd2 || 0;
+  const atingida = declarada && toC(actual) >= toC(valor);
+  let mes = null;
+  if (atingida) {
+    let acc = 0;
+    for (const r of M.rows || []) {
+      if (r.fora || r.v2 == null) continue;
+      acc += toC(r.v2);
+      if (acc >= toC(valor)) { mes = r.mes; break; }
+    }
+  }
+  return {
+    valor,
+    declarada,
+    actual,
+    pct: valor ? actual / valor : null,
+    atingida,
+    acima: atingida ? fromC(toC(actual) - toC(valor)) : 0,
+    acimaPct: atingida ? actual / valor - 1 : null,
+    falta: fromC(Math.max(0, toC(valor) - toC(actual))),
+    mes,
+    cresc: growth(valor, R.total1),
+    projeccao: R.projeccao,
+  };
+}

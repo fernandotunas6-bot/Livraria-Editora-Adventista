@@ -16,6 +16,7 @@ import { accountHref, colporteurHref, staffShortcuts } from '@/lib/siteAreas';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import BrandLogo from '@/components/BrandLogo';
 import MegaMenu from '@/components/header/MegaMenu';
+import { BotaoInstalarApp } from '@/components/InstalarApp';
 import NotificationBell from '@/components/NotificationBell.jsx';
 import UserAvatar from '@/components/UserAvatar';
 import { UserMenu, GuestAuthButton } from '@/components/UserMenu';
@@ -629,6 +630,12 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 </button>
               </>
             )}
+            <BotaoInstalarApp
+              variante="menu"
+              onDepois={closeMobile}
+              className="flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold rounded-lg text-white/80 hover:bg-white/5 hover:text-white"
+              tabIndex={mobileOpen ? 0 : -1}
+            />
             <Link
               to="/track"
               onClick={() => setMobileOpen(false)}

@@ -111,11 +111,11 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 safe-overlay">
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="bg-background rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl border border-border flex flex-col"
+        className="bg-background rounded-2xl w-full max-w-4xl max-h-[min(92vh,100%)] overflow-hidden shadow-2xl border border-border flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="formulario-produto-titulo"

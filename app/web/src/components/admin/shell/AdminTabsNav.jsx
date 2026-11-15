@@ -35,7 +35,7 @@ export default function AdminTabsNav({ nav, active, onNavigate, compact = false 
   const showSections = activeGroup && (activeGroup.items.length > 1 || activeGroup.label);
 
   return (
-    <div className={cn('border-b border-border bg-background', compact && 'sticky top-14 z-20')}>
+    <div className={cn('border-b border-border bg-background', compact && 'sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-20')}>
       {!compact && (
         <nav aria-label="Grupos do painel" className="px-3 sm:px-4 lg:px-6">
           <ul className="-mb-px flex gap-1 overflow-x-auto scrollbar-none">

@@ -4,32 +4,28 @@ import { Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { withCacheBust } from '@/lib/imageUrl';
-import { ENGAGE_AFTER_MS, ENGAGE_SCROLL_PX, installPromptAllowed, installPromptCoversHero, installPromptOffsets } from '@/lib/installPrompt';
+import { ENGAGE_AFTER_MS, ENGAGE_SCROLL_PX, avisoFechado, fecharAviso, installPromptAllowed, installPromptCoversHero, installPromptOffsets } from '@/lib/installPrompt';
+import { capturarPedidoDeInstalacao } from '@/lib/pwaInstall';
+import { useInstalarApp } from '@/hooks/useInstalarApp';
+import { InstalarAppDialog } from '@/components/InstalarApp';
 
 export default function PwaInstallBanner() {
   const { settings } = useSiteSettings();
   const { pathname } = useLocation();
-  const [deferred, setDeferred] = useState(null);
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem('pwa-dismissed') === '1'; } catch { return false; }
-  });
-  const [isStandalone, setIsStandalone] = useState(false);
+  // O pedido de instalação do navegador (Android) é apanhado no arranque (main.jsx); no iPhone
+  // não há pedido e o aviso mostra os passos (lib/pwaInstall.js). Ligar aqui também não faz mal.
+  useEffect(() => { capturarPedidoDeInstalacao(); }, []);
+  const { modo, instalar, visivel: instalavel } = useInstalarApp();
+  const [passos, setPassos] = useState(false);
+  // Fechar o aviso adia-o (installPrompt.js: AVISO_ADIADO_DIAS), não para sempre: quem ainda não
+  // instalou volta a vê-lo. E o menu do telemóvel tem sempre «Instalar a app».
+  const [dismissed, setDismissed] = useState(() => avisoFechado());
   // Só depois de a pessoa mostrar interesse: deslizar um pouco ou ficar uns segundos.
   const [engaged, setEngaged] = useState(false);
   const boxRef = useRef(null);
 
   useEffect(() => {
-    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone);
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferred(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  useEffect(() => {
-    if (engaged || !deferred) return undefined;
+    if (engaged || !instalavel) return undefined;
     const onScroll = () => { if (window.scrollY > ENGAGE_SCROLL_PX) setEngaged(true); };
     const timer = setTimeout(() => setEngaged(true), ENGAGE_AFTER_MS);
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -37,7 +33,7 @@ export default function PwaInstallBanner() {
       clearTimeout(timer);
       window.removeEventListener('scroll', onScroll);
     };
-  }, [engaged, deferred]);
+  }, [engaged, instalavel]);
 
   // No topo da página inicial o aviso fica à espera (ver installPromptCoversHero).
   const [overHero, setOverHero] = useState(() => installPromptCoversHero(pathname, window.scrollY));
@@ -49,7 +45,7 @@ export default function PwaInstallBanner() {
     return () => window.removeEventListener('scroll', measure);
   }, [pathname]);
 
-  const visible = !!settings.pwa_enabled && !dismissed && !isStandalone && !!deferred && engaged && !overHero
+  const visible = !!settings.pwa_enabled && !dismissed && instalavel && engaged && !overHero
     && installPromptAllowed(pathname);
 
   // A altura do aviso vai para variáveis de CSS, e o chat e o botão de subir afastam-se dele
@@ -72,20 +68,19 @@ export default function PwaInstallBanner() {
     };
   }, [visible]);
 
-  if (!visible) return null;
+  if (!visible) return passos ? <InstalarAppDialog open={passos} onOpenChange={setPassos} modo={modo} nome={settings.pwa_short_name || undefined} /> : null;
 
   const logoUrl = settings.logo_url
     ? withCacheBust(settings.logo_url, settings.assets_version)
     : '';
 
+  // Android: a janela do sistema. iPhone e outros: os passos (Partilhar → Adicionar ao ecrã principal).
   const install = async () => {
-    deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    if (outcome === 'accepted') setDeferred(null);
+    if (!(await instalar())) setPassos(true);
   };
 
   const dismiss = () => {
-    try { localStorage.setItem('pwa-dismissed', '1'); } catch { /* sem armazenamento: só nesta visita */ }
+    fecharAviso();
     setDismissed(true);
   };
 
@@ -122,6 +117,7 @@ export default function PwaInstallBanner() {
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>
+      <InstalarAppDialog open={passos} onOpenChange={setPassos} modo={modo} nome={settings.pwa_short_name || undefined} />
     </div>
   );
 }

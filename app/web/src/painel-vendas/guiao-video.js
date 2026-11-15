@@ -118,6 +118,15 @@ function fraseMaisVendidos(ambito) {
 
 function fraseFecho(R, A, B, meta, quem) {
   const sujeito = quem === 'rede' ? 'Perspectiva da rede' : 'Perspectiva';
+  // Com previsão gravada no ano (a do PowerPoint da loja), fala-se dela e de quanto já se passou.
+  if (Number(meta) > 0 && R.ytd2 != null) {
+    const v = Number(meta);
+    if (Math.round(R.ytd2 * 100) >= Math.round(v * 100)) {
+      return `${sujeito}: a previsão para ${A} era de ${kzDito(v)} e já foi atingida.`
+        + ` As vendas vão em ${kzDito(R.ytd2)}, ${pctDito(R.ytd2 / v - 1)} acima. Obrigado.`;
+    }
+    return `${sujeito}: a previsão para ${A} é de ${kzDito(v)}; ${Math.round((R.ytd2 / v) * 100)}% feito, faltam ${kzDito(v - R.ytd2)}. Obrigado.`;
+  }
   if (R.projeccao == null) return `${sujeito}: ainda sem projecção para ${A}. Obrigado.`;
   return `${sujeito}: ${kzDito(R.projeccao)} para ${A}`
     + (R.cresc_proj != null && B != null ? `, ${pctDito(R.cresc_proj)} face a ${B}` : '') + '.'

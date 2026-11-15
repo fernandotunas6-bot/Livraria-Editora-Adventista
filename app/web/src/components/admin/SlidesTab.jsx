@@ -404,8 +404,8 @@ export default function SlidesTab({ onChange }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-xl">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 safe-overlay">
+          <div className="bg-background rounded-2xl w-full max-w-4xl max-h-[min(92vh,100%)] overflow-y-auto shadow-xl">
             <div className="sticky top-0 bg-background border-b px-6 py-4 flex justify-between items-center z-10">
               <h2 className="text-xl font-bold">{editing ? 'Editar slide' : 'Novo slide'}</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowForm(false)} aria-label="Fechar">×</Button>

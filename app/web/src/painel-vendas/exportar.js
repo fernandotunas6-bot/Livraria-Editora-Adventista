@@ -315,7 +315,7 @@ export async function printReport(d) {
 <tfoot>
 <tr><td>Período comparável${R.ultimo ? ' (até ' + htmlEsc(R.ultimo.mes) + ')' : ''}</td><td class="n">${kz2(R.ytd1)}</td><td class="n">${kz2(R.ytd2c)}</td><td class="n">${kz2(R.dif_ytd)}</td><td class="n">${pct1(R.cresc_ytd)}</td><td></td><td></td></tr>
 <tr><td>Total registado ${d.ano}</td><td class="n">${kz2(R.total1)}</td><td class="n">${kz2(R.ytd2)}</td><td></td><td></td><td></td><td></td></tr>
-<tr><td>Projecção anual</td><td></td><td class="n">${kz2(R.projeccao)}</td><td></td><td class="n">${pct1(R.cresc_proj)}</td><td></td><td>${d.meta ? 'Meta: ' + kz2(d.meta) : ''}</td></tr>
+<tr><td>Projecção anual</td><td></td><td class="n">${kz2(R.projeccao)}</td><td></td><td class="n">${pct1(R.cresc_proj)}</td><td></td><td>${d.meta ? 'Previsão: ' + kz2(d.meta) : ''}</td></tr>
 </tfoot></table>
 </body></html>`);
   win.document.close();

@@ -416,8 +416,8 @@ export default function CollectionsTab({ books = [], onBooksChange }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !saving && setShowForm(false)}>
-          <div className="bg-background rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 safe-overlay" onClick={() => !saving && setShowForm(false)}>
+          <div className="bg-background rounded-2xl w-full max-w-lg max-h-[min(90vh,100%)] overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-6">{editing ? 'Editar coleção' : 'Nova coleção'}</h2>
             <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-2">
