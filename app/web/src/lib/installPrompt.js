@@ -37,3 +37,25 @@ export function installPromptOffsets(height, viewportWidth) {
   if (!h) return { full: '0px', right: '0px' };
   return viewportWidth < 640 ? { full: `${h}px`, right: '0px' } : { full: '0px', right: `${h}px` };
 }
+
+/**
+ * Fechar o aviso «Instalar App» adia-o por uns dias; antes era para sempre, e quem o fechava
+ * uma vez nunca mais sabia que a app existia. (O menu do telemóvel tem sempre «Instalar a app».)
+ * O valor antigo, '1', conta como fechado há muito tempo: o aviso volta a aparecer uma vez.
+ */
+export const AVISO_ADIADO_DIAS = 14;
+const CHAVE_AVISO = 'pwa-dismissed';
+
+export function avisoFechado(agora = Date.now(), storage = globalThis.localStorage) {
+  try {
+    const v = Number(storage?.getItem(CHAVE_AVISO));
+    if (!v || v < 1e12) return false;
+    return agora - v < AVISO_ADIADO_DIAS * 86_400_000;
+  } catch {
+    return false;
+  }
+}
+
+export function fecharAviso(agora = Date.now(), storage = globalThis.localStorage) {
+  try { storage?.setItem(CHAVE_AVISO, String(agora)); } catch { /* sem armazenamento: só nesta visita */ }
+}

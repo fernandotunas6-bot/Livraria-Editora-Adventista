@@ -64,7 +64,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
   if (readingMode && product) {
     return (
       <div className="fixed inset-0 z-60 bg-[#faf8f5] text-[#1c1917] flex flex-col">
-        <header className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0 bg-white/80 backdrop-blur-sm">
+        <header className="safe-top flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0 bg-white/80 backdrop-blur-sm">
           <div className="min-w-0 pr-4">
             <p className="text-xs uppercase tracking-widest text-primary font-medium">Modo Leitura</p>
             <h2 className="font-serif text-xl md:text-2xl/8 font-bold leading-tight">{product.title}</h2>

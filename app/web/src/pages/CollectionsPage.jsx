@@ -254,7 +254,7 @@ export default function CollectionsPage() {
                 {/* Mobile Slide-out Drawer */}
                 {mobileFilterOpen && (
                   <div className="fixed inset-0 z-50 bg-black/60 lg:hidden flex justify-end">
-                    <div className="bg-background w-80 h-full p-6 shadow-2xl flex flex-col animate-in slide-in-from-right duration-base">
+                    <div className="bg-background w-80 h-full p-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] shadow-2xl flex flex-col animate-in slide-in-from-right duration-base">
                       <div className="flex items-center justify-between border-b pb-4 mb-6">
                         <h3 className="text-lg font-bold text-foreground">Filtrar por Categoria</h3>
                         <Button variant="ghost" size="icon" onClick={() => setMobileFilterOpen(false)}>

@@ -619,6 +619,13 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* Fundo escuro das janelas centradas: a margem de 1rem cresce até à área segura, para a janela
+     não subir para baixo da hora nem descer para a barra de gestos num ecrã baixo. */
+  .safe-overlay {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
   /* Flutuantes do canto inferior: afastam-se da barra de gestos do sistema e também da
      barra de compra, que aparece na ficha de um livro quando os botões reais já passaram.
      Sem a segunda parcela, o botão de subir ficava por cima do preço e do botão de comprar.

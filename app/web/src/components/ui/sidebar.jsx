@@ -178,7 +178,8 @@ const Sidebar = React.forwardRef((
             <SheetTitle>Menu</SheetTitle>
             <SheetDescription>Navegação entre as secções.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          {/* A gaveta ocupa a altura toda: afasta-se da hora (topo) e da barra de gestos (fundo). */}
+          <div className="safe-top safe-bottom flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
     );

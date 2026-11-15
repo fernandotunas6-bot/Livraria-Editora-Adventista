@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // A versão do build vem do Vite (`__APP_VERSION__`); nos testes define-se à mão antes de importar.
 globalThis.__APP_VERSION__ = '2026.11.08-aaaaaaa';
 const {
-  CURRENT_VERSION, MIN_CHECK_GAP_MS, UPDATED_KEY, applyUpdate, fetchPublishedVersion, isNewerVersion, shouldCheckNow, takeUpdatedFrom,
+  CURRENT_VERSION, MIN_CHECK_GAP_MS, UPDATED_KEY, applyUpdate, fetchPublishedVersion, isNewerVersion, podeActualizarSozinha, shouldCheckNow, takeUpdatedFrom,
 } = await import('@/lib/appVersion');
 
 afterEach(() => sessionStorage.clear());
@@ -77,5 +77,39 @@ describe('applyUpdate / takeUpdatedFrom', () => {
   it('recarregou mas continua na mesma versão (a nova ainda não tinha chegado): não diz que actualizou', () => {
     sessionStorage.setItem(UPDATED_KEY, '2026.11.08-aaaaaaa');
     expect(takeUpdatedFrom(window)).toBe('');
+  });
+});
+
+describe('podeActualizarSozinha', () => {
+  const limpar = () => { document.body.innerHTML = ''; };
+  afterEach(limpar);
+
+  it('ao mudar de página, sem nada aberto: sim', () => {
+    expect(podeActualizarSozinha({ momento: 'navegacao', pathname: '/shop' })).toBe(true);
+    expect(podeActualizarSozinha({ momento: 'navegacao', pathname: '/admin' })).toBe(true);
+  });
+
+  it('com alterações por gravar, uma janela aberta ou uma caixa a ser escrita: não', () => {
+    expect(podeActualizarSozinha({ pathname: '/shop', porGravar: true })).toBe(false);
+    document.body.innerHTML = '<div role="dialog">Carrinho</div>';
+    expect(podeActualizarSozinha({ pathname: '/shop' })).toBe(false);
+    document.body.innerHTML = '<input id="q" type="text">';
+    document.getElementById('q').focus();
+    expect(podeActualizarSozinha({ pathname: '/shop' })).toBe(false);
+    document.body.innerHTML = '<input id="c" type="checkbox">';
+    document.getElementById('c').focus();
+    expect(podeActualizarSozinha({ pathname: '/shop' })).toBe(true);
+  });
+
+  it('nunca nas páginas de um passo só (pagamento, entrada, links de email)', () => {
+    for (const p of ['/success', '/login', '/reset-password', '/confirmar-encomenda']) {
+      expect(podeActualizarSozinha({ momento: 'navegacao', pathname: p }), p).toBe(false);
+    }
+  });
+
+  it('ao voltar à app, não nas páginas com formulários (o painel, o contacto…)', () => {
+    expect(podeActualizarSozinha({ momento: 'regresso', pathname: '/shop' })).toBe(true);
+    expect(podeActualizarSozinha({ momento: 'regresso', pathname: '/admin' })).toBe(false);
+    expect(podeActualizarSozinha({ momento: 'regresso', pathname: '/contact' })).toBe(false);
   });
 });

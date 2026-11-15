@@ -21,6 +21,7 @@ import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './fi
 import { montarFiltros } from './filtros-ui.js';
 import { cidadeDaLoja } from '@/lib/stores';
 import { avisosDePlausibilidade, textoDoAviso } from './plausibilidade.js';
+import { marcarPorGravar } from '@/lib/unsavedWork';
 import { fotoEm, fotosDaLoja, lojaDe, montarApresentacao } from './apresentacao.js';
 
 export { cidadeDaLoja, fotosDaLoja, lojaDe };
@@ -593,6 +594,7 @@ export function mountPainel(root, api) {
     rodapeQuadro(M, true);
     const ch = mudancasQuadro(d);
     S.qe.dirty = !!(ch.A.length || ch.B.length);
+    marcarPorGravar('painel-vendas:quadro', S.qe.dirty);
     $('q-guardar').disabled = !S.qe.dirty || d.bad || S.readOnly;
     qStatus(d.bad ? 'Há valores inválidos (marcados a vermelho).' : S.qe.dirty ? 'Alterações por guardar.' : 'Sem alterações.', d.bad ? 'err' : '');
   }
@@ -610,6 +612,7 @@ export function mountPainel(root, api) {
   }
   function fecharQuadro() {
     S.qe = { on: false, dirty: false, ano: null, comp: null, avisos: null, esperado: null };
+    marcarPorGravar('painel-vendas:quadro', false);
     $('q-barra').hidden = true; $('q-editar').hidden = S.canWrite === false || S.readOnly;
     $('q-note').textContent = 'Valores em Kwanzas (AOA). Clique numa linha para a pôr em destaque.';
     qStatus('');
@@ -1012,7 +1015,7 @@ export function mountPainel(root, api) {
     $('ed-crit').value = Y.criterio || 'media'; $('ed-crit').dataset.orig = $('ed-crit').value;
     $('ed-fonte').value = Y.fonte || ''; $('ed-fonte').dataset.orig = $('ed-fonte').value;
     [sc, $('ed-meta'), $('ed-crit'), $('ed-fonte')].forEach((c) => { c.disabled = S.readOnly; c.classList.remove('changed', 'invalid'); });
-    S.ed.dirty = false;
+    S.ed.dirty = false; marcarPorGravar('painel-vendas:editor', false);
     edStatus(Y.actualizado ? 'Última gravação de ' + S.ed.ano + ': ' + new Date(Y.actualizado).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '');
     $('ed-save').disabled = true;
     $('ed-del').textContent = 'Apagar ' + S.ed.ano; $('ed-del-confirm').hidden = true;
@@ -1029,6 +1032,8 @@ export function mountPainel(root, api) {
     [$('ed-curso'), $('ed-crit')].forEach((s) => { dirty = dirty || s.value !== s.dataset.orig; });
     const needMeta = $('ed-crit').value === 'meta' && !parseKz($('ed-meta').value).v;
     S.ed.dirty = dirty;
+    // A app não se actualiza sozinha por cima de alterações por gravar (AppUpdateNotice).
+    marcarPorGravar('painel-vendas:editor', dirty);
     $('ed-save').disabled = !dirty || bad || needMeta || S.readOnly;
     edStatus(needMeta ? 'Para usar o critério “Meta anual”, escreva a meta.' : bad ? 'Há valores inválidos (marcados a vermelho).' : dirty ? 'Alterações por guardar.' : '', bad || needMeta ? 'err' : '');
   }
@@ -1695,6 +1700,7 @@ export function mountPainel(root, api) {
 
   return () => {
     dead = true;
+    marcarPorGravar('painel-vendas:editor', false); marcarPorGravar('painel-vendas:quadro', false);
     clearTimers(); clearTimeout(rz); clearTimeout(idleT);
     PRES.desmontar();
     if (!$('pres').hidden) {

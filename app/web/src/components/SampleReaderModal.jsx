@@ -36,7 +36,7 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
   if (readingMode) {
     return (
       <div className="fixed inset-0 z-60 bg-[#1a1a18] text-[#f5f0e8] flex flex-col">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+        <header className="safe-top flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-widest text-white/50">Modo Leitura</p>
             <h2 className="font-serif text-lg truncate">{title}</h2>
@@ -84,8 +84,8 @@ export default function SampleReaderModal({ pages = [], title = 'Amostra', open,
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-background rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 safe-overlay" onClick={onClose}>
+      <div className="bg-background rounded-2xl w-full max-w-4xl max-h-[min(90vh,100%)] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b gap-3">
           <div>
             <h3 className="text-lg font-bold">Pré-visualização — {title}</h3>

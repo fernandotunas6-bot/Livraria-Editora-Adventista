@@ -7,6 +7,7 @@ import { Kbd } from '@/components/ui/kbd';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import BrandLogo from '@/components/BrandLogo';
+import { BotaoInstalarApp } from '@/components/InstalarApp';
 import AdminUserMenu from '@/components/admin/shell/AdminUserMenu';
 
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
@@ -72,7 +73,10 @@ export default function AdminTopBar({
   current, currentView = null, onNavigate, layout, showTrigger, showBrand, onOpenSearch, user, roleLabel, onLayoutChange, onProfile, onLogout, sync,
 }) {
   return (
-    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm supports-backdrop-filter:bg-background/85 sm:px-4 lg:px-6">
+    // `safe-top` + `box-content`: na app instalada no iPhone (barra do sistema translúcida) a página
+    // começa por baixo da hora e da bateria; a barra ganha essa altura por cima dos 56 px, e o botão
+    // do menu e o perfil deixam de ficar tapados (e impossíveis de tocar).
+    <header className="safe-top sticky top-0 z-40 box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm supports-backdrop-filter:bg-background/85 sm:px-4 lg:px-6">
       {showTrigger && <SidebarTrigger className="h-9 w-9 shrink-0" title="Mostrar ou esconder o menu (Ctrl+B)" />}
       {showBrand && (
         <div className="flex shrink-0 items-center gap-2">
@@ -114,6 +118,9 @@ export default function AdminTopBar({
 
       <div className="flex shrink-0 items-center gap-1.5">
         <SyncStatus sync={sync} />
+        {/* No telemóvel, sem a app instalada: instalar (Android abre a janela do sistema; no
+            iPhone mostra os passos). Na app instalada e no computador não aparece. */}
+        <BotaoInstalarApp variante="icone" />
         <Button
           type="button" variant="outline" onClick={onOpenSearch}
           className="h-9 w-9 justify-center gap-2 px-0 text-muted-foreground sm:w-64 sm:justify-start sm:px-3"
