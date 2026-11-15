@@ -39,8 +39,25 @@ dizer «ainda sem valor». O mês em curso escolhe-se por loja. Nada é gravado 
 - **Colar do Excel**: uma linha por loja, pela ordem da grelha, 12 colunas separadas por tabulação.
 - Uma loja que abriu a meio do ano: escreva **0** nos meses antes da abertura. Vazio fica como
   «por registar» e a loja aparece nos meses por registar.
-- O painel de cada loja continua a gravar o ano inteiro dessa loja (meses, observações, meta,
+- O painel de cada loja continua a gravar o ano inteiro dessa loja (meses, observações, previsão,
   critério e fonte).
+
+### No Quadro geral de uma loja
+Em **Vendas por loja**, quem pode editar os relatórios carrega em **Editar quadro** e muda tudo no
+próprio quadro: os meses dos dois anos (o ano e o de comparação), o estado de cada mês (qual é o mês
+em curso; um mês vazio fica «por preencher»), a observação e a **previsão do ano**. A diferença, o
+crescimento e os totais recalculam-se enquanto se escreve; nada é gravado até **Guardar alterações**,
+com a mesma protecção do editor (valores invulgares pedem confirmação; se outra pessoa gravou
+entretanto, o servidor recusa). Enquanto se edita, o ano e a comparação ficam bloqueados.
+
+### A previsão do ano
+A **previsão anual** (coluna `meta_anual`; «Previsão anual» no editor e no quadro) é o número do
+PowerPoint da loja — «Previsão para 2026: 31 294 120» no Huambo. É fixa: não sobe nem desce com as
+vendas. Quando existe, é ela que aparece no cartão do topo, no fim do quadro («Ano completo /
+previsão», com «Atingida» e o mês em que o acumulado a passou), no diapositivo REMARQUE
+(«Previsão para …» e, ao lado, «Previsão atingida em Setembro · +7 587 203,00 AOA acima») e no
+vídeo. A projecção pelo critério (média dos meses fechados, por exemplo) continua a aparecer como
+«ao ritmo actual». Sem previsão gravada, vale a projecção, como antes.
 
 ### A partir das vendas do sistema (automático)
 **Conferir com as vendas do sistema › Carregar vendas do sistema** soma as encomendas do site por

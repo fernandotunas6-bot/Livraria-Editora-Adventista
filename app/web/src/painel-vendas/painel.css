@@ -615,3 +615,17 @@ tr.fora td, .t td.fora { opacity: .38; }
   .es-tela { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .estudio.a-gravar .es-gravar { animation: none; } .es-vu span { transition: none; } }
+
+/* Quadro geral editável */
+.q-acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.q-barra { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); position: sticky; bottom: 0; background: var(--panel); }
+.q-barra[hidden] { display: none; }
+.q-barra .st { margin: 0; flex: 1 1 16rem; }
+.q-botoes { display: flex; gap: 8px; }
+.t.qedit td { padding: 4px 6px; }
+.t.qedit input, .t.qedit select { font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--input); color: var(--fg); }
+.t.qedit input.qv { width: 9.5rem; text-align: right; font-weight: 700; }
+.t.qedit input.qo { width: 100%; min-width: 12rem; font-size: 12px; }
+.t.qedit select.qe { font-size: 12px; padding: 5px 6px; }
+.t.qedit select.qe:disabled { opacity: .6; }
+.t.qedit tr.fora td { opacity: .6; }

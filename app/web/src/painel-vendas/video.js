@@ -15,7 +15,7 @@
  * (`planoVideo`, `planoVideoConjunto`), testada em video.test.js sem canvas.
  * A gravação é em tempo real: um vídeo de 3 minutos demora 3 minutos a gravar.
  */
-import { MESES, MESES_CURTOS, periodoAte } from './modelo.js';
+import { MESES, MESES_CURTOS, periodoAte, previsaoDoAno } from './modelo.js';
 import { TEMAS, carregarImagem, desenharFoto, desenharLivro, desenharMuralCapas, desenharPaisagem, rng, veu } from './imagens-video.js';
 import { capasParaFundo } from './capas-de-fundo.js';
 import { destaqueDe } from './destaques.js';
@@ -525,6 +525,7 @@ function tilesResumo(ctx, at, tiles) {
 
 function cenaResumo(ctx, f, at, M) {
   const R = M.R;
+  const P = previsaoDoAno(M);
   const B = f.comp;
   cabecalho(ctx, f, 'Resumo do ano ' + f.ano, (R.ultimo ? `Registado até ${R.ultimo.mes}${R.ultimo.estado === 'Em curso' ? ' (em curso)' : ''} · ${R.nfech} ${R.nfech === 1 ? 'mês fechado' : 'meses fechados'}` : 'Ainda sem vendas registadas') + ' · projecção pela ' + f.critTxt);
   tilesResumo(ctx, at, [
@@ -532,11 +533,11 @@ function cenaResumo(ctx, f, at, M) {
     ['Diferença no período comparável', R.dif_ytd, kzs, R.ytd1 != null ? kz(R.ytd1) + ' em ' + B : 'sem ano de comparação', corDe(R.dif_ytd)],
     ['Média mensal (meses fechados)', R.media2, kz, R.cresc_media != null ? pct(R.cresc_media) + ' vs ' + kz(R.media1) + ' em ' + B : '', corDe(R.cresc_media)],
     ['Melhor mês', R.melhor ? R.melhor.v2 : null, kz, R.melhor ? R.melhor.mes + (R.melhor.cresc != null ? ' · ' + pct(R.melhor.cresc) : '') : '', COL.mut],
-    ['Projecção anual ' + f.ano, R.projeccao, kz, R.cresc_proj != null ? pct(R.cresc_proj) + ' vs total de ' + B : (R.falta != null ? 'faltam ' + kz(R.falta) : ''), corDe(R.cresc_proj)],
-    M.meta
-      ? ['Meta anual', M.meta, kz, Math.round((R.metaPct || 0) * 100) + '% atingido · faltam ' + kz(R.metaFalta), COL.teal]
-      : (B != null ? ['Total ' + B + ' (ano completo)', R.total1, kz, R.ultrapassa ? 'ultrapassado em ' + R.ultrapassa : '', COL.mut]
-        : ['Falta para a projecção', R.falta, kz, '', COL.mut]),
+    P && P.declarada
+      ? ['Previsão anual ' + f.ano, P.valor, kz, P.atingida ? 'atingida' + (P.mes ? ' em ' + P.mes : '') + ' · ' + pct(P.acimaPct) + ' acima' : Math.round(P.pct * 100) + '% feito · faltam ' + kz(P.falta), P.atingida ? COL.pos : COL.teal]
+      : ['Projecção anual ' + f.ano, R.projeccao, kz, R.cresc_proj != null ? pct(R.cresc_proj) + ' vs total de ' + B : (R.falta != null ? 'faltam ' + kz(R.falta) : ''), corDe(R.cresc_proj)],
+    B != null ? ['Total ' + B + ' (ano completo)', R.total1, kz, R.ultrapassa ? 'ultrapassado em ' + R.ultrapassa : '', COL.mut]
+      : ['Falta para a ' + (P && P.declarada ? 'previsão' : 'projecção'), P ? P.falta : R.falta, kz, '', COL.mut],
   ]);
   barrasMensais(ctx, f, M.rows, 64, 552, W - 112, 72, ease(at.s / (animDe(at.cena) * 1.5)), { valores: false, legenda: false, rotulos: false });
 }
@@ -731,18 +732,25 @@ function cenaFecho(ctx, f, at, M, titulo, nota) {
   const cw = (W - 96 - 20) / 2;
   const vidro = f.fundo === 'simples' ? COL.card2 : 'rgba(16,30,52,0.84)';
   card(ctx, 48, 190, cw, 320, vidro);
-  txt(ctx, 'PROJECÇÃO ' + f.ano, 76, 236, { w: 700, size: 16, color: COL.main });
-  txt(ctx, kz(R.projeccao), 76, 300, { w: 700, size: 40, max: cw - 56 });
-  txt(ctx, R.cresc_proj != null ? pct(R.cresc_proj) + ' face ao total de ' + f.comp + ' (' + kz(R.total1) + ')' : 'sem ano de comparação', 76, 344, { w: 700, size: 17, color: corDe(R.cresc_proj), max: cw - 56 });
-  txt(ctx, 'Critério: ' + f.critTxt, 76, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
+  // A previsão gravada no ano (a do PowerPoint da loja); sem ela, a projecção pelo critério.
+  const P = previsaoDoAno(M);
+  const dec = !!(P && P.declarada);
+  const cr = P ? P.cresc : R.cresc_proj;
+  txt(ctx, (dec ? 'PREVISÃO ' : 'PROJECÇÃO ') + f.ano, 76, 236, { w: 700, size: 16, color: COL.main });
+  txt(ctx, kz(P ? P.valor : R.projeccao), 76, 300, { w: 700, size: 40, max: cw - 56 });
+  txt(ctx, cr != null ? pct(cr) + ' face ao total de ' + f.comp + ' (' + kz(R.total1) + ')' : 'sem ano de comparação', 76, 344, { w: 700, size: 17, color: corDe(cr), max: cw - 56 });
+  txt(ctx, dec ? (R.projeccao != null ? 'Ao ritmo actual: ' + kz(R.projeccao) : 'Previsão do ano') : 'Critério: ' + f.critTxt, 76, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
   if (R.ultrapassa) txt(ctx, 'O total de ' + f.comp + ' foi ultrapassado em ' + R.ultrapassa + '.', 76, 416, { w: 600, size: 16, color: COL.pos, max: cw - 56 });
   const x2 = 48 + cw + 20;
   card(ctx, x2, 190, cw, 320, vidro);
-  txt(ctx, M.meta ? 'META ' + f.ano : 'SITUAÇÃO ACTUAL', x2 + 28, 236, { w: 700, size: 16, color: COL.teal });
+  txt(ctx, 'SITUAÇÃO ACTUAL', x2 + 28, 236, { w: 700, size: 16, color: COL.teal });
   txt(ctx, kz(R.ytd2), x2 + 28, 300, { w: 700, size: 40, max: cw - 56 });
   txt(ctx, 'Vendido' + (R.ultimo ? ' de Janeiro a ' + R.ultimo.mes : ''), x2 + 28, 344, { w: 700, size: 17, color: COL.mut, max: cw - 56 });
-  txt(ctx, M.meta ? Math.round((R.metaPct || 0) * 100) + '% da meta de ' + kz(M.meta) + ' · faltam ' + kz(R.metaFalta) : (R.falta != null ? 'Faltam ' + kz(R.falta) + ' para a projecção' : ''), x2 + 28, 380, { w: 600, size: 16, color: COL.mut, max: cw - 56 });
-  const pr = M.meta ? R.metaPct : R.progresso;
+  const situacao = !P ? ''
+    : P.atingida ? 'Previsão atingida' + (P.mes ? ' em ' + P.mes : '') + ' · +' + kz(P.acima) + ' (' + pct(P.acimaPct) + ')'
+      : P.falta ? 'Faltam ' + kz(P.falta) + ' para a ' + (dec ? 'previsão (' + Math.round(P.pct * 100) + '% feito)' : 'projecção') : '';
+  txt(ctx, situacao, x2 + 28, 380, { w: P && P.atingida ? 700 : 600, size: 16, color: P && P.atingida ? COL.pos : COL.mut, max: cw - 56 });
+  const pr = P ? P.pct : R.progresso;
   if (pr != null) {
     ctx.fillStyle = COL.line; roundRect(ctx, x2 + 28, 410, cw - 56, 12, 6); ctx.fill();
     ctx.fillStyle = COL.teal; roundRect(ctx, x2 + 28, 410, (cw - 56) * clamp01(pr) * k, 12, 6); ctx.fill();

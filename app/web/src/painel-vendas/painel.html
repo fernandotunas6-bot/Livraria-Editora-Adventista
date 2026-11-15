@@ -122,7 +122,7 @@
           <h2>Comparativo mensal · Janeiro a Dezembro</h2>
           <p class="note" id="note-mensal">Vendas por mês em Kz. Clique num mês para o pôr em destaque.</p>
         </div>
-        <div class="legend"><span><i style="background:var(--c25)"></i><span class="lgA">—</span></span><span><i style="background:var(--c26)"></i><span class="lgB">—</span></span><span><i class="hatch"></i>Em curso</span><span><i class="ghost"></i>Estimativa</span><span id="lg-meta" hidden><i class="meta"></i>Meta mensal</span></div>
+        <div class="legend"><span><i style="background:var(--c25)"></i><span class="lgA">—</span></span><span><i style="background:var(--c26)"></i><span class="lgB">—</span></span><span><i class="hatch"></i>Em curso</span><span><i class="ghost"></i>Estimativa</span><span id="lg-meta" hidden><i class="meta"></i>Previsão mensal</span></div>
       </div>
       <div class="box" id="chart-mensal"><div class="tip"></div></div>
     </div>
@@ -208,7 +208,11 @@
     <div class="head">
       <div>
         <h2>Quadro geral</h2>
-        <p class="note">Valores em Kwanzas (AOA). Clique numa linha para a pôr em destaque.</p>
+        <p class="note" id="q-note">Valores em Kwanzas (AOA). Clique numa linha para a pôr em destaque.</p>
+      </div>
+      <div class="q-acoes">
+        <span class="st okk" id="q-ok" role="status" aria-live="polite"></span>
+        <button class="btn line sm" id="q-editar" type="button" hidden>Editar quadro</button>
       </div>
     </div>
     <div class="tw">
@@ -217,6 +221,13 @@
         <tbody></tbody>
         <tfoot></tfoot>
       </table>
+    </div>
+    <div class="q-barra" id="q-barra" hidden>
+      <p class="st" id="q-st" role="status" aria-live="polite"></p>
+      <div class="q-botoes">
+        <button class="btn line sm" id="q-cancelar" type="button">Cancelar</button>
+        <button class="btn sm" id="q-guardar" type="button" disabled>Guardar alterações</button>
+      </div>
     </div>
   </section>
 
@@ -234,7 +245,7 @@
 
     <div class="ed-set">
       <div class="fld"><label for="ed-curso">Mês em curso (ainda não fechado)</label><select id="ed-curso"></select></div>
-      <div class="fld"><label for="ed-meta">Meta anual (Kz) <span>opcional</span></label><input id="ed-meta" type="text" inputmode="decimal" autocomplete="off" placeholder="sem meta"></div>
+      <div class="fld"><label for="ed-meta">Previsão anual (Kz) <span>opcional · a meta do ano</span></label><input id="ed-meta" type="text" inputmode="decimal" autocomplete="off" placeholder="sem previsão"></div>
       <div class="fld"><label for="ed-crit">Critério da projecção</label>
         <select id="ed-crit">
           <option value="media">Média dos meses fechados</option>

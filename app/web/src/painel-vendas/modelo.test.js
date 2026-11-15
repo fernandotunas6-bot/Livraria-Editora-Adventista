@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildYearModel, estadoDoMes, mesesDoAno, sumKz, periodoAte } from './modelo';
+import { buildYearModel, estadoDoMes, mesesDoAno, sumKz, periodoAte, previsaoDoAno } from './modelo';
 
 // Os dados reais da Loja do Huambo (migração painel_vendas, Relatório Síntese 2025/26):
 // 2025 completo e 2026 até Outubro, com Novembro em curso.
@@ -205,5 +205,51 @@ describe('periodoAte (o «período em apresentação» do PowerPoint)', () => {
     const M = buildYearModel({ 2026: { meses: [10, 20] } }, 2026, null);
     const p = periodoAte(M, 1);
     expect([p.venda1, p.venda2, p.crescimento, p.difPeriodica, p.difMensal]).toEqual([null, 30, null, null, null]);
+  });
+});
+
+describe('previsaoDoAno', () => {
+  // Os números do Huambo em Novembro de 2026: Outubro fechado (4 908 704), Novembro em curso
+  // (1 202 170) e a previsão do PowerPoint «Loja Huambo - Painel-Vendas 2026S»: 31 294 120.
+  const huambo = (meta) => {
+    const a = anos();
+    a[2026].meses = [...M2026.slice(0, 9), 4908704, 1202170, null];
+    a[2026].meta_anual = meta;
+    return buildYearModel(a, 2026, 2025);
+  };
+
+  it('com previsão gravada, é essa (e não a projecção pela média)', () => {
+    const P = previsaoDoAno(huambo(31294120));
+    expect(P.declarada).toBe(true);
+    expect(P.valor).toBe(31294120);
+    expect(P.projeccao).toBeCloseTo(45214983.6, 2);
+    expect(P.cresc).toBeCloseTo(31294120 / 11959074.65 - 1, 10);
+  });
+
+  it('diz que já foi atingida, em que mês e por quanto a passa', () => {
+    const P = previsaoDoAno(huambo(31294120));
+    expect(P.actual).toBe(38881323);
+    expect(P.atingida).toBe(true);
+    expect(P.mes).toBe('Setembro'); // 32 770 449 acumulados até Setembro
+    expect(P.acima).toBe(7587203);
+    expect(P.acimaPct).toBeCloseTo(0.2424, 4);
+    expect(P.falta).toBe(0);
+  });
+
+  it('antes de a atingir, diz quanto falta', () => {
+    const P = previsaoDoAno(huambo(50000000));
+    expect(P.atingida).toBe(false);
+    expect(P.mes).toBeNull();
+    expect(P.falta).toBe(11118677);
+    expect(P.pct).toBeCloseTo(38881323 / 50000000, 10);
+  });
+
+  it('sem previsão gravada, é a projecção do critério e nunca se diz «atingida»', () => {
+    const M = huambo(null);
+    const P = previsaoDoAno(M);
+    expect(P.declarada).toBe(false);
+    expect(P.valor).toBe(M.R.projeccao);
+    expect(P.atingida).toBe(false);
+    expect(P.falta).toBe(M.R.falta);
   });
 });

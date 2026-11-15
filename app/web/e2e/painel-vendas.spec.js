@@ -65,6 +65,91 @@ test('ao gravar, o painel pede confirmação de um valor invulgar e manda o actu
   expect(erros).toEqual([]);
 });
 
+test('o quadro geral edita-se na própria tabela e a previsão gravada vai para a perspectiva', async ({ page }) => {
+  const erros = [];
+  page.on('pageerror', (e) => erros.push(e.message));
+  await page.goto(PAINEL + '?editar=1');
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  await painel.locator('#q-editar').click();
+  await expect(painel.locator('#q-barra')).toBeVisible();
+  const quadro = painel.locator('#tbl-quadro');
+  await expect(quadro.locator('input.q2')).toHaveCount(12);
+  await expect(quadro.locator('input.q1')).toHaveCount(12);
+  // Enquanto se edita, o ano não muda.
+  await expect(painel.locator('#sel-ano')).toBeDisabled();
+
+  // Novembro de 2026 ganha valor: volta a ser o mês em curso gravado, e o crescimento recalcula-se.
+  const nov = quadro.locator('tbody tr').nth(10);
+  await nov.locator('input.q2').fill('1 202 170');
+  await expect(nov.locator('select.qe')).toHaveValue('c');
+  await expect(nov.locator('.qcr')).toHaveText('+33,6%');
+  // O Novembro de 2025 também se corrige no quadro (900 000 → 911 316).
+  await nov.locator('input.q1').fill('911 316');
+  await expect(nov.locator('.qcr')).toHaveText('+31,9%');
+  await quadro.locator('tbody tr').nth(9).locator('input.qo').fill('Valor final do PowerPoint');
+  // A previsão do ano, a do PowerPoint da loja: já atingida em Setembro.
+  await quadro.locator('input.qp').fill('31 294 120');
+  await expect(quadro.locator('.qf2e')).toHaveText('Atingida');
+  await expect(quadro.locator('.qf2o')).toContainText('Atingida em Setembro');
+  await expect(quadro.locator('.qf2o')).toContainText('7 587 203,00 Kz (+24,2%)');
+  // Um valor inválido não deixa gravar.
+  await quadro.locator('tbody tr').nth(0).locator('input.q2').fill('abc');
+  await expect(painel.locator('#q-guardar')).toBeDisabled();
+  await quadro.locator('tbody tr').nth(0).locator('input.q2').fill('2 171 368');
+  expect(await page.evaluate(() => window.__gravacoes.length), 'nada gravado antes de Guardar').toBe(0);
+
+  await painel.locator('#q-guardar').click();
+  await expect(painel.locator('#q-ok')).toContainText('Guardado');
+  await expect(painel.locator('#q-barra')).toBeHidden();
+  const gravacoes = await page.evaluate(() => window.__gravacoes);
+  expect(gravacoes.map((g) => g.path)).toEqual(['anos/2025', 'anos/2026']);
+  // Cada ano com o `actualizado` que o quadro leu ao abrir.
+  expect(gravacoes[0].opts).toEqual({ esperado: '2026-11-01T10:00:00.111111+00:00' });
+  expect(gravacoes[0].value.meses[10]).toBe(911316);
+  expect(gravacoes[1].opts).toEqual({ esperado: '2026-11-01T10:00:00.222222+00:00' });
+  expect(gravacoes[1].value.meses[10]).toBe(1202170);
+  expect(gravacoes[1].value.mes_em_curso).toBe(11);
+  expect(gravacoes[1].value.meta_anual).toBe(31294120);
+  expect(gravacoes[1].value.observacoes[9]).toBe('Valor final do PowerPoint');
+
+  // Fora da edição: o fim do quadro e o indicador mostram a previsão, não a projecção (≈ 45 M).
+  await expect(quadro.locator('.qf2l')).toHaveText('Ano completo / previsão');
+  await expect(quadro.locator('.qf2b')).toHaveText('31 294 120,00 Kz');
+  await expect(painel.locator('#k5-lab')).toHaveText('Previsão anual 2026');
+  await expect(painel.locator('#k5')).toContainText('31 294 120');
+  await expect(painel.locator('#k5-d')).toContainText('atingida em Setembro');
+
+  // O diapositivo «REMARQUE»: «Previsão para 2026: 31 294 120,00» e a situação actual.
+  await painel.locator('#btn-pres').click();
+  await painel.locator('#pr-next').press('End');
+  const slide = painel.locator('#pres-view .slide');
+  await expect(slide.locator('.s-rem-t')).toBeVisible();
+  await expect(slide.locator('.s-rem-box.pink .big')).toHaveText('31 294 120,00');
+  await expect(slide.locator('.s-rem-box.pink .sm')).toContainText('previsão do ano');
+  await expect(slide.locator('.s-rem-box').nth(1).locator('.big')).toHaveText('38 881 323,00');
+  await expect(slide.locator('.s-rem-box').nth(1)).toContainText('Previsão atingida em Setembro');
+  await expect(slide.locator('.s-rem-box').nth(1)).toContainText('+7 587 203,00 AOA acima · +24,2%');
+  expect(erros, 'erros de JavaScript na página').toEqual([]);
+  expect(await page.evaluate(() => window.__erros), 'erros apanhados pela página').toEqual([]);
+});
+
+test('cancelar a edição do quadro deixa tudo como estava', async ({ page }) => {
+  await page.goto(PAINEL + '?editar=1');
+  const painel = page.locator('#host');
+  await expect(painel.locator('#k1')).toContainText('37 679 153');
+  await painel.locator('#q-editar').click();
+  const quadro = painel.locator('#tbl-quadro');
+  await quadro.locator('tbody tr').nth(2).locator('input.q2').fill('9 999 999');
+  await expect(painel.locator('#q-st')).toContainText('Alterações por guardar');
+  await painel.locator('#q-cancelar').click();
+  await expect(painel.locator('#q-barra')).toBeHidden();
+  await expect(quadro.locator('input')).toHaveCount(0);
+  await expect(quadro.locator('tbody tr').nth(2)).toContainText('4 956 455,00 Kz');
+  await expect(painel.locator('#sel-ano')).toBeEnabled();
+  expect(await page.evaluate(() => window.__gravacoes.length)).toBe(0);
+});
+
 test('substituir um mês registado pelas vendas do sistema pede confirmação', async ({ page }) => {
   const erros = [];
   page.on('pageerror', (e) => erros.push(e.message));

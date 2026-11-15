@@ -15,7 +15,7 @@ import 'd3-transition';
 import { toCsv, buildXlsx, renderSummaryPng, printReport } from './exportar.js';
 import { planoVideo, duracaoPlano, fmtDuracao } from './video.js';
 import { abrirEstudio } from './estudio-video.js';
-import { MESES, CRIT, buildYearModel, periodoAte } from './modelo.js';
+import { MESES, CRIT, buildYearModel, periodoAte, previsaoDoAno, toC, fromC } from './modelo.js';
 import { capasParaFundo, pintarMaisVendidos, pintarParede } from './capas-de-fundo.js';
 import { filtroActivo, mesesDoPeriodo, recortarModelo, rotuloFiltro } from './filtros.js';
 import { montarFiltros } from './filtros-ui.js';
@@ -89,6 +89,7 @@ export function mountPainel(root, api) {
   const S = { db: null, user: null, uid: null, isOwner: false, canWrite: null, years: {}, note: null, cfg: undefined, hist: [], mv: null,
     ano: null, comp: null, model: null, sel: null, playing: false, timers: [], raf: null,
     admin: false, ed: { ano: null, dirty: false }, readOnly: false, downloads: null,
+    qe: { on: false, dirty: false, ano: null, comp: null, avisos: null, esperado: null },
     store: null, sales: null, sys: { ano: null, data: null } };
 
   // ---------- Modelo ----------
@@ -349,6 +350,10 @@ export function mountPainel(root, api) {
     e.appendChild(el('span', 'pill ' + (v == null ? 'na' : v >= 0 ? 'ok' : 'bad'), v == null ? 's/ comparação' : pct(v)));
     if (suffix) e.appendChild(document.createTextNode(suffix));
   }
+  /** O estado da previsão gravada do ano: «Atingida em Setembro · +24,2% acima» ou «82% realizado». */
+  const estadoPrevisao = (P) => (!P || !P.declarada ? ''
+    : P.atingida ? 'Atingida' + (P.mes ? ' em ' + P.mes : '') + ' · ' + pct(P.acimaPct) + ' acima'
+      : Math.round(P.pct * 100) + '% realizado');
   function fillKpis(M, animate) {
     const R = M.R, A = M.ano, B = M.comp;
     const ult = R.ultimo ? R.ultimo.mes : null;
@@ -366,16 +371,20 @@ export function mountPainel(root, api) {
     countUp($('k4'), R.melhor ? R.melhor.v2 : null, kz, animate ? 1100 : 0, 300);
     if (R.melhor) { setPill($('k4-d'), R.melhor.cresc, 'vs ' + short(R.melhor.mes) + (B != null ? ' ' + B : '')); $('k4-d').prepend(document.createTextNode(R.melhor.mes + ' · ')); }
     else $('k4-d').textContent = 'Sem meses fechados';
-    $('k5-lab').textContent = (M.filtro ? 'Projecção ' + M.filtro.rotulo + ' ' : 'Projecção anual ') + A;
-    countUp($('k5'), R.projeccao, kz, animate ? 1100 : 0, 350);
+    // Com previsão gravada para o ano, o cartão mostra-a (é a «Previsão para …» do PowerPoint da
+    // loja); a projecção pelo critério fica por baixo, como referência.
+    const P = previsaoDoAno(M);
+    const declarada = !!(P && P.declarada);
+    $('k5-lab').textContent = (declarada ? 'Previsão ' : 'Projecção ') + (M.filtro ? M.filtro.rotulo + ' ' : 'anual ') + A;
+    countUp($('k5'), P ? P.valor : R.projeccao, kz, animate ? 1100 : 0, 350);
     const parts = [];
     if (R.total1 != null) parts.push(M.filtro ? 'vs ' + M.filtro.rotulo + ' ' + B : 'vs total ' + B);
-    if (M.meta) parts.push('meta ' + mi(M.meta) + ' · ' + Math.round(R.metaPct * 100) + '% atingido');
+    if (declarada) parts.push(P.atingida ? 'atingida' + (P.mes ? ' em ' + P.mes : '') + ' · ' + pct(P.acimaPct) + ' acima' : Math.round(P.pct * 100) + '% realizado · faltam ' + mi(P.falta));
     else if (R.progresso != null) parts.push(Math.round(R.progresso * 100) + '% realizado');
-    setPill($('k5-d'), R.cresc_proj, parts.join(' · '));
-    $('k5-d').appendChild(el('div', 'mut', 'Critério: ' + CRIT[M.crit]));
+    setPill($('k5-d'), P ? P.cresc : R.cresc_proj, parts.join(' · '));
+    $('k5-d').appendChild(el('div', 'mut', declarada && R.projeccao != null ? 'Ao ritmo actual: ≈ ' + mi(R.projeccao) + ' (' + CRIT[M.crit] + ')' : 'Critério: ' + CRIT[M.crit]));
     const pb = $('proj-bar');
-    const prog = M.meta ? R.metaPct : R.progresso;
+    const prog = P ? P.pct : R.progresso;
     pb.style.transition = animate && !reduce ? 'width 1.4s cubic-bezier(.22,1,.36,1) .3s' : 'none';
     pb.style.width = '0';
     requestAnimationFrame(() => requestAnimationFrame(() => { pb.style.width = Math.min(100, (prog || 0) * 100).toFixed(1) + '%'; }));
@@ -401,7 +410,20 @@ export function mountPainel(root, api) {
 
   // ---------- Tabelas ----------
   function fillQuadro(M) {
-    const tb = root.querySelector('#tbl-quadro tbody');
+    const tbl = $('tbl-quadro');
+    if (S.qe.on) {
+      // A editar: os números escritos e ainda não gravados não se perdem quando chegam dados novos
+      // (o servidor recusa a gravação se outra pessoa gravou entretanto). Sem nada escrito, o
+      // quadro reabre com os números novos. Mudar de ano fecha a edição (os selectores ficam
+      // bloqueados enquanto se edita, mas um ano apagado noutro sítio também muda o ano).
+      if (S.qe.ano === M.ano && S.qe.comp === M.comp) {
+        if (S.qe.dirty) recalcQuadro(); else fillQuadroEdicao(M);
+        return;
+      }
+      fecharQuadro();
+    }
+    tbl.classList.add('click'); tbl.classList.remove('qedit');
+    const tb = tbl.querySelector('tbody');
     const max = d3.max(M.rows, (r) => r.v2 || 0) || 1;
     const td = (txt, cls) => el('td', cls, txt);
     tb.replaceChildren(...M.rows.map((r) => {
@@ -414,13 +436,255 @@ export function mountPainel(root, api) {
         td(r.cresc == null ? '—' : pct(r.cresc), r.cresc == null ? 'mut' : r.cresc >= 0 ? 'pos' : 'neg'), cE, td(r.obs || '', 'o'));
       return tr;
     }));
-    const R = M.R, tf = root.querySelector('#tbl-quadro tfoot');
-    const r1 = el('tr');
-    r1.append(td((M.filtro ? 'Filtro ' + M.filtro.rotulo + ' · comparável' : 'Período comparável') + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : '')), td(kz(R.ytd1)), td(kz(R.ytd2c)), td(kzs(R.dif_ytd)), td(pct(R.cresc_ytd), R.cresc_ytd == null ? 'mut' : R.cresc_ytd >= 0 ? 'pos' : 'neg'), td(''), td('', 'o'));
-    const r2 = el('tr');
-    r2.append(td(M.filtro ? 'Período filtrado / projecção' : 'Ano completo / projecção'), td(kz(R.total1)), td(R.projeccao != null ? '≈ ' + kz(R.projeccao) : '—'), td(''), td(pct(R.cresc_proj)), td(''), td(M.meta ? 'Meta: ' + kz(M.meta) : '', 'o'));
-    tf.replaceChildren(r1, r2);
+    rodapeQuadro(M, false);
   }
+  const corDoPct = (v) => (v == null ? 'mut' : v >= 0 ? 'pos' : 'neg');
+  /**
+   * As duas linhas do fim do quadro: o período comparável e o ano completo com a previsão (a
+   * gravada no ano; sem ela, a projecção pelo critério, com «≈»). A editar, a célula da previsão
+   * tem a caixa de texto, criada uma vez: o resto actualiza-se sem lhe tirar o foco.
+   */
+  function rodapeQuadro(M, edicao) {
+    const tf = root.querySelector('#tbl-quadro tfoot');
+    const modo = edicao ? 'e' : 'v';
+    if (tf.dataset.modo !== modo || !tf.querySelector('.qf2b')) {
+      const linha = (n) => { const tr = el('tr'); ['l', 'a', 'b', 'd', 'c', 'e', 'o'].forEach((k) => tr.appendChild(el('td', 'qf' + n + k))); return tr; };
+      tf.replaceChildren(linha(1), linha(2));
+      tf.dataset.modo = modo;
+      if (edicao) {
+        const Y = S.years[M.ano] || {};
+        const ip = caixaKz('qv qp', Y.meta_anual == null ? null : Number(Y.meta_anual), 'Previsão anual de ' + M.ano + ' em Kz', -1);
+        ip.placeholder = 'sem previsão';
+        tf.querySelector('.qf2b').appendChild(ip);
+      }
+    }
+    const put = (k, txt, cls) => { const c = tf.querySelector('.' + k); c.className = k + (cls ? ' ' + cls : ''); c.textContent = txt; return c; };
+    const R = M.R, P = previsaoDoAno(M), dec = !!(P && P.declarada);
+    put('qf1l', (M.filtro ? 'Filtro ' + M.filtro.rotulo + ' · comparável' : 'Período comparável') + (R.ultimo ? ' (até ' + R.ultimo.mes + ')' : ''));
+    put('qf1a', kz(R.ytd1)); put('qf1b', kz(R.ytd2c)); put('qf1d', kzs(R.dif_ytd)); put('qf1c', pct(R.cresc_ytd), corDoPct(R.cresc_ytd)); put('qf1e', ''); put('qf1o', '', 'o');
+    put('qf2l', (M.filtro ? 'Período filtrado / ' : 'Ano completo / ') + (dec || edicao ? 'previsão' : 'projecção'));
+    put('qf2a', kz(R.total1));
+    if (!edicao) put('qf2b', dec ? kz(P.valor) : (R.projeccao != null ? '≈ ' + kz(R.projeccao) : '—'));
+    put('qf2d', dec && R.total1 != null ? kzs(fromC(toC(P.valor) - toC(R.total1))) : '');
+    const cr = P ? P.cresc : R.cresc_proj;
+    put('qf2c', pct(cr), corDoPct(cr));
+    const ce = put('qf2e', '');
+    if (dec) ce.appendChild(el('span', 'tag ' + (P.atingida ? 'f' : 'c'), P.atingida ? 'Atingida' : 'Por atingir'));
+    let obs = '';
+    if (dec) {
+      obs = P.atingida
+        ? 'Atingida' + (P.mes ? ' em ' + P.mes : '') + '; já a passa em ' + kz(P.acima) + ' (' + pct(P.acimaPct) + ').'
+        : 'Faltam ' + kz(P.falta) + ' (' + Math.round(P.pct * 100) + '% feito).';
+      if (R.projeccao != null) obs += ' Ao ritmo actual: ≈ ' + kz(R.projeccao) + '.';
+    } else if (edicao) obs = 'Escreva a previsão do ano (opcional).' + (R.projeccao != null ? ' Sem ela, vale a projecção: ≈ ' + kz(R.projeccao) + '.' : '');
+    put('qf2o', obs, 'o');
+  }
+
+  // ---------- Quadro geral editável ----------
+  // Quem pode editar os relatórios muda os números no próprio quadro: os meses dos dois anos, o
+  // estado (qual é o mês em curso), a observação e a previsão do ano. A diferença, o crescimento e
+  // os totais recalculam-se enquanto se escreve; nada é gravado até carregar em Guardar. Grava como
+  // o editor da Administração: com o `actualizado` lido ao abrir (se outra pessoa gravou entretanto,
+  // o servidor recusa) e o histórico escrito pelo servidor.
+  const qStatus = (t, cls) => { const e = $('q-st'); e.textContent = t || ''; e.className = 'st' + (cls ? ' ' + cls : ''); };
+  function caixaKz(cls, v, rotulo, i) {
+    const x = el('input', cls); x.type = 'text'; x.inputMode = 'decimal'; x.autocomplete = 'off';
+    x.value = inField(v); x.dataset.orig = x.value; x.dataset.i = String(i); x.setAttribute('aria-label', rotulo);
+    return x;
+  }
+  function fillQuadroEdicao(M) {
+    const tbl = $('tbl-quadro'); tbl.classList.remove('click'); tbl.classList.add('qedit');
+    const A = S.years[M.ano] || {}, B = M.comp != null ? (S.years[M.comp] || {}) : null;
+    S.qe.esperado = { A: A.actualizado || null, B: B ? B.actualizado || null : null };
+    S.qe.dirty = false; S.qe.avisos = null;
+    const curso = Number(A.mes_em_curso) || null;
+    tbl.querySelector('tbody').replaceChildren(...M.rows.map((r) => {
+      const i = r.i;
+      const tr = el('tr', r.fora ? 'fora' : null); tr.dataset.key = r.mes;
+      const c1 = el('td');
+      if (B) c1.appendChild(caixaKz('qv q1', r.v1, 'Vendas de ' + r.mes + ' de ' + M.comp + ' em Kz', i));
+      else { c1.textContent = '—'; c1.className = 'mut'; }
+      const c2 = el('td'); c2.appendChild(caixaKz('qv q2', r.v2, 'Vendas de ' + r.mes + ' de ' + M.ano + ' em Kz', i));
+      const cE = el('td'); const se = el('select', 'qe'); se.dataset.i = String(i); se.setAttribute('aria-label', 'Estado de ' + r.mes);
+      se.append(new Option('Fechado', 'f'), new Option('Em curso', 'c'), new Option('Por preencher', 'p'));
+      se.value = r.v2 == null ? 'p' : curso === i + 1 ? 'c' : 'f'; se.dataset.orig = se.value; cE.appendChild(se);
+      const cO = el('td', 'o'); const io = el('input', 'qo'); io.type = 'text'; io.autocomplete = 'off'; io.maxLength = 200; io.placeholder = 'Observação (opcional)';
+      io.value = Array.isArray(A.observacoes) ? (A.observacoes[i] || '') : ''; io.dataset.orig = io.value; io.dataset.i = String(i); io.setAttribute('aria-label', 'Observação de ' + r.mes);
+      cO.appendChild(io);
+      tr.append(el('td', null, r.mes), c1, c2, el('td', 'qdif'), el('td', 'qcr'), cE, cO);
+      return tr;
+    }));
+    rodapeQuadro(M, true);
+    recalcQuadro();
+  }
+  /** O que está escrito no quadro: os meses dos dois anos, as observações, o mês em curso e a previsão. */
+  function rascunhoQuadro() {
+    const A = S.years[S.qe.ano] || {}, B = S.qe.comp != null ? (S.years[S.qe.comp] || {}) : null;
+    const q = (sel) => Array.from(root.querySelectorAll('#tbl-quadro ' + sel));
+    let bad = false;
+    const ler = (x) => {
+      const p = parseKz(x.value);
+      x.classList.toggle('invalid', !p.ok); x.classList.toggle('changed', p.ok && x.value.trim() !== x.dataset.orig.trim());
+      if (!p.ok) bad = true;
+      return p.ok ? p.v : null;
+    };
+    const num = (v) => (v == null || v === '' || !isFinite(Number(v)) ? null : Number(v));
+    const mA = MESES.map((_, i) => num(A.meses && A.meses[i]));
+    q('input.q2').forEach((x) => { mA[Number(x.dataset.i)] = ler(x); });
+    const mB = B ? MESES.map((_, i) => num(B.meses && B.meses[i])) : null;
+    if (mB) q('input.q1').forEach((x) => { mB[Number(x.dataset.i)] = ler(x); });
+    const obs = MESES.map((_, i) => (Array.isArray(A.observacoes) ? (A.observacoes[i] || '') : ''));
+    q('input.qo').forEach((x) => { obs[Number(x.dataset.i)] = x.value.trim(); x.classList.toggle('changed', x.value !== x.dataset.orig); });
+    const emCurso = q('select.qe').find((x) => x.value === 'c');
+    let curso = emCurso ? Number(emCurso.dataset.i) + 1 : null;
+    // Um «mês em curso» gravado num mês ainda vazio (Novembro antes de ter vendas) mantém-se.
+    if (!emCurso && num(A.mes_em_curso) && mA[A.mes_em_curso - 1] == null) curso = Number(A.mes_em_curso);
+    const ip = root.querySelector('#tbl-quadro input.qp');
+    const meta = ip ? ler(ip) || null : num(A.meta_anual);
+    return { mA, mB, obs, curso, meta, bad };
+  }
+  /** O que muda face ao gravado, em texto, por ano (para o histórico e para saber se há o que gravar). */
+  function mudancasQuadro(d) {
+    const A = S.years[S.qe.ano] || {}, B = S.qe.comp != null ? (S.years[S.qe.comp] || {}) : null;
+    const num = (v) => (v == null || v === '' || !isFinite(Number(v)) ? null : Number(v));
+    const ch = { A: [], B: [], mudA: [], mudB: [] };
+    MESES.forEach((m, i) => {
+      const a = num(A.meses && A.meses[i]);
+      if (a !== d.mA[i]) { ch.mudA.push(i); ch.A.push(short(m) + ': ' + (a == null ? 'vazio' : kz(a)) + ' → ' + (d.mA[i] == null ? 'vazio' : kz(d.mA[i]))); }
+      const oa = Array.isArray(A.observacoes) ? (A.observacoes[i] || '') : '';
+      if (oa.trim() !== d.obs[i]) ch.A.push(short(m) + ': observação ' + (d.obs[i] ? 'actualizada' : 'removida'));
+      if (B && d.mB) {
+        const b = num(B.meses && B.meses[i]);
+        if (b !== d.mB[i]) { ch.mudB.push(i); ch.B.push(short(m) + ': ' + (b == null ? 'vazio' : kz(b)) + ' → ' + (d.mB[i] == null ? 'vazio' : kz(d.mB[i]))); }
+      }
+    });
+    if (num(A.mes_em_curso) !== d.curso) ch.A.push('Mês em curso: ' + (d.curso ? MESES[d.curso - 1] : 'nenhum'));
+    if ((num(A.meta_anual) || null) !== d.meta) ch.A.push('Previsão anual: ' + (d.meta ? kz(d.meta) : 'sem previsão'));
+    return ch;
+  }
+  /** Recalcula a diferença, o crescimento, o estado e os totais a partir do que está escrito. */
+  function recalcQuadro() {
+    if (!S.qe.on) return;
+    const A = S.years[S.qe.ano] || {};
+    // O estado segue o valor: um mês vazio está por preencher; ao ganhar valor fica fechado (ou
+    // volta a «em curso», se era o mês em curso gravado e nenhum outro o é agora).
+    const sels = Array.from(root.querySelectorAll('#tbl-quadro select.qe'));
+    sels.forEach((se) => {
+      const i = Number(se.dataset.i);
+      const x = root.querySelector('#tbl-quadro input.q2[data-i="' + i + '"]');
+      const p = parseKz(x ? x.value : '');
+      if (!p.ok || p.v == null) { se.value = 'p'; se.disabled = true; return; }
+      se.disabled = S.readOnly;
+      if (se.value === 'p') se.value = Number(A.mes_em_curso) === i + 1 && !sels.some((o) => o !== se && o.value === 'c') ? 'c' : 'f';
+    });
+    const d = rascunhoQuadro();
+    const anos = { ...S.years, [S.qe.ano]: { ...A, meses: d.mA, observacoes: d.obs, mes_em_curso: d.curso, meta_anual: d.meta } };
+    if (S.qe.comp != null && d.mB) anos[S.qe.comp] = { ...(S.years[S.qe.comp] || {}), meses: d.mB };
+    const M = filtrar(buildYearModel(anos, S.qe.ano, S.qe.comp));
+    const trs = root.querySelectorAll('#tbl-quadro tbody tr');
+    M.rows.forEach((r, i) => {
+      const tr = trs[i]; if (!tr) return;
+      tr.classList.toggle('fora', !!r.fora);
+      const dif = tr.querySelector('.qdif'), cr = tr.querySelector('.qcr');
+      dif.textContent = r.dif == null ? '—' : kzs(r.dif); dif.className = 'qdif' + (r.dif == null ? ' mut' : '');
+      cr.textContent = r.cresc == null ? '—' : pct(r.cresc); cr.className = 'qcr ' + corDoPct(r.cresc);
+      const x2 = tr.querySelector('input.q2'); if (x2) x2.placeholder = r.est != null ? '≈ ' + inField(r.est) : 'vazio';
+    });
+    rodapeQuadro(M, true);
+    const ch = mudancasQuadro(d);
+    S.qe.dirty = !!(ch.A.length || ch.B.length);
+    $('q-guardar').disabled = !S.qe.dirty || d.bad || S.readOnly;
+    qStatus(d.bad ? 'Há valores inválidos (marcados a vermelho).' : S.qe.dirty ? 'Alterações por guardar.' : 'Sem alterações.', d.bad ? 'err' : '');
+  }
+  function abrirQuadro() {
+    if (!S.model || S.readOnly || S.canWrite === false) return;
+    if (!S.admin) setAdmin(true);
+    stopPlay();
+    S.qe = { on: true, dirty: false, ano: S.model.ano, comp: S.model.comp, avisos: null, esperado: null };
+    $('q-editar').hidden = true; $('q-barra').hidden = false;
+    $('q-note').textContent = 'Escreva os valores em Kz (ex.: 2 171 368 ou 2.171.368,50); deixe vazio o mês sem vendas. A diferença, o crescimento e os totais recalculam-se enquanto escreve. Nada é gravado até carregar em Guardar.';
+    $('q-ok').textContent = '';
+    fillSelectors();
+    fillQuadroEdicao(S.model);
+    const primeiro = root.querySelector('#tbl-quadro input.q2'); if (primeiro) primeiro.focus();
+  }
+  function fecharQuadro() {
+    S.qe = { on: false, dirty: false, ano: null, comp: null, avisos: null, esperado: null };
+    $('q-barra').hidden = true; $('q-editar').hidden = S.canWrite === false || S.readOnly;
+    $('q-note').textContent = 'Valores em Kwanzas (AOA). Clique numa linha para a pôr em destaque.';
+    qStatus('');
+    fillSelectors();
+  }
+  async function guardarQuadro() {
+    if (!S.qe.on || !S.admin) return;
+    const d = rascunhoQuadro();
+    if (d.bad) { qStatus('Há valores inválidos (marcados a vermelho).', 'err'); return; }
+    const ch = mudancasQuadro(d);
+    if (!ch.A.length && !ch.B.length) { fecharQuadro(); render(false); return; }
+    const ano = S.qe.ano, comp = S.qe.comp;
+    // Valores invulgares (plausibilidade.js) mostram-se uma vez; a segunda carga em Guardar grava-os.
+    const antA = comp === ano - 1 && d.mB ? d.mB : (S.years[ano - 1] ? S.years[ano - 1].meses : null);
+    const avisos = avisosDePlausibilidade(d.mA, antA, ch.mudA).map((a) => textoDoAviso(a, ano - 1));
+    if (d.mB && ch.mudB.length) {
+      const antB = S.years[comp - 1] ? S.years[comp - 1].meses : null;
+      avisos.push(...avisosDePlausibilidade(d.mB, antB, ch.mudB).map((a) => comp + ' ' + textoDoAviso(a, comp - 1)));
+    }
+    if (avisos.length && S.qe.avisos !== avisos.join('|')) {
+      S.qe.avisos = avisos.join('|');
+      qStatus('Confirme estes valores invulgares antes de gravar — ' + avisos.join(' · ') + '. Se estão certos, carregue outra vez em Guardar e, se puder, explique-os na observação do mês.', 'err');
+      return;
+    }
+    $('q-guardar').disabled = true; qStatus('A guardar…');
+    const gravados = [];
+    try {
+      if (ch.B.length) {
+        const cur = S.years[comp] || {};
+        const body = Object.assign({}, cur, { ano: comp, meses: d.mB, actualizado: new Date().toISOString(), origem: 'manual' });
+        const feito = await writeYear(comp, body, S.qe.esperado.B);
+        if (feito && feito.actualizado) body.actualizado = feito.actualizado;
+        S.years[comp] = body; S.qe.esperado.B = body.actualizado; gravados.push(comp);
+        logHist(comp, 'Quadro geral: ' + comp + ' actualizado', ch.B.join(' · '));
+      }
+      if (ch.A.length) {
+        const cur = S.years[ano] || {};
+        const body = Object.assign({}, cur, {
+          ano, meses: d.mA, observacoes: d.obs, mes_em_curso: d.curso, meta_anual: d.meta,
+          // O critério «meta anual» precisa da previsão: sem ela, volta à média dos meses fechados.
+          criterio: cur.criterio === 'meta' && !d.meta ? 'media' : (cur.criterio || 'media'),
+          actualizado: new Date().toISOString(), origem: 'manual',
+        });
+        const feito = await writeYear(ano, body, S.qe.esperado.A);
+        if (feito && feito.actualizado) body.actualizado = feito.actualizado;
+        S.years[ano] = body; S.qe.esperado.A = body.actualizado; gravados.push(ano);
+        logHist(ano, 'Quadro geral: ' + ano + ' actualizado', ch.A.join(' · '));
+      }
+    } catch (e) {
+      const msg = errMsg(e);
+      qStatus((gravados.length ? gravados.join(' e ') + ' ficou gravado; o resto não. ' : '') + msg, 'err');
+      $('q-guardar').disabled = S.readOnly;
+      return;
+    }
+    fecharQuadro();
+    render(false);
+    $('q-ok').textContent = 'Guardado: ' + gravados.join(' e ') + '.';
+    if (!$('editar').hidden && !S.ed.dirty && gravados.includes(S.ed.ano)) edFill();
+  }
+  $('q-editar').addEventListener('click', abrirQuadro);
+  $('q-cancelar').addEventListener('click', () => { fecharQuadro(); if (S.model) render(false); });
+  $('q-guardar').addEventListener('click', guardarQuadro);
+  $('tbl-quadro').addEventListener('input', () => { if (S.qe.on) { S.qe.avisos = null; recalcQuadro(); } });
+  $('tbl-quadro').addEventListener('change', (ev) => {
+    if (!S.qe.on) return;
+    const se = ev.target.closest('select.qe');
+    // Só um mês pode estar em curso: escolher outro passa o anterior a fechado.
+    if (se && se.value === 'c') root.querySelectorAll('#tbl-quadro select.qe').forEach((o) => { if (o !== se && o.value === 'c') o.value = 'f'; });
+    S.qe.avisos = null; recalcQuadro();
+  });
+  // Ao sair de uma caixa, o valor fica escrito à maneira do painel (2 171 368).
+  $('tbl-quadro').addEventListener('blur', (ev) => {
+    const x = ev.target; if (!S.qe.on || !(x.matches && x.matches('input.qv'))) return;
+    const p = parseKz(x.value); if (p.ok) { x.value = inField(p.v); recalcQuadro(); }
+  }, true);
   function correctedValue(chave, M) {
     const parts = String(chave).split(':'); const k = parts[0], arg = parts[1];
     const A = S.years[M.ano], B = S.years[M.comp];
@@ -540,6 +804,7 @@ export function mountPainel(root, api) {
   $('sp-next').addEventListener('click', () => stepMonth(1));
   $('sp-chips').addEventListener('click', (ev) => { const b = ev.target.closest('.chip'); if (!b) return; stopPlay(); select(b.dataset.mes, true); });
   root.querySelector('#tbl-quadro tbody').addEventListener('click', (ev) => {
+    if (S.qe.on) return;
     const tr = ev.target.closest('tr[data-key]'); if (!tr) return;
     stopPlay(); select(tr.dataset.key, true);
     $('apresentacao').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
@@ -553,7 +818,8 @@ export function mountPainel(root, api) {
     sa.replaceChildren(...ys.map((y) => new Option(String(y), String(y))));
     sc.replaceChildren(new Option('Nenhum', ''), ...ys.filter((y) => y !== S.ano).map((y) => new Option(String(y), String(y))));
     sa.value = S.ano != null ? String(S.ano) : ''; sc.value = S.comp != null ? String(S.comp) : '';
-    sa.disabled = !ys.length; sc.disabled = !ys.length;
+    // Enquanto se edita o quadro, o ano não muda (os números escritos são desse ano).
+    sa.disabled = !ys.length || S.qe.on; sc.disabled = !ys.length || S.qe.on;
     $('btn-pres').disabled = !ys.length;
     $('btn-exp').disabled = !ys.length;
   }
@@ -635,7 +901,7 @@ export function mountPainel(root, api) {
   function touchIdle() {
     if (!S.admin) return;
     clearTimeout(idleT);
-    idleT = setTimeout(() => { if (S.ed.dirty) { touchIdle(); return; } setAdmin(false); }, IDLE_MS);
+    idleT = setTimeout(() => { if (S.ed.dirty || S.qe.dirty) { touchIdle(); return; } setAdmin(false); }, IDLE_MS);
     try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ h: S.cfg && S.cfg.hash, t: Date.now() })); } catch (e) {}
   }
   ['pointerdown', 'keydown'].forEach((ev) => listen(document, ev, touchIdle, { passive: true }));
@@ -644,11 +910,15 @@ export function mountPainel(root, api) {
     $('adm-badge').hidden = !on;
     $('btn-admin-t').textContent = on ? 'Editar dados' : 'Administração';
     $('ed-pass').hidden = !(on && S.isOwner);
-    if (!on) { $('editar').hidden = true; clearTimeout(idleT); try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {} }
+    if (!on) {
+      $('editar').hidden = true; clearTimeout(idleT); try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+      if (S.qe.on) { fecharQuadro(); if (S.model) render(false); }
+    }
     else touchIdle();
   }
   $('btn-lock').addEventListener('click', () => {
     if (S.ed.dirty) { $('editar').hidden = false; edStatus('Guarde ou descarte as alterações antes de bloquear.', 'err'); $('editar').scrollIntoView({ block: 'end' }); return; }
+    if (S.qe.dirty) { qStatus('Guarde ou descarte as alterações do quadro antes de bloquear.', 'err'); $('quadro').scrollIntoView({ block: 'end' }); return; }
     setAdmin(false);
   });
   let mdlMode = 'login';
@@ -1021,7 +1291,15 @@ export function mountPainel(root, api) {
       ['Projecção anual ' + A, R.projeccao, 'critério: ' + d.critTxt],
       ['Crescimento da projecção', R.cresc_proj, ''],
       ['Falta para a projecção', R.falta, ''],
-      ['Meta anual', d.meta, d.meta ? Math.round((R.metaPct || 0) * 100) + '% atingido' : 'sem meta'],
+      ...(() => {
+        const P = previsaoDoAno({ rows: d.rows, R, meta: d.meta });
+        if (!P || !P.declarada) return [['Previsão anual ' + A, null, 'sem previsão gravada (vale a projecção)']];
+        return [
+          ['Previsão anual ' + A, P.valor, P.atingida ? 'atingida' + (P.mes ? ' em ' + P.mes : '') : Math.round(P.pct * 100) + '% realizado'],
+          ['Crescimento da previsão', P.cresc, B ? 'face ao total de ' + B : ''],
+          [P.atingida ? 'Acima da previsão' : 'Falta para a previsão', P.atingida ? P.acima : P.falta, P.atingida ? pct(P.acimaPct) : ''],
+        ];
+      })(),
       ['Fonte', d.fonte || '—', ''],
       ['Gerado em', d.geradoEm, ''],
     ];
@@ -1150,7 +1428,7 @@ export function mountPainel(root, api) {
     if (!lista.length) { ul.replaceChildren(el('li', null, 'Sem gravações registadas no servidor para esta loja.')); return; }
     const accao = { insert: 'Criou', update: 'Alterou', delete: 'Apagou' };
     const origem = { manual: 'à mão', sistema: 'do sistema', misto: 'várias origens', importacao: 'importação' };
-    const nomes = { mes_em_curso: 'mês em curso', meta_anual: 'meta', criterio: 'critério', fonte: 'fonte', observacoes: 'observações' };
+    const nomes = { mes_em_curso: 'mês em curso', meta_anual: 'previsão', criterio: 'critério', fonte: 'fonte', observacoes: 'observações' };
     ul.replaceChildren(...lista.slice(0, 40).map((h) => {
       const li = el('li');
       li.appendChild(el('span', null, new Date(h.em).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })));
@@ -1232,7 +1510,8 @@ export function mountPainel(root, api) {
       lista.querySelectorAll('.mv-i').forEach((li, i) => { li.style.animationDelay = (0.2 + i * 0.12) + 's'; });
       s.appendChild(lista);
     } else if (it.k === 'resumo') {
-      head(s, M, 'Resumo do ano · ' + (R.ultimo ? 'até ' + R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : '') : 'sem dados'));
+      const PR = previsaoDoAno(M);
+      head(s, M,'Resumo do ano · ' + (R.ultimo ? 'até ' + R.ultimo.mes + (R.ultimo.estado === 'Em curso' ? ' (em curso)' : '') : 'sem dados'));
       const tiles = el('div', 's-tiles');
       const T = (k, d) => { const t = el('div', 's-tile'); t.append(el('div', 'k', k)); const vv = el('div', 'v', '—'); t.append(vv); t.append(el('div', 'd', d)); tiles.appendChild(t); return vv; };
       const vs = [
@@ -1240,8 +1519,12 @@ export function mountPainel(root, api) {
         [T('Meses fechados', R.cresc_fech != null ? pct(R.cresc_fech) + ' vs ' + kz(R.fech1) : ''), R.fech2],
         [T('Média mensal ' + A, R.media1 != null ? 'vs ' + kz(R.media1) + ' em ' + B : ''), R.media2],
         [T('Melhor mês', R.melhor ? R.melhor.mes + (R.melhor.cresc != null ? ' · ' + pct(R.melhor.cresc) : '') : '—'), R.melhor ? R.melhor.v2 : null],
-        [T('Projecção anual ' + A, 'Critério: ' + CRIT[M.crit]), R.projeccao],
-        [T(B != null ? 'Total ' + B : (M.meta ? 'Meta anual' : 'Falta para a projecção'), B != null ? 'ano completo' : ''), B != null ? R.total1 : (M.meta || R.falta)],
+        PR && PR.declarada
+          ? [T('Previsão anual ' + A, estadoPrevisao(PR)), PR.valor]
+          : [T('Projecção anual ' + A, 'Critério: ' + CRIT[M.crit]), R.projeccao],
+        B != null ? [T('Total ' + B, 'ano completo'), R.total1]
+          : PR && PR.declarada ? [T(PR.atingida ? 'Acima da previsão' : 'Falta para a previsão', ''), PR.atingida ? PR.acima : PR.falta]
+            : [T('Falta para a projecção', ''), R.falta],
       ];
       s.appendChild(tiles);
       vs.forEach(([e, v], i) => countUp(e, v, kz, 1200, 200 + i * 90));
@@ -1338,15 +1621,21 @@ export function mountPainel(root, api) {
       const c1 = abs('s-rem-card', { left: '80px' }); c1.appendChild(abs('k', null, 'PERSPECTIVA ANUAL'));
       const bx1 = abs('s-rem-box pink'); const a = el('div', 'a');
       if (B != null) { a.append(document.createTextNode(B + ' – ')); a.append(el('b', null, grp(R.total1))); a.append(document.createTextNode(' AOA')); }
+      // A previsão é a gravada no ano (a do PowerPoint da loja); sem ela, a projecção pelo critério.
+      const P = previsaoDoAno(M);
       bx1.append(a, el('div', 'a', 'Previsão para ' + A + ':')); const pv = el('div', 'big', '—'); bx1.append(pv);
-      bx1.append(el('div', 'sm', (R.cresc_proj != null ? pct(R.cresc_proj) + ' face a ' + B + ' · ' : '') + CRIT[M.crit]));
+      bx1.append(el('div', 'sm', (P && P.cresc != null ? pct(P.cresc) + ' face a ' + B + ' · ' : '') + (P && P.declarada ? 'previsão do ano' : CRIT[M.crit])));
       c1.appendChild(bx1); s.appendChild(c1);
-      const c2 = abs('s-rem-card', { left: '680px' }); c2.appendChild(abs('k', null, M.meta ? 'META ' + A : 'SITUAÇÃO ACTUAL'));
+      const c2 = abs('s-rem-card', { left: '680px' }); c2.appendChild(abs('k', null, 'SITUAÇÃO ACTUAL'));
       const bx2 = abs('s-rem-box'); bx2.append(el('div', 'a', 'VALOR ACTUAL' + (R.ultimo ? ' (JAN–' + short(R.ultimo.mes).toUpperCase() + ')' : '') + ':'));
       const va = el('div', 'big g', '—'); bx2.append(va);
-      bx2.append(el('div', 'sm', M.meta ? Math.round(R.metaPct * 100) + '% da meta de ' + grp(M.meta) : (R.falta != null ? 'Faltam ' + grp(R.falta) + ' para a previsão' : '')));
+      if (P && P.atingida) {
+        bx2.append(el('div', 'sm', 'Previsão atingida' + (P.mes ? ' em ' + P.mes : '')), el('div', 'sm', '+' + grp(P.acima) + ' AOA acima · ' + pct(P.acimaPct)));
+      } else if (P && P.falta) {
+        bx2.append(el('div', 'sm', 'Faltam ' + grp(P.falta) + ' para a previsão' + (P.declarada ? ' (' + Math.round(P.pct * 100) + '% feito)' : '')));
+      }
       c2.appendChild(bx2); s.appendChild(c2);
-      depois(() => { countUp(pv, R.projeccao, grp, 1400); }, 300);
+      depois(() => { countUp(pv, P ? P.valor : null, grp, 1400); }, 300);
       depois(() => { countUp(va, R.ytd2, grp, 1400); }, 700);
     }
   }
@@ -1383,6 +1672,7 @@ export function mountPainel(root, api) {
     S.canWrite = can;
     if (can === false) S.readOnly = true;
     $('btn-admin').hidden = can === false;
+    $('q-editar').hidden = can === false || S.qe.on;
     let first = true;
     offs.push(db.collection('anos').onSnapshot((snap) => {
       const ys = {};
