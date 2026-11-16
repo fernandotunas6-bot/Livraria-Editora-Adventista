@@ -3,11 +3,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APARELHOS, PAGINAS, nomeDaCaptura, pixeis } from './capturas-app-store.mjs';
 
-// A ficha da App Store (app/ios/fastlane/metadata) e as capturas (scripts/capturas-app-store.mjs):
-// a App Store Connect recusa o envio inteiro quando um texto passa do limite ou uma imagem não
-// tem um dos tamanhos dela. Melhor saber aqui do que no fim do workflow.
+// As fichas da App Store e da Play Store (app/mobile/fastlane/metadata/{ios,android}) e as capturas
+// (scripts/capturas-app-store.mjs): as lojas recusam o envio inteiro quando um texto passa do
+// limite ou uma imagem não tem um dos tamanhos delas. Melhor saber aqui do que no fim do workflow.
 
-const META = resolve(__dirname, '../app/ios/fastlane/metadata');
+const META = resolve(__dirname, '../app/mobile/fastlane/metadata/ios');
+const META_ANDROID = resolve(__dirname, '../app/mobile/fastlane/metadata/android');
 const ler = (f) => readFileSync(resolve(META, f), 'utf8').trim();
 
 describe('textos da ficha (pt-PT)', () => {
@@ -52,12 +53,42 @@ describe('textos da ficha (pt-PT)', () => {
   });
 });
 
+describe('textos da ficha da Play Store (pt-PT)', () => {
+  const lerAndroid = (f) => readFileSync(resolve(META_ANDROID, f), 'utf8').trim();
+  const LIMITES = { 'title.txt': 30, 'short_description.txt': 80, 'full_description.txt': 4000 };
+
+  for (const [ficheiro, max] of Object.entries(LIMITES)) {
+    it(`${ficheiro} cabe em ${max} caracteres`, () => {
+      const texto = lerAndroid(`pt-PT/${ficheiro}`);
+      expect(texto.length).toBeGreaterThan(0);
+      expect([...texto].length).toBeLessThanOrEqual(max);
+    });
+  }
+
+  it('não fala do iPhone nem da Apple, nem promete livros digitais à venda', () => {
+    const texto = `${lerAndroid('pt-PT/full_description.txt')}\n${lerAndroid('pt-PT/short_description.txt')}`;
+    expect(texto).not.toMatch(/iPhone|iPad|Apple/);
+    expect(texto.toLowerCase()).not.toMatch(/compr\w* (o |os |as )?(livros? )?digita/);
+  });
+});
+
 describe('capturas de ecrã', () => {
   it('nos tamanhos que a App Store aceita (iPhone 6,9" e iPad 13")', () => {
     const aceites = ['1320x2868', '1290x2796', '2064x2752', '2048x2732'];
-    for (const a of APARELHOS) {
+    for (const a of APARELHOS.filter((x) => x.loja === 'apple')) {
       const { largura, altura } = pixeis(a);
       expect(aceites).toContain(`${largura}x${altura}`);
+    }
+  });
+
+  it('nos tamanhos que a Play Store aceita (entre 320 e 3840 px, o lado maior até ao dobro do menor)', () => {
+    const android = APARELHOS.filter((x) => x.loja === 'google');
+    expect(android.length).toBeGreaterThan(0);
+    for (const a of android) {
+      const { largura, altura } = pixeis(a);
+      for (const lado of [largura, altura]) expect(lado).toBeGreaterThanOrEqual(320);
+      for (const lado of [largura, altura]) expect(lado).toBeLessThanOrEqual(3840);
+      expect(Math.max(largura, altura) / Math.min(largura, altura)).toBeLessThanOrEqual(2);
     }
   });
 
@@ -70,8 +101,8 @@ describe('capturas de ecrã', () => {
 });
 
 describe('manifesto de privacidade', () => {
-  const manifesto = readFileSync(resolve(__dirname, '../app/ios/ios/App/App/PrivacyInfo.xcprivacy'), 'utf8');
-  const xcode = readFileSync(resolve(__dirname, '../app/ios/ios/App/App.xcodeproj/project.pbxproj'), 'utf8');
+  const manifesto = readFileSync(resolve(__dirname, '../app/mobile/ios/App/App/PrivacyInfo.xcprivacy'), 'utf8');
+  const xcode = readFileSync(resolve(__dirname, '../app/mobile/ios/App/App.xcodeproj/project.pbxproj'), 'utf8');
 
   it('sem rastreio, e entra no app', () => {
     expect(manifesto).toMatch(/<key>NSPrivacyTracking<\/key>\s*<false\/>/);

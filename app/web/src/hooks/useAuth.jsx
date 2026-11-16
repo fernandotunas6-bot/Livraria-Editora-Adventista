@@ -8,7 +8,7 @@ import { normalizeLoginEmail, parsePbAuthError } from '@/lib/pbAuth';
 import { requestSessionNotice, requestWelcomeEmail, safeInternalPath } from '@/lib/authSession';
 import { AUTH_REDIRECT_ERROR } from '@/lib/authRedirectError';
 import { getUserFirstName } from '@/lib/userUtils';
-import { eAppIos } from '@/lib/nativeApp';
+import { eAppNativa } from '@/lib/nativeApp';
 import {
   getSilentPasswordCredential, keepSiteDataOnDevice, markSilentSignInTried, passwordCredentialsSupported,
   preventSilentSignIn, shouldTrySilentSignIn, silentSignInState, storePasswordCredential,
@@ -162,10 +162,10 @@ export const AuthProvider = ({ children }) => {
       // Com o email da conta lembrada neste aparelho, a Google abre já nessa conta (em vez da
       // lista de contas do telemóvel). Só um email com ar de email segue.
       const hint = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(loginHint || '').trim()) ? String(loginHint).trim() : '';
-      // Dentro do app iOS a Google recusa o WKWebView: o login faz-se na folha do sistema e a
-      // pessoa fica onde estava, já com a conta (lib/nativeAuth.js). Quem chamou decide a seguir,
-      // como depois da palavra-passe.
-      if (eAppIos()) {
+      // Dentro do app a Google recusa o WebView: o login faz-se no navegador do sistema e a pessoa
+      // fica onde estava, já com a conta (lib/nativeAuth.js). Quem chamou decide a seguir, como
+      // depois da palavra-passe.
+      if (eAppNativa()) {
         const { entrarComGoogleNoApp } = await import('@/lib/nativeAuth');
         const result = await entrarComGoogleNoApp({ queryParams: hint ? { login_hint: hint } : undefined });
         setUser(result.record);

@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 import { LojaFalsa } from './lojaFalsa.js';
 
-// O site dentro do app iOS (app/ios, docs/APP_IOS.md), no build de produção.
+// O site dentro do app iOS (app/mobile, docs/APPS.md), no build de produção.
 //
 // O app é o mesmo site num WKWebView do Capacitor. Aqui finge-se o que o Capacitor injecta antes
 // de o site arrancar: o `window.Capacitor` e a ponte `webkit.messageHandlers.bridge` (sem nada do

@@ -35,7 +35,7 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 const {
-  concluirRegressoDoLogin, entrarComApple, entrarComGoogleNoApp, esperarConta, foiCancelado, lerRegressoDoLogin, novoNonce,
+  abrirEEsperarRegresso, concluirRegressoDoLogin, entrarComApple, entrarComGoogleNoApp, esperarConta, foiCancelado, lerRegressoDoLogin, novoNonce,
 } = await import('./nativeAuth');
 
 const REGRESSO = 'ao.livrariaadventista.app://auth/callback';
@@ -175,5 +175,46 @@ describe('novoNonce', () => {
     expect(a.nonce).toMatch(/^[0-9a-f]{64}$/);
     expect(a.hash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.nonce).not.toBe(b.nonce);
+  });
+});
+
+describe('abrirEEsperarRegresso (Android: separador do Chrome)', () => {
+  /** O plugin App e o Browser do Capacitor, com os ouvintes à vista do teste. */
+  const fingir = () => {
+    const ouvintes = {};
+    const ouvir = (nome) => vi.fn(async (_evento, fn) => { ouvintes[nome] = fn; return { remove: vi.fn(() => { delete ouvintes[nome]; }) }; });
+    const app = { addListener: ouvir('appUrlOpen') };
+    const browser = { addListener: ouvir('browserFinished'), open: vi.fn(async () => {}), close: vi.fn(async () => {}) };
+    return { app, browser, ouvintes };
+  };
+  const espera = () => new Promise((r) => setTimeout(r, 0));
+
+  it('abre o login e volta com o endereço do regresso; as outras ligações não contam', async () => {
+    const { app, browser, ouvintes } = fingir();
+    const regresso = abrirEEsperarRegresso('https://x.supabase.co/auth/v1/authorize', { app, browser });
+    await espera();
+    expect(browser.open).toHaveBeenCalledWith({ url: 'https://x.supabase.co/auth/v1/authorize' });
+    ouvintes.appUrlOpen({ url: 'https://livrariaadventista.ao/track' });
+    ouvintes.appUrlOpen({ url: `${REGRESSO}#access_token=a&refresh_token=r` });
+    await expect(regresso).resolves.toBe(`${REGRESSO}#access_token=a&refresh_token=r`);
+    expect(ouvintes.appUrlOpen).toBeUndefined();
+  });
+
+  it('o separador fecha-se ao voltar ao app antes de o regresso chegar: não é cancelar', async () => {
+    const { app, browser, ouvintes } = fingir();
+    const regresso = abrirEEsperarRegresso('https://x/authorize', { app, browser, folgaMs: 50 });
+    await espera();
+    ouvintes.browserFinished();
+    ouvintes.appUrlOpen({ url: `${REGRESSO}?code=abc` });
+    await expect(regresso).resolves.toBe(`${REGRESSO}?code=abc`);
+  });
+
+  it('fechar o separador sem entrar é cancelar', async () => {
+    const { app, browser, ouvintes } = fingir();
+    const regresso = abrirEEsperarRegresso('https://x/authorize', { app, browser, folgaMs: 10 });
+    await espera();
+    ouvintes.browserFinished();
+    const err = await regresso.catch((e) => e);
+    expect(foiCancelado(err)).toBe(true);
   });
 });

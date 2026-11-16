@@ -1,9 +1,10 @@
-// Entrar com a Google e com a Apple dentro do app iOS (lib/nativeApp.js, docs/APP_IOS.md).
+// Entrar com a Google e com a Apple dentro do app iOS (lib/nativeApp.js, docs/APPS.md).
 //
-// · Google: a Google recusa o login dentro de um WKWebView. Pede-se o endereço ao Supabase sem
-//   sair da página (`skipBrowserRedirect`), abre-se na folha de login do sistema (WebAuthPlugin)
-//   e o regresso a `ao.livrariaadventista.app://auth/callback` traz a sessão: um `code` (PKCE) ou
-//   os tokens depois do `#` (fluxo implícito, o do site).
+// · Google: a Google recusa o login dentro de um WebView. Pede-se o endereço ao Supabase sem
+//   sair da página (`skipBrowserRedirect`) e abre-se no navegador do sistema: no iPhone, a folha de
+//   login do iOS (WebAuthPlugin); no Android, um separador do Chrome (plugin Browser), que volta ao
+//   app pelo `appUrlOpen`. O regresso a `ao.livrariaadventista.app://auth/callback` traz a sessão:
+//   um `code` (PKCE) ou os tokens depois do `#` (fluxo implícito, o do site).
 // · Apple: a folha nativa dá um token de identidade, que o Supabase troca por uma sessão
 //   (`signInWithIdToken`). A Apple só dá o nome na primeira vez: se o perfil não tiver nome,
 //   fica com esse.
@@ -13,7 +14,9 @@
 
 import pb from '@/lib/dataClient';
 import { supabase } from '@/lib/supabaseClient';
-import { ESQUEMA_DO_APP, REGRESSO_DO_LOGIN, eRegressoDoLogin, pluginAppleSignIn, pluginWebAuth } from '@/lib/nativeApp';
+import {
+  ESQUEMA_DO_APP, REGRESSO_DO_LOGIN, eAppIos, eRegressoDoLogin, pluginApp, pluginAppleSignIn, pluginBrowser, pluginWebAuth,
+} from '@/lib/nativeApp';
 
 /** A pessoa fechou a folha de login: não é um erro a mostrar. */
 export const LOGIN_CANCELADO = 'CANCELLED';
@@ -68,17 +71,59 @@ export async function concluirRegressoDoLogin(url) {
   return data.user;
 }
 
+const cancelado = () => Object.assign(new Error('Cancelado.'), { code: LOGIN_CANCELADO });
+
+/**
+ * Android: abre o login num separador do Chrome e espera pelo regresso ao app. Fechar o separador
+ * sem entrar é cancelar (com uma folga: ao voltar ao app, o separador fecha-se antes de o
+ * regresso chegar).
+ */
+export function abrirEEsperarRegresso(urlDeLogin, { app, browser, folgaMs = 1000, maxMs = 10 * 60_000 }) {
+  return new Promise((resolve, reject) => {
+    const handles = [];
+    let acabou = false;
+    let limite = null;
+    const fim = (fn, valor) => {
+      if (acabou) return;
+      acabou = true;
+      clearTimeout(limite);
+      handles.forEach((h) => h?.remove?.());
+      fn(valor);
+    };
+    limite = setTimeout(() => fim(reject, new Error('O login demorou de mais. Tente outra vez.')), maxMs);
+    Promise.all([
+      app.addListener('appUrlOpen', ({ url }) => {
+        if (!eRegressoDoLogin(url)) return;
+        browser.close?.().catch?.(() => {});
+        fim(resolve, url);
+      }),
+      browser.addListener('browserFinished', () => setTimeout(() => fim(reject, cancelado()), folgaMs)),
+    ])
+      .then((hs) => {
+        handles.push(...hs);
+        if (acabou) hs.forEach((h) => h?.remove?.());
+        else return browser.open({ url: urlDeLogin });
+        return undefined;
+      })
+      .catch((err) => fim(reject, err));
+  });
+}
+
 /** Google dentro do app. Devolve `{ record }` com a conta já aberta. */
 export async function entrarComGoogleNoApp({ queryParams } = {}) {
-  const webAuth = await pluginWebAuth();
-  if (!webAuth) throw new Error('O login com a Google não está disponível nesta versão da app.');
+  const ios = eAppIos();
+  const webAuth = ios ? await pluginWebAuth() : null;
+  const [app, browser] = ios ? [null, null] : await Promise.all([pluginApp(), pluginBrowser()]);
+  if (ios ? !webAuth : !(app && browser)) throw new Error('O login com a Google não está disponível nesta versão da app.');
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: REGRESSO_DO_LOGIN, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) },
   });
   if (error) throw error;
   if (!data?.url) throw new Error('A Google não respondeu. Tente outra vez.');
-  const { url } = await webAuth.start({ url: data.url, scheme: ESQUEMA_DO_APP });
+  const url = ios
+    ? (await webAuth.start({ url: data.url, scheme: ESQUEMA_DO_APP })).url
+    : await abrirEEsperarRegresso(data.url, { app, browser });
   const user = await concluirRegressoDoLogin(url);
   return { record: await esperarConta(user.id) };
 }

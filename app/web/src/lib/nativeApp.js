@@ -1,4 +1,4 @@
-// O site dentro do app iOS (app/ios, docs/APP_IOS.md).
+// O site dentro do app iOS (app/mobile, docs/APPS.md).
 //
 // O app é uma casca Capacitor que abre o site publicado: o código é o mesmo, e é aqui que o site
 // sabe que está dentro dele e usa o que só o app tem — notificações do APNs, a folha de partilha,
@@ -34,8 +34,10 @@ export function plataformaNativa(win = globalThis.window) {
   }
 }
 
-/** Dentro do app iOS: é aqui que valem as regras da App Store (compras digitais, login da Apple). */
+/** Dentro do app iOS: o login da Apple, o APNs e os plugins Swift do app. */
 export const eAppIos = (win = globalThis.window) => plataformaNativa(win) === 'ios';
+/** Dentro do app Android: o Firebase e o login da Google pelo Chrome. */
+export const eAppAndroid = (win = globalThis.window) => plataformaNativa(win) === 'android';
 
 /**
  * Os plugins do Capacitor são um Proxy que responde a qualquer nome, `then` incluído: devolvido
@@ -64,10 +66,13 @@ export const pluginStatusBar = () => plugin(() => import('@capacitor/status-bar'
 export const pluginSplash = () => plugin(() => import('@capacitor/splash-screen'), 'SplashScreen');
 export const pluginHaptics = () => plugin(() => import('@capacitor/haptics'), 'Haptics');
 
-/** Plugins que vivem no próprio app (app/ios/ios/App/App/*.swift), registados uma vez. */
+/**
+ * Plugins que vivem no próprio app (app/mobile/ios/App/App/*.swift e, no Android,
+ * app/mobile/android/app/src/main/java/…), registados uma vez. `plataformas`: onde existem.
+ */
 const pluginsDoApp = new Map();
-export async function pluginDoApp(nome) {
-  if (!eAppIos()) return null;
+export async function pluginDoApp(nome, plataformas = ['ios']) {
+  if (!plataformas.includes(plataformaNativa())) return null;
   if (pluginsDoApp.has(nome)) return pluginsDoApp.get(nome);
   try {
     const { registerPlugin } = await import('@capacitor/core');
@@ -80,7 +85,7 @@ export async function pluginDoApp(nome) {
 }
 
 /** O número no ícone do app (AparelhoPlugin.swift). */
-export const pluginAparelho = () => pluginDoApp('Aparelho');
+export const pluginAparelho = () => pluginDoApp('Aparelho', ['ios', 'android']);
 /** «Iniciar sessão com a Apple» (AppleSignInPlugin.swift). */
 export const pluginAppleSignIn = () => pluginDoApp('AppleSignIn');
 /** Login no navegador do sistema, para a Google (WebAuthPlugin.swift). */

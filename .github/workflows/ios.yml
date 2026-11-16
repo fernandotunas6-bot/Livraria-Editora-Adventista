@@ -1,6 +1,6 @@
 name: App iOS
 
-# O app iOS (app/ios, docs/APP_IOS.md) compila-se aqui, num Mac do GitHub: não é preciso ter um.
+# O app iOS (app/mobile, docs/APPS.md) compila-se aqui, num Mac do GitHub: não é preciso ter um.
 #
 # - Em cada PR que mexa no app (ou no que ele carrega do site): build para o simulador, sem
 #   assinatura. Confirma que o projecto compila antes de haver segredos da Apple.
@@ -11,7 +11,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'app/ios/**'
+      - 'app/mobile/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/ios.yml'
@@ -43,14 +43,14 @@ jobs:
       # Copia o www/ e o capacitor.config.json para dentro do projecto Xcode (estão no .gitignore)
       # e actualiza o Package.swift com os plugins.
       - name: Capacitor sync
-        working-directory: app/ios
+        working-directory: app/mobile
         run: npx cap sync ios
 
       - name: Xcode
         run: xcodebuild -version
 
       - name: Build (simulador, sem assinatura)
-        working-directory: app/ios/ios/App
+        working-directory: app/mobile/ios/App
         run: |
           xcodebuild build \
             -project App.xcodeproj \
@@ -80,7 +80,7 @@ jobs:
             [ -n "${!name}" ] || missing="$missing $name"
           done
           if [ -n "$missing" ]; then
-            echo "::error::Faltam em Settings → Secrets and variables → Actions:$missing (ver docs/APP_IOS.md)"
+            echo "::error::Faltam em Settings → Secrets and variables → Actions:$missing (ver docs/APPS.md)"
             exit 1
           fi
 
@@ -93,7 +93,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: Capacitor sync
-        working-directory: app/ios
+        working-directory: app/mobile
         run: npx cap sync ios
 
       - name: Xcode
@@ -112,13 +112,13 @@ jobs:
           echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
 
       - name: Arquivo assinado
-        working-directory: app/ios/ios/App
+        working-directory: app/mobile/ios/App
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: |
-          # A versão vem do app/ios/package.json; o número do build, desta corrida (cada envio ao
+          # A versão vem do app/mobile/package.json; o número do build, desta corrida (cada envio ao
           # TestFlight tem de ter um número novo).
           version="$(node -p "require('../../package.json').version")"
           xcodebuild archive \

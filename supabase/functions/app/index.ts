@@ -92,6 +92,7 @@ import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDest
 import { publicContactFields } from "./crmContacts.ts";
 import { isPushEndpoint } from "./pushEndpoints.ts";
 import { type PushPayload, apnsConfig, apnsEndpoint, apnsTokenOf, isApnsToken, sendApns } from "./apns.ts";
+import { fcmConfig, fcmEndpoint, fcmTokenOf, isFcmToken, sendFcm } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1176,15 +1177,17 @@ function pushKeys(settings: Row | null) {
 
 /** O APNs do app iOS (segredos APNS_*), ou null sem ele. */
 const apnsCfg = () => apnsConfig((name) => Deno.env.get(name));
+/** O Firebase do app Android (segredo FCM_SERVICE_ACCOUNT), ou null sem ele. */
+const fcmCfg = () => fcmConfig((name) => Deno.env.get(name));
 
-/** O push está ligado e há por onde enviar (navegadores, app iOS ou os dois)? */
+/** O push está ligado e há por onde enviar (navegadores, app iOS, app Android)? */
 function pushOn(settings: Row | null) {
-  return !!settings?.push_enabled && (!!pushKeys(settings) || !!apnsCfg());
+  return !!settings?.push_enabled && (!!pushKeys(settings) || !!apnsCfg() || !!fcmCfg());
 }
 
 /**
- * Por onde enviar: o `web-push` (chaves e contacto VAPID) para os navegadores e o APNs para o app
- * iOS, cada um null se não estiver configurado; null sem push ligado.
+ * Por onde enviar: o `web-push` (chaves e contacto VAPID) para os navegadores, o APNs para o app
+ * iOS e o Firebase para o app Android, cada um null se não estiver configurado; null sem push ligado.
  */
 async function pushSender(settings: Row | null) {
   if (!pushOn(settings)) return null;
@@ -1195,18 +1198,20 @@ async function pushSender(settings: Row | null) {
     const contact = settings!.contact_email ? `mailto:${settings!.contact_email}` : "mailto:contacto@livrariaadventista.ao";
     webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
   }
-  return { webpush, apns: apnsCfg() };
+  return { webpush, apns: apnsCfg(), fcm: fcmCfg() };
 }
 
 type PushSender = NonNullable<Awaited<ReturnType<typeof pushSender>>>;
 
 /** Um push para uma subscrição: 'sent', ou 'gone' (apagada: o aparelho já não existe) ou 'failed'. */
 async function pushToSubscription(sender: PushSender, sub: Row, payload: Row): Promise<"sent" | "gone" | "failed"> {
-  // O app iOS: `apns:<token>` (apns.ts).
+  // O app iOS: `apns:<token>` (apns.ts); o app Android: `fcm:<token>` (fcm.ts).
   const apnsToken = apnsTokenOf(sub.endpoint);
-  if (apnsToken) {
-    if (!sender.apns) return "failed";
-    const outcome = await sendApns(sender.apns, apnsToken, payload as PushPayload);
+  const fcmToken = apnsToken ? null : fcmTokenOf(sub.endpoint);
+  if (apnsToken || fcmToken) {
+    let outcome: "sent" | "gone" | "failed" = "failed";
+    if (apnsToken && sender.apns) outcome = await sendApns(sender.apns, apnsToken, payload as PushPayload);
+    if (fcmToken && sender.fcm) outcome = await sendFcm(sender.fcm, fcmToken, payload as PushPayload);
     if (outcome === "gone") await db.from("push_subscriptions").delete().eq("id", sub.id);
     return outcome;
   }
@@ -3221,8 +3226,8 @@ route("POST", "/admin/email/test", permissao("manage_settings"), async ({ auth, 
 
 route("GET", "/push/config", publica("só a chave VAPID pública"), async () => {
   const rec = await getSettings();
-  if (!pushOn(rec)) return json({ enabled: false, publicKey: "", ios: false });
-  return json({ enabled: true, publicKey: rec?.vapid_public_key || "", ios: !!apnsCfg() });
+  if (!pushOn(rec)) return json({ enabled: false, publicKey: "", ios: false, android: false });
+  return json({ enabled: true, publicKey: rec?.vapid_public_key || "", ios: !!apnsCfg(), android: !!fcmCfg() });
 });
 
 route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
@@ -3242,18 +3247,28 @@ route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; 
   return json({ message: "Subscrição push registada." });
 });
 
+/** O endereço guardado de um aparelho dos apps: `apns:` (iPhone) ou `fcm:` (Android), ou null. */
+function nativeEndpoint(platform: unknown, token: string) {
+  const p = String(platform || "ios");
+  if (p === "ios" && isApnsToken(token)) return apnsEndpoint(token);
+  if (p === "android" && isFcmToken(token)) return fcmEndpoint(token);
+  return null;
+}
+
 /**
- * O app iOS regista o aparelho (lib/pushNotifications.js → subscreverNoApp): o token do APNs fica
- * em `push_subscriptions` como `apns:<token>`, ao lado dos navegadores. A conta é sempre a da
- * sessão deste pedido: o app volta a registar-se a cada entrada e saída de conta, e um iPhone
- * de onde se saiu deixa de receber os avisos das encomendas de quem lá esteve.
+ * Os apps registam o aparelho (lib/pushNotifications.js → subscreverNoApp): o token do APNs
+ * (iPhone) ou do Firebase (Android) fica em `push_subscriptions` como `apns:<token>` ou
+ * `fcm:<token>`, ao lado dos navegadores. A conta é sempre a da sessão deste pedido: o app volta a
+ * registar-se a cada entrada e saída de conta, e um telemóvel de onde se saiu deixa de receber os
+ * avisos das encomendas de quem lá esteve.
  */
-route("POST", "/push/native/subscribe", publica("o app iOS regista o aparelho; os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
+route("POST", "/push/native/subscribe", publica("os apps registam o aparelho; os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
   if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const token = String(body.token || "").trim();
-  if (String(body.platform || "ios") !== "ios" || !isApnsToken(token)) throw bad("Aparelho inválido.");
+  const endpoint = nativeEndpoint(body.platform, token);
+  if (!endpoint) throw bad("Aparelho inválido.");
   const rec: Row = {
-    endpoint: apnsEndpoint(token),
+    endpoint,
     keys: {},
     user_agent: String(body.user_agent || "").slice(0, 300),
     user: auth?.id || null,
@@ -3264,12 +3279,13 @@ route("POST", "/push/native/subscribe", publica("o app iOS regista o aparelho; o
   return json({ message: "Aparelho registado." });
 });
 
-/** «Activar notificações» desligado no app iOS: o servidor esquece o aparelho. */
+/** «Activar notificações» desligado no app: o servidor esquece o aparelho. */
 route("POST", "/push/native/unsubscribe", publica("quem tem o token do aparelho; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const token = String(body.token || "").trim();
-  if (!isApnsToken(token)) throw bad("Aparelho inválido.");
-  const { error } = await db.from("push_subscriptions").delete().eq("endpoint", apnsEndpoint(token));
+  const endpoint = nativeEndpoint(body.platform, token) || nativeEndpoint(isApnsToken(token) ? "ios" : "android", token);
+  if (!endpoint) throw bad("Aparelho inválido.");
+  const { error } = await db.from("push_subscriptions").delete().eq("endpoint", endpoint);
   if (error) throw error;
   return json({ message: "Aparelho esquecido." });
 });

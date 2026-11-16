@@ -40,7 +40,7 @@ um mapa).
 - **No site, deixar a página aberta** durante a entrega: um site não consegue mandar a localização
   com a página fechada. Fechar pára a partilha e o cliente vê "última posição há X min".
 - **No app iOS a partilha continua com o ecrã apagado**, noutra página ou noutra app, até à entrega
-  (`app/ios/ios/App/App/TrajetoPlugin.swift`, `lib/trajetoNativo.js`). É o iPhone que lê o GPS e
+  (`app/mobile/ios/App/App/TrajetoPlugin.swift`, `lib/trajetoNativo.js`). É o iPhone que lê o GPS e
   manda a posição, pela mesma `delivery_share_position`, com a sessão de quem entrega e as mesmas
   regras (10 s / 25 m, ou 30 s parado). Basta a permissão «Durante a utilização»: começa com o app à
   frente e o iOS mostra o indicador azul no topo enquanto partilha. A sessão renova-se no site de

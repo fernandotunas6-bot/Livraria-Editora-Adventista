@@ -1,7 +1,7 @@
 // O trajeto de quem entrega dentro do app iOS, com o ecrã apagado (docs/TRAJETO_GPS.md).
 //
 // No site, a posição só sai com a página aberta. No app, o GPS e o envio ficam com o iPhone
-// (app/ios/ios/App/App/TrajetoPlugin.swift), pela mesma função do Supabase que o site usa, com a
+// (app/mobile/ios/App/App/TrajetoPlugin.swift), pela mesma função do Supabase que o site usa, com a
 // sessão de quem entrega. Daqui passa-se a sessão, renovada sempre que o site a renova, e
 // recebem-se as leituras e os envios para o ecrã da entrega.
 

@@ -28,9 +28,10 @@ flowchart TB
   UI -. só no painel .-> Google
 ```
 
-O **app iOS** (`app/ios`) não é outro frontend: é uma casca Capacitor que abre o site publicado e lhe
-junta notificações do APNs, login nativo (Google e Apple) e ligações universais. O site reconhece-o
-(`lib/nativeApp.js`) e muda só o que a App Store obriga. Ver [APP_IOS.md](APP_IOS.md).
+Os **apps iOS e Android** (`app/mobile`) não são outro frontend: são uma casca Capacitor que abre o
+site publicado e lhe junta notificações (APNs e Firebase), login nativo (Google e Apple), ligações
+universais e, no iPhone, o trajeto da entrega com o ecrã apagado. O site reconhece-os
+(`lib/nativeApp.js`) e muda só o que as lojas obrigam. Ver [APPS.md](APPS.md).
 
 ## Quem faz o quê
 

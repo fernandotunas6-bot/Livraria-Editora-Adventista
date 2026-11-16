@@ -57,3 +57,12 @@ describe('edição digital no app iOS', () => {
     expect(ebook.purchasable).toBe(false);
   });
 });
+
+describe('edição digital no app Android', () => {
+  it('também não se vende (Google Play Billing)', async () => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+    const livro = await getProduct('liv');
+    expect(livro.variants.map((v) => v.id)).toEqual(['liv-v0']);
+    expect((await getProduct('rev')).purchasable).toBe(false);
+  });
+});

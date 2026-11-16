@@ -1,12 +1,15 @@
-// Capturas de ecrã para a ficha da App Store (docs/APP_IOS.md):
+// Capturas de ecrã para as fichas da App Store e da Play Store (docs/APPS.md):
 //
 //   node scripts/capturas-app-store.mjs [--site https://livrariaadventista.ao] [--saida dist/capturas]
 //
 // Abre o site como o app o abre (o `window.Capacitor` da casca: sem «Instalar a app», sem venda
-// de edições digitais) nos tamanhos que a App Store pede e guarda as imagens em
-// <saida>/pt-PT/, com os nomes que o `fastlane deliver` aceita:
-//   · iPhone 6,9" — 1320 × 2868 (440 × 956 pontos, ×3), obrigatório;
-//   · iPad 13"    — 2064 × 2752 (1032 × 1376 pontos, ×2), porque o app também corre no iPad.
+// de edições digitais) nos tamanhos que cada loja pede, e guarda as imagens onde o fastlane as
+// procura:
+//   · <saida>/ios/pt-PT/ (fastlane deliver):
+//       iPhone 6,9" — 1320 × 2868 (440 × 956 pontos, ×3), obrigatório;
+//       iPad 13"    — 2064 × 2752 (1032 × 1376 pontos, ×2), porque o app também corre no iPad;
+//   · <saida>/android/pt-PT/images/phoneScreenshots/ (fastlane supply):
+//       telemóvel Android — 1080 × 1920 (360 × 640, ×3), 9:16 como a Play Store aceita.
 //
 // Corre no GitHub Actions (.github/workflows/ios-ficha.yml), com o catálogo verdadeiro. Para o
 // testar sem rede: `--loja-falsa` usa a loja em memória dos testes de ponta a ponta
@@ -16,11 +19,22 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Os aparelhos da App Store: nome no ficheiro, pontos e escala. */
+/** Os aparelhos de cada loja: nome no ficheiro, pontos e escala. */
 export const APARELHOS = [
-  { nome: 'iPhone-6.9', largura: 440, altura: 956, escala: 3, movel: true },
-  { nome: 'iPad-13', largura: 1032, altura: 1376, escala: 2, movel: true },
+  { loja: 'apple', nome: 'iPhone-6.9', largura: 440, altura: 956, escala: 3 },
+  { loja: 'apple', nome: 'iPad-13', largura: 1032, altura: 1376, escala: 2 },
+  { loja: 'google', nome: 'Android', largura: 360, altura: 640, escala: 3 },
 ];
+
+const UA = {
+  apple: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 LivrariaAdventistaApp/1 (iOS)',
+  google: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 LivrariaAdventistaApp/1 (Android)',
+};
+
+/** Onde fica cada captura (relativo a `--saida`). */
+export const pastaDaLoja = (aparelho) => (aparelho.loja === 'apple'
+  ? path.join('ios', 'pt-PT')
+  : path.join('android', 'pt-PT', 'images', 'phoneScreenshots'));
 
 /**
  * As páginas, pela ordem em que aparecem na App Store. `produto` é a ficha do primeiro livro do
@@ -43,9 +57,10 @@ export const nomeDaCaptura = (aparelho, pagina) => `${aparelho.nome}-${pagina.id
 export const pixeis = (a) => ({ largura: a.largura * a.escala, altura: a.altura * a.escala });
 
 /** O que a casca do app põe na página antes de o site arrancar (sem ponte do outro lado). */
-function dentroDoApp() {
-  window.webkit = { messageHandlers: { bridge: { postMessage() {} } } };
-  window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+function dentroDoApp(plataforma) {
+  if (plataforma === 'ios') window.webkit = { messageHandlers: { bridge: { postMessage() {} } } };
+  else window.androidBridge = { postMessage() {} };
+  window.Capacitor = { isNativePlatform: () => true, getPlatform: () => plataforma };
 }
 
 function argumentos(argv) {
@@ -63,8 +78,6 @@ function argumentos(argv) {
 async function main() {
   const { site, saida, lojaFalsa } = argumentos(process.argv.slice(2));
   const { chromium } = await import('@playwright/test');
-  const pasta = path.join(saida, 'pt-PT');
-  mkdirSync(pasta, { recursive: true });
 
   const browser = await chromium.launch();
   let caminhoDoLivro = '';
@@ -74,18 +87,20 @@ async function main() {
       const context = await browser.newContext({
         viewport: { width: aparelho.largura, height: aparelho.altura },
         deviceScaleFactor: aparelho.escala,
-        isMobile: aparelho.movel,
+        isMobile: true,
         hasTouch: true,
         locale: 'pt-AO',
         timezoneId: 'Africa/Luanda',
         serviceWorkers: 'block',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 LivrariaAdventistaApp/1 (iOS)',
+        userAgent: UA[aparelho.loja],
       });
+      const pasta = path.join(saida, pastaDaLoja(aparelho));
+      mkdirSync(pasta, { recursive: true });
       if (lojaFalsa) {
         const { LojaFalsa } = await import('../app/web/e2e/lojaFalsa.js');
         await new LojaFalsa().ligar(context);
       }
-      await context.addInitScript(dentroDoApp);
+      await context.addInitScript(dentroDoApp, aparelho.loja === 'apple' ? 'ios' : 'android');
       const page = await context.newPage();
 
       for (const pagina of PAGINAS) {
@@ -112,7 +127,7 @@ async function main() {
   } finally {
     await browser.close();
   }
-  console.log(`capturas: ${total} imagens em ${pasta}`);
+  console.log(`capturas: ${total} imagens em ${saida}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

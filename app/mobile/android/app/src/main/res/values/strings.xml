@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Livraria Adventista</string>
+    <string name="title_activity_main">Livraria Adventista</string>
+    <string name="package_name">ao.livrariaadventista.app</string>
+    <string name="custom_url_scheme">ao.livrariaadventista.app</string>
+</resources>

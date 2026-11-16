@@ -1,5 +1,5 @@
 /**
- * Notificações para o app iOS pelo APNs da Apple (docs/APP_IOS.md).
+ * Notificações para o app iOS pelo APNs da Apple (docs/APPS.md).
  *
  * O WKWebView do app não recebe Web Push. O app regista-se no APNs e entrega o token do aparelho
  * a `/push/native/subscribe`; o token fica em `push_subscriptions` como os dos navegadores, com o

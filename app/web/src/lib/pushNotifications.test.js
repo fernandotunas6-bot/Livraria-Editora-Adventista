@@ -14,6 +14,11 @@ const push = {
   unregister: vi.fn(async () => {}),
 };
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
+push.createChannel = vi.fn(async () => {});
+
+// O plugin «Aparelho» do app Android diz se o build levou o Firebase (google-services.json).
+let firebase = true;
+vi.mock('@capacitor/core', () => ({ registerPlugin: () => ({ pushConfigurado: async () => ({ configurado: firebase }) }) }));
 
 const {
   desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, requestPushPermission, sincronizarPushNativo, subscribeToPush,
@@ -22,6 +27,7 @@ const {
 const noApp = () => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' }; };
 
 afterEach(() => {
+  firebase = true;
   delete window.Capacitor;
   localStorage.clear();
   vi.clearAllMocks();
@@ -82,8 +88,32 @@ describe('no app iOS', () => {
     await subscribeToPush('k');
     send.mockClear();
     await desligarPushNativo();
-    expect(send).toHaveBeenCalledWith('/push/native/unsubscribe', { method: 'POST', body: { token: 'ab'.repeat(32) } });
+    expect(send).toHaveBeenCalledWith('/push/native/unsubscribe', { method: 'POST', body: { token: 'ab'.repeat(32), platform: 'ios' } });
     expect(push.unregister).toHaveBeenCalled();
+  });
+});
+
+describe('no app Android', () => {
+  const noAndroid = () => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' }; };
+
+  it('sem o Firebase no build, nem pergunta nem regista (registar derrubava o app)', async () => {
+    noAndroid();
+    firebase = false;
+    expect(await requestPushPermission()).toBe('unsupported');
+    expect(await subscribeToPush('k')).toBeNull();
+    expect(await sincronizarPushNativo()).toBe(false);
+    expect(push.register).not.toHaveBeenCalled();
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+  });
+
+  it('com o Firebase: regista, cria o canal dos avisos e diz que é Android', async () => {
+    noAndroid();
+    expect(await subscribeToPush('k', { appUpdates: true })).toEqual({ token: 'ab'.repeat(32) });
+    expect(push.createChannel).toHaveBeenCalledWith(expect.objectContaining({ id: 'livraria' }));
+    expect(send).toHaveBeenCalledWith('/push/native/subscribe', {
+      method: 'POST',
+      body: expect.objectContaining({ platform: 'android', app_updates: true }),
+    });
   });
 });
 

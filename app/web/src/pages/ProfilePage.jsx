@@ -52,7 +52,7 @@ import {
   appUpdatesWanted, desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, setAppUpdatesPush, subscribeToPush,
   requestPushPermission,
 } from '@/lib/pushNotifications';
-import { eAppIos } from '@/lib/nativeApp';
+import { eAppAndroid, eAppNativa } from '@/lib/nativeApp';
 import { ROLES } from '@/lib/permissions';
 import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
 import { kwanza } from '@/lib/money';
@@ -188,9 +188,9 @@ const ProfilePage = () => {
   );
   const [movingToCart, setMovingToCart] = useState('');
   const [appUpdates, setAppUpdates] = useState(() => appUpdatesWanted());
-  // No app iOS a permissão é a do iPhone (o WKWebView não tem `Notification`).
+  // No app a permissão é a do telemóvel (o WebView não tem `Notification`).
   useEffect(() => {
-    if (!eAppIos()) return undefined;
+    if (!eAppNativa()) return undefined;
     let vivo = true;
     permissaoDoPushNativo().then((p) => { if (vivo) setPushEnabled(p === 'granted'); });
     return () => { vivo = false; };
@@ -224,9 +224,11 @@ const ProfilePage = () => {
           toast({
             variant: 'destructive',
             title: 'Permissão negada',
-            description: eAppIos()
-              ? 'Active as notificações em Definições do iPhone → Livraria Adventista → Notificações.'
-              : 'Active notificações nas definições do browser.',
+            description: eAppAndroid()
+              ? 'Active as notificações em Definições → Apps → Livraria Adventista → Notificações.'
+              : eAppNativa()
+                ? 'Active as notificações em Definições do iPhone → Livraria Adventista → Notificações.'
+                : 'Active notificações nas definições do browser.',
           });
           setPushEnabled(false);
           return;
@@ -234,7 +236,7 @@ const ProfilePage = () => {
         await subscribeToPush(settings.vapid_public_key);
         setPushEnabled(true);
         toast({ title: 'Notificações activadas', description: 'Receberá alertas de encomendas e novidades.' });
-      } else if (eAppIos()) {
+      } else if (eAppNativa()) {
         await desligarPushNativo();
         setPushEnabled(false);
         toast({ title: 'Notificações desactivadas' });
