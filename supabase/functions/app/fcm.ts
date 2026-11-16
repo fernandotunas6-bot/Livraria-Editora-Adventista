@@ -93,13 +93,13 @@ export async function fcmJwt(cfg: FcmConfig, nowSeconds = Math.floor(Date.now() 
 }
 
 let acessoGuardado: { conta: string; ate: number; token: string } | null = null;
+/** A troca em curso: os envios de um lote esperam todos pela mesma, em vez de pedirem um token cada um. */
+let acessoAPedir: { conta: string; promessa: Promise<string> } | null = null;
 
 /** Só para os testes. */
-export const _esquecerAcesso = () => { acessoGuardado = null; };
+export const _esquecerAcesso = () => { acessoGuardado = null; acessoAPedir = null; };
 
-/** O token de acesso OAuth (uma hora; renova-se aos 50 minutos ou se o FCM o recusar). */
-async function tokenDeAcesso(cfg: FcmConfig, fetchFn: typeof fetch, nowSeconds: number) {
-  if (acessoGuardado && acessoGuardado.conta === cfg.clientEmail && nowSeconds < acessoGuardado.ate) return acessoGuardado.token;
+async function pedirAcesso(cfg: FcmConfig, fetchFn: typeof fetch, nowSeconds: number) {
   const res = await fetchFn(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -110,6 +110,17 @@ async function tokenDeAcesso(cfg: FcmConfig, fetchFn: typeof fetch, nowSeconds: 
   if (!token) throw new Error("FCM OAuth sem token");
   acessoGuardado = { conta: cfg.clientEmail, ate: nowSeconds + 50 * 60, token };
   return token;
+}
+
+/** O token de acesso OAuth (uma hora; renova-se aos 50 minutos ou se o FCM o recusar). */
+function tokenDeAcesso(cfg: FcmConfig, fetchFn: typeof fetch, nowSeconds: number): Promise<string> {
+  if (acessoGuardado && acessoGuardado.conta === cfg.clientEmail && nowSeconds < acessoGuardado.ate) return Promise.resolve(acessoGuardado.token);
+  if (acessoAPedir && acessoAPedir.conta === cfg.clientEmail) return acessoAPedir.promessa;
+  const pedido = { conta: cfg.clientEmail, promessa: pedirAcesso(cfg, fetchFn, nowSeconds) };
+  acessoAPedir = pedido;
+  const acabou = () => { if (acessoAPedir === pedido) acessoAPedir = null; };
+  pedido.promessa.then(acabou, acabou);
+  return pedido.promessa;
 }
 
 /** Um aviso para um aparelho Android: 'sent', 'gone' (o token já não serve: apagar) ou 'failed'. */

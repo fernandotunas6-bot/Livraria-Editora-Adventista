@@ -49,8 +49,8 @@ import { getPaymentMethods } from '@/api/PlatformApi';
 import { getProduct } from '@/api/EcommerceApi';
 import { isPaidUpfront } from '@/lib/paymentMethods';
 import {
-  appUpdatesWanted, desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, setAppUpdatesPush, subscribeToPush,
-  requestPushPermission,
+  appUpdatesWanted, desligarPushNativo, isPushSupported, pushDisponivel, pushNativoLigado, pushNativoNoServidor, setAppUpdatesPush,
+  subscribeToPush, requestPushPermission,
 } from '@/lib/pushNotifications';
 import { eAppAndroid, eAppNativa } from '@/lib/nativeApp';
 import { ROLES } from '@/lib/permissions';
@@ -188,11 +188,12 @@ const ProfilePage = () => {
   );
   const [movingToCart, setMovingToCart] = useState('');
   const [appUpdates, setAppUpdates] = useState(() => appUpdatesWanted());
-  // No app a permissão é a do telemóvel (o WebView não tem `Notification`).
+  // No app a permissão é a do telemóvel (o WebView não tem `Notification`), e quem as desligou
+  // aqui continua com elas desligadas.
   useEffect(() => {
     if (!eAppNativa()) return undefined;
     let vivo = true;
-    permissaoDoPushNativo().then((p) => { if (vivo) setPushEnabled(p === 'granted'); });
+    pushNativoLigado().then((ligado) => { if (vivo) setPushEnabled(ligado); });
     return () => { vivo = false; };
   }, []);
 
@@ -219,7 +220,19 @@ const ProfilePage = () => {
     setPushLoading(true);
     try {
       if (enabled) {
+        // Nos apps: o servidor ainda não envia para este telemóvel (APNs ou Firebase por ligar), ou
+        // este build não traz as notificações. Dizer «activadas» era prometer avisos que não chegam.
+        if (eAppNativa() && !await pushNativoNoServidor()) {
+          toast({ variant: 'destructive', title: 'Indisponível', description: 'As notificações da app ainda não estão ligadas na loja.' });
+          setPushEnabled(false);
+          return;
+        }
         const perm = await requestPushPermission();
+        if (perm === 'unsupported') {
+          toast({ variant: 'destructive', title: 'Indisponível', description: 'Esta versão da app não recebe notificações.' });
+          setPushEnabled(false);
+          return;
+        }
         if (perm !== 'granted') {
           toast({
             variant: 'destructive',
@@ -233,7 +246,7 @@ const ProfilePage = () => {
           setPushEnabled(false);
           return;
         }
-        await subscribeToPush(settings.vapid_public_key);
+        await subscribeToPush(settings.vapid_public_key, { pedida: true });
         setPushEnabled(true);
         toast({ title: 'Notificações activadas', description: 'Receberá alertas de encomendas e novidades.' });
       } else if (eAppNativa()) {

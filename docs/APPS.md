@@ -92,7 +92,9 @@ nada disto acontece e nenhum código do app é descarregado.
 
 Tudo pelo GitHub Actions (`.github/workflows/android.yml`):
 
-- **Em cada PR** que mexa em `app/mobile`: APK de debug, só para verificar que compila.
+- **Em cada PR** que mexa em `app/mobile`: APK de debug e AAB de release sem assinatura, para
+  verificar que compila. O APK fica nos artefactos da corrida (`livraria-adventista-android-debug`)
+  e pode instalar-se num telemóvel: ver «Experimentar no Android sem a Play Store».
 - **Actions → App Android → Run workflow** (ou uma etiqueta `android-v1.0.0`): o AAB assinado com a
   chave de envio, nos artefactos da corrida; com a conta de serviço da Play Console, vai também para
   os **testes internos** como rascunho. A versão vem de `app/mobile/package.json`; o número, da corrida.
@@ -218,6 +220,21 @@ O que só se faz na App Store Connect:
    pasta `android/` do artefacto). Na Play Console: **Segurança dos dados** com as mesmas respostas
    do manifesto de privacidade do iPhone, classificação de conteúdo, público-alvo, e a declaração de
    que a app não vende conteúdo digital.
+
+## Experimentar no Android sem a Play Store
+
+Não precisa de conta na Play Console, de chave de envio nem do Firebase:
+
+1. No GitHub: **Actions → App Android** → a corrida mais recente do PR → **Artifacts** →
+   `livraria-adventista-android-debug` (um `.zip` com o `app-debug.apk`; fica 14 dias).
+2. Passar o `app-debug.apk` para o telemóvel e abri-lo; o Android pede para autorizar a instalação
+   de apps desta origem (Definições → Apps → Acesso especial → Instalar apps desconhecidas).
+3. O app abre o site publicado. O que é do site (login, edições digitais fora de venda, ligações)
+   só se vê depois de o código do site com os apps estar publicado.
+
+Este APK é só para experimentar: não recebe notificações (não leva o Firebase), está assinado com
+uma chave de debug que muda de corrida para corrida (para instalar outro por cima, desinstalar
+primeiro) e não serve para a Play Store. As ligações do site também não abrem nele (App Links).
 
 ## Testar no Android (testes internos)
 

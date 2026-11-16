@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      Sem cópias de segurança dos dados do app: a sessão da conta fica guardada no WebView, e com
+      elas ia para a Google Drive e para o telemóvel novo sem novo login. O que a pessoa tem
+      (encomendas, biblioteca, carrinho) está na conta, não no aparelho.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

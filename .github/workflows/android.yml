@@ -2,7 +2,8 @@ name: App Android
 
 # O app Android (app/mobile, docs/APPS.md) compila-se aqui; não é preciso o Android Studio.
 #
-# - Em cada PR que mexa no app: build de verificação (APK de debug, sem assinatura de envio).
+# - Em cada PR que mexa no app: build de verificação (APK de debug, sem assinatura de envio), que
+#   fica nos artefactos da corrida para instalar num telemóvel e experimentar.
 # - «Run workflow» (à mão) ou uma etiqueta android-v*: o AAB assinado com a chave de envio, nos
 #   artefactos da corrida e, com a conta de serviço da Play Console, na faixa de testes internos
 #   (como rascunho). O primeiro AAB de sempre carrega-se à mão na Play Console.
@@ -53,11 +54,24 @@ jobs:
         working-directory: app/mobile
         run: npx cap sync android
 
-      - name: Build (APK de debug)
+      # O APK de debug é o que se instala para experimentar. O AAB de release sai sem assinatura
+      # (não há chave de envio num PR) e deita-se fora: serve para o caminho do envio para a Play
+      # Store (bundleRelease e a verificação lintVital) falhar aqui, e não no dia de publicar.
+      - name: Build (APK de debug e AAB de release sem assinatura)
         working-directory: app/mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug bundleRelease --no-daemon --stacktrace
+
+      # O APK fica nos artefactos da corrida: descarrega-se e instala-se num telemóvel Android
+      # para experimentar o app antes de haver chave de envio ou Play Console (docs/APPS.md).
+      # É um build de debug, sem o Firebase: não recebe notificações e não serve para a loja.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livraria-adventista-android-debug
+          path: app/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
   play:
     name: Enviar para a Play Store

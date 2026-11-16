@@ -31,6 +31,10 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
     private static let enviarAndandoCada: TimeInterval = 10
     private static let enviarParadoCada: TimeInterval = 30
     private static let distanciaMinima: CLLocationDistance = 25
+    /// Depois de um envio falhado: a espera antes de tentar outra vez. Sem sessão espera-se mais,
+    /// porque só o site a renova (`actualizarSessao`) e até lá cada pedido volta a falhar.
+    private static let esperaAposErro: TimeInterval = 10
+    private static let esperaSemSessao: TimeInterval = 60
 
     private let gestor = CLLocationManager()
     private var encomenda: String?
@@ -40,6 +44,7 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
     private var ultimaLeitura: CLLocation?
     private var ultimoEnvio: (posicao: CLLocation, quando: Date)?
     private var aEnviar = false
+    private var proximaTentativa = Date.distantPast
     private var avisouSessao = false
     private var temporizador: Timer?
 
@@ -71,6 +76,7 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
             self.sessao = sessao
             self.ultimaLeitura = nil
             self.ultimoEnvio = nil
+            self.proximaTentativa = Date.distantPast
             self.avisouSessao = false
             if permissao == .notDetermined { self.gestor.requestWhenInUseAuthorization() }
             self.gestor.allowsBackgroundLocationUpdates = true
@@ -92,6 +98,7 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
         }
         DispatchQueue.main.async {
             self.sessao = sessao
+            self.proximaTentativa = Date.distantPast
             self.avisouSessao = false
             call.resolve()
         }
@@ -124,6 +131,7 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
         sessao = ""
         ultimaLeitura = nil
         ultimoEnvio = nil
+        proximaTentativa = Date.distantPast
     }
 
     // MARK: - GPS
@@ -148,9 +156,14 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
     }
 
     /// Parado, o GPS não manda leituras novas: de 30 em 30 segundos, a última outra vez (o cliente
-    /// vê que quem entrega continua ali, e não "última posição há 10 min").
+    /// vê que quem entrega continua ali, e não "última posição há 10 min"). Se ainda nenhuma seguiu
+    /// (o primeiro envio falhou, sem rede), tenta-se já: `enviar` espaça as tentativas.
     private func enviarSeParado() {
-        guard encomenda != nil, let leitura = ultimaLeitura, let ultimo = ultimoEnvio else { return }
+        guard encomenda != nil, let leitura = ultimaLeitura else { return }
+        guard let ultimo = ultimoEnvio else {
+            enviar(leitura)
+            return
+        }
         if Date().timeIntervalSince(ultimo.quando) >= Self.enviarParadoCada { enviar(leitura) }
     }
 
@@ -170,7 +183,8 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
     // MARK: - Envio
 
     private func enviar(_ leitura: CLLocation) {
-        guard !aEnviar, let encomenda = encomenda, let endereco = endereco, !sessao.isEmpty else { return }
+        guard !aEnviar, Date() >= proximaTentativa,
+              let encomenda = encomenda, let endereco = endereco, !sessao.isEmpty else { return }
         aEnviar = true
 
         var corpo: [String: Any] = [
@@ -215,6 +229,8 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
 
         if codigo == 401 || mensagem.localizedCaseInsensitiveContains("JWT") {
             // A sessão caducou em segundo plano: espera pela renovação do site, e avisa uma vez.
+            // Até lá tenta-se de minuto a minuto, e não a cada leitura do GPS.
+            proximaTentativa = Date().addingTimeInterval(Self.esperaSemSessao)
             notifyListeners("erro", data: ["codigo": "SESSAO", "mensagem": "A sessão caducou: abra a app para continuar a partilhar."])
             avisarSessaoCaducada()
             return
@@ -228,7 +244,8 @@ public class TrajetoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelega
             return
         }
 
-        // Sem rede ou um erro passageiro: tenta-se com a próxima leitura.
+        // Sem rede ou um erro passageiro: tenta-se outra vez daqui a pouco.
+        proximaTentativa = Date().addingTimeInterval(Self.esperaAposErro)
         notifyListeners("erro", data: ["codigo": "ENVIO", "mensagem": mensagem.isEmpty ? "Sem rede: a posição segue quando voltar." : mensagem])
     }
 

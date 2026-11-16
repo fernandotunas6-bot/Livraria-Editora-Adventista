@@ -115,6 +115,16 @@ describe("sendFcm", () => {
     expect(oauth).toBe(2);
   });
 
+  it("envios em paralelo esperam pela mesma troca (um lote não pede um token por aparelho)", async () => {
+    const fetchFn = rede(() => resposta(200, {}));
+    const f = fetchFn as unknown as typeof fetch;
+    const envios = await Promise.all(Array.from({ length: 5 }, () => (
+      sendFcm(config(), TOKEN, { title: "t", body: "b", url: "/" }, { fetchFn: f, nowSeconds: 1_700_000_000 })
+    )));
+    expect(envios).toEqual(["sent", "sent", "sent", "sent", "sent"]);
+    expect(fetchFn.mock.calls.filter(([u]) => String(u).startsWith("https://oauth2")).length).toBe(1);
+  });
+
   it("aparelho que já não existe: apagar o token", async () => {
     for (const r of [resposta(404, { error: { status: "NOT_FOUND" } }), resposta(400, { error: { status: "INVALID_ARGUMENT", details: [{ errorCode: "UNREGISTERED" }] } })]) {
       expect(await sendFcm(config(), TOKEN, { title: "t", body: "b", url: "/" }, { fetchFn: rede(r) as unknown as typeof fetch })).toBe("gone");

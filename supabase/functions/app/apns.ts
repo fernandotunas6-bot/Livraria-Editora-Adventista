@@ -111,8 +111,13 @@ async function jwtActual(cfg: ApnsConfig, nowSeconds: number) {
 /** Só para os testes. */
 export const _esquecerJwt = () => { jwtGuardado = null; };
 
-/** As razões da Apple que querem dizer «este aparelho já não recebe»: o token sai. */
-const RAZOES_SEM_APARELHO = new Set(["BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"]);
+/**
+ * A razão da Apple que quer dizer «este aparelho já não recebe» (vem com o 410): o token sai.
+ * BadDeviceToken e DeviceTokenNotForTopic não apagam: a Apple responde assim a todos os aparelhos
+ * quando o erro é nosso (APNS_ENV=sandbox com tokens de produção, ou APNS_TOPIC errado), e um
+ * engano nos segredos apagava os iPhones todos. Como no fcm.ts com o INVALID_ARGUMENT.
+ */
+const RAZOES_SEM_APARELHO = new Set(["Unregistered"]);
 
 /** Um aviso para um aparelho: 'sent', 'gone' (o token já não serve: apagar) ou 'failed'. */
 export async function sendApns(

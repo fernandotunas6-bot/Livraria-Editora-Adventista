@@ -125,9 +125,17 @@ describe("sendApns", () => {
   });
 
   it("aparelho que já não existe: apagar o token", async () => {
-    for (const [status, reason] of [[410, "Unregistered"], [400, "BadDeviceToken"], [400, "DeviceTokenNotForTopic"]] as const) {
+    for (const [status, reason] of [[410, "Unregistered"], [410, ""], [400, "Unregistered"]] as const) {
       const fetchFn = vi.fn(async () => resposta(status, { reason }));
       expect(await sendApns(config(), TOKEN, { title: "t", body: "b", url: "/" }, { fetchFn })).toBe("gone");
+    }
+  });
+
+  it("ambiente ou bundle errados nos segredos: o token fica (o erro é nosso, não do aparelho)", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    for (const reason of ["BadDeviceToken", "DeviceTokenNotForTopic"]) {
+      const fetchFn = vi.fn(async () => resposta(400, { reason }));
+      expect(await sendApns(config(), TOKEN, { title: "t", body: "b", url: "/" }, { fetchFn })).toBe("failed");
     }
   });
 

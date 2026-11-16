@@ -28,6 +28,24 @@ export function aoPuxarParaActualizar({ porGravar = haTrabalhoPorGravar(), doc =
   return 'recarregar';
 }
 
+/**
+ * Segue as ligações que abrem o app, uma vez cada. Com o app fechado, a ligação que o abre chega
+ * duas vezes — pelo `appUrlOpen` (o plugin guarda-o até haver quem o ouça) e pelo `getLaunchUrl` —
+ * e navegar duas vezes deixava a página repetida no histórico: «voltar» parecia não fazer nada.
+ */
+export function seguidorDeLigacoes(navegar, { agora = Date.now, janelaMs = 3000 } = {}) {
+  let ultima = { caminho: '', quando: -Infinity };
+  return (url) => {
+    const caminho = caminhoDaLigacao(url);
+    if (!caminho) return false;
+    const t = agora();
+    if (caminho === ultima.caminho && t - ultima.quando < janelaMs) return false;
+    ultima = { caminho, quando: t };
+    navegar(caminho);
+    return true;
+  };
+}
+
 /** A ligação que abriu o app já foi seguida nesta sessão (ao recarregar não se volta a ela). */
 const LANCAMENTO_SEGUIDO = 'livraria:app-ligacao-inicial';
 
@@ -112,10 +130,7 @@ export default function NativeAppBridge() {
     let vivo = true;
     let ouvinte = null;
 
-    const seguir = (url) => {
-      const caminho = caminhoDaLigacao(url);
-      if (caminho) navigateRef.current(caminho);
-    };
+    const seguir = seguidorDeLigacoes((caminho) => navigateRef.current(caminho));
 
     (async () => {
       const App = await pluginApp();

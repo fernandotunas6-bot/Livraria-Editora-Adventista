@@ -5,7 +5,41 @@ vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ settings: 
 vi.mock('@/hooks/useNotifications', () => ({ useNotifications: () => ({ unread: 0 }) }));
 vi.mock('@/lib/pushNotifications', () => ({ sincronizarPushNativo: async () => false }));
 
-const { aoPuxarParaActualizar, caminhoDaNotificacao } = await import('./NativeAppBridge.jsx');
+const { aoPuxarParaActualizar, caminhoDaNotificacao, seguidorDeLigacoes } = await import('./NativeAppBridge.jsx');
+
+describe('seguidorDeLigacoes', () => {
+  it('a ligação que abriu o app chega duas vezes e segue-se uma', () => {
+    const navegar = vi.fn();
+    let t = 1000;
+    const seguir = seguidorDeLigacoes(navegar, { agora: () => t });
+    // appUrlOpen (guardado pelo plugin) e, logo a seguir, getLaunchUrl.
+    expect(seguir('https://livrariaadventista.ao/track?code=AB12')).toBe(true);
+    t += 40;
+    expect(seguir('https://livrariaadventista.ao/track?code=AB12')).toBe(false);
+    expect(navegar).toHaveBeenCalledTimes(1);
+    expect(navegar).toHaveBeenCalledWith('/track?code=AB12');
+  });
+
+  it('outra ligação, ou a mesma mais tarde, segue-se', () => {
+    const navegar = vi.fn();
+    let t = 1000;
+    const seguir = seguidorDeLigacoes(navegar, { agora: () => t });
+    seguir('https://livrariaadventista.ao/track?code=AB12');
+    t += 40;
+    expect(seguir('https://livrariaadventista.ao/product/abc')).toBe(true);
+    t += 60_000;
+    expect(seguir('https://livrariaadventista.ao/product/abc')).toBe(true);
+    expect(navegar).toHaveBeenCalledTimes(3);
+  });
+
+  it('o que não é do site não navega', () => {
+    const navegar = vi.fn();
+    const seguir = seguidorDeLigacoes(navegar);
+    expect(seguir('ao.livrariaadventista.app://auth/callback?code=x')).toBe(false);
+    expect(seguir('https://evil.example/track')).toBe(false);
+    expect(navegar).not.toHaveBeenCalled();
+  });
+});
 
 describe('caminhoDaNotificacao', () => {
   it('as páginas do site, pelo caminho ou pelo endereço inteiro', () => {

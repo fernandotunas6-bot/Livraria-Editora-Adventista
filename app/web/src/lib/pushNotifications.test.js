@@ -21,7 +21,8 @@ let firebase = true;
 vi.mock('@capacitor/core', () => ({ registerPlugin: () => ({ pushConfigurado: async () => ({ configurado: firebase }) }) }));
 
 const {
-  desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, requestPushPermission, sincronizarPushNativo, subscribeToPush,
+  desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, pushNativoLigado, pushNativoNoServidor,
+  requestPushPermission, sincronizarPushNativo, subscribeToPush,
 } = await import('./pushNotifications');
 
 const noApp = () => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' }; };
@@ -90,6 +91,44 @@ describe('no app iOS', () => {
     await desligarPushNativo();
     expect(send).toHaveBeenCalledWith('/push/native/unsubscribe', { method: 'POST', body: { token: 'ab'.repeat(32), platform: 'ios' } });
     expect(push.unregister).toHaveBeenCalled();
+  });
+
+  it('quem desligou no perfil continua desligado no arranque seguinte, até voltar a ligar', async () => {
+    noApp();
+    push.checkPermissions.mockImplementation(async () => ({ receive: 'granted' }));
+    await subscribeToPush('k', { pedida: true });
+    expect(await pushNativoLigado()).toBe(true);
+    await desligarPushNativo();
+    send.mockClear();
+    push.register.mockClear();
+    // A permissão do iPhone continua dada, mas o app não volta a registar o aparelho sozinho…
+    expect(await pushNativoLigado()).toBe(false);
+    expect(await sincronizarPushNativo()).toBe(false);
+    // …nem a oferta de depois da compra (SuccessPage), que não é a pessoa a ligar.
+    expect(await subscribeToPush('k')).toBeNull();
+    expect(push.register).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    // Ligar outra vez no perfil desfaz.
+    expect(await subscribeToPush('k', { pedida: true })).toEqual({ token: 'ab'.repeat(32) });
+    expect(await pushNativoLigado()).toBe(true);
+    expect(await sincronizarPushNativo()).toBe(true);
+  });
+
+  it('o servidor diz se envia para este telemóvel; sem resposta, conta como sim', async () => {
+    noApp();
+    send.mockResolvedValueOnce({ enabled: true, ios: false, android: true });
+    expect(await pushNativoNoServidor()).toBe(false);
+    expect(send).toHaveBeenCalledWith('/push/config', { method: 'GET' });
+    send.mockResolvedValueOnce({ enabled: true, ios: true, android: false });
+    expect(await pushNativoNoServidor()).toBe(true);
+    // Um servidor que ainda não diz (sem `ios`) ou que não responde não trava o interruptor.
+    send.mockResolvedValueOnce({ enabled: true, publicKey: 'k' });
+    expect(await pushNativoNoServidor()).toBe(true);
+    send.mockRejectedValueOnce(new Error('sem rede'));
+    expect(await pushNativoNoServidor()).toBe(true);
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+    send.mockResolvedValueOnce({ enabled: true, ios: true, android: false });
+    expect(await pushNativoNoServidor()).toBe(false);
   });
 });
 

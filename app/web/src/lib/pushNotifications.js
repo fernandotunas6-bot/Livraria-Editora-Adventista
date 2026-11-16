@@ -49,6 +49,15 @@ const lerToken = () => { try { return localStorage.getItem(APNS_TOKEN_KEY) || ''
 const guardarToken = (t) => { try { if (t) localStorage.setItem(APNS_TOKEN_KEY, t); else localStorage.removeItem(APNS_TOKEN_KEY); } catch { /* sem armazenamento */ } };
 
 /**
+ * A pessoa desligou as notificações no perfil do app. A permissão do telemóvel continua dada, por
+ * isso é isto que impede o arranque seguinte de voltar a registar o aparelho sozinho
+ * (sincronizarPushNativo); só voltar a ligar no perfil o apaga.
+ */
+const PUSH_DESLIGADO_KEY = 'livraria:push-nativo-desligado';
+const desligadoPelaPessoa = () => { try { return localStorage.getItem(PUSH_DESLIGADO_KEY) === '1'; } catch { return false; } };
+const lembrarDesligado = (sim) => { try { if (sim) localStorage.setItem(PUSH_DESLIGADO_KEY, '1'); else localStorage.removeItem(PUSH_DESLIGADO_KEY); } catch { /* sem armazenamento */ } };
+
+/**
  * No Android as notificações vêm pelo Firebase, que só existe se o build levou o
  * google-services.json: sem ele, pedir o registo derrubava o app. O app diz se o tem.
  */
@@ -88,7 +97,7 @@ async function registarAparelho(push) {
   const handles = [];
   try {
     const token = await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('O iPhone não respondeu ao registo das notificações.')), 20_000);
+      const t = setTimeout(() => reject(new Error('O telemóvel não respondeu ao registo das notificações.')), 20_000);
       Promise.all([
         push.addListener('registration', ({ value }) => { clearTimeout(t); resolve(value); }),
         push.addListener('registrationError', ({ error }) => { clearTimeout(t); reject(new Error(error || 'O registo das notificações falhou.')); }),
@@ -100,11 +109,16 @@ async function registarAparelho(push) {
   }
 }
 
-/** O aparelho fica a receber, associado à conta que tem sessão (ou a nenhuma). */
-async function subscreverNoApp({ appUpdates } = {}) {
+/**
+ * O aparelho fica a receber, associado à conta que tem sessão (ou a nenhuma). `pedida`: foi a
+ * pessoa que ligou as notificações no perfil; sem isso, quem as desligou lá continua sem elas.
+ */
+async function subscreverNoApp({ appUpdates, pedida = false } = {}) {
   const push = await pluginPush();
   if (!push) return null;
+  if (!pedida && desligadoPelaPessoa()) return null;
   if (await pedirPermissaoNativa() !== 'granted') return null;
+  if (pedida) lembrarDesligado(false);
   const token = await registarAparelho(push);
   if (!token) return null;
   guardarToken(token);
@@ -124,12 +138,31 @@ async function subscreverNoApp({ appUpdates } = {}) {
   return { token };
 }
 
+/** As notificações estão ligadas neste aparelho: permissão dada e não desligadas no perfil. */
+export async function pushNativoLigado() {
+  return !desligadoPelaPessoa() && await permissaoDoPushNativo() === 'granted';
+}
+
+/**
+ * O servidor tem por onde enviar para este aparelho (APNs no iPhone, Firebase no Android)?
+ * `/push/config` diz; se não responder, ou num servidor que ainda não diz, conta como sim.
+ */
+export async function pushNativoNoServidor() {
+  try {
+    const cfg = await pb.send('/push/config', { method: 'GET' });
+    return (eAppAndroid() ? cfg?.android : cfg?.ios) !== false;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * No arranque do app e a cada entrada ou saída de conta: com a permissão já dada, regista outra
- * vez (o token pode mudar) e diz ao servidor de quem é agora o aparelho. Sem permissão, nada.
+ * vez (o token pode mudar) e diz ao servidor de quem é agora o aparelho. Sem permissão, ou com
+ * as notificações desligadas no perfil, nada.
  */
 export async function sincronizarPushNativo() {
-  if (await permissaoDoPushNativo() !== 'granted') return false;
+  if (!await pushNativoLigado()) return false;
   try {
     return !!await subscreverNoApp();
   } catch {
@@ -137,12 +170,16 @@ export async function sincronizarPushNativo() {
   }
 }
 
-/** Desliga as notificações neste iPhone: o servidor esquece o aparelho. */
+/**
+ * Desliga as notificações neste aparelho: o servidor esquece-o, e fica lembrado que foi a pessoa
+ * a desligar (o app não volta a registá-lo sozinho no arranque seguinte).
+ */
 export async function desligarPushNativo() {
   const push = await pluginPush();
   const token = lerToken();
   if (token) await pb.send('/push/native/unsubscribe', { method: 'POST', body: { token, platform: plataformaNativa() } });
   guardarToken('');
+  lembrarDesligado(true);
   try { await push?.unregister(); } catch { /* já desligado */ }
 }
 
@@ -154,8 +191,9 @@ export async function requestPushPermission() {
   return Notification.requestPermission();
 }
 
-export async function subscribeToPush(vapidPublicKey, { appUpdates } = {}) {
-  if (eAppNativa()) return subscreverNoApp({ appUpdates });
+/** `pedida`: a pessoa ligou as notificações à mão (perfil); nos apps, desfaz o «desligado». */
+export async function subscribeToPush(vapidPublicKey, { appUpdates, pedida = false } = {}) {
+  if (eAppNativa()) return subscreverNoApp({ appUpdates, pedida });
   if (!vapidPublicKey || !isPushSupported()) return null;
   const permission = await requestPushPermission();
   if (permission !== 'granted') return null;
