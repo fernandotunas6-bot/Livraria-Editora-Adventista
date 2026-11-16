@@ -155,3 +155,17 @@ describe('addToCart — edição digital', () => {
     expect(carrinho.cartDigital).toMatchObject({ all: false, any: true, physicalCents: 200_000 });
   });
 });
+
+describe('addToCart — edição digital dentro do app iOS', () => {
+  afterEach(() => { delete window.Capacitor; });
+
+  it('não entra no carrinho (regra 3.1.1 da App Store); o impresso entra', async () => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    const p = produto({ versions: [{ label: 'Impresso' }, { label: 'Edição digital', digital: true }] });
+    await juntar(p, variante('liv1-v1', { digital: true, manage_inventory: false, inventory_quantity: 1 }));
+    expect(carrinho.cartItems).toHaveLength(0);
+    expect(toasts.at(-1).titulo).toBe('A edição digital não está à venda na app.');
+    await juntar(p, variante('liv1-v0', { title: 'Impresso' }));
+    expect(carrinho.cartItems).toHaveLength(1);
+  });
+});

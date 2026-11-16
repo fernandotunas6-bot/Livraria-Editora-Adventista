@@ -8,6 +8,7 @@ import { downloadKindLabel, formatFileSize } from '@/lib/downloads';
 import {
   TONE_CLASS, digitalState, downloadsLabel, inlinePdfSupported, libraryActions, libraryHint, loadMyLibrary,
 } from '@/lib/digitalLibrary';
+import { abrirNoNavegadorDoApp, eAppNativa } from '@/lib/nativeApp';
 import { cn } from '@/lib/utils';
 
 const dateOnly = (value) => {
@@ -26,12 +27,16 @@ function LibraryItem({ item, onOpened }) {
 
   const open = async (mode) => {
     // "Abrir" mostra o PDF num separador novo. A janela abre já, no toque: o Safari bloqueia as que
-    // se abrem depois de esperar pela rede.
-    const win = mode === 'open' ? window.open('', '_blank') : null;
+    // se abrem depois de esperar pela rede. No app (lib/nativeApp.js) não há separadores: o PDF
+    // abre na folha do Safari por cima do app, que o mostra e o guarda em Ficheiros ou Livros.
+    const noApp = eAppNativa();
+    const win = mode === 'open' && !noApp ? window.open('', '_blank') : null;
     setBusy(mode);
     try {
       const url = await getDownloadUrl(item, { mode });
-      if (win) {
+      if (noApp && await abrirNoNavegadorDoApp(url)) {
+        // Aberto por cima do app.
+      } else if (win) {
         win.opener = null;
         win.location.href = url;
       } else {

@@ -12,9 +12,15 @@
 // O evento chega muitas vezes antes de o aviso de instalação ser carregado (vem a pedido): por
 // isso é apanhado logo no arranque (main.jsx → capturarPedidoDeInstalacao) e guardado aqui.
 
-/** A app está aberta como app instalada (ecrã inteiro, sem a barra do navegador)? */
+import { eAppNativa } from '@/lib/nativeApp';
+
+/**
+ * A app está aberta como app instalada (ecrã inteiro, sem a barra do navegador)? Dentro do app da
+ * App Store (lib/nativeApp.js) também: aí não há nada para instalar.
+ */
 export function abertaComoApp(win = globalThis.window) {
   if (!win) return false;
+  if (eAppNativa(win)) return true;
   try {
     if (win.navigator?.standalone === true) return true; // iOS
     return !!win.matchMedia?.('(display-mode: standalone)')?.matches

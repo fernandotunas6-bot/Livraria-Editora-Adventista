@@ -51,6 +51,13 @@ jobs:
       # públicos do destino, livros e colecções no sitemap, e uma página de partilha por livro
       # (capa e título no WhatsApp). Sem ele, uma publicação pelo Actions saía com o endereço
       # do projecto antigo no canonical e sem as páginas dos livros.
+      # As ligações do site abrem no app iOS (docs/APP_IOS.md). Sem a variável APPLE_TEAM_ID não
+      # escreve nada e o deploy segue.
+      - name: Ligação ao app iOS
+        run: node scripts/apple-app-site-association.mjs dist/app/web
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+
       - name: SEO e partilha do catálogo
         run: node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL"
         env:

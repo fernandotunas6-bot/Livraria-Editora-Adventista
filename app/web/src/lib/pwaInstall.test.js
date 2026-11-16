@@ -45,6 +45,8 @@ describe('abertaComoApp', () => {
     expect(abertaComoApp({ navigator: { standalone: true } })).toBe(true);
     expect(abertaComoApp({ navigator: {}, matchMedia: (q) => ({ matches: q === '(display-mode: standalone)' }) })).toBe(true);
     expect(abertaComoApp({ navigator: {}, matchMedia: () => ({ matches: false }) })).toBe(false);
+    // Dentro do app da App Store (lib/nativeApp.js) não há nada para instalar.
+    expect(abertaComoApp({ navigator: {}, matchMedia: () => ({ matches: false }), Capacitor: { isNativePlatform: () => true } })).toBe(true);
   });
 });
 

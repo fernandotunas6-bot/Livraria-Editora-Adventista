@@ -9,7 +9,18 @@
  * Function (supabase/functions/app/digitalBooks.ts): mexer num sítio obriga a mexer nos outros.
  */
 
+import { eAppIos } from '@/lib/nativeApp';
+
 const TRUE_WORDS = ['true', 't', '1', 'yes', 'sim'];
+
+/**
+ * Pode-se comprar a edição digital aqui? Não dentro do app iOS: a Apple obriga a vender conteúdo
+ * digital com as compras dela (regra 3.1.1 da App Store) e a loja decidiu não o fazer. No app só
+ * se compram os impressos; quem já comprou o digital no site lê-o na biblioteca, como sempre.
+ * A frase não leva ligação nem indicação para comprar noutro lado: a Apple também o proíbe.
+ */
+export const podeComprarDigital = (win = globalThis.window) => !eAppIos(win);
+export const DIGITAL_FORA_DA_APP = 'A edição digital não está à venda na app.';
 
 /** Uma variante (um elemento de `versions`) é a edição digital? */
 export function versionIsDigital(version) {

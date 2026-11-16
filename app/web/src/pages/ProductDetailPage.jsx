@@ -42,7 +42,7 @@ import { breadcrumbJsonLd, jsonLdString, productJsonLd } from '@/lib/structuredD
 import CommunityFeed from '@/components/community/CommunityFeed';
 import ProductDownloads from '@/components/downloads/ProductDownloads';
 import StoreAvailability from '@/components/StoreAvailability';
-import { variantIndexOf } from '@/lib/digitalEditions';
+import { DIGITAL_FORA_DA_APP, variantIndexOf } from '@/lib/digitalEditions';
 import { loadMyLibrary } from '@/lib/digitalLibrary';
 
 // Star rating helper component
@@ -326,7 +326,9 @@ function ProductDetailPage() {
 
   // Uma linha só sobre o stock, logo abaixo do preço, em vez dos três avisos soltos que
   // estavam espalhados pela coluna.
-  const availability = isDigital
+  const availability = product.digital_fora_da_app && !product.purchasable
+    ? { ok: false, label: DIGITAL_FORA_DA_APP, tone: 'text-muted-foreground' }
+    : isDigital
     ? { ok: true, label: 'Edição digital: sem portes — abre na sua biblioteca quando o pagamento for confirmado', tone: 'text-emerald-700 dark:text-emerald-400' }
     : !product.purchasable
     ? { ok: false, label: 'Esgotado de momento' , tone: 'text-destructive' }
@@ -573,7 +575,7 @@ function ProductDetailPage() {
               </div>
             )}
 
-            {isDigital ? (
+            {isDigital && product.digital_fora_da_app ? null : isDigital ? (
               // A edição digital é uma por conta, e fica na biblioteca: sem quantidade nem envio.
               <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm" data-edicao-digital>
                 {ownedRow ? (
@@ -1107,7 +1109,7 @@ function ProductDetailPage() {
         onBuy={handleBuyNow}
         onAdd={product.purchasable ? () => handleAddToCart(false) : undefined}
         disabled={!canAddToCart || !product.purchasable}
-        label={product.purchasable ? 'Comprar' : 'Esgotado'}
+        label={product.purchasable ? 'Comprar' : product.digital_fora_da_app ? 'Não está à venda na app' : 'Esgotado'}
       />
 
       <Footer />

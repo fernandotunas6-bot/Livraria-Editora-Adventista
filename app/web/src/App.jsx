@@ -20,6 +20,7 @@ import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import { captureReferral } from '@/lib/colporteurReferral';
+import { eAppNativa } from '@/lib/nativeApp';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -58,6 +59,8 @@ const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 // "Nova versão disponível — Actualizar" e "App actualizada" (lib/appVersion.js).
 const AppUpdateNotice = lazy(() => import('@/components/AppUpdateNotice.jsx'));
+// Só dentro do app iOS (lib/nativeApp.js): ligações que abrem o app, barra de estado, login.
+const NativeAppBridge = lazy(() => import('@/components/NativeAppBridge.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
 
 function PageLoader() {
@@ -178,6 +181,8 @@ function ColporteurReferralCapture() {
   return null;
 }
 
+const NO_APP = eAppNativa();
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
@@ -192,6 +197,7 @@ function GlobalWidgets() {
     <Suspense fallback={null}>
       <AppUpdateNotice />
       <PwaInstallBanner />
+      {NO_APP && <NativeAppBridge />}
       {showAssistant && <LivrariaAssistant />}
       <MobileBottomNav />
       <ReaderActivity />

@@ -60,6 +60,8 @@ npm run build --silent
 # trocados para o SITE_URL, livros e colecções no sitemap, e uma página de partilha por livro
 # e por colecção, com a capa e o título para o WhatsApp. Ver scripts/seo-catalogo.mjs.
 node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL" || fail "O pós-build de SEO falhou (ver acima)."
+# As ligações do site abrem no app iOS quando há APPLE_TEAM_ID (docs/APP_IOS.md).
+node scripts/apple-app-site-association.mjs dist/app/web || fail "O ficheiro do app iOS falhou (ver acima)."
 
 target="main"
 [ "$mode" = "preview" ] && target="${upstream#origin/}"

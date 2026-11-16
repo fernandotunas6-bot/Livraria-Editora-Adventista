@@ -12,6 +12,8 @@
 	<array>
 		<string>applinks:livrariaadventista.ao</string>
 		<string>applinks:www.livrariaadventista.ao</string>
+		<string>webcredentials:livrariaadventista.ao</string>
+		<string>webcredentials:www.livrariaadventista.ao</string>
 	</array>
 </dict>
 </plist>
