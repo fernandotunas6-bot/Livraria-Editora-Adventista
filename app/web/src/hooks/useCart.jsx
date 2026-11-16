@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
 import { cartVariantLabel, needsVariantChoice, variantNames } from '@/lib/productTypes';
+import { vibrar } from '@/lib/nativeApp';
 import { DIGITAL_FORA_DA_APP, cartDigitalState, isDigitalEdition, podeComprarDigital, variantIndexOf } from '@/lib/digitalEditions';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
@@ -88,6 +89,7 @@ export const CartProvider = ({ children }) => {
             description: 'Edição digital · fica na sua biblioteca quando o pagamento for confirmado',
           });
         }
+        vibrar();
         resolve();
         return;
       }
@@ -128,6 +130,8 @@ export const CartProvider = ({ children }) => {
           description: etiqueta ? `${quantity}× · ${etiqueta}` : `${quantity}×`,
         });
       }
+      // No app, um toque leve no telemóvel confirma que entrou (lib/nativeApp.js).
+      vibrar();
       resolve();
     });
   }, [cartItems]);

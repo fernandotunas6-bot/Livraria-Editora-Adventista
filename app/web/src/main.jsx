@@ -17,6 +17,7 @@ import { installStaleChunkReload } from '@/lib/staleChunkReload';
 import { prefetchProduct } from '@/api/EcommerceApi';
 import { installTelemetry } from '@/lib/telemetry';
 import { capturarPedidoDeInstalacao } from '@/lib/pwaInstall';
+import { eAppNativa, esconderArranque } from '@/lib/nativeApp';
 
 // Antes de montar: os interruptores viram atributos no `<html>`, e o CSS já encontra o
 // estado certo na primeira pintura. Feito depois, os elementos apareciam um instante com
@@ -44,4 +45,6 @@ if (!REDIRECTING_TO_CANONICAL) {
 	ReactDOM.createRoot(document.getElementById('root')).render(
 		<App />
 	);
+	// No app iOS, o logotipo do arranque sai quando o site já pintou (lib/nativeApp.js).
+	if (eAppNativa()) requestAnimationFrame(() => requestAnimationFrame(() => { esconderArranque(); }));
 }

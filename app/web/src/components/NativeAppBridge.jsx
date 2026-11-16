@@ -1,17 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import {
-  aplicarBarraDeEstado, caminhoDaLigacao, estiloDaBarraDeEstado, pluginApp, pluginPush,
+  aplicarBarraDeEstado, caminhoDaLigacao, estiloDaBarraDeEstado, numeroNoIcone, pluginApp, pluginPush,
 } from '@/lib/nativeApp';
 import { sincronizarPushNativo } from '@/lib/pushNotifications';
+import { haTrabalhoPorGravar } from '@/lib/unsavedWork';
 
 /** Para onde vai o toque numa notificação: a página do site que ela traz (`url`). */
 export function caminhoDaNotificacao(url) {
   const s = String(url || '');
   if (s.startsWith('/') && !s.startsWith('//')) return s;
   return caminhoDaLigacao(s);
+}
+
+/**
+ * Puxar para actualizar (MainViewController.swift): recarrega a página, a não ser que se perca
+ * alguma coisa — alterações por gravar (lib/unsavedWork.js) ou uma janela aberta, onde se está a
+ * escrever. Devolve o que fazer: 'recarregar', 'por-gravar' ou 'janela'.
+ */
+export function aoPuxarParaActualizar({ porGravar = haTrabalhoPorGravar(), doc = document } = {}) {
+  if (porGravar) return 'por-gravar';
+  if (doc.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return 'janela';
+  return 'recarregar';
 }
 
 /** A ligação que abriu o app já foi seguida nesta sessão (ao recarregar não se volta a ela). */
@@ -24,7 +38,9 @@ const LANCAMENTO_SEGUIDO = 'livraria:app-ligacao-inicial';
  *   iPhone entrega-as ao app, e aqui vão para a página certa, sem recarregar o site;
  * - a barra de estado (hora, bateria) com a cor certa para cada página;
  * - notificações: tocar numa abre a página dela; ao abrir o app e a cada entrada ou saída de
- *   conta, o aparelho volta a dizer ao servidor de quem é (lib/pushNotifications.js).
+ *   conta, o aparelho volta a dizer ao servidor de quem é (lib/pushNotifications.js);
+ * - o número no ícone do app: os avisos por ler da conta;
+ * - puxar para actualizar.
  */
 export default function NativeAppBridge() {
   const navigate = useNavigate();
@@ -34,6 +50,24 @@ export default function NativeAppBridge() {
   const { user, ready } = useAuth();
   const { settings } = useSiteSettings();
   const pushLigado = !!settings?.push_enabled;
+  const { unread } = useNotifications({ limit: 20 });
+
+  // O número no ícone segue os avisos por ler (sem conta, nenhum).
+  useEffect(() => {
+    if (!ready) return;
+    numeroNoIcone(user?.id ? unread : 0);
+  }, [ready, user?.id, unread]);
+
+  useEffect(() => {
+    const puxou = () => {
+      const fazer = aoPuxarParaActualizar();
+      if (fazer === 'recarregar') window.location.reload();
+      else if (fazer === 'por-gravar') toast.info('Há alterações por gravar nesta página', { description: 'Grave-as antes de actualizar.' });
+      // Com uma janela aberta, puxar é só deslizar dentro dela: não se faz nada.
+    };
+    window.addEventListener('livraria:puxar-para-actualizar', puxou);
+    return () => window.removeEventListener('livraria:puxar-para-actualizar', puxou);
+  }, []);
 
   // O aparelho fica associado a quem tem sessão agora (ou a ninguém, depois de sair).
   useEffect(() => {

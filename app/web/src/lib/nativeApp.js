@@ -37,12 +37,20 @@ export function plataformaNativa(win = globalThis.window) {
 /** Dentro do app iOS: é aqui que valem as regras da App Store (compras digitais, login da Apple). */
 export const eAppIos = (win = globalThis.window) => plataformaNativa(win) === 'ios';
 
+/**
+ * Os plugins do Capacitor são um Proxy que responde a qualquer nome, `then` incluído: devolvido
+ * por uma função `async`, o `await` toma-o por uma promessa, chama `plugin.then(...)` (um método
+ * nativo que não existe) e fica à espera para sempre. Por isso saem daqui embrulhados num Proxy
+ * sem `then`; o resto passa direito ao do Capacitor.
+ */
+export const semThen = (p) => (p ? new Proxy(p, { get: (alvo, prop) => (prop === 'then' ? undefined : alvo[prop]) }) : p);
+
 /** O plugin pedido, ou null fora do app ou se não carregar. */
 async function plugin(carregar, nome) {
   if (!eAppNativa()) return null;
   try {
     const modulo = await carregar();
-    return modulo?.[nome] || null;
+    return semThen(modulo?.[nome] || null);
   } catch {
     return null;
   }
@@ -53,6 +61,8 @@ export const pluginBrowser = () => plugin(() => import('@capacitor/browser'), 'B
 export const pluginShare = () => plugin(() => import('@capacitor/share'), 'Share');
 export const pluginPush = () => plugin(() => import('@capacitor/push-notifications'), 'PushNotifications');
 export const pluginStatusBar = () => plugin(() => import('@capacitor/status-bar'), 'StatusBar');
+export const pluginSplash = () => plugin(() => import('@capacitor/splash-screen'), 'SplashScreen');
+export const pluginHaptics = () => plugin(() => import('@capacitor/haptics'), 'Haptics');
 
 /** Plugins que vivem no próprio app (app/ios/ios/App/App/*.swift), registados uma vez. */
 const pluginsDoApp = new Map();
@@ -61,7 +71,7 @@ async function pluginDoApp(nome) {
   if (pluginsDoApp.has(nome)) return pluginsDoApp.get(nome);
   try {
     const { registerPlugin } = await import('@capacitor/core');
-    const p = registerPlugin(nome);
+    const p = semThen(registerPlugin(nome));
     pluginsDoApp.set(nome, p);
     return p;
   } catch {
@@ -69,6 +79,8 @@ async function pluginDoApp(nome) {
   }
 }
 
+/** O número no ícone do app (AparelhoPlugin.swift). */
+export const pluginAparelho = () => pluginDoApp('Aparelho');
 /** «Iniciar sessão com a Apple» (AppleSignInPlugin.swift). */
 export const pluginAppleSignIn = () => pluginDoApp('AppleSignIn');
 /** Login no navegador do sistema, para a Google (WebAuthPlugin.swift). */
@@ -127,5 +139,42 @@ export async function aplicarBarraDeEstado(style) {
     await statusBar.setStyle({ style });
   } catch {
     // Sem barra de estado (iPad em ecrã dividido, por exemplo): nada a fazer.
+  }
+}
+
+/**
+ * O ecrã de arranque (o logotipo) fica até o site pintar, em vez de um clarão branco enquanto o
+ * site chega pela rede. Se nada o esconder, o app esconde-o sozinho ao fim de 10 segundos
+ * (capacitor.config.json).
+ */
+export async function esconderArranque() {
+  const splash = await pluginSplash();
+  if (!splash) return;
+  try {
+    await splash.hide({ fadeOutDuration: 250 });
+  } catch {
+    // Já escondido.
+  }
+}
+
+/** Um toque leve no telemóvel (juntar ao carrinho, por exemplo). Fora do app não faz nada. */
+export async function vibrar() {
+  const haptics = await pluginHaptics();
+  if (!haptics) return;
+  try {
+    await haptics.impact({ style: 'LIGHT' });
+  } catch {
+    // Sem motor de vibração (iPad): nada a fazer.
+  }
+}
+
+/** O número no ícone do app: os avisos por ler (0 tira-o). */
+export async function numeroNoIcone(numero) {
+  const aparelho = await pluginAparelho();
+  if (!aparelho) return;
+  try {
+    await aparelho.numeroNoIcone({ numero: Math.max(0, Math.floor(Number(numero) || 0)) });
+  } catch {
+    // Sem permissão de notificações o iOS não mostra o número: nada a fazer.
   }
 }

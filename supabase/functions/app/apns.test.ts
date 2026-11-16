@@ -89,6 +89,16 @@ describe("apnsPayload", () => {
   });
 });
 
+describe("apnsPayload — número no ícone", () => {
+  it("só com um número inteiro, até 999", () => {
+    expect(apnsPayload({ title: "t", body: "b", url: "/", badge: 3 }).aps.badge).toBe(3);
+    expect(apnsPayload({ title: "t", body: "b", url: "/", badge: 0 }).aps.badge).toBe(0);
+    expect(apnsPayload({ title: "t", body: "b", url: "/", badge: 5000 }).aps.badge).toBe(999);
+    expect("badge" in apnsPayload({ title: "t", body: "b", url: "/" }).aps).toBe(false);
+    expect("badge" in apnsPayload({ title: "t", body: "b", url: "/", badge: -1 }).aps).toBe(false);
+  });
+});
+
 describe("sendApns", () => {
   const resposta = (status: number, corpo?: unknown) => new Response(corpo ? JSON.stringify(corpo) : null, { status });
 

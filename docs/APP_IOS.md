@@ -27,6 +27,11 @@ que a Apple recusa (regra 4.2):
 | Partilhar | Folha de partilha nativa | `lib/nativeShare.js` |
 | PDFs da biblioteca | Folha do Safari por cima do app (guarda em Ficheiros ou Livros) | `DigitalLibrary.jsx` |
 | Barra de estado | Clara na loja, escura no painel branco | `NativeAppBridge.jsx` |
+| Deslizar para voltar | Do bordo esquerdo, como no Safari | `MainViewController.swift` |
+| Puxar para actualizar | Recarrega; com alterações por gravar avisa e não perde nada; numa janela aberta não faz nada | `MainViewController.swift`, `NativeAppBridge.jsx` |
+| Arranque sem clarão branco | O logotipo fica até o site pintar (no máximo 10 s) | `capacitor.config.json`, `main.jsx` |
+| Vibração leve | Ao juntar ao carrinho | `useCart.jsx` |
+| Número no ícone | Os avisos por ler da conta; com o app fechado, vem em cada notificação | `AparelhoPlugin.swift`, `apns.ts` |
 
 ## O que muda no site quando está no app
 
@@ -146,6 +151,11 @@ Em App Store Connect → a app → a versão:
 6. Uma edição digital não aparece para compra; o impresso compra-se até ao fim.
 
 ## Mudar a casca
+
+- **Os plugins chegam ao site embrulhados** (`semThen` em `lib/nativeApp.js`). O plugin do Capacitor
+  é um Proxy que responde a `then`; devolvido por uma função `async`, o `await` ficava pendurado
+  para sempre. Plugin novo: carregar sempre por `plugin()` ou `pluginDoApp()` desse ficheiro
+  (`nativeApp.capacitor.test.js` prova-o com o Capacitor verdadeiro).
 
 - **Plugins npm** (`app/ios/package.json`): depois de juntar um, `npm install` na raiz e
   `cd app/ios && npx cap sync ios`; o `Package.swift` do `CapApp-SPM` actualiza-se sozinho.

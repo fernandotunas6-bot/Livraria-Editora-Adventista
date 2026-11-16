@@ -1230,9 +1230,17 @@ async function sendUserPush(userId: string, settings: Row | null, payload: { tit
   if (!subs?.length) return 0;
   const sender = await pushSender(settings);
   if (!sender) return 0;
+  // No iPhone, o número no ícone do app: os avisos por ler da conta (customer_notifications).
+  let badge: number | undefined;
+  if (sender.apns && subs.some((sub: Row) => apnsTokenOf(sub.endpoint))) {
+    const { count } = await db.from("customer_notifications").select("id", { count: "exact", head: true })
+      .eq("customer_id", userId).is("read_at", null);
+    if (typeof count === "number") badge = count;
+  }
   let sent = 0;
   for (const sub of subs) {
-    if (await pushToSubscription(sender, sub, payload) === "sent") sent++;
+    const comNumero = badge !== undefined && apnsTokenOf(sub.endpoint) ? { ...payload, badge } : payload;
+    if (await pushToSubscription(sender, sub, comNumero) === "sent") sent++;
   }
   return sent;
 }

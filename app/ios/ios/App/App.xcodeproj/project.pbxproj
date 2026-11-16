@@ -19,6 +19,7 @@
 		A1A5E0012F00000100AA0002 /* AppleSignInPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0001 /* AppleSignInPlugin.swift */; };
 		A1A5E0012F00000100AA0004 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0003 /* MainViewController.swift */; };
 		A1A5E0012F00000100AA0007 /* WebAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */; };
+		A1A5E0012F00000100AA0009 /* AparelhoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 		A1A5E0012F00000100AA0003 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA0005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuthPlugin.swift; sourceTree = "<group>"; };
+		A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AparelhoPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +77,7 @@
 				A1A5E0012F00000100AA0003 /* MainViewController.swift */,
 				A1A5E0012F00000100AA0001 /* AppleSignInPlugin.swift */,
 				A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */,
+				A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */,
 				A1A5E0012F00000100AA0005 /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -174,6 +177,7 @@
 				A1A5E0012F00000100AA0004 /* MainViewController.swift in Sources */,
 				A1A5E0012F00000100AA0002 /* AppleSignInPlugin.swift in Sources */,
 				A1A5E0012F00000100AA0007 /* WebAuthPlugin.swift in Sources */,
+				A1A5E0012F00000100AA0009 /* AparelhoPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

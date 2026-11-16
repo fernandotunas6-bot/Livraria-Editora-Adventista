@@ -27,7 +27,8 @@ export type ApnsConfig = {
   host: string;
 };
 
-export type PushPayload = { title: string; body: string; url: string; tag?: string };
+/** `badge`: o número no ícone do app (os avisos por ler); sem ele o número não muda. */
+export type PushPayload = { title: string; body: string; url: string; tag?: string; badge?: number };
 
 /** Um token de aparelho do APNs: hexadecimal, número par de algarismos (hoje 64). */
 export function isApnsToken(value: unknown): boolean {
@@ -65,6 +66,7 @@ export function apnsPayload(payload: PushPayload) {
       alert: { title: String(payload.title || "Livraria Adventista").slice(0, 120), body: String(payload.body || "").slice(0, 400) },
       sound: "default",
       ...(payload.tag ? { "thread-id": String(payload.tag).slice(0, 64) } : {}),
+      ...(Number.isInteger(payload.badge) && (payload.badge as number) >= 0 ? { badge: Math.min(payload.badge as number, 999) } : {}),
     },
     url: String(payload.url || "/"),
   };

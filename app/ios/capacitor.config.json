@@ -19,6 +19,13 @@
         "sound",
         "alert"
       ]
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 10000,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
     }
   }
 }

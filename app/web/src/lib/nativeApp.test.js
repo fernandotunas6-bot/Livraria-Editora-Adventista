@@ -2,10 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const browserOpen = vi.fn(async () => {});
 vi.mock('@capacitor/browser', () => ({ Browser: { open: browserOpen } }));
+const splashHide = vi.fn(async () => {});
+vi.mock('@capacitor/splash-screen', () => ({ SplashScreen: { hide: splashHide } }));
+const impact = vi.fn(async () => {});
+vi.mock('@capacitor/haptics', () => ({ Haptics: { impact } }));
+const numeroNoIconeNativo = vi.fn(async () => {});
+vi.mock('@capacitor/core', () => ({ registerPlugin: () => ({ numeroNoIcone: numeroNoIconeNativo }) }));
 
 const {
   REGRESSO_DO_LOGIN, abrirNoNavegadorDoApp, caminhoDaLigacao, eAppIos, eAppNativa, eRegressoDoLogin,
-  estiloDaBarraDeEstado, plataformaNativa,
+  esconderArranque, estiloDaBarraDeEstado, numeroNoIcone, plataformaNativa, vibrar,
 } = await import('./nativeApp');
 
 /** O que o Capacitor injecta no WKWebView do app. */
@@ -13,7 +19,7 @@ const capacitorIos = () => ({ isNativePlatform: () => true, getPlatform: () => '
 
 afterEach(() => {
   delete window.Capacitor;
-  browserOpen.mockClear();
+  vi.clearAllMocks();
 });
 
 describe('o site dentro do app', () => {
@@ -93,5 +99,34 @@ describe('abrirNoNavegadorDoApp', () => {
     expect(browserOpen).toHaveBeenCalledWith({ url: 'https://x/livro.pdf', presentationStyle: 'popover' });
     browserOpen.mockRejectedValueOnce(new Error('não'));
     expect(await abrirNoNavegadorDoApp('https://x/livro.pdf')).toBe(false);
+  });
+});
+
+describe('arranque, vibração e número no ícone', () => {
+  it('fora do app não chamam nada', async () => {
+    await esconderArranque();
+    await vibrar();
+    await numeroNoIcone(3);
+    expect(splashHide).not.toHaveBeenCalled();
+    expect(impact).not.toHaveBeenCalled();
+    expect(numeroNoIconeNativo).not.toHaveBeenCalled();
+  });
+
+  it('no app iOS', async () => {
+    window.Capacitor = capacitorIos();
+    await esconderArranque();
+    expect(splashHide).toHaveBeenCalledWith({ fadeOutDuration: 250 });
+    await vibrar();
+    expect(impact).toHaveBeenCalledWith({ style: 'LIGHT' });
+    await numeroNoIcone(4.7);
+    expect(numeroNoIconeNativo).toHaveBeenCalledWith({ numero: 4 });
+    await numeroNoIcone(-2);
+    expect(numeroNoIconeNativo).toHaveBeenLastCalledWith({ numero: 0 });
+  });
+
+  it('um plugin que falha não estraga o site', async () => {
+    window.Capacitor = capacitorIos();
+    impact.mockRejectedValueOnce(new Error('sem motor'));
+    await expect(vibrar()).resolves.toBeUndefined();
   });
 });

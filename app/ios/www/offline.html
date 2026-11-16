@@ -97,6 +97,14 @@
   botao.addEventListener('click', voltar);
   // A rede voltou: abre sozinho.
   window.addEventListener('online', voltar);
+  // Puxar para actualizar (MainViewController.swift) também tenta outra vez.
+  window.addEventListener('livraria:puxar-para-actualizar', voltar);
+
+  // O ecrã de arranque fica até o site pintar; aqui não há site, por isso esconde-se já.
+  try {
+    var plugins = window.Capacitor && window.Capacitor.Plugins;
+    if (plugins && plugins.SplashScreen) plugins.SplashScreen.hide({ fadeOutDuration: 150 }).catch(function () {});
+  } catch (e) { /* sem ponte nativa: nada a esconder */ }
 </script>
 </body>
 </html>
