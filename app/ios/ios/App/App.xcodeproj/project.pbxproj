@@ -21,6 +21,7 @@
 		A1A5E0012F00000100AA0007 /* WebAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */; };
 		A1A5E0012F00000100AA0009 /* AparelhoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */; };
 		A1A5E0012F00000100AA000B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */; };
+		A1A5E0012F00000100AA000D /* TrajetoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA000C /* TrajetoPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuthPlugin.swift; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AparelhoPlugin.swift; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1A5E0012F00000100AA000C /* TrajetoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrajetoPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +82,7 @@
 				A1A5E0012F00000100AA0001 /* AppleSignInPlugin.swift */,
 				A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */,
 				A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */,
+				A1A5E0012F00000100AA000C /* TrajetoPlugin.swift */,
 				A1A5E0012F00000100AA0005 /* App.entitlements */,
 				A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
@@ -182,6 +185,7 @@
 				A1A5E0012F00000100AA0002 /* AppleSignInPlugin.swift in Sources */,
 				A1A5E0012F00000100AA0007 /* WebAuthPlugin.swift in Sources */,
 				A1A5E0012F00000100AA0009 /* AparelhoPlugin.swift in Sources */,
+				A1A5E0012F00000100AA000D /* TrajetoPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

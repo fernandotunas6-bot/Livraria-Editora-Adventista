@@ -32,6 +32,7 @@ que a Apple recusa (regra 4.2):
 | Arranque sem clarão branco | O logotipo fica até o site pintar (no máximo 10 s) | `capacitor.config.json`, `main.jsx` |
 | Vibração leve | Ao juntar ao carrinho | `useCart.jsx` |
 | Número no ícone | Os avisos por ler da conta; com o app fechado, vem em cada notificação | `AparelhoPlugin.swift`, `apns.ts` |
+| Trajeto com o ecrã apagado | Quem entrega partilha a posição em segundo plano até à entrega | `TrajetoPlugin.swift`, `lib/trajetoNativo.js` ([TRAJETO_GPS.md](TRAJETO_GPS.md)) |
 
 ## O que muda no site quando está no app
 
@@ -54,8 +55,6 @@ nada disto acontece e nenhum código do app é descarregado.
 
 ## O que fica de fora do app (por agora)
 
-- O trajecto do colportor com o ecrã desligado (GPS em segundo plano) precisa de um plugin nativo
-  próprio. No app funciona como no site: com a página aberta.
 - Os links de email do Supabase (confirmar conta, nova palavra-passe) passam primeiro pelo Supabase
   e acabam no Safari, não no app. A conta fica confirmada na mesma.
 

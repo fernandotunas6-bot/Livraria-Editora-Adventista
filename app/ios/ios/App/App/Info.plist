@@ -38,13 +38,17 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>A localização serve para mostrar as lojas mais perto, marcar o ponto de entrega das encomendas e, a quem entrega, partilhar o trajecto com o cliente.</string>
+	<string>A localização serve para mostrar as lojas mais perto, marcar o ponto de entrega das encomendas e, a quem entrega, partilhar o trajeto com o cliente até à entrega, mesmo com o ecrã apagado.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>A câmara serve para tirar a fotografia do perfil e, à equipa, as fotografias que carrega no painel (capas, lojas, documentos).</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>As fotografias servem para escolher a imagem do perfil e, à equipa, as imagens que carrega no painel (capas, lojas, documentos).</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>O microfone só é usado quando a equipa grava a narração dos vídeos dos relatórios.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

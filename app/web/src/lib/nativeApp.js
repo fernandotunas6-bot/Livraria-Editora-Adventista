@@ -66,7 +66,7 @@ export const pluginHaptics = () => plugin(() => import('@capacitor/haptics'), 'H
 
 /** Plugins que vivem no próprio app (app/ios/ios/App/App/*.swift), registados uma vez. */
 const pluginsDoApp = new Map();
-async function pluginDoApp(nome) {
+export async function pluginDoApp(nome) {
   if (!eAppIos()) return null;
   if (pluginsDoApp.has(nome)) return pluginsDoApp.get(nome);
   try {

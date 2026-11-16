@@ -7,6 +7,9 @@ import {
   ON_THE_WAY, accuracyLabel, ageLabel, distanceLabel, etaLabel, loadRouteInfo, navigationLinks, sharePosition,
   shouldSendPosition, stopSharing,
 } from '@/lib/deliveryTracking';
+import {
+  estadoDoTrajetoNativo, iniciarTrajetoNativo, ouvirTrajetoNativo, pararTrajetoNativo, trajetoNativoDisponivel,
+} from '@/lib/trajetoNativo';
 
 const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
 
@@ -22,6 +25,9 @@ const etaFromKm = (km) => (km === null ? null : Math.max(1, Math.round(((km * 1.
  * Maps, Waze). Enquanto a encomenda vai a caminho, partilha a posição com o cliente: o GPS do
  * telemóvel manda-a de 10 em 10 segundos quando anda, e o ecrã fica ligado (Wake Lock) para a
  * partilha não parar. Fechar a página pára de mandar; o cliente vê "última posição há X min".
+ *
+ * Dentro do app iOS (lib/trajetoNativo.js) é o iPhone que lê o GPS e manda a posição: continua com
+ * o ecrã apagado, noutra página ou noutra app, até à entrega ou a «Parar de partilhar».
  */
 export default function CourierShare({ orderId, deliveryStatus, compact = false }) {
   const { toast } = useToast();
@@ -36,6 +42,9 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
   const lastSent = useRef(null);
   const sendingRef = useRef(false);
   const lockRef = useRef(null);
+  // No app iOS: o iPhone partilha sozinho; aqui só se ouve o que ele vai fazendo.
+  const [noApp, setNoApp] = useState(false);
+  const ouvirRef = useRef(null);
 
   const onTheWay = ON_THE_WAY.includes(deliveryStatus);
 
@@ -66,6 +75,9 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
     if (watchRef.current !== null) navigator.geolocation?.clearWatch(watchRef.current);
     watchRef.current = null;
     releaseLock();
+    ouvirRef.current?.();
+    ouvirRef.current = null;
+    pararTrajetoNativo();
     setSharing(false);
     if (tell) {
       try { await stopSharing(orderId); } catch { /* fica parada do lado de cá */ }
@@ -73,10 +85,42 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
   }, [orderId]);
 
   // Sair da página pára o GPS (sem avisar o servidor: o cliente vê "última posição há X min").
+  // No app não: o iPhone continua a partilhar, e aqui só se deixa de ouvir.
   useEffect(() => () => {
     if (watchRef.current !== null) navigator.geolocation?.clearWatch(watchRef.current);
     releaseLock();
+    ouvirRef.current?.();
+    ouvirRef.current = null;
   }, []);
+
+  // O que o iPhone conta: as leituras do GPS, os envios, os erros e o fim da partilha.
+  const ouvintesNativos = useCallback(() => ({
+    leitura: ({ lat, lng, accuracy }) => setFix({ lat, lng, accuracy, heading: null, speed: null }),
+    enviado: ({ quando }) => { setSentAt(Number(quando) || Date.now()); setError(''); },
+    erro: ({ mensagem }) => setError(mensagem || 'A posição não seguiu.'),
+    terminou: ({ mensagem }) => {
+      ouvirRef.current?.();
+      ouvirRef.current = null;
+      setSharing(false);
+      toast({ title: 'A partilha terminou', description: mensagem || undefined });
+    },
+  }), [toast]);
+
+  // No app: a partilha pode já correr desde antes (saiu-se da página e voltou-se).
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      if (!await trajetoNativoDisponivel() || !vivo) return;
+      setNoApp(true);
+      const estado = await estadoDoTrajetoNativo();
+      if (!vivo || !estado.activa || estado.encomenda !== String(orderId)) return;
+      setSharing(true);
+      if (estado.enviadoEm) setSentAt(Number(estado.enviadoEm));
+      const parar = await ouvirTrajetoNativo(ouvintesNativos());
+      if (vivo) ouvirRef.current = parar; else parar();
+    })().catch(() => {});
+    return () => { vivo = false; };
+  }, [orderId, ouvintesNativos]);
 
   // A encomenda foi entregue ou cancelada: parar.
   useEffect(() => {
@@ -111,7 +155,22 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
     }
   };
 
+  const startNativo = async () => {
+    setError('');
+    setSharing(true);
+    try {
+      ouvirRef.current = await iniciarTrajetoNativo(orderId, ouvintesNativos());
+    } catch (err) {
+      setSharing(false);
+      toast({ variant: 'destructive', title: 'Não foi possível partilhar', description: err.message });
+    }
+  };
+
   const start = () => {
+    if (noApp) {
+      startNativo();
+      return;
+    }
     if (!navigator.geolocation) {
       toast({ variant: 'destructive', title: 'Este aparelho não dá a localização.' });
       return;
@@ -189,7 +248,11 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
                 ? <>O cliente vê-o no mapa · GPS {accuracyLabel(fix.accuracy)}{sentAt ? ` · enviado ${ageLabel((Date.now() - sentAt) / 1000)}` : ''}.</>
                 : <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" aria-hidden="true" />À espera do GPS…</>}
             </p>
-            <p className="text-[11px] text-muted-foreground">Deixe esta página aberta durante a entrega: fechar pára a partilha.</p>
+            <p className="text-[11px] text-muted-foreground">
+              {noApp
+                ? 'Pode apagar o ecrã ou mudar de app: o trajeto continua a seguir até à entrega (indicador azul no topo).'
+                : 'Deixe esta página aberta durante a entrega: fechar pára a partilha.'}
+            </p>
             <Button type="button" size="sm" variant="outline" onClick={() => stop(true)}>
               <Square className="mr-1.5 h-4 w-4" aria-hidden="true" /> Parar de partilhar
             </Button>

@@ -10,6 +10,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AppleSignInPlugin())
         bridge?.registerPluginInstance(WebAuthPlugin())
         bridge?.registerPluginInstance(AparelhoPlugin())
+        bridge?.registerPluginInstance(TrajetoPlugin())
 
         guard let webView = webView else { return }
 
