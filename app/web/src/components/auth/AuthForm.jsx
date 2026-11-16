@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { HAD_ACCOUNT_KEY, rememberedFirstName, validateAuthForm } from '@/lib/authPrompt';
 import { normalizeLoginEmail } from '@/lib/pbAuth';
+import { eAppIos } from '@/lib/nativeApp';
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5 mr-2 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -19,6 +20,16 @@ const GoogleIcon = () => (
     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
   </svg>
 );
+
+// O logotipo da Apple, como o botão «Iniciar sessão com a Apple» das regras da Apple o pede.
+const AppleIcon = () => (
+  <svg className="h-5 w-5 mr-2 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
+  </svg>
+);
+
+/** A pessoa fechou a folha de login da Google ou da Apple (lib/nativeAuth.js). */
+const cancelado = (err) => err?.code === 'CANCELLED';
 
 /**
  * Entrar ou criar conta: o mesmo formulário na página /login e no modal.
@@ -68,8 +79,10 @@ export default function AuthForm({
   const [passwordOpen, setPasswordOpen] = useState(false);
   const passwordRef = useRef(null);
   const emailRef = useRef(null);
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, loginWithApple } = useAuth();
   const { settings } = useSiteSettings();
+  // Dentro do app iOS, «Continuar com a Apple» (a Apple obriga-o onde há login com a Google).
+  const [appleNoApp] = useState(() => eAppIos());
 
   const usingAccount = mode === 'login' && !!account;
   const googleFirst = usingAccount && account.provider === 'google' && !!settings.google_oauth_enabled;
@@ -160,12 +173,37 @@ export default function AuthForm({
   const handleGoogle = async () => {
     setLoading(true);
     try {
-      // Sai para a Google e volta já com a sessão, à página onde a pessoa estava.
-      await loginWithGoogle(returnPath || '/profile', { loginHint: usingAccount ? account.email : '' });
+      // Sai para a Google e volta já com a sessão, à página onde a pessoa estava. No app, o login
+      // faz-se por cima da página e volta aqui com a conta, como depois da palavra-passe.
+      const result = await loginWithGoogle(returnPath || '/profile', { loginHint: usingAccount ? account.email : '' });
+      if (result?.record) {
+        toast.success('Sessão iniciada', { description: `Bem-vindo, ${result.record.name || 'leitor'}!` });
+        setLoading(false);
+        onDone?.(result.record);
+      }
     } catch (err) {
-      toast.error('Google não disponível', {
-        description: err?.message || 'Tente com o email e a palavra-passe.',
-      });
+      if (!cancelado(err)) {
+        toast.error('Google não disponível', {
+          description: err?.message || 'Tente com o email e a palavra-passe.',
+        });
+      }
+      setLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setLoading(true);
+    try {
+      const result = await loginWithApple();
+      toast.success('Sessão iniciada', { description: `Bem-vindo, ${result.record?.name || 'leitor'}!` });
+      setLoading(false);
+      onDone?.(result.record);
+    } catch (err) {
+      if (!cancelado(err)) {
+        toast.error('Não foi possível entrar com a Apple', {
+          description: err?.message || 'Tente outra vez ou use o email e a palavra-passe.',
+        });
+      }
       setLoading(false);
     }
   };
@@ -183,6 +221,20 @@ export default function AuthForm({
     >
       <GoogleIcon />
       {label}
+    </Button>
+  );
+
+  // Preto, com o logotipo e do tamanho do da Google, como as regras da Apple pedem.
+  const appleButton = (
+    <Button
+      type="button"
+      className="w-full py-6 bg-black text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
+      onClick={handleApple}
+      disabled={loading}
+      data-login-apple=""
+    >
+      <AppleIcon />
+      Continuar com a Apple
     </Button>
   );
 
@@ -228,9 +280,11 @@ export default function AuthForm({
         </div>
       )}
 
-      {settings.google_oauth_enabled && !googleFirst && (
+      {(settings.google_oauth_enabled || appleNoApp) && !googleFirst && (
         <>
-          {googleButton('Continuar com Google')}
+          {appleNoApp && appleButton}
+          {appleNoApp && settings.google_oauth_enabled && <div className="h-3" />}
+          {settings.google_oauth_enabled && googleButton('Continuar com Google')}
           {mode === 'signup' && (
             <p className="mt-2 text-center text-[11px] text-muted-foreground">O mais rápido: sem palavra-passe nova e sem esperar por email.</p>
           )}

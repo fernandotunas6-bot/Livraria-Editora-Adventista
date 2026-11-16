@@ -54,16 +54,25 @@ export const pluginShare = () => plugin(() => import('@capacitor/share'), 'Share
 export const pluginPush = () => plugin(() => import('@capacitor/push-notifications'), 'PushNotifications');
 export const pluginStatusBar = () => plugin(() => import('@capacitor/status-bar'), 'StatusBar');
 
-/** O plugin da Apple vive no próprio app (app/ios/ios/App/App/AppleSignInPlugin.swift). */
-export async function pluginAppleSignIn() {
+/** Plugins que vivem no próprio app (app/ios/ios/App/App/*.swift), registados uma vez. */
+const pluginsDoApp = new Map();
+async function pluginDoApp(nome) {
   if (!eAppIos()) return null;
+  if (pluginsDoApp.has(nome)) return pluginsDoApp.get(nome);
   try {
     const { registerPlugin } = await import('@capacitor/core');
-    return registerPlugin('AppleSignIn');
+    const p = registerPlugin(nome);
+    pluginsDoApp.set(nome, p);
+    return p;
   } catch {
     return null;
   }
 }
+
+/** «Iniciar sessão com a Apple» (AppleSignInPlugin.swift). */
+export const pluginAppleSignIn = () => pluginDoApp('AppleSignIn');
+/** Login no navegador do sistema, para a Google (WebAuthPlugin.swift). */
+export const pluginWebAuth = () => pluginDoApp('WebAuth');
 
 /**
  * Para onde vai uma ligação que abriu o app: o caminho do site (`/track?x=1`) para uma ligação
