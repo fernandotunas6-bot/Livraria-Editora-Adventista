@@ -48,7 +48,11 @@ import { Switch } from '@/components/ui/switch';
 import { getPaymentMethods } from '@/api/PlatformApi';
 import { getProduct } from '@/api/EcommerceApi';
 import { isPaidUpfront } from '@/lib/paymentMethods';
-import { appUpdatesWanted, isPushSupported, setAppUpdatesPush, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
+import {
+  appUpdatesWanted, desligarPushNativo, isPushSupported, permissaoDoPushNativo, pushDisponivel, setAppUpdatesPush, subscribeToPush,
+  requestPushPermission,
+} from '@/lib/pushNotifications';
+import { eAppIos } from '@/lib/nativeApp';
 import { ROLES } from '@/lib/permissions';
 import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
 import { kwanza } from '@/lib/money';
@@ -184,6 +188,13 @@ const ProfilePage = () => {
   );
   const [movingToCart, setMovingToCart] = useState('');
   const [appUpdates, setAppUpdates] = useState(() => appUpdatesWanted());
+  // No app iOS a permissão é a do iPhone (o WKWebView não tem `Notification`).
+  useEffect(() => {
+    if (!eAppIos()) return undefined;
+    let vivo = true;
+    permissaoDoPushNativo().then((p) => { if (vivo) setPushEnabled(p === 'granted'); });
+    return () => { vivo = false; };
+  }, []);
 
   const handleAppUpdatesToggle = async (enabled) => {
     setAppUpdates(enabled);
@@ -201,7 +212,7 @@ const ProfilePage = () => {
       toast({ variant: 'destructive', title: 'Não suportado', description: 'O seu browser não suporta notificações push.' });
       return;
     }
-    if (!settings?.push_enabled || !settings?.vapid_public_key) {
+    if (!pushDisponivel(settings)) {
       toast({ variant: 'destructive', title: 'Indisponível', description: 'Notificações push não estão activas na loja.' });
       return;
     }
@@ -210,13 +221,23 @@ const ProfilePage = () => {
       if (enabled) {
         const perm = await requestPushPermission();
         if (perm !== 'granted') {
-          toast({ variant: 'destructive', title: 'Permissão negada', description: 'Active notificações nas definições do browser.' });
+          toast({
+            variant: 'destructive',
+            title: 'Permissão negada',
+            description: eAppIos()
+              ? 'Active as notificações em Definições do iPhone → Livraria Adventista → Notificações.'
+              : 'Active notificações nas definições do browser.',
+          });
           setPushEnabled(false);
           return;
         }
         await subscribeToPush(settings.vapid_public_key);
         setPushEnabled(true);
         toast({ title: 'Notificações activadas', description: 'Receberá alertas de encomendas e novidades.' });
+      } else if (eAppIos()) {
+        await desligarPushNativo();
+        setPushEnabled(false);
+        toast({ title: 'Notificações desactivadas' });
       } else {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();

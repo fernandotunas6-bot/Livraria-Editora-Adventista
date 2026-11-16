@@ -147,6 +147,8 @@ describe("o registo das rotas no index.ts", () => {
       "POST /order-feedback",
       "POST /order/cancel",
       "POST /order/payment-reference",
+      "POST /push/native/subscribe",
+      "POST /push/native/unsubscribe",
       "POST /push/subscribe",
       "POST /recommendations",
       "POST /telemetria",
