@@ -4,7 +4,8 @@ Um navegador a sério (Chromium, pelo Playwright) faz o caminho de quem compra: 
 carrinho → dados e pagamento → página de sucesso → rastreio → confirmação de recepção
 (`compra.spec.js`). À parte, `lojas.spec.js` cobre a página das lojas físicas, onde o que
 interessa provar no navegador são as fotografias: que abrem em grande e que não são
-descarregadas em tamanho grande sem necessidade. Corre em dois tamanhos, computador e telemóvel
+descarregadas em tamanho grande sem necessidade. `app-ios.spec.js` finge o app iOS (o `window.Capacitor` que a casca injecta) e prova o que o
+site muda lá: a edição digital fora de venda e o botão «Continuar com a Apple». Corre em dois tamanhos, computador e telemóvel
 (`playwright.config.js`).
 
 ```bash

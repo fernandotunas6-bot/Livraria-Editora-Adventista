@@ -55,7 +55,9 @@ export default function NativeAppBridge() {
       });
       if (!vivo) { h.remove(); return; }
       ouvinte = h;
-    })();
+    })().catch(() => {
+      // Plugin em falta numa versão antiga do app: o site funciona sem isto.
+    });
     return () => {
       vivo = false;
       ouvinte?.remove();
@@ -98,7 +100,9 @@ export default function NativeAppBridge() {
         // Sem armazenamento: segue-se a ligação na mesma.
       }
       if (!jaSeguida) seguir(inicial.url);
-    })();
+    })().catch(() => {
+      // Plugin em falta numa versão antiga do app: o site funciona sem isto.
+    });
 
     return () => {
       vivo = false;

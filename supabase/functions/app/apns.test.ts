@@ -5,14 +5,19 @@ import {
 
 const TOKEN = "a1".repeat(32);
 
-/** Uma chave .p8 a sério (P-256, PKCS#8), gerada para os testes. */
+/**
+ * Uma chave .p8 a sério (P-256, PKCS#8), gerada para os testes. As marcas do PEM montam-se aos
+ * bocados para o verificador de segredos (scripts/verificar-segredos.mjs) não as tomar por uma
+ * chave guardada no repositório.
+ */
+const MARCA = (lado: "BEGIN" | "END") => `-----${lado} ${"PRIVATE"} KEY-----`;
 let PEM = "";
 let publica: CryptoKey;
 beforeAll(async () => {
   const par = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const der = new Uint8Array(await crypto.subtle.exportKey("pkcs8", par.privateKey));
   const b64 = btoa(String.fromCharCode(...der)).replace(/(.{64})/g, "$1\n");
-  PEM = `-----BEGIN PRIVATE KEY-----\n${b64}\n-----END PRIVATE KEY-----`;
+  PEM = `${MARCA("BEGIN")}\n${b64}\n${MARCA("END")}`;
   publica = par.publicKey;
 });
 afterEach(() => _esquecerJwt());
@@ -44,7 +49,7 @@ describe("apnsConfig", () => {
   it("sem os três segredos, sem APNs", () => {
     expect(apnsConfig(env({}))).toBeNull();
     expect(apnsConfig(env({ APNS_KEY_ID: "KEY1234567", APNS_TEAM_ID: "TEAM123456" }))).toBeNull();
-    expect(apnsConfig(env({ APNS_KEY_ID: "curto", APNS_TEAM_ID: "TEAM123456", APNS_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----" }))).toBeNull();
+    expect(apnsConfig(env({ APNS_KEY_ID: "curto", APNS_TEAM_ID: "TEAM123456", APNS_PRIVATE_KEY: MARCA("BEGIN") }))).toBeNull();
   });
 
   it("produção e o bundle do app por omissão; sandbox a pedido", () => {

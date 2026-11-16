@@ -251,6 +251,7 @@ O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), i
 - **Selector geográfico** — províncias, municípios e localidades de Angola (com fallback offline)
 - **Tema da loja** — cores de marca, glass morphism e fundos gradiente/imagem/vídeo/slides
 - **PWA** — instalável no telemóvel com manifest e service worker
+- **App iOS** — o próprio site dentro de uma casca nativa (Capacitor): notificações do iPhone, login com a Google e com a Apple, ligações que abrem no app; compila-se no GitHub Actions e vai para o TestFlight sem Mac ([docs/APP_IOS.md](docs/APP_IOS.md))
 - **Livros digitais** — só abrem com a encomenda paga (pagamento confirmado pelo gateway ou pela equipa); biblioteca do cliente com o estado de cada livro e painel de acessos para a equipa ([docs/LIVROS_DIGITAIS.md](docs/LIVROS_DIGITAIS.md))
 - **Telemóvel** — a sessão não cai ao abrir sem rede, a app entra sozinha com a palavra-passe guardada no navegador (Chrome/Android), o ecrã de entrada identifica a conta lembrada, e a app avisa quando há uma versão nova; as novidades de cada versão ficam em `/novidades` e podem ser anunciadas por push a todos os aparelhos (painel → Versões da app)
 - **Permissões** — roles `admin`, `manager` e `member` com controlo granular no admin
@@ -264,6 +265,8 @@ Cada push para `main` publica automaticamente:
 - **Frontend** → Cloudflare Pages (`.github/workflows/deploy-cloudflare.yml`)
 - **Migrações e Edge Function** → Supabase (`.github/workflows/deploy-supabase.yml`, só quando `supabase/` muda)
 
+O **app iOS** compila-se à parte, à mão ou com uma etiqueta `ios-v*` (`.github/workflows/ios.yml` → TestFlight).
+
 Configuração no GitHub (Settings → Secrets and variables → Actions). Num repositório novo isto tem de ser criado à mão — ver [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md):
 
 | Tipo | Nome | Valor |
@@ -276,6 +279,8 @@ Configuração no GitHub (Settings → Secrets and variables → Actions). Num r
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare |
 | Secret | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase |
 | Secret | `SUPABASE_DB_PASSWORD` | Palavra-passe da base de dados |
+| Variável | `APPLE_TEAM_ID` | Team ID da Apple: ligações do site no app iOS e build do app ([docs/APP_IOS.md](docs/APP_IOS.md)) |
+| Secret | `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_P8` | Chave da App Store Connect para enviar o app iOS ao TestFlight |
 
 O ficheiro `app/web/public/_redirects` encaminha todas as rotas para `index.html` (SPA).
 
