@@ -55,6 +55,7 @@ const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx')
 const ColporteurVerifyPage = lazy(() => import('@/pages/ColporteurVerifyPage.jsx'));
 const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
+const AppDownloadPage = lazy(() => import('@/pages/AppDownloadPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 // "Nova versão disponível — Actualizar" e "App actualizada" (lib/appVersion.js).
@@ -266,6 +267,10 @@ function App() {
               <Route path="/materiais" element={<MaterialsPage />} />
               <Route path="/novidades" element={<NovidadesPage />} />
               <Route path="/versoes" element={<Navigate to="/novidades" replace />} />
+              <Route path="/app" element={<AppDownloadPage />} />
+              <Route path="/descarregar" element={<Navigate to="/app" replace />} />
+              <Route path="/download" element={<Navigate to="/app" replace />} />
+              <Route path="/aplicacao" element={<Navigate to="/app" replace />} />
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />

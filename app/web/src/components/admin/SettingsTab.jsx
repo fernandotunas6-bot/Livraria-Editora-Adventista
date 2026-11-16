@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Save, Mail, Bell, Sparkles, RotateCcw } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
+import { ligacaoDaApp } from '@/lib/appDownload';
 import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
 import { embedOnlyVideoPlatform } from '@/lib/videoUrl';
 import { useToast } from '@/hooks/use-toast';
@@ -83,6 +84,8 @@ const empty = {
   pwa_enabled: true,
   pwa_name: '',
   pwa_short_name: 'Livraria',
+  app_android_url: '',
+  app_ios_url: '',
   pwa_theme_color: '#0c4a6e',
   shipping_free_threshold: 20000,
   shipping_cost: 1500,
@@ -174,6 +177,8 @@ export default function SettingsTab() {
   // enviado: um pedido com uma coluna que não existe é recusado pelo PostgREST inteiro, e a
   // equipa ficava sem gravar configuração nenhuma. É o mesmo padrão das colunas abaixo.
   const [hasYoutube, setHasYoutube] = useState(false);
+  // As ligações para descarregar os apps (migração `ligacoes_dos_apps`, página /app do site).
+  const [hasAppLinks, setHasAppLinks] = useState(false);
   const [hasAboutImages, setHasAboutImages] = useState(false);
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
@@ -198,6 +203,7 @@ export default function SettingsTab() {
         const r = list[0];
         setRecordId(r.id);
         setHasYoutube(hasColumn(r, 'youtube'));
+        setHasAppLinks(hasColumn(r, 'app_android_url'));
         setHasAboutImages(hasColumn(r, 'about_top_image_url'));
         setHasAboutTeam(hasColumn(r, 'about_team'));
         setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
@@ -231,6 +237,8 @@ export default function SettingsTab() {
           pwa_enabled: !!r.pwa_enabled,
           pwa_name: r.pwa_name || '',
           pwa_short_name: r.pwa_short_name || 'Livraria',
+          app_android_url: r.app_android_url || '',
+          app_ios_url: r.app_ios_url || '',
           pwa_theme_color: r.pwa_theme_color || '#0c4a6e',
           shipping_free_threshold: r.shipping_free_threshold ?? 20000,
           shipping_cost: r.shipping_cost ?? 1500,
@@ -364,6 +372,11 @@ export default function SettingsTab() {
       toast({ title: 'A enviar imagem…', description: 'Aguarde que o envio termine e guarde de novo.' });
       return;
     }
+    // Uma ligação mal escrita não se grava a meio: ia para o botão «Descarregar» da página /app.
+    if (hasAppLinks && [form.app_android_url, form.app_ios_url].some((v) => String(v || '').trim() && !ligacaoDaApp(v))) {
+      toast({ variant: 'destructive', title: 'Ligação dos apps inválida', description: 'Em PWA / telemóvel, as ligações para descarregar têm de começar por https://' });
+      return;
+    }
     setSaving(true);
     try {
       const data = {
@@ -436,6 +449,10 @@ export default function SettingsTab() {
             .filter((m) => m.name),
         }],
         [hasYoutube, { youtube: (form.youtube || '').trim() }],
+        [hasAppLinks, {
+          app_android_url: ligacaoDaApp(form.app_android_url),
+          app_ios_url: ligacaoDaApp(form.app_ios_url),
+        }],
         [hasFloating, {
           chat_hidden_on: hiddenPages(form, 'chat'),
           scroll_top_hidden_on: hiddenPages(form, 'top'),
@@ -702,6 +719,37 @@ export default function SettingsTab() {
               <Input value={form.pwa_theme_color} onChange={(e) => set('pwa_theme_color', e.target.value)} className="font-mono" />
             </div>
           </div>
+
+          {hasAppLinks && (
+            <div className="space-y-4 border-t pt-4" data-ligacoes-dos-apps>
+              <div>
+                <h3 className="text-lg font-semibold">Apps para descarregar</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para onde vão os botões da página <a href="/app" target="_blank" rel="noreferrer" className="font-medium text-primary underline">/app</a> («Descarregar a app»).
+                  Sem ligação, a página oferece a instalação da app web, como até aqui.
+                </p>
+              </div>
+              {[
+                ['app_android_url', 'app-android', 'Android', 'O APK publicado no GitHub ou a página da Google Play.', 'https://github.com/…/releases/latest/download/livraria-adventista.apk'],
+                ['app_ios_url', 'app-ios', 'iPhone e iPad', 'A página da App Store ou o convite público do TestFlight.', 'https://apps.apple.com/…'],
+              ].map(([campo, id, nome, ajuda, exemplo]) => {
+                const escrito = String(form[campo] || '').trim();
+                const invalida = !!escrito && !ligacaoDaApp(escrito);
+                return (
+                  <div key={campo} className="space-y-2">
+                    <Label htmlFor={id}>{nome} — ligação para descarregar</Label>
+                    <Input
+                      id={id} type="url" inputMode="url" value={form[campo]} maxLength={500} placeholder={exemplo}
+                      onChange={(e) => set(campo, e.target.value)} aria-describedby={`${id}-ajuda`} aria-invalid={invalida}
+                    />
+                    <p id={`${id}-ajuda`} className={invalida ? 'text-xs font-medium text-destructive' : 'text-xs text-muted-foreground'}>
+                      {invalida ? 'Tem de ser uma ligação completa, começada por https://' : ajuda}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="messaging" className="space-y-6 max-w-xl">

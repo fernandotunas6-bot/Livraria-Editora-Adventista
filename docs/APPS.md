@@ -98,6 +98,8 @@ Tudo pelo GitHub Actions (`.github/workflows/android.yml`):
 - **Actions → App Android → Run workflow** (ou uma etiqueta `android-v1.0.0`): o AAB assinado com a
   chave de envio, nos artefactos da corrida; com a conta de serviço da Play Console, vai também para
   os **testes internos** como rascunho. A versão vem de `app/mobile/package.json`; o número, da corrida.
+  Sai também o **APK assinado**, publicado numa Release do GitHub: é o que a página `/app` do site dá
+  a descarregar (ver «A página /app»).
 
 ### iPhone
 
@@ -220,6 +222,41 @@ O que só se faz na App Store Connect:
    pasta `android/` do artefacto). Na Play Console: **Segurança dos dados** com as mesmas respostas
    do manifesto de privacidade do iPhone, classificação de conteúdo, público-alvo, e a declaração de
    que a app não vende conteúdo digital.
+
+## A página /app: descarregar os apps a partir do site
+
+`https://livrariaadventista.ao/app` («Descarregar a app», também no rodapé e no menu do telemóvel) é
+o painel de download: um cartão para Android e outro para iPhone e iPad, o do telemóvel de quem
+visita primeiro e em destaque; no computador, um código QR para abrir a página no telemóvel.
+
+Para onde vai cada botão escolhe-se no painel, em **Configurações → PWA / telemóvel → Apps para
+descarregar** (`site_settings.app_android_url` e `app_ios_url`; só ligações `https://`):
+
+| Campo | O que pôr | O botão |
+|---|---|---|
+| Android | o APK publicado pelo workflow: `https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista/releases/latest/download/livraria-adventista.apk` | boneco do Android, «Descarregar para Android», com os passos para instalar |
+| Android (mais tarde) | a página da Google Play | logótipo da Google Play, «Disponível no Google Play» |
+| iPhone | o convite público do TestFlight (`https://testflight.apple.com/join/…`) | logótipo da Apple, «Experimentar no TestFlight» |
+| iPhone (mais tarde) | a página da App Store (`https://apps.apple.com/…`) | logótipo da Apple, «Descarregar na App Store» |
+
+O ícone de cada botão é o do sítio para onde ele leva (`components/StoreIcons.jsx`): o logótipo da
+Google Play só aparece quando a ligação é mesmo da Google Play, não no APK descarregado do site.
+
+- **Sem ligação**, o cartão diz que a app está a chegar e oferece a app web (PWA), que já se instalava.
+- **Com ligação para o telemóvel de quem visita**, o «Instalar a app» do menu passa a «Descarregar a
+  app» e leva a esta página.
+- **Dentro dos apps** a página só diz «Já está a usar a app», e a ligação para ela não aparece: não
+  há nada para descarregar, e a Apple não deixa falar das outras lojas (regra 2.3.10).
+- **O iPhone não tem ficheiro para descarregar**: a Apple só deixa instalar pela App Store ou pelo
+  TestFlight, e os dois precisam da conta Apple Developer (passo a passo acima). O convite público
+  do TestFlight cria-se na App Store Connect → TestFlight → Testes externos → Ligação pública, depois
+  de a Apple aprovar o primeiro build para testes externos.
+- **O APK do site e a Google Play não se misturam**: o APK é assinado com a chave de envio e a app
+  da Play Store com a chave da Google. Quem instalou o APK tem de o desinstalar antes de instalar
+  pela Play Store. Quando a app estiver na Play Store, trocar a ligação do Android pela da loja.
+- O APK só se publica com os segredos da chave de envio no GitHub (passo 2 do Android, acima). A
+  ligação `…/releases/latest/download/livraria-adventista.apk` não muda de versão para versão: cada
+  corrida do workflow publica uma Release nova e a ligação passa a dar a mais recente.
 
 ## Experimentar no Android sem a Play Store
 

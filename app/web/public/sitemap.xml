@@ -10,6 +10,7 @@
   <url><loc>https://livrariaadventista.ao/contact</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://livrariaadventista.ao/faq</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
   <url><loc>https://livrariaadventista.ao/materiais</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://livrariaadventista.ao/app</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://livrariaadventista.ao/comunidade</loc><changefreq>daily</changefreq><priority>0.5</priority></url>
   <url><loc>https://livrariaadventista.ao/shipping-returns</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
   <url><loc>https://livrariaadventista.ao/privacidade</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>

@@ -16,6 +16,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import FooterCompact from '@/components/FooterCompact.jsx';
+import { eAppNativa } from '@/lib/nativeApp';
+
+// Dentro dos apps não há nada para descarregar: a ligação para a página /app não aparece.
+const NO_APP = eAppNativa();
 
 // Só caminhos que existem no App.jsx. O separador do perfil vai no URL (/profile?tab=…),
 // como no painel, para estes atalhos abrirem já na secção certa.
@@ -28,6 +32,7 @@ const DEFAULT_FOOTER_COLUMNS = [
       { label: 'Perguntas frequentes', url: '/faq', internal: true },
       { label: 'Falar connosco', url: '/contact', internal: true },
       { label: 'Lojas físicas e horários', url: '/lojas', internal: true },
+      { label: 'Descarregar a app', url: '/app', internal: true },
     ],
   },
   {
@@ -234,7 +239,7 @@ const Footer = () => {
             <div key={col.title} className="lg:col-span-2">
               <h4 className="text-lg font-semibold mb-4 text-background">{col.title}</h4>
               <ul className="space-y-1">
-                {(col.links || []).map((link) => (
+                {(col.links || []).filter((link) => !(NO_APP && link?.url === '/app')).map((link) => (
                   <li key={link.label}><FooterLink link={link} /></li>
                 ))}
               </ul>

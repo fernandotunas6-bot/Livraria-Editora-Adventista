@@ -277,7 +277,7 @@ export const ADMIN_SECTIONS = {
       { id: 'messaging', label: 'Email, push e chat', group: 'Comunicação', icon: Mail, keywords: 'smtp provedor remetente notificacoes push vapid assistente ia', description: 'O envio dos emails (provedor e remetente), as notificações push e o assistente do chat.' },
       { id: 'header', label: 'Barra superior', group: 'Comunicação', icon: MessageSquare, keywords: 'topo cabecalho mensagem cta', description: 'A mensagem da barra no topo do site, para visitantes e para quem entrou, com uma ligação.' },
       { id: 'footer', label: 'Rodapé', group: 'Comunicação', icon: LayoutTemplate, keywords: 'copyright colunas ligacoes lojas', description: 'O texto, o copyright, as colunas de ligações e as lojas no rodapé.' },
-      { id: 'pwa', label: 'PWA / telemóvel', group: 'Aplicação', icon: Smartphone, keywords: 'instalar app aplicacao cor', description: 'A instalação como aplicação no telemóvel: o nome, o nome curto e a cor.' },
+      { id: 'pwa', label: 'PWA / telemóvel', group: 'Aplicação', icon: Smartphone, keywords: 'instalar app aplicacao cor descarregar download apk android iphone app store play', description: 'A instalação como aplicação no telemóvel (nome, nome curto e cor) e as ligações para descarregar os apps Android e iPhone.' },
     ],
   },
   notices: {

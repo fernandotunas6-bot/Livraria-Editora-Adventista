@@ -91,6 +91,7 @@ import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.
 import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
 import { publicContactFields } from "./crmContacts.ts";
 import { isPushEndpoint } from "./pushEndpoints.ts";
+import { appLink } from "./appLinks.ts";
 import { type PushPayload, apnsConfig, apnsEndpoint, apnsTokenOf, isApnsToken, sendApns } from "./apns.ts";
 import { fcmConfig, fcmEndpoint, fcmTokenOf, isFcmToken, sendFcm } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
@@ -1596,6 +1597,10 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     pwa_name: rec.pwa_name || rec.site_name,
     pwa_short_name: rec.pwa_short_name || "Livraria",
     pwa_theme_color: rec.pwa_theme_color || "#0c4a6e",
+    // As ligações para descarregar os apps (página /app do site): vazias, ou antes da migração
+    // `ligacoes_dos_apps`, a página oferece a app web.
+    app_android_url: appLink(rec.app_android_url),
+    app_ios_url: appLink(rec.app_ios_url),
     shipping_free_threshold: settingNumber(rec.shipping_free_threshold, 20000),
     shipping_cost: settingNumber(rec.shipping_cost, 1500),
     shipping_express_cost: settingNumber(rec.shipping_express_cost, 0),

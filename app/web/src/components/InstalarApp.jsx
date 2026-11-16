@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Copy, Download, EllipsisVertical, Share, SquarePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -6,6 +7,8 @@ import {
 } from '@/components/ui/dialog';
 import { useInstalarApp } from '@/hooks/useInstalarApp';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { aparelhoDe, appsParaDescarregar } from '@/lib/appDownload';
+import { eAppNativa } from '@/lib/nativeApp';
 import { cn } from '@/lib/utils';
 
 function Passo({ n, children }) {
@@ -95,17 +98,51 @@ export function InstalarAppDialog({ open, onOpenChange, modo, nome = 'Livraria A
   );
 }
 
+/** Há app (da loja de apps ou o APK) para o telemóvel de quem visita? (Configurações → PWA / telemóvel.) */
+function temAppParaEsteTelemovel(settings) {
+  if (typeof navigator === 'undefined' || eAppNativa()) return false;
+  const aparelho = aparelhoDe(navigator.userAgent || '', navigator.maxTouchPoints || 0);
+  return !!appsParaDescarregar(settings)[aparelho];
+}
+
 /**
  * O botão «Instalar a app», para quem ainda não a tem instalada no telemóvel. Não aparece na app
  * instalada, no computador (sem pedido do navegador) nem com a instalação desligada no painel.
  *  · `variante="icone"`: só o ícone (barra do topo do painel);
  *  · `variante="menu"`: uma linha de menu (menu do telemóvel do site);
  *  · `variante="botao"`: um botão normal.
+ *
+ * Quando a loja tem app para este telemóvel (Android ou iPhone), o botão passa a «Descarregar a
+ * app» e leva à página /app, em vez de instalar a app web. `semApp` mantém o de sempre: é o que a
+ * própria página /app usa quando ainda não há app para o telemóvel.
  */
-export function BotaoInstalarApp({ variante = 'botao', className, onDepois, ...props }) {
+export function BotaoInstalarApp({ variante = 'botao', className, onDepois, semApp = false, ...props }) {
   const { settings } = useSiteSettings();
   const { modo, instalar, visivel } = useInstalarApp();
   const [passos, setPassos] = useState(false);
+  if (!semApp && temAppParaEsteTelemovel(settings)) {
+    if (variante === 'icone') {
+      return (
+        <Button asChild variant="ghost" size="icon" className={cn('h-9 w-9 shrink-0 text-primary', className)} {...props}>
+          <Link to="/app" onClick={onDepois} aria-label="Descarregar a app" title="Descarregar a app para o telemóvel">
+            <Download className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Button>
+      );
+    }
+    if (variante === 'menu') {
+      return (
+        <Link to="/app" onClick={onDepois} className={className} {...props}>
+          <Download className="h-4 w-4 text-[#22d3ee]" aria-hidden="true" /> Descarregar a app
+        </Link>
+      );
+    }
+    return (
+      <Button asChild className={className} {...props}>
+        <Link to="/app" onClick={onDepois}><Download className="mr-2 h-4 w-4" aria-hidden="true" /> Descarregar a app</Link>
+      </Button>
+    );
+  }
   if (!visivel || settings.pwa_enabled === false) return null;
   const nome = settings.pwa_short_name || 'Livraria Adventista';
 

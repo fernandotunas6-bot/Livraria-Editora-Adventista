@@ -7,6 +7,9 @@ name: App Android
 # - «Run workflow» (à mão) ou uma etiqueta android-v*: o AAB assinado com a chave de envio, nos
 #   artefactos da corrida e, com a conta de serviço da Play Console, na faixa de testes internos
 #   (como rascunho). O primeiro AAB de sempre carrega-se à mão na Play Console.
+#   Sai também o APK assinado com a mesma chave, publicado numa Release do GitHub: é o ficheiro
+#   que a página /app do site dá a descarregar (Configurações → PWA / telemóvel), sempre em
+#   …/releases/latest/download/livraria-adventista.apk.
 #   Segredos: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
 #   ANDROID_KEY_PASSWORD; opcionais GOOGLE_SERVICES_JSON (notificações) e
 #   PLAY_SERVICE_ACCOUNT_JSON (envio para a Play Store).
@@ -148,12 +151,21 @@ jobs:
           # número novo em cada envio).
           export ANDROID_VERSION_NAME="$(node -p "require('../package.json').version")"
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon --stacktrace
+          # O AAB vai para a Play Store; o APK, com a mesma chave, é o que se descarrega do site.
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/livraria-adventista.apk"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: livraria-adventista-android
           path: app/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livraria-adventista-android-apk
+          path: ${{ runner.temp }}/livraria-adventista.apk
+          if-no-files-found: error
           retention-days: 30
 
       - name: Enviar para os testes internos da Play Store
@@ -182,3 +194,55 @@ jobs:
       - name: Apagar as chaves
         if: always()
         run: rm -f "$RUNNER_TEMP/envio.jks" "$RUNNER_TEMP/play.json" app/mobile/android/app/google-services.json
+
+  # O APK assinado fica numa Release pública do GitHub, com o endereço que não muda:
+  #   https://github.com/<dono>/<repositório>/releases/latest/download/livraria-adventista.apk
+  # É esse o endereço a pôr em Configurações → PWA / telemóvel → Android, para a página /app do
+  # site. À parte do job de cima: só este escreve no repositório, e não vê nenhum segredo.
+  apk:
+    name: Publicar o APK para descarregar
+    needs: play
+    # O APK já está nos artefactos quando o envio para a Play Store corre: uma falha lá (o
+    # primeiro AAB carrega-se à mão, por exemplo) não impede de o publicar aqui.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: livraria-adventista-android-apk
+          path: ${{ runner.temp }}/apk
+
+      - name: Release com o APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./app/mobile/package.json').version")"
+          # Com uma etiqueta android-v*, a Release é a dela; à mão, cria-se uma para esta corrida.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="android-v${version}-b${{ github.run_number }}"
+          fi
+          apk="$RUNNER_TEMP/apk/livraria-adventista.apk"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --target "$GITHUB_SHA" \
+              --latest \
+              --title "App Android ${version} (build ${{ github.run_number }})" \
+              --notes "A app da Livraria Adventista para Android. Descarregue o ficheiro livraria-adventista.apk no telemóvel e abra-o para instalar; uma versão nova instala-se por cima."
+          fi
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/livraria-adventista.apk"
+          {
+            echo "APK publicado em **${tag}**."
+            echo ""
+            echo "Ligação para a página /app do site (Configurações → PWA / telemóvel → Android):"
+            echo ""
+            echo "    ${url}"
+          } >> "$GITHUB_STEP_SUMMARY"
