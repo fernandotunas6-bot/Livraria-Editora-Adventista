@@ -1,0 +1,116 @@
+name: App iOS — ficha da App Store
+
+# As capturas de ecrã e os textos da ficha da App Store (docs/APP_IOS.md). Só corre à mão:
+# Actions → «App iOS — ficha da App Store» → Run workflow.
+#
+# - Capturas: o site publicado, como o app o mostra, no iPhone 6,9" e no iPad 13"
+#   (scripts/capturas-app-store.mjs). Ficam nos artefactos da corrida, para ver antes de enviar.
+# - «Enviar para a App Store Connect» ligado: o fastlane deliver envia as capturas e os textos de
+#   app/ios/fastlane/metadata para a versão em preparação. Não submete para revisão: isso faz-se na
+#   App Store Connect, depois de rever. Precisa dos mesmos segredos do ios.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      enviar:
+        description: 'Enviar as capturas e os textos para a App Store Connect'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-ficha
+  cancel-in-progress: true
+
+jobs:
+  capturas:
+    name: Capturas de ecrã
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Instalar o navegador
+        run: npx playwright install --with-deps chromium
+        working-directory: app/web
+
+      - name: Capturar
+        run: node scripts/capturas-app-store.mjs --site "${SITE_URL}" --saida "$RUNNER_TEMP/capturas"
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://livrariaadventista.ao' }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: capturas-app-store
+          path: ${{ runner.temp }}/capturas
+          retention-days: 30
+
+  enviar:
+    name: Enviar para a App Store Connect
+    needs: capturas
+    if: inputs.enviar
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Confirmar segredos
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          missing=""
+          for name in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Faltam em Settings → Secrets and variables → Actions:$missing (ver docs/APP_IOS.md)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: capturas-app-store
+          path: ${{ runner.temp }}/capturas
+
+      # A chave da App Store Connect no formato do fastlane, só no disco temporário desta máquina.
+      - name: Chave da App Store Connect
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          key_json="$RUNNER_TEMP/asc-key.json"
+          echo "$APP_STORE_CONNECT_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          ruby -rjson -e 'puts({ key_id: ENV.fetch("APP_STORE_CONNECT_KEY_ID"), issuer_id: ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"), key: File.read(ARGV[0]), in_house: false }.to_json)' "$RUNNER_TEMP/asc.p8" > "$key_json"
+          rm -f "$RUNNER_TEMP/asc.p8"
+          chmod 600 "$key_json"
+          echo "ASC_KEY_JSON=$key_json" >> "$GITHUB_ENV"
+
+      - name: Enviar capturas e textos
+        run: |
+          command -v fastlane >/dev/null || sudo gem install fastlane --no-document
+          fastlane deliver \
+            --api_key_path "$ASC_KEY_JSON" \
+            --app_identifier ao.livrariaadventista.app \
+            --metadata_path app/ios/fastlane/metadata \
+            --screenshots_path "$RUNNER_TEMP/capturas" \
+            --overwrite_screenshots true \
+            --skip_binary_upload true \
+            --submit_for_review false \
+            --run_precheck_before_submit false \
+            --force true
+          echo "Capturas e textos enviados. Reveja-os na App Store Connect antes de submeter." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apagar a chave
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc-key.json" "$RUNNER_TEMP/asc.p8"

@@ -1,0 +1,1 @@
+Primeira versão da app da Livraria Adventista: o catálogo, as compras, o rastreio das entregas, a biblioteca, a comunidade e as notificações no iPhone e no iPad.

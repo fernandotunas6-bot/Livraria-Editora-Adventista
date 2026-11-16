@@ -127,17 +127,29 @@ Connect → TestFlight. Junta-se quem testa (Internal Testing) e instala-se pela
 
 ### 6. Enviar para a App Store
 
-Em App Store Connect → a app → a versão:
+A ficha está no repositório e envia-se sozinha:
 
-- capturas de ecrã do iPhone (6,9" e 6,5") e do iPad, se ficar o iPad;
-- descrição, palavras-chave, URL de suporte (`https://livrariaadventista.ao/contact`) e da política
-  de privacidade (`https://livrariaadventista.ao/privacidade`);
-- **App Privacy**: nome, email, telefone, morada (encomendas), localização aproximada e precisa
-  (lojas perto e ponto de entrega, só com o app aberto), identificadores do aparelho
-  (notificações). Nada para publicidade nem rastreio;
-- **notas para a revisão**: uma conta de demonstração (email e palavra-passe) e uma frase: "Os livros
-  digitais compram-se só no nosso site; no app só se vendem livros impressos e entregues em mão, e
-  quem comprou um digital lê-o na biblioteca da conta.";
+- **Textos** (`app/ios/fastlane/metadata/pt-PT/`): nome, subtítulo, descrição, palavras-chave, texto
+  promocional, novidades da versão, endereços de suporte, do site e da política de privacidade;
+  categorias Compras e Livros; as notas para a revisão em `review_information/notes.txt` (explicam
+  as compras só de impressos, o login e a localização em segundo plano dos colportores).
+  `scripts/ficha-app-store.test.mjs` confere os limites da Apple em cada PR.
+- **Capturas de ecrã** (`scripts/capturas-app-store.mjs`): o site publicado como o app o mostra, no
+  iPhone 6,9" (1320 × 2868) e no iPad 13" (2064 × 2752), sete páginas: início, loja, um livro,
+  colecções, comunidade, rastreio e lojas.
+- **Actions → «App iOS — ficha da App Store» → Run workflow**: sem marcar nada, só tira as capturas
+  (ficam nos artefactos da corrida, para ver); com «Enviar para a App Store Connect», envia as
+  capturas e os textos para a versão em preparação. **Não submete**: depois de rever, carrega-se em
+  «Adicionar para revisão» na App Store Connect.
+
+O que só se faz na App Store Connect:
+
+- **App Privacy**: as mesmas respostas do manifesto do app (`app/ios/ios/App/App/PrivacyInfo.xcprivacy`):
+  nome, email, telefone, morada, localização precisa, ID do utilizador e do aparelho, histórico de
+  compras, interacção com os produtos, fotografias, áudio (só a equipa), apoio ao cliente, conteúdo
+  da comunidade, falhas e desempenho. Tudo ligado à conta, **nada para rastreio nem publicidade**;
+- a **conta de demonstração** (email e palavra-passe) em «Sign-in required»: não vai para o
+  repositório;
 - «Apagar a conta» já existe em Perfil → Privacidade (regra 5.1.1).
 
 ## Testar no iPhone (TestFlight)

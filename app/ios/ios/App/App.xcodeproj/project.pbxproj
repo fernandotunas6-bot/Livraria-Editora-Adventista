@@ -20,6 +20,7 @@
 		A1A5E0012F00000100AA0004 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0003 /* MainViewController.swift */; };
 		A1A5E0012F00000100AA0007 /* WebAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */; };
 		A1A5E0012F00000100AA0009 /* AparelhoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */; };
+		A1A5E0012F00000100AA000B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		A1A5E0012F00000100AA0005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuthPlugin.swift; sourceTree = "<group>"; };
 		A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AparelhoPlugin.swift; sourceTree = "<group>"; };
+		A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				A1A5E0012F00000100AA0006 /* WebAuthPlugin.swift */,
 				A1A5E0012F00000100AA0008 /* AparelhoPlugin.swift */,
 				A1A5E0012F00000100AA0005 /* App.entitlements */,
+				A1A5E0012F00000100AA000A /* PrivacyInfo.xcprivacy */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -157,6 +160,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
+				A1A5E0012F00000100AA000B /* PrivacyInfo.xcprivacy in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
