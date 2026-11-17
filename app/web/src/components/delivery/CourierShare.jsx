@@ -10,6 +10,13 @@ import {
 import {
   estadoDoTrajetoNativo, iniciarTrajetoNativo, ouvirTrajetoNativo, pararTrajetoNativo, trajetoNativoDisponivel,
 } from '@/lib/trajetoNativo';
+import { eAppAndroid } from '@/lib/nativeApp';
+
+/** Enquanto o telemóvel partilha sozinho: como se sabe que continua (o sinal de cada sistema). */
+const SINAL_DA_PARTILHA = {
+  android: 'a notificação «A partilhar a localização» fica na barra',
+  ios: 'indicador azul no topo',
+};
 
 const DeliveryMap = lazy(() => import('@/components/maps/DeliveryMap'));
 
@@ -26,8 +33,8 @@ const etaFromKm = (km) => (km === null ? null : Math.max(1, Math.round(((km * 1.
  * telemóvel manda-a de 10 em 10 segundos quando anda, e o ecrã fica ligado (Wake Lock) para a
  * partilha não parar. Fechar a página pára de mandar; o cliente vê "última posição há X min".
  *
- * Dentro do app iOS (lib/trajetoNativo.js) é o iPhone que lê o GPS e manda a posição: continua com
- * o ecrã apagado, noutra página ou noutra app, até à entrega ou a «Parar de partilhar».
+ * Dentro dos apps (lib/trajetoNativo.js) é o telemóvel que lê o GPS e manda a posição: continua
+ * com o ecrã apagado, noutra página ou noutra app, até à entrega ou a «Parar de partilhar».
  */
 export default function CourierShare({ orderId, deliveryStatus, compact = false }) {
   const { toast } = useToast();
@@ -42,7 +49,7 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
   const lastSent = useRef(null);
   const sendingRef = useRef(false);
   const lockRef = useRef(null);
-  // No app iOS: o iPhone partilha sozinho; aqui só se ouve o que ele vai fazendo.
+  // Nos apps: o telemóvel partilha sozinho; aqui só se ouve o que ele vai fazendo.
   const [noApp, setNoApp] = useState(false);
   const ouvirRef = useRef(null);
 
@@ -85,7 +92,7 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
   }, [orderId]);
 
   // Sair da página pára o GPS (sem avisar o servidor: o cliente vê "última posição há X min").
-  // No app não: o iPhone continua a partilhar, e aqui só se deixa de ouvir.
+  // No app não: o telemóvel continua a partilhar, e aqui só se deixa de ouvir.
   useEffect(() => () => {
     if (watchRef.current !== null) navigator.geolocation?.clearWatch(watchRef.current);
     releaseLock();
@@ -93,7 +100,7 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
     ouvirRef.current = null;
   }, []);
 
-  // O que o iPhone conta: as leituras do GPS, os envios, os erros e o fim da partilha.
+  // O que o telemóvel conta: as leituras do GPS, os envios, os erros e o fim da partilha.
   const ouvintesNativos = useCallback(() => ({
     leitura: ({ lat, lng, accuracy }) => setFix({ lat, lng, accuracy, heading: null, speed: null }),
     enviado: ({ quando }) => { setSentAt(Number(quando) || Date.now()); setError(''); },
@@ -250,7 +257,7 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
             </p>
             <p className="text-[11px] text-muted-foreground">
               {noApp
-                ? 'Pode apagar o ecrã ou mudar de app: o trajeto continua a seguir até à entrega (indicador azul no topo).'
+                ? `Pode apagar o ecrã ou mudar de app: o trajeto continua a seguir até à entrega (${SINAL_DA_PARTILHA[eAppAndroid() ? 'android' : 'ios']}).`
                 : 'Deixe esta página aberta durante a entrega: fechar pára a partilha.'}
             </p>
             <Button type="button" size="sm" variant="outline" onClick={() => stop(true)}>

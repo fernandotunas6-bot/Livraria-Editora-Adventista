@@ -88,6 +88,18 @@ describe('CourierShare no app iOS', () => {
     expect(button('Parar de partilhar')).toBeTruthy();
   });
 
+  it('no Android, o sinal de que continua é a notificação', async () => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+    try {
+      await mount();
+      await click(button('Partilhar a minha localização'));
+      expect(host.textContent).toContain('a notificação «A partilhar a localização» fica na barra');
+      expect(host.textContent).not.toContain('indicador azul');
+    } finally {
+      delete window.Capacitor;
+    }
+  });
+
   it('sair da página não pára a partilha do iPhone, só deixa de ouvir', async () => {
     await mount();
     await click(button('Partilhar a minha localização'));
