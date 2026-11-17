@@ -1,0 +1,11 @@
+Notas para a revisão (Livraria Adventista)
+
+1. Conta de demonstração: preenchida na App Store Connect (Sign-in required). Com ela vê-se a conta, as encomendas, a biblioteca e a comunidade.
+
+2. Compras: a app vende só livros impressos e outros artigos físicos, entregues em mão em Angola ou levantados nas lojas. O pagamento é na entrega, por transferência bancária ou Multicaixa Express. Os livros digitais (PDF) não se vendem dentro da app: quem os comprou antes no nosso site lê-os na biblioteca da conta.
+
+3. Iniciar sessão: Iniciar sessão com a Apple, com a Google (na janela do sistema) ou com email e palavra-passe. A conta apaga-se em Perfil > Privacidade > Apagar a conta.
+
+4. Localização: com a app aberta, para mostrar as lojas mais perto e marcar o ponto de entrega. Em segundo plano só para os colportores e a equipa que entregam encomendas: quando carregam em «Partilhar a minha localização com o cliente», o trajeto continua a ser enviado ao cliente com o ecrã apagado até à entrega, com o indicador azul do iOS à vista. Pára sozinho quando a encomenda é entregue ou cancelada.
+
+5. Notificações: avisos das encomendas, das respostas da comunidade e das novidades da app. Desligam-se em Perfil > Notificações no aparelho.

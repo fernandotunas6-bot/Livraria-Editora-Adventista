@@ -155,7 +155,7 @@ function jwtPayload(token) {
 }
 
 /**
- * Como se entrou nesta sessão: `'email'` (palavra-passe), `'google'` ou `''` (não se sabe).
+ * Como se entrou nesta sessão: `'email'` (palavra-passe), `'google'`, `'apple'` (app iOS) ou `''` (não se sabe).
  * Serve para, da próxima vez, o ecrã de entrada mostrar logo o caminho certo à pessoa.
  */
 export function sessionMethod(token) {
@@ -166,7 +166,9 @@ export function sessionMethod(token) {
       .filter((a) => a && (a.method === 'oauth' || EMAIL_METHODS.has(a.method)))
       .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))[0];
     if (!primary) return '';
-    return primary.method === 'oauth' ? 'google' : 'email';
+    if (primary.method !== 'oauth') return 'email';
+    // O token de identidade da Apple (app iOS) também conta como `oauth`.
+    return jwtPayload(token)?.app_metadata?.provider === 'apple' ? 'apple' : 'google';
   } catch {
     return '';
   }

@@ -17,6 +17,7 @@ import PostComposer from '@/components/community/PostComposer';
 import { useMinuteTick } from '@/hooks/useMinuteTick';
 import { useReaderLevel } from '@/hooks/useReader';
 import ReaderBadge from '@/components/community/ReaderBadge';
+import { canNativeShare, nativeShare } from '@/lib/nativeShare';
 
 const REPORT_REASONS = ['Spam ou publicidade', 'Link suspeito', 'Ofensivo ou desrespeitoso', 'Outro motivo'];
 // Links de utilizadores: sem passar autoridade de pesquisa, sem dar acesso à página de origem.
@@ -76,27 +77,20 @@ function Author({ post, small = false, linkToPost = true }) {
   );
 }
 
-const canNativeShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-
 function ShareMenu({ post }) {
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   // No telemóvel, a folha de partilha do próprio sistema (WhatsApp, Facebook, SMS, copiar…),
   // como nas lojas e redes sociais; o menu fica para o computador e para quem a cancelar.
-  const nativeShare = async () => {
-    try {
-      await navigator.share({
-        title: `${postKind(post.kind).label} de ${post.author_name}`,
-        text: String(post.quote || post.body || '').replace(/\s+/g, ' ').slice(0, 140),
-        url: `${origin}${postPath(post.id)}`,
-      });
-    } catch {
-      // cancelado pela pessoa ou não suportado neste navegador: nada a fazer
-    }
-  };
+  // Cancelada pela pessoa ou não suportada neste navegador: nada a fazer (lib/nativeShare.js).
+  const partilhar = () => nativeShare({
+    title: `${postKind(post.kind).label} de ${post.author_name}`,
+    text: String(post.quote || post.body || '').replace(/\s+/g, ' ').slice(0, 140),
+    url: `${origin}${postPath(post.id)}`,
+  });
   if (canNativeShare()) {
     return (
-      <Button type="button" variant="ghost" size="sm" onClick={nativeShare} className="h-11 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta sm:h-9">
+      <Button type="button" variant="ghost" size="sm" onClick={partilhar} className="h-11 gap-1.5 px-2.5 text-editorial-tinta-suave hover:text-editorial-tinta sm:h-9">
         <Share2 className="h-4 w-4" aria-hidden="true" /> Partilhar
       </Button>
     );

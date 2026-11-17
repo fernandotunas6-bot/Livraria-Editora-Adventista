@@ -91,6 +91,9 @@ import { type PaidMaterial, digitalBooksFor, digitalCart } from "./digitalBooks.
 import { destinationOf, canSetDestination, inAngola, liveTrackingView, parseDestination } from "./deliveryTracking.ts";
 import { publicContactFields } from "./crmContacts.ts";
 import { isPushEndpoint } from "./pushEndpoints.ts";
+import { appLink } from "./appLinks.ts";
+import { type PushPayload, apnsConfig, apnsEndpoint, apnsTokenOf, isApnsToken, sendApns } from "./apns.ts";
+import { fcmConfig, fcmEndpoint, fcmTokenOf, isFcmToken, sendFcm } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1156,8 +1159,9 @@ async function sendOrderStepWhatsApp(order: Row, step: string, text: string) {
 
 /**
  * Notificação push para os dispositivos do cliente (subscrições em `push_subscriptions`).
- * Precisa de `push_enabled`, da chave pública em site_settings e da privada no segredo
- * `VAPID_PRIVATE_KEY` (ou em private.site_secrets). Subscrições mortas (404/410) são apagadas.
+ * Precisa de `push_enabled` e, para os navegadores, da chave pública em site_settings e da
+ * privada no segredo `VAPID_PRIVATE_KEY` (ou em private.site_secrets); para o app iOS, dos
+ * segredos do APNs (apns.ts). Subscrições mortas (404/410) são apagadas.
  */
 async function sendOrderPush(order: Row, settings: Row | null, payload: { title: string; body: string; url: string }) {
   if (!order?.customer_id) return 0;
@@ -1172,20 +1176,48 @@ function pushKeys(settings: Row | null) {
   return publicKey && privateKey ? { publicKey, privateKey } : null;
 }
 
-/** O `web-push` pronto a enviar (chaves e contacto VAPID), ou null sem push ligado. */
+/** O APNs do app iOS (segredos APNS_*), ou null sem ele. */
+const apnsCfg = () => apnsConfig((name) => Deno.env.get(name));
+/** O Firebase do app Android (segredo FCM_SERVICE_ACCOUNT), ou null sem ele. */
+const fcmCfg = () => fcmConfig((name) => Deno.env.get(name));
+
+/** O push está ligado e há por onde enviar (navegadores, app iOS, app Android)? */
+function pushOn(settings: Row | null) {
+  return !!settings?.push_enabled && (!!pushKeys(settings) || !!apnsCfg() || !!fcmCfg());
+}
+
+/**
+ * Por onde enviar: o `web-push` (chaves e contacto VAPID) para os navegadores, o APNs para o app
+ * iOS e o Firebase para o app Android, cada um null se não estiver configurado; null sem push ligado.
+ */
 async function pushSender(settings: Row | null) {
+  if (!pushOn(settings)) return null;
   const keys = pushKeys(settings);
-  if (!keys) return null;
-  const webpush = (await import("npm:web-push@3.6.7")).default;
-  const contact = settings!.contact_email ? `mailto:${settings!.contact_email}` : "mailto:contacto@livrariaadventista.ao";
-  webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
-  return webpush;
+  let webpush = null;
+  if (keys) {
+    webpush = (await import("npm:web-push@3.6.7")).default;
+    const contact = settings!.contact_email ? `mailto:${settings!.contact_email}` : "mailto:contacto@livrariaadventista.ao";
+    webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
+  }
+  return { webpush, apns: apnsCfg(), fcm: fcmCfg() };
 }
 
 type PushSender = NonNullable<Awaited<ReturnType<typeof pushSender>>>;
 
 /** Um push para uma subscrição: 'sent', ou 'gone' (apagada: o aparelho já não existe) ou 'failed'. */
-async function pushToSubscription(webpush: PushSender, sub: Row, payload: Row): Promise<"sent" | "gone" | "failed"> {
+async function pushToSubscription(sender: PushSender, sub: Row, payload: Row): Promise<"sent" | "gone" | "failed"> {
+  // O app iOS: `apns:<token>` (apns.ts); o app Android: `fcm:<token>` (fcm.ts).
+  const apnsToken = apnsTokenOf(sub.endpoint);
+  const fcmToken = apnsToken ? null : fcmTokenOf(sub.endpoint);
+  if (apnsToken || fcmToken) {
+    let outcome: "sent" | "gone" | "failed" = "failed";
+    if (apnsToken && sender.apns) outcome = await sendApns(sender.apns, apnsToken, payload as PushPayload);
+    if (fcmToken && sender.fcm) outcome = await sendFcm(sender.fcm, fcmToken, payload as PushPayload);
+    if (outcome === "gone") await db.from("push_subscriptions").delete().eq("id", sub.id);
+    return outcome;
+  }
+  const webpush = sender.webpush;
+  if (!webpush) return "failed";
   try {
     await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload), { TTL: 24 * 3600 });
     return "sent";
@@ -1199,14 +1231,22 @@ async function pushToSubscription(webpush: PushSender, sub: Row, payload: Row): 
 
 /** Push para os dispositivos de uma pessoa (cliente ou equipa). */
 async function sendUserPush(userId: string, settings: Row | null, payload: { title: string; body: string; url: string }) {
-  if (!userId || !pushKeys(settings)) return 0;
+  if (!userId || !pushOn(settings)) return 0;
   const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, keys").eq("user", userId).limit(10);
   if (!subs?.length) return 0;
-  const webpush = await pushSender(settings);
-  if (!webpush) return 0;
+  const sender = await pushSender(settings);
+  if (!sender) return 0;
+  // No iPhone, o número no ícone do app: os avisos por ler da conta (customer_notifications).
+  let badge: number | undefined;
+  if (sender.apns && subs.some((sub: Row) => apnsTokenOf(sub.endpoint))) {
+    const { count } = await db.from("customer_notifications").select("id", { count: "exact", head: true })
+      .eq("customer_id", userId).is("read_at", null);
+    if (typeof count === "number") badge = count;
+  }
   let sent = 0;
   for (const sub of subs) {
-    if (await pushToSubscription(webpush, sub, payload) === "sent") sent++;
+    const comNumero = badge !== undefined && apnsTokenOf(sub.endpoint) ? { ...payload, badge } : payload;
+    if (await pushToSubscription(sender, sub, comNumero) === "sent") sent++;
   }
   return sent;
 }
@@ -1234,8 +1274,8 @@ async function dispatchReleasePush(batch = RELEASE_PUSH_BATCH) {
     return { pending: 1, sent: 0, stopped: "antigo" };
   }
   const settings = await getSettings();
-  const webpush = await pushSender(settings);
-  if (!webpush) {
+  const sender = await pushSender(settings);
+  if (!sender) {
     // Push desligado entretanto: o envio fica dado por acabado, sem mandar nada.
     await finish();
     return { pending: 1, sent: 0, stopped: "push desligado" };
@@ -1261,7 +1301,7 @@ async function dispatchReleasePush(batch = RELEASE_PUSH_BATCH) {
   if (!claimed?.length) return { pending: 1, sent: 0, skipped: "lote já reservado" };
 
   const payload = releasePushPayload(release as { id: string; title: string });
-  const outcomes = await mapLimit(list, RELEASE_PUSH_CONCURRENCY, (sub) => pushToSubscription(webpush, sub, payload));
+  const outcomes = await mapLimit(list, RELEASE_PUSH_CONCURRENCY, (sub) => pushToSubscription(sender, sub, payload));
   const sent = outcomes.filter((o) => o === "sent").length;
   const failed = outcomes.length - sent;
   if (outcomes.length) await db.rpc("app_release_push_progress", { p_id: release.id, p_sent: sent, p_failed: failed });
@@ -1557,6 +1597,10 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     pwa_name: rec.pwa_name || rec.site_name,
     pwa_short_name: rec.pwa_short_name || "Livraria",
     pwa_theme_color: rec.pwa_theme_color || "#0c4a6e",
+    // As ligações para descarregar os apps (página /app do site): vazias, ou antes da migração
+    // `ligacoes_dos_apps`, a página oferece a app web.
+    app_android_url: appLink(rec.app_android_url),
+    app_ios_url: appLink(rec.app_ios_url),
     shipping_free_threshold: settingNumber(rec.shipping_free_threshold, 20000),
     shipping_cost: settingNumber(rec.shipping_cost, 1500),
     shipping_express_cost: settingNumber(rec.shipping_express_cost, 0),
@@ -3187,8 +3231,8 @@ route("POST", "/admin/email/test", permissao("manage_settings"), async ({ auth, 
 
 route("GET", "/push/config", publica("só a chave VAPID pública"), async () => {
   const rec = await getSettings();
-  if (!rec?.push_enabled) return json({ enabled: false, publicKey: "" });
-  return json({ enabled: true, publicKey: rec.vapid_public_key || "" });
+  if (!pushOn(rec)) return json({ enabled: false, publicKey: "", ios: false, android: false });
+  return json({ enabled: true, publicKey: rec?.vapid_public_key || "", ios: !!apnsCfg(), android: !!fcmCfg() });
 });
 
 route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
@@ -3208,6 +3252,49 @@ route("POST", "/push/subscribe", publica("os visitantes também recebem avisos; 
   return json({ message: "Subscrição push registada." });
 });
 
+/** O endereço guardado de um aparelho dos apps: `apns:` (iPhone) ou `fcm:` (Android), ou null. */
+function nativeEndpoint(platform: unknown, token: string) {
+  const p = String(platform || "ios");
+  if (p === "ios" && isApnsToken(token)) return apnsEndpoint(token);
+  if (p === "android" && isFcmToken(token)) return fcmEndpoint(token);
+  return null;
+}
+
+/**
+ * Os apps registam o aparelho (lib/pushNotifications.js → subscreverNoApp): o token do APNs
+ * (iPhone) ou do Firebase (Android) fica em `push_subscriptions` como `apns:<token>` ou
+ * `fcm:<token>`, ao lado dos navegadores. A conta é sempre a da sessão deste pedido: o app volta a
+ * registar-se a cada entrada e saída de conta, e um telemóvel de onde se saiu deixa de receber os
+ * avisos das encomendas de quem lá esteve.
+ */
+route("POST", "/push/native/subscribe", publica("os apps registam o aparelho; os visitantes também recebem avisos; limite de pedidos"), async ({ auth, body, ip }) => {
+  if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const token = String(body.token || "").trim();
+  const endpoint = nativeEndpoint(body.platform, token);
+  if (!endpoint) throw bad("Aparelho inválido.");
+  const rec: Row = {
+    endpoint,
+    keys: {},
+    user_agent: String(body.user_agent || "").slice(0, 300),
+    user: auth?.id || null,
+  };
+  if (typeof body.app_updates === "boolean") rec.app_updates = body.app_updates;
+  const { error } = await db.from("push_subscriptions").upsert(rec, { onConflict: "endpoint" });
+  if (error) throw error;
+  return json({ message: "Aparelho registado." });
+});
+
+/** «Activar notificações» desligado no app: o servidor esquece o aparelho. */
+route("POST", "/push/native/unsubscribe", publica("quem tem o token do aparelho; limite de pedidos"), async ({ body, ip }) => {
+  if (!await checkRateLimit("push-subscribe", ip, 10)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
+  const token = String(body.token || "").trim();
+  const endpoint = nativeEndpoint(body.platform, token) || nativeEndpoint(isApnsToken(token) ? "ios" : "android", token);
+  if (!endpoint) throw bad("Aparelho inválido.");
+  const { error } = await db.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (error) throw error;
+  return json({ message: "Aparelho esquecido." });
+});
+
 /**
  * Avisar por push todos os aparelhos das novidades de uma versão (painel → Versões da app).
  * Uma só vez por novidade e só depois de publicada; o envio continua em lotes (dispatchReleasePush).
@@ -3222,7 +3309,7 @@ route("POST", "/admin/releases/notify", permissao("manage_settings"), async ({ a
   if (!release.published_at || new Date(release.published_at).getTime() > Date.now()) {
     throw bad("Publique as novidades antes de avisar: o aviso abre a página das novidades.");
   }
-  if (!pushKeys(await getSettings(true))) {
+  if (!pushOn(await getSettings(true))) {
     throw bad("As notificações push não estão ligadas (Configurações → Email, push e chat).");
   }
   const { count } = await db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true);
@@ -3244,7 +3331,7 @@ route("GET", "/admin/releases/devices", permissao("manage_settings"), async ({ a
     db.from("push_subscriptions").select("id", { count: "exact", head: true }),
     db.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("app_updates", true),
   ]);
-  return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: !!pushKeys(await getSettings()) });
+  return json({ devices: all.count || 0, app_updates: updates.count || 0, push_enabled: pushOn(await getSettings()) });
 });
 
 /**

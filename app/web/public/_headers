@@ -65,3 +65,8 @@
 # uma cópia velha em qualquer cache escondia a versão nova.
 /version.json
   Cache-Control: no-store
+# O ficheiro que liga o site ao app iOS (scripts/ligacoes-app.mjs, gerado no deploy).
+# Não tem extensão, e sem isto o Pages servia-o como binário.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600

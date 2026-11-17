@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { effectivePrice, isSaleActive, variantPrices } from '@/lib/pricing';
 import { toast } from 'sonner';
 import { cartVariantLabel, needsVariantChoice, variantNames } from '@/lib/productTypes';
-import { cartDigitalState, isDigitalEdition, variantIndexOf } from '@/lib/digitalEditions';
+import { vibrar } from '@/lib/nativeApp';
+import { DIGITAL_FORA_DA_APP, cartDigitalState, isDigitalEdition, podeComprarDigital, variantIndexOf } from '@/lib/digitalEditions';
 
 const bookIdOf = (variantId) => String(variantId || '').replace(/-(default|v\d+)$/, '');
 
@@ -70,6 +71,11 @@ export const CartProvider = ({ children }) => {
 
       // Edição digital: uma por conta, sem stock. Pôr outra vez não soma — já lá está.
       if (variant.digital === true) {
+        if (!podeComprarDigital()) {
+          if (!silent) toast.info(DIGITAL_FORA_DA_APP);
+          reject(new Error(DIGITAL_FORA_DA_APP));
+          return;
+        }
         if (cartItems.some((item) => item.variant.id === variant.id)) {
           if (!silent) toast.info(`A edição digital de "${product.title}" já está no carrinho.`);
           resolve();
@@ -83,6 +89,7 @@ export const CartProvider = ({ children }) => {
             description: 'Edição digital · fica na sua biblioteca quando o pagamento for confirmado',
           });
         }
+        vibrar();
         resolve();
         return;
       }
@@ -123,6 +130,8 @@ export const CartProvider = ({ children }) => {
           description: etiqueta ? `${quantity}× · ${etiqueta}` : `${quantity}×`,
         });
       }
+      // No app, um toque leve no telemóvel confirma que entrou (lib/nativeApp.js).
+      vibrar();
       resolve();
     });
   }, [cartItems]);
@@ -205,6 +214,12 @@ export const CartProvider = ({ children }) => {
       // Stock próprio da edição, quando o painel o regista (o servidor recusa acima dele).
       if (version && /^\s*-?\d+(\.\d+)?\s*$/.test(String(version.stock ?? ''))) {
         stock = Math.min(stock, Math.max(0, Math.floor(Number(version.stock))));
+      }
+      // O carrinho é o da conta: a edição digital posta no site não se compra dentro do app iOS.
+      if (digital && !podeComprarDigital()) {
+        changes.push(`A edição digital de "${title}" não está à venda na app e saiu do carrinho.`);
+        updates.set(item.variant.id, null);
+        continue;
       }
       if (digital) stock = 1;
       if (stock === 0) { changes.push(`"${title}" esgotou e saiu do carrinho.`); updates.set(item.variant.id, null); continue; }

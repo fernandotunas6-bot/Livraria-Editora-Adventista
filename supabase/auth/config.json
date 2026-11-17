@@ -6,7 +6,8 @@
     "https://livrariaadventista.com/**",
     "https://www.livrariaadventista.com/**",
     "https://livraria-editora-adventista-ben.pages.dev/**",
-    "https://*.livraria-editora-adventista-ben.pages.dev/**"
+    "https://*.livraria-editora-adventista-ben.pages.dev/**",
+    "ao.livrariaadventista.app://**"
   ],
   "subjects": {
     "confirmation": "Confirme o seu email — Livraria Adventista",

@@ -1,0 +1,248 @@
+name: App Android
+
+# O app Android (app/mobile, docs/APPS.md) compila-se aqui; não é preciso o Android Studio.
+#
+# - Em cada PR que mexa no app: build de verificação (APK de debug, sem assinatura de envio), que
+#   fica nos artefactos da corrida para instalar num telemóvel e experimentar.
+# - «Run workflow» (à mão) ou uma etiqueta android-v*: o AAB assinado com a chave de envio, nos
+#   artefactos da corrida e, com a conta de serviço da Play Console, na faixa de testes internos
+#   (como rascunho). O primeiro AAB de sempre carrega-se à mão na Play Console.
+#   Sai também o APK assinado com a mesma chave, publicado numa Release do GitHub: é o ficheiro
+#   que a página /app do site dá a descarregar (Configurações → PWA / telemóvel), sempre em
+#   …/releases/latest/download/livraria-adventista.apk.
+#   Segredos: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+#   ANDROID_KEY_PASSWORD; opcionais GOOGLE_SERVICES_JSON (notificações) e
+#   PLAY_SERVICE_ACCOUNT_JSON (envio para a Play Store).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/mobile/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  push:
+    tags: ['android-v*']
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Build de verificação (APK)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - run: npm ci --no-audit --no-fund
+
+      # Copia o www/ e o capacitor.config.json para dentro do projecto Android (estão no
+      # .gitignore) e liga os plugins.
+      - name: Capacitor sync
+        working-directory: app/mobile
+        run: npx cap sync android
+
+      # O APK de debug é o que se instala para experimentar. O AAB de release sai sem assinatura
+      # (não há chave de envio num PR) e deita-se fora: serve para o caminho do envio para a Play
+      # Store (bundleRelease e a verificação lintVital) falhar aqui, e não no dia de publicar.
+      - name: Build (APK de debug e AAB de release sem assinatura)
+        working-directory: app/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug bundleRelease --no-daemon --stacktrace
+
+      # O APK fica nos artefactos da corrida: descarrega-se e instala-se num telemóvel Android
+      # para experimentar o app antes de haver chave de envio ou Play Console (docs/APPS.md).
+      # É um build de debug, sem o Firebase: não recebe notificações e não serve para a loja.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livraria-adventista-android-debug
+          path: app/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  play:
+    name: Enviar para a Play Store
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Confirmar segredos
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Faltam em Settings → Secrets and variables → Actions:$missing (ver docs/APPS.md)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - run: npm ci --no-audit --no-fund
+
+      # As notificações do Android vêm pelo Firebase: sem este ficheiro o app funciona, mas não
+      # pede notificações (o site pergunta ao app antes, lib/pushNotifications.js).
+      - name: Firebase (notificações)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/mobile/android/app/google-services.json
+            echo "Firebase: ligado."
+          else
+            echo "::warning::Sem GOOGLE_SERVICES_JSON: este build não recebe notificações."
+          fi
+
+      - name: Capacitor sync
+        working-directory: app/mobile
+        run: npx cap sync android
+
+      # A chave de envio fica só no disco temporário desta máquina.
+      - name: Chave de envio
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/envio.jks"
+          chmod 600 "$RUNNER_TEMP/envio.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/envio.jks" >> "$GITHUB_ENV"
+
+      - name: AAB assinado
+        working-directory: app/mobile/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          # A versão vem do app/mobile/package.json; o número, desta corrida (a Play Store exige um
+          # número novo em cada envio).
+          export ANDROID_VERSION_NAME="$(node -p "require('../package.json').version")"
+          chmod +x gradlew
+          # O AAB vai para a Play Store; o APK, com a mesma chave, é o que se descarrega do site.
+          ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/livraria-adventista.apk"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livraria-adventista-android
+          path: app/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livraria-adventista-android-apk
+          path: ${{ runner.temp }}/livraria-adventista.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enviar para os testes internos da Play Store
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "Sem PLAY_SERVICE_ACCOUNT_JSON: o AAB fica nos artefactos desta corrida, para carregar à mão." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
+          chmod 600 "$RUNNER_TEMP/play.json"
+          sudo gem install fastlane --no-document
+          fastlane supply \
+            --package_name ao.livrariaadventista.app \
+            --aab app/mobile/android/app/build/outputs/bundle/release/app-release.aab \
+            --track internal \
+            --release_status draft \
+            --json_key "$RUNNER_TEMP/play.json" \
+            --skip_upload_metadata true \
+            --skip_upload_changelogs true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true
+          echo "Build ${{ github.run_number }} enviado para os testes internos (rascunho) da Play Store." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apagar as chaves
+        if: always()
+        run: rm -f "$RUNNER_TEMP/envio.jks" "$RUNNER_TEMP/play.json" app/mobile/android/app/google-services.json
+
+  # O APK assinado fica numa Release pública do GitHub, com o endereço que não muda:
+  #   https://github.com/<dono>/<repositório>/releases/latest/download/livraria-adventista.apk
+  # É esse o endereço a pôr em Configurações → PWA / telemóvel → Android, para a página /app do
+  # site. À parte do job de cima: só este escreve no repositório, e não vê nenhum segredo.
+  apk:
+    name: Publicar o APK para descarregar
+    needs: play
+    # O APK já está nos artefactos quando o envio para a Play Store corre: uma falha lá (o
+    # primeiro AAB carrega-se à mão, por exemplo) não impede de o publicar aqui.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: livraria-adventista-android-apk
+          path: ${{ runner.temp }}/apk
+
+      - name: Release com o APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./app/mobile/package.json').version")"
+          # Com uma etiqueta android-v*, a Release é a dela; à mão, cria-se uma para esta corrida.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="android-v${version}-b${{ github.run_number }}"
+          fi
+          apk="$RUNNER_TEMP/apk/livraria-adventista.apk"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --target "$GITHUB_SHA" \
+              --latest \
+              --title "App Android ${version} (build ${{ github.run_number }})" \
+              --notes "A app da Livraria Adventista para Android. Descarregue o ficheiro livraria-adventista.apk no telemóvel e abra-o para instalar; uma versão nova instala-se por cima."
+          fi
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/livraria-adventista.apk"
+          {
+            echo "APK publicado em **${tag}**."
+            echo ""
+            echo "Ligação para a página /app do site (Configurações → PWA / telemóvel → Android):"
+            echo ""
+            echo "    ${url}"
+          } >> "$GITHUB_STEP_SUMMARY"

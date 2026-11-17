@@ -1,0 +1,40 @@
+{
+  "appId": "ao.livrariaadventista.app",
+  "appName": "Livraria Adventista",
+  "webDir": "www",
+  "server": {
+    "url": "https://livrariaadventista.ao",
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "appendUserAgent": "LivrariaAdventistaApp/1 (iOS)",
+    "contentInset": "never",
+    "backgroundColor": "#ffffff",
+    "allowsLinkPreview": false
+  },
+  "android": {
+    "appendUserAgent": "LivrariaAdventistaApp/1 (Android)",
+    "backgroundColor": "#ffffff",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 10000,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

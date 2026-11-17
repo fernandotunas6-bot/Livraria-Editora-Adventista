@@ -13,7 +13,8 @@
     "test:e2e": "npm run test:e2e --prefix app/web"
   },
   "workspaces": [
-    "app/web"
+    "app/web",
+    "app/mobile"
   ],
   "overrides": {
     "@grpc/grpc-js": "^1.14.7"

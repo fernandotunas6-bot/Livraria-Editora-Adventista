@@ -55,3 +55,12 @@ KIGEST-exportacao-*.kigest
 # Python compilado
 __pycache__/
 *.pyc
+
+# Chaves da Apple (App Store Connect e APNs): vão para os segredos do GitHub e do Supabase,
+# nunca para o repositório (docs/APPS.md).
+*.p8
+# Android: a chave de envio para a Play Store e o ficheiro do Firebase vêm dos segredos do GitHub
+# (.github/workflows/android.yml), nunca do repositório.
+*.jks
+*.keystore
+app/mobile/android/app/google-services.json

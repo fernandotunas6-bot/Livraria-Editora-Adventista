@@ -37,9 +37,16 @@ um mapa).
   com o cliente**: o GPS do telemóvel manda a posição de 10 em 10 segundos quando anda pelo menos
   25 m, ou de 30 em 30 segundos parado — poupa a bateria e os dados de quem entrega. O ecrã fica
   ligado enquanto partilha (Wake Lock, onde o telemóvel o deixa).
-- **Deixar a página aberta** durante a entrega: um site não consegue mandar a localização com a
-  página fechada (só uma app instalada da loja o faria). Fechar pára a partilha e o cliente vê
-  "última posição há X min".
+- **No site, deixar a página aberta** durante a entrega: um site não consegue mandar a localização
+  com a página fechada. Fechar pára a partilha e o cliente vê "última posição há X min".
+- **No app iOS a partilha continua com o ecrã apagado**, noutra página ou noutra app, até à entrega
+  (`app/mobile/ios/App/App/TrajetoPlugin.swift`, `lib/trajetoNativo.js`). É o iPhone que lê o GPS e
+  manda a posição, pela mesma `delivery_share_position`, com a sessão de quem entrega e as mesmas
+  regras (10 s / 25 m, ou 30 s parado). Basta a permissão «Durante a utilização»: começa com o app à
+  frente e o iOS mostra o indicador azul no topo enquanto partilha. A sessão renova-se no site de
+  hora a hora com o app à frente; se caducar em segundo plano, o envio pára e o iPhone avisa
+  «A partilha da localização parou — abra a app». Pára sozinha quando a encomenda é entregue ou
+  cancelada (o servidor responde «terminou»).
 - "Parar de partilhar" pára; a partilha também pára sozinha quando a encomenda é entregue ou
   cancelada.
 
@@ -76,4 +83,5 @@ Function.
   fornecedor de mosaicos com chave (MapTiler, Stadia, Thunderforest) mudando só o endereço em
   `DeliveryMap.jsx`.
 - O tempo estimado não conhece o trânsito nem as ruas: é uma conta pela distância.
-- Sem partilha com a página fechada (ver acima).
+- No site, sem partilha com a página fechada (ver acima). No app iOS, até uma hora em segundo
+  plano sem abrir o app (a validade da sessão do Supabase).

@@ -20,6 +20,7 @@ import { AUTH_REDIRECT_ERROR, withoutAuthError } from '@/lib/authRedirectError';
 import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import { captureReferral } from '@/lib/colporteurReferral';
+import { eAppNativa } from '@/lib/nativeApp';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -54,10 +55,13 @@ const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx')
 const ColporteurVerifyPage = lazy(() => import('@/pages/ColporteurVerifyPage.jsx'));
 const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
+const AppDownloadPage = lazy(() => import('@/pages/AppDownloadPage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 // "Nova versão disponível — Actualizar" e "App actualizada" (lib/appVersion.js).
 const AppUpdateNotice = lazy(() => import('@/components/AppUpdateNotice.jsx'));
+// Só dentro do app iOS (lib/nativeApp.js): ligações que abrem o app, barra de estado, login.
+const NativeAppBridge = lazy(() => import('@/components/NativeAppBridge.jsx'));
 const LivrariaAssistant = lazy(() => import('@/components/LivrariaAssistant.jsx'));
 
 function PageLoader() {
@@ -178,6 +182,8 @@ function ColporteurReferralCapture() {
   return null;
 }
 
+const NO_APP = eAppNativa();
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   const { settings } = useSiteSettings();
@@ -192,6 +198,7 @@ function GlobalWidgets() {
     <Suspense fallback={null}>
       <AppUpdateNotice />
       <PwaInstallBanner />
+      {NO_APP && <NativeAppBridge />}
       {showAssistant && <LivrariaAssistant />}
       <MobileBottomNav />
       <ReaderActivity />
@@ -260,6 +267,10 @@ function App() {
               <Route path="/materiais" element={<MaterialsPage />} />
               <Route path="/novidades" element={<NovidadesPage />} />
               <Route path="/versoes" element={<Navigate to="/novidades" replace />} />
+              <Route path="/app" element={<AppDownloadPage />} />
+              <Route path="/descarregar" element={<Navigate to="/app" replace />} />
+              <Route path="/download" element={<Navigate to="/app" replace />} />
+              <Route path="/aplicacao" element={<Navigate to="/app" replace />} />
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />

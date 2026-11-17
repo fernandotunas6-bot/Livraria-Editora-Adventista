@@ -4,6 +4,10 @@ import { CreditCard, Facebook, Instagram, MapPin, MessageCircle, PackageSearch, 
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
+import { eAppNativa } from '@/lib/nativeApp';
+
+// Dentro dos apps não há nada para descarregar: a ligação para a página /app não aparece.
+const NO_APP = eAppNativa();
 
 /**
  * Rodapé do telemóvel (todas as páginas: o `Footer` escolhe este abaixo de 768 px).
@@ -118,6 +122,11 @@ export default function FooterCompact() {
           <Link to="/faq" className={pe}>
             Perguntas frequentes
           </Link>
+          {!NO_APP && (
+            <Link to="/app" className={pe}>
+              Descarregar a app
+            </Link>
+          )}
         </div>
       </div>
     </footer>

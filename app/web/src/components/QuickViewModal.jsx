@@ -163,7 +163,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
                     )}
                     <dt className="text-muted-foreground">Stock</dt>
                     <dd className={inStock ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>
-                      {!inStock ? 'Esgotado' : product.digital_only ? 'Edição digital' : product.has_digital && !(variant?.inventory_quantity > 0) ? 'Edição digital disponível' : `${variant?.inventory_quantity ?? 0} un.`}
+                      {!inStock ? (product.digital_fora_da_app && product.digital_only ? 'Não está à venda na app' : 'Esgotado') : product.digital_only ? 'Edição digital' : product.has_digital && !(variant?.inventory_quantity > 0) ? 'Edição digital disponível' : `${variant?.inventory_quantity ?? 0} un.`}
                     </dd>
                   </dl>
 

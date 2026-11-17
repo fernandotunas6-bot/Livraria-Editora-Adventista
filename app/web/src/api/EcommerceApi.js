@@ -7,7 +7,7 @@ import { toSiteRelativeUrl } from '@/lib/imageUrl';
 import { looksLikeProductCode, normalizeProductCode, variantNames } from '@/lib/productTypes';
 import { getRecentlyViewed } from '@/lib/recentlyViewed';
 import { sanitizeYoutubeUrl } from '@/lib/youtube';
-import { isDigitalEdition, productHasDigital, productOnlyDigital, versionIsDigital } from '@/lib/digitalEditions';
+import { isDigitalEdition, podeComprarDigital, productHasDigital, productOnlyDigital, versionIsDigital } from '@/lib/digitalEditions';
 
 // Só livros visíveis na loja (quem gere o catálogo também lê os ocultos, mas não os vê na loja).
 const VISIBLE = 'active = true';
@@ -46,7 +46,10 @@ function bookToProduct(book, collectionsMap = {}) {
   const cover = resolveBookCover(book);
   // Edições digitais (lib/digitalEditions.js): sem stock nem envio, uma por conta.
   const digitalDefault = isDigitalEdition(book, null);
-  const hasDigital = productHasDigital(book);
+  // No app iOS a edição digital não se vende (lib/digitalEditions.js: podeComprarDigital): o
+  // produto fica com o que se vende em papel, e o só digital fica "não está à venda na app".
+  const digitalForaDaApp = productHasDigital(book) && !podeComprarDigital();
+  const hasDigital = productHasDigital(book) && !digitalForaDaApp;
 
   const variant = {
     id: variantId,
@@ -75,6 +78,7 @@ function bookToProduct(book, collectionsMap = {}) {
     purchasable: stock > 0 || hasDigital,
     has_digital: hasDigital,
     digital_only: productOnlyDigital(book),
+    digital_fora_da_app: digitalForaDaApp,
     ribbon_text: book.urgency_text || (onSale ? `Promoção −${Math.round((1 - saleInCents / priceInCents) * 100)}%` : book.featured ? 'Destaque' : book.stock_low && stock > 0 ? 'Últimas unidades' : null),
     on_sale: onSale,
     sale_ends_at: onSale ? book.sale_ends_at || null : null,
@@ -370,6 +374,12 @@ async function loadProduct(id) {
         isbn: v.isbn || '',
       };
     });
+    // No app iOS as edições digitais saem da escolha (os ids das outras não mudam: `-v<índice>`).
+    if (product.digital_fora_da_app) {
+      const aVenda = product.variants.filter((v) => !v.digital);
+      if (aVenda.length) product.variants = aVenda;
+      else product.purchasable = false;
+    }
     // A capa própria de cada variante (a cor de uma bíblia) entra na galeria: a página do
     // produto só muda a imagem ao escolher a variante se a capa dela estiver em `images`.
     product.images = withVariantImages(product.images, product.variants);

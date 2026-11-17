@@ -48,7 +48,11 @@ import { Switch } from '@/components/ui/switch';
 import { getPaymentMethods } from '@/api/PlatformApi';
 import { getProduct } from '@/api/EcommerceApi';
 import { isPaidUpfront } from '@/lib/paymentMethods';
-import { appUpdatesWanted, isPushSupported, setAppUpdatesPush, subscribeToPush, requestPushPermission } from '@/lib/pushNotifications';
+import {
+  appUpdatesWanted, desligarPushNativo, isPushSupported, pushDisponivel, pushNativoLigado, pushNativoNoServidor, setAppUpdatesPush,
+  subscribeToPush, requestPushPermission,
+} from '@/lib/pushNotifications';
+import { eAppAndroid, eAppNativa } from '@/lib/nativeApp';
 import { ROLES } from '@/lib/permissions';
 import { customerOrderStage, isOrderFinished } from '@/lib/customerOrders';
 import { kwanza } from '@/lib/money';
@@ -184,6 +188,14 @@ const ProfilePage = () => {
   );
   const [movingToCart, setMovingToCart] = useState('');
   const [appUpdates, setAppUpdates] = useState(() => appUpdatesWanted());
+  // No app a permissão é a do telemóvel (o WebView não tem `Notification`), e quem as desligou
+  // aqui continua com elas desligadas.
+  useEffect(() => {
+    if (!eAppNativa()) return undefined;
+    let vivo = true;
+    pushNativoLigado().then((ligado) => { if (vivo) setPushEnabled(ligado); });
+    return () => { vivo = false; };
+  }, []);
 
   const handleAppUpdatesToggle = async (enabled) => {
     setAppUpdates(enabled);
@@ -201,22 +213,46 @@ const ProfilePage = () => {
       toast({ variant: 'destructive', title: 'Não suportado', description: 'O seu browser não suporta notificações push.' });
       return;
     }
-    if (!settings?.push_enabled || !settings?.vapid_public_key) {
+    if (!pushDisponivel(settings)) {
       toast({ variant: 'destructive', title: 'Indisponível', description: 'Notificações push não estão activas na loja.' });
       return;
     }
     setPushLoading(true);
     try {
       if (enabled) {
-        const perm = await requestPushPermission();
-        if (perm !== 'granted') {
-          toast({ variant: 'destructive', title: 'Permissão negada', description: 'Active notificações nas definições do browser.' });
+        // Nos apps: o servidor ainda não envia para este telemóvel (APNs ou Firebase por ligar), ou
+        // este build não traz as notificações. Dizer «activadas» era prometer avisos que não chegam.
+        if (eAppNativa() && !await pushNativoNoServidor()) {
+          toast({ variant: 'destructive', title: 'Indisponível', description: 'As notificações da app ainda não estão ligadas na loja.' });
           setPushEnabled(false);
           return;
         }
-        await subscribeToPush(settings.vapid_public_key);
+        const perm = await requestPushPermission();
+        if (perm === 'unsupported') {
+          toast({ variant: 'destructive', title: 'Indisponível', description: 'Esta versão da app não recebe notificações.' });
+          setPushEnabled(false);
+          return;
+        }
+        if (perm !== 'granted') {
+          toast({
+            variant: 'destructive',
+            title: 'Permissão negada',
+            description: eAppAndroid()
+              ? 'Active as notificações em Definições → Apps → Livraria Adventista → Notificações.'
+              : eAppNativa()
+                ? 'Active as notificações em Definições do iPhone → Livraria Adventista → Notificações.'
+                : 'Active notificações nas definições do browser.',
+          });
+          setPushEnabled(false);
+          return;
+        }
+        await subscribeToPush(settings.vapid_public_key, { pedida: true });
         setPushEnabled(true);
         toast({ title: 'Notificações activadas', description: 'Receberá alertas de encomendas e novidades.' });
+      } else if (eAppNativa()) {
+        await desligarPushNativo();
+        setPushEnabled(false);
+        toast({ title: 'Notificações desactivadas' });
       } else {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();

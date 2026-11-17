@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { getDownloadUrl } from '@/lib/downloadsApi';
+import { abrirNoNavegadorDoApp } from '@/lib/nativeApp';
 import { downloadAction, downloadKindLabel, formatFileSize, variantLabel } from '@/lib/downloads';
 
 /**
@@ -24,8 +25,9 @@ export default function DownloadItem({ item, product = null, compact = false }) 
     setBusy(true);
     try {
       const url = await getDownloadUrl(item);
-      // O link traz Content-Disposition: attachment, por isso a página não muda.
-      window.location.assign(url);
+      // No app, a folha do Safari por cima do app mostra o PDF e guarda-o (lib/nativeApp.js).
+      // No site, o link traz Content-Disposition: attachment, por isso a página não muda.
+      if (!(await abrirNoNavegadorDoApp(url))) window.location.assign(url);
     } catch (e) {
       toast({ variant: 'destructive', title: 'Não foi possível descarregar', description: e.message });
     } finally {

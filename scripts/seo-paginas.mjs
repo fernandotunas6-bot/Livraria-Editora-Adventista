@@ -107,6 +107,7 @@ export const FIXED_PAGES = [
   { path: '/contact', title: 'Contacto', description: `Entre em contacto com a ${SITE_NAME}. Estamos aqui para ajudar.` },
   { path: '/faq', title: 'FAQ', description: 'Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.' },
   { path: '/materiais', title: 'Materiais para descarregar', description: 'Revistas, lições e folhetos em PDF para descarregar.' },
+  { path: '/app', title: 'Descarregar a app', description: 'A app da Livraria Adventista para Android e para iPhone: avisos das encomendas, a sua conta e a loja toda no telemóvel.' },
   { path: '/comunidade', title: 'Comunidade de Leitores', description: 'Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.' },
   { path: '/shipping-returns', title: 'Envios e Devoluções', description: 'Prazos de entrega, custos de envio em Angola e como devolver um livro.' },
   { path: '/privacidade', title: 'Política de privacidade', description: 'Que dados pessoais tratamos na loja, na comunidade de leitores e no atendimento, com quem os partilhamos e como exercer os seus direitos.' },

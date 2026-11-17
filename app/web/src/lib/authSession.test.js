@@ -171,6 +171,12 @@ describe('sessionMethod', () => {
     expect(sessionMethod(token({ amr: [{ method: 'recovery', timestamp: 1 }] }))).toBe('email');
   });
 
+  it('a Apple (app iOS) também chega como `oauth`: distingue-se pelo fornecedor', () => {
+    expect(sessionMethod(token({ app_metadata: { provider: 'apple' }, amr: [{ method: 'oauth', timestamp: 1 }] }))).toBe('apple');
+    expect(sessionMethod(token({ app_metadata: { provider: 'google' }, amr: [{ method: 'oauth', timestamp: 1 }] }))).toBe('google');
+    expect(sessionMethod(token({ app_metadata: { provider: 'apple' }, amr: [{ method: 'password', timestamp: 1 }] }))).toBe('email');
+  });
+
   it('a verificação em dois passos não esconde o método principal', () => {
     expect(sessionMethod(token({ amr: [{ method: 'totp', timestamp: 9 }, { method: 'oauth', timestamp: 5 }] }))).toBe('google');
   });

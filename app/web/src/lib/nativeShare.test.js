@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canNativeShare, copyText, nativeShare } from '@/lib/nativeShare';
+
+const pluginShare = vi.fn(async () => ({}));
+vi.mock('@capacitor/share', () => ({ Share: { share: pluginShare } }));
+
+const { canNativeShare, copyText, nativeShare } = await import('@/lib/nativeShare');
 
 const original = { share: navigator.share, clipboard: navigator.clipboard };
 afterEach(() => {
+  delete window.Capacitor;
+  pluginShare.mockClear();
   Object.defineProperty(navigator, 'share', { value: original.share, configurable: true });
   Object.defineProperty(navigator, 'clipboard', { value: original.clipboard, configurable: true });
 });
@@ -25,6 +31,19 @@ describe('nativeShare', () => {
 
     share.mockRejectedValueOnce(Object.assign(new Error('não'), { name: 'NotAllowedError' }));
     expect(await nativeShare({ url: 'https://x' })).toBe('unsupported');
+  });
+});
+
+describe('nativeShare no app iOS', () => {
+  it('usa a folha nativa do plugin, mesmo sem a do WKWebView', async () => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    expect(canNativeShare()).toBe(true);
+    expect(await nativeShare({ title: 'Livro', text: 'Leia', url: 'https://x/p/1' })).toBe('shared');
+    expect(pluginShare).toHaveBeenCalledWith({ title: 'Livro', text: 'Leia', url: 'https://x/p/1', dialogTitle: 'Livro' });
+
+    pluginShare.mockRejectedValueOnce(new Error('Share canceled'));
+    expect(await nativeShare({ url: 'https://x' })).toBe('cancelled');
   });
 });
 

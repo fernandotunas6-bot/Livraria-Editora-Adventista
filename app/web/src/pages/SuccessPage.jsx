@@ -14,7 +14,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { useToast } from '@/hooks/use-toast';
 import { loadLastOrder, downloadReceipt, sendReceiptViaWhatsApp, receiptBrand } from '@/lib/receipt';
-import { showLocalNotification, subscribeToPush, isPushSupported } from '@/lib/pushNotifications';
+import { showLocalNotification, subscribeToPush, isPushSupported, pushDisponivel } from '@/lib/pushNotifications';
 import { isPaidUpfront } from '@/lib/paymentMethods';
 import PayLaterBox from '@/components/PayLaterBox';
 import { kwanza } from '@/lib/money';
@@ -89,10 +89,10 @@ const SuccessPage = () => {
   // Sem notificações locais, oferece-se o push uma vez, quando as definições chegam.
   useEffect(() => {
     if (!hasOrder || isWhatsApp || localShown !== false || pushTriedRef.current) return;
-    if (!settings.push_enabled || !settings.vapid_public_key || !isPushSupported()) return;
+    if (!pushDisponivel(settings) || !isPushSupported()) return;
     pushTriedRef.current = true;
     subscribeToPush(settings.vapid_public_key).catch(() => {});
-  }, [hasOrder, isWhatsApp, localShown, settings.push_enabled, settings.vapid_public_key]);
+  }, [hasOrder, isWhatsApp, localShown, settings]);
 
   // Transferência e Multicaixa: paga-se agora, depois de encomendar. Até lá a compra não está
   // "confirmada": está registada e com o stock reservado.

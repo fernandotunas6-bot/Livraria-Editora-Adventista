@@ -1,8 +1,15 @@
 // Partilhar com a folha do próprio sistema (WhatsApp, Facebook, SMS, copiar…), como nas lojas
 // e redes sociais no telemóvel. Onde não existe (a maioria dos computadores), quem chama
-// decide a alternativa: copiar a ligação ou abrir o WhatsApp.
+// decide a alternativa: copiar a ligação ou abrir o WhatsApp. Dentro do app iOS (lib/nativeApp.js)
+// usa-se a folha nativa do plugin Share: a do WKWebView nem sempre existe.
 
-export const canNativeShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+import { eAppNativa, pluginShare } from '@/lib/nativeApp';
+
+export const canNativeShare = () => eAppNativa()
+  || (typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+
+/** O plugin recusa com «Share canceled» quando a pessoa fecha a folha. */
+const foiCancelada = (error) => error?.name === 'AbortError' || /cancel/i.test(String(error?.message || ''));
 
 /**
  * Abre a folha de partilha. Devolve 'shared', 'cancelled' (a pessoa fechou a folha: não se
@@ -10,11 +17,14 @@ export const canNativeShare = () => typeof navigator !== 'undefined' && typeof n
  */
 export async function nativeShare({ title, text, url }) {
   if (!canNativeShare()) return 'unsupported';
+  const share = await pluginShare();
   try {
-    await navigator.share({ title, text, url });
+    if (share) await share.share({ title, text, url, dialogTitle: title });
+    else if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') await navigator.share({ title, text, url });
+    else return 'unsupported';
     return 'shared';
   } catch (error) {
-    return error?.name === 'AbortError' ? 'cancelled' : 'unsupported';
+    return foiCancelada(error) ? 'cancelled' : 'unsupported';
   }
 }
 
