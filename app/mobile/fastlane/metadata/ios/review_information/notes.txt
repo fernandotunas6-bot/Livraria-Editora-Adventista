@@ -8,11 +8,11 @@ Review notes — Livraria Adventista (Seventh-day Adventist bookshop in Angola).
 The app sells only printed books and other physical goods, delivered by hand in Angola or picked up at our shops. Payment is cash on delivery, bank transfer or Multicaixa Express (a local bank payment), all outside the app for physical goods (3.1.5(a)). Digital editions (PDF) cannot be bought in the app and the app does not point to any other way of buying them; customers who bought them earlier on our website read them in their library ("Biblioteca").
 
 3. SIGN IN AND ACCOUNT DELETION
-Sign in with Apple (native), Google (in the system authentication sheet) or email and password. The account can be deleted in the app: "Perfil" > "Dados pessoais" > "Os seus dados" > "Apagar a conta".
+Sign in with Apple (native), Google (in the system authentication sheet) or email and password. The account can be deleted in the app: "Perfil" > "Segurança e privacidade" > "Os seus dados" > "Apagar a conta".
 
 4. USER-GENERATED CONTENT (Guideline 1.2) — "Comunidade"
 - Report: menu "..." on any post or reply > "Denunciar". Our team reviews reports; a post with three reports is hidden automatically until the team decides.
-- Block: menu "..." > "Bloquear <name>". The user stops seeing that person's posts and replies on all devices; the list and "Desbloquear" are in "Perfil" > "Dados pessoais".
+- Block: menu "..." > "Bloquear <name>". The user stops seeing that person's posts and replies on all devices; the list and "Desbloquear" are in "Perfil" > "Segurança e privacidade".
 - Filter: links in posts are checked against a malicious and adult-content filter before they are shown.
 - The terms ("Termos e condições", section "Comunidade") state there is no tolerance for objectionable content or abusive users; the team can hide content and suspend accounts. Contact details are in "Falar connosco" and in the footer.
 
