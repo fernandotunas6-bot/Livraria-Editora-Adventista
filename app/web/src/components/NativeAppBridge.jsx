@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import {
-  aplicarBarraDeEstado, caminhoDaLigacao, estiloDaBarraDeEstado, numeroNoIcone, pluginApp, pluginPush,
+  aplicarBarraDeEstado, caminhoDaLigacao, eAppAndroid, estiloDaBarraDeEstado, numeroNoIcone, pluginAparelho, pluginApp, pluginPush,
 } from '@/lib/nativeApp';
 import { sincronizarPushNativo } from '@/lib/pushNotifications';
 import { haTrabalhoPorGravar } from '@/lib/unsavedWork';
@@ -17,14 +17,33 @@ export function caminhoDaNotificacao(url) {
   return caminhoDaLigacao(s);
 }
 
+const JANELA_ABERTA = '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
+
 /**
- * Puxar para actualizar (MainViewController.swift): recarrega a página, a não ser que se perca
- * alguma coisa — alterações por gravar (lib/unsavedWork.js) ou uma janela aberta, onde se está a
- * escrever. Devolve o que fazer: 'recarregar', 'por-gravar' ou 'janela'.
+ * Puxar para baixo aqui é actualizar, ou é só deslizar? Só deslizar com uma janela aberta (o
+ * carrinho, um formulário) ou dentro de uma lista com scroll próprio que já desceu: aí puxar sobe
+ * a lista. `alvo`: onde o dedo tocou. O topo da própria página vê-o o telemóvel.
  */
-export function aoPuxarParaActualizar({ porGravar = haTrabalhoPorGravar(), doc = document } = {}) {
+export function podePuxarAqui(alvo, { doc = document, win = window } = {}) {
+  if (doc.querySelector(JANELA_ABERTA)) return false;
+  for (let el = alvo; el && el !== doc.body && el !== doc.documentElement; el = el.parentElement) {
+    if (el.scrollTop > 0) {
+      const { overflowY } = win.getComputedStyle(el);
+      if (overflowY === 'auto' || overflowY === 'scroll') return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Puxar para actualizar (MainViewController.swift no iPhone, MainActivity.java no Android):
+ * recarrega a página, a não ser que se perca alguma coisa — alterações por gravar
+ * (lib/unsavedWork.js) — ou que o gesto fosse só deslizar (podePuxarAqui). Devolve o que fazer:
+ * 'recarregar', 'por-gravar' ou 'janela' (não fazer nada).
+ */
+export function aoPuxarParaActualizar({ porGravar = haTrabalhoPorGravar(), doc = document, win = window, alvo = null } = {}) {
+  if (!podePuxarAqui(alvo, { doc, win })) return 'janela';
   if (porGravar) return 'por-gravar';
-  if (doc.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return 'janela';
   return 'recarregar';
 }
 
@@ -58,7 +77,7 @@ const LANCAMENTO_SEGUIDO = 'livraria:app-ligacao-inicial';
  * - notificações: tocar numa abre a página dela; ao abrir o app e a cada entrada ou saída de
  *   conta, o aparelho volta a dizer ao servidor de quem é (lib/pushNotifications.js);
  * - o número no ícone do app: os avisos por ler da conta;
- * - puxar para actualizar.
+ * - puxar para actualizar (e, no Android, dizer ao app quando o gesto é só deslizar).
  */
 export default function NativeAppBridge() {
   const navigate = useNavigate();
@@ -76,15 +95,55 @@ export default function NativeAppBridge() {
     numeroNoIcone(user?.id ? unread : 0);
   }, [ready, user?.id, unread]);
 
+  // Onde o dedo tocou por último: o puxar para actualizar não recarrega quando o gesto era subir
+  // uma lista com scroll próprio.
+  const ultimoToque = useRef(null);
   useEffect(() => {
     const puxou = () => {
-      const fazer = aoPuxarParaActualizar();
+      const fazer = aoPuxarParaActualizar({ alvo: ultimoToque.current });
       if (fazer === 'recarregar') window.location.reload();
       else if (fazer === 'por-gravar') toast.info('Há alterações por gravar nesta página', { description: 'Grave-as antes de actualizar.' });
       // Com uma janela aberta, puxar é só deslizar dentro dela: não se faz nada.
     };
+    const tocou = (e) => { ultimoToque.current = e.target; };
+    document.addEventListener('touchstart', tocou, { capture: true, passive: true });
     window.addEventListener('livraria:puxar-para-actualizar', puxou);
-    return () => window.removeEventListener('livraria:puxar-para-actualizar', puxou);
+    return () => {
+      document.removeEventListener('touchstart', tocou, { capture: true });
+      window.removeEventListener('livraria:puxar-para-actualizar', puxou);
+    };
+  }, []);
+
+  // Android: o gesto de puxar é do app (MainActivity.java), que decide antes de o dedo andar. O
+  // site diz-lhe se pode — ao tocar, ao deslizar e quando uma janela abre ou fecha — para não
+  // roubar o deslizar de uma janela ou de uma lista. No iPhone o próprio WKWebView já o sabe.
+  useEffect(() => {
+    if (!eAppAndroid()) return undefined;
+    let ultimo = null;
+    let agendado = 0;
+    const dizer = () => {
+      agendado = 0;
+      const pode = podePuxarAqui(ultimoToque.current);
+      if (pode === ultimo) return;
+      ultimo = pode;
+      pluginAparelho().then((a) => a?.podePuxar({ sim: pode })).catch(() => {
+        // Versão do app sem o puxar para actualizar: nada a dizer.
+      });
+    };
+    const agendar = () => { if (!agendado) agendado = requestAnimationFrame(dizer); };
+    // Ao tocar diz-se logo, sem esperar: o app decide quando o dedo começa a andar.
+    const tocou = (e) => { ultimoToque.current = e.target; dizer(); };
+    document.addEventListener('touchstart', tocou, { capture: true, passive: true });
+    document.addEventListener('scroll', agendar, { capture: true, passive: true });
+    const janelas = new MutationObserver(agendar);
+    janelas.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-state'] });
+    dizer();
+    return () => {
+      document.removeEventListener('touchstart', tocou, { capture: true });
+      document.removeEventListener('scroll', agendar, { capture: true });
+      janelas.disconnect();
+      if (agendado) cancelAnimationFrame(agendado);
+    };
   }, []);
 
   // O aparelho fica associado a quem tem sessão agora (ou a ninguém, depois de sair).

@@ -14,6 +14,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * - pushConfigurado: as notificações do Android vêm pelo Firebase, que só existe se o build levou o
  *   google-services.json (segredo GOOGLE_SERVICES_JSON no GitHub, docs/APPS.md). Sem ele, pedir
  *   o registo derrubava o app; o site pergunta primeiro (lib/pushNotifications.js).
+ * - podePuxar: o site diz se puxar para baixo é actualizar ou só deslizar (MainActivity.java).
  */
 @CapacitorPlugin(name = "Aparelho")
 public class AparelhoPlugin extends Plugin {
@@ -30,5 +31,13 @@ public class AparelhoPlugin extends Plugin {
         JSObject resposta = new JSObject();
         resposta.put("configurado", id != 0);
         call.resolve(resposta);
+    }
+
+    /** O site (NativeAppBridge.jsx) diz se o puxar para actualizar pode começar agora. */
+    @PluginMethod
+    public void podePuxar(PluginCall call) {
+        Boolean sim = call.getBoolean("sim", true);
+        MainActivity.podePuxar = sim == null || sim;
+        call.resolve();
     }
 }
