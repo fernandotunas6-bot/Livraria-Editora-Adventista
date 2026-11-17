@@ -730,7 +730,7 @@ export default function SettingsTab() {
                 </p>
               </div>
               {[
-                ['app_android_url', 'app-android', 'Android', 'O APK publicado no GitHub ou a página da Google Play.', 'https://github.com/…/releases/latest/download/livraria-adventista.apk'],
+                ['app_android_url', 'app-android', 'Android', 'O APK servido pelo site (workflow «App Android») ou a página da Google Play.', 'https://livrariaadventista.ao/downloads/livraria-adventista.apk'],
                 ['app_ios_url', 'app-ios', 'iPhone e iPad', 'A página da App Store ou o convite público do TestFlight.', 'https://apps.apple.com/…'],
               ].map(([campo, id, nome, ajuda, exemplo]) => {
                 const escrito = String(form[campo] || '').trim();

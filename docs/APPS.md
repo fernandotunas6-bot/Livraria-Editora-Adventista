@@ -234,7 +234,7 @@ descarregar** (`site_settings.app_android_url` e `app_ios_url`; só ligações `
 
 | Campo | O que pôr | O botão |
 |---|---|---|
-| Android | o APK publicado pelo workflow: `https://github.com/fernandotunas6-bot/Livraria-Editora-Adventista/releases/latest/download/livraria-adventista.apk` | boneco do Android, «Descarregar para Android», com os passos para instalar |
+| Android | o APK servido pelo site: `https://livrariaadventista.ao/downloads/livraria-adventista.apk` | boneco do Android, «Descarregar para Android», com os passos para instalar |
 | Android (mais tarde) | a página da Google Play | logótipo da Google Play, «Disponível no Google Play» |
 | iPhone | o convite público do TestFlight (`https://testflight.apple.com/join/…`) | logótipo da Apple, «Experimentar no TestFlight» |
 | iPhone (mais tarde) | a página da App Store (`https://apps.apple.com/…`) | logótipo da Apple, «Descarregar na App Store» |
@@ -254,9 +254,11 @@ Google Play só aparece quando a ligação é mesmo da Google Play, não no APK 
 - **O APK do site e a Google Play não se misturam**: o APK é assinado com a chave de envio e a app
   da Play Store com a chave da Google. Quem instalou o APK tem de o desinstalar antes de instalar
   pela Play Store. Quando a app estiver na Play Store, trocar a ligação do Android pela da loja.
-- O APK só se publica com os segredos da chave de envio no GitHub (passo 2 do Android, acima). A
-  ligação `…/releases/latest/download/livraria-adventista.apk` não muda de versão para versão: cada
-  corrida do workflow publica uma Release nova e a ligação passa a dar a mais recente.
+- O APK só se publica com os segredos da chave de envio no GitHub (passo 2 do Android, acima). Cada
+  corrida do workflow publica uma Release nova e lança o deploy do site, que copia o APK da Release
+  mais recente para `/downloads/livraria-adventista.apk` (deploy-cloudflare.yml). O repositório é
+  privado: o endereço da Release (`…/releases/latest/download/…`) só abre com sessão no GitHub, por
+  isso a página `/app` usa o do site, que não muda de versão para versão.
 
 ## Experimentar no Android sem a Play Store
 

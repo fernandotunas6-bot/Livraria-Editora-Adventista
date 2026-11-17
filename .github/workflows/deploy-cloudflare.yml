@@ -59,6 +59,23 @@ jobs:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
 
+      # O APK da app Android (workflow «App Android») vive numa Release do GitHub; o repositório
+      # é privado e quem visita o site não o descarregava de lá. Vai para /downloads/, servido pelo
+      # próprio site (o endereço da página /app). Sem nenhuma Release com o APK, segue sem ele.
+      - name: App Android para descarregar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("android-v"))][0].tagName // empty')"
+          if [ -z "$tag" ]; then
+            echo "Ainda não há APK publicado (workflow «App Android»): /downloads/ fica vazio."
+            exit 0
+          fi
+          mkdir -p dist/app/web/downloads
+          gh release download "$tag" --pattern livraria-adventista.apk --dir dist/app/web/downloads --clobber
+          ls -la dist/app/web/downloads
+          echo "APK de $tag em /downloads/livraria-adventista.apk" >> "$GITHUB_STEP_SUMMARY"
+
       - name: SEO e partilha do catálogo
         run: node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL"
         env:

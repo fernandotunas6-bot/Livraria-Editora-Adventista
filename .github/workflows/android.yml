@@ -8,8 +8,9 @@ name: App Android
 #   artefactos da corrida e, com a conta de serviço da Play Console, na faixa de testes internos
 #   (como rascunho). O primeiro AAB de sempre carrega-se à mão na Play Console.
 #   Sai também o APK assinado com a mesma chave, publicado numa Release do GitHub: é o ficheiro
-#   que a página /app do site dá a descarregar (Configurações → PWA / telemóvel), sempre em
-#   …/releases/latest/download/livraria-adventista.apk.
+#   que a página /app do site dá a descarregar (Configurações → PWA / telemóvel): o deploy do site
+#   copia-o para https://livrariaadventista.ao/downloads/livraria-adventista.apk (o repositório é
+#   privado, e a Release só se descarrega com sessão no GitHub).
 #   Segredos: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
 #   ANDROID_KEY_PASSWORD; opcionais GOOGLE_SERVICES_JSON (notificações) e
 #   PLAY_SERVICE_ACCOUNT_JSON (envio para a Play Store).
@@ -195,10 +196,13 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/envio.jks" "$RUNNER_TEMP/play.json" app/mobile/android/app/google-services.json
 
-  # O APK assinado fica numa Release pública do GitHub, com o endereço que não muda:
-  #   https://github.com/<dono>/<repositório>/releases/latest/download/livraria-adventista.apk
-  # É esse o endereço a pôr em Configurações → PWA / telemóvel → Android, para a página /app do
-  # site. À parte do job de cima: só este escreve no repositório, e não vê nenhum segredo.
+  # O APK assinado fica numa Release do GitHub e, a seguir, o site é publicado outra vez: o
+  # deploy (deploy-cloudflare.yml) copia o APK da Release mais recente para
+  #   https://livrariaadventista.ao/downloads/livraria-adventista.apk
+  # o endereço a pôr em Configurações → PWA / telemóvel → Android, para a página /app. Os
+  # ficheiros de uma Release de um repositório privado (como este) não se descarregam sem sessão
+  # no GitHub; servidos pelo site, sim. À parte do job de cima: só este escreve no repositório,
+  # e não vê nenhum segredo.
   apk:
     name: Publicar o APK para descarregar
     needs: play
@@ -209,6 +213,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      # Para lançar o deploy do site, que passa a servir o APK novo.
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -238,11 +244,16 @@ jobs:
               --title "App Android ${version} (build ${{ github.run_number }})" \
               --notes "A app da Livraria Adventista para Android. Descarregue o ficheiro livraria-adventista.apk no telemóvel e abra-o para instalar; uma versão nova instala-se por cima."
           fi
-          url="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/livraria-adventista.apk"
           {
             echo "APK publicado em **${tag}**."
             echo ""
-            echo "Ligação para a página /app do site (Configurações → PWA / telemóvel → Android):"
+            echo "O site é publicado outra vez e passa a servi-lo em (Configurações → PWA / telemóvel → Android):"
             echo ""
-            echo "    ${url}"
+            echo "    https://livrariaadventista.ao/downloads/livraria-adventista.apk"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # O deploy do site copia o APK desta Release para /downloads/ (deploy-cloudflare.yml).
+      - name: Publicar o site com o APK novo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-cloudflare.yml --ref main
