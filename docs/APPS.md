@@ -48,7 +48,9 @@ O mesmo site, com o que o Android pede (`app/mobile/android`):
 | Ligações que abrem no app | App Links do `.ao` (verificados) | `AndroidManifest.xml`, `scripts/ligacoes-app.mjs` |
 | Palavras-passe do Chrome | `get_login_creds` no assetlinks.json | o mesmo ficheiro |
 | Voltar | O botão do sistema volta à página anterior; na primeira, sai | o Capacitor |
+| Puxar para actualizar | Como no iPhone: recarrega, ou avisa que há alterações por gravar; numa janela aberta ou numa lista que já desceu, puxar é só deslizar (o site diz ao app antes de cada gesto) | `MainActivity.java`, `AparelhoPlugin.java`, `NativeAppBridge.jsx` |
 | Margens do ecrã | O site fica entre a barra de estado e a de navegação (`env(safe-area-inset-*)`) | `capacitor.config.json` (SystemBars) |
+| Trajeto com o ecrã apagado | Quem entrega partilha a posição em segundo plano até à entrega, com a notificação «A partilhar a localização» | `TrajetoService.java`, `TrajetoPlugin.java`, `lib/trajetoNativo.js` ([TRAJETO_GPS.md](TRAJETO_GPS.md)) |
 | Ícone e arranque | O logotipo, com ícone adaptativo | `android/app/src/main/res` |
 
 Sem o `google-services.json` no build, o app funciona mas não pede notificações: o plugin
@@ -78,10 +80,8 @@ nada disto acontece e nenhum código do app é descarregado.
 
 ## O que fica de fora (por agora)
 
-- **Android**: o trajeto de quem entrega com o ecrã apagado (no iPhone já existe; no Android
-  precisa de um serviço em primeiro plano próprio), o puxar para actualizar e o número no ícone
-  (o Android mostra o das notificações por ler). O microfone da narração dos vídeos dos relatórios
-  usa-se no site.
+- **Android**: o número no ícone (o Android mostra o das notificações por ler). O microfone da
+  narração dos vídeos dos relatórios usa-se no site.
 
 - Os links de email do Supabase (confirmar conta, nova palavra-passe) passam primeiro pelo Supabase
   e acabam no Safari, não no app. A conta fica confirmada na mesma.
@@ -222,6 +222,14 @@ O que só se faz na App Store Connect:
    pasta `android/` do artefacto). Na Play Console: **Segurança dos dados** com as mesmas respostas
    do manifesto de privacidade do iPhone, classificação de conteúdo, público-alvo, e a declaração de
    que a app não vende conteúdo digital.
+8. **Serviço de localização em primeiro plano** (Play Console → Política e programas → Conteúdo da
+   app → **Permissões de serviço em primeiro plano**): declarar **Localização**. Descrição: «Quem
+   entrega uma encomenda toca em "Partilhar a minha localização" e o telemóvel continua a mandar a
+   posição ao cliente com o ecrã apagado, até à entrega; a notificação "A partilhar a localização"
+   fica na barra enquanto dura.» A Google pede um vídeo curto do caminho: abrir uma encomenda «Saiu
+   para entrega», tocar em Partilhar, apagar o ecrã, e ver o mapa do cliente a mexer. Não é preciso
+   a localização em segundo plano (`ACCESS_BACKGROUND_LOCATION`): a partilha começa sempre com o app
+   à frente.
 
 ## A página /app: descarregar os apps a partir do site
 
@@ -281,6 +289,11 @@ primeiro) e não serve para a Play Store. As ligações do site também não abr
    nele abre a página.
 4. Tocar num link de rastreio de um email: abre no app (depois do passo 5 acima).
 5. Uma edição digital não aparece para compra; o impresso compra-se até ao fim.
+6. No topo de uma página, puxar para baixo recarrega; com o carrinho aberto, puxar só desliza a lista.
+7. Com uma conta de quem entrega: numa encomenda «Saiu para entrega», «Partilhar a minha
+   localização» → aceitar a localização exacta → aparece a notificação «A partilhar a localização».
+   Apagar o ecrã uns minutos e ver, no rastreio do cliente, a posição a mudar; «Parar de partilhar»
+   tira a notificação.
 
 ## Testar no iPhone (TestFlight)
 

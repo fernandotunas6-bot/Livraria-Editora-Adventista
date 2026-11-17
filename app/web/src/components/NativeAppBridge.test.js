@@ -5,7 +5,7 @@ vi.mock('@/hooks/useSiteSettings', () => ({ useSiteSettings: () => ({ settings: 
 vi.mock('@/hooks/useNotifications', () => ({ useNotifications: () => ({ unread: 0 }) }));
 vi.mock('@/lib/pushNotifications', () => ({ sincronizarPushNativo: async () => false }));
 
-const { aoPuxarParaActualizar, caminhoDaNotificacao, seguidorDeLigacoes } = await import('./NativeAppBridge.jsx');
+const { aoPuxarParaActualizar, caminhoDaNotificacao, podePuxarAqui, seguidorDeLigacoes } = await import('./NativeAppBridge.jsx');
 
 describe('seguidorDeLigacoes', () => {
   it('a ligação que abriu o app chega duas vezes e segue-se uma', () => {
@@ -75,5 +75,54 @@ describe('aoPuxarParaActualizar', () => {
   it('com uma janela aberta (o carrinho, um formulário), não faz nada', () => {
     expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" data-state="open"></div>') })).toBe('janela');
     expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="alertdialog" data-state="open"></div>') })).toBe('janela');
+    // Deslizar dentro de uma janela não é pedir para actualizar: nem o aviso das alterações.
+    expect(aoPuxarParaActualizar({ porGravar: true, doc: docCom('<div role="dialog" data-state="open"></div>') })).toBe('janela');
+  });
+
+  it('as janelas feitas à mão também contam (o carrinho, os filtros, o assistente), sem data-state', () => {
+    // O carrinho e os filtros no telemóvel: modais, só no ecrã enquanto abertos.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-modal="true" aria-labelledby="titulo-carrinho"></div>') })).toBe('janela');
+    // O assistente: ecrã inteiro no telemóvel, sem aria-modal.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-label="Assistente"></div>') })).toBe('janela');
+    // Uma do Radix a fechar já não conta.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-modal="true" data-state="closed"></div>') })).toBe('recarregar');
+  });
+
+  it('dentro de uma lista que já desceu, puxar é subir a lista: não recarrega', () => {
+    const doc = docCom('<div id="lista" style="overflow-y:auto;height:100px"><p id="item">x</p></div>');
+    const lista = doc.getElementById('lista');
+    const item = doc.getElementById('item');
+    const win = { getComputedStyle: (el) => ({ overflowY: el.style.overflowY || 'visible' }) };
+    Object.defineProperty(lista, 'scrollTop', { value: 240, configurable: true });
+    expect(aoPuxarParaActualizar({ porGravar: false, doc, win, alvo: item })).toBe('janela');
+    // A lista no topo: puxar já é actualizar.
+    Object.defineProperty(lista, 'scrollTop', { value: 0, configurable: true });
+    expect(aoPuxarParaActualizar({ porGravar: false, doc, win, alvo: item })).toBe('recarregar');
+  });
+});
+
+describe('podePuxarAqui', () => {
+  const docCom = (html) => {
+    const d = document.implementation.createHTMLDocument('x');
+    d.body.innerHTML = html;
+    return d;
+  };
+  const win = { getComputedStyle: (el) => ({ overflowY: el.style.overflowY || 'visible' }) };
+
+  it('sem toque nem janela, pode', () => {
+    expect(podePuxarAqui(null, { doc: docCom('<main></main>'), win })).toBe(true);
+  });
+
+  it('uma janela aberta não deixa, onde quer que se toque', () => {
+    expect(podePuxarAqui(null, { doc: docCom('<div role="dialog" data-state="open"></div>'), win })).toBe(false);
+  });
+
+  it('só conta o que tem scroll vertical próprio (um carrossel na horizontal não)', () => {
+    const doc = docCom('<div id="carrossel" style="overflow-y:hidden"><img id="capa"></div>');
+    const carrossel = doc.getElementById('carrossel');
+    Object.defineProperty(carrossel, 'scrollTop', { value: 30, configurable: true });
+    expect(podePuxarAqui(doc.getElementById('capa'), { doc, win })).toBe(true);
+    carrossel.style.overflowY = 'scroll';
+    expect(podePuxarAqui(doc.getElementById('capa'), { doc, win })).toBe(false);
   });
 });

@@ -39,14 +39,21 @@ um mapa).
   ligado enquanto partilha (Wake Lock, onde o telemóvel o deixa).
 - **No site, deixar a página aberta** durante a entrega: um site não consegue mandar a localização
   com a página fechada. Fechar pára a partilha e o cliente vê "última posição há X min".
-- **No app iOS a partilha continua com o ecrã apagado**, noutra página ou noutra app, até à entrega
-  (`app/mobile/ios/App/App/TrajetoPlugin.swift`, `lib/trajetoNativo.js`). É o iPhone que lê o GPS e
+- **Nos apps (iPhone e Android) a partilha continua com o ecrã apagado**, noutra página ou noutra
+  app, até à entrega (`lib/trajetoNativo.js`; `app/mobile/ios/App/App/TrajetoPlugin.swift` no
+  iPhone, `TrajetoPlugin.java` e `TrajetoService.java` no Android). É o telemóvel que lê o GPS e
   manda a posição, pela mesma `delivery_share_position`, com a sessão de quem entrega e as mesmas
-  regras (10 s / 25 m, ou 30 s parado). Basta a permissão «Durante a utilização»: começa com o app à
-  frente e o iOS mostra o indicador azul no topo enquanto partilha. A sessão renova-se no site de
-  hora a hora com o app à frente; se caducar em segundo plano, o envio pára e o iPhone avisa
-  «A partilha da localização parou — abra a app». Pára sozinha quando a encomenda é entregue ou
-  cancelada (o servidor responde «terminou»).
+  regras (10 s / 25 m, ou 30 s parado). Basta a permissão de localização «durante a utilização»:
+  começa com o app à frente. Enquanto partilha, o iPhone mostra o indicador azul no topo; o Android,
+  a notificação «A partilhar a localização» (um serviço em primeiro plano, que é o que o Android
+  exige para continuar com o ecrã apagado). A sessão renova-se no site de hora a hora com o app à
+  frente; se caducar em segundo plano, o envio pára e o telemóvel avisa «A partilha da localização
+  parou — abra a app». Pára sozinha quando a encomenda é entregue ou cancelada (o servidor responde
+  «terminou»).
+- **Android: alguns telemóveis fecham apps em segundo plano** para poupar bateria (Tecno, Infinix,
+  Xiaomi, Huawei, alguns Samsung), mesmo com a notificação. Se a partilha parar sozinha com o ecrã
+  apagado, em Definições → Apps → Livraria Adventista → Bateria escolher «Sem restrições» (o nome
+  muda de marca para marca).
 - "Parar de partilhar" pára; a partilha também pára sozinha quando a encomenda é entregue ou
   cancelada.
 
@@ -83,5 +90,5 @@ Function.
   fornecedor de mosaicos com chave (MapTiler, Stadia, Thunderforest) mudando só o endereço em
   `DeliveryMap.jsx`.
 - O tempo estimado não conhece o trânsito nem as ruas: é uma conta pela distância.
-- No site, sem partilha com a página fechada (ver acima). No app iOS, até uma hora em segundo
-  plano sem abrir o app (a validade da sessão do Supabase).
+- No site, sem partilha com a página fechada (ver acima). Nos apps, até uma hora em segundo plano
+  sem abrir o app (a validade da sessão do Supabase).

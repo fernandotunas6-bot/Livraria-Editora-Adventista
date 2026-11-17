@@ -5,7 +5,10 @@ carrinho → dados e pagamento → página de sucesso → rastreio → confirma�
 (`compra.spec.js`). À parte, `lojas.spec.js` cobre a página das lojas físicas, onde o que
 interessa provar no navegador são as fotografias: que abrem em grande e que não são
 descarregadas em tamanho grande sem necessidade. `app-ios.spec.js` finge o app iOS (o `window.Capacitor` que a casca injecta) e prova o que o
-site muda lá: a edição digital fora de venda e o botão «Continuar com a Apple». Corre em dois tamanhos, computador e telemóvel
+site muda lá: a edição digital fora de venda e o botão «Continuar com a Apple». `app-android.spec.js` finge o app Android
+(o `window.androidBridge` e a ponte `nativePromise`, que regista as chamadas) e prova a conversa do puxar para actualizar:
+com o carrinho aberto o site diz ao app que puxar é só deslizar, e o gesto que chega não recarrega. `app-download.spec.js`
+prova a página `/app`. Corre em dois tamanhos, computador e telemóvel
 (`playwright.config.js`).
 
 ```bash
