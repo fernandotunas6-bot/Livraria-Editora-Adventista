@@ -164,7 +164,7 @@ describe('addToCart — edição digital dentro do app iOS', () => {
     const p = produto({ versions: [{ label: 'Impresso' }, { label: 'Edição digital', digital: true }] });
     await juntar(p, variante('liv1-v1', { digital: true, manage_inventory: false, inventory_quantity: 1 }));
     expect(carrinho.cartItems).toHaveLength(0);
-    expect(toasts.at(-1).titulo).toBe('A edição digital não está à venda na app.');
+    expect(toasts.at(-1).titulo).toBe('A edição digital está indisponível.');
     await juntar(p, variante('liv1-v0', { title: 'Impresso' }));
     expect(carrinho.cartItems).toHaveLength(1);
   });
