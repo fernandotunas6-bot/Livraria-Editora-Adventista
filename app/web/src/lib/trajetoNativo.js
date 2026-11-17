@@ -1,21 +1,32 @@
-// O trajeto de quem entrega dentro do app iOS, com o ecrã apagado (docs/TRAJETO_GPS.md).
+// O trajeto de quem entrega dentro dos apps, com o ecrã apagado (docs/TRAJETO_GPS.md).
 //
-// No site, a posição só sai com a página aberta. No app, o GPS e o envio ficam com o iPhone
-// (app/mobile/ios/App/App/TrajetoPlugin.swift), pela mesma função do Supabase que o site usa, com a
-// sessão de quem entrega. Daqui passa-se a sessão, renovada sempre que o site a renova, e
-// recebem-se as leituras e os envios para o ecrã da entrega.
+// No site, a posição só sai com a página aberta. Nos apps, o GPS e o envio ficam com o telemóvel —
+// app/mobile/ios/App/App/TrajetoPlugin.swift no iPhone, TrajetoService.java no Android — pela mesma
+// função do Supabase que o site usa, com a sessão de quem entrega. Daqui passa-se a sessão,
+// renovada sempre que o site a renova, e recebem-se as leituras e os envios para o ecrã da entrega.
 
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabase } from '@/lib/supabaseClient';
 import { pluginDoApp } from '@/lib/nativeApp';
 
-const pluginTrajeto = () => pluginDoApp('Trajeto');
+const pluginTrajeto = () => pluginDoApp('Trajeto', ['ios', 'android']);
 
-/** O app sabe partilhar o trajeto com o ecrã apagado? (Só o app iOS.) */
+/**
+ * O app sabe partilhar o trajeto com o ecrã apagado? Pergunta-se o estado ao próprio app: uma
+ * versão do app sem o plugin recusa, e quem entrega fica com a partilha do site, que funciona com a
+ * página aberta.
+ */
 export async function trajetoNativoDisponivel() {
-  return !!(await pluginTrajeto());
+  const trajeto = await pluginTrajeto();
+  if (!trajeto) return false;
+  try {
+    await trajeto.estado();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/** A partilha que o iPhone tem em curso: `{ activa, encomenda?, enviadoEm? }`. */
+/** A partilha que o telemóvel tem em curso: `{ activa, encomenda?, enviadoEm? }`. */
 export async function estadoDoTrajetoNativo() {
   const trajeto = await pluginTrajeto();
   if (!trajeto) return { activa: false };
@@ -28,7 +39,7 @@ export async function estadoDoTrajetoNativo() {
 
 let renovacao = null;
 
-/** Enquanto partilha, cada sessão nova do site (renovada de hora a hora) segue para o iPhone. */
+/** Enquanto partilha, cada sessão nova do site (renovada de hora a hora) segue para o telemóvel. */
 function seguirASessao(trajeto) {
   renovacao?.unsubscribe?.();
   renovacao = supabase.auth.onAuthStateChange((evento, sessao) => {
@@ -38,7 +49,7 @@ function seguirASessao(trajeto) {
 }
 
 /**
- * Começa a partilhar a posição desta encomenda. `ouvir` recebe os acontecimentos do iPhone:
+ * Começa a partilhar a posição desta encomenda. `ouvir` recebe os acontecimentos do telemóvel:
  * `leitura` ({ lat, lng, accuracy }), `enviado` ({ quando }), `erro` ({ codigo, mensagem }) e
  * `terminou` ({ mensagem }). Devolve uma função para deixar de ouvir (a partilha continua).
  */

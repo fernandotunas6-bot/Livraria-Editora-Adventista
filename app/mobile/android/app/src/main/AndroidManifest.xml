@@ -49,6 +49,13 @@
 
         </activity>
 
+        <!-- O trajeto de quem entrega com o ecrã apagado (TrajetoService.java, docs/TRAJETO_GPS.md):
+             começa com o app à frente, por isso basta a localização «durante a utilização». -->
+        <service
+            android:name=".TrajetoService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -63,10 +70,13 @@
     <!-- Permissões -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Lojas perto, ponto de entrega e o trajeto de quem entrega (com o app aberto) -->
+    <!-- Lojas perto, ponto de entrega e o trajeto de quem entrega -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- O trajeto continua com o ecrã apagado: serviço em primeiro plano do tipo localização -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Notificações das encomendas, da comunidade e das novidades (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Vibração leve ao juntar ao carrinho -->

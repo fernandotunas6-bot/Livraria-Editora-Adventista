@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// O trajeto no app iOS: o que se passa ao iPhone (lib/trajetoNativo.js → TrajetoPlugin.swift).
+// O trajeto nos apps: o que se passa ao telemóvel (lib/trajetoNativo.js → TrajetoPlugin.swift no
+// iPhone, TrajetoPlugin.java e TrajetoService.java no Android).
 
 let aoMudarSessao = null;
 const largarSessao = vi.fn();
@@ -65,5 +66,28 @@ describe('trajeto no app iOS', () => {
 
   it('o estado da partilha em curso', async () => {
     expect(await estadoDoTrajetoNativo()).toEqual({ activa: true, encomenda: 'o1' });
+  });
+
+  it('uma versão do app sem o plugin não conta: quem entrega fica com a partilha do site', async () => {
+    trajeto.estado.mockRejectedValueOnce(Object.assign(new Error('"Trajeto" plugin is not implemented on ios'), { code: 'UNIMPLEMENTED' }));
+    expect(await trajetoNativoDisponivel()).toBe(false);
+    expect(await trajetoNativoDisponivel()).toBe(true);
+  });
+});
+
+describe('trajeto no app Android', () => {
+  beforeEach(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' }; });
+
+  it('o Android também partilha com o ecrã apagado, com as mesmas mensagens', async () => {
+    expect(await trajetoNativoDisponivel()).toBe(true);
+    const enviado = vi.fn();
+    await iniciarTrajetoNativo('o2', { enviado });
+    expect(trajeto.iniciar).toHaveBeenCalledWith({
+      encomenda: 'o2', supabaseUrl: 'https://projecto.supabase.co', chave: 'sb_publishable_x', sessao: 'sessao-1',
+    });
+    ouvintes.enviado({ quando: 123 });
+    expect(enviado).toHaveBeenCalledWith({ quando: 123 });
+    await pararTrajetoNativo();
+    expect(trajeto.parar).toHaveBeenCalled();
   });
 });

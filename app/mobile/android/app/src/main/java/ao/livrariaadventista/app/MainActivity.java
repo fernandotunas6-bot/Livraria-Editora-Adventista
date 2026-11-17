@@ -4,13 +4,14 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * O ecrã do app: o site publicado dentro do WebView do Capacitor (docs/APPS.md), mais o plugin
- * que vive aqui no app. Os dos pacotes npm registam-se sozinhos.
+ * O ecrã do app: o site publicado dentro do WebView do Capacitor (docs/APPS.md), mais os plugins
+ * que vivem aqui no app (o Aparelho e o Trajeto). Os dos pacotes npm registam-se sozinhos.
  */
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AparelhoPlugin.class);
+        registerPlugin(TrajetoPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
