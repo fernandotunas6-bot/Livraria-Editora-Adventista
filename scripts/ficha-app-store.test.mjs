@@ -72,6 +72,20 @@ describe('textos da ficha da Play Store (pt-PT)', () => {
   });
 });
 
+describe('imagens da ficha da Play Store', () => {
+  // A Play Console não deixa publicar sem estas duas, e recusa outros tamanhos.
+  const tamanhoPng = (f) => {
+    const b = readFileSync(resolve(META_ANDROID, 'pt-PT/images', f));
+    expect(b.subarray(1, 4).toString()).toBe('PNG');
+    return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+  };
+
+  it('o ícone de 512 x 512 e o gráfico de destaque de 1024 x 500', () => {
+    expect(tamanhoPng('icon.png')).toBe('512x512');
+    expect(tamanhoPng('featureGraphic.png')).toBe('1024x500');
+  });
+});
+
 describe('capturas de ecrã', () => {
   it('nos tamanhos que a App Store aceita (iPhone 6,9" e iPad 13")', () => {
     const aceites = ['1320x2868', '1290x2796', '2064x2752', '2048x2732'];

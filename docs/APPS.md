@@ -221,9 +221,9 @@ O que só se faz na App Store Connect:
   fazer;
 - a **exportação com cifra** fica respondida pelo `ITSAppUsesNonExemptEncryption = false` do
   Info.plist (só HTTPS): o TestFlight não pergunta;
-- «Apagar a conta» já existe em Perfil → Dados pessoais → Os seus dados (regra 5.1.1);
+- «Apagar a conta» já existe em Perfil → Segurança e privacidade → Os seus dados (regra 5.1.1);
 - **Comunidade** (regra 1.2): denunciar, a publicação oculta à terceira denúncia, **bloquear** uma
-  pessoa (menu «⋯» → «Bloquear»; lista em Perfil → Dados pessoais) e os termos com tolerância zero.
+  pessoa (menu «⋯» → «Bloquear»; lista em Perfil → Segurança e privacidade) e os termos com tolerância zero.
   Está explicado nas notas para a revisão.
 
 Antes de carregar em «Adicionar para revisão», confirmar:
@@ -239,6 +239,11 @@ Antes de carregar em «Adicionar para revisão», confirmar:
 
 ## Passo a passo do dono no Android (uma vez)
 
+0. **Tipo de conta na Play Console** (25 USD uma vez). Uma conta **pessoal** criada depois de
+   Novembro de 2023 só publica na produção depois de um **teste fechado com pelo menos 12 pessoas
+   durante 14 dias seguidos** (Testes → Teste fechado; elas instalam pela ligação de convite). Uma
+   conta de **organização** não tem essa espera, mas pede o número **D-U-N-S** da empresa (o mesmo da
+   Apple). A Google também verifica a identidade de quem a abre.
 1. **Chave de envio** (num computador com Java):
    `keytool -genkeypair -v -keystore envio.jks -alias livraria -keyalg RSA -keysize 2048 -validity 10000`.
    Guardar o ficheiro e as palavras-passe num sítio seguro: sem eles não se envia mais nenhuma versão.
@@ -260,11 +265,32 @@ Antes de carregar em «Adicionar para revisão», confirmar:
 6. **Envio automático** (opcional): Google Cloud → conta de serviço com acesso à Play Console
    (Utilizadores e permissões → convidar o email da conta, com «Lançar para faixas de teste») → a
    chave JSON no segredo `PLAY_SERVICE_ACCOUNT_JSON` do GitHub.
-7. **Ficha da Play Store**: os textos estão em `app/mobile/fastlane/metadata/android/pt-PT/` e as
-   capturas de ecrã do telemóvel saem do mesmo workflow das da Apple («App iOS — ficha da App Store»,
-   pasta `android/` do artefacto). Na Play Console: **Segurança dos dados** com as mesmas respostas
-   do manifesto de privacidade do iPhone, classificação de conteúdo, público-alvo, e a declaração de
-   que a app não vende conteúdo digital.
+7. **Ficha da Play Store** (Crescimento → Presença na loja → Ficha principal):
+   - textos em `app/mobile/fastlane/metadata/android/pt-PT/` (título, descrição breve e completa);
+   - o **ícone de 512 × 512** e o **gráfico de destaque de 1024 × 500** em
+     `app/mobile/fastlane/metadata/android/pt-PT/images/` (`icon.png`, `featureGraphic.png`; o teste
+     da ficha confere os tamanhos);
+   - as **capturas do telemóvel** (pelo menos 2) saem do mesmo workflow das da Apple («App iOS —
+     ficha da App Store», pasta `android/` do artefacto);
+   - categoria **Compras**, email de contacto e a política de privacidade
+     `https://livrariaadventista.ao/privacidade`.
+   Em Política e programas → **Conteúdo da app**:
+   - **Acesso à app**: as duas contas de demonstração (cliente e colportor), como na Apple, e o
+     caminho do colportor (Área do colportor → Entregas → Para entregar);
+   - **Anúncios**: não tem;
+   - **Segurança dos dados**: as mesmas respostas do manifesto de privacidade do iPhone (nome, email,
+     telefone, morada, localização precisa, IDs da conta e do aparelho, compras, interacções,
+     fotografias, áudio da equipa, mensagens de apoio, conteúdo da comunidade, falhas e desempenho);
+     tudo cifrado em trânsito, nada partilhado para publicidade, e **pode pedir-se que os dados sejam
+     apagados**;
+   - **Eliminação da conta**: a ligação `https://livrariaadventista.ao/privacidade#direitos`, que
+     explica como se apaga dentro da app (Perfil → Segurança e privacidade) e pelos contactos, sem conta;
+   - **Classificação de conteúdo** (questionário IARC): categoria «Referência, notícias ou educação»
+     ou «Compras»; os utilizadores **podem interagir e partilhar conteúdo** (a comunidade), há
+     moderação, denúncia e bloqueio; sem violência, sexo, linguagem ou jogo;
+   - **Público-alvo**: 13 anos ou mais (por causa da comunidade); a app não é dirigida a crianças;
+   - **Pagamentos**: só artigos físicos; as edições digitais não se vendem na app (a política de
+     pagamentos da Google obriga a usar o Play Billing para conteúdo digital).
 8. **Serviço de localização em primeiro plano** (Play Console → Política e programas → Conteúdo da
    app → **Permissões de serviço em primeiro plano**): declarar **Localização**. Descrição: «Quem
    entrega uma encomenda toca em "Partilhar a minha localização" e o telemóvel continua a mandar a
