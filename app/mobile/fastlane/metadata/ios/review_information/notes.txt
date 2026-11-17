@@ -1,11 +1,27 @@
-Notas para a revisão (Livraria Adventista)
+Review notes — Livraria Adventista (Seventh-day Adventist bookshop in Angola). The app is in Portuguese; screen names are quoted as they appear.
 
-1. Conta de demonstração: preenchida na App Store Connect (Sign-in required). Com ela vê-se a conta, as encomendas, a biblioteca e a comunidade.
+1. DEMO ACCOUNTS (entered in App Store Connect, "Sign-in required")
+- Customer account: shows the account, orders, the digital library and the reader community.
+- Courier account (a "colportor"): has one delivery out for delivery, under "Área do colportor" > "Entregas" > "Para entregar", so you can test the background location described in point 5.
 
-2. Compras: a app vende só livros impressos e outros artigos físicos, entregues em mão em Angola ou levantados nas lojas. O pagamento é na entrega, por transferência bancária ou Multicaixa Express. Os livros digitais (PDF) não se vendem dentro da app: quem os comprou antes no nosso site lê-os na biblioteca da conta.
+2. PURCHASES (Guideline 3.1)
+The app sells only printed books and other physical goods, delivered by hand in Angola or picked up at our shops. Payment is cash on delivery, bank transfer or Multicaixa Express (a local bank payment), all outside the app for physical goods (3.1.5(a)). Digital editions (PDF) cannot be bought in the app and the app does not point to any other way of buying them; customers who bought them earlier on our website read them in their library ("Biblioteca").
 
-3. Iniciar sessão: Iniciar sessão com a Apple, com a Google (na janela do sistema) ou com email e palavra-passe. A conta apaga-se em Perfil > Privacidade > Apagar a conta.
+3. SIGN IN AND ACCOUNT DELETION
+Sign in with Apple (native), Google (in the system authentication sheet) or email and password. The account can be deleted in the app: "Perfil" > "Dados pessoais" > "Os seus dados" > "Apagar a conta".
 
-4. Localização: com a app aberta, para mostrar as lojas mais perto e marcar o ponto de entrega. Em segundo plano só para os colportores e a equipa que entregam encomendas: quando carregam em «Partilhar a minha localização com o cliente», o trajeto continua a ser enviado ao cliente com o ecrã apagado até à entrega, com o indicador azul do iOS à vista. Pára sozinho quando a encomenda é entregue ou cancelada.
+4. USER-GENERATED CONTENT (Guideline 1.2) — "Comunidade"
+- Report: menu "..." on any post or reply > "Denunciar". Our team reviews reports; a post with three reports is hidden automatically until the team decides.
+- Block: menu "..." > "Bloquear <name>". The user stops seeing that person's posts and replies on all devices; the list and "Desbloquear" are in "Perfil" > "Dados pessoais".
+- Filter: links in posts are checked against a malicious and adult-content filter before they are shown.
+- The terms ("Termos e condições", section "Comunidade") state there is no tolerance for objectionable content or abusive users; the team can hide content and suspend accounts. Contact details are in "Falar connosco" and in the footer.
 
-5. Notificações: avisos das encomendas, das respostas da comunidade e das novidades da app. Desligam-se em Perfil > Notificações no aparelho.
+5. LOCATION
+- While using the app: to sort the nearest shops and to mark the delivery point at checkout.
+- In the background, only for couriers (our staff and our book evangelists, "colportores") delivering an order: after they tap "Partilhar a minha localização com o cliente" on an order that is out for delivery, the route keeps being sent to the customer with the screen off until the order is delivered or they tap "Parar de partilhar". It uses the "While Using" permission, starts with the app in the foreground and shows the blue location indicator. With the courier demo account: "Área do colportor" > "Entregas" > "Para entregar", tap "Partilhar a minha localização com o cliente", allow location and lock the phone — the order's tracking page ("Rastrear encomenda") keeps updating.
+
+6. NATIVE FEATURES
+Push notifications for order updates, replies in the community and app news (APNs, with the unread count on the app icon); Sign in with Apple; background route sharing for deliveries; the system share sheet; Universal Links from our emails and WhatsApp messages; Safari passwords for the site (shared web credentials); haptic feedback; pull to refresh; a native offline screen.
+
+7. NOTIFICATIONS
+Turned on and off in "Perfil" > "Notificações". The app asks for permission when the user turns them on there, or once after the first order is placed, to send that order's updates.

@@ -41,7 +41,7 @@ describe('páginas legais', () => {
   it('os termos mostram título, data, índice e os contactos das Configurações', async () => {
     await render(<TermsPage />);
     expect(host.querySelector('h1').textContent).toBe('Termos e condições');
-    expect(host.textContent).toMatch(/Última actualização: 9 de Novembro de 2026/);
+    expect(host.textContent).toMatch(/Última actualização: 17 de Novembro de 2026/);
     expect(host.querySelector('nav a[href="#pagamentos"]')).not.toBeNull();
     expect(host.querySelector('section#pagamentos h2')).not.toBeNull();
     expect(host.textContent).toMatch(/pelo email geral@exemplo\.ao/);

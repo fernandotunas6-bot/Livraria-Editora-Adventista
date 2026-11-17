@@ -368,7 +368,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
             {originalPrice && <span className="text-xs text-muted-foreground line-through tabular-nums">{originalPrice}</span>}
           </div>
           <p className={`text-xs font-medium ${!inStock ? 'text-muted-foreground' : isLowStock ? 'text-orange-700 dark:text-orange-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-            {!inStock ? (product.digital_fora_da_app && product.digital_only ? 'Não está à venda na app' : 'Esgotado') : product.digital_only ? 'Edição digital' : product.has_digital && qty <= 0 ? 'Edição digital disponível' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
+            {!inStock ? (product.digital_fora_da_app && product.digital_only ? 'Indisponível' : 'Esgotado') : product.digital_only ? 'Edição digital' : product.has_digital && qty <= 0 ? 'Edição digital disponível' : isLowStock && qty > 0 ? `Restam ${qty}` : 'Em stock'}
           </p>
         </Link>
 

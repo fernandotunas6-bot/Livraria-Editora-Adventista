@@ -5,9 +5,13 @@
  * das Configurações, para não ficarem desactualizados.
  *
  * Blocos: { p: 'texto' } ou { list: ['…'] }. No texto, `[rótulo](/caminho)` vira link interno.
+ * Os apps para iPhone e Android (docs/APPS.md) mostram este mesmo texto: o que só existe neles
+ * (entrar com a Apple, as notificações do telemóvel, o trajeto de quem entrega com o ecrã apagado)
+ * está aqui também, e tem de bater com o manifesto de privacidade do iPhone
+ * (app/mobile/ios/App/App/PrivacyInfo.xcprivacy) e com a ficha das lojas.
  */
 
-export const PRIVACY_UPDATED = '11 de Novembro de 2026';
+export const PRIVACY_UPDATED = '17 de Novembro de 2026';
 export const PRIVACY_PATH = '/privacidade';
 
 /** Contactos para pedidos sobre dados: o email e o telefone das Configurações, se existirem. */
@@ -39,7 +43,7 @@ export function privacySections(settings = {}) {
       id: 'dados',
       title: 'Que dados recolhemos e para quê',
       blocks: [
-        { p: '**Conta.** Nome, email, telefone e, se quiser, uma fotografia. Se entrar com o Google, recebemos dele o nome, o email e a fotografia. A palavra-passe é guardada cifrada pelo serviço de contas e ninguém da equipa a consegue ver. Guardamos também uma descrição resumida do navegador e do sistema de cada aparelho de onde entra, só para o avisar quando há um acesso a partir de um aparelho novo.' },
+        { p: '**Conta.** Nome, email, telefone e, se quiser, uma fotografia. Se entrar com o Google, recebemos dele o nome, o email e a fotografia. Se entrar com a Apple (na app para iPhone e iPad), recebemos o email e, só na primeira vez, o nome; se escolher esconder o email, a Apple dá-nos um endereço de reencaminhamento, e os emails da loja chegam-lhe por ele. A palavra-passe é guardada cifrada pelo serviço de contas e ninguém da equipa a consegue ver. Guardamos também uma descrição resumida do navegador e do sistema de cada aparelho de onde entra, só para o avisar quando há um acesso a partir de um aparelho novo.' },
         { p: '**Encomendas.** Para entregar, cobrar e provar a entrega:' },
         { list: [
           'nome, email e telefone;',
@@ -54,10 +58,11 @@ export function privacySections(settings = {}) {
         { p: '**Avaliações de livros.** O nome e a fotografia do perfil aparecem publicamente junto da avaliação.' },
         { p: '**Lista de desejos e sugestões.** Os livros que guarda e os que vê com sessão iniciada, para lhe sugerirmos outros (página [Para si](/sugestoes)).' },
         { p: '**Newsletter e campanhas.** O email com que subscreve. Se nos deu o seu contacto, por exemplo numa loja, podemos enviar-lhe novidades por email ou WhatsApp. Cada email de novidades tem um link para deixar de receber, e pode pedir-nos que deixemos de o contactar a qualquer momento.' },
-        { p: '**Notificações.** Se activar as notificações no navegador, guardamos o endereço técnico que o navegador nos dá para lhe enviar avisos de encomendas, de atendimento e da comunidade.' },
+        { p: '**Notificações.** Se activar as notificações no navegador ou na app, guardamos o endereço técnico que o navegador ou o telemóvel nos dá (na app, o identificador do aparelho da Apple ou da Google) para lhe enviar avisos de encomendas, de atendimento, da comunidade e das novidades da app. Desligá-las no perfil apaga esse endereço.' },
         { p: '**Segurança.** O endereço IP é usado durante pouco tempo para travar tentativas repetidas (por exemplo, palavras-passe erradas seguidas) e é apagado automaticamente.' },
         { p: '**Funcionamento do site.** Para encontrarmos avarias e sabermos se o site está rápido, o navegador envia-nos quanto tempo cada página demorou a aparecer e a responder, e os erros técnicos que aconteçam, com a página (sem números de encomenda nem outros identificadores), o tipo de aparelho (telemóvel ou computador), o tipo de rede e a versão do site. Não vai nada que o identifique: nem a conta, nem o email, nem o endereço IP.' },
         { p: '**Localização na página das lojas.** Só é pedida quando carrega em "lojas perto de mim", e fica no seu navegador: serve para ordenar as lojas pela distância e não nos é enviada.' },
+        { p: '**Localização de quem entrega.** Quem entrega uma encomenda (a equipa ou um colportor) pode carregar em "Partilhar a minha localização" para o cliente ver o caminho até à entrega. Enquanto partilha, o telemóvel envia a posição de alguns em alguns segundos; na app, continua com o ecrã apagado até à entrega ou até carregar em "Parar de partilhar", com o aviso do sistema à vista (o indicador azul no iPhone, a notificação no Android). O cliente vê só o primeiro nome de quem entrega e a posição da última hora. As posições apagam-se 7 dias depois de a partilha parar.' },
       ],
     },
     {
@@ -77,6 +82,7 @@ export function privacySections(settings = {}) {
         { p: 'As publicações têm um endereço próprio e podem aparecer em motores de pesquisa. Quando alguém partilha esse endereço, por exemplo no WhatsApp, a pré-visualização mostra o seu nome, o início do texto e a capa do livro. Os perfis de leitor pedem aos motores de pesquisa que não os mostrem.' },
         { p: '**Nunca é mostrado:** o email, o telefone, a fotografia, as encomendas nem o identificador da sua conta. O endereço do seu perfil de leitor usa um código aleatório.' },
         { p: '**Fica privado:** de quem gostou (cada pessoa vê só os seus gostos; os outros vêem apenas o número) e as denúncias, que só a equipa vê. Quem é denunciado não sabe quem o denunciou.' },
+        { p: '**Bloquear.** Pode bloquear uma pessoa no menu "⋯" de qualquer publicação ou resposta dela: deixa de ver o que ela escreve, em qualquer aparelho com a sua conta. A lista de quem bloqueou só a vê você, em [Perfil → Dados pessoais](/profile?tab=settings), onde também desbloqueia; quem é bloqueado não é avisado.' },
         { p: '**Moderação.** Publica-se logo, sem revisão prévia. A equipa pode fixar publicações, marcar respostas oficiais e ocultar o que não respeita as regras. Com três denúncias, uma publicação fica oculta até a equipa decidir. Para proteger quem lê, o nome do site de cada link (nunca o resto do endereço nem quem o escreveu) é verificado num filtro de sites maliciosos e de conteúdo adulto da Cloudflare.' },
         { p: '**Avisos.** Avisamo-lo no site, e por notificação se a tiver activa, quando alguém responde ou gosta das suas publicações. Pode desligar estes avisos em [Perfil → Notificações](/profile?tab=notifications).' },
         { p: '**Apagar.** Pode apagar qualquer publicação ou resposta sua a qualquer momento, no menu "⋯" da publicação; apagar uma publicação apaga também as respostas a ela. Se a sua conta for apagada, as suas publicações, respostas e gostos são apagados com ela.' },
@@ -109,7 +115,8 @@ export function privacySections(settings = {}) {
           'Google: entrada com a conta Google, tipos de letra do site, mapas das lojas e, se for o caso, o assistente (Gemini);',
           'OpenStreetMap, para os mapas das lojas quando não se usa o do Google;',
           'DeepSeek, se for o serviço de inteligência artificial escolhido para o assistente;',
-          'o serviço de notificações do seu navegador (Google, Apple ou Mozilla), para entregar os avisos;',
+          'o serviço de notificações do seu navegador (Google, Apple ou Mozilla) ou do seu telemóvel (Apple Push Notification service no iPhone, Firebase Cloud Messaging da Google no Android), para entregar os avisos;',
+          'Apple, quando entra com a conta Apple na app para iPhone e iPad;',
           'a empresa de transporte, quando a entrega não é feita pela nossa equipa: nome, telefone e morada de entrega.',
         ] },
         { p: 'Alguns destes serviços têm servidores fora de Angola. Escolhemos fornecedores com medidas de segurança reconhecidas e enviamos-lhes só o necessário para cada tarefa. Também podemos ter de fornecer dados a autoridades, quando a lei o exigir.' },

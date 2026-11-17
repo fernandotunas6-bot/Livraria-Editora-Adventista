@@ -21,7 +21,7 @@ const TRUE_WORDS = ['true', 't', '1', 'yes', 'sim'];
  * duas lojas também o proíbem.
  */
 export const podeComprarDigital = (win = globalThis.window) => !eAppNativa(win);
-export const DIGITAL_FORA_DA_APP = 'A edição digital não está à venda na app.';
+export const DIGITAL_FORA_DA_APP = 'A edição digital está indisponível.';
 
 /** Uma variante (um elemento de `versions`) é a edição digital? */
 export function versionIsDigital(version) {

@@ -115,6 +115,16 @@ e o perfil sozinho. Não há certificados nem perfis no repositório.
 
 ## Passo a passo do dono no iPhone (uma vez)
 
+### 0. Conta de programador da Apple
+
+- **Apple Developer Program** (developer.apple.com/programs, 99 USD por ano). Inscrita como
+  **organização** (a «Livraria e Editora Adventista»), a loja aparece como vendedora com esse nome,
+  mas a Apple pede o número **D-U-N-S** da empresa (gratuito, pedido em developer.apple.com/support/D-U-N-S,
+  demora uns dias) e que quem inscreve possa assinar pela empresa. Inscrita em nome de uma pessoa,
+  é o nome dela que aparece na App Store.
+- Na App Store Connect, **Business → Agreements**: aceitar o acordo das apps gratuitas (sem ele não
+  se publica nada).
+
 ### 1. Apple Developer (developer.apple.com → Certificates, Identifiers & Profiles)
 
 1. **Identifiers → +** → App IDs → App. Bundle ID **explícito**: `ao.livrariaadventista.app`.
@@ -123,6 +133,11 @@ e o perfil sozinho. Não há certificados nem perfis no repositório.
 3. **Keys → +** → nome "APNs Livraria", marcar **Apple Push Notifications service (APNs)** →
    Continue → Download. Guarda-se o ficheiro `AuthKey_XXXXXXXXXX.p8` (só se descarrega uma vez) e
    anota-se o **Key ID**. Esta chave é para o Supabase (passo 4).
+4. **Services → Sign in with Apple for Email Communication → Configure**: registar o domínio e o
+   endereço de onde a loja envia os emails (os do provedor escolhido no painel, em Configurações →
+   Email, push e chat). Quem entra com a Apple e esconde o email recebe um endereço
+   `@privaterelay.appleid.com`; sem este registo, a Apple deita fora os emails das encomendas e da
+   conta que lhe chegam. O domínio tem de ter o SPF certo para esse provedor.
 
 ### 2. App Store Connect (appstoreconnect.apple.com)
 
@@ -191,8 +206,36 @@ O que só se faz na App Store Connect:
   compras, interacção com os produtos, fotografias, áudio (só a equipa), apoio ao cliente, conteúdo
   da comunidade, falhas e desempenho. Tudo ligado à conta, **nada para rastreio nem publicidade**;
 - a **conta de demonstração** (email e palavra-passe) em «Sign-in required»: não vai para o
-  repositório;
-- «Apagar a conta» já existe em Perfil → Privacidade (regra 5.1.1).
+  repositório. São precisas **duas**, porque as notas para a revisão falam das duas:
+  - uma de cliente, com pelo menos uma encomenda, um livro na biblioteca e acesso à comunidade;
+  - uma de **colportor** com uma entrega «Saiu para entrega» em Área do colportor → Entregas → Para
+    entregar, para a Apple experimentar a localização em segundo plano (sem isto recusa pela regra
+    2.5.4). Escreve-se a segunda na caixa das notas, a seguir às notas do repositório;
+- o **contacto** para a revisão (nome, telefone, email), em App Review Information;
+- **Age Rating** (classificação etária): conteúdo gerado pelos utilizadores **sim** (a comunidade);
+  acesso livre à web **não** (o app só mostra o site da loja; as ligações de fora abrem no Safari);
+  publicidade **não**; compras dentro da app **não**; o resto **não** ou **nenhum**;
+- **Pricing and Availability**: gratuita, e os países onde aparece (Angola, e os outros que se
+  quiser);
+- **Content Rights**: o app mostra capas e excertos dos livros que a loja vende, com o direito de o
+  fazer;
+- a **exportação com cifra** fica respondida pelo `ITSAppUsesNonExemptEncryption = false` do
+  Info.plist (só HTTPS): o TestFlight não pergunta;
+- «Apagar a conta» já existe em Perfil → Dados pessoais → Os seus dados (regra 5.1.1);
+- **Comunidade** (regra 1.2): denunciar, a publicação oculta à terceira denúncia, **bloquear** uma
+  pessoa (menu «⋯» → «Bloquear»; lista em Perfil → Dados pessoais) e os termos com tolerância zero.
+  Está explicado nas notas para a revisão.
+
+Antes de carregar em «Adicionar para revisão», confirmar:
+
+1. o deploy do site depois de pôr a `APPLE_TEAM_ID` (passo 3) publicou
+   `https://livrariaadventista.ao/.well-known/apple-app-site-association`. As notas para a revisão
+   dizem que os links e as palavras-passe do site abrem no app, e a Apple experimenta;
+2. as duas contas de demonstração entram no app do TestFlight e mostram o que as notas dizem;
+3. uma notificação chega a um iPhone com o app do TestFlight (sem `APNS_ENV=sandbox` no Supabase);
+4. «Continuar com a Apple» entra, e uma encomenda de teste manda o email para o endereço da Apple;
+5. o site publicado já tem o bloqueio da comunidade e a política de privacidade nova (o app mostra
+   o site: o que não estiver publicado, a Apple não vê).
 
 ## Passo a passo do dono no Android (uma vez)
 
