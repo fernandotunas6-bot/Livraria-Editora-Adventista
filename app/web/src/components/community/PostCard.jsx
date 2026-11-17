@@ -233,7 +233,7 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-editorial-filete bg-editorial-tela p-2.5 text-xs" role="group" aria-label="Bloquear">
           <span>
             Bloquear {post.author_name}? Deixa de ver as publicações e as respostas desta pessoa; ela não é avisada.
-            Desbloqueia-se em Perfil → Dados pessoais.
+            Desbloqueia-se em Perfil → Segurança e privacidade.
           </span>
           <Button
             type="button" size="sm" className="h-10 text-xs sm:h-8"
