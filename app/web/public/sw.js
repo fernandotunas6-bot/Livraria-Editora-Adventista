@@ -1,4 +1,4 @@
-const CACHE_NAME = 'livraria-v6';
+const CACHE_NAME = 'livraria-v7';
 const PRECACHE = ['/', '/shop', '/manifest.webmanifest', '/icons/icon-192.svg'];
 
 self.addEventListener('install', (event) => {
@@ -67,6 +67,8 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api')) return;
   // A versão publicada vai sempre à rede: servida da cache, a app nunca saberia que há uma nova.
   if (url.pathname === '/version.json') return;
+  // A app Android para descarregar (~5 MB, muda a cada versão): nunca na cache do site.
+  if (url.pathname.startsWith('/downloads/')) return;
   // API do Supabase (login, dados, Edge Functions, tempo real): sempre pela rede, nunca da cache,
   // para não mostrar dados antigos nem misturar sessões. As imagens do Storage continuam em cache.
   if (/\/(auth|rest|functions|realtime)\/v1\//.test(url.pathname)) return;
