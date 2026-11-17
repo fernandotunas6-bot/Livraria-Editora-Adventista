@@ -17,7 +17,17 @@ export function caminhoDaNotificacao(url) {
   return caminhoDaLigacao(s);
 }
 
-const JANELA_ABERTA = '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
+/**
+ * Uma janela aberta: as do Radix (`data-state="open"`) e as feitas à mão — o carrinho, os filtros
+ * no telemóvel, o assistente, o formulário de livro do painel —, que só existem no ecrã enquanto
+ * estão abertas e não têm `data-state`. Uma do Radix a fechar (`data-state="closed"`, durante a
+ * animação de saída) já não conta. É a mesma ideia do useAuthDialog.jsx.
+ */
+const JANELA_ABERTA = [
+  '[role="dialog"]:not([data-state="closed"])',
+  '[role="alertdialog"]:not([data-state="closed"])',
+  '[aria-modal="true"]:not([data-state="closed"])',
+].join(', ');
 
 /**
  * Puxar para baixo aqui é actualizar, ou é só deslizar? Só deslizar com uma janela aberta (o

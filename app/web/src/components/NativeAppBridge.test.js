@@ -79,6 +79,15 @@ describe('aoPuxarParaActualizar', () => {
     expect(aoPuxarParaActualizar({ porGravar: true, doc: docCom('<div role="dialog" data-state="open"></div>') })).toBe('janela');
   });
 
+  it('as janelas feitas à mão também contam (o carrinho, os filtros, o assistente), sem data-state', () => {
+    // O carrinho e os filtros no telemóvel: modais, só no ecrã enquanto abertos.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-modal="true" aria-labelledby="titulo-carrinho"></div>') })).toBe('janela');
+    // O assistente: ecrã inteiro no telemóvel, sem aria-modal.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-label="Assistente"></div>') })).toBe('janela');
+    // Uma do Radix a fechar já não conta.
+    expect(aoPuxarParaActualizar({ porGravar: false, doc: docCom('<div role="dialog" aria-modal="true" data-state="closed"></div>') })).toBe('recarregar');
+  });
+
   it('dentro de uma lista que já desceu, puxar é subir a lista: não recarrega', () => {
     const doc = docCom('<div id="lista" style="overflow-y:auto;height:100px"><p id="item">x</p></div>');
     const lista = doc.getElementById('lista');
