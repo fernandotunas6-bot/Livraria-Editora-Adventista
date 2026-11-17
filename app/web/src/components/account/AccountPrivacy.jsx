@@ -9,6 +9,35 @@ import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { deleteMyAccount, exportMyData } from '@/api/PlatformApi';
+import { useBloqueios } from '@/lib/communityBlocks';
+
+/**
+ * Quem a pessoa bloqueou na comunidade (lib/communityBlocks.js), para poder desbloquear. Só aparece
+ * com alguém na lista.
+ */
+export function PessoasBloqueadas() {
+  const { lista, desbloquear } = useBloqueios();
+  if (!lista.length) return null;
+  const tirar = async (b) => {
+    const err = await desbloquear(b.blocked_key);
+    if (err) toast.error(err);
+    else toast.success(`Desbloqueou ${b.blocked_name || 'esta pessoa'}`);
+  };
+  return (
+    <div className="border-t pt-5" data-pessoas-bloqueadas>
+      <p className="font-medium">Pessoas bloqueadas na comunidade</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">Não vê as publicações nem as respostas delas, e elas não sabem.</p>
+      <ul className="mt-3 divide-y rounded-lg border">
+        {lista.map((b) => (
+          <li key={b.blocked_key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <span className="min-w-0 truncate">{b.blocked_name || 'Leitor'}</span>
+            <Button type="button" size="sm" variant="outline" onClick={() => tirar(b)}>Desbloquear</Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Nome do ficheiro: os-meus-dados-livraria-2026-11-08.json */
 export const exportFileName = (date = new Date()) => `os-meus-dados-livraria-${date.toISOString().slice(0, 10)}.json`;
@@ -85,6 +114,8 @@ export default function AccountPrivacy({ user, isStaff, onDeleted }) {
             Descarregar (JSON)
           </Button>
         </div>
+
+        <PessoasBloqueadas />
 
         <div className="border-t pt-5">
           <p className="font-medium">Apagar a conta</p>

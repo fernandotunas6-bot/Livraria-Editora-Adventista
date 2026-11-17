@@ -9,7 +9,7 @@
 
 import { privacyContacts } from '@/lib/privacyPolicy';
 
-export const TERMS_UPDATED = '9 de Novembro de 2026';
+export const TERMS_UPDATED = '17 de Novembro de 2026';
 export const TERMS_PATH = '/termos';
 
 export function termsSections(settings = {}) {
@@ -132,7 +132,8 @@ export function termsSections(settings = {}) {
           'não publicar conteúdo de outros sem autorização;',
           'ser fiel à sua experiência quando avalia um livro ou o serviço.',
         ] },
-        { p: 'Publica-se sem revisão prévia. Podemos ocultar o que não cumprir estas regras, e uma publicação com várias denúncias pode ficar oculta até a equipa decidir. Pode apagar o que publicou na comunidade a qualquer momento. [O que fica visível e o que não fica](/privacidade#comunidade).' },
+        { p: 'Não há tolerância para conteúdo ofensivo, abusivo ou ilegal, nem para quem incomoda outras pessoas: o que não cumprir estas regras é ocultado, e a conta de quem insiste pode ser suspensa.' },
+        { p: 'Publica-se sem revisão prévia. Qualquer pessoa pode denunciar uma publicação; a equipa revê as denúncias, e uma publicação com várias denúncias fica oculta até a equipa decidir. Pode também bloquear quem não quer ver, no menu "⋯" das publicações dessa pessoa. Pode apagar o que publicou na comunidade a qualquer momento. [O que fica visível e o que não fica](/privacidade#comunidade).' },
       ],
     },
     {

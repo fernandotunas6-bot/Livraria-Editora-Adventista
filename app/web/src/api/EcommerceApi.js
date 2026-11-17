@@ -47,7 +47,8 @@ function bookToProduct(book, collectionsMap = {}) {
   // Edições digitais (lib/digitalEditions.js): sem stock nem envio, uma por conta.
   const digitalDefault = isDigitalEdition(book, null);
   // No app iOS a edição digital não se vende (lib/digitalEditions.js: podeComprarDigital): o
-  // produto fica com o que se vende em papel, e o só digital fica "não está à venda na app".
+  // produto fica com o que se vende em papel, e o só digital fica "Indisponível" (sem dizer que se
+  // vende noutro lado: a regra 3.1.1 da Apple não o deixa).
   const digitalForaDaApp = productHasDigital(book) && !podeComprarDigital();
   const hasDigital = productHasDigital(book) && !digitalForaDaApp;
 

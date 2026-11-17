@@ -217,7 +217,7 @@ export const CartProvider = ({ children }) => {
       }
       // O carrinho é o da conta: a edição digital posta no site não se compra dentro do app iOS.
       if (digital && !podeComprarDigital()) {
-        changes.push(`A edição digital de "${title}" não está à venda na app e saiu do carrinho.`);
+        changes.push(`A edição digital de "${title}" está indisponível e saiu do carrinho.`);
         updates.set(item.variant.id, null);
         continue;
       }
