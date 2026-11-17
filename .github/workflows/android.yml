@@ -9,11 +9,11 @@ name: App Android
 #   (como rascunho). O primeiro AAB de sempre carrega-se à mão na Play Console.
 #   Sai também o APK assinado com a mesma chave, publicado numa Release do GitHub: é o ficheiro
 #   que a página /app do site dá a descarregar (Configurações → PWA / telemóvel): o deploy do site
-#   copia-o para https://livrariaadventista.ao/downloads/livraria-adventista.apk (o repositório é
-#   privado, e a Release só se descarrega com sessão no GitHub).
-#   Segredos: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
-#   ANDROID_KEY_PASSWORD; opcionais GOOGLE_SERVICES_JSON (notificações) e
-#   PLAY_SERVICE_ACCOUNT_JSON (envio para a Play Store).
+#   copia-o para https://livrariaadventista.ao/downloads/livraria-adventista.apk.
+#   A chave de envio vem dos segredos ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD ou, sem eles, do Vault do Supabase (passo «Chave de
+#   envio»), onde se gera sozinha na primeira corrida. Opcionais: GOOGLE_SERVICES_JSON
+#   (notificações) e PLAY_SERVICE_ACCOUNT_JSON (envio para a Play Store).
 on:
   pull_request:
     branches: [main]
@@ -85,23 +85,90 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Confirmar segredos
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A chave de envio (a «assinatura» do app) fica só no disco temporário desta máquina. Vem:
+      # - dos segredos ANDROID_KEYSTORE_* do GitHub, quando existem;
+      # - senão, do Vault do Supabase (segredo «android_signing»), lido com o SUPABASE_ACCESS_TOKEN
+      #   que o deploy do Supabase já usa. Na primeira vez que não existe em lado nenhum, gera-se
+      #   aqui e guarda-se lá: nunca passa por uma pessoa nem fica nos registos. É SEMPRE a mesma
+      #   chave depois disso — com outra, quem instalou o APK do site não consegue actualizar.
+      # Corre antes do `npm ci`: o token do Supabase só existe neste passo, antes de qualquer
+      # código de terceiros correr na máquina.
+      - name: Chave de envio
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: |
-          missing=""
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            [ -n "${!name}" ] || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Faltam em Settings → Secrets and variables → Actions:$missing (ver docs/APPS.md)"
-            exit 1
+          set -euo pipefail
+          chave="$RUNNER_TEMP/envio.jks"
+          umask 077
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            for name in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+              [ -n "${!name}" ] || { echo "::error::Falta o segredo $name (ver docs/APPS.md)"; exit 1; }
+            done
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$chave"
+            senha="$ANDROID_KEYSTORE_PASSWORD"; nome="$ANDROID_KEY_ALIAS"; senha_da_chave="$ANDROID_KEY_PASSWORD"
+            origem="segredos do GitHub"
+          else
+            if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then
+              echo "::error::Sem chave de envio: faltam os segredos ANDROID_KEYSTORE_* ou o SUPABASE_ACCESS_TOKEN e a variável SUPABASE_PROJECT_REF (ver docs/APPS.md)"
+              exit 1
+            fi
+            sql() {
+              jq -n --arg q "$1" '{query: $q}' | curl -fsS -X POST \
+                "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+                -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+                --data-binary @-
+            }
+            # Uma leitura que falha pára aqui (curl -f): nunca se gera uma chave nova por engano.
+            guardada="$(sql "select decrypted_secret as v from vault.decrypted_secrets where name = 'android_signing'" | jq -r '.[0].v // empty')"
+            if [ -n "$guardada" ]; then
+              echo "::add-mask::$guardada"
+              senha="$(jq -r .password <<<"$guardada")"
+              echo "::add-mask::$senha"
+              nome="$(jq -r .alias <<<"$guardada")"
+              jq -r .keystore <<<"$guardada" | base64 --decode > "$chave"
+              origem="Vault do Supabase"
+            else
+              senha="$(openssl rand -hex 24)"
+              echo "::add-mask::$senha"
+              nome="livraria"
+              keytool -genkeypair -keystore "$chave" -storetype PKCS12 -alias "$nome" \
+                -keyalg RSA -keysize 4096 -validity 10000 \
+                -dname "CN=Livraria Adventista, O=Livraria Adventista, L=Luanda, C=AO" \
+                -storepass "$senha" -keypass "$senha" >/dev/null 2>&1
+              valor="$(jq -cn --arg k "$(base64 -w0 "$chave")" --arg s "$senha" --arg a "$nome" '{keystore: $k, password: $s, alias: $a}')"
+              echo "::add-mask::$valor"
+              # base64, hexadecimal e o nome: nenhum tem plicas, mas confirma-se antes de ir no SQL.
+              case "$valor" in *"'"*) echo "::error::Valor inesperado na chave gerada"; exit 1 ;; esac
+              # O nome é único no Vault: se outra corrida a guardou ao mesmo tempo, esta falha e a
+              # seguinte usa a que ficou.
+              sql "select vault.create_secret('$valor', 'android_signing', 'Chave de assinatura do app Android (.github/workflows/android.yml). NÃO APAGAR: sem ela quem instalou o APK do site não actualiza a app.')" >/dev/null
+              origem="gerada agora e guardada no Vault do Supabase (android_signing)"
+            fi
+            senha_da_chave="$senha"
           fi
+          impressao="$(keytool -list -v -keystore "$chave" -storepass "$senha" -alias "$nome" 2>/dev/null | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')"
+          [ -n "$impressao" ] || { echo "::error::A chave de envio não abre com a senha guardada"; exit 1; }
+          {
+            echo "ANDROID_KEYSTORE_PATH=$chave"
+            echo "ANDROID_KEYSTORE_PASSWORD=$senha"
+            echo "ANDROID_KEY_ALIAS=$nome"
+            echo "ANDROID_KEY_PASSWORD=$senha_da_chave"
+          } >> "$GITHUB_ENV"
+          {
+            echo "Chave de envio: $origem."
+            echo ""
+            echo "Impressão SHA-256 do certificado (pública; é a da variável ANDROID_CERT_SHA256):"
+            echo ""
+            echo "    $impressao"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -131,21 +198,10 @@ jobs:
         working-directory: app/mobile
         run: npx cap sync android
 
-      # A chave de envio fica só no disco temporário desta máquina.
-      - name: Chave de envio
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/envio.jks"
-          chmod 600 "$RUNNER_TEMP/envio.jks"
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/envio.jks" >> "$GITHUB_ENV"
-
+      # A chave e as senhas vêm do passo «Chave de envio» (ANDROID_KEYSTORE_PATH e companhia).
       - name: AAB assinado
         working-directory: app/mobile/android
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
           # A versão vem do app/mobile/package.json; o número, desta corrida (a Play Store exige um
