@@ -244,11 +244,16 @@ Antes de carregar em «Adicionar para revisão», confirmar:
    durante 14 dias seguidos** (Testes → Teste fechado; elas instalam pela ligação de convite). Uma
    conta de **organização** não tem essa espera, mas pede o número **D-U-N-S** da empresa (o mesmo da
    Apple). A Google também verifica a identidade de quem a abre.
-1. **Chave de envio** (num computador com Java):
-   `keytool -genkeypair -v -keystore envio.jks -alias livraria -keyalg RSA -keysize 2048 -validity 10000`.
-   Guardar o ficheiro e as palavras-passe num sítio seguro: sem eles não se envia mais nenhuma versão.
-2. **GitHub → Secrets**: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 envio.jks`), `ANDROID_KEYSTORE_PASSWORD`,
-   `ANDROID_KEY_ALIAS` (`livraria`), `ANDROID_KEY_PASSWORD`.
+1. **Chave de envio**: não é preciso fazer nada. Na primeira corrida do workflow «App Android»
+   (à mão), o passo «Chave de envio» gera-a e guarda-a no **Vault do Supabase**, no segredo
+   `android_signing` (o JSON com o ficheiro em base64, a senha e o nome), com o
+   `SUPABASE_ACCESS_TOKEN` que o deploy do Supabase já usa; as corridas seguintes lêem-na de lá. A
+   impressão SHA-256 aparece no resumo da corrida. **Nunca apagar esse segredo**: com outra chave,
+   quem instalou o APK do site tem de desinstalar para actualizar. Cópia de segurança: Supabase →
+   Project Settings → Vault → `android_signing`, guardada num cofre de senhas.
+2. *(Opcional)* Para usar uma chave própria em vez dessa: **GitHub → Secrets**
+   `ANDROID_KEYSTORE_BASE64` (`base64 -w0 envio.jks`), `ANDROID_KEYSTORE_PASSWORD`,
+   `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Quando existem, têm prioridade sobre o Vault.
 3. **Play Console** (play.google.com/console, conta de programador: 25 USD uma vez): criar a app
    «Livraria Adventista», pacote `ao.livrariaadventista.app`, gratuita, com a **Assinatura de apps do
    Google Play**. Correr o workflow «App Android» e **carregar à mão o primeiro AAB** (artefacto da
