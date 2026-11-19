@@ -72,9 +72,16 @@ export default function PainelGestaoPage({ embutido = false }) {
       onTv={() => mudarFiltros({ tv: true })}
     />
   );
+  // na página própria, o «Sair» fica na faixa azul do painel, ao lado do relógio
+  const sair = embutido ? null : (
+    <Button size="sm" variant="ghost" className="text-white/80 hover:bg-white/10 hover:text-white" onClick={() => logout?.()} aria-label="Sair">
+      <LogOut className="h-4 w-4" />
+    </Button>
+  );
   const painel = (
     <>
-      <PainelGestao alvo={filtros.alvo} canal={filtros.canal} onFiltros={mudarFiltros} variante={embutido ? 'admin' : 'pagina'} acoes={acoes} onDados={setDados} />
+      <PainelGestao alvo={filtros.alvo} canal={filtros.canal} onFiltros={mudarFiltros} variante={embutido ? 'admin' : 'pagina'}
+        acoes={acoes} extra={sair} onDados={setDados} />
       <Suspense fallback={null}>
         {metas && dados && (
           <MetasDialog open={metas} onOpenChange={setMetas} alvos={dados.alvos} ano={dados.ano} mes={dados.mes} />
@@ -97,16 +104,11 @@ export default function PainelGestaoPage({ embutido = false }) {
       </div>
     );
   }
+  // a faixa azul do painel (com o logótipo) abre a página; o fundo leva um brilho da marca
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-[env(safe-area-inset-top,0px)] z-30 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-2.5">
-          {logo ? <img src={logo} alt={nome} className="h-8 w-auto object-contain" /> : <span className="font-semibold">{nome}</span>}
-          <span className="hidden text-sm font-semibold text-muted-foreground sm:inline">Painel de Gestão</span>
-          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => logout?.()}><LogOut className="mr-1.5 h-4 w-4" />Sair</Button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1600px] px-4 py-4">{painel}</main>
+    <div className="min-h-screen bg-[#eef3f9] text-foreground dark:bg-background"
+      style={{ backgroundImage: 'radial-gradient(60rem 30rem at 100% 0%, rgba(14,165,200,0.10), transparent 60%)' }}>
+      <main className="mx-auto max-w-[1600px] px-3 pb-2 pt-3 sm:px-5">{painel}</main>
     </div>
   );
 }

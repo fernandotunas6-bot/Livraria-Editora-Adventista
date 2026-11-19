@@ -131,12 +131,39 @@ export const playlist = (midia) => (midia || []).filter((m) => m && m.activo !==
 /** O índice seguinte, em ciclo. */
 export const proximo = (i, n) => (n > 0 ? (i + 1) % n : 0);
 
-/** O endereço de um vídeo do YouTube para o ecrã (sem cookies, a tocar, em ciclo, sem controlos). */
-export function youtubeEmbed(url, { som = false } = {}) {
+/**
+ * O endereço de um vídeo do YouTube para o ecrã: sem cookies, a tocar, sem controlos, e com a interface de mensagens
+ * ligada (`enablejsapi`) — é por ela que a TV sabe quando o vídeo termina para passar ao seguinte. `repetir`: em
+ * ciclo (quando é o único da lista). `origem`: o endereço do painel (o YouTube pede-o com `enablejsapi`).
+ */
+export function youtubeEmbed(url, { som = false, repetir = false, origem = '' } = {}) {
   const m = /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{6,20})/.exec(String(url || ''));
   if (!m) return null;
   const id = m[1];
-  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=${som ? 0 : 1}&controls=0&loop=1&playlist=${id}&rel=0&modestbranding=1&playsinline=1`;
+  const p = new URLSearchParams({ autoplay: '1', mute: som ? '0' : '1', controls: '0', rel: '0', modestbranding: '1', playsinline: '1', enablejsapi: '1' });
+  if (repetir) {
+    p.set('loop', '1');
+    p.set('playlist', id);
+  }
+  if (origem) p.set('origin', origem);
+  return `https://www.youtube-nocookie.com/embed/${id}?${p}`;
+}
+
+/**
+ * O estado do vídeo numa mensagem do leitor do YouTube (o que a interface `enablejsapi` manda à página):
+ * 'terminou' | 'a-tocar' | 'erro' | null. As mensagens vêm em JSON, como «onStateChange» ou «infoDelivery».
+ */
+export function estadoYoutube(dados) {
+  let d = dados;
+  if (typeof d === 'string') {
+    try { d = JSON.parse(d); } catch { return null; }
+  }
+  if (!d || typeof d !== 'object') return null;
+  if (d.event === 'onError') return 'erro';
+  const estado = d.event === 'onStateChange' ? d.info : d.info?.playerState;
+  if (estado === 0) return 'terminou';
+  if (estado === 1) return 'a-tocar';
+  return null;
 }
 
 /** O tipo de um endereço de publicidade, para quem o cola sem escolher: YouTube, vídeo ou imagem. */
@@ -151,3 +178,75 @@ export function tipoDoUrl(url) {
 export function rodaDeLojas(alvos) {
   return ['', ...(alvos || []).map((a) => a.id)];
 }
+
+// ------------------------------------------------------------------ rodapé (como nos noticiários)
+
+const pctTexto = (v) => `${Math.round(Number(v) || 0)} %`;
+
+/**
+ * As notícias do rodapé, a partir dos números do painel e das mensagens da direcção (que vêm primeiro).
+ * Cada uma: { etiqueta, texto, tom } — tom 'bom' (verde), 'mau' (vermelho), 'aviso' (âmbar) ou 'neutro'.
+ */
+export function noticias(d, mensagens = []) {
+  if (!d) return [];
+  const r = d.resumo || {};
+  const mes = MESES[(d.mes || 1) - 1];
+  const out = (mensagens || []).filter((m) => m && String(m.texto || '').trim())
+    .map((m) => ({ etiqueta: 'AVISO', texto: String(m.texto).trim(), tom: 'aviso' }));
+
+  const v = variacao(r.hoje, r.semana_passada);
+  out.push({
+    etiqueta: 'HOJE',
+    texto: `${fmtKz(r.hoje)} em ${Number(r.hoje_vendas) || 0} vendas${v ? ` · ${v.texto} face ao mesmo dia da semana passada` : ''}`,
+    tom: v ? (v.sobe ? 'bom' : 'mau') : 'neutro',
+  });
+  const meta = Number(r.meta) || 0;
+  if (meta > 0 && Number(r.mes) >= meta) {
+    out.push({ etiqueta: 'META ATINGIDA', texto: `${mes}: ${fmtKz(r.mes)}, ${pctTexto(r.percentagem)} da meta. Parabéns a toda a equipa!`, tom: 'bom' });
+  } else if (meta > 0) {
+    const est = estadoMeta({ vendido: r.mes, meta, ritmoIdeal: r.ritmo_ideal });
+    out.push({
+      etiqueta: 'META',
+      texto: `${pctTexto(r.percentagem)} da meta de ${mes} · faltam ${fmtKz(r.falta)} · ${fmtKz(r.ritmo_necessario)} por dia até ao fim do mês`,
+      tom: est === 'adiantada' ? 'bom' : est === 'critica' ? 'mau' : 'aviso',
+    });
+  } else {
+    out.push({ etiqueta: mes.toUpperCase(), texto: `${fmtKz(r.mes)} em ${Number(r.mes_vendas) || 0} vendas`, tom: 'neutro' });
+  }
+  if (Number(r.projeccao) > 0) {
+    out.push({
+      etiqueta: 'PROJECÇÃO',
+      texto: `ao ritmo actual, ${mes} fecha em ${fmtKz(r.projeccao)}`,
+      tom: meta > 0 ? (Number(r.projeccao) >= meta ? 'bom' : 'aviso') : 'neutro',
+    });
+  }
+  const comMeta = (d.lojas || []).filter((l) => Number(l.meta) > 0);
+  if (comMeta.length > 1) {
+    const lider = [...comMeta].sort((a, b) => (Number(b.percentagem) || 0) - (Number(a.percentagem) || 0))[0];
+    out.push({ etiqueta: 'LIDERA', texto: `${nomeCurto(lider.id, lider.nome)}, com ${pctTexto(lider.percentagem)} da meta do mês`, tom: 'bom' });
+  }
+  for (const l of d.lojas || []) {
+    if (!(Number(l.hoje) > 0)) continue;
+    out.push({
+      etiqueta: nomeCurto(l.id, l.nome).toUpperCase(),
+      texto: `hoje ${fmtKz(l.hoje)}${Number(l.meta) > 0 ? ` · ${pctTexto(l.percentagem)} da meta do mês` : ''}`,
+      tom: 'neutro',
+    });
+  }
+  const top = (d.mais_vendidos_hoje || [])[0];
+  if (top) out.push({ etiqueta: 'MAIS VENDIDO HOJE', texto: `${top.titulo} (${Number(top.quantidade)} un.)`, tom: 'neutro' });
+  const u = (d.ultimas || []).find((x) => !x.anulado);
+  if (u) {
+    out.push({
+      etiqueta: 'ÚLTIMA VENDA',
+      texto: `${horaDe(u.quando)} · ${nomeCurto(u.alvo, u.loja)} · ${fmtKz(Math.abs(Number(u.total)))}${u.artigo ? ` · ${u.artigo}` : ''}`,
+      tom: Number(u.total) < 0 ? 'mau' : 'bom',
+    });
+  }
+  return out;
+}
+
+/** As mensagens da direcção que ainda passam hoje (activas e sem data de fim, ou com o fim hoje ou depois). */
+export const mensagensDeHoje = (lista, hoje) => (lista || [])
+  .filter((m) => m && m.activo !== false && (!m.ate || String(m.ate) >= String(hoje)))
+  .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || (a.id ?? 0) - (b.id ?? 0));

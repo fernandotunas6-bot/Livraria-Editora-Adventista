@@ -164,8 +164,24 @@ Ecrã inteiro, tema escuro, letra maior, sem menus (`?tv=1`, ou o botão **Modo 
 ### 6.9 Telemóvel
 Uma coluna: cartões (deslizar), meta, lojas, últimas vendas; gráficos em largura total.
 
+### 6.10 Rodapé de noticiário
+Uma faixa a passar no fundo (na página e, a toda a largura, no modo TV), como nos noticiários: «Última hora» em
+vermelho, o logótipo, as notícias com etiquetas coloridas (verde a subir, vermelho a descer, âmbar avisos) e a hora.
+As notícias saem dos números (hoje contra a semana passada, a meta e o que falta por dia, a projecção, a loja que
+lidera, cada loja hoje, o mais vendido, a última venda); as **mensagens da direcção** vêm primeiro — em
+**Publicidade e rodapé → Mensagens do rodapé** (`painel_rodape`), com um «até ao dia» opcional, e chegam às TVs logo.
+
+### 6.11 YouTube na publicidade
+Cola-se o endereço (youtube.com/watch, youtu.be ou shorts). O vídeo passa **até ao fim** e depois vem o seguinte: o
+leitor do YouTube avisa o painel quando termina (`enablejsapi`). Um vídeo bloqueado pelo dono (sem incorporação) ou
+que não arranca em 20 s passa à frente. O único da lista repete. Os segundos só contam para as imagens.
+
 ## 7. Aspecto
 
+- A faixa de cima em azul-marinho com o **logótipo branco** e os arcos do logótipo em ciano; os cartões sobrepõem-se
+  a ela. A meta num **anel**, o ranking das lojas com medalhas, o pódio dos mais vendidos com as capas, confetes
+  quando a meta é atingida. As cores da marca vivem em `src/components/gestao/marca.js` (para outro cliente, troca-se
+  só esse ficheiro).
 - Cores da marca (logótipo) nos títulos; **verde** sobe / **vermelho** desce / **âmbar** atrás do ritmo — sempre com
   ▲▼ ou texto além da cor.
 - Números `tabular-nums`, Kz com espaço de milhares («24 810 000 Kz»; nos cartões, «24,8 M Kz» com o valor inteiro ao
