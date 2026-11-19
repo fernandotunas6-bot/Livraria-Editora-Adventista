@@ -60,7 +60,7 @@ import {
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
 import {
-  assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, tratarAviso, type Ligacao,
+  assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { mfaPending } from "./mfa.ts";
@@ -3093,7 +3093,10 @@ route("GET", "/admin/kangest", permissao("manage_settings"), async () => {
     .eq("estado", "erro").order("actualizado", { ascending: false }).limit(50);
   const { data: estado } = await db.from("kangest_estado").select("chave, valor, actualizado");
   return json({
-    ligacoes: ligs.map((l) => ({ id: l.id, url: l.url, lojas: l.lojas || {}, armazens_online: l.armazens_online || [], avisos: !!l.segredo, portes: l.portes || "", generico: l.generico || "" })),
+    ligacoes: ligs.map((l) => ({
+      id: l.id, url: l.url, lojas: l.lojas || {}, armazens_online: l.armazens_online || [], avisos: !!l.segredo, portes: l.portes || "",
+      generico: l.generico || "", padrao: !!l.padrao, pagamentos: l.pagamentos || {},
+    })),
     webhook_url: `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/app/webhooks/kangest?ligacao=<id>`,
     fila: contagem, erros: erros || [], estado: estado || [],
   });
@@ -3108,6 +3111,37 @@ route("POST", "/admin/kangest/repetir", permissao("manage_settings"), async ({ b
   if (error) throw new Error(error.message);
   if (!data?.length) throw bad("Esse documento não está com erro.");
   return json({ ok: true });
+});
+
+/**
+ * Confere a configuração sem emitir nada: cada ligação (permissões da chave, armazéns, modos de pagamento, portes),
+ * as lojas do site sem KanGest e o agendador.
+ */
+route("POST", "/admin/kangest/testar", permissao("manage_settings"), async ({ ip }) => {
+  if (!await checkRateLimit("kangest-testar", ip, 10)) throw tooMany("Espere um minuto antes de testar outra vez.");
+  let ligs: Ligacao[] = [];
+  const geral: { nivel: string; texto: string }[] = [];
+  try {
+    ligs = lerLigacoes(Deno.env.get("KANGEST_LIGACOES"));
+  } catch (e) {
+    geral.push({ nivel: "erro", texto: (e as Error).message });
+  }
+  if (!ligs.length && !geral.length) geral.push({ nivel: "erro", texto: "O segredo KANGEST_LIGACOES está vazio: a ligação está desligada." });
+  if (!Deno.env.get("KANGEST_CRON_TOKEN")) geral.push({ nivel: "erro", texto: "Falta o segredo KANGEST_CRON_TOKEN: o agendador não consegue emitir a fila." });
+  if (ligs.filter((l) => l.padrao).length > 1) geral.push({ nivel: "aviso", texto: "Há mais de uma ligação «padrao»: vale a primeira." });
+  const { data: lojas } = await db.from("physical_stores").select("id, name, active");
+  const mapeadas = new Set(ligs.flatMap((l) => Object.keys(l.lojas || {})));
+  const padrao = ligs.find((l) => l.padrao) ?? ligs[0];
+  for (const l of (lojas || []).filter((x: Record<string, unknown>) => x.active && !mapeadas.has(String(x.id)))) {
+    if (padrao) geral.push({ nivel: "aviso", texto: `A loja «${l.name}» não tem armazém em nenhuma ligação: as encomendas dela vão para «${padrao.id}», no armazém do posto da chave.` });
+  }
+  const { data: estado } = await db.from("kangest_estado").select("chave, valor, actualizado");
+  const sinc = (estado || []).find((e: Record<string, unknown>) => e.chave === "sincronizado");
+  if (ligs.length && (!sinc || Date.now() - new Date(String(sinc.valor)).getTime() > 2 * 3600_000)) {
+    geral.push({ nivel: "aviso", texto: "O agendador não sincroniza há mais de 2 horas: confira kangest_cron_url e kangest_cron_token no Vault." });
+  }
+  const resultados = await Promise.all(ligs.map((l) => testarLigacao(l, (lojas || []).map((x: Record<string, unknown>) => ({ id: String(x.id), name: String(x.name) })))));
+  return json({ ok: !geral.some((g) => g.nivel === "erro") && resultados.every((r) => r.ok), geral, ligacoes: resultados });
 });
 
 /** Corre já o ciclo (fila, stock completo e vendas). */

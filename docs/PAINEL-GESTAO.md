@@ -47,6 +47,11 @@ Serve a Livraria Adventista. Está desenhado para servir outros clientes do KanG
 Quando entra uma linha, a base manda o sinal **«vendas»** pelo tempo real que o painel já usa (tópico `painel`); o
 ecrã pede os números de novo. Sem tempo real, actualiza de 30 em 30 segundos.
 
+Os números todos vêm de **uma só chamada** (`public.painel_gestao`), que lê `vendas_ao_vivo` **uma vez** para o
+intervalo que o ecrã precisa (o mês e as 8 semanas para trás) e calcula daí os cartões, os gráficos, as lojas, os
+mais vendidos e a fita (migração `20261119180000_painel_rapido`: cerca de 40 % menos tempo que a versão anterior,
+com a empresa toda ou com uma loja).
+
 ## 3. As contas (definições)
 
 Todas na hora de Angola (UTC+1). Valores **com IVA**, em Kz.
