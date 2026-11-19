@@ -59,6 +59,9 @@ import {
   type Letter,
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
+import {
+  assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, tratarAviso, type Ligacao,
+} from "./kangest.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
@@ -3000,6 +3003,101 @@ route("POST", "/admin/email/categories", permissao("manage_settings"), async ({ 
  * Sem o segredo definido, responde 404 como qualquer caminho desconhecido — uma rota que
  * respondesse "falta configurar" anunciava a quem passasse que existe aqui algo por fechar.
  */
+// ------------------------------------------------------------------ KanGest (docs/KANGEST.md)
+
+/** As ligações ao KanGest (segredo KANGEST_LIGACOES). Configuração inválida = desligada, com o erro no registo. */
+function ligacoesKanGest(): Ligacao[] {
+  try {
+    return lerLigacoes(Deno.env.get("KANGEST_LIGACOES"));
+  } catch (e) {
+    console.error("KanGest:", (e as Error).message);
+    return [];
+  }
+}
+
+/** Avisos do KanGest (stock e preços), assinados com o segredo da ligação: …/webhooks/kangest?ligacao=<id>. */
+route("POST", "/webhooks/kangest", segredo("assinatura HMAC-SHA256 do KanGest (segredo da ligação), conferida no handler"), async ({ req, raw, url, ip }) => {
+  if (!await checkRateLimit("kangest-aviso", ip, 600)) throw tooMany("Demasiados pedidos.");
+  const lig = ligacoesKanGest().find((l) => l.id === (url.searchParams.get("ligacao") || ""));
+  if (!lig?.segredo) return json({ message: "Rota não encontrada." }, 404);
+  if (!await assinaturaValida(raw, req.headers.get("x-kangest-assinatura"), lig.segredo)) throw new HttpError(401, "Assinatura inválida.");
+  let aviso: Record<string, unknown>;
+  try {
+    aviso = JSON.parse(raw);
+  } catch {
+    throw bad("Aviso inválido.");
+  }
+  // o KanGest repete enquanto não receber 2xx: um erro nosso volta mais tarde, com o estado desse momento
+  const feito = await tratarAviso(db, lig, aviso);
+  return json({ ok: true, feito });
+});
+
+/**
+ * Agendador (pg_cron, de 5 em 5 minutos): emite a fila no KanGest; de hora a hora traz o stock completo (recupera
+ * avisos perdidos) e as vendas do ano por loja e por mês.
+ */
+route("POST", "/cron/kangest", segredo("x-kangest-token do agendador (KANGEST_CRON_TOKEN), conferido no handler"), async ({ req, body, ip }) => {
+  const expected = Deno.env.get("KANGEST_CRON_TOKEN") || "";
+  if (!expected) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("cron-kangest", ip, 30)) throw tooMany("Demasiados pedidos.");
+  if (!secretsMatch((req.headers.get("x-kangest-token") || "").trim(), expected)) throw new HttpError(401, "Token inválido.");
+  return json(await cicloKanGest(body.completo === true));
+});
+
+async function cicloKanGest(completo: boolean) {
+  const ligs = ligacoesKanGest();
+  const agora = new Date();
+  // com ligações configuradas, as encomendas novas passam a ir para a fila (gatilho orders_kangest)
+  await db.from("kangest_estado").upsert({ chave: "activo", valor: ligs.length > 0, actualizado: agora.toISOString() });
+  if (!ligs.length) return { activo: false };
+  const fila = await processarFila(db, ligs, 25);
+  const { data: ultima } = await db.from("kangest_estado").select("valor").eq("chave", "sincronizado").maybeSingle();
+  const passou = !ultima?.valor || agora.getTime() - new Date(String(ultima.valor)).getTime() > 55 * 60_000;
+  const sinc: Record<string, unknown> = {};
+  if (completo || passou) {
+    for (const l of ligs) {
+      try {
+        sinc[l.id] = { stock: await sincronizarStock(db, l), vendas: await sincronizarVendas(db, l, agora.getFullYear()) };
+      } catch (e) {
+        sinc[l.id] = { erro: (e as Error).message };
+      }
+    }
+    await db.from("kangest_estado").upsert({ chave: "sincronizado", valor: agora.toISOString(), actualizado: agora.toISOString() });
+  }
+  console.log("KanGest (cron):", JSON.stringify({ fila, sinc }));
+  return { activo: true, fila, sincronizado: sinc };
+}
+
+/** Estado da ligação para o painel: ligações (sem chaves), fila e últimos erros. */
+route("GET", "/admin/kangest", permissao("manage_settings"), async () => {
+  const ligs = ligacoesKanGest();
+  const { data: fila } = await db.from("kangest_fila").select("estado");
+  const contagem: Record<string, number> = {};
+  for (const f of fila || []) contagem[f.estado] = (contagem[f.estado] || 0) + 1;
+  const { data: erros } = await db.from("kangest_fila").select("id, order_id, accao, erro, tentativas, actualizado")
+    .eq("estado", "erro").order("actualizado", { ascending: false }).limit(50);
+  const { data: estado } = await db.from("kangest_estado").select("chave, valor, actualizado");
+  return json({
+    ligacoes: ligs.map((l) => ({ id: l.id, url: l.url, lojas: l.lojas || {}, armazens_online: l.armazens_online || [], avisos: !!l.segredo, portes: l.portes || "", generico: l.generico || "" })),
+    webhook_url: `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/app/webhooks/kangest?ligacao=<id>`,
+    fila: contagem, erros: erros || [], estado: estado || [],
+  });
+});
+
+/** Volta a pôr na fila um documento com erro (depois de corrigir o artigo, a referência ou a ligação). */
+route("POST", "/admin/kangest/repetir", permissao("manage_settings"), async ({ body }) => {
+  const id = Number(body.id);
+  if (!Number.isInteger(id) || id <= 0) throw bad("Indique o documento a repetir.");
+  const { data, error } = await db.from("kangest_fila").update({ estado: "pendente", proxima: new Date().toISOString(), tentativas: 0, erro: "" })
+    .eq("id", id).eq("estado", "erro").select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw bad("Esse documento não está com erro.");
+  return json({ ok: true });
+});
+
+/** Corre já o ciclo (fila, stock completo e vendas). */
+route("POST", "/admin/kangest/sincronizar", permissao("manage_settings"), async () => json(await cicloKanGest(true)));
+
 route("POST", "/cron/email-queue", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, body, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
   if (!expected) return json({ message: "Rota não encontrada." }, 404);

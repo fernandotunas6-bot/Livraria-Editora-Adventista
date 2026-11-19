@@ -1,5 +1,9 @@
 # O KiGest e o catálogo do site
 
+> **Com o KanGest ligado ao site ([../KANGEST.md](../KANGEST.md)), o stock e os preços chegam sozinhos.** Este
+> processo continua a servir para a primeira conciliação (ligar cada produto à referência, `kigest_ref`) e para as
+> lojas que ainda usem o KiGest.
+
 O **KiGest** (KigestGC) é o programa de facturação que corre no computador da loja
 (`DESKTOP-G26LDJM`). É nele que se vende ao balcão: cada venda sai do stock, cada preço cobrado
 é o que lá está. O site tem o seu próprio catálogo, em `public.stock_books`.

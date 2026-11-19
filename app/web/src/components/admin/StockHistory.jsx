@@ -13,6 +13,7 @@ const REASONS = {
   consignacao: { label: 'Consignação a colportor', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
   devolucao_consignacao: { label: 'Devolução de colportor', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
   compra_colportor: { label: 'Compra de colportor', className: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  kangest: { label: 'KanGest', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
 };
 
 const formatDateTime = (value) => {
