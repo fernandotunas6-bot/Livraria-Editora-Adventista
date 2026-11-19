@@ -165,7 +165,7 @@ Ecrã inteiro, tema escuro, letra maior, sem menus (`?tv=1`, ou o botão **Modo 
 Uma coluna: cartões (deslizar), meta, lojas, últimas vendas; gráficos em largura total.
 
 ### 6.10 Rodapé de noticiário
-Uma faixa a passar no fundo (na página e, a toda a largura, no modo TV), como nos noticiários: «Última hora» em
+Uma faixa a passar no fundo (na página e, a toda a largura, no modo TV), como nos noticiários: «Vendas Online» em
 vermelho, o logótipo, as notícias com etiquetas coloridas (verde a subir, vermelho a descer, âmbar avisos) e a hora.
 As notícias saem dos números (hoje contra a semana passada, a meta e o que falta por dia, a projecção, a loja que
 lidera, cada loja hoje, o mais vendido, a última venda); as **mensagens da direcção** vêm primeiro — em
