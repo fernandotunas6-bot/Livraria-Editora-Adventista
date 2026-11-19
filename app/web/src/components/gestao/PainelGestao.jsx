@@ -13,6 +13,7 @@ import { usePainelGestao, useNumeroAnimado } from '@/components/gestao/usePainel
 import { GraficoHoras, GraficoMes, GraficoMeses, Sparkline } from '@/components/gestao/GestaoGraficos';
 import { corDaLoja, MARCA, MEDALHAS } from '@/components/gestao/marca';
 import RodapeNoticias from '@/components/gestao/RodapeNoticias';
+import GraficoAoVivo, { useConfigGrafico } from '@/components/gestao/GraficoAoVivo';
 
 const TODAS = '__todas__';
 
@@ -22,13 +23,16 @@ const COR_ESTADO = { atingida: '#10b981', adiantada: '#10b981', atras: '#f59e0b'
 /**
  * O Painel de Gestão (docs/PAINEL-GESTAO.md). `variante`: 'pagina' (gestao.livrariaadventista.ao), 'admin' (secção
  * do painel) ou 'tv' (letra maior, sem botões de edição; o logótipo fica na barra do modo TV). `extra`: o que fica no
- * canto da faixa de cima (sair, por exemplo).
+ * canto da faixa de cima (sair, por exemplo). `aoVivo`: a configuração do gráfico ao vivo vinda do modo TV (nos
+ * outros ecrãs, cada aparelho guarda a sua e muda-a na roda do próprio gráfico).
  */
 export default function PainelGestao({
-  alvo = '', canal = '', onFiltros, variante = 'pagina', acoes = null, extra = null, onDados,
+  alvo = '', canal = '', onFiltros, variante = 'pagina', acoes = null, extra = null, onDados, aoVivo = null,
 }) {
   const { dados, erro, estado } = usePainelGestao({ alvo, canal });
   const tv = variante === 'tv';
+  const [cfgLocal, mudarCfg] = useConfigGrafico('pagina');
+  const cfgGrafico = aoVivo || cfgLocal;
   useEffect(() => { if (dados) onDados?.(dados); }, [dados, onDados]);
 
   if (!dados) {
@@ -42,14 +46,21 @@ export default function PainelGestao({
   const r = dados.resumo || {};
   const titulo = alvo ? nomeCurto(alvo, dados.alvos?.find((a) => a.id === alvo)?.nome) : 'Todas as livrarias';
   const est = estadoMeta({ vendido: r.mes, meta: r.meta, ritmoIdeal: r.ritmo_ideal });
+  // o gráfico ao vivo no lugar escolhido (no modo TV, só «topo» fica dentro do painel; os outros são do ModoTv)
+  const grafico = (lugar) => cfgGrafico.onde === lugar && (
+    <GraficoAoVivo alvo={alvo} canal={canal} cfg={cfgGrafico} onCfg={aoVivo ? null : mudarCfg} alvos={dados.alvos}
+      ecra={tv ? 'tv' : 'pagina'} altura={tv ? 250 : 240} />
+  );
 
   return (
     <div className={cn('pb-6', tv ? 'space-y-3' : 'space-y-5')}>
       <Heroi dados={dados} titulo={titulo} alvo={alvo} canal={canal} onFiltros={onFiltros} estado={estado}
         tv={tv} acoes={acoes} extra={extra} compacto={variante === 'admin'} />
       <div className={cn('relative z-10 space-y-5 px-1', tv ? '-mt-2' : '-mt-12 sm:px-4')}>
+        {grafico('topo')}
         <Cartoes r={r} dados={dados} tv={tv} est={est} alvo={alvo} />
         <FaixaFecho dados={dados} />
+        {grafico('depois-cartoes')}
         <Fita ultimas={dados.ultimas} alvos={dados.alvos} tv={tv} />
         <div className="grid gap-5 xl:grid-cols-3">
           <Bloco titulo={`${MESES[dados.mes - 1]} · acumulado contra o ritmo da meta`} icone={CalendarDays} className="xl:col-span-2">
@@ -61,6 +72,7 @@ export default function PainelGestao({
               onEscolher={tv || !onFiltros ? null : (id) => onFiltros({ alvo: id, canal })} />
           </Bloco>
         </div>
+        {grafico('antes-horas')}
         <div className="grid gap-5 xl:grid-cols-3">
           <Bloco titulo="Hoje, hora a hora · contra a média deste dia da semana" icone={Clock} className="xl:col-span-2">
             <GraficoHoras horas={dados.horas} altura={tv ? 190 : 210} />
@@ -79,6 +91,13 @@ export default function PainelGestao({
           <Bloco titulo="Últimos 12 meses · vendido e meta" icone={BadgeCheck}>
             <GraficoMeses meses={dados.meses} />
           </Bloco>
+        )}
+        {grafico('fim')}
+        {!aoVivo && cfgGrafico.onde === 'nao' && (
+          <button type="button" onClick={() => mudarCfg({ onde: 'depois-cartoes' })}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed p-3 text-sm text-muted-foreground hover:text-foreground">
+            <TrendingUp className="h-4 w-4" />Mostrar o gráfico ao vivo das vendas de hoje
+          </button>
         )}
       </div>
       {/* no modo TV o rodapé é do ecrã todo (ModoTv) */}

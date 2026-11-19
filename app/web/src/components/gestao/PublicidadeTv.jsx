@@ -42,10 +42,10 @@ export async function enviarFicheiroTv(ficheiro, pasta) {
   return supabase.storage.from('painel-tv').getPublicUrl(caminho).data.publicUrl;
 }
 // a passagem de uma peça para a seguinte (ms); a anterior fica por baixo até a nova estar pronta (máx. 2,5 s)
-const PASSAGEM_MS = 900;
+export const PASSAGEM_MS = 900;
 const ESPERA_MAX_MS = 2500;
 
-const ESTILO = `
+export const ESTILO = `
 @keyframes pub-entra{from{opacity:0;transform:scale(1.035)}to{opacity:1;transform:scale(1)}}
 @keyframes pub-legenda{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pub-kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.09) translate(-1.5%,-1%)}}
@@ -111,11 +111,15 @@ function Peca({ m, som, unica, origem, iframeRef, onPronto, onFim, onProgresso }
  * nova já está a tocar): sem cortes nem ecrã preto. O título e uma barra de progresso em baixo. O único da lista
  * repete; um vídeo que não abre (ou bloqueado pelo dono no YouTube) passa ao seguinte.
  */
-export function LeitorPublicidade({ midia, som = false, logo, nome, transicao = 'esbater', vinhetas = true }) {
+export function LeitorPublicidade({ midia, som = false, logo, nome, transicao = 'esbater', vinhetas = true, inicial = 0, onPassagem }) {
   // os anúncios, com uma vinheta entre eles (se houver e estiverem ligadas)
   const lista = sequenciaTv(midia, { vinhetas });
   const n = lista.length;
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(() => Math.max(Number(inicial) || 0, 0));
+  const iRef = useRef(i);
+  iRef.current = i;
+  const onPassagemRef = useRef(onPassagem);
+  onPassagemRef.current = onPassagem;
   const [anterior, setAnterior] = useState(null);
   const [pronto, setPronto] = useState(false);
   const [progresso, setProgresso] = useState(0);
@@ -128,6 +132,8 @@ export function LeitorPublicidade({ midia, som = false, logo, nome, transicao = 
 
   const seguinte = useCallback(() => {
     if (n < 2) return;
+    // entre duas peças, quem usa o leitor pode pô-lo de parte (a montra de livros entra aqui)
+    if (onPassagemRef.current?.(proximo(iRef.current, n)) === true) return;
     setAnterior(atualRef.current);
     setPronto(false);
     setProgresso(0);

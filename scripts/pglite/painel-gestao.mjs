@@ -185,5 +185,37 @@ await como(admin, `insert into storage.objects (bucket_id, name) values ('painel
 await recusa('cliente não envia ficheiros da TV', () => como(cliente, `insert into storage.objects (bucket_id, name) values ('painel-tv', 'publicidade/x.mp4')`), /row-level security|permission/);
 await recusa('gerente de loja não envia ficheiros da TV', () => como(gerente, `insert into storage.objects (bucket_id, name) values ('painel-tv', 'publicidade/y.mp4')`), /row-level security|permission/);
 
+// --- gráfico ao vivo (painel_gestao_ao_vivo): minuto a minuto, contra um dia de comparação ---------------------------
+const [t] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Teste', 'Luanda', 'Luanda', true) returning id`);
+const vivo = (origem, dias, hora, total, anulado = false) => q(
+  `insert into public.vendas_ao_vivo (origem, quando, alvo, canal, tipo, numero, total, itens, anulado)
+   values ($1, private.de_luanda(private.hora_luanda(now())::date - $2::int + $3::interval), $4, 'balcao', 'FR', $1, $5, '[]'::jsonb, $6)`,
+  [origem, dias, hora, t.id, total, anulado]);
+await vivo('t:1', 0, '09:15', 3000);
+await vivo('t:2', 0, '09:15:40', 2000);
+await vivo('t:3', 0, '10:40', 1500);
+await vivo('t:4', 0, '11:00', -500); // nota de crédito: desce
+await vivo('t:5', 0, '11:30', 9999, true); // anulada: não conta
+await vivo('t:6', 7, '09:00', 4000);
+await vivo('t:7', 14, '09:00', 8000);
+await vivo('t:8', 1, '10:00', 700);
+const aoVivo = async (sub, alvo, comparar = 'semana', canal = null) =>
+  (await como(sub, `select public.painel_gestao_ao_vivo($1, $2, $3) p`, [alvo, canal, comparar]))[0].p;
+const av = await aoVivo(admin, t.id);
+check('ao vivo: hoje minuto a minuto [minuto, Kz, vendas], sem a anulada',
+  JSON.stringify(av.hoje.map((x) => x.map(Number))) === JSON.stringify([[555, 5000, 2], [640, 1500, 1], [660, -500, 0]]), av.hoje);
+check('ao vivo: contra o mesmo dia da semana passada', JSON.stringify(av.comparacao.map((x) => x.map(Number))) === JSON.stringify([[540, 4000]]) && Number(av.comparacao_total) === 4000, av);
+check('ao vivo: contra ontem', JSON.stringify((await aoVivo(admin, t.id, 'ontem')).comparacao.map((x) => x.map(Number))) === JSON.stringify([[600, 700]]));
+const media = await aoVivo(admin, t.id, 'media');
+check('ao vivo: média de 4 semanas (12 000 / 4)', JSON.stringify(media.comparacao.map((x) => x.map(Number))) === JSON.stringify([[540, 3000]]), media.comparacao);
+check('ao vivo: últimas de hoje, a mais recente primeiro', av.ultimas.length === 4 && Number(av.ultimas[0].total) === -500 && av.ultimas[0].loja, av.ultimas);
+check('ao vivo: hora de Angola', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(av.agora), av.agora);
+check('ao vivo: canal online não tem estas vendas', (await aoVivo(admin, t.id, 'semana', 'online')).hoje.length === 0);
+await recusa('ao vivo: cliente não vê', () => aoVivo(cliente, null), /Sem permissão/);
+await recusa('ao vivo: gerente não vê outra loja', () => aoVivo(gerente, t.id), /Sem permissão para ver esta loja/);
+await recusa('ao vivo: comparação inventada', () => aoVivo(admin, t.id, 'ano'), /Comparação inválida/);
+const ag = await aoVivo(gerente, null);
+check('ao vivo: o gerente vê só a sua loja', ag.ultimas.length > 0 && ag.ultimas.every((u) => u.alvo === l.id), ag.ultimas);
+
 console.log(`painel-gestao: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

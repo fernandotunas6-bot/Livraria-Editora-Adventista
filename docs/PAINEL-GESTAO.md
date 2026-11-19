@@ -194,6 +194,45 @@ sai quando a nova já está a tocar (ou a imagem carregou), por isso não há co
 zoom lento (Ken Burns) durante o tempo delas; o título aparece em baixo, na serif da casa; uma barra fina em azul
 petróleo mostra o que falta. Com «reduzir movimento» no sistema, as trocas são simples.
 
+### 6.13 Gráfico ao vivo (como os de bolsa)
+O acumulado das vendas de hoje, **minuto a minuto**: a linha **sobe em degrau a cada venda** (desce numa nota de
+crédito) e **segue a direito** enquanto não entra nenhuma — o ponto de agora anda com o relógio e pulsa. A tracejado,
+o mesmo acumulado no dia de comparação. **Verde** quando hoje vai à frente à mesma hora, **vermelho** quando vai
+atrás. À direita, como nos gráficos de bolsa, a etiqueta com o valor de agora (e a cinzento o da comparação); em
+baixo, **barras de volume** (Kz de 15 em 15 minutos; de 5 em 5 na janela de 3 h; de 2 em 2 na de 1 h). Cada venda
+nova **sobe** do ponto de agora («+ 12 500 Kz · Huambo»). No computador, passar o rato mostra a hora, hoje e a
+comparação.
+
+- **Comparar com**: o mesmo dia da semana passada (por omissão), ontem, ou a média das últimas 4 semanas nesse dia.
+- **Tempo**: o dia (das 7h às 20h, ou mais se houver vendas fora), as últimas 3 horas ou a última hora (a janela
+  corre com o relógio).
+- **Onde mostrar** — na página e no painel (⚙ no próprio gráfico): depois dos cartões (por omissão), no topo, antes
+  do gráfico hora a hora, no fim, ou não mostrar (fica um botão para o voltar a pôr). No **modo TV** (⚙ → Gráfico
+  ao vivo): automático (por baixo da publicidade, ou no topo do painel sem publicidade), por baixo da publicidade, no
+  topo do painel, numa faixa a toda a largura por cima do rodapé, ou não mostrar. Cada aparelho guarda a sua escolha.
+- Os números vêm de `public.painel_gestao_ao_vivo(alvo, canal, comparar)` (migração
+  `20261119190000_painel_ao_vivo`), à parte do resto do painel e com as mesmas regras de quem vê o quê. Volta a pedir
+  a cada venda (o mesmo sinal «vendas»), e de minuto a minuto por segurança.
+
+### 6.14 Montra de livros na TV
+Do lado da publicidade, a TV mostra os **livros do site com os preços**, com as transições da TV: uma abertura
+(«Destaques da semana», ou o nome do tema), e depois os livros um a um — a capa grande, o título, o autor, o preço (o
+de promoção, com o antigo riscado), a fita «Destaque» ou «Promoção −20 %» e a capa desfocada por trás — ou, nos
+temas, a **prateleira** com cinco capas e preços, seguida dos livros desse tema. Cada passagem mostra outros livros.
+
+- **Livros** (⚙ → Montra de livros): os **destaques** do site (por omissão), os **temas do catálogo** como na página
+  inicial (Ellen G. White, Família, Apocalipse & Profecia…), ou os dois alternados.
+- **Quando aparece** — nada da publicidade se perde:
+  - **sem publicidade** carregada: a montra passa sempre (em vez do aviso «Sem publicidade»);
+  - **sem internet**: a montra passa sempre, com um aviso discreto «sem internet»; as capas e os preços ficaram
+    guardados na TV enquanto havia rede. A TV testa a ligação de 30 em 30 s e só volta à publicidade depois de duas
+    respostas boas seguidas (uma rede que vai e vem não a faz saltar);
+  - **com a internet estável**: de **5 em 5 minutos** (ou 3, 10, 15, nunca) entra **1 minuto** de montra (ou 30 s,
+    1 min 30, 2 min) **entre duas peças** — um vídeo nunca é cortado a meio; só o vídeo único que se repete é
+    interrompido. Depois, a publicidade continua na peça seguinte.
+- **Mostrar os preços** pode-se desligar; **Mostrar a montra já** para a ver sem esperar.
+- Sem internet, a TV também já não recarrega à meia-noite (esperaria uma página de erro): fica à espera da rede.
+
 ## 7. Aspecto
 
 - A faixa de cima em azul-marinho com o **logótipo branco** e os arcos do logótipo em ciano; os cartões sobrepõem-se
