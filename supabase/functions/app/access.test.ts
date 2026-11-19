@@ -111,8 +111,10 @@ describe("o registo das rotas no index.ts", () => {
 
   it("os agendadores e o webhook exigem segredo, e o segredo é conferido no handler", () => {
     const comSegredo = rotas.filter((r) => r.tipo === "segredo").map((r) => r.rota);
-    expect(comSegredo.filter((r) => r.startsWith("POST /cron/")).length).toBe(5);
+    expect(comSegredo.filter((r) => r.startsWith("POST /cron/")).length).toBe(6);
     expect(comSegredo).toContain("POST /webhooks/pagamentos");
+    // os avisos do KanGest: assinatura HMAC com o segredo da ligação (docs/KANGEST.md)
+    expect(comSegredo).toContain("POST /webhooks/kangest");
     expect(rotas.filter((r) => r.rota.startsWith("POST /cron/") && r.tipo !== "segredo")).toEqual([]);
   });
 
