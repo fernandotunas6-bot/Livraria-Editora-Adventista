@@ -46,6 +46,9 @@ A loja de uma encomenda é a de `orders.store_id` (a do levantamento, ou a que s
 KiGest: a migração do KiGest para o KanGest mantém as referências). Um produto sem ela não recebe stock nem preço,
 e uma encomenda com ele fica com erro na fila, a não ser que a ligação tenha o artigo genérico.
 
+**Atalho:** o painel monta tudo isto — **Sistema → Ligação ao KanGest → Configurar a ligação** (§5.1) gera o JSON de
+`KANGEST_LIGACOES`, o comando `supabase secrets set` e o token e o SQL do agendador; depois, **Testar ligação**.
+
 Segredos da Edge Function (Supabase → Edge Functions → Secrets; nunca no repositório, que é público):
 
 | Segredo | Valor |
@@ -90,6 +93,9 @@ escreve em `stock_books.stock`:
 stock à venda = Σ disponível dos armazéns online − encomendas do site que ainda não têm NE no KanGest
 ```
 
+A sincronização de hora a hora recalcula em lotes de 500 referências (`kangest_recalcular_stock_lote`), num pedido
+à base por lote em vez de um por livro.
+
 O desconto das encomendas por reservar evita vender duas vezes o mesmo livro enquanto a NE não sai (a loja sem
 Internet, por exemplo). No histórico de stock aparece com o motivo **KanGest**. O «temos / não temos» de cada loja
 (`store_stock`) passa a vir do disponível do armazém dela. Produtos com tamanhos e variantes (`versions`) não são
@@ -116,6 +122,14 @@ Consumidor Final. Os números e o QR da AGT ficam em `kangest_fila.resultado`; o
 fila. Sem ligação, limite de pedidos ou erro do KanGest: nova tentativa ao fim de 1, 2, 4, 8… minutos (até 6 horas),
 12 vezes.
 
+**Nunca em dobro.** Cada documento é **reservado** antes de sair (`kangest_reservar`: passa a `processando` numa
+transacção, saltando os que outro já reservou), por isso o agendador e o **Sincronizar já** a correr ao mesmo tempo
+não emitem o mesmo documento duas vezes; a `Idempotency-Key` protege ainda a NE, a FR e a NC do lado do KanGest. Um
+reservado há mais de 10 minutos (a função caiu a meio) volta a sair sozinho. A fila sai um documento de cada vez,
+com um prazo de 90 segundos por volta: o que não couber fica para a volta seguinte. Se a encomenda for cancelada (ou
+reembolsada) enquanto a NE (ou a FR) está a sair, a anulação (ou a NC) entra na fila assim que o documento chega ao
+KanGest (gatilho `kangest_fila_concluida`). Uma NE em curso continua a descontar no stock do site.
+
 **Onde se vê:** o cliente vê o número da factura (e da nota de crédito) e o **QR da AGT** na página de rastreio; a
 equipa vê os documentos de cada encomenda (NE, FR, anulação, NC, com o estado e o erro) no painel das encomendas.
 Um reembolso parcial não faz nota de crédito sozinho: faz-se no KanGest.
@@ -124,8 +138,21 @@ Um reembolso parcial não faz nota de crédito sozinho: faz-se no KanGest.
 
 O estado da ligação (activa, última sincronização), o que falta configurar (segredos, agendador, avisos, livros
 ligados pela referência, artigo dos portes), cada ligação com as suas lojas e o endereço do aviso para copiar, a fila
-dos documentos (na fila, feitos, com erro) e os erros com **Repetir**; **Sincronizar já** corre a fila, o stock e as
-vendas sem esperar pelo agendador.
+dos documentos (na fila, a sair agora, feitos, com erro) e os erros com **Repetir**; **Sincronizar já** corre a
+fila, o stock e as vendas sem esperar pelo agendador.
+
+**Testar ligação** confere tudo sem emitir nada e diz o que corrigir: chega a cada KanGest (e em quanto tempo), a
+versão (1.3.0 ou mais recente), as permissões que faltam à chave, se os armazéns das lojas e dos `armazens_online`
+existem, se os modos de `pagamentos` existem, se os artigos dos portes e genérico existem e estão activos, se há
+segredo dos avisos, lojas activas do site sem armazém em nenhuma ligação, `KANGEST_CRON_TOKEN` e se o agendador
+sincronizou nas últimas 2 horas.
+
+**Configurar a ligação** é um assistente: por ligação, o identificador, o endereço (basta o domínio do túnel), a
+chave, o segredo, o armazém de cada loja, os armazéns online e os artigos de serviço; os métodos de pagamento do site
+com o modo do KanGest sugerido. Confere com as mesmas regras da Edge Function e dá o comando `supabase secrets set …`
+(ou o JSON para colar em Secrets). Para o agendador, gera um token e dá o comando e o SQL do Vault (cria ou
+actualiza `kangest_cron_url` e `kangest_cron_token`). A chave e o segredo ficam só no navegador: não vão para o
+servidor nem ficam guardados.
 
 ## 5.2 Relatórios
 
@@ -141,10 +168,13 @@ site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-
 | `GET /admin/kangest` | `manage_settings` | Ligações (sem chaves), fila e erros |
 | `POST /admin/kangest/repetir` | `manage_settings` | Repetir um documento com erro |
 | `POST /admin/kangest/sincronizar` | `manage_settings` | Correr já a fila, o stock e as vendas |
+| `POST /admin/kangest/testar` | `manage_settings` | Conferir a configuração sem emitir nada (10 por minuto) |
 
 ## 7. Testes
 
 - `supabase/functions/app/kangest.test.ts` (vitest, com `npm test`): ligações, documentos, assinatura, stock, vendas
-  e a fila com um KanGest falso.
+  a fila com um KanGest falso (incluindo dois ciclos ao mesmo tempo) e o **Testar ligação**.
+- `app/web/src/lib/kangestConfig.test.js`: o assistente da configuração (JSON, erros, comandos, SQL do Vault).
 - `scripts/pglite/kangest.mjs` (cenários com as migrações reais): fila pelos gatilhos, pagamento pelo caminho real,
-  cancelamentos, stock à venda, «temos / não temos» e permissões.
+  cancelamentos, stock à venda, «temos / não temos», permissões, a reserva da fila (sem dobrar, presos há 10
+  minutos, cancelada ou reembolsada durante a emissão) e o recálculo em lote.

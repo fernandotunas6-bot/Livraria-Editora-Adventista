@@ -2,7 +2,8 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas, modoPagamento,
-  corpoNC, pedir, precoDoArtigo, processarFila, proximaTentativa, vendaDoDocumento, type Ligacao,
+  corpoNC, PERMISSOES_LIGACAO, pedir, precoDoArtigo, processarFila, proximaTentativa, testarLigacao, vendaDoDocumento, versaoAntiga,
+  type Ligacao,
 } from "./kangest.ts";
 
 const CHAVE = `kg_${"a".repeat(48)}`;
@@ -230,7 +231,20 @@ function baseFalsa(tabelas: Record<string, Record<string, any>[]>) {
     };
     return q;
   };
-  return { db: { from: consulta, rpc: async (f: string, a: unknown) => { rpcs.push({ f, a }); return { data: 1 }; } }, rpcs };
+  // kangest_reservar como a função da base: o primeiro pendente na hora (ou preso há 10 min) passa a «processando»
+  const reservar = () => {
+    const agora = new Date().toISOString();
+    const preso = new Date(Date.now() - 10 * 60_000).toISOString();
+    const job = [...(tabelas.kangest_fila || [])].sort((a, b) => a.id - b.id)
+      .find((r) => (r.estado === "pendente" && String(r.proxima) <= agora) || (r.estado === "processando" && String(r.actualizado) < preso));
+    if (job) Object.assign(job, { estado: "processando", actualizado: agora });
+    return job ? [job] : [];
+  };
+  const rpc = async (f: string, a: unknown) => {
+    rpcs.push({ f, a });
+    return { data: f === "kangest_reservar" ? reservar() : 1, error: null };
+  };
+  return { db: { from: consulta, rpc }, rpcs };
 }
 
 describe("processarFila", () => {
@@ -255,7 +269,9 @@ describe("processarFila", () => {
     expect(pedidos[1].corpo).toMatchObject({ doc_origem_id: 50, pagamentos: [{ modo: "MB", valor: 870000 }] });
     expect(fila.map((x) => x.estado)).toEqual(["feito", "feito"]);
     expect(fila[1].resultado).toMatchObject({ numero: "FR W2026/9", fe: { estado: "P" } });
-    expect(rpcs.map((r) => r.f)).toContain("kangest_recalcular_stock");
+    const lotes = rpcs.filter((r) => r.f === "kangest_recalcular_stock_lote");
+    expect(lotes).toHaveLength(1);
+    expect((lotes[0].a as any).p_referencias).toContain("LIV-001");
   });
   it("FR antes da NE espera; erro de validação fica para alguém resolver", async () => {
     const fila = [{ id: 2, order_id: "o1", accao: "fr", estado: "pendente", tentativas: 0, proxima: passado, resultado: null },
@@ -270,10 +286,77 @@ describe("processarFila", () => {
     expect(fila2[0].estado).toBe("erro");
     expect(String((fila2[0] as any).erro)).toMatch(/não tem artigo no KanGest/);
   });
+  it("dois ciclos ao mesmo tempo não emitem a mesma nota de encomenda", async () => {
+    const fila = [
+      { id: 1, order_id: "o1", accao: "ne", estado: "pendente", tentativas: 0, proxima: passado, resultado: null },
+      { id: 2, order_id: "o1", accao: "fr", estado: "pendente", tentativas: 0, proxima: passado, resultado: null },
+    ];
+    const { db } = baseFalsa({ kangest_fila: fila, orders: [encomenda()], stock_books: [{ id: "b1", kigest_ref: "LIV-001" }] });
+    const tipos: string[] = [];
+    const f = (async (_url: string, i: RequestInit) => {
+      const corpo = JSON.parse(String(i.body));
+      tipos.push(corpo.tipo);
+      await new Promise((r) => setTimeout(r, 5));
+      return new Response(JSON.stringify({ id: corpo.tipo === "NE" ? 50 : 51, numero_doc: corpo.tipo, total: 870000 }), { status: 201 });
+    }) as unknown as typeof fetch;
+    const lig = { ...central, generico: "DIGITAL" };
+    await Promise.all([processarFila(db, [lig], 20, f), processarFila(db, [lig], 20, f)]);
+    expect(tipos.filter((t) => t === "NE")).toHaveLength(1);
+    expect(fila[0].estado).toBe("feito");
+    // a FR ou saiu a seguir à NE, ou espera por ela (nunca fica presa como «processando»)
+    expect(["feito", "pendente"]).toContain(fila[1].estado);
+  });
+  it("sem tempo: nada fica reservado", async () => {
+    const fila = [{ id: 1, order_id: "o1", accao: "ne", estado: "pendente", tentativas: 0, proxima: passado, resultado: null }];
+    const { db } = baseFalsa({ kangest_fila: fila, orders: [encomenda()], stock_books: [] });
+    expect(await processarFila(db, [central], 20, fetch, 0)).toEqual({ feitos: 0, falhas: 0, adiados: 0 });
+    expect(fila[0].estado).toBe("pendente");
+  });
   it("sem ligação ao KanGest: volta a tentar mais tarde", async () => {
     const fila = [{ id: 1, order_id: "o1", accao: "ne", estado: "pendente", tentativas: 0, proxima: passado, resultado: null }];
     const { db } = baseFalsa({ kangest_fila: fila, orders: [encomenda({ items: [{ book_id: "b1", quantity: 1, price: 10 }], shipping_cost: 0 })], stock_books: [{ id: "b1", kigest_ref: "LIV-001" }] });
     await processarFila(db, [central], 20, (async () => { throw new Error("timeout"); }) as unknown as typeof fetch);
     expect([fila[0].estado, fila[0].tentativas]).toEqual(["pendente", 1]);
+  });
+});
+
+describe("testarLigacao", () => {
+  const todas = PERMISSOES_LIGACAO.map(([p]) => p);
+  const kangest = (perms: string[], artigos: string[] = ["PORTES"]) => (async (url: string) => {
+    const caminho = url.replace(central.url, "");
+    if (caminho === "/") {
+      return new Response(JSON.stringify({ versao: "1.3.0", empresa: { nome: "Livraria" }, chave: { nome: "site", permissoes: perms }, posto: { descricao: "Online" } }));
+    }
+    if (caminho === "/tabelas") {
+      return new Response(JSON.stringify({ armazens: [{ id: 1, nome: "Huambo" }, { id: 2, nome: "Lubango" }], modos_pagamento: [{ codigo: "MB" }, { codigo: "TB" }, { codigo: "NU" }] }));
+    }
+    const ref = decodeURIComponent(caminho.replace("/artigos/codigo/", ""));
+    return artigos.includes(ref) ? new Response(JSON.stringify({ id: 9 })) : new Response(JSON.stringify({ erro: { mensagem: "Nenhum artigo" } }), { status: 404 });
+  }) as unknown as typeof fetch;
+  const lojas = [{ id: "huambo", name: "Huambo" }, { id: "lubango", name: "Lubango" }];
+
+  it("tudo certo", async () => {
+    const r = await testarLigacao(central, lojas, kangest(todas));
+    expect(r.ok).toBe(true);
+    expect(r.verificacoes.filter((v: any) => v.nivel === "erro")).toEqual([]);
+    expect(r.armazens).toEqual([{ id: 1, nome: "Huambo" }, { id: 2, nome: "Lubango" }]);
+  });
+  it("aponta permissões, armazéns, modos e artigos que faltam", async () => {
+    const lig = { ...central, lojas: { huambo: 1, sumbe: 7 }, armazens_online: [3], pagamentos: { multicaixa_express: "XX" }, generico: "DIGITAL" };
+    const r = await testarLigacao(lig, lojas, kangest(todas.filter((p) => p !== "vendas.nota_credito")));
+    const erros = r.verificacoes.filter((v: any) => v.nivel === "erro").map((v: any) => v.texto).join(" | ");
+    expect(r.ok).toBe(false);
+    expect(erros).toMatch(/vendas\.nota_credito/);
+    expect(erros).toMatch(/sumbe não é uma loja do site/);
+    expect(erros).toMatch(/armazém 7/);
+    expect(erros).toMatch(/«armazens_online»: o armazém 3/);
+    expect(erros).toMatch(/modo XX/);
+    expect(erros).toMatch(/«generico»: o artigo DIGITAL/);
+  });
+  it("chave recusada e KanGest antigo", async () => {
+    const recusa = (async () => new Response(JSON.stringify({ erro: { mensagem: "Chave inválida" } }), { status: 401 })) as unknown as typeof fetch;
+    const r = await testarLigacao(central, lojas, recusa);
+    expect([r.ok, r.verificacoes[0].texto]).toEqual([false, "A chave da API não é aceite (revogada, expirada ou de outro KanGest)."]);
+    expect([versaoAntiga("1.2.9"), versaoAntiga("1.3.0"), versaoAntiga("1.10.0"), versaoAntiga("2.0.0-beta")]).toEqual([true, false, false, false]);
   });
 });

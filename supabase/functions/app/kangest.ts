@@ -278,6 +278,101 @@ export async function pedir(lig: Ligacao, metodo: string, caminho: string, corpo
   return v;
 }
 
+// ------------------------------------------------------------------ testar a ligação
+
+/** O que a chave da API precisa para a ligação toda (docs/KANGEST.md §2). */
+export const PERMISSOES_LIGACAO: [string, string][] = [
+  ["api.artigos", "ler artigos e preços"], ["api.stock", "ler o stock"], ["api.documentos", "ler e emitir documentos"],
+  ["vendas.proforma", "nota de encomenda (NE)"], ["vendas.fatura_recibo", "factura/recibo (FR)"],
+  ["vendas.nota_credito", "nota de crédito dos reembolsos (NC)"], ["documentos.anular", "anular a NE das encomendas canceladas"],
+  ["clientes", "criar o cliente com NIF"], ["relatorios.ver", "vendas por loja e mês"], ["pos.alterar_preco", "cobrar o preço do site (promoções)"],
+];
+/** Versão do KanGest a partir da qual a ligação está completa (reservas por loja, relatórios por loja). */
+export const VERSAO_MINIMA = "1.3.0";
+
+export function versaoAntiga(v: string, minima = VERSAO_MINIMA): boolean {
+  const a = String(v || "0").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const b = minima.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((a[i] || 0) !== b[i]) return (a[i] || 0) < b[i];
+  return false;
+}
+
+export type Verificacao = { nivel: "ok" | "aviso" | "erro"; texto: string };
+
+/**
+ * Confere uma ligação de ponta a ponta, sem emitir nada: chega ao KanGest, a chave tem as permissões, os armazéns
+ * das lojas existem, os modos de pagamento e os artigos dos portes e genérico também. `lojasSite`: physical_stores.
+ */
+export async function testarLigacao(lig: Ligacao, lojasSite: { id: string; name: string }[], fetchFn: typeof fetch = fetch): Promise<Row> {
+  const v: Verificacao[] = [];
+  const t0 = Date.now();
+  let info: Row;
+  try {
+    info = await pedir(lig, "GET", "/", undefined, undefined, fetchFn);
+  } catch (e) {
+    const err = e as ErroKanGest;
+    const texto = err.status === 401 ? "A chave da API não é aceite (revogada, expirada ou de outro KanGest)."
+      : err.status === 403 ? `O KanGest recusou o pedido: ${err.message} (endereço IP fora da lista da chave?)`
+      : err.message;
+    return { id: lig.id, ok: false, verificacoes: [{ nivel: "erro", texto }] };
+  }
+  const ms = Date.now() - t0;
+  v.push({ nivel: "ok", texto: `Ligado ao KanGest ${info.versao} de ${info.empresa?.nome || "—"} em ${ms} ms.` });
+  if (versaoAntiga(info.versao)) v.push({ nivel: "erro", texto: `Actualize o KanGest para ${VERSAO_MINIMA} ou mais recente (tem ${info.versao}).` });
+  if (ms > 5000) v.push({ nivel: "aviso", texto: "O KanGest demora a responder: as encomendas podem atrasar." });
+
+  const tem = new Set<string>(info.chave?.permissoes || []);
+  const faltam = PERMISSOES_LIGACAO.filter(([p]) => !tem.has(p));
+  if (faltam.length) {
+    v.push({ nivel: "erro", texto: `Faltam permissões à chave «${info.chave?.nome || ""}»: ${faltam.map(([p, d]) => `${p} (${d})`).join(", ")}. `
+      + "Algumas também têm de estar no perfil do utilizador da chave." });
+  } else v.push({ nivel: "ok", texto: "A chave tem todas as permissões." });
+
+  let tabelas: Row = {};
+  try {
+    tabelas = await pedir(lig, "GET", "/tabelas", undefined, undefined, fetchFn);
+  } catch (e) {
+    v.push({ nivel: "erro", texto: `Não foi possível ler as tabelas do KanGest: ${(e as Error).message}` });
+  }
+  const armazens = new Map<number, string>((tabelas.armazens || []).map((a: Row) => [Number(a.id), String(a.nome)]));
+  const nomeLoja = new Map(lojasSite.map((l) => [String(l.id), l.name]));
+  if (armazens.size) {
+    for (const [loja, arm] of Object.entries(lig.lojas || {})) {
+      if (!nomeLoja.has(loja)) v.push({ nivel: "erro", texto: `«lojas»: ${loja} não é uma loja do site.` });
+      if (!armazens.has(Number(arm))) v.push({ nivel: "erro", texto: `«lojas»: o armazém ${arm} (${nomeLoja.get(loja) || loja}) não existe no KanGest.` });
+    }
+    for (const a of lig.armazens_online || []) {
+      if (!armazens.has(Number(a))) v.push({ nivel: "erro", texto: `«armazens_online»: o armazém ${a} não existe no KanGest.` });
+    }
+    const online = (lig.armazens_online?.length ? lig.armazens_online : [...armazens.keys()]).map((a) => armazens.get(Number(a)) || `#${a}`);
+    v.push({ nivel: "ok", texto: `Vende no site o stock de: ${online.join(", ")}.` });
+  }
+  const modos = new Set<string>((tabelas.modos_pagamento || []).map((m: Row) => String(m.codigo)));
+  if (modos.size) {
+    for (const [metodo, modo] of Object.entries(lig.pagamentos || {})) {
+      if (!modos.has(modo)) v.push({ nivel: "erro", texto: `«pagamentos»: ${metodo} → ${modo}, mas o KanGest não tem o modo ${modo}.` });
+    }
+    if (!modos.has("TB")) v.push({ nivel: "aviso", texto: "O KanGest não tem o modo TB (transferência), usado quando o método não está em «pagamentos»." });
+  }
+  for (const [campo, ref] of [["portes", lig.portes], ["generico", lig.generico]] as const) {
+    if (!ref) {
+      if (campo === "portes") v.push({ nivel: "aviso", texto: "Sem artigo dos portes («portes»): encomendas com portes ficam com erro." });
+      continue;
+    }
+    try {
+      await pedir(lig, "GET", `/artigos/codigo/${encodeURIComponent(ref)}`, undefined, undefined, fetchFn);
+    } catch (e) {
+      v.push({ nivel: "erro", texto: `«${campo}»: o artigo ${ref} não existe (ou está inactivo) no KanGest. ${(e as ErroKanGest).status === 404 ? "" : (e as Error).message}`.trim() });
+    }
+  }
+  if (!lig.segredo) v.push({ nivel: "aviso", texto: "Sem «segredo» dos avisos: o stock e as vendas ao balcão só chegam de hora a hora." });
+  return {
+    id: lig.id, ok: !v.some((x) => x.nivel === "erro"), ms, versao: info.versao, empresa: info.empresa?.nome || "",
+    posto: info.posto?.descricao || "", armazens: [...armazens].map(([id, nome]) => ({ id, nome })),
+    modos: tabelas.modos_pagamento || [], verificacoes: v,
+  };
+}
+
 // ------------------------------------------------------------------ fila de documentos
 
 type Db = { from: (t: string) => any; rpc: (f: string, a?: Row) => any };
@@ -298,16 +393,28 @@ async function falhou(db: Db, job: Row, e: unknown) {
 
 /** Espera pela NE (sem contar como tentativa). */
 async function adiar(db: Db, job: Row, minutos: number, motivo: string) {
-  await db.from("kangest_fila").update({ proxima: new Date(Date.now() + minutos * 60_000).toISOString(), erro: motivo, actualizado: new Date().toISOString() }).eq("id", job.id);
+  await db.from("kangest_fila").update({ estado: "pendente", proxima: new Date(Date.now() + minutos * 60_000).toISOString(), erro: motivo, actualizado: new Date().toISOString() }).eq("id", job.id);
+}
+
+/**
+ * Reserva o próximo documento da fila (fica «processando»): o agendador e o «Sincronizar já» nunca emitem o mesmo
+ * documento os dois. Um reservado há mais de 10 minutos (a função caiu a meio) volta a sair.
+ */
+async function reservar(db: Db): Promise<Row | null> {
+  const { data, error } = await db.rpc("kangest_reservar", { p_limite: 1 });
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] ?? null : data ?? null;
 }
 
 /** Emite no KanGest o que está na fila (NE, FR, anulações), pela ordem. Devolve um resumo. */
-export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchFn: typeof fetch = fetch): Promise<Row> {
+export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchFn: typeof fetch = fetch, prazoMs = 90_000): Promise<Row> {
   const resumo = { feitos: 0, falhas: 0, adiados: 0 };
   if (!ligs.length) return resumo;
-  const { data: fila, error } = await db.from("kangest_fila").select("*").eq("estado", "pendente").lte("proxima", new Date().toISOString()).order("id").limit(limite);
-  if (error) throw new Error(error.message);
-  for (const job of fila || []) {
+  // um de cada vez e com prazo: o que não couber fica para a próxima volta, sem ficar preso como «processando»
+  const fim = Date.now() + prazoMs;
+  for (let n = 0; n < limite && Date.now() < fim; n++) {
+    const job = await reservar(db);
+    if (!job) break;
     try {
       const { data: order } = await db.from("orders").select("*").eq("id", job.order_id).maybeSingle();
       if (!order) {
@@ -331,7 +438,7 @@ export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchF
         const d = await pedir(lig, "POST", "/documentos", corpo, `ne-${numero}`, fetchFn);
         await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, armazem_id: d.armazem_id, linhas: corpo.linhas });
         // a encomenda passa a estar reservada no KanGest: o stock do site deixa de a descontar à parte
-        for (const r of new Set(corpo.linhas.map((l: Row) => l.referencia))) await db.rpc("kangest_recalcular_stock", { p_referencia: r });
+        await recalcularStock(db, [...new Set<string>(corpo.linhas.map((l: Row) => String(l.referencia)))]);
       } else if (job.accao === "fr") {
         if (!ne || ne.estado !== "feito") {
           if (ne && (ne.estado === "erro" || ne.estado === "ignorado")) throw new ErroKanGest("A nota de encomenda não chegou ao KanGest: resolva-a primeiro.", 0, "", true);
@@ -367,6 +474,14 @@ export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchF
 }
 
 // ------------------------------------------------------------------ avisos e sincronização
+
+/** Recalcula o stock do site de várias referências, 500 por pedido à base (em vez de um pedido por livro). */
+export async function recalcularStock(db: Db, refs: string[]) {
+  for (let i = 0; i < refs.length; i += 500) {
+    const { error } = await db.rpc("kangest_recalcular_stock_lote", { p_referencias: refs.slice(i, i + 500) });
+    if (error) throw new Error(error.message);
+  }
+}
 
 /** Trata um aviso do KanGest já com a assinatura conferida. */
 export async function tratarAviso(db: Db, lig: Ligacao, aviso: Row): Promise<string> {
@@ -420,7 +535,7 @@ export async function sincronizarStock(db: Db, lig: Ligacao, fetchFn: typeof fet
     if (!p.mais) break;
     desde = p.seguinte;
   }
-  for (const r of refs) await db.rpc("kangest_recalcular_stock", { p_referencia: r });
+  await recalcularStock(db, [...refs]);
   return n;
 }
 
