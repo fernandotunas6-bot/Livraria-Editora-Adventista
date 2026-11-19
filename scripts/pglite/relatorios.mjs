@@ -48,7 +48,7 @@ check('os dados do Huambo continuam lá', anos.map((a) => a.ano).join() === '202
 // --- 1. A permissão --------------------------------------------------------------------------
 {
   const keys = (await q(`select private.permission_keys() as k`))[0].k;
-  check('a base de dados conhece edit_reports', keys.includes('edit_reports') && keys.includes('manage_store_stock') && keys.length === 15, keys); // + stock da loja (lojas_donas_dos_dados), que vem depois
+  check('a base de dados conhece edit_reports', keys.includes('edit_reports') && keys.includes('manage_store_stock') && keys.length === 16, keys); // + stock da loja (lojas_donas_dos_dados) e painel da sua loja (painel_gestao), que vêm depois
   await as(admin, `select public.users_admin_update($1, null, null, 'manager', '{"view_reports":true,"edit_reports":true,"inventada":true}'::jsonb)`, [leitor]);
   const [p] = await q(`select permissions from public.profiles where id = $1`, [leitor]);
   check('users_admin_update guarda edit_reports', p.permissions.edit_reports === true && !('inventada' in p.permissions), p.permissions);

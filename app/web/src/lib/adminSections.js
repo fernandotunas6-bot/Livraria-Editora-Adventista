@@ -28,7 +28,7 @@ export const ADMIN_GROUPS = [
   { id: 'catalogo', label: 'Catálogo', sections: ['books', 'disponibilidade', 'collections', 'slides', 'downloads'] },
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
-  { id: 'relatorios', label: 'Relatórios', sections: ['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
+  { id: 'relatorios', label: 'Relatórios', sections: ['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
@@ -131,6 +131,15 @@ export const ADMIN_SECTIONS = {
     keywords: 'balcao levantamento moradas mapa',
     description: 'Aparecem em /lojas, no rodapé, no menu e no levantamento das encomendas.',
     allowed: (p) => p.settings,
+  },
+  // As vendas de todas as livrarias ao vivo, a meta do mês e o modo TV (docs/PAINEL-GESTAO.md); também em
+  // gestao.livrariaadventista.ao. O gerente de uma loja vê só a sua (view_store_dashboard).
+  'painel-gestao': {
+    label: 'Painel de Gestão', title: 'Painel de Gestão — vendas ao vivo', icon: Activity,
+    keywords: 'ao vivo tempo real bolsa meta mes objectivo objetivo tv televisao ecra fita vendas hoje projeccao gerente',
+    description: 'As vendas das livrarias e da loja online a acontecer: hoje, o mês, a meta e quanto falta, cada loja, os mais vendidos e o modo TV.',
+    allowed: (p) => p.salesReports || p.storeDashboard,
+    readOnly: (p) => !p.salesReportsEdit,
   },
   // O relatório conjunto: todas as livrarias num só sítio (consolidado-ui.js, docs/RELATORIOS.md).
   'relatorios-lojas': {
@@ -336,6 +345,8 @@ export function adminPermissions({ isAdmin = false, hasPermission = () => false 
     // lança os números do mês («Editar relatórios de vendas», que não abre o caixa).
     salesReports: has('view_reports') || has('edit_reports'),
     salesReportsEdit: has('edit_reports'),
+    // O Painel de Gestão só da sua loja (o gerente de uma livraria).
+    storeDashboard: has('view_store_dashboard'),
     marketing: has('manage_marketing'),
     // Quem gere colportores também vê as igrejas e os pastores (só leitura).
     churchRegistry: has('manage_church_registry') || has('manage_colporteurs'),

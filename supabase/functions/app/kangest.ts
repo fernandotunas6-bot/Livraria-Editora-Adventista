@@ -207,6 +207,36 @@ export function linhasVendas(lig: Ligacao, dados: Row[], canal: "balcao" | "api"
   return [...soma.values()].map((r) => ({ ...r, actualizado: new Date().toISOString() }));
 }
 
+/**
+ * Uma venda do balcão para o Painel de Gestão (vendas_ao_vivo), a partir do aviso documento.emitido/anulado.
+ * Só facturas, facturas-recibo, notas de débito e notas de crédito (estas a abater); as da loja online (emitidas
+ * pela chave da API) ficam de fora — entram pelas encomendas pagas, com o canal online. A loja é a do armazém
+ * (servidor central) ou a única da ligação; um armazém sem loja ligada fica «sem-loja».
+ */
+export function vendaDoDocumento(lig: Ligacao, d: Row): Row | null {
+  const tipo = String(d?.tipo_codigo || "").toUpperCase();
+  if (!["FR", "FT", "ND", "NC"].includes(tipo) || d.api_chave_id != null || d.id == null) return null;
+  const sinal = tipo === "NC" ? -1 : 1;
+  const lojas = Object.entries(lig.lojas || {});
+  const lojaDe = new Map<number, string>(lojas.map(([loja, a]) => [Number(a), loja]));
+  const alvo = lojas.length === 1 ? lojas[0][0] : (d.armazem_id != null && lojaDe.get(Number(d.armazem_id))) || "sem-loja";
+  const hora = String(d.data_hora || "");
+  // o KanGest dá a hora local da loja (Angola, UTC+1)
+  const quando = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(hora) ? `${hora}+01:00` : new Date().toISOString();
+  const kz = (c: unknown) => Math.round(Math.abs(Number(c || 0))) / 100;
+  return {
+    origem: `kangest:${lig.id}:${d.id}`,
+    quando, alvo, canal: "balcao", tipo, numero: String(d.numero_doc || ""),
+    total: sinal * kz(d.total),
+    itens: (Array.isArray(d.linhas) ? d.linhas : []).map((l: Row) => ({
+      chave: String(l.referencia || l.descricao || ""), referencia: String(l.referencia || ""), book_id: null,
+      titulo: String(l.descricao || "").slice(0, 200), quantidade: sinal * Math.abs(Number(l.quantidade || 0)), total: sinal * kz(l.total),
+    })),
+    anulado: d.estado === "A",
+    actualizado: new Date().toISOString(),
+  };
+}
+
 // ------------------------------------------------------------------ pedidos ao KanGest
 
 export async function pedir(lig: Ligacao, metodo: string, caminho: string, corpo?: Row, idem?: string, fetchFn: typeof fetch = fetch): Promise<Row> {
@@ -330,6 +360,20 @@ export async function tratarAviso(db: Db, lig: Ligacao, aviso: Row): Promise<str
     if (error) throw new Error(error.message);
     await db.rpc("kangest_recalcular_stock", { p_referencia: linhas[0].referencia });
     return "stock";
+  }
+  if (aviso?.evento === "documento.emitido" || aviso?.evento === "documento.anulado") {
+    const venda = vendaDoDocumento(lig, dados);
+    if (!venda) return "não é venda do balcão";
+    // a capa do produto do site, pela referência
+    const refs = [...new Set(venda.itens.map((i: Row) => i.referencia).filter(Boolean))];
+    if (refs.length) {
+      const { data: livros } = await db.from("stock_books").select("id, kigest_ref").in("kigest_ref", refs);
+      const porRef = new Map<string, string>((livros || []).map((b: Row) => [b.kigest_ref, b.id]));
+      for (const i of venda.itens) i.book_id = porRef.get(i.referencia) ?? null;
+    }
+    const { error } = await db.from("vendas_ao_vivo").upsert(venda, { onConflict: "origem" });
+    if (error) throw new Error(error.message);
+    return venda.anulado ? "venda anulada" : "venda";
   }
   if (aviso?.evento === "artigo.alterado") {
     const preco = precoDoArtigo(lig, dados);

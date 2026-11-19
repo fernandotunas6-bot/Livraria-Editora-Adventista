@@ -1,6 +1,7 @@
 # Painel de Gestão — `gestao.livrariaadventista.ao`
 
-> **Estado: especificação para aprovar.** Nada disto está construído ainda. As decisões em aberto estão no fim (§11).
+> **Estado: construído** (migração `20261119140000_painel_gestao`, `src/pages/PainelGestaoPage.jsx`,
+> `src/components/gestao/`). As decisões do dono estão em §11; a configuração do domínio em §13.
 
 Um ecrã único para a direcção acompanhar **todas as vendas de todas as livrarias, ao vivo**: o que se está a vender
 agora, quanto se vendeu hoje e no mês, a **meta do mês** e quanto falta. No fim do mês o mês **fecha** (fica
@@ -14,13 +15,13 @@ Serve a Livraria Adventista. Está desenhado para servir outros clientes do KanG
 |---|---|---|
 | Direcção (administrador, `view_reports`) | Todas as lojas, todos os canais | — |
 | Quem lança relatórios (`edit_reports`) | Igual | Definir as metas do mês |
-| Gerente de uma loja (membro da equipa da loja) | Só a loja dele | — (proposta, §11) |
+| Gerente de uma loja (permissão **Painel da sua loja**, `view_store_dashboard`) | Só a loja da sua ficha de funcionário | — |
 
 - **Computador** (ecrã inteiro), **televisão na sede** (modo TV, §6.8) e **telemóvel** (uma coluna).
 - Entra-se com a conta do site, como no painel (`/admin`), com a verificação em dois passos da equipa.
 - `gestao.livrariaadventista.ao` é um domínio personalizado do mesmo projecto do Cloudflare Pages: o site, ao abrir
   nesse endereço, mostra só o Painel de Gestão (o resto do site não aparece aí). Mesmas contas, mesmas permissões, um
-  só deploy.
+  só deploy. Também abre em `/gestao` e no painel (Relatórios → Painel de Gestão).
 
 ## 2. De onde vêm os números
 
@@ -149,9 +150,16 @@ dias. Ordenadas pela % da meta (ranking). Carregar numa loja filtra o painel tod
 - **Últimos 12 meses**: barras do vendido com o traço da meta e ✓/✗ de cada fecho; carregar num mês abre o relatório
   desse mês (o painel de vendas que já existe).
 
-### 6.8 Modo TV
-Ecrã inteiro, tema escuro, letra maior, sem menus; roda entre **Empresa → cada loja** de 30 em 30 segundos (opcional).
-Fica aberto o dia todo: reconecta-se sozinho e recarrega à meia-noite (para o dia novo).
+### 6.8 Modo TV (com o ecrã dividido)
+Ecrã inteiro, tema escuro, letra maior, sem menus (`?tv=1`, ou o botão **Modo TV**):
+
+- **Ecrã dividido**: a **publicidade** de um lado e o **painel** do outro, ao mesmo tempo — 60/40, 50/50, 40/60, 30/70
+  ou só o painel; a publicidade à esquerda ou à direita. Cada televisão guarda a sua escolha (⚙ no canto).
+- **Publicidade** (botão **Publicidade da TV**, quem tem «Configurações» ou «Editar relatórios de vendas»): vídeos dos
+  ficheiros do site (Supabase), imagens e vídeos do YouTube (`youtube-nocookie`), por ordem e em ciclo. Os vídeos
+  passam até ao fim; as imagens e o YouTube pelo tempo de cada um. Sem som por omissão (🔈 no canto para o ligar).
+- **Roda** entre a empresa e cada loja (30 s por omissão; pode-se desligar ou mudar).
+- Fica aberto o dia todo: o ecrã não se apaga (Wake Lock), reconecta-se sozinho e recarrega à meia-noite e cinco.
 
 ### 6.9 Telemóvel
 Uma coluna: cartões (deslizar), meta, lojas, últimas vendas; gráficos em largura total.
@@ -162,7 +170,7 @@ Uma coluna: cartões (deslizar), meta, lojas, últimas vendas; gráficos em larg
   ▲▼ ou texto além da cor.
 - Números `tabular-nums`, Kz com espaço de milhares («24 810 000 Kz»; nos cartões, «24,8 M Kz» com o valor inteiro ao
   passar o rato).
-- Gráficos com o mesmo d3 do painel de vendas (consistência e as exportações que já existem).
+- Gráficos com o Recharts (já usado nos relatórios do painel), com as mesmas cores.
 
 ## 8. Desempenho e fiabilidade
 
@@ -185,13 +193,15 @@ avisos do KanGest (`documento.emitido`, já com a loja), e as tabelas não depen
 dá as capas). Para outro cliente do KanGest, o mesmo painel pode correr noutro projecto (ou como «Painel da empresa»
 no próprio serviço do KanGest), com o domínio `gestao.<cliente>`.
 
-## 11. Decisões em aberto
+## 11. Decisões do dono (2026-11-19)
 
-1. **Metas**: por loja, e a da empresa é a soma? (proposto) Ou uma meta só da empresa?
-2. **Online**: conta como uma loja à parte (proposto, com meta própria) ou dentro da loja que serve a encomenda?
-3. **Gerentes de loja**: vêem só a loja deles (proposto)?
-4. **Avisos**: push à direcção quando uma loja passa a meta, ou fica atrás do ritmo a partir do dia 20?
-5. **TV**: há um ecrã na sede para o modo TV?
+1. **Metas**: uma por loja; a da empresa é a soma (ou uma própria, se for escrita).
+2. **Online**: conta como uma loja à parte, com meta própria (`alvo = 'online'`).
+3. **Gerentes de loja**: cada um vê só a sua (`view_store_dashboard` + a loja da ficha de funcionário).
+4. **Avisos** (email, WhatsApp ou push, pelo envio de sempre à equipa): quando uma loja (ou a empresa) **passa a meta**
+   — no momento, uma vez por mês — e quando **fica atrasada** — do dia 7 em diante, se a projecção ficar abaixo de
+   95 % da meta, no máximo uma vez por semana. Recebem a direcção (`view_reports`) e o gerente dessa loja.
+5. **TV na sede**: sim, com o ecrã dividido entre a publicidade e o painel.
 
 ## 12. Fases
 
@@ -201,3 +211,20 @@ no próprio serviço do KanGest), com o domínio `gestao.<cliente>`.
 | 2 | O ecrã: barra, cartões, mês em curso, lojas, últimas vendas, filtros; domínio `gestao.` |
 | 3 | Fita, hora a hora, mais vendidos com capas, histórico dos 12 meses, modo TV, telemóvel |
 | 4 | Metas no painel com proposta automática, faixa do mês fechado, avisos push |
+
+Todas as fases estão feitas. Testes: `scripts/pglite/painel-gestao.mjs` (vendas pelo pagamento real, quem vê o quê,
+metas, avisos, fecho do mês, publicidade), `src/lib/painelGestao.test.js` (formatos, cores da meta, filtros, TV) e
+`kangest.test.ts` (as vendas do balcão a partir dos avisos do KanGest).
+
+## 13. Pôr o domínio a funcionar (uma vez)
+
+1. **Cloudflare → Workers & Pages →** projecto do site **→ Custom domains → Set up a custom domain**:
+   `gestao.livrariaadventista.ao`. Com a zona na Cloudflare, o registo DNS (CNAME) fica criado sozinho.
+2. **Supabase → Authentication → URL Configuration**: já vai em `supabase/auth/config.json`
+   (`https://gestao.livrariaadventista.ao/**`), aplicado pelo deploy; confirmar que aparece na lista.
+3. **No KanGest** (cada servidor), no aviso do site (docs/KANGEST.md §2), juntar os eventos `documento.emitido` e
+   `documento.anulado`: são eles que trazem as vendas do balcão ao vivo.
+4. Dar a cada gerente de loja a permissão **Painel da sua loja** e ligar a conta à ficha de funcionário dele (com a
+   loja). A direcção já vê tudo com «Ver relatórios».
+5. Na televisão da sede: abrir `https://gestao.livrariaadventista.ao/?tv=1`, entrar, escolher a divisão (⚙) e pôr em
+   ecrã inteiro. Na Android TV ou num mini-PC, o browser em modo quiosque abre directamente aí.

@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas, modoPagamento,
-  pedir, precoDoArtigo, processarFila, proximaTentativa, type Ligacao,
+  pedir, precoDoArtigo, processarFila, proximaTentativa, vendaDoDocumento, type Ligacao,
 } from "./kangest.ts";
 
 const CHAVE = `kg_${"a".repeat(48)}`;
@@ -149,6 +149,33 @@ describe("avisos e relatórios", () => {
     ]);
     const so: Ligacao = { id: "lub", url: "https://l.ao/api/v1", chave: CHAVE, lojas: { lubango: 1 } };
     expect(linhasVendas(so, [{ chave: "2026-09", total: 100000, docs: 2 }], "api")[0]).toMatchObject({ store_id: "lubango", mes: 9, canal: "api", total: 1000 });
+  });
+});
+
+describe("vendaDoDocumento (Painel de Gestão)", () => {
+  const doc = (extra: Record<string, unknown> = {}) => ({
+    id: 1532, tipo_codigo: "FR", numero_doc: "FR P12026/1532", data_hora: "2026-11-19T10:42:07", armazem_id: 2, api_chave_id: null,
+    total: 1140000, estado: "N", linhas: [{ referencia: "LIV-001", descricao: "O DESEJADO", quantidade: 2, total: 1140000 }], ...extra,
+  });
+  it("venda do balcão: a loja do armazém, a hora de Angola, Kz", () => {
+    const v = vendaDoDocumento(central, doc())!;
+    expect(v).toMatchObject({ origem: "kangest:central:1532", quando: "2026-11-19T10:42:07+01:00", alvo: "lubango", canal: "balcao", tipo: "FR", total: 11400, anulado: false });
+    expect(v.itens).toEqual([{ chave: "LIV-001", referencia: "LIV-001", book_id: null, titulo: "O DESEJADO", quantidade: 2, total: 11400 }]);
+  });
+  it("nota de crédito a abater; anulada fica marcada", () => {
+    const nc = vendaDoDocumento(central, doc({ tipo_codigo: "NC", total: 350000, linhas: [{ referencia: "LIV-001", quantidade: 1, total: 350000 }] }))!;
+    expect([nc.total, nc.itens[0].quantidade]).toEqual([-3500, -1]);
+    expect(vendaDoDocumento(central, doc({ estado: "A" }))!.anulado).toBe(true);
+  });
+  it("de fora: as da loja online (chave da API), compras e documentos de stock", () => {
+    expect(vendaDoDocumento(central, doc({ api_chave_id: 3 }))).toBeNull();
+    expect(vendaDoDocumento(central, doc({ tipo_codigo: "NE" }))).toBeNull();
+    expect(vendaDoDocumento(central, doc({ tipo_codigo: "ES" }))).toBeNull();
+  });
+  it("armazém sem loja ligada: «sem-loja»; um KanGest por loja: a loja dele", () => {
+    expect(vendaDoDocumento(central, doc({ armazem_id: 9 }))!.alvo).toBe("sem-loja");
+    const so: Ligacao = { id: "lub", url: "https://l.ao/api/v1", chave: CHAVE, lojas: { lubango: 1 } };
+    expect(vendaDoDocumento(so, doc({ armazem_id: 7 }))!.alvo).toBe("lubango");
   });
 });
 

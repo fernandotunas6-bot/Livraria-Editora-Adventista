@@ -21,6 +21,7 @@ import { useRouteRemountKey } from '@/hooks/useRouteRemountKey';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import { captureReferral } from '@/lib/colporteurReferral';
 import { eAppNativa } from '@/lib/nativeApp';
+import { EM_GESTAO } from '@/lib/gestaoHost';
 
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const ShopPage = lazy(() => import('@/pages/ShopPage.jsx'));
@@ -46,6 +47,7 @@ const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage.jsx'));
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage.jsx'));
 const TrackOrderPage = lazy(() => import('@/pages/TrackOrderPage.jsx'));
 const AdminPage = lazy(() => import('@/pages/AdminPage.jsx'));
+const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage.jsx'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage.jsx'));
 const CollectionsPage = lazy(() => import('@/pages/CollectionsPage.jsx'));
 const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
@@ -186,6 +188,14 @@ const NO_APP = eAppNativa();
 
 function GlobalWidgets() {
   const { pathname } = useLocation();
+  // O Painel de Gestão (e a TV da sede) ocupa o ecrã todo: sem o assistente, a barra de baixo nem os avisos da app.
+  if (EM_GESTAO || pathname.startsWith('/gestao')) {
+    return <Suspense fallback={null}><AppUpdateNotice /></Suspense>;
+  }
+  return <GlobalWidgetsDaLoja pathname={pathname} />;
+}
+
+function GlobalWidgetsDaLoja({ pathname }) {
   const { settings } = useSiteSettings();
   // O assistente só entra ao primeiro gesto ou uns segundos depois do load
   // (hooks/useAfterLoad.js): o código dele, o /chat/config e o canal em tempo real competiam
@@ -226,7 +236,9 @@ function App() {
         <RouteErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              {/* Em gestao.livrariaadventista.ao a página inicial é o Painel de Gestão (lib/gestaoHost.js). */}
+              <Route path="/" element={EM_GESTAO ? <PainelGestaoPage /> : <HomePage />} />
+              <Route path="/gestao" element={<PainelGestaoPage />} />
 
               <Route path="/shop" element={<ShopPage />} />
               <Route path="/loja" element={<Navigate to="/shop" replace />} />
