@@ -34,7 +34,9 @@ export function useConfigMontra() {
 /**
  * 'ok' ou 'sem': um pedido pequeno à base de 30 em 30 segundos (de 15 em 15 quando falha). Passa a «sem» com o
  * browser sem rede ou ao fim de duas falhas (ou respostas de mais de 5 s) seguidas, e volta a «ok» só depois de
- * duas boas seguidas — uma rede que vai e vem não faz a TV saltar entre a publicidade e a montra.
+ * duas boas seguidas — uma rede que vai e vem não faz a TV saltar entre a publicidade e a montra. Uma resposta do
+ * servidor, mesmo a recusar (sessão expirada, sem permissão), quer dizer que a internet está lá: só a falta de
+ * resposta (status 0), um erro do servidor (5xx) ou a demora contam como falha.
  */
 export function useInternet() {
   const [estado, setEstado] = useState(() => (typeof navigator !== 'undefined' && navigator.onLine === false ? 'sem' : 'ok'));
@@ -51,9 +53,9 @@ export function useInternet() {
         try {
           const ctl = new AbortController();
           const corta = setTimeout(() => ctl.abort(), 8000);
-          const { error } = await supabase.from('painel_tv_midia').select('id', { head: true, count: 'exact' }).limit(1).abortSignal(ctl.signal);
+          const { status } = await supabase.from('painel_tv_midia').select('id', { head: true, count: 'exact' }).limit(1).abortSignal(ctl.signal);
           clearTimeout(corta);
-          bom = !error && performance.now() - t0 < 5000;
+          bom = status >= 200 && status < 500 && performance.now() - t0 < 5000;
         } catch {
           bom = false;
         }

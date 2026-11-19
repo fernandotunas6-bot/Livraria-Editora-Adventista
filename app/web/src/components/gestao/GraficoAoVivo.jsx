@@ -63,7 +63,8 @@ function useCurvaAoVivo({ alvo, canal, comparar }) {
     setFalhou(false);
     // a hora de Angola que o servidor deu, menos a deste aparelho: o relógio do gráfico anda com ela
     desvio.current = minutoDe(data?.agora) * 60_000 - (Date.now() % 86_400_000);
-    setDados(data);
+    // de que loja e comparação são estes números (ao trocar, o gráfico muda de uma vez, sem animar a diferença)
+    setDados({ ...data, __chave: `${alvo}|${canal}|${comparar}` });
   }, [alvo, canal, comparar]);
   const carregarRef = useRef(carregar);
   carregarRef.current = carregar;
@@ -158,7 +159,12 @@ export default function GraficoAoVivo({ alvo = '', canal = '', cfg, onCfg, alvos
   const hoje = useMemo(() => curvaAcumulada(dados?.hoje), [dados]);
   const comp = useMemo(() => curvaAcumulada(dados?.comparacao), [dados]);
   const total = hoje.length ? hoje[hoje.length - 1].v : 0;
-  const mostrado = useNumeroAnimado(total, 900);
+  // só as vendas novas sobem a animar; a troca de loja (a TV roda) ou de comparação muda logo
+  const chaveDados = dados?.__chave || '';
+  const chaveAnterior = useRef(chaveDados);
+  const trocou = chaveDados !== chaveAnterior.current;
+  useEffect(() => { chaveAnterior.current = chaveDados; }, [chaveDados]);
+  const mostrado = useNumeroAnimado(total, trocou ? 1 : 900);
   const compAgora = valorEm(comp, agora);
   const contra = contraComparacao(total, compAgora);
   const temComp = comp.length > 0;
