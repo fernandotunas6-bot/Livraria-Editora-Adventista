@@ -36,8 +36,9 @@ A loja de uma encomenda é a de `orders.store_id` (a do levantamento, ou a que s
 4. Dois artigos de serviço: **portes** (ex.: referência `PORTES`) e, para as edições digitais e produtos que não
    existam no KanGest, um **genérico** (ex.: `DIGITAL`; a linha leva o título do produto).
 5. **Avisos automáticos → Novo aviso**: endereço
-   `https://<projecto>.supabase.co/functions/v1/app/webhooks/kangest?ligacao=<id>`, eventos `stock.alterado` e
-   `artigo.alterado`. Guarde o segredo (`whsec_…`).
+   `https://<projecto>.supabase.co/functions/v1/app/webhooks/kangest?ligacao=<id>`, eventos `stock.alterado`,
+   `artigo.alterado`, `documento.emitido` e `documento.anulado` (estes dois trazem as vendas do balcão ao vivo para o
+   Painel de Gestão — [PAINEL-GESTAO.md](PAINEL-GESTAO.md)). Guarde o segredo (`whsec_…`).
 
 ## 3. No site
 

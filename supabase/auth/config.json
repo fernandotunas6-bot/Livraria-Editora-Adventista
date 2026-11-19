@@ -2,6 +2,7 @@
   "site_url": "https://livrariaadventista.ao",
   "uri_allow_list": [
     "https://livrariaadventista.ao/**",
+    "https://gestao.livrariaadventista.ao/**",
     "https://www.livrariaadventista.ao/**",
     "https://livrariaadventista.com/**",
     "https://www.livrariaadventista.com/**",

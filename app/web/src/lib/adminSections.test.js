@@ -109,7 +109,9 @@ describe('searchSections', () => {
     expect(searchSections(nav, 'colecoes').map((i) => i.id)).toEqual(['collections']);
     expect(searchSections(nav, 'PERMISSOES').map((i) => i.id)).toEqual(expect.arrayContaining(['users', 'seguranca']));
     // o grupo "Relatórios" e a colportagem, que fala de relatórios na descrição
-    expect(searchSections(nav, 'relatorios').map((i) => i.id)).toEqual(['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas', 'colportagem']);
+    expect(searchSections(nav, 'relatorios').map((i) => i.id)).toEqual(['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas', 'colportagem']);
+    // o painel ao vivo, pelas palavras de quem o procura
+    expect(searchSections(nav, 'ao vivo').map((i) => i.id)).toEqual(['painel-gestao']);
     // a biblioteca de imagens dos vídeos
     expect(searchSections(nav, 'paisagens').map((i) => i.id)).toEqual(['imagens-videos']);
     // o relatório conjunto encontra-se pelas palavras de quem o procura
@@ -263,16 +265,22 @@ describe('permissões arrumadas pelas áreas do painel', () => {
 describe('relatórios de vendas: ver e editar', () => {
   it('«Editar relatórios de vendas» abre os dois painéis de vendas e as imagens dos vídeos, sem o caixa nem as finanças', () => {
     const ids = sectionsOpenedBy('edit_reports').map((x) => x.id);
-    expect(ids).toEqual(['relatorios-lojas', 'vendas-huambo', 'imagens-videos']);
+    expect(ids).toEqual(['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'imagens-videos']);
     expect(sectionsOpenedBy('edit_reports').every((x) => x.readOnly === false)).toBe(true);
   });
 
   it('«Ver relatórios» abre os painéis de vendas só de leitura, e o caixa', () => {
     const v = sectionsOpenedBy('view_reports');
-    expect(v.map((x) => x.id)).toEqual(['relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa']);
+    expect(v.map((x) => x.id)).toEqual(['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa']);
     expect(v.find((x) => x.id === 'imagens-videos').readOnly).toBe(true);
     expect(v.find((x) => x.id === 'relatorios-lojas').readOnly).toBe(true);
     expect(v.find((x) => x.id === 'vendas-huambo').readOnly).toBe(true);
+  });
+
+  it('«Painel da sua loja» abre só o Painel de Gestão, de leitura', () => {
+    const v = sectionsOpenedBy('view_store_dashboard');
+    expect(v.map((x) => x.id)).toEqual(['painel-gestao']);
+    expect(v[0].readOnly).toBe(true);
   });
 
   it('o administrador vê e edita', () => {

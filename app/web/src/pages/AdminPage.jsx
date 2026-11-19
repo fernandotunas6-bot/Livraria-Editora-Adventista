@@ -67,6 +67,7 @@ const ContactsManager = lazy(() => import('@/components/ContactsManager'));
 const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const RelatoriosLojasTab = lazy(() => import('@/components/admin/RelatoriosLojasTab'));
+const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage'));
 const ImagensVideosTab = lazy(() => import('@/components/admin/ImagensVideosTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -782,6 +783,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="acompanhamento">
                 <Suspense fallback={spinner}>
                   <OrderWatchPanel onOpenOrder={(ref) => openOrders({ search: ref })} />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canAccessAdmin && (
+              <AdminSection active={activeTab} value="painel-gestao">
+                <Suspense fallback={spinner}>
+                  <PainelGestaoPage embutido />
                 </Suspense>
               </AdminSection>
             )}

@@ -48,6 +48,9 @@ export const PERMISSION_KEYS = [
   // «Temos / não temos» nos produtos da sua loja, a da ficha de funcionário (migração
   // lojas_donas_dos_dados). Sem o resto do catálogo: preços e textos continuam centrais.
   "manage_store_stock",
+  // O Painel de Gestão só das lojas da ficha de funcionário (migração painel_gestao): o gerente de uma loja
+  // acompanha as vendas e a meta dela sem ver as outras nem a facturação toda.
+  "view_store_dashboard",
 ];
 
 /** Faz parte da equipa — distinto de ter uma permissão concreta. */
