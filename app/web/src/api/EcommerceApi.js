@@ -474,6 +474,7 @@ export async function initializeCheckout({
   deliveryGpsLat, deliveryGpsLng, deliveryGpsAccuracy,
   idempotencyKey,
   colporteurCode,
+  customerNif,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -511,6 +512,8 @@ export async function initializeCheckout({
       ...(idempotencyKey ? { idempotencyKey } : {}),
       // Código do colportor que trouxe a venda (o servidor confirma se é válido).
       ...(colporteurCode ? { colporteurCode } : {}),
+      // NIF para a factura do KanGest (opcional; o servidor confere a forma).
+      ...(customerNif ? { customerNif } : {}),
     }),
   });
 

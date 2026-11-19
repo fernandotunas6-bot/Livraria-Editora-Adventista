@@ -68,6 +68,8 @@ const SupportCenter = lazy(() => import('@/components/SupportCenter'));
 const VendasHuamboTab = lazy(() => import('@/components/admin/VendasHuamboTab'));
 const RelatoriosLojasTab = lazy(() => import('@/components/admin/RelatoriosLojasTab'));
 const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage'));
+const OrderKanGest = lazy(() => import('@/components/admin/OrderKanGest'));
+const KanGestTab = lazy(() => import('@/components/admin/KanGestTab'));
 const ImagensVideosTab = lazy(() => import('@/components/admin/ImagensVideosTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -683,6 +685,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="versoes">
                 <Suspense fallback={spinner}>
                   <ReleasesTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canManageSettings && (
+              <AdminSection active={activeTab} value="kangest">
+                <Suspense fallback={spinner}>
+                  <KanGestTab />
                 </Suspense>
               </AdminSection>
             )}
@@ -1319,6 +1328,8 @@ const AdminPage = () => {
                               currentUserName={user?.name || user?.email || ''}
                               onChanged={loadAll}
                             />
+                            {/* Os documentos do KanGest desta encomenda: NE, FR, anulação e nota de crédito (docs/KANGEST.md). */}
+                            <Suspense fallback={null}><OrderKanGest orderId={o.id} podeRepetir={isAdmin || hasPermission('manage_settings')} /></Suspense>
                             {/* Entrega ao domicílio: o colportor mais próximo (migração entregas_por_colportor). */}
                             {['delivery', 'express'].includes(o.shipping_method) && (
                               <OrderColporteurDelivery order={o} onChanged={loadAll} />

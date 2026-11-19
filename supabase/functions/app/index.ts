@@ -1792,7 +1792,16 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
   // o encontrou, porquê (pagamentos registados, migração pagamentos_registados).
   const { data: payRows } = await db.from("order_payments")
     .select("kind, status, source, reference, decision_reason, created, decided_at").eq("order_id", order.id).limit(50);
+  // A factura do KanGest (e a nota de crédito, se foi reembolsada): o número e o QR da AGT (docs/KANGEST.md).
+  const { data: docsKanGest } = await db.from("kangest_fila").select("accao, resultado")
+    .eq("order_id", order.id).in("accao", ["fr", "nc"]).eq("estado", "feito");
+  const docKanGest = (accao: string) => {
+    const r = (docsKanGest || []).find((x: Row) => x.accao === accao)?.resultado;
+    return r?.numero ? { numero: String(r.numero), total: Number(r.total || 0) / 100, url_agt: r.fe?.url_consulta || "" } : null;
+  };
   return json({
+    factura: docKanGest("fr"),
+    nota_credito: docKanGest("nc"),
     payment_method_name: order.payment_method_name || method?.name || "",
     payment_upfront: isPaidUpfront(method?.type),
     payment_reference_present: !!order.payment_reference,
@@ -2626,6 +2635,12 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
   // inválido é ignorado e nunca impede a compra. Sem a migração, o place_order ignora a coluna.
   const colporteurCode = clip(data.colporteurCode, 20).toUpperCase();
   if (/^CPT[-\s]?\d{1,6}$/.test(colporteurCode)) order.colporteur_code = colporteurCode;
+  // NIF para a factura do KanGest (opcional; docs/KANGEST.md): com ele, a FR sai em nome do cliente.
+  const customerNif = String(data.customerNif ?? "").replace(/[\s.-]/g, "").toUpperCase();
+  if (customerNif) {
+    if (!/^[A-Z0-9]{9,14}$/.test(customerNif)) throw bad("O NIF tem 9 a 14 letras e algarismos.");
+    order.customer_nif = customerNif;
+  }
   if (!isPickup && !isDigital) {
     Object.assign(order, {
       delivery_province_id: clip(data.deliveryProvinceId, 40),

@@ -92,6 +92,18 @@ await q(`update public.kangest_fila set estado = 'feito', resultado = '{"id": 51
 await q(`update public.orders set status = 'cancelled' where id = $1`, [o3]);
 check('cancelada com a NE no KanGest: anulação na fila', (await fila(o3)).map((f) => `${f.accao}:${f.estado}`).join() === 'ne:feito,anular:pendente', await fila(o3));
 
+// --- reembolso depois de facturada: nota de crédito; cancelada já facturada: sem anulação da NE ----------------------
+const o4 = await encomenda('LIV-0005', [{ book_id: livro.id, quantity: 1, price: 5700 }]);
+await pagar(o4);
+await q(`update public.kangest_fila set estado = 'feito', resultado = '{"id": 60}'::jsonb where order_id = $1`, [o4]);
+await db.transaction(async (tx) => {
+  await tx.query(`select set_config('app.payment_sync', 'on', true)`);
+  await tx.query(`update public.orders set amount_refunded = amount_paid, payment_status = payment_status where id = $1`, [o4]);
+});
+check('reembolsada depois da FR: nota de crédito na fila', (await fila(o4)).some((f) => f.accao === 'nc' && f.estado === 'pendente'), await fila(o4));
+await q(`update public.orders set status = 'cancelled' where id = $1`, [o4]);
+check('cancelada já facturada: não tenta anular a NE (a NC trata)', !(await fila(o4)).some((f) => f.accao === 'anular'), await fila(o4));
+
 // --- documentos de uma encomenda e vendas ao balcão, só para a equipa / quem vê relatórios -------------------
 const membro = (await q(`insert into auth.users (email, email_confirmed_at) values ('m@x.ao', now()) returning id`))[0].id;
 await recusa('kangest_da_encomenda: só a equipa', () => como('authenticated', membro, `select public.kangest_da_encomenda($1)`, [o1]), /Sem permissão/);

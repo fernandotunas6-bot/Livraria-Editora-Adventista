@@ -42,6 +42,12 @@ import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
 import { checkoutMemoryKey, checkoutMemoryOff, readCheckoutMemory, saveCheckoutMemory, setCheckoutMemoryEnabled } from '@/lib/checkoutMemory';
 
+/** O NIF para a factura, sem espaços nem pontos e em maiúsculas; '' se não tiver a forma de um NIF (9 a 14). */
+const nifLimpo = (v) => {
+  const n = String(v || '').replace(/[\s.-]/g, '').toUpperCase();
+  return /^[A-Z0-9]{9,14}$/.test(n) ? n : '';
+};
+
 // O mapa do ponto de entrega só se carrega quando se abre (migração trajeto_gps).
 const DeliveryMap = React.lazy(() => import('@/components/maps/DeliveryMap'));
 
@@ -110,6 +116,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     pickupStore: '',
     // Vem do link do colportor (?c=CPT-0007), guardado 30 dias; o cliente também o pode escrever.
     colporteurCode: getReferral(),
+    // NIF para a factura (opcional): com ele, a factura do KanGest sai em nome do cliente (docs/KANGEST.md).
+    customerNif: '',
   });
   const [deliveryAddress, setDeliveryAddress] = useState({
     provinceId: '',
@@ -495,6 +503,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         checkoutSignature,
         ...(gps && needsAddress ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng, deliveryGpsAccuracy: gps.accuracy ?? null } : {}),
         ...(normalizeColporteurCode(form.colporteurCode) ? { colporteurCode: normalizeColporteurCode(form.colporteurCode) } : {}),
+        ...(nifLimpo(form.customerNif) ? { customerNif: nifLimpo(form.customerNif) } : {}),
       };
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
       // servidor gravar), a chave repete-se e o servidor devolve essa encomenda em vez de outra.
@@ -1029,6 +1038,16 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                   <div className="space-y-2">
                     <Label htmlFor="checkout-notas">Notas (opcional)</Label>
                     <Textarea id="checkout-notas" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={digitalOnly ? 'Alguma observação para a loja...' : 'Instruções de entrega...'} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="checkout-nif">NIF para a factura (opcional)</Label>
+                    <Input id="checkout-nif" autoComplete="off" inputMode="text" value={form.customerNif} maxLength={20}
+                      onChange={(e) => setForm({ ...form, customerNif: e.target.value })} placeholder="Ex.: 5000111222" />
+                    {form.customerNif && !nifLimpo(form.customerNif) && (
+                      <p className="text-xs text-destructive">O NIF tem 9 a 14 letras e algarismos.</p>
+                    )}
+                    {!form.customerNif && <p className="text-xs text-muted-foreground">Sem NIF, a factura sai a Consumidor Final.</p>}
                   </div>
 
                   <div className="space-y-2">

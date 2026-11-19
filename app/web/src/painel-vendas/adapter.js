@@ -88,7 +88,8 @@ const LUANDA_OFFSET_MS = 3600 * 1000;
  * public.vendas_do_sistema, migração relatorios_de_todas_as_livrarias): só totais, sem dados dos
  * clientes, para quem vê ou edita os relatórios. Devolve null quando a função ainda não existe
  * (migração por aplicar), para o painel de uma loja voltar ao cálculo antigo.
- *   { porLoja: { [lojaId]: { months[12], counts[12] } }, semLoja: { months, counts }, orders }
+ *   { porLoja: { [lojaId]: { months[12], counts[12] } }, semLoja: { months, counts }, orders, balcao }
+ * Com o KanGest ligado, os meses de cada loja somam também as vendas ao balcão (`balcao` diz quanto foi do balcão).
  */
 export async function fetchSystemSalesAll(ano, { paidOnly = true } = {}) {
   const { data, error } = await supabase.rpc('vendas_do_sistema', { p_ano: ano, p_so_pagas: paidOnly });
@@ -108,7 +109,25 @@ export async function fetchSystemSalesAll(ano, { paidOnly = true } = {}) {
     alvo.counts[m] += Number(r.encomendas || 0);
     orders += Number(r.encomendas || 0);
   }
-  return { porLoja, semLoja, orders };
+  // As vendas ao balcão das livrarias, do KanGest (public.vendas_do_kangest, docs/KANGEST.md): somam-se às do site,
+  // loja a loja e mês a mês, para o relatório ter a venda toda de cada livraria. Sem a ligação (ou sem a função),
+  // fica só o site, como antes.
+  const balcao = { porLoja: {}, total: 0 };
+  const { data: kg, error: kgErro } = await supabase.rpc('vendas_do_kangest', { p_ano: ano, p_canal: 'balcao' });
+  if (!kgErro) {
+    for (const r of kg || []) {
+      const m = Number(r.mes) - 1;
+      if (m < 0 || m > 11) continue;
+      const valor = Number(r.total || 0);
+      const alvo = r.store_id ? (porLoja[r.store_id] ||= vazio()) : semLoja;
+      alvo.months[m] = Math.round((alvo.months[m] + valor) * 100) / 100;
+      alvo.counts[m] += Number(r.docs || 0);
+      const b = (balcao.porLoja[r.store_id || ''] ||= Array(12).fill(0));
+      b[m] = Math.round((b[m] + valor) * 100) / 100;
+      balcao.total = Math.round((balcao.total + valor) * 100) / 100;
+    }
+  }
+  return { porLoja, semLoja, orders, balcao };
 }
 
 /**

@@ -32,7 +32,7 @@ export const ADMIN_GROUPS = [
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
-  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'saude', 'apps', 'seguranca'] },
+  { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'saude', 'kangest', 'apps', 'seguranca'] },
 ];
 
 /**
@@ -299,6 +299,13 @@ export const ADMIN_SECTIONS = {
     label: 'Versões da app', title: 'Versões da app', icon: Rocket,
     keywords: 'versao novidades actualizacao atualizacao app telemovel lancamento push todos',
     description: 'O que mudou em cada versão da app (em /novidades) e o aviso por push a todos os telemóveis.',
+    allowed: (p) => p.settings,
+  },
+  // A ligação ao programa de facturação das livrarias (docs/KANGEST.md): estado, fila, erros e sincronizar.
+  kangest: {
+    label: 'Ligação ao KanGest', title: 'Ligação ao KanGest', icon: Plug,
+    keywords: 'kangest kigest facturacao faturacao balcao stock precos encomendas notas fila erros sincronizar api',
+    description: 'O programa de facturação das livrarias ligado ao site: stock e preços, encomendas facturadas, vendas ao balcão — e o que está na fila ou com erro.',
     allowed: (p) => p.settings,
   },
   saude: {

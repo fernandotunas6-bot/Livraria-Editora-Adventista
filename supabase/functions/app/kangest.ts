@@ -137,6 +137,18 @@ export function corpoFR(order: Row, ne: { id: number; total: number; linhas: Row
   };
 }
 
+/** Nota de crédito de uma encomenda reembolsada: a partir da FR, com as mesmas linhas (os preços vêm da FR). */
+export function corpoNC(order: Row, fr: { id: number }, linhas: Row[]): Row {
+  const numero = String(order.order_number || order.id);
+  return {
+    tipo: "NC",
+    doc_origem_id: fr.id,
+    referencia: numero,
+    motivo: `Reembolso da encomenda ${numero} na loja online`,
+    linhas: (linhas || []).map((l) => ({ referencia: l.referencia, quantidade: l.quantidade, ...(l.descricao ? { descricao: l.descricao } : {}) })),
+  };
+}
+
 /** Próxima tentativa: 1, 2, 4, 8… minutos, no máximo 6 horas. */
 export function proximaTentativa(tentativas: number, agora = new Date()): string {
   const min = Math.min(2 ** Math.max(tentativas - 1, 0), 360);
@@ -330,6 +342,12 @@ export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchF
         const r = ne.resultado;
         const d = await pedir(lig, "POST", "/documentos", corpoFR(order, { id: r.id, total: r.total, linhas: r.linhas || [] }, lig), `fr-${numero}`, fetchFn);
         await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null, hash: d.hash_controlo ?? null });
+      } else if (job.accao === "nc") {
+        if (fr?.estado !== "feito" || !fr.resultado?.id) {
+          throw new ErroKanGest("Não há factura no KanGest para fazer a nota de crédito.", 0, "", true);
+        }
+        const d = await pedir(lig, "POST", "/documentos", corpoNC(order, { id: fr.resultado.id }, ne?.resultado?.linhas || []), `nc-${numero}`, fetchFn);
+        await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null });
       } else if (job.accao === "anular") {
         if (fr?.estado === "feito") {
           throw new ErroKanGest(`A encomenda já foi facturada (${fr.resultado?.numero}): faça a nota de crédito no KanGest.`, 0, "", true);

@@ -31,8 +31,8 @@ A loja de uma encomenda é a de `orders.store_id` (a do levantamento, ou a que s
    (docs do KanGest: `API.md` §3). O endereço fica `https://<nome>/api/v1`.
 2. Um utilizador e um posto próprios para o site (prefixo de série `W`: as vendas do site saem como `FR W2026/15`).
 3. **Chave de acesso** com: `api.artigos`, `api.stock`, `api.documentos`, `vendas.proforma` (NE),
-   `vendas.fatura_recibo` (FR), `documentos.anular`, `clientes`, `relatorios.ver` e `pos.alterar_preco` (o site cobra
-   o preço dele, com as promoções).
+   `vendas.fatura_recibo` (FR), `vendas.nota_credito` (NC dos reembolsos), `documentos.anular`, `clientes`,
+   `relatorios.ver` e `pos.alterar_preco` (o site cobra o preço dele, com as promoções).
 4. Dois artigos de serviço: **portes** (ex.: referência `PORTES`) e, para as edições digitais e produtos que não
    existam no KanGest, um **genérico** (ex.: `DIGITAL`; a linha leva o título do produto).
 5. **Avisos automáticos → Novo aviso**: endereço
@@ -103,9 +103,11 @@ tocados: o stock é de cada variante, e o KanGest não o tem.
 | Paga (`payment_status` → `paid`) | `fr` | FR a partir da NE (as linhas e os preços vêm da NE), paga pelo total da NE no modo correspondente; `fr-<n.º>` |
 | Cancelada antes de a NE sair | a NE fica `ignorado` | nada |
 | Cancelada com a NE no KanGest | `anular` | NE anulada (a reserva desaparece) |
-| Cancelada depois de facturada | `anular` fica com erro | a nota de crédito faz-se no KanGest |
+| Reembolsada (toda) depois de facturada | `nc` | **Nota de crédito** a partir da FR (as mesmas linhas, os preços da FR); `nc-<n.º>` |
+| Cancelada depois de facturada | — | nada (o reembolso é que faz a nota de crédito) |
 
-O cliente com **NIF** (`orders.customer_nif`) fica identificado na factura (o KanGest procura-o ou cria-o); sem NIF, é
+O cliente com **NIF** — pede-se no checkout, «NIF para a factura (opcional)», e fica em `orders.customer_nif` —
+fica identificado na factura (o KanGest procura-o ou cria-o); sem NIF, é
 Consumidor Final. Os números e o QR da AGT ficam em `kangest_fila.resultado`; o painel lê-os com
 `public.kangest_da_encomenda(id)`.
 
@@ -113,6 +115,22 @@ Consumidor Final. Os números e o QR da AGT ficam em `kangest_fila.resultado`; o
 `erro` até alguém o resolver: `GET /admin/kangest` lista-os e `POST /admin/kangest/repetir {id}` volta a pô-lo na
 fila. Sem ligação, limite de pedidos ou erro do KanGest: nova tentativa ao fim de 1, 2, 4, 8… minutos (até 6 horas),
 12 vezes.
+
+**Onde se vê:** o cliente vê o número da factura (e da nota de crédito) e o **QR da AGT** na página de rastreio; a
+equipa vê os documentos de cada encomenda (NE, FR, anulação, NC, com o estado e o erro) no painel das encomendas.
+Um reembolso parcial não faz nota de crédito sozinho: faz-se no KanGest.
+
+## 5.1 No painel: Sistema → Ligação ao KanGest
+
+O estado da ligação (activa, última sincronização), o que falta configurar (segredos, agendador, avisos, livros
+ligados pela referência, artigo dos portes), cada ligação com as suas lojas e o endereço do aviso para copiar, a fila
+dos documentos (na fila, feitos, com erro) e os erros com **Repetir**; **Sincronizar já** corre a fila, o stock e as
+vendas sem esperar pelo agendador.
+
+## 5.2 Relatórios
+
+Em **Relatórios → Todas as livrarias → Carregar vendas do sistema**, as vendas ao balcão do KanGest somam-se às do
+site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-GESTAO.md](PAINEL-GESTAO.md)).
 
 ## 6. Rotas da Edge Function
 

@@ -303,3 +303,14 @@ export function getSettingsFileUrl(record, field) {
   if (!record?.[field]) return null;
   return pb.files.getURL(record, record[field]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// KanGest (docs/KANGEST.md): o estado da ligação, repetir um documento com erro, sincronizar já
+// ---------------------------------------------------------------------------------------------
+
+/** Ligações (sem chaves), contagem da fila, últimos erros e o estado (activo, última sincronização). */
+export const kangestEstado = () => pb.send('/admin/kangest', { method: 'GET' });
+/** Volta a pôr na fila um documento com erro (depois de corrigir o artigo, a referência ou a ligação). */
+export const kangestRepetir = (id) => pb.send('/admin/kangest/repetir', { method: 'POST', body: { id } });
+/** Corre já a fila, o stock completo e as vendas do ano. */
+export const kangestSincronizar = () => pb.send('/admin/kangest/sincronizar', { method: 'POST', body: {} });
