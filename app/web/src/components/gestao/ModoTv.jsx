@@ -103,11 +103,11 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
       <div className="flex items-center gap-4 border-b border-white/10 px-5 py-2.5" style={{ background: `linear-gradient(90deg, ${MARCA.marinho}, ${MARCA.marinhoProfundo})` }}>
         <img src={MARCA.logoBranco} alt={MARCA.nome || nome} className="h-10 w-auto object-contain" />
         <span className="h-8 w-px bg-white/20" />
-        <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#5fd4ee]">Painel de Gestão</span>
+        <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#fcefc7]">Painel de Gestão</span>
         {cfg.rodarLojas && roda.length > 1 && (
           <span className="flex gap-1">
             {roda.map((a, k) => (
-              <span key={a || 'todas'} className={cn('rounded-full px-2 py-0.5 text-[11px]', k === indice % roda.length ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+              <span key={a || 'todas'} className={cn('rounded-full px-2 py-0.5 text-[11px]', k === indice % roda.length ? 'bg-white font-semibold text-[#075a70]' : 'bg-white/10 text-white/75')}>
                 {a ? nomeCurto(a, alvos.find((x) => x.id === a)?.nome) : 'Todas'}
               </span>
             ))}

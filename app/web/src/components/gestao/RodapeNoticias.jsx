@@ -24,7 +24,7 @@ export function useMensagensRodape() {
   return { lista, recarregar: carregar };
 }
 
-const TONS = { bom: '#34d399', mau: '#f87171', aviso: '#fbbf24', neutro: '#5fd4ee' };
+const TONS = { bom: '#34d399', mau: '#fca5a5', aviso: '#fbbf24', neutro: '#7fd3e6' };
 
 function HoraDeLuanda() {
   const [agora, setAgora] = useState(() => new Date());
@@ -36,7 +36,7 @@ function HoraDeLuanda() {
 }
 
 /**
- * O rodapé a passar, como nos noticiários: «Última hora», o logótipo, as notícias do painel (e as mensagens da
+ * O rodapé a passar, como nos noticiários: «Vendas Online», o logótipo, as notícias do painel (e as mensagens da
  * direcção) a correr, e a hora. `fixo`: preso ao fundo do ecrã; senão acompanha a página (sticky).
  */
 export default function RodapeNoticias({ dados, fixo = false, tv = false, className }) {
@@ -69,7 +69,7 @@ export default function RodapeNoticias({ dados, fixo = false, tv = false, classN
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75 motion-reduce:hidden" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
         </span>
-        <span className={tv ? 'text-base' : 'text-xs'}>Última hora</span>
+        <span className={tv ? 'text-base' : 'text-xs'}>Vendas Online</span>
       </div>
       <div className="z-10 hidden shrink-0 items-center px-3 sm:flex" style={{ background: MARCA.azul }}>
         <img src={MARCA.logoBranco} alt={MARCA.nome} className={cn('w-auto object-contain', tv ? 'h-9' : 'h-7')} />
@@ -88,7 +88,7 @@ export default function RodapeNoticias({ dados, fixo = false, tv = false, classN
         <span className="pointer-events-none absolute inset-y-0 left-0 w-8" style={{ background: `linear-gradient(90deg, ${MARCA.marinhoProfundo}, transparent)` }} />
         <span className="pointer-events-none absolute inset-y-0 right-0 w-8" style={{ background: `linear-gradient(270deg, ${MARCA.marinhoProfundo}, transparent)` }} />
       </div>
-      <div className="z-10 flex shrink-0 items-center px-4 font-mono font-black tabular-nums" style={{ background: MARCA.ciano, color: MARCA.marinhoProfundo }}>
+      <div className="z-10 flex shrink-0 items-center px-4 font-mono font-black tabular-nums text-white" style={{ background: MARCA.petroleo }}>
         <HoraDeLuanda />
       </div>
     </div>

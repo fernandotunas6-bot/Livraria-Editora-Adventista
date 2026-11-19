@@ -165,7 +165,7 @@ Ecrã inteiro, tema escuro, letra maior, sem menus (`?tv=1`, ou o botão **Modo 
 Uma coluna: cartões (deslizar), meta, lojas, últimas vendas; gráficos em largura total.
 
 ### 6.10 Rodapé de noticiário
-Uma faixa a passar no fundo (na página e, a toda a largura, no modo TV), como nos noticiários: «Última hora» em
+Uma faixa a passar no fundo (na página e, a toda a largura, no modo TV), como nos noticiários: «Vendas Online» em
 vermelho, o logótipo, as notícias com etiquetas coloridas (verde a subir, vermelho a descer, âmbar avisos) e a hora.
 As notícias saem dos números (hoje contra a semana passada, a meta e o que falta por dia, a projecção, a loja que
 lidera, cada loja hoje, o mais vendido, a última venda); as **mensagens da direcção** vêm primeiro — em
@@ -175,6 +175,11 @@ lidera, cada loja hoje, o mais vendido, a última venda); as **mensagens da dire
 Cola-se o endereço (youtube.com/watch, youtu.be ou shorts). O vídeo passa **até ao fim** e depois vem o seguinte: o
 leitor do YouTube avisa o painel quando termina (`enablejsapi`). Um vídeo bloqueado pelo dono (sem incorporação) ou
 que não arranca em 20 s passa à frente. O único da lista repete. Os segundos só contam para as imagens.
+
+**Transições**: a peça seguinte entra por cima da anterior, com um esbater e um ligeiro zoom (0,9 s); a anterior só
+sai quando a nova já está a tocar (ou a imagem carregou), por isso não há cortes nem ecrã preto. As imagens têm um
+zoom lento (Ken Burns) durante o tempo delas; o título aparece em baixo, na serif da casa; uma barra fina em azul
+petróleo mostra o que falta. Com «reduzir movimento» no sistema, as trocas são simples.
 
 ## 7. Aspecto
 

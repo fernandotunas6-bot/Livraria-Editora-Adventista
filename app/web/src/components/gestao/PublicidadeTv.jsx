@@ -28,31 +28,112 @@ export function useMidiaTv() {
 }
 
 const ORIGEM_YOUTUBE = 'https://www.youtube-nocookie.com';
+// a passagem de uma peça para a seguinte (ms); a anterior fica por baixo até a nova estar pronta (máx. 2,5 s)
+const PASSAGEM_MS = 900;
+const ESPERA_MAX_MS = 2500;
+
+const ESTILO = `
+@keyframes pub-entra{from{opacity:0;transform:scale(1.035)}to{opacity:1;transform:scale(1)}}
+@keyframes pub-legenda{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pub-kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.09) translate(-1.5%,-1%)}}
+@keyframes pub-barra{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.pub-espera{opacity:0}
+.pub-entra{animation:pub-entra ${PASSAGEM_MS}ms cubic-bezier(.2,.7,.2,1) both}
+.pub-legenda{animation:pub-legenda 700ms ease-out 400ms both}
+@media (prefers-reduced-motion: reduce){.pub-entra,.pub-legenda,.pub-kb,.pub-barra{animation:none!important}.pub-espera{opacity:1}}
+`;
+
+/** O progresso de um vídeo do YouTube numa mensagem do leitor (currentTime ÷ duration), ou null. */
+function progressoYoutube(dados) {
+  try {
+    const d = typeof dados === 'string' ? JSON.parse(dados) : dados;
+    const t = Number(d?.info?.currentTime);
+    const total = Number(d?.info?.duration);
+    return total > 0 && Number.isFinite(t) ? Math.min(t / total, 1) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Uma peça da publicidade (vídeo, imagem ou YouTube) a ocupar a moldura toda. */
+function Peca({ m, som, unica, origem, iframeRef, onPronto, onFim, onProgresso }) {
+  if (m.tipo === 'video') {
+    return (
+      <video src={m.url} className="h-full w-full object-contain" autoPlay muted={!som} playsInline loop={unica}
+        onPlaying={onPronto} onEnded={onFim} onError={onFim}
+        onTimeUpdate={(e) => e.currentTarget.duration > 0 && onProgresso?.(e.currentTarget.currentTime / e.currentTarget.duration)} />
+    );
+  }
+  if (m.tipo === 'youtube') {
+    const src = youtubeEmbed(m.url, { som, repetir: unica, origem });
+    if (!src) return null;
+    return (
+      <iframe ref={iframeRef} src={src} title={m.titulo || 'Vídeo'} className="h-full w-full border-0"
+        allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin"
+        onLoad={() => setTimeout(() => onPronto?.(), 600)} />
+    );
+  }
+  const dur = Math.max(Number(m.duracao_s) || 15, 3);
+  return (
+    <div className="h-full w-full overflow-hidden">
+      {/* um zoom lento sobre a imagem, pelo tempo dela (Ken Burns) */}
+      <img src={m.url} alt={m.titulo || ''} onLoad={onPronto} onError={onFim}
+        className="pub-kb h-full w-full object-contain" style={{ animation: `pub-kenburns ${dur + 1}s ease-out both` }} />
+    </div>
+  );
+}
 
 /**
  * Passa a publicidade em ciclo: os vídeos (dos ficheiros do site e do YouTube) até ao fim, sem som salvo `som`; as
- * imagens pelo tempo de cada uma. O único da lista repete. Um vídeo que não abre (ou bloqueado pelo dono no YouTube)
- * passa ao seguinte.
+ * imagens pelo tempo de cada uma, com um zoom lento. A peça seguinte entra por cima da anterior (que só sai quando a
+ * nova já está a tocar): sem cortes nem ecrã preto. O título e uma barra de progresso em baixo. O único da lista
+ * repete; um vídeo que não abre (ou bloqueado pelo dono no YouTube) passa ao seguinte.
  */
 export function LeitorPublicidade({ midia, som = false, logo, nome }) {
   const lista = playlist(midia);
+  const n = lista.length;
   const [i, setI] = useState(0);
-  const atual = lista[i % Math.max(lista.length, 1)];
-  const seguinte = useCallback(() => setI((x) => proximo(x, lista.length)), [lista.length]);
+  const [anterior, setAnterior] = useState(null);
+  const [pronto, setPronto] = useState(false);
+  const [progresso, setProgresso] = useState(0);
+  const atual = lista[i % Math.max(n, 1)];
+  const chave = atual ? `${atual.id}-${i}` : '';
   const iframe = useRef(null);
   const origem = typeof window !== 'undefined' ? window.location.origin : '';
+  const atualRef = useRef(null);
+  atualRef.current = atual ? { m: atual, chave } : null;
+
+  const seguinte = useCallback(() => {
+    if (n < 2) return;
+    setAnterior(atualRef.current);
+    setPronto(false);
+    setProgresso(0);
+    setI((x) => proximo(x, n));
+  }, [n]);
+
+  // a anterior sai depois da passagem — quando a nova está pronta, ou ao fim da espera máxima
+  useEffect(() => {
+    if (!anterior) return undefined;
+    const t = setTimeout(() => setPronto(true), ESPERA_MAX_MS);
+    return () => clearTimeout(t);
+  }, [anterior]);
+  useEffect(() => {
+    if (!pronto || !anterior) return undefined;
+    const t = setTimeout(() => setAnterior(null), PASSAGEM_MS + 50);
+    return () => clearTimeout(t);
+  }, [pronto, anterior]);
 
   // imagens: o tempo de cada uma
   useEffect(() => {
-    if (!atual || atual.tipo !== 'imagem' || lista.length < 2) return undefined;
+    if (!atual || atual.tipo !== 'imagem' || n < 2) return undefined;
     const t = setTimeout(seguinte, Math.max(Number(atual.duracao_s) || 15, 3) * 1000);
     return () => clearTimeout(t);
-  }, [atual, seguinte, lista.length]);
+  }, [atual, seguinte, n]);
 
-  // YouTube: o leitor avisa a página quando o vídeo termina (enablejsapi). Pede-se-lhe que comece a avisar
-  // («listening», como faz a biblioteca do YouTube) até responder; sem resposta nem imagem em 20 s, passa à frente.
+  // YouTube: o leitor avisa a página quando o vídeo termina (enablejsapi), e de quanto vai; pede-se-lhe que comece
+  // a avisar («listening», como faz a biblioteca do YouTube) até responder; sem resposta nem imagem em 20 s, passa.
   useEffect(() => {
-    if (!atual || atual.tipo !== 'youtube' || lista.length < 2) return undefined;
+    if (!atual || atual.tipo !== 'youtube') return undefined;
     let comecou = false;
     const ouvir = () => {
       try {
@@ -62,45 +143,66 @@ export function LeitorPublicidade({ midia, som = false, logo, nome }) {
     const aoReceber = (e) => {
       if (e.source !== iframe.current?.contentWindow || !/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
       const estado = estadoYoutube(e.data);
-      if (estado === 'a-tocar') comecou = true;
+      const p = progressoYoutube(e.data);
+      if (p != null) setProgresso(p);
+      if (estado === 'a-tocar') {
+        comecou = true;
+        setPronto(true);
+      }
       if (estado === 'terminou' || estado === 'erro') seguinte();
     };
     window.addEventListener('message', aoReceber);
     const pedir = setInterval(ouvir, 1500);
     const pararDePedir = setTimeout(() => clearInterval(pedir), 15_000);
-    const salvaguarda = setTimeout(() => { if (!comecou) seguinte(); }, 20_000);
+    const salvaguarda = setTimeout(() => { if (!comecou && n > 1) seguinte(); }, 20_000);
     return () => {
       window.removeEventListener('message', aoReceber);
       clearInterval(pedir);
       clearTimeout(pararDePedir);
       clearTimeout(salvaguarda);
     };
-  }, [atual, seguinte, lista.length]);
+  }, [atual, seguinte, n]);
 
   if (!atual) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-black p-8 text-center text-white/70">
         {logo && <img src={logo} alt="" className="max-h-28 max-w-[60%] object-contain" />}
         <p className="text-lg font-semibold text-white">{nome}</p>
-        <p className="text-sm">Sem publicidade: adicione vídeos ou imagens em «Publicidade da TV».</p>
+        <p className="text-sm">Sem publicidade: adicione vídeos ou imagens em «Publicidade e rodapé».</p>
       </div>
     );
   }
-  const chave = `${atual.id}-${i}`;
+  const unica = n === 1;
+  const durImagem = Math.max(Number(atual.duracao_s) || 15, 3);
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {atual.tipo === 'video' && (
-        <video key={chave} src={atual.url} className="h-full w-full object-contain" autoPlay muted={!som} playsInline
-          loop={lista.length === 1} onEnded={seguinte} onError={seguinte} />
+      <style>{ESTILO}</style>
+      {/* a anterior por baixo, a tocar até a nova a cobrir */}
+      {anterior && anterior.chave !== chave && (
+        <div key={anterior.chave} className="absolute inset-0">
+          <Peca m={anterior.m} som={false} unica={false} origem={origem} />
+        </div>
       )}
-      {atual.tipo === 'imagem' && <img key={chave} src={atual.url} alt={atual.titulo || ''} className="h-full w-full object-contain motion-safe:animate-in motion-safe:fade-in" />}
-      {atual.tipo === 'youtube' && youtubeEmbed(atual.url, { som }) && (
-        <iframe key={chave} ref={iframe} src={youtubeEmbed(atual.url, { som, repetir: lista.length === 1, origem })} title={atual.titulo || 'Vídeo'}
-          className="h-full w-full border-0" allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" />
+      <div key={chave} className={cn('absolute inset-0', anterior ? (pronto ? 'pub-entra' : 'pub-espera') : '')}>
+        <Peca m={atual} som={som} unica={unica} origem={origem} iframeRef={iframe}
+          onPronto={() => setPronto(true)} onFim={seguinte} onProgresso={setProgresso} />
+      </div>
+      {atual.titulo && (
+        <div key={`t-${chave}`} className="pub-legenda pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-5 pb-7 pt-16">
+          <p className="font-serif text-xl font-semibold text-white drop-shadow sm:text-2xl">{atual.titulo}</p>
+        </div>
       )}
-      {lista.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-          {lista.map((m, k) => <span key={m.id} className={cn('h-1.5 rounded-full transition-all', k === i % lista.length ? 'w-6 bg-white' : 'w-1.5 bg-white/40')} />)}
+      {/* o progresso da peça: as imagens pelo tempo delas, os vídeos pelo que já passou */}
+      {!unica && (
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
+          {atual.tipo === 'imagem'
+            ? <div key={`b-${chave}`} className="pub-barra h-full origin-left bg-[#7fd3e6]" style={{ animation: `pub-barra ${durImagem}s linear both` }} />
+            : <div className="h-full origin-left bg-[#7fd3e6] transition-transform duration-300 ease-linear" style={{ transform: `scaleX(${progresso})` }} />}
+        </div>
+      )}
+      {n > 1 && (
+        <div className="absolute right-3 top-3 flex gap-1.5 rounded-full bg-black/35 px-2 py-1.5 backdrop-blur-sm">
+          {lista.map((m, k) => <span key={m.id} className={cn('h-1.5 rounded-full transition-all duration-500', k === i % n ? 'w-5 bg-white' : 'w-1.5 bg-white/45')} />)}
         </div>
       )}
     </div>

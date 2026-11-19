@@ -9,15 +9,26 @@ export const MARCA = {
   nome: 'Livraria & Editora Adventista',
   logoAzul,
   logoBranco,
-  // o azul do logótipo e o ciano dos arcos, para os fundos e os acentos
-  marinho: '#0b2a55',
-  marinhoProfundo: '#071a36',
-  azul: '#1d4f91',
-  ciano: '#0ea5c8',
+  // A paleta editorial do site (index.css, --color-editorial-*): o azul petróleo e o branco, com o ouro nos acentos.
+  petroleo: '#0a748f',
+  petroleoEscuro: '#075a70',
+  petroleoProfundo: '#05404f',
+  petroleoClaro: '#7fd3e6',
+  ouro: '#b8892f',
+  ouroTexto: '#7a5716',
+  tinta: '#1d2a3f',
+  papel: '#fffdf8',
+  // ouro claro: texto pequeno sobre o petróleo (contraste acima de 4,5 na faixa escura)
+  ouroClaro: '#fcefc7',
+  // os nomes por papel que os componentes usam (faixa, fundos escuros, barras, linhas)
+  marinho: '#075a70',
+  marinhoProfundo: '#05404f',
+  azul: '#0a748f',
+  ciano: '#0a748f',
 };
 
 // Cada loja com a sua cor (a mesma na fita, nas últimas vendas e na lista), pela ordem em que o painel as dá.
-const CORES_LOJAS = ['#0ea5c8', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#84cc16', '#f97316'];
+const CORES_LOJAS = ['#0a748f', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#84cc16', '#f97316'];
 export const COR_ONLINE = '#10b981';
 
 /** A cor de uma loja: o online é sempre verde; as outras pela posição na lista de lojas. */
@@ -28,4 +39,4 @@ export function corDaLoja(id, alvos) {
 }
 
 /** Medalha do ranking (1.º, 2.º, 3.º). */
-export const MEDALHAS = ['#f5c542', '#c0c7d1', '#d08a4f'];
+export const MEDALHAS = ['#d4a73f', '#c0c7d1', '#c9875a'];

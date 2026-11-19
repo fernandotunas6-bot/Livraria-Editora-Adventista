@@ -54,7 +54,7 @@ export default function PainelGestao({
         <div className="grid gap-5 xl:grid-cols-3">
           <Bloco titulo={`${MESES[dados.mes - 1]} · acumulado contra o ritmo da meta`} icone={CalendarDays} className="xl:col-span-2">
             <GraficoMes dias={dados.dias} meta={r.meta} diasMes={dados.dias_mes} altura={tv ? 270 : 280} />
-            <Legenda itens={[[MARCA.ciano, 'Acumulado'], ['#94a3b8', 'Ritmo da meta'], ['#f59e0b', 'Meta'], [MARCA.azul, 'Vendido em cada dia']]} />
+            <Legenda itens={[[MARCA.ciano, 'Acumulado'], ['#94a3b8', 'Ritmo da meta'], [MARCA.ouro, 'Meta'], ['#8fc3d1', 'Vendido em cada dia']]} />
           </Bloco>
           <Bloco titulo="Ranking das lojas · % da meta" icone={Trophy}>
             <Lojas lojas={dados.lojas} alvos={dados.alvos} dia={dados.dia} diasMes={dados.dias_mes} alvo={alvo}
@@ -91,8 +91,8 @@ function Bloco({ titulo, icone: Icone, children, className }) {
   return (
     <section className={cn('rounded-2xl border border-black/5 bg-card p-5 text-card-foreground shadow-lg shadow-slate-900/5 dark:border-white/10 dark:shadow-black/30', className)}>
       {titulo && (
-        <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground/80">
-          {Icone && <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#0ea5c8]/10 text-[#0ea5c8]"><Icone className="h-4 w-4" /></span>}
+        <h3 className="mb-4 flex items-center gap-2 font-serif text-base font-semibold tracking-tight text-[#1d2a3f] dark:text-foreground">
+          {Icone && <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#0a748f]/10 text-[#0a748f]"><Icone className="h-4 w-4" /></span>}
           {titulo}
         </h3>
       )}
@@ -116,13 +116,13 @@ function Legenda({ itens }) {
 /** Os arcos do logótipo, a enfeitar a faixa (só decoração). */
 function Arcos() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 400 260" className="pointer-events-none absolute -right-10 -top-16 h-[22rem] w-auto opacity-[0.16]">
-      <g fill="none" stroke={MARCA.ciano} strokeLinecap="round">
+    <svg aria-hidden="true" viewBox="0 0 400 260" className="pointer-events-none absolute -right-10 -top-16 h-[22rem] w-auto opacity-[0.12]">
+      <g fill="none" stroke="#ffffff" strokeLinecap="round">
         <path d="M60 250 C 60 110, 170 20, 330 18" strokeWidth="14" />
         <path d="M105 250 C 105 135, 190 62, 330 58" strokeWidth="10" />
         <path d="M150 250 C 150 160, 215 102, 330 98" strokeWidth="7" />
       </g>
-      <g fill={MARCA.ciano}><circle cx="338" cy="18" r="9" /><circle cx="338" cy="58" r="7" /><circle cx="338" cy="98" r="5" /></g>
+      <g fill="#ffffff"><circle cx="338" cy="18" r="9" /><circle cx="338" cy="58" r="7" /><circle cx="338" cy="98" r="5" /></g>
     </svg>
   );
 }
@@ -146,7 +146,7 @@ function Relogio({ grande }) {
 function Estado({ estado, ultimo }) {
   if (estado === 'ao-vivo') {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold tracking-wider text-emerald-300 ring-1 ring-emerald-300/30">
+      <span className="inline-flex items-center gap-2 rounded-full bg-black/25 px-3 py-1 text-xs font-bold tracking-wider text-white ring-1 ring-emerald-300/50">
         <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" /></span>
         AO VIVO
       </span>
@@ -154,13 +154,13 @@ function Estado({ estado, ultimo }) {
   }
   if (estado === 'sem-ligacao') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-400/15 px-3 py-1 text-xs font-semibold text-red-200 ring-1 ring-red-300/30" title="Sem ligação: os números são os últimos que chegaram">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-xs font-semibold text-white ring-1 ring-red-300/60" title="Sem ligação: os números são os últimos que chegaram">
         <WifiOff className="h-3.5 w-3.5" /> Sem ligação{ultimo ? ` · ${horaDe(ultimo)}` : ''}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/70 ring-1 ring-white/15" title="Sem tempo real: actualiza de 30 em 30 segundos">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-white/20" title="Sem tempo real: actualiza de 30 em 30 segundos">
       <Clock className="h-3.5 w-3.5" /> de 30 em 30 s
     </span>
   );
@@ -172,7 +172,7 @@ function Pilulas({ opcoes, valor, onEscolher, rotulo }) {
       {opcoes.map(([v, rot]) => (
         <button key={rot} type="button" onClick={() => onEscolher(v)}
           className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-            valor === v ? 'bg-white text-[#0b2a55] shadow' : 'text-white/75 hover:bg-white/10 hover:text-white')}>
+            valor === v ? 'bg-white text-[#075a70] shadow' : 'text-white/75 hover:bg-white/10 hover:text-white')}>
           {rot}
         </button>
       ))}
@@ -193,8 +193,8 @@ function Heroi({ dados, titulo, alvo, canal, onFiltros, estado, tv, acoes, extra
         {!tv && <img src={MARCA.logoBranco} alt={MARCA.nome} className="h-10 w-auto object-contain sm:h-12" />}
         {!tv && <span className="hidden h-10 w-px bg-white/20 sm:block" />}
         <div className="mr-auto min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#5fd4ee]">Painel de Gestão</p>
-          <h2 className={cn('truncate font-bold tracking-tight', tv ? 'text-3xl' : 'text-2xl sm:text-3xl')}>{titulo}</h2>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#fcefc7]">Painel de Gestão</p>
+          <h2 className={cn('truncate font-serif font-semibold tracking-tight', tv ? 'text-4xl' : 'text-3xl sm:text-4xl')}>{titulo}</h2>
           <p className="text-xs text-white/60">
             {MESES[dados.mes - 1]} de {dados.ano} · dia {dados.dia} de {dados.dias_mes}
             {canal === 'balcao' ? ' · só balcão' : canal === 'online' ? ' · só loja online' : ''}
@@ -273,10 +273,10 @@ function Fita({ ultimas, alvos, tv }) {
     const neg = Number(u.total) < 0;
     return (
       <span key={`${u.quando}-${u.numero}`} className={cn('mx-4 inline-flex items-center gap-2 whitespace-nowrap', u.anulado && 'line-through opacity-40')}>
-        <span className="font-mono text-[#5fd4ee]">{horaDe(u.quando)}</span>
+        <span className="font-mono text-[#7fd3e6]">{horaDe(u.quando)}</span>
         <span className="h-2 w-2 rounded-full" style={{ background: corDaLoja(u.alvo, alvos) }} />
         <span className="font-bold uppercase tracking-wide text-white">{nomeCurto(u.alvo, u.loja)}</span>
-        <span className={cn('font-mono font-bold tabular-nums', neg ? 'text-red-400' : 'text-emerald-400')}>
+        <span className={cn('font-mono font-bold tabular-nums', neg ? 'text-red-300' : 'text-emerald-400')}>
           {neg ? '▼' : '▲'} {fmtKz(Math.abs(Number(u.total)))}
         </span>
         {u.artigo && <span className="text-white/55">{u.artigo}{Number(u.quantidade) > 1 ? ` ×${Number(u.quantidade)}` : ''}{u.artigos > 1 ? ` +${u.artigos - 1}` : ''}</span>}
@@ -292,7 +292,7 @@ function Fita({ ultimas, alvos, tv }) {
         .painel-fita{animation:painel-fita ${Math.max(lista.length * 4, 30)}s linear infinite}
         .group:hover .painel-fita{animation-play-state:paused}
         @media (prefers-reduced-motion: reduce){.painel-fita{animation:none}}`}</style>
-      <span className="z-10 flex shrink-0 items-center gap-2 px-4 text-[11px] font-black uppercase tracking-[0.2em] text-[#071a36]" style={{ background: MARCA.ciano }}>
+      <span className="z-10 flex shrink-0 items-center gap-2 px-4 text-[11px] font-black uppercase tracking-[0.2em]" style={{ background: '#ffffff', color: MARCA.marinho }}>
         <TrendingUp className="h-4 w-4" />Vendas
       </span>
       <div className="relative min-w-0 flex-1 overflow-hidden py-2.5">
@@ -377,7 +377,7 @@ function Confetes({ chave }) {
     return () => clearTimeout(t);
   }, [chave]);
   if (!mostrar) return null;
-  const cores = [MARCA.ciano, '#10b981', '#f5c542', '#ec4899', '#8b5cf6', '#ffffff'];
+  const cores = [MARCA.ciano, '#10b981', '#b8892f', '#ec4899', '#8b5cf6', '#ffffff'];
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
       <style>{'@keyframes painel-confete{0%{transform:translate3d(0,-10vh,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(720deg)}}'}</style>
@@ -499,7 +499,7 @@ function Lojas({ lojas, alvos, dia, diasMes, onEscolher, alvo }) {
           <li key={l.id}>
             {onEscolher ? (
               <button type="button" onClick={() => onEscolher(alvo === l.id ? '' : l.id)}
-                className={cn('w-full rounded-xl p-2 text-left transition hover:bg-muted/70', alvo === l.id && 'bg-muted ring-1 ring-[#0ea5c8]/40')}>
+                className={cn('w-full rounded-xl p-2 text-left transition hover:bg-muted/70', alvo === l.id && 'bg-muted ring-1 ring-[#0a748f]/40')}>
                 {conteudo}
               </button>
             ) : <div className="p-2">{conteudo}</div>}
@@ -543,7 +543,7 @@ function Canais({ lojas }) {
 function Capa({ p, tamanho = 'h-12 w-9' }) {
   return p.capa
     ? <img src={p.capa} alt="" loading="lazy" className={cn(tamanho, 'shrink-0 rounded-md object-cover shadow-md ring-1 ring-black/10')} />
-    : <span className={cn(tamanho, 'grid shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#1d4f91] to-[#0b2a55] text-[10px] font-bold text-white/70')}>LIV</span>;
+    : <span className={cn(tamanho, 'grid shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#0a748f] to-[#075a70] text-[10px] font-bold text-white/70')}>LIV</span>;
 }
 
 function MaisVendidos({ hoje, mes, tv }) {
@@ -556,8 +556,8 @@ function MaisVendidos({ hoje, mes, tv }) {
   return (
     <section className="rounded-2xl border border-black/5 bg-card p-5 shadow-lg shadow-slate-900/5 dark:border-white/10 dark:shadow-black/30">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground/80">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#f5c542]/20 text-[#b8860b]"><Trophy className="h-4 w-4" /></span>
+        <h3 className="flex items-center gap-2 font-serif text-base font-semibold tracking-tight text-[#1d2a3f] dark:text-foreground">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#b8892f]/20 text-[#7a5716]"><Trophy className="h-4 w-4" /></span>
           Mais vendidos
         </h3>
         {!tv && (
@@ -649,7 +649,7 @@ export function BotoesPainel({ onMetas, onPublicidade, onTv }) {
     <div className="flex flex-wrap gap-2">
       {onMetas && <Button size="sm" variant="outline" className={claro} onClick={onMetas}><Target className="mr-1.5 h-4 w-4" />Metas</Button>}
       {onPublicidade && <Button size="sm" variant="outline" className={claro} onClick={onPublicidade}><Megaphone className="mr-1.5 h-4 w-4" />Publicidade e rodapé</Button>}
-      {onTv && <Button size="sm" className="bg-[#0ea5c8] font-semibold text-[#071a36] hover:bg-[#38bdf8]" onClick={onTv}><MonitorPlay className="mr-1.5 h-4 w-4" />Modo TV</Button>}
+      {onTv && <Button size="sm" className="bg-white font-semibold text-[#075a70] shadow hover:bg-white/90" onClick={onTv}><MonitorPlay className="mr-1.5 h-4 w-4" />Modo TV</Button>}
     </div>
   );
 }
