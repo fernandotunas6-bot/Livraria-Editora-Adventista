@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { LAYOUTS_TV, lerTv, nomeCurto, rodaDeLojas } from '@/lib/painelGestao';
 import PainelGestao from '@/components/gestao/PainelGestao';
 import { LeitorPublicidade, useMidiaTv } from '@/components/gestao/PublicidadeTv';
+import RodapeNoticias from '@/components/gestao/RodapeNoticias';
+import { MARCA } from '@/components/gestao/marca';
 
 const GUARDA = 'painel-gestao-tv';
 
@@ -26,6 +28,7 @@ function lerGuardado() {
 export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nome }) {
   const [cfg, setCfg] = useState(lerGuardado);
   const [alvos, setAlvos] = useState([]);
+  const [dados, setDados] = useState(null);
   const [indice, setIndice] = useState(0);
   const [ecraInteiro, setEcraInteiro] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
   const { midia } = useMidiaTv();
@@ -83,7 +86,10 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
     } catch { /* o browser não deixa */ }
   };
 
-  const guardarAlvos = useCallback((d) => setAlvos(d?.alvos || []), []);
+  const guardarAlvos = useCallback((d) => {
+    setAlvos(d?.alvos || []);
+    setDados(d);
+  }, []);
   const pub = LAYOUTS_TV[cfg.layout]?.publicidade ?? 0;
   const painel = (
     <div className="h-full overflow-y-auto p-4">
@@ -92,10 +98,12 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
   );
 
   return (
-    <div className="dark fixed inset-0 z-50 flex flex-col bg-background text-foreground">
-      <div className="flex items-center gap-3 border-b px-4 py-2">
-        {logo && <img src={logo} alt="" className="h-7 w-auto object-contain" />}
-        <span className="text-sm font-semibold">{nome} · Painel de Gestão</span>
+    <div className="dark fixed inset-0 z-50 flex flex-col text-foreground"
+      style={{ background: `radial-gradient(90rem 50rem at 0% 0%, ${MARCA.azul}55, transparent 60%), ${MARCA.marinhoProfundo}` }}>
+      <div className="flex items-center gap-4 border-b border-white/10 px-5 py-2.5" style={{ background: `linear-gradient(90deg, ${MARCA.marinho}, ${MARCA.marinhoProfundo})` }}>
+        <img src={MARCA.logoBranco} alt={MARCA.nome || nome} className="h-10 w-auto object-contain" />
+        <span className="h-8 w-px bg-white/20" />
+        <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#5fd4ee]">Painel de Gestão</span>
         {cfg.rodarLojas && roda.length > 1 && (
           <span className="flex gap-1">
             {roda.map((a, k) => (
@@ -154,12 +162,16 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
       </div>
       <div className={cn('flex min-h-0 flex-1', cfg.lado === 'direita' && 'flex-row-reverse')}>
         {pub > 0 && (
-          <div className="h-full shrink-0" style={{ width: `${pub}%` }}>
-            <LeitorPublicidade midia={midia} som={cfg.som} logo={logo} nome={nome} />
+          <div className="h-full shrink-0 p-3" style={{ width: `${pub}%` }}>
+            <div className="h-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+              <LeitorPublicidade midia={midia} som={cfg.som} logo={MARCA.logoBranco || logo} nome={nome} />
+            </div>
           </div>
         )}
         <div className="min-w-0 flex-1">{painel}</div>
       </div>
+      {/* o rodapé de noticiário, a toda a largura */}
+      {dados && <RodapeNoticias dados={dados} tv />}
     </div>
   );
 }

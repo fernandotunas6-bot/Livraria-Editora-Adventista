@@ -166,5 +166,12 @@ await recusa('só endereços https', () => como(admin, `insert into public.paine
 check('o gerente vê a publicidade (a TV da loja)', (await como(gerente, `select * from public.painel_tv_midia`)).length === 1);
 check('o cliente não vê a publicidade da TV', (await como(cliente, `select * from public.painel_tv_midia`)).length === 0);
 
+// --- rodapé (mensagens da direcção) ---------------------------------------------------------------------------------
+await como(admin, `insert into public.painel_rodape (texto, ate) values ('Bíblias com 20 % até sábado', current_date + 3)`);
+await recusa('cliente não escreve no rodapé', () => como(cliente, `insert into public.painel_rodape (texto) values ('olá a todos')`), /row-level security|permission/);
+await recusa('mensagem vazia', () => como(admin, `insert into public.painel_rodape (texto) values ('  ')`), /check/);
+check('o gerente lê o rodapé', (await como(gerente, `select texto from public.painel_rodape`)).length === 1);
+check('o cliente não lê o rodapé', (await como(cliente, `select texto from public.painel_rodape`)).length === 0);
+
 console.log(`painel-gestao: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);
