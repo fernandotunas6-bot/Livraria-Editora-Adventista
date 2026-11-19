@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { LAYOUTS_TV, lerTv, nomeCurto, rodaDeLojas, TRANSICOES } from '@/lib/painelGestao';
+import { FONTES_MONTRA, LAYOUTS_TV, lerTv, MONTRA_A_CADA, MONTRA_DURACOES, nomeCurto, rodaDeLojas, TRANSICOES } from '@/lib/painelGestao';
 import PainelGestao from '@/components/gestao/PainelGestao';
-import { LeitorPublicidade, useMidiaTv } from '@/components/gestao/PublicidadeTv';
+import { useMidiaTv } from '@/components/gestao/PublicidadeTv';
+import { PublicidadeComMontra, useConfigMontra } from '@/components/gestao/MontraLivros';
 import RodapeNoticias from '@/components/gestao/RodapeNoticias';
 import { MARCA } from '@/components/gestao/marca';
+import GraficoAoVivo, { DefinicoesGrafico, useConfigGrafico } from '@/components/gestao/GraficoAoVivo';
 
 const GUARDA = 'painel-gestao-tv';
 
@@ -27,6 +29,9 @@ function lerGuardado() {
  */
 export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nome }) {
   const [cfg, setCfg] = useState(lerGuardado);
+  const [cfgGrafico, mudarGrafico] = useConfigGrafico('tv');
+  const [cfgMontra, mudarMontra] = useConfigMontra();
+  const [montraJa, setMontraJa] = useState(0);
   const [alvos, setAlvos] = useState([]);
   const [dados, setDados] = useState(null);
   const [indice, setIndice] = useState(0);
@@ -69,8 +74,14 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
     const luanda = new Date(agora.toLocaleString('en-US', { timeZone: 'Africa/Luanda' }));
     const meiaNoite = new Date(luanda);
     meiaNoite.setHours(24, 5, 0, 0);
-    const t = setTimeout(() => window.location.reload(), meiaNoite - luanda);
-    return () => clearTimeout(t);
+    // sem internet, recarregar deixava a TV numa página de erro: espera que a rede volte (a montra segue entretanto)
+    let t2 = null;
+    const recarregar = () => {
+      if (navigator.onLine === false) t2 = setTimeout(recarregar, 5 * 60_000);
+      else window.location.reload();
+    };
+    const t = setTimeout(recarregar, meiaNoite - luanda);
+    return () => { clearTimeout(t); clearTimeout(t2); };
   }, []);
 
   useEffect(() => {
@@ -91,9 +102,14 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
     setDados(d);
   }, []);
   const pub = LAYOUTS_TV[cfg.layout]?.publicidade ?? 0;
+  // o gráfico ao vivo: «automático» fica por baixo da publicidade (ou no topo do painel, sem publicidade)
+  const ondeGrafico = cfgGrafico.onde === 'auto' ? (pub > 0 ? 'lado' : 'topo') : (cfgGrafico.onde === 'lado' && !pub ? 'topo' : cfgGrafico.onde);
+  const graficoTv = (props) => (
+    <GraficoAoVivo alvo={alvo} canal={canal} cfg={cfgGrafico} alvos={alvos} ecra="tv" {...props} />
+  );
   const painel = (
     <div className="h-full overflow-y-auto p-4">
-      <PainelGestao alvo={alvo} canal={canal} variante="tv" onDados={guardarAlvos} />
+      <PainelGestao alvo={alvo} canal={canal} variante="tv" onDados={guardarAlvos} aoVivo={{ ...cfgGrafico, onde: ondeGrafico === 'topo' ? 'topo' : 'fora' }} />
     </div>
   );
 
@@ -123,7 +139,7 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
             <PopoverTrigger asChild>
               <Button size="icon" variant="ghost" aria-label="Definições da TV"><Settings2 className="h-4 w-4" /></Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="dark w-80 space-y-3 text-sm">
+            <PopoverContent align="end" className="dark max-h-[80vh] w-80 space-y-3 overflow-y-auto text-sm">
               <p className="font-semibold">Este ecrã</p>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Divisão</p>
@@ -159,6 +175,48 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
                   </label>
                 </>
               )}
+              {pub > 0 && (
+                <details className="rounded-lg bg-white/5 p-2">
+                  <summary className="cursor-pointer font-semibold">Montra de livros</summary>
+                  <div className="mt-2 space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Livros</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(FONTES_MONTRA).map(([id, rot]) => (
+                          <button key={id} type="button" onClick={() => mudarMontra({ fonte: id })}
+                            className={cn('rounded-md px-2 py-1 text-xs', cfgMontra.fonte === id ? 'bg-white font-semibold text-[#075a70]' : 'bg-white/10 text-white/80 hover:bg-white/20')}>{rot}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Entre a publicidade, com a internet estável</p>
+                      <div className="flex flex-wrap gap-1">
+                        {MONTRA_A_CADA.map((m) => (
+                          <button key={m} type="button" onClick={() => mudarMontra({ aCada: m })}
+                            className={cn('rounded-md px-2 py-1 text-xs', cfgMontra.aCada === m ? 'bg-white font-semibold text-[#075a70]' : 'bg-white/10 text-white/80 hover:bg-white/20')}>{m ? `de ${m} em ${m} min` : 'nunca'}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Quanto tempo de cada vez</p>
+                      <div className="flex flex-wrap gap-1">
+                        {MONTRA_DURACOES.map((d) => (
+                          <button key={d} type="button" onClick={() => mudarMontra({ duracao: d })}
+                            className={cn('rounded-md px-2 py-1 text-xs', cfgMontra.duracao === d ? 'bg-white font-semibold text-[#075a70]' : 'bg-white/10 text-white/80 hover:bg-white/20')}>{d < 60 ? `${d} s` : d % 60 ? `${Math.floor(d / 60)} min ${d % 60} s` : `${d / 60} min`}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="flex items-center justify-between gap-2"><span>Sempre que a internet falhar</span><Switch checked={cfgMontra.semInternet} onCheckedChange={(v) => mudarMontra({ semInternet: v })} /></label>
+                    <label className="flex items-center justify-between gap-2"><span>Quando não há publicidade</span><Switch checked={cfgMontra.semPublicidade} onCheckedChange={(v) => mudarMontra({ semPublicidade: v })} /></label>
+                    <label className="flex items-center justify-between gap-2"><span>Mostrar os preços</span><Switch checked={cfgMontra.precos} onCheckedChange={(v) => mudarMontra({ precos: v })} /></label>
+                    <Button size="sm" variant="outline" className="w-full" onClick={() => setMontraJa(Date.now())}>Mostrar a montra já</Button>
+                  </div>
+                </details>
+              )}
+              <details className="rounded-lg bg-white/5 p-2">
+                <summary className="cursor-pointer font-semibold">Gráfico ao vivo</summary>
+                <div className="mt-2"><DefinicoesGrafico cfg={cfgGrafico} onCfg={mudarGrafico} ecra="tv" /></div>
+              </details>
               <label className="flex items-center justify-between gap-2">
                 <span>Rodar entre a empresa e cada loja</span>
                 <Switch checked={cfg.rodarLojas} onCheckedChange={(v) => mudar({ rodarLojas: v })} />
@@ -181,14 +239,17 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
       </div>
       <div className={cn('flex min-h-0 flex-1', cfg.lado === 'direita' && 'flex-row-reverse')}>
         {pub > 0 && (
-          <div className="h-full shrink-0 p-3" style={{ width: `${pub}%` }}>
-            <div className="h-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-              <LeitorPublicidade midia={midia} som={cfg.som} logo={MARCA.logoBranco || logo} nome={nome} transicao={cfg.transicao} vinhetas={cfg.vinhetas} />
+          <div className="flex h-full shrink-0 flex-col gap-3 p-3" style={{ width: `${pub}%` }}>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+              <PublicidadeComMontra midia={midia} som={cfg.som} logo={MARCA.logoBranco || logo} nome={nome} transicao={cfg.transicao} vinhetas={cfg.vinhetas}
+                montra={cfgMontra} agora={montraJa} />
             </div>
+            {ondeGrafico === 'lado' && <div className="h-[40%] shrink-0">{graficoTv({ encher: true, className: 'h-full' })}</div>}
           </div>
         )}
         <div className="min-w-0 flex-1">{painel}</div>
       </div>
+      {ondeGrafico === 'faixa' && <div className="h-[30vh] shrink-0 px-3 pb-2">{graficoTv({ encher: true, className: 'h-full' })}</div>}
       {/* o rodapé de noticiário, a toda a largura */}
       {dados && <RodapeNoticias dados={dados} tv />}
     </div>

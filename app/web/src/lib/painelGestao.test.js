@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   escreverFiltros, estadoMeta, fmtCompacto, fmtKz, horaDe, lerFiltros, lerTv, mensagensDeHoje, nomeCurto, noticias, playlist,
   proximo, rodaDeLojas, tipoDoUrl, variacao, youtubeEmbed, estadoYoutube, estiloDaPassagem, livrosParaRodape, sequenciaTv,
+  contraComparacao, curvaAcumulada, janelaDoGrafico, lerGraficoAoVivo, minutoDe, valorEm, volumes,
+  lerMontra, livroDaMontra, quadrosDaMontra, temasDaMontra,
 } from '@/lib/painelGestao';
 
 describe('formatos', () => {
@@ -177,5 +179,73 @@ describe('livros no rodapé', () => {
     expect(n[0]).toMatchObject({ etiqueta: 'AVISO', imagem: 'https://x/cartaz.jpg', forma: 'quadrada' });
     expect(n.find((x) => x.etiqueta === 'PROMOÇÃO')).toMatchObject({ texto: 'Promoção válida — de 9 000 Kz por 7 000 Kz', imagem: 'https://x/a.jpg', forma: 'capa' });
     expect(n.find((x) => x.etiqueta === 'NOVIDADE' && x.texto.startsWith('Novo')).texto).toBe('Novo · Ellen G. White · 5 700 Kz');
+  });
+});
+
+describe('gráfico ao vivo', () => {
+  it('configuração com valores por omissão e lugares de cada ecrã', () => {
+    expect(lerGraficoAoVivo(null)).toEqual({ onde: 'depois-cartoes', comparar: 'semana', janela: 'dia', volume: true });
+    expect(lerGraficoAoVivo(null, 'tv').onde).toBe('auto');
+    expect(lerGraficoAoVivo('{"onde":"faixa","comparar":"media","janela":"3h","volume":false}', 'tv'))
+      .toEqual({ onde: 'faixa', comparar: 'media', janela: '3h', volume: false });
+    expect(lerGraficoAoVivo('{"onde":"faixa"}').onde).toBe('depois-cartoes');
+    expect(lerGraficoAoVivo('{estragado', 'tv').comparar).toBe('semana');
+  });
+  it('acumulado em degraus: sobe com as vendas, desce com as notas de crédito', () => {
+    const c = curvaAcumulada([[640, 1500, 1], [555, 5000, 2], [660, -500, 0]]);
+    expect(c.map((p) => [p.m, p.v])).toEqual([[555, 5000], [640, 6500], [660, 6000]]);
+    expect([valorEm(c, 500), valorEm(c, 555), valorEm(c, 600), valorEm(c, 700)]).toEqual([0, 5000, 5000, 6000]);
+    expect(minutoDe('2026-11-19T10:42:30')).toBe(642.5);
+  });
+  it('janela do dia e janelas que correm com o relógio', () => {
+    expect(janelaDoGrafico('dia', 600)).toEqual({ ini: 420, fim: 1200 });
+    expect(janelaDoGrafico('dia', 600, [{ m: 395 }], [{ m: 1250 }])).toEqual({ ini: 360, fim: 1320 });
+    expect(janelaDoGrafico('dia', 1430)).toEqual({ ini: 420, fim: 1440 });
+    expect(janelaDoGrafico('3h', 600)).toEqual({ ini: 432, fim: 612 });
+    expect(janelaDoGrafico('1h', 20)).toEqual({ ini: 0, fim: 60 });
+  });
+  it('volume por intervalo e comparação à mesma hora', () => {
+    const c = curvaAcumulada([[555, 5000, 2], [560, 1000, 1], [640, 1500, 1]]);
+    expect(volumes(c, 540, 600, 30)).toEqual([{ m: 540, total: 6000, vendas: 3 }, { m: 570, total: 0, vendas: 0 }]);
+    expect(contraComparacao(1100, 1000)).toEqual({ diferenca: 100, pct: 10, sobe: true });
+    expect(contraComparacao(500, 0).pct).toBe(null);
+  });
+});
+
+describe('montra de livros', () => {
+  const produto = (id, extra = {}) => ({ id, title: `Livro ${id}`, author: 'Autor', image: `https://x.ao/${id}.jpg`, featured: true,
+    variants: [{ price_formatted: '5 700 Kz', sale_price_formatted: null }], ...extra });
+  it('configuração por omissão: destaques, 1 min de 5 em 5 min, sem internet e sem publicidade', () => {
+    expect(lerMontra(null)).toEqual({ fonte: 'destaques', aCada: 5, duracao: 60, semInternet: true, semPublicidade: true, precos: true });
+    expect(lerMontra('{"fonte":"ambos","aCada":0,"duracao":120,"semInternet":false,"precos":false}'))
+      .toEqual({ fonte: 'ambos', aCada: 0, duracao: 120, semInternet: false, semPublicidade: true, precos: false });
+    expect(lerMontra('{"aCada":7,"duracao":5,"fonte":"x"}')).toMatchObject({ aCada: 5, duracao: 60, fonte: 'destaques' });
+  });
+  it('o livro com o preço de promoção e o antigo riscado; sem capa não entra', () => {
+    expect(livroDaMontra(produto('a', { on_sale: true, ribbon_text: 'Promoção −20%', variants: [{ price_formatted: '5 700 Kz', sale_price_formatted: '4 560 Kz' }] })))
+      .toEqual({ id: 'a', titulo: 'Livro a', autor: 'Autor', capa: 'https://x.ao/a.jpg', preco: '4 560 Kz', precoAntigo: '5 700 Kz', fita: 'Promoção −20%', promocao: true });
+    expect(livroDaMontra(produto('b')).fita).toBe('Destaque');
+    expect(livroDaMontra(produto('c', { image: '' }))).toBe(null);
+  });
+  it('temas como na página inicial, com pelo menos 3 livros', () => {
+    const cats = [{ id: 'catalogo', title: 'Catálogo Geral', books: [produto('1'), produto('2'), produto('3')] },
+      { id: 'ellen', title: 'Ellen G. White', books: [produto('4'), produto('5'), produto('6')] },
+      { id: 'familia', title: 'Família', books: [produto('7'), produto('8', { image: '' })] }];
+    expect(temasDaMontra(cats).map((t) => t.titulo)).toEqual(['Ellen G. White']);
+  });
+  it('uma passagem soma o minuto, e a seguinte mostra outros livros', () => {
+    const destaques = Array.from({ length: 20 }, (_, i) => livroDaMontra(produto(String(i))));
+    const a = quadrosDaMontra({ destaques }, 'destaques', 0, 60);
+    expect(a[0].tipo).toBe('abertura');
+    expect(a.reduce((s, q) => s + q.s, 0)).toBeLessThanOrEqual(60);
+    expect(a.length).toBe(9);
+    const b = quadrosDaMontra({ destaques }, 'destaques', 1, 60);
+    expect(b[1].livro.id).not.toBe(a[1].livro.id);
+    const temas = [{ id: 'e', titulo: 'Ellen G. White', livros: destaques.slice(0, 6) }, { id: 'f', titulo: 'Família', livros: destaques.slice(6, 12) }];
+    const c = quadrosDaMontra({ destaques, temas }, 'ambos', 1, 60);
+    expect([c[0].titulo, c[1].tipo, c[1].livros.length]).toEqual(['Ellen G. White', 'prateleira', 5]);
+    expect(quadrosDaMontra({ destaques, temas }, 'ambos', 3, 60)[0].titulo).toBe('Família');
+    expect(quadrosDaMontra({ destaques: [], temas }, 'destaques', 0, 60)[0].titulo).toBe('Ellen G. White');
+    expect(quadrosDaMontra({}, 'destaques', 0, 60)).toEqual([]);
   });
 });

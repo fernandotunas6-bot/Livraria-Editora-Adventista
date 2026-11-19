@@ -83,7 +83,8 @@ export function useNumeroAnimado(valor, ms = 900) {
     let raf = 0;
     const t0 = performance.now();
     const passo = (t) => {
-      const p = Math.min((t - t0) / ms, 1);
+      // o primeiro quadro pode vir com a hora um pouco antes de t0: nunca abaixo de 0 (nem acima de 1)
+      const p = Math.min(Math.max((t - t0) / ms, 0), 1);
       const suave = 1 - (1 - p) ** 3;
       const v = inicio + (alvo - inicio) * suave;
       setMostrado(v);

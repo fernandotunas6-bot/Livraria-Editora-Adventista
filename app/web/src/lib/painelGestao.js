@@ -307,3 +307,194 @@ export function livrosParaRodape(livros, agora = new Date(), max = 6) {
     .map((b) => ({ titulo: b.title.trim(), autor: String(b.author || '').trim(), preco: Number(b.price), capa: capa(b) }));
   return { promocoes, novidades };
 }
+
+// ------------------------------------------------------------------ gráfico ao vivo (docs/PAINEL-GESTAO.md §6.13)
+
+/** Onde o gráfico ao vivo aparece: no painel (computador, telemóvel) e no modo TV. */
+export const ONDE_GRAFICO = {
+  pagina: {
+    'depois-cartoes': 'Depois dos cartões',
+    topo: 'No topo, antes dos cartões',
+    'antes-horas': 'Antes do gráfico hora a hora',
+    fim: 'No fim do painel',
+    nao: 'Não mostrar',
+  },
+  tv: {
+    auto: 'Automático (junto à publicidade, ou no topo)',
+    lado: 'Por baixo da publicidade',
+    topo: 'No topo do painel',
+    faixa: 'Faixa a toda a largura, por cima do rodapé',
+    nao: 'Não mostrar',
+  },
+};
+export const COMPARACOES = { semana: 'Mesmo dia da semana passada', ontem: 'Ontem', media: 'Média de 4 semanas' };
+export const COMPARACOES_CURTAS = { semana: 'semana passada', ontem: 'ontem', media: 'média de 4 semanas' };
+export const JANELAS = { dia: 'O dia', '3h': '3 horas', '1h': '1 hora' };
+
+/** A configuração do gráfico ao vivo guardada neste aparelho (`ecra`: 'pagina' ou 'tv'). */
+export function lerGraficoAoVivo(guardado, ecra = 'pagina') {
+  let v = {};
+  try {
+    v = typeof guardado === 'string' ? JSON.parse(guardado) : guardado || {};
+  } catch {
+    v = {};
+  }
+  const lugares = ONDE_GRAFICO[ecra] || ONDE_GRAFICO.pagina;
+  return {
+    onde: lugares[v?.onde] ? v.onde : Object.keys(lugares)[0],
+    comparar: COMPARACOES[v?.comparar] ? v.comparar : 'semana',
+    janela: JANELAS[v?.janela] ? v.janela : 'dia',
+    volume: typeof v?.volume === 'boolean' ? v.volume : true,
+  };
+}
+
+/** Minuto do dia (com os segundos em fracção) de «2026-11-19T10:42:30». */
+export function minutoDe(iso) {
+  const m = String(iso || '').match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) + Number(m[3] || 0) / 60 : 0;
+}
+
+/** [[minuto, Kz, vendas]] → [{ m, v (acumulado), d (Kz nesse minuto), n }], por ordem. */
+export function curvaAcumulada(pontos) {
+  let soma = 0;
+  return [...(pontos || [])]
+    .map((p) => ({ m: Number(p[0]) || 0, d: Number(p[1]) || 0, n: Number(p[2]) || 0 }))
+    .sort((a, b) => a.m - b.m)
+    .map((p) => {
+      soma += p.d;
+      return { ...p, v: soma };
+    });
+}
+
+/** O acumulado no fim do minuto `m` (degrau: o último ponto até `m`). */
+export function valorEm(curva, m) {
+  let v = 0;
+  for (const p of curva || []) {
+    if (p.m > m) break;
+    v = p.v;
+  }
+  return v;
+}
+
+/**
+ * O intervalo do eixo do tempo, em minutos do dia. «dia»: das 7h (ou da primeira venda) até às 20h (ou à última
+ * venda do dia de comparação, ou agora), em horas certas. «3h» e «1h»: a janela que corre com o relógio, com um
+ * pouco de espaço à direita do ponto de agora, como nos gráficos de bolsa.
+ */
+export function janelaDoGrafico(janela, agora, hoje = [], comparacao = []) {
+  const fimDia = 24 * 60;
+  if (janela === '3h' || janela === '1h') {
+    const largura = janela === '3h' ? 180 : 60;
+    const folga = janela === '3h' ? 12 : 5;
+    const fim = Math.min(Math.max(agora + folga, largura), fimDia);
+    return { ini: fim - largura, fim };
+  }
+  const ms = [...hoje, ...comparacao].map((p) => p.m);
+  const ini = Math.floor(Math.min(7 * 60, agora, ...ms) / 60) * 60;
+  const fim = Math.min(Math.ceil(Math.max(20 * 60, agora + 30, ...comparacao.map((p) => p.m + 30)) / 60) * 60, fimDia);
+  return { ini, fim: Math.max(fim, ini + 60) };
+}
+
+/** As barras de volume: Kz e vendas de hoje por intervalo de `passo` minutos, dentro da janela. */
+export function volumes(curva, ini, fim, passo) {
+  const n = Math.max(Math.ceil((fim - ini) / passo), 1);
+  const barras = Array.from({ length: n }, (_, i) => ({ m: ini + i * passo, total: 0, vendas: 0 }));
+  for (const p of curva || []) {
+    if (p.m < ini || p.m >= fim) continue;
+    const b = barras[Math.floor((p.m - ini) / passo)];
+    b.total += p.d;
+    b.vendas += p.n;
+  }
+  return barras;
+}
+
+/** Hoje contra a comparação à mesma hora: { diferenca, pct, sobe } (pct null sem base). */
+export function contraComparacao(hoje, comparacao) {
+  const h = Number(hoje) || 0;
+  const c = Number(comparacao) || 0;
+  return { diferenca: h - c, pct: c > 0 ? ((h - c) / c) * 100 : null, sobe: h >= c };
+}
+
+// ------------------------------------------------------------------ montra de livros na TV (docs/PAINEL-GESTAO.md §6.14)
+
+export const FONTES_MONTRA = { destaques: 'Destaques', catalogo: 'Temas do catálogo', ambos: 'Os dois, alternados' };
+export const MONTRA_PADRAO = { fonte: 'destaques', aCada: 5, duracao: 60, semInternet: true, semPublicidade: true, precos: true };
+export const MONTRA_A_CADA = [0, 3, 5, 10, 15];
+export const MONTRA_DURACOES = [30, 60, 90, 120];
+// os temas que a página inicial também não mostra como prateleira (CatalogShowcase)
+const TEMAS_FORA = new Set(['destaques', 'stock', 'catalogo']);
+
+/** A configuração da montra guardada nesta TV. */
+export function lerMontra(guardado) {
+  let v = {};
+  try {
+    v = typeof guardado === 'string' ? JSON.parse(guardado) : guardado || {};
+  } catch {
+    v = {};
+  }
+  const bool = (k) => (typeof v?.[k] === 'boolean' ? v[k] : MONTRA_PADRAO[k]);
+  return {
+    fonte: FONTES_MONTRA[v?.fonte] ? v.fonte : MONTRA_PADRAO.fonte,
+    aCada: MONTRA_A_CADA.includes(Number(v?.aCada)) ? Number(v.aCada) : MONTRA_PADRAO.aCada,
+    duracao: MONTRA_DURACOES.includes(Number(v?.duracao)) ? Number(v.duracao) : MONTRA_PADRAO.duracao,
+    semInternet: bool('semInternet'),
+    semPublicidade: bool('semPublicidade'),
+    precos: bool('precos'),
+  };
+}
+
+/** Um produto do site (EcommerceApi) como a montra o mostra; null sem capa. */
+export function livroDaMontra(p) {
+  if (!p?.image) return null;
+  const v = p.variants?.[0] || {};
+  return {
+    id: String(p.id),
+    titulo: String(p.title || ''),
+    autor: String(p.author || p.subtitle || ''),
+    capa: p.image,
+    preco: v.sale_price_formatted || v.price_formatted || '',
+    precoAntigo: p.on_sale && v.sale_price_formatted ? v.price_formatted || '' : '',
+    fita: p.ribbon_text || (p.featured ? 'Destaque' : ''),
+    promocao: !!p.on_sale,
+  };
+}
+
+/** Os temas do catálogo como na página inicial (sem os escondidos), cada um com os livros com capa. */
+export function temasDaMontra(categorias, max = 12) {
+  return (categorias || [])
+    .filter((c) => !TEMAS_FORA.has(c.id))
+    .map((c) => ({ id: c.id, titulo: c.title, livros: (c.books || []).map(livroDaMontra).filter(Boolean).slice(0, max) }))
+    .filter((t) => t.livros.length >= 3);
+}
+
+const SEG_ABERTURA = 4;
+const SEG_LIVRO = 7;
+const SEG_PRATELEIRA = 10;
+
+/**
+ * Os quadros de uma passagem da montra (`volta`: quantas já passaram, para cada uma mostrar outros livros), a
+ * somar `duracao` segundos: uma abertura, e livros um a um (os destaques) ou a prateleira de um tema e depois os
+ * livros dele. «ambos» alterna destaques e temas.
+ */
+export function quadrosDaMontra({ destaques = [], temas = [] }, fonte, volta = 0, duracao = 60) {
+  const usarTemas = temas.length > 0 && (fonte === 'catalogo' || (fonte === 'ambos' && volta % 2 === 1) || !destaques.length);
+  const roda = (lista, n, desde) => (lista.length ? Array.from({ length: Math.min(n, lista.length) }, (_, k) => lista[(desde + k) % lista.length]) : []);
+  if (usarTemas) {
+    const k = fonte === 'ambos' ? Math.floor(volta / 2) : volta;
+    const tema = temas[k % temas.length];
+    const n = Math.max(Math.floor((duracao - SEG_ABERTURA - SEG_PRATELEIRA) / SEG_LIVRO), 1);
+    const voltasDoTema = Math.floor(k / temas.length);
+    return [
+      { tipo: 'abertura', titulo: tema.titulo, subtitulo: 'Do nosso catálogo', s: SEG_ABERTURA },
+      { tipo: 'prateleira', titulo: tema.titulo, livros: roda(tema.livros, 5, voltasDoTema * 5), s: SEG_PRATELEIRA },
+      ...roda(tema.livros, n, voltasDoTema * n).map((livro) => ({ tipo: 'livro', livro, tema: tema.titulo, s: SEG_LIVRO })),
+    ];
+  }
+  if (!destaques.length) return [];
+  const n = Math.max(Math.floor((duracao - SEG_ABERTURA) / SEG_LIVRO), 1);
+  const k = fonte === 'ambos' ? Math.floor(volta / 2) : volta;
+  return [
+    { tipo: 'abertura', titulo: 'Destaques da semana', subtitulo: 'Na livraria e em livrariaadventista.ao', s: SEG_ABERTURA },
+    ...roda(destaques, n, k * n).map((livro) => ({ tipo: 'livro', livro, tema: 'Destaque', s: SEG_LIVRO })),
+  ];
+}
