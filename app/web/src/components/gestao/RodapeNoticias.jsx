@@ -24,7 +24,7 @@ export function useMensagensRodape() {
   return { lista, recarregar: carregar };
 }
 
-const TONS = { bom: '#34d399', mau: '#f87171', aviso: '#fbbf24', neutro: '#5fd4ee' };
+const TONS = { bom: '#34d399', mau: '#f87171', aviso: '#fbbf24', neutro: '#7fd3e6' };
 
 function HoraDeLuanda() {
   const [agora, setAgora] = useState(() => new Date());

@@ -7,11 +7,12 @@ import { MARCA } from '@/components/gestao/marca';
 
 // Cores com significado: verde atingida, âmbar a meta e atrás, vermelho abaixo; o azul e o ciano da marca.
 const VERDE = '#10b981';
-const AMBAR = '#f59e0b';
+const AMBAR = MARCA.ouro;
 const VERMELHO = '#ef4444';
 const CINZA = '#94a3b8';
 const CIANO = MARCA.ciano;
-const AZUL = MARCA.azul;
+// as barras de cada dia num petróleo claro; a linha do acumulado no petróleo da marca
+const AZUL = '#8fc3d1';
 
 const eixo = { fontSize: 11, fill: 'currentColor', opacity: 0.55 };
 
