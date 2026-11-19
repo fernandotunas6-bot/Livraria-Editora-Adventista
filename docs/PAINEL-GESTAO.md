@@ -176,6 +176,11 @@ Cola-se o endereço (youtube.com/watch, youtu.be ou shorts). O vídeo passa **at
 leitor do YouTube avisa o painel quando termina (`enablejsapi`). Um vídeo bloqueado pelo dono (sem incorporação) ou
 que não arranca em 20 s passa à frente. O único da lista repete. Os segundos só contam para as imagens.
 
+**Transições**: a peça seguinte entra por cima da anterior, com um esbater e um ligeiro zoom (0,9 s); a anterior só
+sai quando a nova já está a tocar (ou a imagem carregou), por isso não há cortes nem ecrã preto. As imagens têm um
+zoom lento (Ken Burns) durante o tempo delas; o título aparece em baixo, na serif da casa; uma barra fina em azul
+petróleo mostra o que falta. Com «reduzir movimento» no sistema, as trocas são simples.
+
 ## 7. Aspecto
 
 - A faixa de cima em azul-marinho com o **logótipo branco** e os arcos do logótipo em ciano; os cartões sobrepõem-se
