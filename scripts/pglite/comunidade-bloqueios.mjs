@@ -1,4 +1,4 @@
-// Bloquear na comunidade (migração 20261117130000_bloquear_na_comunidade), com as migrações reais:
+// Bloquear na comunidade (migração 20261119200000_bloquear_na_comunidade), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/comunidade-bloqueios.mjs supabase/migrations
 // Instruções em base.mjs. Cada pessoa só vê, junta e tira da sua lista; quem foi bloqueado não a vê;
 // sem sessão não se lê nada; apagar a conta apaga a lista.

@@ -1,4 +1,4 @@
-// Bloquear uma pessoa na comunidade (migração 20261117130000_bloquear_na_comunidade).
+// Bloquear uma pessoa na comunidade (migração 20261119200000_bloquear_na_comunidade).
 //
 // A regra 1.2 da App Store pede, para conteúdo publicado pelos utilizadores, que cada pessoa possa
 // bloquear quem abusa. Aqui guarda-se a lista de quem a conta bloqueou — pela chave pública de
