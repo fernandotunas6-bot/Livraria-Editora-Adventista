@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas, modoPagamento,
-  pedir, precoDoArtigo, processarFila, proximaTentativa, vendaDoDocumento, type Ligacao,
+  corpoNC, pedir, precoDoArtigo, processarFila, proximaTentativa, vendaDoDocumento, type Ligacao,
 } from "./kangest.ts";
 
 const CHAVE = `kg_${"a".repeat(48)}`;
@@ -99,6 +99,15 @@ describe("FR e pagamento", () => {
     expect(proximaTentativa(1, t0)).toBe("2026-11-19T10:01:00.000Z");
     expect(proximaTentativa(4, t0)).toBe("2026-11-19T10:08:00.000Z");
     expect(proximaTentativa(30, t0)).toBe("2026-11-19T16:00:00.000Z");
+  });
+});
+
+describe("nota de crédito (reembolso)", () => {
+  it("a partir da FR, com as linhas da NE sem preço e o motivo", () => {
+    expect(corpoNC(encomenda(), { id: 51 }, [{ referencia: "LIV-001", quantidade: 2, preco_com_iva: 570000 }, { referencia: "PORTES", quantidade: 1, preco_com_iva: 150000, descricao: "Portes de envio" }])).toEqual({
+      tipo: "NC", doc_origem_id: 51, referencia: "LIV-1001", motivo: "Reembolso da encomenda LIV-1001 na loja online",
+      linhas: [{ referencia: "LIV-001", quantidade: 2 }, { referencia: "PORTES", quantidade: 1, descricao: "Portes de envio" }],
+    });
   });
 });
 

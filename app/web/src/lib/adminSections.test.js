@@ -121,7 +121,8 @@ describe('searchSections', () => {
 
   it('entende as palavras que as pessoas usam para a mesma coisa', () => {
     expect(searchSections(nav, 'iban').map((i) => i.id)).toEqual(['payments']);
-    expect(searchSections(nav, 'faturação').map((i) => i.id)).toEqual(['vendas-huambo']);
+    // e o programa de facturação das livrarias (Ligação ao KanGest)
+    expect(searchSections(nav, 'faturação').map((i) => i.id)).toEqual(['vendas-huambo', 'kangest']);
     expect(searchSections(nav, 'senha').map((i) => i.id)).toEqual(['users']);
     expect(searchSections(nav, 'banner').map((i) => i.id)).toEqual(['slides', 'notices']);
   });
@@ -233,7 +234,7 @@ describe('permissões arrumadas pelas áreas do painel', () => {
     // «Stock da loja» abre só a disponibilidade (migração lojas_donas_dos_dados).
     expect(labels('manage_store_stock')).toEqual(['disponibilidade']);
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
-    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes', 'saude']);
+    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes', 'saude', 'kangest']);
     expect(labels('manage_settings')).not.toContain('apps');
     // Produção, funcionários e finanças (migrações funcionarios, producao e saidas).
     expect(labels('manage_production')).toEqual(['producao']);

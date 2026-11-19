@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import FacturaKanGest from '@/components/FacturaKanGest';
 import PayLaterBox from '@/components/PayLaterBox';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Helmet } from 'react-helmet';
@@ -209,6 +210,8 @@ export default function TrackOrderPage() {
                     rejectedReason={order.rejected_reason || ''}
                   />
                 )}
+                {/* A factura do KanGest e o QR da AGT, quando a encomenda já foi facturada (docs/KANGEST.md). */}
+                <FacturaKanGest factura={order.factura} notaCredito={order.nota_credito} />
                 <div className="bg-card border rounded-2xl p-6">
                   <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                     <div>
