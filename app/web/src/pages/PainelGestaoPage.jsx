@@ -106,8 +106,8 @@ export default function PainelGestaoPage({ embutido = false }) {
   }
   // a faixa azul do painel (com o logótipo) abre a página; o fundo leva um brilho da marca
   return (
-    <div className="min-h-screen bg-[#eef3f9] text-foreground dark:bg-background"
-      style={{ backgroundImage: 'radial-gradient(60rem 30rem at 100% 0%, rgba(14,165,200,0.10), transparent 60%)' }}>
+    <div className="min-h-screen bg-[#ffffff] text-foreground dark:bg-background"
+      style={{ backgroundImage: 'radial-gradient(60rem 30rem at 100% 0%, rgba(10,116,143,0.08), transparent 60%)' }}>
       <main className="mx-auto max-w-[1600px] px-3 pb-2 pt-3 sm:px-5">{painel}</main>
     </div>
   );

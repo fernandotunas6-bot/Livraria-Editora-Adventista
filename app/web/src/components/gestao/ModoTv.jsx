@@ -103,7 +103,7 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
       <div className="flex items-center gap-4 border-b border-white/10 px-5 py-2.5" style={{ background: `linear-gradient(90deg, ${MARCA.marinho}, ${MARCA.marinhoProfundo})` }}>
         <img src={MARCA.logoBranco} alt={MARCA.nome || nome} className="h-10 w-auto object-contain" />
         <span className="h-8 w-px bg-white/20" />
-        <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#5fd4ee]">Painel de Gestão</span>
+        <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#7fd3e6]">Painel de Gestão</span>
         {cfg.rodarLojas && roda.length > 1 && (
           <span className="flex gap-1">
             {roda.map((a, k) => (
