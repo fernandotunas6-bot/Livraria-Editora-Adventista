@@ -196,8 +196,8 @@ export function LeitorPublicidade({ midia, som = false, logo, nome }) {
       {!unica && (
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
           {atual.tipo === 'imagem'
-            ? <div key={`b-${chave}`} className="pub-barra h-full origin-left bg-[#0a748f]" style={{ animation: `pub-barra ${durImagem}s linear both` }} />
-            : <div className="h-full origin-left bg-[#0a748f] transition-transform duration-300 ease-linear" style={{ transform: `scaleX(${progresso})` }} />}
+            ? <div key={`b-${chave}`} className="pub-barra h-full origin-left bg-[#7fd3e6]" style={{ animation: `pub-barra ${durImagem}s linear both` }} />
+            : <div className="h-full origin-left bg-[#7fd3e6] transition-transform duration-300 ease-linear" style={{ transform: `scaleX(${progresso})` }} />}
         </div>
       )}
       {n > 1 && (

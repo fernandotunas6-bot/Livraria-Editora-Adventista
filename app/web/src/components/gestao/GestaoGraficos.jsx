@@ -100,7 +100,7 @@ export function GraficoMes({ dias, meta, diasMes, altura = 260 }) {
           isAnimationActive={false} />
         {m > 0 && (
           <ReferenceLine yAxisId="acum" y={m} stroke={AMBAR} strokeWidth={2} strokeDasharray="4 3"
-            label={{ value: `META ${fmtCompacto(m)}`, position: 'insideTopLeft', fontSize: 11, fontWeight: 700, fill: AMBAR }} />
+            label={{ value: `META ${fmtCompacto(m)}`, position: 'insideTopLeft', fontSize: 11, fontWeight: 700, fill: MARCA.ouroTexto }} />
         )}
       </ComposedChart>
     </ResponsiveContainer>

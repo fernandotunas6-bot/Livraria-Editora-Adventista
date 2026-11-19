@@ -24,7 +24,7 @@ export function useMensagensRodape() {
   return { lista, recarregar: carregar };
 }
 
-const TONS = { bom: '#34d399', mau: '#f87171', aviso: '#fbbf24', neutro: '#7fd3e6' };
+const TONS = { bom: '#34d399', mau: '#fca5a5', aviso: '#fbbf24', neutro: '#7fd3e6' };
 
 function HoraDeLuanda() {
   const [agora, setAgora] = useState(() => new Date());
@@ -88,7 +88,7 @@ export default function RodapeNoticias({ dados, fixo = false, tv = false, classN
         <span className="pointer-events-none absolute inset-y-0 left-0 w-8" style={{ background: `linear-gradient(90deg, ${MARCA.marinhoProfundo}, transparent)` }} />
         <span className="pointer-events-none absolute inset-y-0 right-0 w-8" style={{ background: `linear-gradient(270deg, ${MARCA.marinhoProfundo}, transparent)` }} />
       </div>
-      <div className="z-10 flex shrink-0 items-center px-4 font-mono font-black tabular-nums" style={{ background: MARCA.ciano, color: MARCA.marinhoProfundo }}>
+      <div className="z-10 flex shrink-0 items-center px-4 font-mono font-black tabular-nums text-white" style={{ background: MARCA.petroleo }}>
         <HoraDeLuanda />
       </div>
     </div>

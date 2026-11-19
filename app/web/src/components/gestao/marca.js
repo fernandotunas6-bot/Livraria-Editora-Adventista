@@ -18,6 +18,8 @@ export const MARCA = {
   ouroTexto: '#7a5716',
   tinta: '#1d2a3f',
   papel: '#fffdf8',
+  // ouro claro: texto pequeno sobre o petróleo (contraste acima de 4,5 na faixa escura)
+  ouroClaro: '#fcefc7',
   // os nomes por papel que os componentes usam (faixa, fundos escuros, barras, linhas)
   marinho: '#075a70',
   marinhoProfundo: '#05404f',

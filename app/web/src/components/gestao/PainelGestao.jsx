@@ -116,13 +116,13 @@ function Legenda({ itens }) {
 /** Os arcos do logótipo, a enfeitar a faixa (só decoração). */
 function Arcos() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 400 260" className="pointer-events-none absolute -right-10 -top-16 h-[22rem] w-auto opacity-[0.16]">
-      <g fill="none" stroke={MARCA.ciano} strokeLinecap="round">
+    <svg aria-hidden="true" viewBox="0 0 400 260" className="pointer-events-none absolute -right-10 -top-16 h-[22rem] w-auto opacity-[0.12]">
+      <g fill="none" stroke="#ffffff" strokeLinecap="round">
         <path d="M60 250 C 60 110, 170 20, 330 18" strokeWidth="14" />
         <path d="M105 250 C 105 135, 190 62, 330 58" strokeWidth="10" />
         <path d="M150 250 C 150 160, 215 102, 330 98" strokeWidth="7" />
       </g>
-      <g fill={MARCA.ciano}><circle cx="338" cy="18" r="9" /><circle cx="338" cy="58" r="7" /><circle cx="338" cy="98" r="5" /></g>
+      <g fill="#ffffff"><circle cx="338" cy="18" r="9" /><circle cx="338" cy="58" r="7" /><circle cx="338" cy="98" r="5" /></g>
     </svg>
   );
 }
@@ -146,7 +146,7 @@ function Relogio({ grande }) {
 function Estado({ estado, ultimo }) {
   if (estado === 'ao-vivo') {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold tracking-wider text-emerald-300 ring-1 ring-emerald-300/30">
+      <span className="inline-flex items-center gap-2 rounded-full bg-black/25 px-3 py-1 text-xs font-bold tracking-wider text-white ring-1 ring-emerald-300/50">
         <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" /></span>
         AO VIVO
       </span>
@@ -154,13 +154,13 @@ function Estado({ estado, ultimo }) {
   }
   if (estado === 'sem-ligacao') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-400/15 px-3 py-1 text-xs font-semibold text-red-200 ring-1 ring-red-300/30" title="Sem ligação: os números são os últimos que chegaram">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-xs font-semibold text-white ring-1 ring-red-300/60" title="Sem ligação: os números são os últimos que chegaram">
         <WifiOff className="h-3.5 w-3.5" /> Sem ligação{ultimo ? ` · ${horaDe(ultimo)}` : ''}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/70 ring-1 ring-white/15" title="Sem tempo real: actualiza de 30 em 30 segundos">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-white/20" title="Sem tempo real: actualiza de 30 em 30 segundos">
       <Clock className="h-3.5 w-3.5" /> de 30 em 30 s
     </span>
   );
@@ -193,7 +193,7 @@ function Heroi({ dados, titulo, alvo, canal, onFiltros, estado, tv, acoes, extra
         {!tv && <img src={MARCA.logoBranco} alt={MARCA.nome} className="h-10 w-auto object-contain sm:h-12" />}
         {!tv && <span className="hidden h-10 w-px bg-white/20 sm:block" />}
         <div className="mr-auto min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7fd3e6]">Painel de Gestão</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#fcefc7]">Painel de Gestão</p>
           <h2 className={cn('truncate font-serif font-semibold tracking-tight', tv ? 'text-4xl' : 'text-3xl sm:text-4xl')}>{titulo}</h2>
           <p className="text-xs text-white/60">
             {MESES[dados.mes - 1]} de {dados.ano} · dia {dados.dia} de {dados.dias_mes}
@@ -276,7 +276,7 @@ function Fita({ ultimas, alvos, tv }) {
         <span className="font-mono text-[#7fd3e6]">{horaDe(u.quando)}</span>
         <span className="h-2 w-2 rounded-full" style={{ background: corDaLoja(u.alvo, alvos) }} />
         <span className="font-bold uppercase tracking-wide text-white">{nomeCurto(u.alvo, u.loja)}</span>
-        <span className={cn('font-mono font-bold tabular-nums', neg ? 'text-red-400' : 'text-emerald-400')}>
+        <span className={cn('font-mono font-bold tabular-nums', neg ? 'text-red-300' : 'text-emerald-400')}>
           {neg ? '▼' : '▲'} {fmtKz(Math.abs(Number(u.total)))}
         </span>
         {u.artigo && <span className="text-white/55">{u.artigo}{Number(u.quantidade) > 1 ? ` ×${Number(u.quantidade)}` : ''}{u.artigos > 1 ? ` +${u.artigos - 1}` : ''}</span>}
@@ -292,7 +292,7 @@ function Fita({ ultimas, alvos, tv }) {
         .painel-fita{animation:painel-fita ${Math.max(lista.length * 4, 30)}s linear infinite}
         .group:hover .painel-fita{animation-play-state:paused}
         @media (prefers-reduced-motion: reduce){.painel-fita{animation:none}}`}</style>
-      <span className="z-10 flex shrink-0 items-center gap-2 px-4 text-[11px] font-black uppercase tracking-[0.2em] text-[#05404f]" style={{ background: MARCA.ciano }}>
+      <span className="z-10 flex shrink-0 items-center gap-2 px-4 text-[11px] font-black uppercase tracking-[0.2em]" style={{ background: '#ffffff', color: MARCA.marinho }}>
         <TrendingUp className="h-4 w-4" />Vendas
       </span>
       <div className="relative min-w-0 flex-1 overflow-hidden py-2.5">
@@ -649,7 +649,7 @@ export function BotoesPainel({ onMetas, onPublicidade, onTv }) {
     <div className="flex flex-wrap gap-2">
       {onMetas && <Button size="sm" variant="outline" className={claro} onClick={onMetas}><Target className="mr-1.5 h-4 w-4" />Metas</Button>}
       {onPublicidade && <Button size="sm" variant="outline" className={claro} onClick={onPublicidade}><Megaphone className="mr-1.5 h-4 w-4" />Publicidade e rodapé</Button>}
-      {onTv && <Button size="sm" className="bg-[#0a748f] font-semibold text-[#05404f] hover:bg-[#0d8aa8]" onClick={onTv}><MonitorPlay className="mr-1.5 h-4 w-4" />Modo TV</Button>}
+      {onTv && <Button size="sm" className="bg-white font-semibold text-[#075a70] shadow hover:bg-white/90" onClick={onTv}><MonitorPlay className="mr-1.5 h-4 w-4" />Modo TV</Button>}
     </div>
   );
 }
