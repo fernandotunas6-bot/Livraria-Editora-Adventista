@@ -126,6 +126,21 @@ comment on table public.vendas_ao_vivo is
   'Uma linha por venda: balcão (avisos documento.emitido do KanGest, pela Edge Function) e online (encomendas pagas, '
   'pelo gatilho orders_venda_ao_vivo). Lê-se pelo painel_gestao(). docs/PAINEL-GESTAO.md';
 
+-- Um número escrito em texto, ou 0: as encomendas antigas (do tempo do PocketBase) podem ter preços e quantidades
+-- noutro formato, e uma só não pode parar a migração nem um pagamento.
+create or replace function private.num_ou_zero(p text)
+returns numeric
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  return coalesce(nullif(btrim(p), '')::numeric, 0);
+exception when others then
+  return 0;
+end;
+$$;
+
 -- Os artigos de uma encomenda, no formato das vendas ao vivo (a chave é a referência do KanGest, quando o
 -- produto a tem: as vendas do balcão e do site do mesmo livro juntam-se nos mais vendidos).
 create or replace function private.itens_da_encomenda(p_items jsonb)
@@ -140,8 +155,8 @@ as $$
            'referencia', coalesce(b.kigest_ref, ''),
            'book_id', it ->> 'book_id',
            'titulo', coalesce(nullif(it ->> 'title', ''), b.title, ''),
-           'quantidade', greatest(coalesce((it ->> 'quantity')::numeric, 0), 0),
-           'total', round(coalesce((it ->> 'price')::numeric, 0) * greatest(coalesce((it ->> 'quantity')::numeric, 0), 0), 2))), '[]'::jsonb)
+           'quantidade', greatest(private.num_ou_zero(it ->> 'quantity'), 0),
+           'total', round(private.num_ou_zero(it ->> 'price') * greatest(private.num_ou_zero(it ->> 'quantity'), 0), 2))), '[]'::jsonb)
   from jsonb_array_elements(case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end) it
   left join public.stock_books b on b.id = it ->> 'book_id';
 $$;

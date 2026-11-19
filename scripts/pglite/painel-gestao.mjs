@@ -67,6 +67,10 @@ const online = await q(`select alvo, canal, total::float8 total, itens from publ
 check('encomenda paga: venda online sem os portes', online.length === 1 && online[0].alvo === 'online' && online[0].total === 5700, online);
 check('o livro do site junta-se ao do balcão pela referência', online[0]?.itens?.[0]?.chave === 'LIV-001', online[0]?.itens);
 
+// encomenda antiga com o preço em texto estragado: conta 0, não rebenta
+check('preço estragado numa encomenda antiga conta 0', (await q(`select private.itens_da_encomenda('[{"book_id":"x","title":"Velho","quantity":"2","price":"5.700,00 Kz"}]'::jsonb) i`))[0].i[0].total === 0);
+check('quantidade em texto lê-se', (await q(`select private.itens_da_encomenda('[{"book_id":"x","quantity":"3","price":10}]'::jsonb) i`))[0].i[0].quantidade === 3);
+
 // --- quem vê o quê -----------------------------------------------------------------------------------------------
 await recusa('cliente não abre o painel', () => painel(cliente), /Sem permissão/);
 const pa = await painel(admin);
