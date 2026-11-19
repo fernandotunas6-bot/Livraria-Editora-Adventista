@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { LAYOUTS_TV, lerTv, nomeCurto, rodaDeLojas } from '@/lib/painelGestao';
+import { LAYOUTS_TV, lerTv, nomeCurto, rodaDeLojas, TRANSICOES } from '@/lib/painelGestao';
 import PainelGestao from '@/components/gestao/PainelGestao';
 import { LeitorPublicidade, useMidiaTv } from '@/components/gestao/PublicidadeTv';
 import RodapeNoticias from '@/components/gestao/RodapeNoticias';
@@ -140,6 +140,25 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
                   <Button size="sm" variant="outline" onClick={() => mudar({ lado: cfg.lado === 'esquerda' ? 'direita' : 'esquerda' })}>Trocar</Button>
                 </div>
               )}
+              {pub > 0 && (
+                <>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Transição da publicidade</p>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(TRANSICOES).map(([id, rot]) => (
+                        <button key={id} type="button" onClick={() => mudar({ transicao: id })}
+                          className={cn('rounded-md px-2 py-1 text-xs', cfg.transicao === id ? 'bg-white font-semibold text-[#075a70]' : 'bg-white/10 text-white/80 hover:bg-white/20')}>
+                          {rot}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <label className="flex items-center justify-between gap-2">
+                    <span>Vinhetas entre os anúncios</span>
+                    <Switch checked={cfg.vinhetas} onCheckedChange={(v) => mudar({ vinhetas: v })} />
+                  </label>
+                </>
+              )}
               <label className="flex items-center justify-between gap-2">
                 <span>Rodar entre a empresa e cada loja</span>
                 <Switch checked={cfg.rodarLojas} onCheckedChange={(v) => mudar({ rodarLojas: v })} />
@@ -164,7 +183,7 @@ export default function ModoTv({ canal = '', alvoInicial = '', onSair, logo, nom
         {pub > 0 && (
           <div className="h-full shrink-0 p-3" style={{ width: `${pub}%` }}>
             <div className="h-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-              <LeitorPublicidade midia={midia} som={cfg.som} logo={MARCA.logoBranco || logo} nome={nome} />
+              <LeitorPublicidade midia={midia} som={cfg.som} logo={MARCA.logoBranco || logo} nome={nome} transicao={cfg.transicao} vinhetas={cfg.vinhetas} />
             </div>
           </div>
         )}
