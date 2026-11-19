@@ -173,5 +173,17 @@ await recusa('mensagem vazia', () => como(admin, `insert into public.painel_roda
 check('o gerente lê o rodapé', (await como(gerente, `select texto from public.painel_rodape`)).length === 1);
 check('o cliente não lê o rodapé', (await como(cliente, `select texto from public.painel_rodape`)).length === 0);
 
+// --- TV avançada: vinhetas, imagem nas mensagens, ficheiros da TV -------------------------------------------------------
+await como(admin, `insert into public.painel_tv_midia (tipo, url, titulo, papel) values ('video', 'https://x.supabase.co/storage/v1/object/public/painel-tv/vinhetas/a.mp4', 'Vinheta', 'vinheta')`);
+check('a publicidade é anúncio por omissão', (await q(`select count(*)::int n from public.painel_tv_midia where papel = 'publicidade'`))[0].n >= 1);
+await recusa('papel inventado', () => como(admin, `insert into public.painel_tv_midia (tipo, url, papel) values ('video', 'https://x/a.mp4', 'outro')`), /check/);
+await como(admin, `insert into public.painel_rodape (texto, imagem) values ('Feira do livro no sábado', 'https://x.supabase.co/storage/v1/object/public/painel-tv/rodape/cartaz.jpg')`);
+await recusa('imagem da mensagem só https', () => como(admin, `insert into public.painel_rodape (texto, imagem) values ('outra mensagem', 'http://x/a.jpg')`), /check/);
+const balde = (await q(`select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'painel-tv'`))[0];
+check('bucket painel-tv público, 100 MB, vídeos e imagens', balde?.public === true && Number(balde.file_size_limit) === 104857600 && balde.allowed_mime_types.includes('video/mp4'), balde);
+await como(admin, `insert into storage.objects (bucket_id, name) values ('painel-tv', 'publicidade/promo.mp4')`);
+await recusa('cliente não envia ficheiros da TV', () => como(cliente, `insert into storage.objects (bucket_id, name) values ('painel-tv', 'publicidade/x.mp4')`), /row-level security|permission/);
+await recusa('gerente de loja não envia ficheiros da TV', () => como(gerente, `insert into storage.objects (bucket_id, name) values ('painel-tv', 'publicidade/y.mp4')`), /row-level security|permission/);
+
 console.log(`painel-gestao: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

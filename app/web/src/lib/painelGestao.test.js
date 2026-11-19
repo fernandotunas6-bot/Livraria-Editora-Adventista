@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   escreverFiltros, estadoMeta, fmtCompacto, fmtKz, horaDe, lerFiltros, lerTv, mensagensDeHoje, nomeCurto, noticias, playlist,
-  proximo, rodaDeLojas, tipoDoUrl, variacao, youtubeEmbed, estadoYoutube,
+  proximo, rodaDeLojas, tipoDoUrl, variacao, youtubeEmbed, estadoYoutube, estiloDaPassagem, livrosParaRodape, sequenciaTv,
 } from '@/lib/painelGestao';
 
 describe('formatos', () => {
@@ -57,9 +57,10 @@ describe('lojas e filtros', () => {
 
 describe('modo TV', () => {
   it('a configuração deste aparelho, com valores seguros', () => {
-    expect(lerTv(null)).toEqual({ layout: '40-60', lado: 'esquerda', rodarLojas: true, som: false, segundosPorLoja: 30 });
-    expect(lerTv('{"layout":"50-50","lado":"direita","rodarLojas":false,"som":true,"segundosPorLoja":5}'))
-      .toEqual({ layout: '50-50', lado: 'direita', rodarLojas: false, som: true, segundosPorLoja: 10 });
+    expect(lerTv(null)).toEqual({ layout: '40-60', lado: 'esquerda', rodarLojas: true, som: false, segundosPorLoja: 30, transicao: 'esbater', vinhetas: true });
+    expect(lerTv('{"layout":"50-50","lado":"direita","rodarLojas":false,"som":true,"segundosPorLoja":5,"transicao":"cortina","vinhetas":false}'))
+      .toEqual({ layout: '50-50', lado: 'direita', rodarLojas: false, som: true, segundosPorLoja: 10, transicao: 'cortina', vinhetas: false });
+    expect(lerTv('{"transicao":"inventada"}').transicao).toBe('esbater');
     expect(lerTv('{estragado').layout).toBe('40-60');
     expect(lerTv({ layout: 'inventado' }).layout).toBe('40-60');
   });
@@ -100,7 +101,7 @@ describe('rodapé (notícias)', () => {
   };
   it('as mensagens da direcção primeiro, depois os números', () => {
     const n = noticias(dados, [{ texto: 'Bíblias com 20 % esta semana' }]);
-    expect(n[0]).toEqual({ etiqueta: 'AVISO', texto: 'Bíblias com 20 % esta semana', tom: 'aviso' });
+    expect(n[0]).toMatchObject({ etiqueta: 'AVISO', texto: 'Bíblias com 20 % esta semana', tom: 'aviso' });
     expect(n.map((x) => x.etiqueta)).toEqual(['AVISO', 'HOJE', 'META', 'PROJECÇÃO', 'LIDERA', 'HUAMBO', 'LOJA ONLINE', 'MAIS VENDIDO HOJE', 'ÚLTIMA VENDA']);
   });
   it('hoje com a variação, a meta com o que falta, quem lidera', () => {
@@ -137,5 +138,44 @@ describe('fim dos vídeos do YouTube', () => {
     expect(estadoYoutube('{"event":"infoDelivery","info":{"currentTime":3}}')).toBeNull();
     expect(estadoYoutube('não é json')).toBeNull();
     expect(estadoYoutube(null)).toBeNull();
+  });
+});
+
+describe('TV avançada', () => {
+  const m = (id, papel = 'publicidade', ordem = id) => ({ id, ordem, papel, url: `https://x/${id}.mp4` });
+  it('uma vinheta depois de cada anúncio, a rodar entre as vinhetas', () => {
+    expect(sequenciaTv([m(1), m(2), m(3), m(8, 'vinheta'), m(9, 'vinheta')]).map((x) => x.id)).toEqual([1, 8, 2, 9, 3, 8]);
+    expect(sequenciaTv([m(1), m(2), m(8, 'vinheta')], { vinhetas: false }).map((x) => x.id)).toEqual([1, 2]);
+    expect(sequenciaTv([m(1), m(2)]).map((x) => x.id)).toEqual([1, 2]);
+    expect(sequenciaTv([m(8, 'vinheta')]).map((x) => x.id)).toEqual([8]);
+  });
+  it('a transição de cada passagem: a escolhida, ou a rodar na aleatória', () => {
+    expect(estiloDaPassagem('cortina', 7)).toBe('cortina');
+    expect([0, 1, 2, 3, 4].map((k) => estiloDaPassagem('aleatoria', k))).toEqual(['esbater', 'deslizar', 'zoom', 'cortina', 'esbater']);
+    expect(estiloDaPassagem('inventada', 1)).toBe('esbater');
+  });
+});
+
+describe('livros no rodapé', () => {
+  const agora = new Date('2026-11-19T12:00:00Z');
+  const livros = [
+    { title: 'Promoção válida', price: 9000, sale_price: 7000, sale_ends_at: '2026-11-30T00:00:00Z', stock: 3, cover_image: 'https://x/a.jpg', created: '2026-01-01' },
+    { title: 'Promoção acabada', price: 9000, sale_price: 7000, sale_ends_at: '2026-11-01T00:00:00Z', stock: 3, created: '2026-11-18' },
+    { title: 'Novo', author: 'Ellen G. White', price: 5700, stock: 2, cover: 'https://x/b.jpg', created: '2026-11-17' },
+    { title: 'Esgotado', price: 100, stock: 0, created: '2026-11-19' },
+    { title: 'Oculto', price: 100, stock: 9, active: false, created: '2026-11-19' },
+  ];
+  it('promoções em vigor e novidades com stock, com a capa', () => {
+    const r = livrosParaRodape(livros, agora);
+    expect(r.promocoes).toEqual([{ titulo: 'Promoção válida', preco: 9000, promocao: 7000, capa: 'https://x/a.jpg' }]);
+    expect(r.novidades.map((x) => x.titulo)).toEqual(['Promoção acabada', 'Novo']);
+    expect(r.novidades[1]).toMatchObject({ autor: 'Ellen G. White', capa: 'https://x/b.jpg' });
+  });
+  it('no rodapé: promoção e novidade com a capa; a mensagem com a sua imagem', () => {
+    const d = { mes: 11, resumo: { hoje: 0, hoje_vendas: 0, mes: 0 }, lojas: [], ultimas: [], mais_vendidos_hoje: [] };
+    const n = noticias(d, [{ texto: 'Feira do livro no sábado', imagem: 'https://x/cartaz.jpg' }], livrosParaRodape(livros, agora));
+    expect(n[0]).toMatchObject({ etiqueta: 'AVISO', imagem: 'https://x/cartaz.jpg', forma: 'quadrada' });
+    expect(n.find((x) => x.etiqueta === 'PROMOÇÃO')).toMatchObject({ texto: 'Promoção válida — de 9 000 Kz por 7 000 Kz', imagem: 'https://x/a.jpg', forma: 'capa' });
+    expect(n.find((x) => x.etiqueta === 'NOVIDADE' && x.texto.startsWith('Novo')).texto).toBe('Novo · Ellen G. White · 5 700 Kz');
   });
 });

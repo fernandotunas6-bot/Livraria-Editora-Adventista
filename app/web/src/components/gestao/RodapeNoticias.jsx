@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { subscribeSignal } from '@/lib/realtimeSignals';
 import { cn } from '@/lib/utils';
-import { mensagensDeHoje, noticias } from '@/lib/painelGestao';
+import { livrosParaRodape, mensagensDeHoje, noticias } from '@/lib/painelGestao';
 import { MARCA } from '@/components/gestao/marca';
 
 /** As mensagens da direcção para o rodapé (public.painel_rodape); chegam logo pelo sinal «rodape». */
@@ -24,6 +24,29 @@ export function useMensagensRodape() {
   return { lista, recarregar: carregar };
 }
 
+/**
+ * Os livros das livrarias para o rodapé: as promoções em vigor e as novidades com stock, do catálogo do site
+ * (stock_books, a leitura pública). Volta a ler de 10 em 10 minutos.
+ */
+export function useLivrosRodape() {
+  const [livros, setLivros] = useState({ promocoes: [], novidades: [] });
+  const carregar = useCallback(async () => {
+    const campos = 'title, author, price, sale_price, sale_starts_at, sale_ends_at, stock, cover_image, cover, created, active';
+    const [promo, novos] = await Promise.all([
+      supabase.from('stock_books').select(campos).eq('active', true).not('sale_price', 'is', null).limit(40),
+      supabase.from('stock_books').select(campos).eq('active', true).gt('stock', 0).order('created', { ascending: false }).limit(12),
+    ]);
+    const todos = [...(promo.data || []), ...(novos.data || [])];
+    setLivros(livrosParaRodape(todos));
+  }, []);
+  useEffect(() => {
+    carregar();
+    const t = setInterval(carregar, 600_000);
+    return () => clearInterval(t);
+  }, [carregar]);
+  return livros;
+}
+
 const TONS = { bom: '#34d399', mau: '#fca5a5', aviso: '#fbbf24', neutro: '#7fd3e6' };
 
 function HoraDeLuanda() {
@@ -41,14 +64,20 @@ function HoraDeLuanda() {
  */
 export default function RodapeNoticias({ dados, fixo = false, tv = false, className }) {
   const { lista } = useMensagensRodape();
+  const livros = useLivrosRodape();
   const hoje = String(dados?.agora || '').slice(0, 10);
-  const itens = noticias(dados, mensagensDeHoje(lista, hoje));
+  const itens = noticias(dados, mensagensDeHoje(lista, hoje), livros);
   if (!itens.length) return null;
   // velocidade de leitura constante, por muito ou pouco texto que haja
   const letras = itens.reduce((s, n) => s + n.texto.length + n.etiqueta.length + 6, 0);
   const duracao = Math.max(Math.round(letras * (tv ? 0.2 : 0.17)), 25);
   const conteudo = itens.map((n, i) => (
     <span key={i} className="mx-5 inline-flex items-center gap-3 whitespace-nowrap">
+      {n.imagem && (
+        // a capa do livro (ou a imagem da mensagem), pequena, ao lado da notícia
+        <img src={n.imagem} alt="" loading="lazy"
+          className={cn('shrink-0 object-cover shadow ring-1 ring-white/25', n.forma === 'capa' ? (tv ? 'h-11 w-8 rounded' : 'h-8 w-6 rounded-sm') : (tv ? 'h-10 w-10 rounded-lg' : 'h-7 w-7 rounded-md'))} />
+      )}
       <span className="rounded-md px-2 py-0.5 text-[0.72em] font-black tracking-[0.12em]" style={{ background: TONS[n.tom] || TONS.neutro, color: MARCA.marinhoProfundo }}>
         {n.etiqueta}
       </span>

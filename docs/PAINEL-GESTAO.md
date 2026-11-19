@@ -171,6 +171,19 @@ As notícias saem dos números (hoje contra a semana passada, a meta e o que fal
 lidera, cada loja hoje, o mais vendido, a última venda); as **mensagens da direcção** vêm primeiro — em
 **Publicidade e rodapé → Mensagens do rodapé** (`painel_rodape`), com um «até ao dia» opcional, e chegam às TVs logo.
 
+**Os livros das livrarias no rodapé**: as **promoções** em vigor («de 9 000 Kz por 7 000 Kz») e as **novidades** com
+stock, do catálogo do site, cada uma com a **capa** pequena; o mais vendido de hoje também leva a capa. As mensagens
+da direcção podem levar uma **imagem pequena** (um cartaz, um logótipo), carregada do computador.
+
+### 6.12 TV avançada: carregar vídeos, vinhetas e transições
+- **Carregar do computador**: um ou vários vídeos (MP4, WebM, MOV) e imagens de uma vez, até 100 MB cada, para o
+  bucket público `painel-tv` (só envia quem tem «Configurações» ou «Editar relatórios»).
+- **Vinhetas**: vídeos curtos da marca marcados como vinheta passam **entre os anúncios** (anúncio → vinheta →
+  anúncio…), como nos canais de televisão. Marca-se ao carregar ou na lista (Anúncio / Vinheta); cada TV pode
+  desligá-las (⚙).
+- **Transições** (⚙ em cada TV): esbater, deslizar (o anterior sai para o lado), zoom, cortina, ou aleatória (uma
+  diferente a cada passagem).
+
 ### 6.11 YouTube na publicidade
 Cola-se o endereço (youtube.com/watch, youtu.be ou shorts). O vídeo passa **até ao fim** e depois vem o seguinte: o
 leitor do YouTube avisa o painel quando termina (`enablejsapi`). Um vídeo bloqueado pelo dono (sem incorporação) ou

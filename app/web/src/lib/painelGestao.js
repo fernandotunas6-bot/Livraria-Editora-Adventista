@@ -105,7 +105,22 @@ export const LAYOUTS_TV = {
   '30-70': { rotulo: 'Publicidade 30 % · painel 70 %', publicidade: 30 },
 };
 
-export const TV_PADRAO = { layout: '40-60', lado: 'esquerda', rodarLojas: true, som: false, segundosPorLoja: 30 };
+export const TV_PADRAO = { layout: '40-60', lado: 'esquerda', rodarLojas: true, som: false, segundosPorLoja: 30, transicao: 'esbater', vinhetas: true };
+
+/** As transições entre as peças da publicidade (a «aleatória» escolhe uma diferente a cada passagem). */
+export const TRANSICOES = {
+  esbater: 'Esbater',
+  deslizar: 'Deslizar',
+  zoom: 'Zoom',
+  cortina: 'Cortina',
+  aleatoria: 'Aleatória',
+};
+const ESTILOS = ['esbater', 'deslizar', 'zoom', 'cortina'];
+
+/** O estilo de uma passagem: o escolhido, ou um diferente a cada passagem na «aleatória». */
+export const estiloDaPassagem = (transicao, passagem) => (transicao === 'aleatoria'
+  ? ESTILOS[Math.abs(Number(passagem) || 0) % ESTILOS.length]
+  : (ESTILOS.includes(transicao) ? transicao : 'esbater'));
 
 /** A configuração da TV guardada neste aparelho (cada televisão tem a sua). */
 export function lerTv(guardado) {
@@ -121,12 +136,27 @@ export function lerTv(guardado) {
     rodarLojas: typeof v.rodarLojas === 'boolean' ? v.rodarLojas : TV_PADRAO.rodarLojas,
     som: v.som === true,
     segundosPorLoja: Math.min(Math.max(Number(v.segundosPorLoja) || TV_PADRAO.segundosPorLoja, 10), 600),
+    transicao: TRANSICOES[v.transicao] ? v.transicao : TV_PADRAO.transicao,
+    vinhetas: typeof v.vinhetas === 'boolean' ? v.vinhetas : TV_PADRAO.vinhetas,
   };
 }
 
 /** A publicidade activa, pela ordem. */
 export const playlist = (midia) => (midia || []).filter((m) => m && m.activo !== false && /^https:\/\//.test(m.url || ''))
   .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || (a.id ?? 0) - (b.id ?? 0));
+
+/**
+ * A sequência da TV: os anúncios pela ordem, com uma vinheta (a rodar entre as que houver) depois de cada um — como
+ * nos canais de televisão. Sem vinhetas (ou desligadas), só os anúncios; só vinhetas, passam elas.
+ */
+export function sequenciaTv(midia, { vinhetas = true } = {}) {
+  const lista = playlist(midia);
+  const anuncios = lista.filter((m) => m.papel !== 'vinheta');
+  const vin = lista.filter((m) => m.papel === 'vinheta');
+  if (!anuncios.length) return vin;
+  if (!vinhetas || !vin.length) return anuncios;
+  return anuncios.flatMap((m, k) => [m, vin[k % vin.length]]);
+}
 
 /** O índice seguinte, em ciclo. */
 export const proximo = (i, n) => (n > 0 ? (i + 1) % n : 0);
@@ -187,12 +217,12 @@ const pctTexto = (v) => `${Math.round(Number(v) || 0)} %`;
  * As notícias do rodapé, a partir dos números do painel e das mensagens da direcção (que vêm primeiro).
  * Cada uma: { etiqueta, texto, tom } — tom 'bom' (verde), 'mau' (vermelho), 'aviso' (âmbar) ou 'neutro'.
  */
-export function noticias(d, mensagens = []) {
+export function noticias(d, mensagens = [], livros = {}) {
   if (!d) return [];
   const r = d.resumo || {};
   const mes = MESES[(d.mes || 1) - 1];
   const out = (mensagens || []).filter((m) => m && String(m.texto || '').trim())
-    .map((m) => ({ etiqueta: 'AVISO', texto: String(m.texto).trim(), tom: 'aviso' }));
+    .map((m) => ({ etiqueta: 'AVISO', texto: String(m.texto).trim(), tom: 'aviso', imagem: m.imagem || undefined, forma: 'quadrada' }));
 
   const v = variacao(r.hoje, r.semana_passada);
   out.push({
@@ -234,7 +264,14 @@ export function noticias(d, mensagens = []) {
     });
   }
   const top = (d.mais_vendidos_hoje || [])[0];
-  if (top) out.push({ etiqueta: 'MAIS VENDIDO HOJE', texto: `${top.titulo} (${Number(top.quantidade)} un.)`, tom: 'neutro' });
+  if (top) out.push({ etiqueta: 'MAIS VENDIDO HOJE', texto: `${top.titulo} (${Number(top.quantidade)} un.)`, tom: 'neutro', imagem: top.capa || undefined, forma: 'capa' });
+  // os livros das livrarias: as promoções em vigor e as novidades do catálogo, com a capa
+  for (const l of livros?.promocoes || []) {
+    out.push({ etiqueta: 'PROMOÇÃO', texto: `${l.titulo} — de ${fmtKz(l.preco)} por ${fmtKz(l.promocao)}`, tom: 'aviso', imagem: l.capa || undefined, forma: 'capa' });
+  }
+  for (const l of livros?.novidades || []) {
+    out.push({ etiqueta: 'NOVIDADE', texto: `${l.titulo}${l.autor ? ` · ${l.autor}` : ''} · ${fmtKz(l.preco)}`, tom: 'neutro', imagem: l.capa || undefined, forma: 'capa' });
+  }
   const u = (d.ultimas || []).find((x) => !x.anulado);
   if (u) {
     out.push({
@@ -250,3 +287,23 @@ export function noticias(d, mensagens = []) {
 export const mensagensDeHoje = (lista, hoje) => (lista || [])
   .filter((m) => m && m.activo !== false && (!m.ate || String(m.ate) >= String(hoje)))
   .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || (a.id ?? 0) - (b.id ?? 0));
+
+
+/**
+ * Os livros para o rodapé, a partir do catálogo (stock_books): as promoções em vigor (preço promocional abaixo do
+ * normal e dentro das datas) e as novidades com stock, até `max` de cada.
+ */
+export function livrosParaRodape(livros, agora = new Date(), max = 6) {
+  const t = agora.getTime();
+  const capa = (b) => b.cover_image || b.cover || '';
+  const emPromocao = (b) => Number(b.sale_price) > 0 && Number(b.sale_price) < Number(b.price)
+    && (!b.sale_starts_at || new Date(b.sale_starts_at).getTime() <= t) && (!b.sale_ends_at || new Date(b.sale_ends_at).getTime() > t);
+  const ativos = (livros || []).filter((b) => b && b.active !== false && String(b.title || '').trim());
+  const promocoes = ativos.filter(emPromocao).slice(0, max)
+    .map((b) => ({ titulo: b.title.trim(), preco: Number(b.price), promocao: Number(b.sale_price), capa: capa(b) }));
+  const jaEmPromocao = new Set(promocoes.map((p) => p.titulo));
+  const novidades = ativos.filter((b) => Number(b.stock) > 0 && !jaEmPromocao.has(b.title.trim()))
+    .sort((a, b) => String(b.created || '').localeCompare(String(a.created || ''))).slice(0, max)
+    .map((b) => ({ titulo: b.title.trim(), autor: String(b.author || '').trim(), preco: Number(b.price), capa: capa(b) }));
+  return { promocoes, novidades };
+}
