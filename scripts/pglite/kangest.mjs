@@ -118,5 +118,48 @@ const vendas = await como('authenticated', admin, `select store_id, mes, total::
 check('vendas ao balcão por loja e mês', vendas.length === 2 && vendas[0].total === 1000, vendas);
 check('membro sem permissão não lê kangest_vendas', (await como('authenticated', membro, `select * from public.kangest_vendas`)).length === 0);
 
+// --- a fila reserva cada documento (o agendador e o «Sincronizar já» não o emitem os dois) -------------------
+await recusa('kangest_reservar: só o servidor', () => como('authenticated', admin, `select * from public.kangest_reservar(5)`), /permission denied/);
+const o5 = await encomenda('LIV-0006', [{ book_id: livro.id, quantity: 1, price: 5700 }]);
+const reserva = await q(`select id, order_id, accao, estado from public.kangest_reservar(100)`);
+check('reservar: devolve o pendente já marcado «processando»', reserva.some((r) => r.order_id === o5 && r.accao === 'ne' && r.estado === 'processando'), reserva);
+check('reservar outra vez: o que está reservado não sai em dobro', (await q(`select id from public.kangest_reservar(100)`)).length === 0);
+await q(`select public.kangest_recalcular_stock('LIV-001')`);
+check('em emissão continua a descontar no stock do site (8 − 1)', await stock(livro.id) === 7, await stock(livro.id));
+await q(`update public.kangest_fila set actualizado = now() - interval '11 minutes' where order_id = $1`, [o5]);
+const presa = await q(`select order_id from public.kangest_reservar(100)`);
+check('reservado há mais de 10 minutos (a função caiu): volta a sair', presa.length === 1 && presa[0].order_id === o5, presa);
+const o6 = await encomenda('LIV-0007', [{ book_id: livro.id, quantity: 1, price: 5700 }]);
+await q(`update public.kangest_fila set proxima = now() + interval '1 hour' where order_id = $1`, [o6]);
+check('pendente para mais tarde: não sai antes da hora', (await q(`select id from public.kangest_reservar(100)`)).length === 0);
+
+// cancelada enquanto a NE estava a sair: a NE fica e, quando chega ao KanGest, anula-se
+await q(`update public.orders set status = 'cancelled' where id = $1`, [o5]);
+check('cancelada durante a emissão: a NE em curso fica', (await fila(o5)).map((f) => `${f.accao}:${f.estado}`).join() === 'ne:processando', await fila(o5));
+await q(`update public.kangest_fila set estado = 'feito', resultado = '{"id": 70}'::jsonb where order_id = $1`, [o5]);
+check('a NE chegou depois de cancelada: anulação na fila', (await fila(o5)).map((f) => `${f.accao}:${f.estado}`).join() === 'ne:feito,anular:pendente', await fila(o5));
+
+// reembolsada enquanto a FR estava a sair: quando chega, a nota de crédito vai para a fila
+const o7 = await encomenda('LIV-0008', [{ book_id: livro.id, quantity: 1, price: 5700 }]);
+await pagar(o7);
+await q(`update public.kangest_fila set estado = 'feito', resultado = '{"id": 80}'::jsonb where order_id = $1 and accao = 'ne'`, [o7]);
+await q(`update public.kangest_fila set estado = 'processando' where order_id = $1 and accao = 'fr'`, [o7]);
+await db.transaction(async (tx) => {
+  await tx.query(`select set_config('app.payment_sync', 'on', true)`);
+  await tx.query(`update public.orders set amount_refunded = amount_paid, payment_status = payment_status where id = $1`, [o7]);
+});
+check('reembolsada durante a FR: ainda sem NC', !(await fila(o7)).some((f) => f.accao === 'nc'), await fila(o7));
+await q(`update public.kangest_fila set estado = 'feito', resultado = '{"id": 81}'::jsonb where order_id = $1 and accao = 'fr'`, [o7]);
+check('a FR chegou depois do reembolso: NC na fila', (await fila(o7)).some((f) => f.accao === 'nc' && f.estado === 'pendente'), await fila(o7));
+
+// --- recalcular em lote (a sincronização de hora a hora) ----------------------------------------------------
+await recusa('kangest_recalcular_stock_lote: só o servidor', () => como('authenticated', admin, `select public.kangest_recalcular_stock_lote(array['LIV-001'])`), /permission denied/);
+await q(`update public.kangest_stock set disponivel = 20 where referencia = 'BIB-01'`);
+await q(`update public.kangest_stock set disponivel = 6 where referencia = 'LIV-001' and armazem_id = 1`);
+const lote = (await q(`select public.kangest_recalcular_stock_lote(array['LIV-001', 'BIB-01', 'NAO-EXISTE', '']) n`))[0].n;
+check('em lote: recalcula cada livro ligado', lote === 1, lote);
+// 6 disponíveis online − 1 (LIV-0007, ainda por reservar)
+check('em lote: o stock fica igual ao de um a um', await stock(livro.id) === 5, await stock(livro.id));
+
 console.log(`kangest: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

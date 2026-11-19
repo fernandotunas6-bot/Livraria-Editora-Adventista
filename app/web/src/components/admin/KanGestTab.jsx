@@ -1,14 +1,32 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckCircle2, Circle, Copy, RefreshCw, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Circle, Copy, RefreshCw, RotateCcw, Stethoscope, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
-import { kangestEstado, kangestRepetir, kangestSincronizar } from '@/api/PlatformApi';
+import { kangestEstado, kangestRepetir, kangestSincronizar, kangestTestar } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
 
 const ACCOES = { ne: 'Nota de encomenda', fr: 'Factura/Recibo', anular: 'Anulação', nc: 'Nota de crédito' };
-const FILA = [['pendente', 'Na fila', 'text-amber-600'], ['feito', 'Feitos', 'text-emerald-600'], ['erro', 'Com erro', 'text-red-600'], ['ignorado', 'Não vão', 'text-muted-foreground']];
+const KanGestConfigurador = lazy(() => import('./KanGestConfigurador'));
+
+const FILA = [['pendente', 'Na fila', 'text-amber-600'], ['processando', 'A sair agora', 'text-sky-600'], ['feito', 'Feitos', 'text-emerald-600'], ['erro', 'Com erro', 'text-red-600'], ['ignorado', 'Não vão', 'text-muted-foreground']];
+const NIVEL = {
+  ok: [CheckCircle2, 'text-emerald-600'],
+  aviso: [AlertTriangle, 'text-amber-600'],
+  erro: [XCircle, 'text-red-600'],
+};
 const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', dateStyle: 'short', timeStyle: 'short' }) : '—');
+
+function Verificacoes({ lista }) {
+  return (
+    <ul className="space-y-1.5 text-sm">
+      {lista.map((v, i) => {
+        const [Icone, cor] = NIVEL[v.nivel] || NIVEL.aviso;
+        return <li key={i} className="flex items-start gap-2"><Icone className={cn('mt-0.5 h-4 w-4 shrink-0', cor)} /><span>{v.texto}</span></li>;
+      })}
+    </ul>
+  );
+}
 
 function Passo({ feito, children }) {
   return (
@@ -26,7 +44,10 @@ function Passo({ feito, children }) {
  */
 export default function KanGestTab() {
   const [estado, setEstado] = useState(null);
-  const [lojas, setLojas] = useState({});
+  const [lojas, setLojas] = useState([]);
+  const [teste, setTeste] = useState(null);
+  const [aTestar, setATestar] = useState(false);
+  const [configurar, setConfigurar] = useState(false);
   const [livros, setLivros] = useState(null);
   const [aSincronizar, setASincronizar] = useState(false);
 
@@ -37,11 +58,11 @@ export default function KanGestTab() {
       toast.error(e?.message || 'Não foi possível ler o estado da ligação.');
     }
     const [{ data: ls }, total, ligados] = await Promise.all([
-      supabase.from('physical_stores').select('id, name'),
+      supabase.from('physical_stores').select('id, name, active').order('name'),
       supabase.from('stock_books').select('id', { count: 'exact', head: true }).eq('active', true),
       supabase.from('stock_books').select('id', { count: 'exact', head: true }).eq('active', true).neq('kigest_ref', ''),
     ]);
-    setLojas(Object.fromEntries((ls || []).map((l) => [l.id, l.name])));
+    setLojas(ls || []);
     setLivros({ total: total.count ?? 0, ligados: ligados.count ?? 0 });
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
@@ -56,6 +77,19 @@ export default function KanGestTab() {
       toast.error(e?.message || 'Não foi possível sincronizar.');
     } finally {
       setASincronizar(false);
+    }
+  }
+  async function testar() {
+    setATestar(true);
+    try {
+      const r = await kangestTestar();
+      setTeste(r);
+      if (r?.ok) toast.success('A ligação está pronta.');
+      else toast.error('Há pontos a corrigir: veja o resultado do teste.');
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível testar.');
+    } finally {
+      setATestar(false);
     }
   }
   async function repetir(id) {
@@ -74,6 +108,7 @@ export default function KanGestTab() {
   const sincronizado = valor('sincronizado');
   const ligacoes = estado.ligacoes || [];
   const fila = estado.fila || {};
+  const nomeLoja = Object.fromEntries(lojas.map((l) => [l.id, l.name]));
   const copiar = (txt) => navigator.clipboard?.writeText(txt).then(() => toast.success('Copiado.'), () => toast.error('Não foi possível copiar.'));
 
   return (
@@ -84,10 +119,31 @@ export default function KanGestTab() {
           {activo ? 'Ligação activa' : 'Ligação por configurar'}
         </span>
         <span className="text-sm text-muted-foreground">Última sincronização: {dataHora(sincronizado)}</span>
-        <Button size="sm" className="ml-auto" onClick={sincronizar} disabled={aSincronizar}>
+        <Button size="sm" variant="outline" className="ml-auto" onClick={testar} disabled={aTestar}>
+          <Stethoscope className={cn('mr-1.5 h-4 w-4', aTestar && 'animate-pulse')} />{aTestar ? 'A testar…' : 'Testar ligação'}
+        </Button>
+        <Button size="sm" onClick={sincronizar} disabled={aSincronizar}>
           <RefreshCw className={cn('mr-1.5 h-4 w-4', aSincronizar && 'animate-spin')} />{aSincronizar ? 'A sincronizar…' : 'Sincronizar já'}
         </Button>
       </div>
+
+      {teste && (
+        <section className={cn('space-y-4 rounded-xl border p-4', teste.ok ? 'border-emerald-500/40' : 'border-red-500/40')}>
+          <h3 className="font-semibold">{teste.ok ? 'Teste: tudo pronto' : 'Teste: há pontos a corrigir'}</h3>
+          {(teste.geral || []).length > 0 && <Verificacoes lista={teste.geral} />}
+          {(teste.ligacoes || []).map((r) => (
+            <div key={r.id} className="space-y-2">
+              <p className="text-sm font-semibold">
+                {r.id}{r.empresa ? ` — ${r.empresa}` : ''}{r.posto ? <span className="font-normal text-muted-foreground"> · posto {r.posto}</span> : null}
+              </p>
+              <Verificacoes lista={r.verificacoes || []} />
+              {(r.armazens || []).length > 0 && (
+                <p className="text-xs text-muted-foreground">Armazéns deste KanGest: {r.armazens.map((a) => `${a.id} ${a.nome}`).join(' · ')}</p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="rounded-xl border p-4">
         <h3 className="mb-3 font-semibold">O que falta para a ligação funcionar</h3>
@@ -107,6 +163,21 @@ export default function KanGestTab() {
         <p className="mt-3 text-xs text-muted-foreground">Passo a passo em <code>docs/KANGEST.md</code>.</p>
       </section>
 
+      <section className="rounded-xl border">
+        <button type="button" className="flex w-full items-center gap-2 p-4 text-left font-semibold" onClick={() => setConfigurar((v) => !v)} aria-expanded={configurar}>
+          Configurar a ligação
+          <span className="text-xs font-normal text-muted-foreground">gera o segredo KANGEST_LIGACOES e o agendador</span>
+          <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', configurar && 'rotate-180')} />
+        </button>
+        {configurar && (
+          <div className="border-t p-4">
+            <Suspense fallback={<p className="text-sm text-muted-foreground">A abrir…</p>}>
+              <KanGestConfigurador ligacoesActuais={ligacoes} lojas={lojas} />
+            </Suspense>
+          </div>
+        )}
+      </section>
+
       <section className="space-y-3">
         <h3 className="font-semibold">Ligações</h3>
         {!ligacoes.length && <p className="text-sm text-muted-foreground">Nenhuma ligação configurada.</p>}
@@ -122,7 +193,7 @@ export default function KanGestTab() {
                 </span>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Lojas: {Object.entries(l.lojas || {}).map(([id, a]) => `${lojas[id] || id} → armazém ${a}`).join(' · ') || 'nenhuma (vai para o armazém do posto da chave)'}
+                Lojas: {Object.entries(l.lojas || {}).map(([id, a]) => `${nomeLoja[id] || id} → armazém ${a}`).join(' · ') || 'nenhuma (vai para o armazém do posto da chave)'}
                 {l.armazens_online?.length ? ` · vendem online os armazéns ${l.armazens_online.join(', ')}` : ''}
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -136,7 +207,7 @@ export default function KanGestTab() {
 
       <section className="space-y-3">
         <h3 className="font-semibold">Documentos para o KanGest</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {FILA.map(([k, rot, cor]) => (
             <div key={k} className="rounded-xl border p-3">
               <p className="text-xs text-muted-foreground">{rot}</p>

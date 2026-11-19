@@ -314,3 +314,6 @@ export const kangestEstado = () => pb.send('/admin/kangest', { method: 'GET' });
 export const kangestRepetir = (id) => pb.send('/admin/kangest/repetir', { method: 'POST', body: { id } });
 /** Corre já a fila, o stock completo e as vendas do ano. */
 export const kangestSincronizar = () => pb.send('/admin/kangest/sincronizar', { method: 'POST', body: {} });
+
+/** Confere a configuração da ligação ao KanGest sem emitir nada (permissões, armazéns, pagamentos, agendador). */
+export const kangestTestar = () => pb.send('/admin/kangest/testar', { method: 'POST', body: {} });
