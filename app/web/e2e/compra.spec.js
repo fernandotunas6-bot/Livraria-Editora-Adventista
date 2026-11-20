@@ -99,7 +99,7 @@ test('compra sem conta, com entrega: do catálogo à confirmação de recepção
   await assinar(page, c.locator('canvas'));
 
   // 4. Confirmar: uma encomenda, com o que o servidor precisa.
-  await c.getByRole('button', { name: /Confirmar Compra · Kz 10[\s. ]?500,00/ }).click();
+  await c.getByRole('button', { name: /Confirmar Compra · Kz 10[\s. ]?500(,00)?/ }).click();
   await expect(page).toHaveURL(/\/success\?/);
   expect(loja.pedidosCheckout).toHaveLength(1);
   expect(loja.pedidosCheckout[0]).toMatchObject({
@@ -125,7 +125,7 @@ test('compra sem conta, com entrega: do catálogo à confirmação de recepção
   // 5. A página de sucesso mostra a encomenda, e o carrinho ficou vazio.
   await expect(page.getByRole('heading', { level: 1, name: 'Compra Confirmada!' })).toBeVisible();
   await expect(page.getByText(encomenda.order_number)).toBeVisible();
-  await expect(page.getByText(/Kz 10[\s. ]?500,00/)).toBeVisible();
+  await expect(page.getByText(/Kz 10[\s. ]?500(,00)?/)).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('e-commerce-cart'))).toBe('[]');
   await expect(page.getByRole('banner').getByRole('button', { name: 'Carrinho com 0 itens' })).toBeVisible();
 
@@ -201,7 +201,7 @@ test('levantamento na loja: sem morada, com a loja escolhida e o pagamento no ba
   await c.getByRole('radio', { name: /Loja do Huambo/ }).click();
   await c.getByRole('radio', { name: /Pagar no Balcão/ }).click();
   // Sem portes: o total é o preço do livro.
-  await c.getByRole('button', { name: /Confirmar Compra · Kz 12[\s. ]?000,00/ }).click();
+  await c.getByRole('button', { name: /Confirmar Compra · Kz 12[\s. ]?000(,00)?/ }).click();
 
   await expect(page).toHaveURL(/\/success\?/);
   await expect(page.getByRole('heading', { level: 1, name: 'Compra Confirmada!' })).toBeVisible();

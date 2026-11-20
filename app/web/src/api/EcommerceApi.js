@@ -30,10 +30,16 @@ function resolveBookCover(book) {
   return '';
 }
 
+/**
+ * "Kz 10 000" ou "Kz 10 000,50": os cêntimos só quando existem. Em kwanzas quase tudo é redondo, e
+ * ",00" em cada preço era ruído (análise crítica de 2026-11-20). Os documentos — recibo, nota de
+ * encomenda, emails — continuam com as duas casas (lib/receipt.js e a Edge Function).
+ */
 export function formatCurrency(amountInCents, currencyInfo = CURRENCY) {
-  const amount = amountInCents / 100;
+  const amount = Math.round(Number(amountInCents) || 0) / 100;
   const symbol = currencyInfo?.symbol || 'Kz';
-  return `${symbol} ${amount.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const decimals = Number.isInteger(amount) ? 0 : 2;
+  return `${symbol} ${amount.toLocaleString('pt-AO', { minimumFractionDigits: decimals, maximumFractionDigits: 2 })}`;
 }
 
 function bookToProduct(book, collectionsMap = {}) {

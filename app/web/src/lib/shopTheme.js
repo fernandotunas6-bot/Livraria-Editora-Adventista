@@ -145,7 +145,7 @@ export function resolveShopBgMode(settings = {}) {
 export const shopDefaults = {
   shop_hero_title: 'Todos os Livros',
   shop_hero_subtitle: 'O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.',
-  shop_hero_badge: 'Catálogo Premium',
+  shop_hero_badge: 'Catálogo da livraria',
   shop_default_sort: 'featured',
   shop_per_page: 24,
   shop_show_featured: true,

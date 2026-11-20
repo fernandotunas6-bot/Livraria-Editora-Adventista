@@ -1675,7 +1675,7 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     show_stores_in_footer: orTrue(rec.show_stores_in_footer),
     shop_hero_title: rec.shop_hero_title || "Todos os Livros",
     shop_hero_subtitle: rec.shop_hero_subtitle || "",
-    shop_hero_badge: rec.shop_hero_badge || "Catálogo Premium",
+    shop_hero_badge: rec.shop_hero_badge || "Catálogo da livraria",
     shop_default_sort: rec.shop_default_sort || "featured",
     shop_per_page: Number(rec.shop_per_page) || 24,
     shop_show_featured: orTrue(rec.shop_show_featured),

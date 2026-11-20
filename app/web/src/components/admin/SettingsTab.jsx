@@ -101,7 +101,7 @@ const empty = {
   show_stores_in_footer: true,
   shop_hero_title: 'Todos os Livros',
   shop_hero_subtitle: 'O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.',
-  shop_hero_badge: 'Catálogo Premium',
+  shop_hero_badge: 'Catálogo da livraria',
   shop_default_sort: 'featured',
   shop_per_page: 24,
   shop_show_featured: true,
@@ -1075,7 +1075,7 @@ export default function SettingsTab() {
           </p>
           <div className="space-y-2">
             <Label htmlFor="config-shop-hero-badge">Badge do hero</Label>
-            <Input id="config-shop-hero-badge" value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo Premium" />
+            <Input id="config-shop-hero-badge" value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo da livraria" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="config-shop-hero-title">Título do hero</Label>

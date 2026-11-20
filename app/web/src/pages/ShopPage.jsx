@@ -212,7 +212,7 @@ const ShopPage = () => {
       {/* Hero personalizável com fundo configurável */}
       <ShopHeroBackground settings={shop}>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="flex items-center gap-2 text-white/70 text-sm mb-4">
+            <div className="flex items-center gap-2 text-white/70 text-sm mb-2 sm:mb-4">
               <Sparkles className="h-4 w-4" />
               <span>{heroBadge}</span>
               <span className="text-white/40">·</span>
@@ -220,8 +220,8 @@ const ShopPage = () => {
               <ChevronRight className="h-3 w-3" />
               <span className="text-white">Loja</span>
             </div>
-            <h1 className="text-3xl md:text-5xl font-bold mb-3 tracking-tight">{heroTitle}</h1>
-            <p className="text-white/85 max-w-2xl text-base mb-4 md:text-lg md:mb-8">{heroSubtitle}</p>
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-1 sm:mb-3 tracking-tight">{heroTitle}</h1>
+            <p className="text-white/85 max-w-2xl text-sm line-clamp-1 sm:line-clamp-none sm:text-base mb-1 sm:mb-4 md:text-lg md:mb-8">{heroSubtitle}</p>
           </motion.div>
       </ShopHeroBackground>
 
