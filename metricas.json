@@ -1,0 +1,6444 @@
+{
+  "site": "http://127.0.0.1:8744",
+  "data": "2026-11-20T16:30:58.885Z",
+  "resultados": [
+    {
+      "pagina": "inicio",
+      "caminho": "/",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Livros e Histórias — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 6764,
+      "ttfb": 9,
+      "fcp": 76,
+      "lcp": 348,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/960/slide-catalogo.webp",
+      "cls": 0.009,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 58,
+      "pedidos": 135,
+      "kb": {
+        "script": 386,
+        "css": 38,
+        "img": 1176,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 76,
+          "tipo": "img",
+          "url": "/images/capas/kigest/em-busca-de-esperanca.webp"
+        },
+        {
+          "kb": 64,
+          "tipo": "img",
+          "url": "/images/capas/kigest/profecias-surpreendentes.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/esperanca-para-a-familia-o-caminho-para-um-final-feliz.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 53,
+          "tipo": "img",
+          "url": "/images/site/960/slide-catalogo.webp"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/capas/kigest/conecte-se-com-seu-filho.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "img",
+          "url": "/images/capas/kigest/alem-da-magia-livro-infantil.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "inicio",
+      "caminho": "/",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Livros e Histórias — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 7218,
+      "ttfb": 8,
+      "fcp": 1180,
+      "lcp": 4512,
+      "lcpElemento": "",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/960/slide-catalogo.webp",
+      "cls": 0.008,
+      "tarefasLongas": 11,
+      "tarefasLongasMs": 1091,
+      "pedidos": 146,
+      "kb": {
+        "script": 476,
+        "css": 38,
+        "img": 812,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 76,
+          "tipo": "img",
+          "url": "/images/capas/kigest/em-busca-de-esperanca.webp"
+        },
+        {
+          "kb": 64,
+          "tipo": "img",
+          "url": "/images/capas/kigest/profecias-surpreendentes.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 53,
+          "tipo": "img",
+          "url": "/images/site/960/slide-catalogo.webp"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/capas/kigest/conecte-se-com-seu-filho.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "inicio",
+      "caminho": "/",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Livros e Histórias — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 9510,
+      "ttfb": 5,
+      "fcp": 168,
+      "lcp": 444,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/960/slide-catalogo.webp",
+      "cls": 0.004,
+      "tarefasLongas": 2,
+      "tarefasLongasMs": 118,
+      "pedidos": 138,
+      "kb": {
+        "script": 386,
+        "css": 38,
+        "img": 1176,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 76,
+          "tipo": "img",
+          "url": "/images/capas/kigest/em-busca-de-esperanca.webp"
+        },
+        {
+          "kb": 64,
+          "tipo": "img",
+          "url": "/images/capas/kigest/profecias-surpreendentes.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/esperanca-para-a-familia-o-caminho-para-um-final-feliz.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 53,
+          "tipo": "img",
+          "url": "/images/site/960/slide-catalogo.webp"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/capas/kigest/conecte-se-com-seu-filho.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "img",
+          "url": "/images/capas/kigest/alem-da-magia-livro-infantil.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "inicio",
+      "caminho": "/",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Livros e Histórias — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 8595,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 320,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/1280/slide-catalogo.webp",
+      "cls": 0.005,
+      "tarefasLongas": 2,
+      "tarefasLongasMs": 116,
+      "pedidos": 138,
+      "kb": {
+        "script": 386,
+        "css": 38,
+        "img": 1201,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 78,
+          "tipo": "img",
+          "url": "/images/site/1280/slide-catalogo.webp"
+        },
+        {
+          "kb": 76,
+          "tipo": "img",
+          "url": "/images/capas/kigest/em-busca-de-esperanca.webp"
+        },
+        {
+          "kb": 64,
+          "tipo": "img",
+          "url": "/images/capas/kigest/profecias-surpreendentes.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/esperanca-para-a-familia-o-caminho-para-um-final-feliz.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/capas/kigest/conecte-se-com-seu-filho.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "img",
+          "url": "/images/capas/kigest/alem-da-magia-livro-infantil.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "inicio",
+      "caminho": "/",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Livros e Histórias — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 8680,
+      "ttfb": 14,
+      "fcp": 88,
+      "lcp": 304,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/slide-catalogo.webp",
+      "cls": 0.003,
+      "tarefasLongas": 2,
+      "tarefasLongasMs": 101,
+      "pedidos": 138,
+      "kb": {
+        "script": 386,
+        "css": 38,
+        "img": 1272,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 149,
+          "tipo": "img",
+          "url": "/images/site/slide-catalogo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 76,
+          "tipo": "img",
+          "url": "/images/capas/kigest/em-busca-de-esperanca.webp"
+        },
+        {
+          "kb": 64,
+          "tipo": "img",
+          "url": "/images/capas/kigest/profecias-surpreendentes.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/esperanca-para-a-familia-o-caminho-para-um-final-feliz.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/capas/kigest/conecte-se-com-seu-filho.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "img",
+          "url": "/images/capas/kigest/alem-da-magia-livro-infantil.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "loja",
+      "caminho": "/shop",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Todos os Livros — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shop",
+      "canonicais": 1,
+      "descricao": "O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 6004,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 408,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.004,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 69,
+      "pedidos": 102,
+      "kb": {
+        "script": 411,
+        "css": 38,
+        "img": 430,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 30,
+          "tipo": "img",
+          "url": "/images/capas/novos/hinario-adventista-em-umbundo-e-portugues-capa-rosa.jpg"
+        },
+        {
+          "kb": 30,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-jesus-capa-castanha-com-relevo.jpg"
+        },
+        {
+          "kb": 28,
+          "tipo": "img",
+          "url": "/images/capas/novos/emblema-bordado-do-clube-de-desbravadores.jpg"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "loja",
+      "caminho": "/shop",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Todos os Livros — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shop",
+      "canonicais": 1,
+      "descricao": "O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 6486,
+      "ttfb": 5,
+      "fcp": 1140,
+      "lcp": 4888,
+      "lcpElemento": "",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.031,
+      "tarefasLongas": 5,
+      "tarefasLongasMs": 667,
+      "pedidos": 123,
+      "kb": {
+        "script": 489,
+        "css": 38,
+        "img": 279,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/site/opcoes/loja-doutrina.webp"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 30,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-jesus-capa-castanha-com-relevo.jpg"
+        },
+        {
+          "kb": 28,
+          "tipo": "img",
+          "url": "/images/capas/novos/emblema-bordado-do-clube-de-desbravadores.jpg"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/capas/novos/lenco-dos-jovens-adventistas-azul-marinho-com-debrum-azul-e-amarelo.jpg"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "loja",
+      "caminho": "/shop",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Todos os Livros — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shop",
+      "canonicais": 1,
+      "descricao": "O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 7194,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 440,
+      "lcpElemento": "",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.002,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 76,
+      "pedidos": 143,
+      "kb": {
+        "script": 489,
+        "css": 38,
+        "img": 644,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/site/opcoes/loja-ellen-white.webp"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 45,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-olhai-para-as-aves-do-ceu.jpg"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/site/opcoes/loja-doutrina.webp"
+        },
+        {
+          "kb": 43,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-bordo-com-flores-e-passaro.jpg"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "loja",
+      "caminho": "/shop",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Todos os Livros — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shop",
+      "canonicais": 1,
+      "descricao": "O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4379,
+      "ttfb": 3,
+      "fcp": 48,
+      "lcp": 840,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.043,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 78,
+      "pedidos": 116,
+      "kb": {
+        "script": 411,
+        "css": 38,
+        "img": 609,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 45,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-olhai-para-as-aves-do-ceu.jpg"
+        },
+        {
+          "kb": 43,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-bordo-com-flores-e-passaro.jpg"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 30,
+          "tipo": "img",
+          "url": "/images/capas/novos/hinario-adventista-em-umbundo-e-portugues-capa-rosa.jpg"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "loja",
+      "caminho": "/shop",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Todos os Livros — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shop",
+      "canonicais": 1,
+      "descricao": "O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4379,
+      "ttfb": 3,
+      "fcp": 52,
+      "lcp": 448,
+      "lcpElemento": "",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.021,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 78,
+      "pedidos": 149,
+      "kb": {
+        "script": 489,
+        "css": 38,
+        "img": 709,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/site/opcoes/loja-ellen-white.webp"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 54,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-castanha.jpg"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 45,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-olhai-para-as-aves-do-ceu.jpg"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/site/opcoes/loja-doutrina.webp"
+        },
+        {
+          "kb": 43,
+          "tipo": "img",
+          "url": "/images/capas/novos/biblia-sagrada-capa-dura-bordo-com-flores-e-passaro.jpg"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "livro",
+      "caminho": "/product/047fsrl1mka65wf",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "O Desejado de Todas as Nações — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/product/047fsrl1mka65wf",
+      "canonicais": 1,
+      "descricao": "A vida de Jesus contada por Ellen G. White — o livro central da série Conflito e, para muitos leitores, o mais querido de tudo o que ela escreveu. Acompanha…",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4442,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 576,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/capas/kigest/o-desejado-de-todas-as-nacoes.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 129,
+      "kb": {
+        "script": 455,
+        "css": 38,
+        "img": 120,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/capas/LIV-097.jpg"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 15,
+          "tipo": "script",
+          "url": "/assets/ProductDetailPage-C2P0QVbb.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 12,
+          "tipo": "script",
+          "url": "/assets/sanitizeHtml-lWjzrFS9.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "livro",
+      "caminho": "/product/047fsrl1mka65wf",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "O Desejado de Todas as Nações — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/product/047fsrl1mka65wf",
+      "canonicais": 1,
+      "descricao": "A vida de Jesus contada por Ellen G. White — o livro central da série Conflito e, para muitos leitores, o mais querido de tudo o que ela escreveu. Acompanha…",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4509,
+      "ttfb": 13,
+      "fcp": 1156,
+      "lcp": 5280,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/capas/kigest/o-desejado-de-todas-as-nacoes.webp",
+      "cls": 0,
+      "tarefasLongas": 4,
+      "tarefasLongasMs": 555,
+      "pedidos": 123,
+      "kb": {
+        "script": 455,
+        "css": 38,
+        "img": 49,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 15,
+          "tipo": "script",
+          "url": "/assets/ProductDetailPage-C2P0QVbb.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 12,
+          "tipo": "script",
+          "url": "/assets/sanitizeHtml-lWjzrFS9.js"
+        },
+        {
+          "kb": 10,
+          "tipo": "script",
+          "url": "/assets/drawer-UFXAURu4.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "livro",
+      "caminho": "/product/047fsrl1mka65wf",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "O Desejado de Todas as Nações — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/product/047fsrl1mka65wf",
+      "canonicais": 1,
+      "descricao": "A vida de Jesus contada por Ellen G. White — o livro central da série Conflito e, para muitos leitores, o mais querido de tudo o que ela escreveu. Acompanha…",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 6668,
+      "ttfb": 4,
+      "fcp": 56,
+      "lcp": 932,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/capas/kigest/o-desejado-de-todas-as-nacoes.webp",
+      "cls": 0,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 53,
+      "pedidos": 137,
+      "kb": {
+        "script": 455,
+        "css": 38,
+        "img": 179,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/capas/LIV-097.jpg"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 15,
+          "tipo": "script",
+          "url": "/assets/ProductDetailPage-C2P0QVbb.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "livro",
+      "caminho": "/product/047fsrl1mka65wf",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "O Desejado de Todas as Nações — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/product/047fsrl1mka65wf",
+      "canonicais": 1,
+      "descricao": "A vida de Jesus contada por Ellen G. White — o livro central da série Conflito e, para muitos leitores, o mais querido de tudo o que ela escreveu. Acompanha…",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 5891,
+      "ttfb": 3,
+      "fcp": 40,
+      "lcp": 1108,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/capas/kigest/o-desejado-de-todas-as-nacoes.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 146,
+      "kb": {
+        "script": 455,
+        "css": 38,
+        "img": 396,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/LIV-038.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/capas/LIV-097.jpg"
+        },
+        {
+          "kb": 43,
+          "tipo": "img",
+          "url": "/images/capas/LIV-061.jpg"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "livro",
+      "caminho": "/product/047fsrl1mka65wf",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "O Desejado de Todas as Nações — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/product/047fsrl1mka65wf",
+      "canonicais": 1,
+      "descricao": "A vida de Jesus contada por Ellen G. White — o livro central da série Conflito e, para muitos leitores, o mais querido de tudo o que ela escreveu. Acompanha…",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 5891,
+      "ttfb": 4,
+      "fcp": 72,
+      "lcp": 644,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/capas/kigest/o-desejado-de-todas-as-nacoes.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 162,
+      "kb": {
+        "script": 505,
+        "css": 38,
+        "img": 396,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/LIV-038.jpg"
+        },
+        {
+          "kb": 56,
+          "tipo": "img",
+          "url": "/images/capas/novos/a-fe-de-jesus-guia-de-estudos-para-a-classe-baptismal.jpg"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 44,
+          "tipo": "img",
+          "url": "/images/capas/LIV-097.jpg"
+        },
+        {
+          "kb": 43,
+          "tipo": "img",
+          "url": "/images/capas/LIV-061.jpg"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "colecoes",
+      "caminho": "/colecoes",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Coleções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/colecoes",
+      "canonicais": 1,
+      "descricao": "Os livros da Livraria Adventista organizados em colecções.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2331,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 368,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 80,
+      "kb": {
+        "script": 387,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 12,
+          "tipo": "script",
+          "url": "/assets/sanitizeHtml-lWjzrFS9.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "script",
+          "url": "/assets/select-BBB0Q6b3.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "colecoes",
+      "caminho": "/colecoes",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Coleções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/colecoes",
+      "canonicais": 1,
+      "descricao": "Os livros da Livraria Adventista organizados em colecções.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2251,
+      "ttfb": 4,
+      "fcp": 1140,
+      "lcp": 4536,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 339,
+      "pedidos": 80,
+      "kb": {
+        "script": 387,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 12,
+          "tipo": "script",
+          "url": "/assets/sanitizeHtml-lWjzrFS9.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "script",
+          "url": "/assets/select-BBB0Q6b3.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "colecoes",
+      "caminho": "/colecoes",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Coleções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/colecoes",
+      "canonicais": 1,
+      "descricao": "Os livros da Livraria Adventista organizados em colecções.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3499,
+      "ttfb": 3,
+      "fcp": 68,
+      "lcp": 288,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 86,
+      "kb": {
+        "script": 387,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "colecoes",
+      "caminho": "/colecoes",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Coleções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/colecoes",
+      "canonicais": 1,
+      "descricao": "Os livros da Livraria Adventista organizados em colecções.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2587,
+      "ttfb": 5,
+      "fcp": 52,
+      "lcp": 272,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.005,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 86,
+      "kb": {
+        "script": 387,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "colecoes",
+      "caminho": "/colecoes",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Coleções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/colecoes",
+      "canonicais": 1,
+      "descricao": "Os livros da Livraria Adventista organizados em colecções.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2687,
+      "ttfb": 3,
+      "fcp": 56,
+      "lcp": 296,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.004,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 86,
+      "kb": {
+        "script": 387,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "lojas",
+      "caminho": "/lojas",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Lojas físicas — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/lojas",
+      "canonicais": 1,
+      "descricao": "Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2197,
+      "ttfb": 5,
+      "fcp": 56,
+      "lcp": 468,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/lojas/catumbela-1.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 80,
+      "kb": {
+        "script": 361,
+        "css": 38,
+        "img": 222,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 61,
+          "tipo": "img",
+          "url": "/images/lojas/catumbela-1.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 34,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-4.webp"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 22,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-2.webp"
+        },
+        {
+          "kb": 21,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-5.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "lojas",
+      "caminho": "/lojas",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Lojas físicas — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/lojas",
+      "canonicais": 1,
+      "descricao": "Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1944,
+      "ttfb": 5,
+      "fcp": 1144,
+      "lcp": 5388,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/lojas/catumbela-1.webp",
+      "cls": 0.001,
+      "tarefasLongas": 4,
+      "tarefasLongasMs": 381,
+      "pedidos": 80,
+      "kb": {
+        "script": 361,
+        "css": 38,
+        "img": 222,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 61,
+          "tipo": "img",
+          "url": "/images/lojas/catumbela-1.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 34,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-4.webp"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 22,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-2.webp"
+        },
+        {
+          "kb": 21,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-5.webp"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impacto": "serious",
+          "nos": 1,
+          "ajuda": "Elements must meet minimum color contrast ratio thresholds",
+          "exemplo": ".ml-auto"
+        }
+      ],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "lojas",
+      "caminho": "/lojas",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Lojas físicas — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/lojas",
+      "canonicais": 1,
+      "descricao": "Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3499,
+      "ttfb": 4,
+      "fcp": 76,
+      "lcp": 472,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/lojas/catumbela-1.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 83,
+      "kb": {
+        "script": 361,
+        "css": 38,
+        "img": 222,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 61,
+          "tipo": "img",
+          "url": "/images/lojas/catumbela-1.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 34,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-4.webp"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 22,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-2.webp"
+        },
+        {
+          "kb": 21,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-5.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "lojas",
+      "caminho": "/lojas",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Lojas físicas — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/lojas",
+      "canonicais": 1,
+      "descricao": "Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2587,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 816,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/lojas/catumbela-1.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 83,
+      "kb": {
+        "script": 361,
+        "css": 38,
+        "img": 222,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 61,
+          "tipo": "img",
+          "url": "/images/lojas/catumbela-1.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 34,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-4.webp"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 22,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-2.webp"
+        },
+        {
+          "kb": 21,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-5.webp"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impacto": "serious",
+          "nos": 1,
+          "ajuda": "Elements must meet minimum color contrast ratio thresholds",
+          "exemplo": ".normal-case"
+        }
+      ],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "lojas",
+      "caminho": "/lojas",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Lojas físicas — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/lojas",
+      "canonicais": 1,
+      "descricao": "Moradas, horários, contactos e mapa das lojas da Livraria Adventista em Angola.",
+      "jsonLd": 2,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2687,
+      "ttfb": 4,
+      "fcp": 44,
+      "lcp": 480,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/lojas/catumbela-1.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 83,
+      "kb": {
+        "script": 361,
+        "css": 38,
+        "img": 222,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 61,
+          "tipo": "img",
+          "url": "/images/lojas/catumbela-1.webp"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 34,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-4.webp"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 22,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-2.webp"
+        },
+        {
+          "kb": 21,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-5.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "sobre",
+      "caminho": "/about",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Sobre Nós — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/about",
+      "canonicais": 1,
+      "descricao": "Conheça a Livraria Adventista — a nossa missão de difundir literatura cristã e educacional.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3651,
+      "ttfb": 6,
+      "fcp": 48,
+      "lcp": 252,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/sobre-topo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 60,
+      "kb": {
+        "script": 344,
+        "css": 38,
+        "img": 322,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 251,
+          "tipo": "img",
+          "url": "/images/site/sobre-topo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "img",
+          "url": "/images/site/sobre-livros.webp"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "sobre",
+      "caminho": "/about",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Sobre Nós — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/about",
+      "canonicais": 1,
+      "descricao": "Conheça a Livraria Adventista — a nossa missão de difundir literatura cristã e educacional.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3503,
+      "ttfb": 4,
+      "fcp": 1140,
+      "lcp": 5460,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/sobre-topo.webp",
+      "cls": 0.053,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 312,
+      "pedidos": 60,
+      "kb": {
+        "script": 344,
+        "css": 38,
+        "img": 322,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 251,
+          "tipo": "img",
+          "url": "/images/site/sobre-topo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "img",
+          "url": "/images/site/sobre-livros.webp"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "sobre",
+      "caminho": "/about",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Sobre Nós — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/about",
+      "canonicais": 1,
+      "descricao": "Conheça a Livraria Adventista — a nossa missão de difundir literatura cristã e educacional.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4363,
+      "ttfb": 5,
+      "fcp": 56,
+      "lcp": 288,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/sobre-topo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 66,
+      "kb": {
+        "script": 344,
+        "css": 38,
+        "img": 380,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 251,
+          "tipo": "img",
+          "url": "/images/site/sobre-topo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "img",
+          "url": "/images/site/sobre-livros.webp"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "sobre",
+      "caminho": "/about",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Sobre Nós — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/about",
+      "canonicais": 1,
+      "descricao": "Conheça a Livraria Adventista — a nossa missão de difundir literatura cristã e educacional.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3485,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 264,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/sobre-topo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 66,
+      "kb": {
+        "script": 344,
+        "css": 38,
+        "img": 380,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 251,
+          "tipo": "img",
+          "url": "/images/site/sobre-topo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "img",
+          "url": "/images/site/sobre-livros.webp"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "sobre",
+      "caminho": "/about",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Sobre Nós — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/about",
+      "canonicais": 1,
+      "descricao": "Conheça a Livraria Adventista — a nossa missão de difundir literatura cristã e educacional.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3545,
+      "ttfb": 4,
+      "fcp": 72,
+      "lcp": 272,
+      "lcpElemento": "img.w-full.h-full",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/sobre-topo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 66,
+      "kb": {
+        "script": 344,
+        "css": 38,
+        "img": 380,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 251,
+          "tipo": "img",
+          "url": "/images/site/sobre-topo.webp"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "img",
+          "url": "/images/site/sobre-livros.webp"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "contacto",
+      "caminho": "/contact",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Contacto — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/contact",
+      "canonicais": 1,
+      "descricao": "Entre em contacto com a Livraria Adventista. Estamos aqui para ajudar.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2093,
+      "ttfb": 5,
+      "fcp": 52,
+      "lcp": 1104,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 67,
+      "kb": {
+        "script": 350,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "contacto",
+      "caminho": "/contact",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Contacto — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/contact",
+      "canonicais": 1,
+      "descricao": "Entre em contacto com a Livraria Adventista. Estamos aqui para ajudar.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2017,
+      "ttfb": 4,
+      "fcp": 1148,
+      "lcp": 4436,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.003,
+      "tarefasLongas": 4,
+      "tarefasLongasMs": 393,
+      "pedidos": 80,
+      "kb": {
+        "script": 394,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 13,
+          "tipo": "script",
+          "url": "/assets/LivrariaAssistant-Bpp6PIu9.js"
+        },
+        {
+          "kb": 12,
+          "tipo": "script",
+          "url": "/assets/SupportCenter--32bTrRe.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "contacto",
+      "caminho": "/contact",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Contacto — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/contact",
+      "canonicais": 1,
+      "descricao": "Entre em contacto com a Livraria Adventista. Estamos aqui para ajudar.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3205,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 272,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 72,
+      "kb": {
+        "script": 350,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "contacto",
+      "caminho": "/contact",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Contacto — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/contact",
+      "canonicais": 1,
+      "descricao": "Entre em contacto com a Livraria Adventista. Estamos aqui para ajudar.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2549,
+      "ttfb": 3,
+      "fcp": 64,
+      "lcp": 264,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 72,
+      "kb": {
+        "script": 350,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "contacto",
+      "caminho": "/contact",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Contacto — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/contact",
+      "canonicais": 1,
+      "descricao": "Entre em contacto com a Livraria Adventista. Estamos aqui para ajudar.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2549,
+      "ttfb": 4,
+      "fcp": 56,
+      "lcp": 272,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 72,
+      "kb": {
+        "script": 350,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "faq",
+      "caminho": "/faq",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "FAQ — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/faq",
+      "canonicais": 1,
+      "descricao": "Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1590,
+      "ttfb": 6,
+      "fcp": 72,
+      "lcp": 284,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 62,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "faq",
+      "caminho": "/faq",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "FAQ — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/faq",
+      "canonicais": 1,
+      "descricao": "Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1483,
+      "ttfb": 3,
+      "fcp": 1164,
+      "lcp": 4148,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.003,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 306,
+      "pedidos": 62,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "faq",
+      "caminho": "/faq",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "FAQ — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/faq",
+      "canonicais": 1,
+      "descricao": "Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3253,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 268,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 68,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "faq",
+      "caminho": "/faq",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "FAQ — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/faq",
+      "canonicais": 1,
+      "descricao": "Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2597,
+      "ttfb": 5,
+      "fcp": 68,
+      "lcp": 264,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.004,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 68,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "faq",
+      "caminho": "/faq",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "FAQ — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/faq",
+      "canonicais": 1,
+      "descricao": "Perguntas frequentes sobre encomendas, envios, devoluções e pagamentos.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2597,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 276,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.003,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 68,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "envios",
+      "caminho": "/shipping-returns",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Envios e Devoluções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shipping-returns",
+      "canonicais": 1,
+      "descricao": "Prazos de entrega, custos de envio em Angola e como devolver um livro.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2943,
+      "ttfb": 4,
+      "fcp": 68,
+      "lcp": 248,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 65,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "envios",
+      "caminho": "/shipping-returns",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Envios e Devoluções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shipping-returns",
+      "canonicais": 1,
+      "descricao": "Prazos de entrega, custos de envio em Angola e como devolver um livro.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2677,
+      "ttfb": 9,
+      "fcp": 1168,
+      "lcp": 4124,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.002,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 319,
+      "pedidos": 65,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "envios",
+      "caminho": "/shipping-returns",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Envios e Devoluções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shipping-returns",
+      "canonicais": 1,
+      "descricao": "Prazos de entrega, custos de envio em Angola e como devolver um livro.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 4061,
+      "ttfb": 5,
+      "fcp": 48,
+      "lcp": 264,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 71,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "envios",
+      "caminho": "/shipping-returns",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Envios e Devoluções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shipping-returns",
+      "canonicais": 1,
+      "descricao": "Prazos de entrega, custos de envio em Angola e como devolver um livro.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3405,
+      "ttfb": 4,
+      "fcp": 44,
+      "lcp": 252,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.002,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 71,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "envios",
+      "caminho": "/shipping-returns",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Envios e Devoluções — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/shipping-returns",
+      "canonicais": 1,
+      "descricao": "Prazos de entrega, custos de envio em Angola e como devolver um livro.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3405,
+      "ttfb": 4,
+      "fcp": 44,
+      "lcp": 260,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.002,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 71,
+      "kb": {
+        "script": 349,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "rastreio",
+      "caminho": "/track",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Rastrear Encomenda — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1507,
+      "ttfb": 7,
+      "fcp": 56,
+      "lcp": 276,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 84,
+      "kb": {
+        "script": 397,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 9,
+          "tipo": "script",
+          "url": "/assets/TrackOrderPage-BiGlZ1ll.js"
+        },
+        {
+          "kb": 9,
+          "tipo": "script",
+          "url": "/assets/colporteurApi-kCg2NMuV.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "rastreio",
+      "caminho": "/track",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Rastrear Encomenda — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1671,
+      "ttfb": 4,
+      "fcp": 1136,
+      "lcp": 4764,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.002,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 319,
+      "pedidos": 84,
+      "kb": {
+        "script": 397,
+        "css": 38,
+        "img": 63,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 9,
+          "tipo": "script",
+          "url": "/assets/TrackOrderPage-BiGlZ1ll.js"
+        },
+        {
+          "kb": 9,
+          "tipo": "script",
+          "url": "/assets/colporteurApi-kCg2NMuV.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "rastreio",
+      "caminho": "/track",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Rastrear Encomenda — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3499,
+      "ttfb": 3,
+      "fcp": 48,
+      "lcp": 528,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 90,
+      "kb": {
+        "script": 397,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "rastreio",
+      "caminho": "/track",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Rastrear Encomenda — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2587,
+      "ttfb": 4,
+      "fcp": 68,
+      "lcp": 284,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 90,
+      "kb": {
+        "script": 397,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "rastreio",
+      "caminho": "/track",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Rastrear Encomenda — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2687,
+      "ttfb": 3,
+      "fcp": 48,
+      "lcp": 288,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/loja-banner.webp",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 90,
+      "kb": {
+        "script": 397,
+        "css": 38,
+        "img": 121,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 51,
+          "tipo": "img",
+          "url": "/images/site/loja-banner.webp"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "entrar",
+      "caminho": "/login",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Entrar — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 682,
+      "ttfb": 6,
+      "fcp": 72,
+      "lcp": 192,
+      "lcpElemento": "p.text-muted-foreground.text-sm",
+      "lcpUrl": "",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 43,
+      "kb": {
+        "script": 283,
+        "css": 38,
+        "img": 504,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp"
+        },
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp?v=2026-11-20T13%3A52%3A46.979624%2B00%3A00"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact.svg"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "entrar",
+      "caminho": "/login",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Entrar — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 844,
+      "ttfb": 4,
+      "fcp": 1144,
+      "lcp": 3500,
+      "lcpElemento": "p.text-muted-foreground.text-sm",
+      "lcpUrl": "",
+      "cls": 0.008,
+      "tarefasLongas": 2,
+      "tarefasLongasMs": 177,
+      "pedidos": 42,
+      "kb": {
+        "script": 283,
+        "css": 38,
+        "img": 262,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp?v=2026-11-20T13%3A52%3A46.979624%2B00%3A00"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact.svg"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/AuthForm-B7yHZ9p3.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Esqueceu?»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "entrar",
+      "caminho": "/login",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Entrar — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1024,
+      "ttfb": 4,
+      "fcp": 72,
+      "lcp": 188,
+      "lcpElemento": "img.h-9.sm:h-10",
+      "lcpUrl": "http://127.0.0.1:8744/logo-compact.svg",
+      "cls": 0.019,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 43,
+      "kb": {
+        "script": 283,
+        "css": 38,
+        "img": 504,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp"
+        },
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp?v=2026-11-20T13%3A52%3A46.979624%2B00%3A00"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact.svg"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "entrar",
+      "caminho": "/login",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Entrar — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 800,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 188,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/login-fundo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 43,
+      "kb": {
+        "script": 283,
+        "css": 38,
+        "img": 504,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp"
+        },
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp?v=2026-11-20T13%3A52%3A46.979624%2B00%3A00"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact.svg"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Esqueceu?»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "entrar",
+      "caminho": "/login",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Entrar — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 900,
+      "ttfb": 5,
+      "fcp": 48,
+      "lcp": 208,
+      "lcpElemento": "img.absolute.inset-0",
+      "lcpUrl": "http://127.0.0.1:8744/images/site/login-fundo.webp",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 43,
+      "kb": {
+        "script": 283,
+        "css": 38,
+        "img": 504,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp"
+        },
+        {
+          "kb": 243,
+          "tipo": "img",
+          "url": "/images/site/login-fundo.webp?v=2026-11-20T13%3A52%3A46.979624%2B00%3A00"
+        },
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact.svg"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "comunidade",
+      "caminho": "/comunidade",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Comunidade de Leitores — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/comunidade",
+      "canonicais": 1,
+      "descricao": "Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1659,
+      "ttfb": 4,
+      "fcp": 48,
+      "lcp": 272,
+      "lcpElemento": "p.mt-2.max-w-2xl",
+      "lcpUrl": "",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 84,
+      "kb": {
+        "script": 393,
+        "css": 38,
+        "img": 11,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 10,
+          "tipo": "script",
+          "url": "/assets/drawer-UFXAURu4.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "comunidade",
+      "caminho": "/comunidade",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Comunidade de Leitores — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/comunidade",
+      "canonicais": 1,
+      "descricao": "Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1571,
+      "ttfb": 4,
+      "fcp": 1148,
+      "lcp": 3988,
+      "lcpElemento": "p.mt-2.max-w-2xl",
+      "lcpUrl": "",
+      "cls": 0.021,
+      "tarefasLongas": 3,
+      "tarefasLongasMs": 343,
+      "pedidos": 84,
+      "kb": {
+        "script": 393,
+        "css": 38,
+        "img": 11,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 10,
+          "tipo": "script",
+          "url": "/assets/drawer-UFXAURu4.js"
+        },
+        {
+          "kb": 8,
+          "tipo": "img",
+          "url": "/logo-compact-light.svg"
+        },
+        {
+          "kb": 7,
+          "tipo": "script",
+          "url": "/assets/dropdown-menu-zhckpGKY.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "button «Leituras»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "comunidade",
+      "caminho": "/comunidade",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Comunidade de Leitores — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/comunidade",
+      "canonicais": 1,
+      "descricao": "Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 3129,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 304,
+      "lcpElemento": "h1.mt-2.text-3xl",
+      "lcpUrl": "",
+      "cls": 0,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 54,
+      "pedidos": 90,
+      "kb": {
+        "script": 393,
+        "css": 38,
+        "img": 70,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 11,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-1.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "comunidade",
+      "caminho": "/comunidade",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Comunidade de Leitores — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/comunidade",
+      "canonicais": 1,
+      "descricao": "Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2367,
+      "ttfb": 4,
+      "fcp": 52,
+      "lcp": 288,
+      "lcpElemento": "p.mt-2.max-w-2xl",
+      "lcpUrl": "",
+      "cls": 0.001,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 50,
+      "pedidos": 90,
+      "kb": {
+        "script": 393,
+        "css": 38,
+        "img": 70,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 11,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-1.webp"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Saltar para o conteúdo»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "comunidade",
+      "caminho": "/comunidade",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Comunidade de Leitores — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/comunidade",
+      "canonicais": 1,
+      "descricao": "Converse com outros leitores sobre livros, a Bíblia e a vida: citações, perguntas e recomendações.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 2367,
+      "ttfb": 4,
+      "fcp": 72,
+      "lcp": 304,
+      "lcpElemento": "h1.mt-2.text-3xl",
+      "lcpUrl": "",
+      "cls": 0.014,
+      "tarefasLongas": 1,
+      "tarefasLongasMs": 59,
+      "pedidos": 90,
+      "kb": {
+        "script": 393,
+        "css": 38,
+        "img": 70,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 24,
+          "tipo": "img",
+          "url": "/images/lojas/480/huambo-1.webp"
+        },
+        {
+          "kb": 23,
+          "tipo": "img",
+          "url": "/images/lojas/480/lubango-1.webp"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/ShoppingCart-C6tTRmkf.js"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 14,
+          "tipo": "script",
+          "url": "/assets/adminSections-4BQoIf8m.js"
+        },
+        {
+          "kb": 11,
+          "tipo": "img",
+          "url": "/images/lojas/480/catumbela-1.webp"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "pagina-inexistente",
+      "caminho": "/pagina-que-nao-existe",
+      "largura": "telemovel-320",
+      "estado": 200,
+      "titulo": "Página não encontrada — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 696,
+      "ttfb": 4,
+      "fcp": 68,
+      "lcp": 136,
+      "lcpElemento": "p.text-muted-foreground.mb-8",
+      "lcpUrl": "",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 26,
+      "kb": {
+        "script": 267,
+        "css": 38,
+        "img": 3,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/web-vitals-hVzxNkul.js"
+        },
+        {
+          "kb": 3,
+          "tipo": "img",
+          "url": "/logo-icon-light.svg"
+        },
+        {
+          "kb": 3,
+          "tipo": "script",
+          "url": "/assets/InstalarApp-DX1R8Iuz.js"
+        },
+        {
+          "kb": 2,
+          "tipo": "script",
+          "url": "/assets/PwaInstallBanner-BnpCBExA.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "pagina-inexistente",
+      "caminho": "/pagina-que-nao-existe",
+      "largura": "telemovel-390",
+      "estado": 200,
+      "titulo": "Página não encontrada — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 900,
+      "ttfb": 3,
+      "fcp": 1144,
+      "lcp": 2188,
+      "lcpElemento": "p.text-muted-foreground.mb-8",
+      "lcpUrl": "",
+      "cls": 0.005,
+      "tarefasLongas": 2,
+      "tarefasLongasMs": 195,
+      "pedidos": 26,
+      "kb": {
+        "script": 267,
+        "css": 38,
+        "img": 3,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/web-vitals-hVzxNkul.js"
+        },
+        {
+          "kb": 3,
+          "tipo": "img",
+          "url": "/logo-icon-light.svg"
+        },
+        {
+          "kb": 3,
+          "tipo": "script",
+          "url": "/assets/InstalarApp-DX1R8Iuz.js"
+        },
+        {
+          "kb": 2,
+          "tipo": "script",
+          "url": "/assets/PwaInstallBanner-BnpCBExA.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Ver o catálogoLivros, Bíblias, materiais»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "pagina-inexistente",
+      "caminho": "/pagina-que-nao-existe",
+      "largura": "tablet-768",
+      "estado": 200,
+      "titulo": "Página não encontrada — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 1024,
+      "ttfb": 4,
+      "fcp": 56,
+      "lcp": 136,
+      "lcpElemento": "p.text-muted-foreground.mb-8",
+      "lcpUrl": "",
+      "cls": 0,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 26,
+      "kb": {
+        "script": 267,
+        "css": 38,
+        "img": 3,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/web-vitals-hVzxNkul.js"
+        },
+        {
+          "kb": 3,
+          "tipo": "img",
+          "url": "/logo-icon-light.svg"
+        },
+        {
+          "kb": 3,
+          "tipo": "script",
+          "url": "/assets/InstalarApp-DX1R8Iuz.js"
+        },
+        {
+          "kb": 2,
+          "tipo": "script",
+          "url": "/assets/PwaInstallBanner-BnpCBExA.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "pagina-inexistente",
+      "caminho": "/pagina-que-nao-existe",
+      "largura": "computador-1280",
+      "estado": 200,
+      "titulo": "Página não encontrada — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 800,
+      "ttfb": 4,
+      "fcp": 44,
+      "lcp": 136,
+      "lcpElemento": "p.text-muted-foreground.mb-8",
+      "lcpUrl": "",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 26,
+      "kb": {
+        "script": 267,
+        "css": 38,
+        "img": 3,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/web-vitals-hVzxNkul.js"
+        },
+        {
+          "kb": 3,
+          "tipo": "img",
+          "url": "/logo-icon-light.svg"
+        },
+        {
+          "kb": 3,
+          "tipo": "script",
+          "url": "/assets/InstalarApp-DX1R8Iuz.js"
+        },
+        {
+          "kb": 2,
+          "tipo": "script",
+          "url": "/assets/PwaInstallBanner-BnpCBExA.js"
+        }
+      ],
+      "largos": [],
+      "primeiroTab": "a «Ver o catálogoLivros, Bíblias, materiais»",
+      "axe": [],
+      "consola": [],
+      "falhas": []
+    },
+    {
+      "pagina": "pagina-inexistente",
+      "caminho": "/pagina-que-nao-existe",
+      "largura": "computador-1440",
+      "estado": 200,
+      "titulo": "Página não encontrada — Livraria Adventista",
+      "lang": "pt",
+      "canonical": "https://livrariaadventista.ao/",
+      "canonicais": 1,
+      "descricao": "Livraria Adventista — literatura cristã, educação e inspiração. Compre online com entrega ao domicílio.",
+      "jsonLd": 1,
+      "h1": 1,
+      "imagensSemAlt": 0,
+      "deslocamentoHorizontal": 0,
+      "alturaPagina": 900,
+      "ttfb": 3,
+      "fcp": 48,
+      "lcp": 144,
+      "lcpElemento": "p.text-muted-foreground.mb-8",
+      "lcpUrl": "",
+      "cls": 0.001,
+      "tarefasLongas": 0,
+      "tarefasLongasMs": 0,
+      "pedidos": 26,
+      "kb": {
+        "script": 267,
+        "css": 38,
+        "img": 3,
+        "font": 97,
+        "fetch": 0,
+        "outro": 0
+      },
+      "maiores": [
+        {
+          "kb": 105,
+          "tipo": "script",
+          "url": "/assets/index-CyVziAck.js"
+        },
+        {
+          "kb": 59,
+          "tipo": "script",
+          "url": "/assets/vendor-react-CJ3BZQT2.js"
+        },
+        {
+          "kb": 58,
+          "tipo": "script",
+          "url": "/assets/vendor-supabase-D2ifPpM8.js"
+        },
+        {
+          "kb": 50,
+          "tipo": "font",
+          "url": "/assets/source-serif-4-latin-wght-normal-DMe4EKeb.woff2"
+        },
+        {
+          "kb": 47,
+          "tipo": "font",
+          "url": "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2"
+        },
+        {
+          "kb": 38,
+          "tipo": "css",
+          "url": "/assets/index-C-7xPJUX.css"
+        },
+        {
+          "kb": 19,
+          "tipo": "script",
+          "url": "/assets/motionFeatures-DmCo8QWT.js"
+        },
+        {
+          "kb": 6,
+          "tipo": "script",
+          "url": "/assets/Helmet-BIjACoBe.js"
+        },
+        {
+          "kb": 4,
+          "tipo": "script",
+          "url": "/assets/web-vitals-hVzxNkul.js"
+        },
+        {
+          "kb": 3,
+          "tipo": "img",
+          "url": "/logo-icon-light.svg"
+        },
+        {
+          "kb": 3,
+          "tipo": "script",
+          "url": "/assets/InstalarApp-DX1R8Iuz.js"
+        },
+        {
+          "kb": 2,
+          "tipo": "script",
+          "url": "/assets/PwaInstallBanner-BnpCBExA.js"
+        }
+      ],
+      "largos": [],
+      "consola": [],
+      "falhas": []
+    }
+  ]
+}
