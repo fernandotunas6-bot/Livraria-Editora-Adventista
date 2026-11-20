@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Endireita a frente de uma maquete 3D da CPB (livro em pé sobre fundo preto ou branco)."""
 import sys, json, numpy as np, cv2
 from PIL import Image

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Painel de Vendas da Loja do Huambo (pacote painel-vendas-huambo), igual à página autónoma do pacote.
  * mountPainel(root, api) desenha-o dentro de `root` (o Shadow DOM do separador do Painel Admin) e devolve a função que o desmonta.

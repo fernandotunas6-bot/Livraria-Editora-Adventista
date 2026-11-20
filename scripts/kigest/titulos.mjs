@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Os títulos do KiGest foram escritos ao balcão, em maiúsculas e com as gralhas de quem
 // digitou («COMO CONHECER A VONTE DE DEUS», «O DESEJADO DE TODAS AS NOÇOES», «BIBLIA SGARADA»).
 // Na loja online não podem aparecer assim. Aqui passam a maiúsculas e minúsculas pelas regras

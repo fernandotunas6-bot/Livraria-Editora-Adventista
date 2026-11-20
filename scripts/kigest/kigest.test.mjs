@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Testes dos módulos do KiGest. Correm no `npm test` (o vitest inclui scripts/**/*.test.mjs) e
 // não tocam na rede nem na base de dados: a exportação de exemplo é escrita aqui.
 import { afterAll, describe, expect, it } from 'vitest';

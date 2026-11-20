@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários da migração 20261114200000_colportores_igrejas_cartao_avaliacoes, com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/colportores.mjs supabase/migrations
 // Instruções em base.mjs e em docs/COLPORTAGEM.md (secções 6 a 9).

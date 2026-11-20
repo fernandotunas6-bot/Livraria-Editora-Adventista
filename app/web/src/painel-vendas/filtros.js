@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Filtros avançados dos relatórios (painel de cada loja e relatório conjunto): o período (ano,
  * trimestre, semestre, até ao último mês registado ou de um mês a outro), só os meses fechados e,

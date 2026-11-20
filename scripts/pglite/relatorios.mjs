@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários dos relatórios de vendas de todas as livrarias (migrações 20261114120000 e 20261114140000):
 // a permissão «Editar relatórios de vendas», quem lê, grava e apaga, o histórico no servidor, os
 // documentos do relatório conjunto, as vendas do sistema por loja (vendas_do_sistema), os mais

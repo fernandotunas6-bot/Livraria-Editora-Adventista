@@ -1,3 +1,6 @@
+-- Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+-- © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 -- Testes de segurança da lista de desejos (security_spec.md, secção 2, casos 01–12).
 --
 -- Corre no SQL Editor do Supabase. Faz as tentativas como o cliente A (o primeiro

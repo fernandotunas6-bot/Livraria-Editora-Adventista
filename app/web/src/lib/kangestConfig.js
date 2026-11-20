@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Assistente da configuração da ligação ao KanGest (docs/KANGEST.md §2): monta o segredo KANGEST_LIGACOES com as
 // mesmas regras com que a Edge Function o lê (supabase/functions/app/kangest.ts, lerLigacoes), o comando para o
 // gravar e o SQL do agendador. Corre só no navegador: a chave e o segredo não saem dele.

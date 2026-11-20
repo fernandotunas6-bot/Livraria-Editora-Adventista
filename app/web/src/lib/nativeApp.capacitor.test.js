@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 // Com o Capacitor verdadeiro (sem simulações): os plugins carregados pelo site têm de chegar a

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cérebro do assistente: perceber o pedido, responder com dados reais e saber quando passar
 // à equipa. Funções puras (sem base de dados nem rede), testadas em chatEngine.test.ts.
 //

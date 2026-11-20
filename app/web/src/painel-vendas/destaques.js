@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Os mais vendidos dos vídeos: o que o site vendeu (public.produtos_mais_vendidos) e o que se
  * lançou à mão (public.vendas_produtos), por loja, por mês e no ano — e somados para a rede.

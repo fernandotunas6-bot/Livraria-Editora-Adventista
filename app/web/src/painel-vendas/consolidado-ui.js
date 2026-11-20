@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * O ecrã do relatório conjunto das livrarias (separador «Todas as livrarias» do Painel Admin).
  * mountConsolidado(root, api) desenha-o dentro de `root` (um Shadow DOM, como o painel de cada loja)

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Lista de origem dos sites bloqueados na comunidade: os mesmos domínios que a migração
  * 20261106220000_comunidade_links_seguros põe em `community_blocked_domains` (o teste

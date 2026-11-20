@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Procura na loja da CPB a capa dos produtos que ainda têm capa tipográfica.
 
     python3 procurar_capas.py alvos.txt candidatos.json

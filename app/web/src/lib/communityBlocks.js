@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Bloquear uma pessoa na comunidade (migração 20261119200000_bloquear_na_comunidade).
 //
 // A regra 1.2 da App Store pede, para conteúdo publicado pelos utilizadores, que cada pessoa possa

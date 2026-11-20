@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Montagens de produto: recorte (máscara), fundo neutro, sombra suave."""
 import numpy as np, cv2
 from PIL import Image, ImageFilter

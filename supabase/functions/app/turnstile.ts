@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cloudflare Turnstile: prova de que quem envia um formulário público não é um programa.
 //
 // Achado da análise crítica de 2026-11-20: o checkout é público, cada encomenda reserva stock, e as

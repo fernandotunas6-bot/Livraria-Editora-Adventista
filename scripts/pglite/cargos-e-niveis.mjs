@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários dos cargos, da permissão «Ver relatórios», dos níveis dos leitores e dos sinais em
 // tempo real (migrações 20261108130000, 131000 e 132000), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/cargos-e-niveis.mjs supabase/migrations

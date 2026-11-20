@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * O guião dos vídeos dos relatórios: uma ou duas frases por quadro, tiradas dos números, em
  * português. É o teleponto de quem grava a narração no Estúdio de vídeo e são as legendas do vídeo.

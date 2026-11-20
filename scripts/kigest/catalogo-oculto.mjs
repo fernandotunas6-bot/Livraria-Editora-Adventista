@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Os produtos do catálogo que a chave pública não vê.
 //
 // O scripts/kigest/migracao.mjs lê o catálogo do site com a chave pública — e a chave pública

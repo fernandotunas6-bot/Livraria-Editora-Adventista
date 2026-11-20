@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * O som dos vídeos dos relatórios, gerado no navegador com a Web Audio API: sem ficheiros de áudio,
  * sem licenças e sem serviços de fora. O mesmo vídeo soa sempre igual.

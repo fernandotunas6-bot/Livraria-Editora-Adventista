@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Postgres em WASM (PGlite) com o mínimo do Supabase que as migrações usam: papéis, auth.*,
 // storage.*, cron.*, net.*, vault.*. Serve para correr as migrações reais e testar cenários sem
 // Docker nem Postgres instalado (ver docs/PAGAMENTOS.md, "Testes").

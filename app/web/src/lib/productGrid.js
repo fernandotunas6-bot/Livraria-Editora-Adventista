@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Grelha de produtos única para o site inteiro, como nas grandes lojas: duas colunas no
 // telemóvel, três no tablet, quatro e cinco no desktop, com espaços compactos. Antes cada
 // página tinha a sua (2/3/4 com 24 px de espaço, ou 2/4, ou 2/3/4/5/6), e o mesmo livro

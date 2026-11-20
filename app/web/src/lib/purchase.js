@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Quando uma encomenda conta como compra feita: não cancelada, e já paga, entregue ou confirmada
 // pelo cliente. É a regra da "compra verificada" nas avaliações; a base de dados aplica a mesma
 // (public.book_reviews_before_save, migração 20261106160000). Mudar um lado obriga a mudar o outro.

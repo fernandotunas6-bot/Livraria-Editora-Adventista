@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Dinheiro escrito sempre da mesma maneira: "Kz 14 500,00", o formato da loja (formatCurrency em
 // api/EcommerceApi.js, que recebe cêntimos). Este recebe kwanzas.
 //

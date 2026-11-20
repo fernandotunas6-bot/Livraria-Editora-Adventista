@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Operação da loja: horário de funcionamento, prazos de entrega prometidos, que função da equipa
 // trata cada alerta e por que canais sai cada aviso. Funções puras, testadas em
 // opsRouting.test.ts; a base de dados decide QUEM recebe (public.ops_recipients).

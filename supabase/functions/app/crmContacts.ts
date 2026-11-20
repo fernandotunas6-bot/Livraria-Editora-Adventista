@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Regras de escrita no CRM (tabela `contacts`) a partir de rotas públicas.
 //
 // O formulário de contacto e o checkout escrevem no CRM sem sessão, e o contacto encontra-se pelo

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Endereços de subscrição Web Push aceites em /push/subscribe.
 //
 // A rota é pública (os visitantes também recebem as novidades da app) e o servidor faz depois um

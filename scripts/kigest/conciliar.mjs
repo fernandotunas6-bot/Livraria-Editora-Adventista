@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Conciliação entre o catálogo do site (public.stock_books) e o catálogo da loja (KiGest).
 //
 // Os dois catálogos nasceram da mesma lista de preços da Casa Publicadora Brasileira, mas

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Utilitários de execução da Edge Function, sem nada de Deno nem de Supabase — por isso
 // testáveis no `npm test` (ver runtime.test.ts).
 

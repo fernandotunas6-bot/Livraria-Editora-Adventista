@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Faixa de aviso: leitura dos avisos no ar (a base de dados só os devolve ligados e dentro das
  * datas) e escrita pela equipa. Migração: supabase/migrations/20261106210000_faixa_de_aviso.sql.

@@ -1,14 +1,31 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { supabaseCspPlugin } from '../../scripts/csp-supabase.mjs';
 import { appVersionPlugin } from '../../scripts/app-version.mjs';
 
+/** Aviso de direitos de autor no topo de cada ficheiro JavaScript da compilação (depois da minificação). */
+const AVISO =
+  '/*! Livraria Editora Adventista — © 2026 Valentino Canguele (926 445 277 · valentinocanguele@gmail.com). Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor. */';
+function avisoDireitos() {
+  return {
+    name: 'livraria-aviso-direitos',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      for (const f of Object.values(bundle)) if (f.type === 'chunk') f.code = `${AVISO}\n${f.code}`;
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
   // O CSP do `_headers` passa a aceitar só o projecto Supabase da loja (ver o script). A versão
   // de cada build vai para o código e para /version.json: é como a app aberta sabe que há uma
   // versão nova (scripts/app-version.mjs).
-  plugins: [react(), supabaseCspPlugin(loadEnv(mode, __dirname, 'VITE_').VITE_SUPABASE_URL), appVersionPlugin()],
+  plugins: [react(), supabaseCspPlugin(loadEnv(mode, __dirname, 'VITE_').VITE_SUPABASE_URL), appVersionPlugin(), avisoDireitos()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

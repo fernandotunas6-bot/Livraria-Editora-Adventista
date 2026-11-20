@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Importação do registo da Igreja a partir dos ficheiros que já existiam (churches.json e
  * pastores.json). Código puro: recebe os dois ficheiros e a geografia da base de dados e

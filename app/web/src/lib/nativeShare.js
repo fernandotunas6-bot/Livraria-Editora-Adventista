@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Partilhar com a folha do próprio sistema (WhatsApp, Facebook, SMS, copiar…), como nas lojas
 // e redes sociais no telemóvel. Onde não existe (a maioria dos computadores), quem chama
 // decide a alternativa: copiar a ligação ou abrir o WhatsApp. Dentro do app iOS (lib/nativeApp.js)

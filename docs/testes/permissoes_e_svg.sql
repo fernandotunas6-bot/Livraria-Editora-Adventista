@@ -1,3 +1,6 @@
+-- Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+-- © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 -- Verificação das correcções da revisão de 2026-11-06 que vivem na base de dados:
 --   A) `private.has_permission` só aceita o booleano JSON `true`
 --      (migração `20261106122000_permissoes_so_booleanos`);

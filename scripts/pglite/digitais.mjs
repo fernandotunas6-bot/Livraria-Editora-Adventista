@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários dos livros digitais (migração livros_digitais), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/digitais.mjs supabase/migrations
 // Instruções em base.mjs e em docs/PAGAMENTOS.md ("Testes").

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // As secções do painel, num só sítio: a que grupo pertencem, como se chamam na navegação e no
 // título da página, o que fazem, que ícone têm, quem as pode ver e — nas que se dividem em
 // partes — as suas vistas (as sub-secções: Colportagem › Contas, Configurações › Envio…).

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Actualizar a lista de encomendas do painel sem a pedir toda: só as que mudaram desde a última
 // vez (coluna `updated`, com o relógio do servidor), juntas às que já lá estão.
 

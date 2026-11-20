@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // As encomendas vistas pelo cliente (A minha conta, rastreio): em que ponto estão, em palavras
 // simples, o que falta fazer e se ainda as pode cancelar.
 //

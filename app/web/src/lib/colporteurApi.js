@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Colportores — candidatura pública (Edge Function), painel (base de dados com RLS e funções
  * de 20261107101000_colportores.sql) e a área do próprio colportor.

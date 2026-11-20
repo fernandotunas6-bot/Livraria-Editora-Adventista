@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Gera a migração e o relatório de uma exportação do KiGest:
 //
 //   node scripts/kigest/migracao.mjs <ficheiro.kigest> [--sql <saída.sql>] [--relatorio <saída.md>]

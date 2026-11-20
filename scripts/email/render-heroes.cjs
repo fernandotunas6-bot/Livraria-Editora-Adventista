@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Gera as imagens do topo dos emails (1200×520) a partir dos banners da galeria da loja.
 // Uso: node scripts/email/render-heroes.cjs <pasta-de-saída>
 // Depois, enviar os JPEG para o bucket público `media` em `email/` (ver EMAIL_HEROES em emailLayout.ts).

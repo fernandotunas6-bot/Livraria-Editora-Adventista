@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Métodos de pagamento no checkout. As regras são as do servidor
 // (supabase/functions/app/checkoutRules.ts): mudar um lado obriga a mudar o outro.
 

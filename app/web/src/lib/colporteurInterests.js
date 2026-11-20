@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Os interessados que os colportores escrevem nos relatórios semanais (nome, telefone, bairro e
  * pedido), juntos por distrito e com o pastor do distrito, para a equipa os encaminhar.

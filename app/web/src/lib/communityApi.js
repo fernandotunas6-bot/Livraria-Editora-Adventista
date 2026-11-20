@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Comunidade: leitura pelas funções públicas (`community_list`, `community_list_replies`,
  * `community_thread`, `community_reader`, `community_sidebar`, `community_current_club`), sem

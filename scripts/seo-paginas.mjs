@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Funções puras do pós-build de SEO (ver seo-catalogo.mjs): sem rede nem disco, para serem
 // testadas no `npm test` (seo-paginas.test.mjs).
 

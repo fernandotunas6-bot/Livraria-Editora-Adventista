@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Quando mostrar o aviso "Instalar App" (PwaInstallBanner).
 //
 // Aparecia mal a página abria, em todas as páginas: no telemóvel tapava o chat e o conteúdo,

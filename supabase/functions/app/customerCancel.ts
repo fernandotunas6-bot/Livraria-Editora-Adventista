@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Quando o cliente pode cancelar uma encomenda sua (rota /order/cancel e o `can_cancel` do
 // /track). A regra que decide é a de public.order_cancel_by_customer, na base de dados, com a
 // linha bloqueada; esta cópia só serve para mostrar ou esconder o botão e responder sem ir à base.

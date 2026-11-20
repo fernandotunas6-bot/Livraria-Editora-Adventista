@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Fotografias das lojas físicas: de uma pasta de originais para WebP prontas para o site.
 
 As fotografias chegam das lojas como JPEG de telemóvel (1280×960, 150 KB cada). O site mostra-as

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Regras dos pagamentos registados que não dependem da base de dados. Testes em payments.test.ts.
 //
 // O estado do pagamento é calculado pela base de dados a partir de `order_payments`

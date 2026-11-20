@@ -2,6 +2,8 @@
   "name": "livraria-adventista",
   "version": "0.0.0",
   "private": true,
+  "author": "Valentino Canguele <valentinocanguele@gmail.com>",
+  "license": "UNLICENSED",
   "scripts": {
     "setup": "npm install",
     "dev": "npm run dev --prefix app/web",

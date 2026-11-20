@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Facebook, Instagram, Youtube, Mail, MapPin, ExternalLink, CheckCircle2, PackageSearch, Truck, CreditCard, Store, MessageCircle } from 'lucide-react';
@@ -488,6 +491,8 @@ const Footer = () => {
 
         <div className="flex flex-col items-center gap-2 border-t border-background/20 pt-8 text-center sm:flex-row sm:justify-center sm:gap-4">
           <p className="text-sm text-background/70">{copyright}</p>
+          {/* Crédito de quem desenvolveu: fixo, fora das definições do painel. */}
+          <p className="text-sm text-background/70"><a href="mailto:valentinocanguele@gmail.com" className="hover:underline">Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com</a></p>
           {/* Fora das colunas, que o painel pode mudar: as páginas legais ficam sempre ligadas. */}
           <Link to="/privacidade" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Política de privacidade</Link>
           <Link to="/termos" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Termos e condições</Link>

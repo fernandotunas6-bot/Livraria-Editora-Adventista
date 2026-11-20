@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Auditoria visual da loja publicada (docs/audits/livraria-premium-360.md, Fase 2.2): capturas
 // em cinco larguras, medições de carregamento, erros da consola e acessibilidade (axe-core).
 //

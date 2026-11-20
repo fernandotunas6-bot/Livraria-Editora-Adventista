@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Trata as capas aprovadas na auditoria visual e grava-as no lugar das capas tipográficas.
 
     python3 capas_internet.py docs/catalogo/capas-internet.json pasta-das-fontes/ [--so id1,id2]

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Registo da Igreja (campos, distritos, igrejas, pastores) — leitura e escrita directas na base
  * de dados, com as regras RLS de `20261107100000_registo_igreja.sql`. As operações que mexem em

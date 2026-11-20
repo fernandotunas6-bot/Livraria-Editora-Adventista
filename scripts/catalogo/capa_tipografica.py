@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 """Capas tipográficas para os produtos que vieram do KiGest sem fotografia.
 
 Os 287 artigos que a loja vende e o site não tinha chegaram do KiGest só com nome, preço e

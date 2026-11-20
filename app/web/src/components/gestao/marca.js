@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * A marca do Painel de Gestão: o logótipo da Livraria & Editora Adventista (o azul, e o branco para os fundos
  * escuros) e as cores. Para outro cliente, troca-se só este ficheiro.

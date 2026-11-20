@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   _esquecerJwt, apnsConfig, apnsEndpoint, apnsJwt, apnsPayload, apnsTokenOf, isApnsToken, sendApns, type ApnsConfig,

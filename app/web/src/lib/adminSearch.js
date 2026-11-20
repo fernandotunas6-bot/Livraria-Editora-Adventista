@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O que se escreveu na procura do painel (Ctrl+K)? Um número de encomenda, um código de produto,
 // um email, um telefone ou texto solto. Conforme o que for, a procura põe à frente a acção certa
 // ("Abrir produto LIV-063", "Encomendas de ana@…") em vez de só procurar secções pelo nome.

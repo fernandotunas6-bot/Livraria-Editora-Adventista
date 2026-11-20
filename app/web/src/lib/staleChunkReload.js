@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Depois de cada publicação, os ficheiros do site com o hash antigo (/assets/Página-ab12cd34.js)
 // deixam de existir, e o Cloudflare Pages responde a esses endereços com o index.html (200,
 // text/html; verificado a 2026-11-07). Quem tinha o site aberto e mudava de página pedia o

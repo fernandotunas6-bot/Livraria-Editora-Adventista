@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários das duas migrações do KiGest (20261112140000_catalogo_do_kigest e
 // 20261112141000_descricoes_que_faltavam), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/kigest.mjs supabase/migrations

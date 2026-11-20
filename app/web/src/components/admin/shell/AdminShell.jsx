@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SidebarInset, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import AdminTopBar from '@/components/admin/shell/AdminTopBar';

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Gera uma migração com as vendas de um PowerPoint «Painel de Vendas» da loja.
 //
 //   node scripts/relatorios/pptx-para-sql.mjs "Loja Huambo - Painel-Vendas 2026S.pptx" [--nome vendas_ate_novembro] [--escrever]

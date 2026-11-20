@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O que falta para os clientes pagarem sem dúvidas — a lista no topo de Vendas → Métodos de
 // pagamento. Cada ponto diz o que falta, porque importa e onde se resolve (`action`: a secção e a
 // vista do painel). Os dados em si (NIF, telefone, prazo, gateway) são decisões do dono: o painel

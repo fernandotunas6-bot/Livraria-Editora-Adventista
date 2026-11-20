@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Percentagem do colportor. A regra que conta está na base de dados
  * (`private.colporteur_pct`, migração 20261107101000_colportores); esta cópia serve a matriz e

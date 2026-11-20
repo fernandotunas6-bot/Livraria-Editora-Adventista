@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Os algarismos de um valor a rodar até ao número, como num contador mecânico ou numa máquina de
  * calcular: cada algarismo é uma fita de 0 a 9 que sobe; os da esquerda param primeiro e os da

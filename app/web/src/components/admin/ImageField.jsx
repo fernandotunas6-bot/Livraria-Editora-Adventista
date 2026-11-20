@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link2, Upload, X, ImageIcon, Info, HardDrive, Loader2, Images, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';

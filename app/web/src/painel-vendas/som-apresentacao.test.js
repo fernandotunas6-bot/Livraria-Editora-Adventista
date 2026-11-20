@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { afterEach, describe, expect, it } from 'vitest';
 import { criarSomDaApresentacao, instantesDosTiques, somLigadoGuardado } from './som-apresentacao.js';
 

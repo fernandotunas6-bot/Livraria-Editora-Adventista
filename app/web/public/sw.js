@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 const CACHE_NAME = 'livraria-v8';
 // As imagens numa cache à parte e com tecto: cada capa vista ficava guardada para sempre, e num
 // telemóvel com pouco espaço a cache do site crescia sem fim (análise crítica de 2026-11-20).

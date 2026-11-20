@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Pagamentos registados, no site: o que se lê do pagamento de uma encomenda (liquidado, em
 // falta, por reembolsar, pago a mais) e a receita dos painéis e relatórios.
 //

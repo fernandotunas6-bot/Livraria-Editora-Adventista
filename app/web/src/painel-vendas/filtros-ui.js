@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * A barra «Filtros» dos relatórios (painel de cada loja e relatório conjunto), por baixo do topo.
  * Guarda a escolha no browser (por ecrã) e chama `onChange(filtro)` quando muda. As contas estão

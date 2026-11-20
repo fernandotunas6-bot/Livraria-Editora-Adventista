@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O mês da loja em números, para o Início do painel: do dia 1 até hoje, comparado com os mesmos
 // dias do mês anterior (1 a 8 de Novembro contra 1 a 8 de Outubro — comparar o mês a meio com o
 // mês anterior inteiro dizia sempre "a descer").

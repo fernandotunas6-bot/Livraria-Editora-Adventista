@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Níveis dos leitores (migração 20261108131000_niveis_dos_leitores; decisões do dono de
 // 2026-11-08). Toda a conta começa como «Conta nova»; ao pagar o primeiro livro passa a «Leitor» e
 // entra na Comunidade de Leitores; depois sobe por livros comprados. Quem participa sem comprar

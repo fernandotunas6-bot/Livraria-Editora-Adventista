@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Guardar no navegador respostas públicas (configurações do site, integrações activas) para quem
 // volta ao site as ter logo, sem esperar pela Edge Function (~2 s a partir de Angola), e pedir a
 // versão nova por trás. A cache HTTP já faz isto durante 5 minutos (stale-while-revalidate do
