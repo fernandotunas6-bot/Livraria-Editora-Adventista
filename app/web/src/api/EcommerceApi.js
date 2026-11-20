@@ -476,6 +476,7 @@ export async function initializeCheckout({
   colporteurCode,
   customerNif,
   expectedTotal,
+  turnstileToken,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -518,6 +519,8 @@ export async function initializeCheckout({
       // O total que o cliente viu: se o do servidor for outro, a compra pára (409) e pede-se
       // confirmação, em vez de gravar outro valor.
       ...(Number.isFinite(expectedTotal) && expectedTotal > 0 ? { expectedTotal } : {}),
+      // Cloudflare Turnstile, quando a loja o liga.
+      ...(turnstileToken ? { turnstileToken } : {}),
     }),
   });
 
@@ -547,11 +550,12 @@ export async function initializeCheckout({
   };
 }
 
-export async function subscribeNewsletter(email) {
+/** Pede a subscrição: o servidor manda um email com o link de confirmação (dupla confirmação). */
+export async function subscribeNewsletter(email, { turnstileToken = '' } = {}) {
   const res = await fetch(`${APP_API_URL}/newsletter`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, ...(turnstileToken ? { turnstileToken } : {}) }),
   });
 
   const data = await res.json().catch(() => ({}));

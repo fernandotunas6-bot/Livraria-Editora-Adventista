@@ -1,5 +1,7 @@
 // Primeiro de tudo: o www e o endereço do Pages vão para o domínio principal (lib/canonicalHost.js).
 import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
+import { applyStoreScriptPolicy } from '@/lib/storeCsp';
+import { EM_GESTAO } from '@/lib/gestaoHost';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App';
@@ -18,6 +20,10 @@ import { prefetchProduct } from '@/api/EcommerceApi';
 import { installTelemetry } from '@/lib/telemetry';
 import { capturarPedidoDeInstalacao } from '@/lib/pwaInstall';
 import { eAppNativa, esconderArranque } from '@/lib/nativeApp';
+
+// Na loja, uma política de scripts mais apertada do que a do `_headers` (sem os domínios da Google,
+// que só o painel usa), antes de qualquer outro script da página (lib/storeCsp.js).
+applyStoreScriptPolicy({ pathname: window.location.pathname, emGestao: EM_GESTAO });
 
 // Antes de montar: os interruptores viram atributos no `<html>`, e o CSS já encontra o
 // estado certo na primeira pintura. Feito depois, os elementos apareciam um instante com

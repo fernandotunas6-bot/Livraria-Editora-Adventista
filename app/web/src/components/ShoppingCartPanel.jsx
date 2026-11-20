@@ -41,6 +41,7 @@ import { MOTION } from '@/lib/motion';
 import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
 import { checkoutMemoryKey, checkoutMemoryOff, readCheckoutMemory, saveCheckoutMemory, setCheckoutMemoryEnabled } from '@/lib/checkoutMemory';
+import TurnstileWidget, { TURNSTILE_WAIT, useTurnstileToken } from '@/components/TurnstileWidget';
 
 /** O NIF para a factura, sem espaços nem pontos e em maiúsculas; '' se não tiver a forma de um NIF (9 a 14). */
 const nifLimpo = (v) => {
@@ -94,6 +95,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   // O total que o servidor disse ser o certo, quando o do carrinho não batia (preço, promoção ou
   // portes mudaram entretanto). A próxima confirmação vai com ele; muda o carrinho, apaga-se.
   const [serverTotal, setServerTotal] = useState(null);
+  // Cloudflare Turnstile, quando a loja o liga (turnstile_site_key no /settings): um token por envio.
+  const human = useTurnstileToken();
   const signatureRef = useRef(null);
   // Tentativa de checkout em curso: { fingerprint, key }. Fica entre carregamentos do botão
   // e só é limpa quando a encomenda é confirmada.
@@ -455,6 +458,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     }
     setErrors({});
 
+    // Sem o token do Turnstile (ainda a confirmar, ou o Cloudflare pede um clique), o servidor recusaria.
+    if (settings.turnstile_site_key && !human.token) {
+      toast({ title: 'Um momento', description: TURNSTILE_WAIT });
+      return;
+    }
+
     // Transferência e Multicaixa: paga-se depois de encomendar, com o número da encomenda; a
     // referência indica-se na página seguinte (ou no rastreio). Já não se pede aqui.
 
@@ -517,6 +526,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       const { orderId, total, orderNumber, order_type, whatsapp_sent, payment_status } = await initializeCheckout({
         ...checkoutPayload,
         idempotencyKey: checkoutAttemptRef.current.key,
+        // Fora do `checkoutPayload`: muda a cada tentativa e não pode mudar a chave de idempotência.
+        ...(human.token ? { turnstileToken: human.token } : {}),
       });
       checkoutAttemptRef.current = null;
 
@@ -597,8 +608,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       });
     } finally {
       setCheckingOut(false);
+      // Os tokens servem uma vez: o próximo envio leva outro.
+      human.reset();
     }
-  }, [serverTotal, totalCents, cartItems, clearCart, refreshCart, deliveryAddress, digitalOnly, form, gps, maintenanceMode, needsLogin, openAuth, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shipping, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
+  }, [human, serverTotal, totalCents, cartItems, clearCart, refreshCart, deliveryAddress, digitalOnly, form, gps, maintenanceMode, needsLogin, openAuth, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shipping, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
 
   const maxQty = (item) => (isDigitalCartItem(item) ? 1 : item.variant.manage_inventory ? item.variant.inventory_quantity : 99);
   // Edição digital sem forma de pagar pelo site (só há pagamento na entrega ou no balcão).
@@ -1263,6 +1276,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         )}
                       </div>
                     )}
+                    <TurnstileWidget siteKey={settings.turnstile_site_key} onToken={human.setToken} resetKey={human.resetKey} action="checkout" />
                     <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode || noDigitalPayment}>
                       {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Confirmar Compra · {formatCurrency(serverTotal !== null ? Math.round(serverTotal * 100) : totalCents)}

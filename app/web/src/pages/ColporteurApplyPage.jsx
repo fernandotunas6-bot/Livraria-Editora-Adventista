@@ -12,6 +12,8 @@ import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { pageTitle } from '@/lib/brand';
 import { loadApplicationDirectory, submitApplication } from '@/lib/colporteurApi';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import TurnstileWidget, { TURNSTILE_WAIT, useTurnstileToken } from '@/components/TurnstileWidget';
 import { CATEGORIES } from '@/lib/colporteurCommission';
 import { NativeSelect } from '@/components/admin/igreja/registryUi';
 
@@ -35,6 +37,8 @@ export default function ColporteurApplyPage() {
   const [form, setForm] = useState(EMPTY);
   const [notListed, setNotListed] = useState(false);
   const [sending, setSending] = useState(false);
+  const { settings } = useSiteSettings();
+  const human = useTurnstileToken();
   const [error, setError] = useState('');
   const [done, setDone] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -63,6 +67,7 @@ export default function ColporteurApplyPage() {
     if (!/^9\d{8}$/.test(phone)) return setError('O telefone tem 9 algarismos e começa por 9 (ex.: 923 456 789).');
     if (!form.church_id && form.church_other.trim().length < 2) return setError('Escolha a sua igreja ou escreva o nome.');
     if (!form.consent) return setError('Para continuar, aceite que a Livraria use estes dados para tratar a candidatura.');
+    if (settings.turnstile_site_key && !human.token) return setError(TURNSTILE_WAIT);
     setSending(true);
     try {
       const out = await submitApplication({
@@ -71,12 +76,14 @@ export default function ColporteurApplyPage() {
         church_id: notListed ? '' : form.church_id,
         church_other: notListed ? form.church_other : '',
         weekly_hours: form.weekly_hours === '' ? null : Number(form.weekly_hours),
+        ...(human.token ? { turnstileToken: human.token } : {}),
       });
       setDone(out);
     } catch (err) {
       setError(err.message);
     } finally {
       setSending(false);
+      human.reset();
     }
   };
 
@@ -225,6 +232,7 @@ export default function ColporteurApplyPage() {
                 <span>Aceito que a Livraria Adventista use estes dados para tratar a candidatura e me contactar, e que os partilhe com o pastor do meu distrito (<Link to="/privacidade#colportagem" className="text-primary underline-offset-4 hover:underline">política de privacidade</Link>).</span>
               </label>
 
+              <TurnstileWidget siteKey={settings.turnstile_site_key} onToken={human.setToken} resetKey={human.resetKey} action="candidatura" />
               {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
               <Button type="submit" size="lg" disabled={sending} className="w-full sm:w-auto">
                 {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enviar candidatura

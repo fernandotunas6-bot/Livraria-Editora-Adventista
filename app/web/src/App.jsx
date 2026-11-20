@@ -14,6 +14,7 @@ import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
 import StaffMfaGate from '@/components/StaffMfaGate.jsx';
+import { needsReloadForStaff } from '@/lib/storeCsp';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 import ReaderActivity from '@/components/ReaderActivity.jsx';
 import { toast } from 'sonner';
@@ -52,6 +53,7 @@ const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage.jsx'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage.jsx'));
 const CollectionsPage = lazy(() => import('@/pages/CollectionsPage.jsx'));
 const UnsubscribePage = lazy(() => import('@/pages/UnsubscribePage.jsx'));
+const NewsletterConfirmPage = lazy(() => import('@/pages/NewsletterConfirmPage.jsx'));
 const SuggestionsPage = lazy(() => import('@/pages/SuggestionsPage.jsx'));
 const OrderFeedbackPage = lazy(() => import('@/pages/OrderFeedbackPage.jsx'));
 const ColporteurApplyPage = lazy(() => import('@/pages/ColporteurApplyPage.jsx'));
@@ -187,6 +189,16 @@ function ColporteurReferralCapture() {
 
 const NO_APP = eAppNativa();
 
+// A política de scripts da loja (lib/storeCsp.js) não sai sem recarregar: quem entra no painel vindo
+// da loja recarrega uma vez, para o painel poder usar os scripts da Google (Workspace, Drive).
+function StaffScriptPolicy() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (needsReloadForStaff(pathname, { emGestao: EM_GESTAO })) window.location.reload();
+  }, [pathname]);
+  return null;
+}
+
 function GlobalWidgets() {
   const { pathname } = useLocation();
   // O Painel de Gestão (e a TV da sede) ocupa o ecrã todo: sem o assistente, a barra de baixo nem os avisos da app.
@@ -289,6 +301,7 @@ function App() {
               <Route path="/confirmar-encomenda" element={<OrderFeedbackPage />} />
               <Route path="/para-si" element={<Navigate to="/sugestoes" replace />} />
               <Route path="/unsubscribe" element={<UnsubscribePage />} />
+              <Route path="/newsletter/confirmar" element={<NewsletterConfirmPage />} />
               <Route path="/cancelar-subscricao" element={<UnsubscribeAliasRedirect />} />
               <Route path="/rastreio" element={<Navigate to="/track" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
@@ -318,6 +331,7 @@ function App() {
         </RouteErrorBoundary>
         <Toaster />
         <MfaGate />
+        <StaffScriptPolicy />
         <GlobalWidgets />
         </AuthDialogProvider>
       </Router>

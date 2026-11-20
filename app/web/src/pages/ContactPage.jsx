@@ -14,6 +14,7 @@ import PageBannerSlider from '@/components/PageBannerSlider';
 import { pageTitle, BRAND } from '@/lib/brand';
 import { APP_API_URL } from '@/lib/supabaseClient';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import TurnstileWidget, { TURNSTILE_WAIT, useTurnstileToken } from '@/components/TurnstileWidget';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { MOTION } from '@/lib/motion';
 
@@ -34,16 +35,21 @@ const ContactPage = () => {
     message: ''
   });
   const [sending, setSending] = useState(false);
+  const human = useTurnstileToken();
   const { toast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (settings.turnstile_site_key && !human.token) {
+      toast({ title: 'Um momento', description: TURNSTILE_WAIT });
+      return;
+    }
     setSending(true);
     try {
       const res = await fetch(`${APP_API_URL}/contact-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, ...(human.token ? { turnstileToken: human.token } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Erro ao enviar mensagem');
@@ -60,6 +66,7 @@ const ContactPage = () => {
       });
     } finally {
       setSending(false);
+      human.reset();
     }
   };
 
@@ -175,6 +182,7 @@ const ContactPage = () => {
                   />
                 </div>
 
+                <TurnstileWidget siteKey={settings.turnstile_site_key} onToken={human.setToken} resetKey={human.resetKey} action="contacto" />
                 <Button type="submit" className="w-full btn-primary" disabled={sending}>
                   {sending ? 'A enviar...' : 'Enviar Mensagem'}
                 </Button>

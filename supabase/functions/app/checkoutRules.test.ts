@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
-  saleChannelFrom, settingNumber, shippingPhrase, successPath, unpaidOrdersToCancel,
+  saleChannelFrom, settingNumber, shippingPhrase, successPath, unconfirmedOrdersToCancel, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 
 describe("settingNumber", () => {
@@ -134,6 +134,38 @@ describe("unpaidOrdersToCancel", () => {
   it("com uma parte paga nunca cancela pelo relógio", () => {
     expect(unpaidOrdersToCancel([{ ...base, id: "parte", payment_status: "partially_paid", amount_paid: 500 }], upfront, 3, agora)).toEqual([]);
     expect(unpaidOrdersToCancel([{ ...base, id: "parte2", payment_status: "failed", amount_paid: 500 }], upfront, 3, agora)).toEqual([]);
+  });
+});
+
+describe("unconfirmedOrdersToCancel", () => {
+  const agora = Date.parse("2026-11-20T12:00:00Z");
+  const dia = 24 * 3600_000;
+  const base = {
+    status: "pending", delivery_status: "received", payment_status: "pending", payment_method_code: "entrega",
+    shipping_method: "delivery", acknowledged_at: null, created: new Date(agora - 8 * dia).toISOString(),
+  };
+  const upfront = new Set(["transferencia", "multicaixa"]);
+
+  it("com 0 dias (o valor por omissão) não cancela nada", () => {
+    expect(unconfirmedOrdersToCancel([{ ...base, id: "a" }], upfront, 0, agora)).toEqual([]);
+  });
+  it("cancela a encomenda na entrega que ninguém confirmou, passado o prazo", () => {
+    expect(unconfirmedOrdersToCancel([{ ...base, id: "a" }, { ...base, id: "b", payment_method_code: "balcao", shipping_method: "pickup" }], upfront, 7, agora)
+      .map((o) => o.id)).toEqual(["a", "b"]);
+  });
+  it("não toca nas vistas pela equipa, recentes, preparadas, pagas, digitais ou de transferência", () => {
+    const fora = [
+      { ...base, id: "vista", acknowledged_at: new Date(agora - 7 * dia).toISOString() },
+      { ...base, id: "recente", created: new Date(agora - 2 * dia).toISOString() },
+      { ...base, id: "confirmada", status: "confirmed" },
+      { ...base, id: "preparada", delivery_status: "preparing" },
+      { ...base, id: "parte-paga", payment_status: "partially_paid", amount_paid: 1000 },
+      { ...base, id: "digital", shipping_method: "digital" },
+      { ...base, id: "transferencia", payment_method_code: "transferencia" },
+      { ...base, id: "cancelada", status: "cancelled" },
+      { ...base, id: "sem-data", created: "" },
+    ];
+    expect(unconfirmedOrdersToCancel(fora, upfront, 7, agora)).toEqual([]);
   });
 });
 
