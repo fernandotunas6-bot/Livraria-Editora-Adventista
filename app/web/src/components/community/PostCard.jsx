@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   BadgeCheck, BookOpen, Copy, ExternalLink, EyeOff, Flag, Heart, MessageCircle, MoreHorizontal, Pin, PinOff,
-  Share2, Trash2,
+  Share2, Trash2, UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,7 @@ import { useMinuteTick } from '@/hooks/useMinuteTick';
 import { useReaderLevel } from '@/hooks/useReader';
 import ReaderBadge from '@/components/community/ReaderBadge';
 import { canNativeShare, nativeShare } from '@/lib/nativeShare';
+import { useBloqueios } from '@/lib/communityBlocks';
 
 const REPORT_REASONS = ['Spam ou publicidade', 'Link suspeito', 'Ofensivo ou desrespeitoso', 'Outro motivo'];
 // Links de utilizadores: sem passar autoridade de pesquisa, sem dar acesso à página de origem.
@@ -125,9 +126,15 @@ function ShareMenu({ post }) {
   );
 }
 
-function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, onReport, onRemove, onNeedAuth, onPin, onOfficial, onHide, share = false }) {
+/** O primeiro nome, para as frases curtas («Bloquear Ana»). */
+const primeiroNome = (nome) => String(nome || '').trim().split(/\s+/)[0] || 'esta pessoa';
+
+function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, onReport, onRemove, onNeedAuth, onPin, onOfficial, onHide, onBlock, share = false }) {
   const [reporting, setReporting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  // Bloquear: quem não é o próprio nem a equipa (a equipa modera; não se esconde de quem modera).
+  const podeBloquear = !!onBlock && !post.mine && !!post.author_key && !post.author_is_staff;
   const [notice, setNotice] = useState('');
   const guard = (fn) => () => (signedIn ? fn() : onNeedAuth());
   const run = async (fn) => { const err = await fn(); if (err) setNotice(err); };
@@ -167,6 +174,11 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
             {!post.mine && (
               <DropdownMenuItem onSelect={guard(() => setReporting(true))}>
                 <Flag className="mr-2 h-4 w-4" aria-hidden="true" /> Denunciar
+              </DropdownMenuItem>
+            )}
+            {podeBloquear && (
+              <DropdownMenuItem onSelect={guard(() => setConfirmBlock(true))}>
+                <UserX className="mr-2 h-4 w-4" aria-hidden="true" /> Bloquear {primeiroNome(post.author_name)}
               </DropdownMenuItem>
             )}
             {post.mine && (
@@ -215,6 +227,21 @@ function Actions({ post, liked, signedIn, isStaff, replyCount, onLike, onReply, 
           <span>Apagar {post.parent_id ? 'esta resposta' : 'esta publicação e as respostas'}?</span>
           <Button type="button" size="sm" variant="destructive" className="h-10 text-xs sm:h-8" onClick={async () => { const err = await onRemove(post); if (err) setNotice(err); setConfirmDelete(false); }}>Apagar</Button>
           <Button type="button" size="sm" variant="ghost" className="h-10 text-xs sm:h-8" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+        </div>
+      )}
+      {confirmBlock && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-editorial-filete bg-editorial-tela p-2.5 text-xs" role="group" aria-label="Bloquear">
+          <span>
+            Bloquear {post.author_name}? Deixa de ver as publicações e as respostas desta pessoa; ela não é avisada.
+            Desbloqueia-se em Perfil → Segurança e privacidade.
+          </span>
+          <Button
+            type="button" size="sm" className="h-10 text-xs sm:h-8"
+            onClick={async () => { const err = await onBlock(post); setConfirmBlock(false); if (err) setNotice(err); }}
+          >
+            Bloquear
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-10 text-xs sm:h-8" onClick={() => setConfirmBlock(false)}>Cancelar</Button>
         </div>
       )}
       {notice && <p className="text-xs text-editorial-tinta-suave" role="status">{notice}</p>}
@@ -291,6 +318,7 @@ export default function PostCard({
   const [focusReply, setFocusReply] = useState(false);
   const replyBox = useRef(null);
   const navigate = useNavigate();
+  const { bloqueado, bloquear, desbloquear } = useBloqueios();
   const focusBox = () => {
     const box = replyBox.current?.querySelector('textarea');
     box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -319,10 +347,14 @@ export default function PostCard({
     if (typeof window !== 'undefined' && String(window.getSelection?.() || '').trim()) return;
     navigate(postPath(post.id));
   };
+  // Quem foi bloqueado (lib/communityBlocks.js): a publicação e as respostas dessa pessoa não
+  // aparecem. Na página da publicação fica um aviso, para se poder desbloquear.
+  const autorBloqueado = !post.mine && bloqueado(post.author_key);
   const showComposer = replying && signedIn;
-  const official = replies.filter((r) => r.is_official);
-  const others = replies.filter((r) => !r.is_official);
-  const visibleReplies = full ? replies : [...official, ...others.slice(-(official.length ? 1 : 2))];
+  const daQuemSeVe = replies.filter((r) => r.mine || !bloqueado(r.author_key));
+  const official = daQuemSeVe.filter((r) => r.is_official);
+  const others = daQuemSeVe.filter((r) => !r.is_official);
+  const visibleReplies = full ? daQuemSeVe : [...official, ...others.slice(-(official.length ? 1 : 2))];
   // O feed só recebe as respostas que mostra (FEED_REPLIES_PER_POST): o total vem da publicação.
   const totalReplies = Math.max(Number(post.replies_count) || 0, replies.length);
   const hiddenCount = totalReplies - visibleReplies.length;
@@ -330,9 +362,22 @@ export default function PostCard({
   const topic = post.topic ? topics[post.topic] : null;
   const kind = postKind(post.kind);
   const answered = post.kind === 'pergunta' && official.length > 0;
+  const onBlock = (alvo) => bloquear(alvo.author_key, alvo.author_name);
   const actionProps = {
-    liked: false, signedIn, isStaff, onLike, onReport, onRemove, onNeedAuth, onPin, onOfficial, onHide,
+    liked: false, signedIn, isStaff, onLike, onReport, onRemove, onNeedAuth, onPin, onOfficial, onHide, onBlock,
   };
+
+  if (autorBloqueado) {
+    if (!full) return null;
+    return (
+      <div className="rounded-2xl border border-editorial-filete bg-editorial-papel p-5 text-sm text-editorial-tinta-suave" data-autor-bloqueado>
+        <p>Bloqueou quem escreveu esta publicação, por isso não a vê.</p>
+        <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => desbloquear(post.author_key)}>
+          Desbloquear {primeiroNome(post.author_name)}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <article

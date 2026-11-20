@@ -57,7 +57,10 @@ jobs:
         run: node scripts/ligacoes-app.mjs dist/app/web
         env:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+          # Por omissão, a impressão (pública) da chave de envio guardada no Vault do Supabase
+          # (android.yml, passo «Chave de envio»). Com a Play Store, juntar a da chave da Google
+          # na variável, separadas por vírgulas (docs/APPS.md).
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 || 'BE:E1:ED:98:5B:ED:0C:71:B7:AD:80:0A:4A:1E:60:5F:7A:7C:61:29:15:A8:4D:39:F5:93:92:02:E5:FE:23:A7' }}
 
       # O APK da app Android (workflow «App Android») vive numa Release do GitHub; o repositório
       # é privado e quem visita o site não o descarregava de lá. Vai para /downloads/, servido pelo

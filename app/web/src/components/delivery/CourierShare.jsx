@@ -265,9 +265,19 @@ export default function CourierShare({ orderId, deliveryStatus, compact = false 
             </Button>
           </div>
         ) : (
-          <Button type="button" size="sm" onClick={start} data-partilhar>
-            <Radio className="mr-1.5 h-4 w-4" aria-hidden="true" /> Partilhar a minha localização com o cliente
-          </Button>
+          <div className="space-y-2">
+            {/* Nos apps a partilha continua com o ecrã apagado: diz-se antes de o telemóvel pedir a
+                localização (a «divulgação clara» que a Google Play pede, e a Apple também lê). */}
+            {noApp && (
+              <p className="text-[11px] text-muted-foreground" data-aviso-localizacao>
+                Ao partilhar, a app envia a sua localização ao cliente desta encomenda de alguns em alguns segundos,
+                mesmo com o ecrã apagado ou noutra app, até à entrega ou até carregar em «Parar de partilhar».
+              </p>
+            )}
+            <Button type="button" size="sm" onClick={start} data-partilhar>
+              <Radio className="mr-1.5 h-4 w-4" aria-hidden="true" /> Partilhar a minha localização com o cliente
+            </Button>
+          </div>
         )
       ) : (
         <p className="text-[11px] text-muted-foreground">Quando marcar que saiu para entrega, pode partilhar a sua localização com o cliente.</p>

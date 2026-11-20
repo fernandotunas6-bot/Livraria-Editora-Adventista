@@ -54,6 +54,13 @@ beforeEach(() => {
 afterEach(() => { act(() => root?.unmount()); host?.remove(); });
 
 describe('CourierShare no app iOS', () => {
+  it('antes de partilhar, diz o que acontece à localização (a divulgação que as lojas pedem)', async () => {
+    await mount();
+    expect(host.querySelector('[data-aviso-localizacao]').textContent).toContain('mesmo com o ecrã apagado');
+    await click(button('Partilhar a minha localização'));
+    expect(host.querySelector('[data-aviso-localizacao]')).toBeNull();
+  });
+
   it('partilhar entrega o GPS ao iPhone; a página mostra as leituras e os envios', async () => {
     await mount();
     await click(button('Partilhar a minha localização'));

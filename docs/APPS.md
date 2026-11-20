@@ -115,6 +115,16 @@ e o perfil sozinho. Não há certificados nem perfis no repositório.
 
 ## Passo a passo do dono no iPhone (uma vez)
 
+### 0. Conta de programador da Apple
+
+- **Apple Developer Program** (developer.apple.com/programs, 99 USD por ano). Inscrita como
+  **organização** (a «Livraria e Editora Adventista»), a loja aparece como vendedora com esse nome,
+  mas a Apple pede o número **D-U-N-S** da empresa (gratuito, pedido em developer.apple.com/support/D-U-N-S,
+  demora uns dias) e que quem inscreve possa assinar pela empresa. Inscrita em nome de uma pessoa,
+  é o nome dela que aparece na App Store.
+- Na App Store Connect, **Business → Agreements**: aceitar o acordo das apps gratuitas (sem ele não
+  se publica nada).
+
 ### 1. Apple Developer (developer.apple.com → Certificates, Identifiers & Profiles)
 
 1. **Identifiers → +** → App IDs → App. Bundle ID **explícito**: `ao.livrariaadventista.app`.
@@ -123,6 +133,11 @@ e o perfil sozinho. Não há certificados nem perfis no repositório.
 3. **Keys → +** → nome "APNs Livraria", marcar **Apple Push Notifications service (APNs)** →
    Continue → Download. Guarda-se o ficheiro `AuthKey_XXXXXXXXXX.p8` (só se descarrega uma vez) e
    anota-se o **Key ID**. Esta chave é para o Supabase (passo 4).
+4. **Services → Sign in with Apple for Email Communication → Configure**: registar o domínio e o
+   endereço de onde a loja envia os emails (os do provedor escolhido no painel, em Configurações →
+   Email, push e chat). Quem entra com a Apple e esconde o email recebe um endereço
+   `@privaterelay.appleid.com`; sem este registo, a Apple deita fora os emails das encomendas e da
+   conta que lhe chegam. O domínio tem de ter o SPF certo para esse provedor.
 
 ### 2. App Store Connect (appstoreconnect.apple.com)
 
@@ -191,16 +206,54 @@ O que só se faz na App Store Connect:
   compras, interacção com os produtos, fotografias, áudio (só a equipa), apoio ao cliente, conteúdo
   da comunidade, falhas e desempenho. Tudo ligado à conta, **nada para rastreio nem publicidade**;
 - a **conta de demonstração** (email e palavra-passe) em «Sign-in required»: não vai para o
-  repositório;
-- «Apagar a conta» já existe em Perfil → Privacidade (regra 5.1.1).
+  repositório. São precisas **duas**, porque as notas para a revisão falam das duas:
+  - uma de cliente, com pelo menos uma encomenda, um livro na biblioteca e acesso à comunidade;
+  - uma de **colportor** com uma entrega «Saiu para entrega» em Área do colportor → Entregas → Para
+    entregar, para a Apple experimentar a localização em segundo plano (sem isto recusa pela regra
+    2.5.4). Escreve-se a segunda na caixa das notas, a seguir às notas do repositório;
+- o **contacto** para a revisão (nome, telefone, email), em App Review Information;
+- **Age Rating** (classificação etária): conteúdo gerado pelos utilizadores **sim** (a comunidade);
+  acesso livre à web **não** (o app só mostra o site da loja; as ligações de fora abrem no Safari);
+  publicidade **não**; compras dentro da app **não**; o resto **não** ou **nenhum**;
+- **Pricing and Availability**: gratuita, e os países onde aparece (Angola, e os outros que se
+  quiser);
+- **Content Rights**: o app mostra capas e excertos dos livros que a loja vende, com o direito de o
+  fazer;
+- a **exportação com cifra** fica respondida pelo `ITSAppUsesNonExemptEncryption = false` do
+  Info.plist (só HTTPS): o TestFlight não pergunta;
+- «Apagar a conta» já existe em Perfil → Segurança e privacidade → Os seus dados (regra 5.1.1);
+- **Comunidade** (regra 1.2): denunciar, a publicação oculta à terceira denúncia, **bloquear** uma
+  pessoa (menu «⋯» → «Bloquear»; lista em Perfil → Segurança e privacidade) e os termos com tolerância zero.
+  Está explicado nas notas para a revisão.
+
+Antes de carregar em «Adicionar para revisão», confirmar:
+
+1. o deploy do site depois de pôr a `APPLE_TEAM_ID` (passo 3) publicou
+   `https://livrariaadventista.ao/.well-known/apple-app-site-association`. As notas para a revisão
+   dizem que os links e as palavras-passe do site abrem no app, e a Apple experimenta;
+2. as duas contas de demonstração entram no app do TestFlight e mostram o que as notas dizem;
+3. uma notificação chega a um iPhone com o app do TestFlight (sem `APNS_ENV=sandbox` no Supabase);
+4. «Continuar com a Apple» entra, e uma encomenda de teste manda o email para o endereço da Apple;
+5. o site publicado já tem o bloqueio da comunidade e a política de privacidade nova (o app mostra
+   o site: o que não estiver publicado, a Apple não vê).
 
 ## Passo a passo do dono no Android (uma vez)
 
-1. **Chave de envio** (num computador com Java):
-   `keytool -genkeypair -v -keystore envio.jks -alias livraria -keyalg RSA -keysize 2048 -validity 10000`.
-   Guardar o ficheiro e as palavras-passe num sítio seguro: sem eles não se envia mais nenhuma versão.
-2. **GitHub → Secrets**: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 envio.jks`), `ANDROID_KEYSTORE_PASSWORD`,
-   `ANDROID_KEY_ALIAS` (`livraria`), `ANDROID_KEY_PASSWORD`.
+0. **Tipo de conta na Play Console** (25 USD uma vez). Uma conta **pessoal** criada depois de
+   Novembro de 2023 só publica na produção depois de um **teste fechado com pelo menos 12 pessoas
+   durante 14 dias seguidos** (Testes → Teste fechado; elas instalam pela ligação de convite). Uma
+   conta de **organização** não tem essa espera, mas pede o número **D-U-N-S** da empresa (o mesmo da
+   Apple). A Google também verifica a identidade de quem a abre.
+1. **Chave de envio**: não é preciso fazer nada. Na primeira corrida do workflow «App Android»
+   (à mão), o passo «Chave de envio» gera-a e guarda-a no **Vault do Supabase**, no segredo
+   `android_signing` (o JSON com o ficheiro em base64, a senha e o nome), com o
+   `SUPABASE_ACCESS_TOKEN` que o deploy do Supabase já usa; as corridas seguintes lêem-na de lá. A
+   impressão SHA-256 aparece no resumo da corrida. **Nunca apagar esse segredo**: com outra chave,
+   quem instalou o APK do site tem de desinstalar para actualizar. Cópia de segurança: Supabase →
+   Project Settings → Vault → `android_signing`, guardada num cofre de senhas.
+2. *(Opcional)* Para usar uma chave própria em vez dessa: **GitHub → Secrets**
+   `ANDROID_KEYSTORE_BASE64` (`base64 -w0 envio.jks`), `ANDROID_KEYSTORE_PASSWORD`,
+   `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Quando existem, têm prioridade sobre o Vault.
 3. **Play Console** (play.google.com/console, conta de programador: 25 USD uma vez): criar a app
    «Livraria Adventista», pacote `ao.livrariaadventista.app`, gratuita, com a **Assinatura de apps do
    Google Play**. Correr o workflow «App Android» e **carregar à mão o primeiro AAB** (artefacto da
@@ -217,11 +270,32 @@ O que só se faz na App Store Connect:
 6. **Envio automático** (opcional): Google Cloud → conta de serviço com acesso à Play Console
    (Utilizadores e permissões → convidar o email da conta, com «Lançar para faixas de teste») → a
    chave JSON no segredo `PLAY_SERVICE_ACCOUNT_JSON` do GitHub.
-7. **Ficha da Play Store**: os textos estão em `app/mobile/fastlane/metadata/android/pt-PT/` e as
-   capturas de ecrã do telemóvel saem do mesmo workflow das da Apple («App iOS — ficha da App Store»,
-   pasta `android/` do artefacto). Na Play Console: **Segurança dos dados** com as mesmas respostas
-   do manifesto de privacidade do iPhone, classificação de conteúdo, público-alvo, e a declaração de
-   que a app não vende conteúdo digital.
+7. **Ficha da Play Store** (Crescimento → Presença na loja → Ficha principal):
+   - textos em `app/mobile/fastlane/metadata/android/pt-PT/` (título, descrição breve e completa);
+   - o **ícone de 512 × 512** e o **gráfico de destaque de 1024 × 500** em
+     `app/mobile/fastlane/metadata/android/pt-PT/images/` (`icon.png`, `featureGraphic.png`; o teste
+     da ficha confere os tamanhos);
+   - as **capturas do telemóvel** (pelo menos 2) saem do mesmo workflow das da Apple («App iOS —
+     ficha da App Store», pasta `android/` do artefacto);
+   - categoria **Compras**, email de contacto e a política de privacidade
+     `https://livrariaadventista.ao/privacidade`.
+   Em Política e programas → **Conteúdo da app**:
+   - **Acesso à app**: as duas contas de demonstração (cliente e colportor), como na Apple, e o
+     caminho do colportor (Área do colportor → Entregas → Para entregar);
+   - **Anúncios**: não tem;
+   - **Segurança dos dados**: as mesmas respostas do manifesto de privacidade do iPhone (nome, email,
+     telefone, morada, localização precisa, IDs da conta e do aparelho, compras, interacções,
+     fotografias, áudio da equipa, mensagens de apoio, conteúdo da comunidade, falhas e desempenho);
+     tudo cifrado em trânsito, nada partilhado para publicidade, e **pode pedir-se que os dados sejam
+     apagados**;
+   - **Eliminação da conta**: a ligação `https://livrariaadventista.ao/privacidade#direitos`, que
+     explica como se apaga dentro da app (Perfil → Segurança e privacidade) e pelos contactos, sem conta;
+   - **Classificação de conteúdo** (questionário IARC): categoria «Referência, notícias ou educação»
+     ou «Compras»; os utilizadores **podem interagir e partilhar conteúdo** (a comunidade), há
+     moderação, denúncia e bloqueio; sem violência, sexo, linguagem ou jogo;
+   - **Público-alvo**: 13 anos ou mais (por causa da comunidade); a app não é dirigida a crianças;
+   - **Pagamentos**: só artigos físicos; as edições digitais não se vendem na app (a política de
+     pagamentos da Google obriga a usar o Play Billing para conteúdo digital).
 8. **Serviço de localização em primeiro plano** (Play Console → Política e programas → Conteúdo da
    app → **Permissões de serviço em primeiro plano**): declarar **Localização**. Descrição: «Quem
    entrega uma encomenda toca em "Partilhar a minha localização" e o telemóvel continua a mandar a

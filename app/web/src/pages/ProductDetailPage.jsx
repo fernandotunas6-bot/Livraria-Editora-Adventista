@@ -1109,7 +1109,7 @@ function ProductDetailPage() {
         onBuy={handleBuyNow}
         onAdd={product.purchasable ? () => handleAddToCart(false) : undefined}
         disabled={!canAddToCart || !product.purchasable}
-        label={product.purchasable ? 'Comprar' : product.digital_fora_da_app ? 'Não está à venda na app' : 'Esgotado'}
+        label={product.purchasable ? 'Comprar' : product.digital_fora_da_app ? 'Indisponível' : 'Esgotado'}
       />
 
       <Footer />
