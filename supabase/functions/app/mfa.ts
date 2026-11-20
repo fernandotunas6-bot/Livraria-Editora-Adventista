@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Verificação em dois passos (TOTP do Supabase Auth) na Edge Function.
 //
 // Uma conta com um factor verificado só tem os poderes da equipa numa sessão `aal2`, ou seja,

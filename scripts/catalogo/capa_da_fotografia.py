@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Capa a partir de uma fotografia do livro tirada pelo dono (cantos medidos à mão).
 
     python3 capa_da_fotografia.py foto.webp saida.webp '[[x,y],[x,y],[x,y],[x,y]]' [--aparar e,c,d,b]

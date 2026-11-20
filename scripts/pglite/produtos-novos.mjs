@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários da migração dos 93 produtos novos da loja (20261110090000_produtos_novos_da_loja),
 // com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/produtos-novos.mjs supabase/migrations

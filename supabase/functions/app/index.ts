@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // API da Livraria (antes: pb_hooks/main.pb.js e chat.pb.js do PocketBase).
 // URL: <SUPABASE_URL>/functions/v1/app/<rota>  — as rotas mantêm os caminhos de /api/app/*.
 // Deploy com verify_jwt=false: a autenticação é feita aqui (token do Supabase Auth, quando existe).

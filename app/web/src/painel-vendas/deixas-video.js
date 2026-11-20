@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * A banda sonora dos vídeos, como deixas no tempo: que som toca, em que segundo e com que força,
  * a seguir o que cada quadro desenha em video.js. Puro (sem Web Audio), testado em

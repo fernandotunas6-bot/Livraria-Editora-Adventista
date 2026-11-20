@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Bloquear na comunidade (regra 1.2 da App Store): a lista da conta, guardada no servidor.

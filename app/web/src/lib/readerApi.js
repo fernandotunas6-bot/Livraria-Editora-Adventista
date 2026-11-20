@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Pedidos dos níveis dos leitores (migração 20261108131000_niveis_dos_leitores). Antes da migração
 // as funções não existem: tudo devolve null ou vazio, e o site comporta-se como antes.
 import { supabase } from '@/lib/supabaseClient';

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // As decisões tomadas à mão sobre o que o emparelhamento automático não resolve.
 //
 // O automático é conservador de propósito: só aceita um par quando ganha com folga, e deixa

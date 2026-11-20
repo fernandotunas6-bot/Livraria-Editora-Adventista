@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Página de teste do Painel de Vendas de uma loja (e2e/painel-vendas.spec.js).
 //
 // Monta o painel como o separador «Vendas por loja» o monta (components/admin/VendasHuamboTab.jsx):

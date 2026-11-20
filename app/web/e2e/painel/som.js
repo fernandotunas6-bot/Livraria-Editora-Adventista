@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Página de teste do som dos vídeos (e2e/painel-vendas.spec.js): a mistura da banda sonora feita
 // à parte (OfflineAudioContext), para o teste medir onde há som e com que força, sem tempo real.
 import { criarMistura, prepararSom } from '@/painel-vendas/som-video.js';

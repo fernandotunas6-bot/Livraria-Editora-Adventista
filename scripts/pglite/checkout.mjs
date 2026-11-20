@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Checkout (place_order): o total que o cliente viu e os bloqueios por ordem fixa
 // (migração checkout_bloqueios_e_total):
 //   PGLITE_MODULE=… node scripts/pglite/checkout.mjs supabase/migrations

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Validação dos eventos de saúde do site (POST /telemetria): erros de JavaScript e Core Web
 // Vitals medidos em quem visita. A rota é pública, por isso tudo o que chega é cortado e
 // conferido aqui antes de ir para private.site_events (migração saude_do_site).

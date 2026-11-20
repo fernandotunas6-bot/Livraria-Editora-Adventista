@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // A loja falsa: o Supabase dos testes de ponta a ponta, respondido na rede do navegador.
 //
 // O site é o build verdadeiro; o que é falso é o que está do outro lado. Cada teste tem a sua

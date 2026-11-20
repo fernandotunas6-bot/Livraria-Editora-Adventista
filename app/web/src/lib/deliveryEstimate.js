@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Quando chega: a data estimada de entrega, a partir dos prazos publicados em "Envios e
 // devoluções" (/shipping-returns). Como nas lojas grandes, "chega entre 14 e 18 nov." diz mais
 // do que "5 a 7 dias úteis", que obriga a pessoa a fazer a conta (e a saltar os fins de semana).

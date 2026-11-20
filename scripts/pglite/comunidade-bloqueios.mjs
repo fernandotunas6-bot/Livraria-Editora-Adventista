@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Bloquear na comunidade (migração 20261119200000_bloquear_na_comunidade), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/comunidade-bloqueios.mjs supabase/migrations
 // Instruções em base.mjs. Cada pessoa só vê, junta e tira da sua lista; quem foi bloqueado não a vê;

@@ -3,6 +3,8 @@
   "type": "module",
   "version": "0.0.0",
   "private": true,
+  "author": "Valentino Canguele <valentinocanguele@gmail.com>",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "vite --host :: --port 3000",
     "build": "vite build --outDir ../../dist/app/web",

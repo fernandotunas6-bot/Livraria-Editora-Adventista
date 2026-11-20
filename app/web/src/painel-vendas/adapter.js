@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Adaptador do Painel de Vendas (pacote painel-vendas-huambo) para o Supabase.
  * createPainelApi() devolve a interface que a página do pacote pedia a window.claude.use('db' | 'user' | 'downloads'):

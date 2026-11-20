@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Verificações à base de dados inteira, com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/seguranca.mjs supabase/migrations
 // Instruções em base.mjs. Cada verificação apanha uma classe de erros, não um caso: uma migração

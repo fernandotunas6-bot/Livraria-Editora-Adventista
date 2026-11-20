@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O trajeto de quem entrega dentro dos apps, com o ecrã apagado (docs/TRAJETO_GPS.md).
 //
 // No site, a posição só sai com a página aberta. Nos apps, o GPS e o envio ficam com o telemóvel —

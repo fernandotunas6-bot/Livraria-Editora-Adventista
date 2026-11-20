@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Horário da equipa no chat: "disponível agora" ou "volta amanhã às 08h", como nos mensageiros
 // de atendimento. O horário vem do servidor (Equipas e alertas, /chat/config) e é em hora de
 // Luanda — UTC+1, sem hora de Verão —, a mesma conta de supabase/functions/app/opsRouting.ts.

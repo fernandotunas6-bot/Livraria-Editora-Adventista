@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Os controlos do modo apresentação, iguais nos dois relatórios (o painel de uma loja, painel.js,
  * e todas as livrarias, consolidado-ui.js): o palco de 1280×720 à escala do ecrã, os botões, o

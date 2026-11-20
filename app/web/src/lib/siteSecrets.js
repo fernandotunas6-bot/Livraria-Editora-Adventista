@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Segredos das configurações (SMTP, SendGrid, VAPID, IA).
 //
 // Desde a migração `segredos_fora_da_api` estes valores vivem em private.site_secrets, fora da

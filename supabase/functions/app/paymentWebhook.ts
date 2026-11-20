@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Webhook do gateway de pagamentos: assinatura e leitura do aviso. Testes em paymentWebhook.test.ts.
 //
 // Regra do dono (2026-11-07): um pagamento só fica confirmado pelo gateway, ou por um

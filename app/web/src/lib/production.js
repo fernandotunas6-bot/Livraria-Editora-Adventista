@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Produção da Editora, funcionários e saídas de dinheiro: os rótulos e as contas que os ecrãs
 // mostram. Funções puras (os dados entram, o resultado sai), testadas em production.test.js. Os
 // valores (estados, tipos, formas de pagamento) são os das migrações funcionarios, producao e saidas.

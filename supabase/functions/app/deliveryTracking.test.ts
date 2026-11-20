@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import { describe, expect, it } from "vitest";
 import {
   HIDE_AFTER_MS, STALE_AFTER_MS, canSetDestination, destinationOf, etaMinutes, firstName, inAngola, kmBetween,

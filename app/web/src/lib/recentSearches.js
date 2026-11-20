@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Pesquisas recentes, neste aparelho: ao tocar na lupa, o que se procurou da última vez fica à
 // mão em vez de se escrever outra vez num teclado pequeno (como nas lojas grandes). Só neste
 // navegador (localStorage), as últimas oito, e apagam-se com "Limpar".

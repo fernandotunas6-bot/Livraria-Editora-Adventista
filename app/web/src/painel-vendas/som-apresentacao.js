@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * O som do modo apresentação, como os efeitos do PowerPoint: a página a virar ao mudar de
  * diapositivo, os tiques de uma máquina de calcular enquanto os números rodam, a subida das barras

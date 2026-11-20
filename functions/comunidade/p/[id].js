@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cloudflare Pages Function: /comunidade/p/:id com as etiquetas de partilha da publicação
 // (título, texto, capa do livro), para o WhatsApp e as redes mostrarem a pré-visualização.
 // O resto da página é o mesmo index.html da aplicação: quem abre no navegador vê o React.

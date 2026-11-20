@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import React, { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { Navigate, Route, Routes, BrowserRouter as Router, useLocation, useNavigate, useParams } from 'react-router-dom';

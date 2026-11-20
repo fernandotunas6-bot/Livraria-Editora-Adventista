@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Painel de Gestão (docs/PAINEL-GESTAO.md): as contas e os formatos que o ecrã usa. Os números vêm prontos de
  * public.painel_gestao(); aqui só se mostram — e o que se guarda neste aparelho (a TV).

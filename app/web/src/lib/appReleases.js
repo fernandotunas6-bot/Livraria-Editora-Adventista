@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Novidades da app: o que mudou em cada versão, escrito pela equipa (painel → Versões da app) e
  * mostrado em /novidades e no aviso "App actualizada". A equipa pode também avisar por push

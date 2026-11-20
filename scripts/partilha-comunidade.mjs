@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Partilha das publicações da comunidade (/comunidade/p/:id): o que o WhatsApp, o Facebook e o
 // X lêem quando alguém cola o link. Funções puras, usadas pela Pages Function
 // (functions/comunidade/p/[id].js) e pelo pós-build (seo-catalogo.mjs); testadas em

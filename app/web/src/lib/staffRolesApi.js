@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cargos da equipa (migração 20261108130000_cargos_e_ver_relatorios): Caixa, Atendimento,
 // Gerente de loja… Um gestor com cargo tem as permissões do cargo; mudar o cargo muda logo toda a
 // gente que o tem. Quem pode o quê decide a base de dados (só administradores escrevem); aqui só

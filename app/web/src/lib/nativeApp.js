@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O site dentro do app iOS (app/mobile, docs/APPS.md).
 //
 // O app é uma casca Capacitor que abre o site publicado: o código é o mesmo, e é aqui que o site

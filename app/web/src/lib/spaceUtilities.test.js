@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Guarda da migração para o Tailwind 4: cada `space-y-*`/`space-x-*` usado no site tem de ter, no
 // index.css, a regra que repõe o comportamento do Tailwind 3 (ver o comentário lá). Sem ela, um
 // rótulo seguido de um campo dentro de um `space-y-*` perde o espaço entre os dois.

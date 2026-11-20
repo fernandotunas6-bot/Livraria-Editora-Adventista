@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Ler o PowerPoint «Painel de Vendas» que as lojas mandam (modelo da Loja do Huambo).
 //
 // O ficheiro .pptx é um ZIP de XML. Abre-se aqui sem bibliotecas: o índice do ZIP lê-se à mão e

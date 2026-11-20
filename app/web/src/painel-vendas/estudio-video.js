@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * O Estúdio de vídeo dos relatórios, ao jeito do Adobe Premiere: abre-se com «Vídeo lento /
  * normal / curto» do menu Exportar, nos dois relatórios (o painel de uma loja e todas as

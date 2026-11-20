@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Decisão de quais canais de uma campanha podem mesmo entregar, sem nada de Deno nem de
 // Supabase — por isso testável no `npm test` (ver campaigns.test.ts).
 //

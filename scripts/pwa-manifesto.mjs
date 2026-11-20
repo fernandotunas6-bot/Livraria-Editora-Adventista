@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // A app instalada (PWA) com o nome e a cor que estão no painel.
 //
 // O painel tem, em Configurações, o «Nome da App», o «Nome Curto (ícone)» e a cor do tema. A

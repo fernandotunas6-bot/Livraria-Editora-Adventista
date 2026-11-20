@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Primeiro de tudo: o www e o endereço do Pages vão para o domínio principal (lib/canonicalHost.js).
 import { REDIRECTING_TO_CANONICAL } from '@/lib/canonicalHost';
 import { applyStoreScriptPolicy } from '@/lib/storeCsp';

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // O que o rastreio mostra a quem só tem o número da encomenda e o email.
 //
 // Achado da análise crítica de 2026-11-20: /track e /track/live devolviam a morada completa, os

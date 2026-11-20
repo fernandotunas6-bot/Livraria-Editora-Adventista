@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Modelo de camisa (t-shirt e polo) desenhado em código, para aplicar a estampa."""
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageChops

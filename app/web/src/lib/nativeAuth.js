@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Entrar com a Google e com a Apple dentro do app iOS (lib/nativeApp.js, docs/APPS.md).
 //
 // · Google: a Google recusa o login dentro de um WebView. Pede-se o endereço ao Supabase sem

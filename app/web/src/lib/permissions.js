@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Permissões granulares do painel. As mesmas chaves são verificadas no servidor
 // (private.has_permission na base de dados e requirePermission na Edge Function).
 //

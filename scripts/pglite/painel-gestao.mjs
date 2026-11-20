@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários do Painel de Gestão (migração 20261119140000_painel_gestao), com as migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/painel-gestao.mjs supabase/migrations
 // O que se confere: vendas ao vivo pelo caminho real do pagamento, quem vê o quê (direcção, gerente de loja,

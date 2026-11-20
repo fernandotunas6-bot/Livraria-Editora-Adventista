@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Chave de idempotência do checkout.
 //
 // Se a rede cai depois de o servidor gravar a encomenda, o cliente vê um erro e carrega outra

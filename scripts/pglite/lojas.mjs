@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários das lojas donas dos seus dados (migração 20261114180000_lojas_donas_dos_dados): a loja
 // de cada encomenda, de cada colportor e de cada guia, e o «temos / não temos» por loja. Corre as
 // migrações reais até à anterior, põe dados como os da produção, e só então aplica esta e as

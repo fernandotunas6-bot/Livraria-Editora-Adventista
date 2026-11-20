@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Verificação em dois passos obrigatória para a equipa (migração dois_passos_obrigatorio_equipa):
 //   PGLITE_MODULE=… node scripts/pglite/dois-passos.mjs supabase/migrations
 // Instruções em base.mjs.

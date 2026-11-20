@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Cenários das novidades da app e do aviso por push (migração versoes_da_app), com as
 // migrações reais:
 //   PGLITE_MODULE=… node scripts/pglite/versoes.mjs supabase/migrations

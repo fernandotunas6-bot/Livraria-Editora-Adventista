@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Leitura única dos campos repetidos das encomendas — a mesma regra que o site usa em
 // app/web/src/lib/orderUtils.js (o orderFields.test.js confirma que as duas dizem o mesmo).
 //

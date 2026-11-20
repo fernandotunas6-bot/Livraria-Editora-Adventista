@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 import json, re, sys, time, unicodedata, urllib.parse, subprocess, difflib, os
 SP=os.path.dirname(os.path.abspath(__file__))
 def norm(s):

@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Quais canais de uma campanha podem mesmo entregar.
 //
 // O painel precisa de responder a isto **antes** de enviar: uma campanha pendente cujo canal

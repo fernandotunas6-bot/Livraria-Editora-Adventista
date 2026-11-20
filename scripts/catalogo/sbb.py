@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Lê uma página de produto da loja da SBB e descarrega as fotos do próprio produto.
 
     python3 sbb.py https://www.sbb.com.br/produto/<slug>-<id> pasta/

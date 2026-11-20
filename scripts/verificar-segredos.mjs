@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Procura credenciais nos ficheiros versionados antes de um PR ou de um deploy.
 //
 // Só padrões com prefixo próprio, que quase nunca aparecem por acaso: um verificador que

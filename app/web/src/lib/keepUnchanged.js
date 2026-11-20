@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Junta uma leitura nova à anterior sem trocar o que não mudou: as partes iguais ficam com o
  * objecto antigo. Os ecrãs que voltam a ler em silêncio (um sinal em tempo real, a consulta de

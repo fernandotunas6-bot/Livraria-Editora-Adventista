@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 /**
  * Tipos de produto do catálogo. A mesma lista está na base de dados
  * (`stock_books.product_type`, `public.product_code_prefix`): mudar um lado obriga a mudar o outro.

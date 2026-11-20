@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Indicadores do atendimento e da operação num período (por omissão, os últimos 7 dias).
 // Funções puras, testadas em opsReport.test.ts; usadas pelo painel e pelo relatório semanal.
 //

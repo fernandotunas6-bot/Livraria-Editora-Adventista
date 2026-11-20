@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Sinais em tempo real (migração 20261108132000_sinais_em_tempo_real): quando muda alguma coisa,
 // a base de dados manda um sinal pequeno por um canal («painel», «conta:<id>», «comunidade») e o
 // site volta a pedir só isso, pelo caminho de sempre — com as mesmas permissões. O sinal não traz

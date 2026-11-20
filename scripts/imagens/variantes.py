@@ -1,3 +1,6 @@
+# Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+# © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 """Variantes de 960 e 1280 px dos slides do herói, para os telemóveis.
 
 Os slides têm 1920×1080 (44–153 KB) e eram servidos assim a ecrãs de 390 px: no telemóvel, a

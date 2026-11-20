@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // "Precisa de atenção" da Editora e das finanças: o que o Início deve pôr à frente de quem gere a
 // produção ou paga (lib/adminAttention.js faz o mesmo para as encomendas e o catálogo), e o
 // número ao lado da Produção e dos Funcionários na navegação.

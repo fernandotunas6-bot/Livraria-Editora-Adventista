@@ -1,3 +1,6 @@
+-- Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+-- © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 -- Verificação do estado geral das encomendas (migração 20261107150000_estado_geral_acompanha_a_entrega).
 --
 -- Corre no SQL Editor do Supabase ou numa base local com as migrações. NÃO GRAVA NADA: cria um

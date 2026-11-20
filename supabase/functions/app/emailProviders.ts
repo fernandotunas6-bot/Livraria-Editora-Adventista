@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // Fornecedores de email por API HTTP. Funções puras (pedido e leitura da resposta), testadas em
 // emailProviders.test.ts; o envio (fetch) fica em index.ts.
 //

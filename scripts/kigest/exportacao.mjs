@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Leitor dos ficheiros .kigest — a exportação do KiGest, o programa de facturação que corre
 // no computador da loja (DESKTOP-G26LDJM/KigestGC). É nele que se vende ao balcão, por isso é
 // nele que está o stock verdadeiro e o preço que o cliente paga à porta.

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 // Serve a pasta do build como o Cloudflare Pages a serve, para a auditoria visual de um PR
 // (.github/workflows/auditoria-visual.yml):
 //   1. o ficheiro pedido, se existir;

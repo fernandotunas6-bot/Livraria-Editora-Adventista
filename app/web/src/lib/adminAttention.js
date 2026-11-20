@@ -1,3 +1,6 @@
+// Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
 // "Precisa de atenção": o que o painel deve pôr à frente de quem entra, por ordem de urgência.
 //
 // Não são totais (esses estão nos indicadores): são situações que pioram se ninguém fizer nada —
