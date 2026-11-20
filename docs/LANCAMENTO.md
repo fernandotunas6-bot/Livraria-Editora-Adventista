@@ -214,9 +214,12 @@ Ordem dos passos:
 O checkout, o contacto, a candidatura a colportor e a newsletter aceitam o Cloudflare Turnstile
 (supabase/functions/app/turnstile.ts). Fica desligado até haver as duas chaves:
 
-1. Cloudflare → Turnstile → Add widget: modo «Managed», domínios `livrariaadventista.ao` e
-   `www.livrariaadventista.ao`.
-2. `supabase secrets set TURNSTILE_SITE_KEY=… TURNSTILE_SECRET_KEY=…`
+1. O widget já existe: Cloudflare → Turnstile → «Livraria Adventista - formularios publicos» (modo
+   «Managed», domínios `livrariaadventista.ao` e `www.livrariaadventista.ao`, chave do site
+   `0x4AAAAAAGKUDNRe46_eQsO3`). A chave secreta está nas definições do widget.
+2. Depois de o deploy do código terminar: `supabase secrets set TURNSTILE_SITE_KEY=… TURNSTILE_SECRET_KEY=…`
+   (ou Supabase → Edge Functions → Secrets). Antes do deploy, o servidor exigiria o token a um site
+   que ainda não mostra o widget.
 
 O `/settings` passa a publicar a chave do site e os formulários mostram o widget (quase sempre
 invisível). Durante uns minutos, quem tiver o `/settings` antigo em cache pode ver «Não conseguimos
