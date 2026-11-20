@@ -24,6 +24,9 @@ export default function PageBannerSlider({
   overlayOpacity = 0.65,
   contentClassName = 'text-left',
   ariaLabel = 'Banners da livraria',
+  // No telemóvel, mais baixo e sem os pontos (a imagem continua a mudar sozinha): na loja, os
+  // livros têm de aparecer no primeiro ecrã (análise crítica de 2026-11-20).
+  compactOnMobile = false,
 }) {
   const configuredSlides = [...new Set((images || []).filter(Boolean))];
   const slides = configuredSlides.length > 0 ? configuredSlides : fallbackImages;
@@ -54,7 +57,7 @@ export default function PageBannerSlider({
       // No telemóvel, espaço para a barra fina do cabeçalho (56px, com o logótipo) e para a
       // área segura do topo (ver .pt-below-thin-bar): sem isto o texto centrado subia para
       // debaixo do logótipo.
-      className="pt-below-thin-bar relative isolate flex min-h-[240px] items-center overflow-hidden bg-[#0c4a6e] text-white md:min-h-[290px]"
+      className={`pt-below-thin-bar relative isolate flex ${compactOnMobile ? 'min-h-[150px] sm:min-h-[240px]' : 'min-h-[240px]'} items-center overflow-hidden bg-[#0c4a6e] text-white md:min-h-[290px]`}
       {...(slides.length > 1 ? swipe : {})}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -87,7 +90,7 @@ export default function PageBannerSlider({
         }}
       />
 
-      <div className={`container-custom relative z-10 pb-14 pt-10 md:py-14 ${contentClassName}`}>
+      <div className={`container-custom relative z-10 ${compactOnMobile ? 'pb-4 pt-6 sm:pb-14 sm:pt-10' : 'pb-14 pt-10'} md:py-14 ${contentClassName}`}>
         {children}
       </div>
 
@@ -112,7 +115,7 @@ export default function PageBannerSlider({
           {/* O ponto mede 8px: quem cresce é o botão à volta dele, até aos 24 que a WCAG
               2.5.8 pede em AA. O intervalo sai do contentor porque o preenchimento de cada
               botão já afasta os pontos — somados, davam uma fila larga de mais. */}
-          <div className="absolute bottom-0 left-1/2 z-20 flex -translate-x-1/2 sm:bottom-3">
+          <div className={`absolute bottom-0 left-1/2 z-20 ${compactOnMobile ? 'hidden sm:flex' : 'flex'} -translate-x-1/2 sm:bottom-3`}>
             {slides.map((image, index) => (
               <button
                 key={image}

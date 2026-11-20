@@ -72,6 +72,7 @@ export default function ShopHeroBackground({ settings, children }) {
         images={[settings.shop_bg_image_url, ...SHOP_BANNER_IMAGES]}
         overlayOpacity={overlay}
         contentClassName="text-left"
+        compactOnMobile
       >
         {children}
       </PageBannerSlider>

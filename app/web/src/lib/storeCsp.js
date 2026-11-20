@@ -26,9 +26,21 @@ export function isStaffPath(pathname, emGestao = false) {
   return /^\/(admin|gestao|painel)(?=$|[/.?#-])/.test(String(pathname || ''));
 }
 
+/**
+ * Onde a política não entra ao abrir a página: o painel e o perfil. No perfil, a equipa tem os
+ * separadores do Google Workspace e dos contactos, que carregam scripts da Google; o perfil não
+ * mostra HTML vindo do painel (descrições, slides), que é o que a política protege.
+ */
+export function isPolicyExempt(pathname, emGestao = false) {
+  return isStaffPath(pathname, emGestao) || /^\/profile(?=$|[/?#])/.test(String(pathname || ''));
+}
+
+/** O documento tem a política da loja (abriu numa página da loja). */
+export const hasStoreScriptPolicy = (doc = document) => !!doc.querySelector('meta[data-politica="loja"]');
+
 /** Junta a política da loja ao documento, antes de qualquer script da página. `true` se a juntou. */
 export function applyStoreScriptPolicy({ doc = document, pathname = window.location.pathname, emGestao = false } = {}) {
-  if (isStaffPath(pathname, emGestao)) return false;
+  if (isPolicyExempt(pathname, emGestao)) return false;
   if (doc.querySelector('meta[data-politica="loja"]')) return true;
   const meta = doc.createElement('meta');
   meta.httpEquiv = 'Content-Security-Policy';
@@ -40,5 +52,8 @@ export function applyStoreScriptPolicy({ doc = document, pathname = window.locat
 
 /** A página tem a política da loja e a pessoa entrou no painel: precisa de recarregar. */
 export function needsReloadForStaff(pathname, { emGestao = false, doc = document } = {}) {
-  return !!doc.querySelector('meta[data-politica="loja"]') && isStaffPath(pathname, emGestao);
+  return hasStoreScriptPolicy(doc) && isStaffPath(pathname, emGestao);
 }
+
+/** Separadores do perfil que usam os scripts da Google (só a equipa os vê). */
+export const GOOGLE_PROFILE_TABS = ['workspace', 'crm'];

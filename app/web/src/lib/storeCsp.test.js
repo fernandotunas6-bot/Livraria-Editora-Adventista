@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STORE_SCRIPT_POLICY, applyStoreScriptPolicy, isStaffPath, needsReloadForStaff } from './storeCsp';
+import { STORE_SCRIPT_POLICY, applyStoreScriptPolicy, hasStoreScriptPolicy, isPolicyExempt, isStaffPath, needsReloadForStaff } from './storeCsp';
 
 const novoDocumento = () => document.implementation.createHTMLDocument('teste');
 
@@ -43,5 +43,22 @@ describe('applyStoreScriptPolicy', () => {
     applyStoreScriptPolicy({ doc, pathname: '/' });
     expect(needsReloadForStaff('/admin', { doc })).toBe(true);
     expect(needsReloadForStaff('/shop', { doc })).toBe(false);
+  });
+});
+
+describe('perfil', () => {
+  it('o perfil abre sem a política (a equipa usa lá os scripts da Google)', () => {
+    const doc = novoDocumento();
+    expect(isPolicyExempt('/profile')).toBe(true);
+    expect(isPolicyExempt('/profile?tab=workspace')).toBe(true);
+    expect(isPolicyExempt('/profiles')).toBe(false);
+    expect(applyStoreScriptPolicy({ doc, pathname: '/profile' })).toBe(false);
+    expect(hasStoreScriptPolicy(doc)).toBe(false);
+  });
+  it('ir da loja para o perfil não recarrega (só os separadores da Google o pedem)', () => {
+    const doc = novoDocumento();
+    applyStoreScriptPolicy({ doc, pathname: '/shop' });
+    expect(hasStoreScriptPolicy(doc)).toBe(true);
+    expect(needsReloadForStaff('/profile', { doc })).toBe(false);
   });
 });
