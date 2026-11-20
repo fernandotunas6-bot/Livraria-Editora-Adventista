@@ -125,9 +125,15 @@ export async function getPaymentMethods() {
 }
 
 export async function trackOrder(orderNumber, email) {
+  // Com a sessão da conta da encomenda, o servidor mostra tudo; sem ela, os telefones, a rua e o
+  // ponto GPS saem mascarados (supabase/functions/app/trackPrivacy.ts).
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
   const res = await fetch(`${APP_API_URL}/track`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({ orderNumber, email }),
   });
   const data = await res.json().catch(() => null);

@@ -264,6 +264,12 @@ export default function TrackOrderPage() {
                         </p>
                       </div>
                     )}
+                    {order.personal_data_masked && (
+                      <p className="sm:col-span-2 text-xs text-muted-foreground" data-rastreio="mascarado">
+                        Por privacidade, os telefones e a morada aparecem em parte. Entre na conta com que fez a encomenda para os ver
+                        por inteiro.
+                      </p>
+                    )}
                     {order.tracking_number && (
                       <div className="sm:col-span-2">
                         <span className="text-muted-foreground">Número de seguimento</span>

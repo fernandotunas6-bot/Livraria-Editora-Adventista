@@ -37,7 +37,8 @@ export default function ColporteurApplyPage() {
   const [form, setForm] = useState(EMPTY);
   const [notListed, setNotListed] = useState(false);
   const [sending, setSending] = useState(false);
-  const { settings } = useSiteSettings();
+  // Fora do fornecedor das definições (testes, páginas soltas) não há chave: sem Turnstile.
+  const { settings = {} } = useSiteSettings() || {};
   const human = useTurnstileToken();
   const [error, setError] = useState('');
   const [done, setDone] = useState(null);

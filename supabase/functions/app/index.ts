@@ -99,6 +99,7 @@ import { appLink } from "./appLinks.ts";
 import { type PushPayload, apnsConfig, apnsEndpoint, apnsTokenOf, isApnsToken, sendApns } from "./apns.ts";
 import { fcmConfig, fcmEndpoint, fcmTokenOf, isFcmToken, sendFcm } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
+import { firstNameOnly, trackDestination, trackPersonalFields } from "./trackPrivacy.ts";
 import { TURNSTILE_MESSAGE, turnstileEnabled, verifyTurnstile } from "./turnstile.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1830,7 +1831,7 @@ async function findOrderByNumberAndEmail(orderNumber: string, email: string) {
   return data?.[0] || null;
 }
 
-route("POST", "/track", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
+route("POST", "/track", publica("só com o número e o email da encomenda; os dados pessoais mascarados sem a sessão dona (trackPrivacy.ts); limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1849,6 +1850,9 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
   // A factura do KanGest (e a nota de crédito, se foi reembolsada): o número e o QR da AGT (docs/KANGEST.md).
   const { data: docsKanGest } = await db.from("kangest_fila").select("accao, resultado")
     .eq("order_id", order.id).in("accao", ["fr", "nc"]).eq("estado", "feito");
+  // Sem a sessão dona da encomenda, os dados pessoais saem mascarados (trackPrivacy.ts).
+  const owner = sessionOwnsOrder(auth, order);
+  const personal = trackPersonalFields(order, owner);
   const docKanGest = (accao: string) => {
     const r = (docsKanGest || []).find((x: Row) => x.accao === accao)?.resultado;
     return r?.numero ? { numero: String(r.numero), total: Number(r.total || 0) / 100, url_agt: r.fe?.url_consulta || "" } : null;
@@ -1868,15 +1872,19 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
       payment_link: /^https:\/\//.test(String(method?.payment_link || "")) ? method!.payment_link : "",
     } : {}),
     order_number: order.order_number, status: order.status, delivery_status: order.delivery_status || "received",
-    total: order.total, customer_name: order.customer_name, phone: order.phone || "",
-    delivery_relative_name: order.delivery_relative_name || "", delivery_relative_phone: order.delivery_relative_phone || "",
+    total: order.total, customer_name: personal.customer_name, phone: personal.phone,
+    delivery_relative_name: personal.delivery_relative_name, delivery_relative_phone: personal.delivery_relative_phone,
+    personal_data_masked: personal.masked,
     delivery_province: order.delivery_province || "",
     delivery_municipality: order.delivery_municipality || "", delivery_locality: order.delivery_locality || "",
-    delivery_street: order.delivery_street || "", delivery_reference: order.delivery_reference || "",
-    // A morada numa linha, também nas encomendas antigas (que só tinham address/city).
-    delivery_address_full: deliveryAddressLine(order),
-    delivery_confirmed_at: order.delivery_confirmed_at || "", delivery_confirmed_by: order.delivery_confirmed_by || "",
-    delivery_recipient_name: order.delivery_recipient_name || "",
+    delivery_street: personal.delivery_street, delivery_reference: personal.delivery_reference,
+    // A morada numa linha, também nas encomendas antigas (que só tinham address/city); só até ao
+    // bairro para quem não tem a sessão dona da encomenda.
+    delivery_address_full: !personal.masked ? deliveryAddressLine(order)
+      : deliveryAddressLine(order) ? personal.delivery_address_full || String(order.city || "") : "",
+    delivery_confirmed_at: order.delivery_confirmed_at || "",
+    delivery_confirmed_by: owner ? order.delivery_confirmed_by || "" : firstNameOnly(order.delivery_confirmed_by),
+    delivery_recipient_name: owner ? order.delivery_recipient_name || "" : firstNameOnly(order.delivery_recipient_name),
     // A imagem da assinatura não sai daqui: basta o número da encomenda e o email para
     // chegar a esta rota, e o número é curto. Quem confirmou a recepção vê-a na resposta
     // do /confirm-delivery; a equipa vê-a no painel (RLS) e no recibo.
@@ -1887,8 +1895,9 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
     // O cliente ainda a pode cancelar sozinho (rota /order/cancel; regras em customerCancel.ts).
     can_cancel: customerCancelBlock(order) === null,
-    // O ponto de entrega (migração trajeto_gps): o cliente afina-o em /track/destination.
-    delivery_gps: destinationOf(order),
+    // O ponto de entrega (migração trajeto_gps): o cliente afina-o em /track/destination. Sem a
+    // sessão dona, só a zona (~1 km).
+    delivery_gps: trackDestination(destinationOf(order), owner),
     can_set_destination: canSetDestination(order),
   });
 });
@@ -1900,7 +1909,7 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
 // Identifica-se como no rastreio: o número da encomenda e o email. A página pergunta de 15 em 15
 // segundos enquanto a encomenda vai a caminho; o limite por minuto dá para dois separadores.
 
-route("POST", "/track/live", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
+route("POST", "/track/live", publica("só com o número e o email da encomenda; o ponto de entrega só à zona sem a sessão dona; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("track_live", ip, 40)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1909,7 +1918,10 @@ route("POST", "/track/live", publica("só com o número e o email da encomenda; 
   if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
   // Sem a migração a tabela não existe: a leitura falha e o mapa mostra só o ponto de entrega.
   const { data: position } = await db.from("delivery_positions").select("*").eq("order_id", order.id).maybeSingle();
-  return json(liveTrackingView(order, position || null));
+  const view = liveTrackingView(order, position || null) as Row;
+  // A casa do cliente só à zona para quem não tem a sessão dona (trackPrivacy.ts).
+  if (view.destination) view.destination = trackDestination(view.destination, sessionOwnsOrder(auth, order));
+  return json(view);
 });
 
 route("POST", "/track/destination", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
