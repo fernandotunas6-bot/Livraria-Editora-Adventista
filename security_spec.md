@@ -83,18 +83,15 @@ Riscos aceites:
 
 ## 4. Por resolver
 
-Pelo dono (actualizado a 2026-11-07; o detalhe e o porquê estão na secção 5).
+Pelo dono (actualizado a 2026-11-20; o detalhe e o porquê estão nas secções 5 e 6).
 
-> **Verificado em produção a 2026-11-14:** os itens 1 e 3 continuam abertos — 4 contas de
-> administrador, nenhum gestor, **nenhuma** com verificação em dois passos; 145 emails «skipped»
-> nos últimos 7 dias e nenhum administrador com push (a única subscrição é de um cliente). Os
-> avisos de segurança (IBAN, permissões, segredos) ficam só no sino do painel. Ver
-> [docs/AUDITORIA.md](docs/AUDITORIA.md) §9.23.
+> **Desde 2026-11-20** a verificação em dois passos é obrigatória para a equipa (secção 6): sete
+> dias depois de a migração `dois_passos_obrigatorio_equipa` chegar à produção, uma conta de admin
+> ou gestor sem o código conta como a de um cliente até o activar. Quem ainda não o tem deve
+> activá-lo antes do prazo (o painel mostra a data).
 
-| # | O quê | Onde | Porquê |
-|---|---|---|---|
-| 1 | **Verificação em dois passos nas 4 contas da equipa** (3 admins e 1 gestor; nenhuma a tem) | Perfil → Segurança, em cada conta | Com a palavra-passe de uma conta da equipa roubada, entra-se no painel e troca-se o IBAN. É a protecção que mais falta |
-| 2 | **Apagar o projecto antigo `livraria-adventista.pages.dev`** | Cloudflare da conta antiga → Workers & Pages | Continua no ar, ligado à base de produção, com um build sem o DOMPurify (o sanitizador antigo deixava passar `<img onerror>`) |
+| 1 | **Activar a verificação em dois passos em cada conta da equipa, antes do prazo** | Perfil → Segurança (ou o aviso no painel) | Passado o prazo, o painel só abre com o código; a regra já está no servidor |
+| 2 | **Apagar o projecto antigo `livraria-adventista.pages.dev`** | Cloudflare da conta antiga → Workers & Pages | Confirmado a 2026-11-20: continua no ar, com um build antigo ligado ao Supabase de produção. Não está na conta Cloudflare do token do projecto, por isso só o dono o apaga |
 | 3 | **Ligar o envio de email** (SMTP ou API) e **activar o push** no telemóvel de cada admin | Configurações → Email; painel → sino → activar avisos | Sem isto, os avisos de segurança ficam só no sino do painel: os 13 emails da última semana ficaram por enviar (`skipped`) e nenhum aparelho da equipa tem push |
 | 4 | Email do `livrariaadventista.com`: `MX 0 .`, `TXT "v=spf1 -all"`, `_dmarc TXT "v=DMARC1; p=reject"` | Cloudflare → `livrariaadventista.com` → DNS | Sem SPF nem DMARC, qualquer pessoa manda email "da loja" a pedir transferências. O domínio não envia email (o da loja é o `.ao`), por isso fecha-se tudo. O token desta sessão não chega a essa zona |
 | 5 | DNSSEC do `.com` | Cloudflare → DNS → DNSSEC, e o registo DS na Hostinger, por esta ordem | O `.ao` não tem DNSSEC (o TLD `ao.` não está assinado) |
@@ -102,6 +99,9 @@ Pelo dono (actualizado a 2026-11-07; o detalhe e o porquê estão na secção 5)
 | 7 | Dependabot | GitHub → Settings → Code security → Dependabot alerts e security updates | Estão desligados; o proxy desta sessão não deixa ligá-los |
 | 8 | Restringir a chave do Google Maps por referenciador HTTP | Google Cloud → APIs → Credenciais | Vai na resposta pública `/settings` (achado 83 do PR #22) |
 | 9 | Palavras-passe vazadas (HaveIBeenPwned) | Supabase → Authentication → Policies | Exige o plano Pro |
+| 10 | **Ligar o Turnstile**: criar o widget (modo «Managed», domínios `livrariaadventista.ao` e `www.livrariaadventista.ao`) e pôr `TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` nos segredos da Edge Function | Cloudflare → Turnstile; `supabase secrets set …` | Sem as chaves, o checkout e os formulários continuam sem prova de que quem envia é uma pessoa |
+| 11 | **Aplicar a lista de endereços do Auth** (sem as pré-visualizações `*.pages.dev`) | `bash scripts/configurar-auth.sh` | O ficheiro `supabase/auth/config.json` já está certo; a produção só muda com o script |
+| 12 | Decidir o prazo para cancelar encomendas na entrega que ninguém confirmou | Configurações → Regras da loja | Por omissão é 0 (nunca): cada uma reserva stock até alguém a cancelar |
 
 ## 5. Verificação em produção (2026-11-07)
 
@@ -182,3 +182,20 @@ curl -s "$U/rest/v1/security_audit_log?select=*&limit=1" -H "apikey: $K"
 curl -s -X POST "$U/storage/v1/object/list/media" -H "apikey: $K" -H "Authorization: Bearer $K" -H "content-type: application/json" -d '{"prefix":""}'
 curl -s -X POST "$U/rest/v1/rpc/users_admin_list" -H "apikey: $K" -H "content-type: application/json" -d '{}'
 ```
+
+## 6. Análise crítica de 2026-11-20
+
+O que mudou no código (detalhe em [docs/AUDITORIA.md](docs/AUDITORIA.md) §9.24):
+
+| # | Achado | Gravidade | Estado |
+|---|---|---|---|
+| C1 | Verificação em dois passos opcional também para administradores | Alta | ✅ obrigatória para a equipa depois de um prazo de 7 dias (`private.staff_mfa_policy`, `mfa.ts`, ecrã no painel); administradores repõem o código de quem perdeu o telemóvel |
+| C2 | Webhook de pagamentos tomava um aviso sem estado por «pago» | Média | ✅ estado obrigatório na Edge Function e em `order_payment_gateway` |
+| C3 | Checkout público sem CAPTCHA; encomendas na entrega reservavam stock para sempre | Média | ✅ Turnstile (liga-se com as chaves, ponto 10) e regra opcional `unconfirmed_cancel_days` |
+| C4 | Newsletter sem confirmação; «Já subscrito.» revelava quem está na lista | Média-baixa | ✅ dupla confirmação, resposta igual para todos |
+| C5 | Auth aceitava redireccionar para qualquer pré-visualização do Pages | Baixa-média | ✅ no repositório; falta aplicar (ponto 11) |
+| C6 | Dados das contas (emails pessoais, ID do Cloudflare, quem é admin) na documentação | Baixa | ✅ retirados; continuam no histórico do git |
+| C7 | `anon` com escrita concedida em 29 tabelas (só a RLS travava) | Baixa | ✅ `anon_sem_escrita`, verificado em `seguranca.mjs` |
+| C8 | Domínios da Google no `script-src` da loja inteira; HSTS sem subdomínios | Baixa | ✅ política de scripts mais apertada nas páginas da loja (`lib/storeCsp.js`); HSTS com `includeSubDomains` |
+| C9 | `/track` mostrava morada, telefones e GPS a quem tivesse número e email | Baixa | ✅ mascarados sem a sessão dona da encomenda (`trackPrivacy.ts`) |
+| C10 | Checkout: bloqueio mútuo entre compras simultâneas; total do servidor podia diferir do mostrado | Baixa | ✅ bloqueio por ordem do id; o carrinho manda o total e o servidor recusa (409) se for outro |

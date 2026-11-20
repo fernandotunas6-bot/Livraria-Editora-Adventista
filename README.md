@@ -217,8 +217,6 @@ Contas e papéis geram-se em **Admin → Utilizadores e Clientes**. Para dar ace
 
 ## API própria (Edge Function `app`)
 
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
 Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 
 | Endpoint | Método | Descrição |

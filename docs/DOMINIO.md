@@ -57,7 +57,7 @@ teste (`scripts/seo-paginas.test.mjs`) impede que voltem a ter outro domínio.
 
 A AngoWeb já não serve o `.ao`, mas os nameservers foram trocados para **`randy` e `riya`**.
 Estes pertencem a uma **segunda zona `livrariaadventista.ao`, criada noutra conta Cloudflare**,
-vazia. A conta do projecto (`Valentinocanguele@gmail.com's Account`, a do Pages e do token)
+vazia. A conta do projecto (`<conta pessoal do dono>'s Account`, a do Pages e do token)
 continua com a zona `.ao` **pending** em `cody`/`hadlee`, com os registos todos. Não se recriam os
 registos na outra conta: o Pages está nesta conta e um domínio de outra conta não activa nele
 (o apex nem chega a validar). A correcção é pôr `cody`/`hadlee` na AngoWeb e apagar a zona
@@ -73,7 +73,7 @@ duplicada da outra conta.
   `.ao` ainda delegava em `randy`/`riya` e a zona continuava **pending**.
 - Email: o dono **não usa** email `@livrariaadventista.ao` (nem Google, nem a AngoWeb `ws100`).
   Decidido: **Cloudflare Email Routing**, `contacto@livrariaadventista.ao` →
-  `valentinocanguele@gmail.com`. Ainda **não ficou activo** nesta zona (regra inexistente; MX e SPF
+  `<conta pessoal do dono>`. Ainda **não ficou activo** nesta zona (regra inexistente; MX e SPF
   do Google ainda lá). Fazer pelo painel, nesta conta: Email → Email Routing → regra `contacto` →
   verificar o Gmail → "Adicionar registos e ativar", aceitando apagar o MX/SPF do Google.
   O token do repositório não tem permissão para os endereços de destino.

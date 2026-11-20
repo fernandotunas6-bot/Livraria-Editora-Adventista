@@ -6,7 +6,7 @@ import { lerPainelPptx } from '../../app/web/src/painel-vendas/pptx.js';
 import { migracaoSql } from './pptx-para-sql.mjs';
 
 // No vitest corre a partir de app/web.
-const FICHEIRO = resolve(process.cwd(), '../../Loja Huambo - Painel-Vendas 2026S (1).pptx');
+const FICHEIRO = resolve(process.cwd(), 'e2e/dados/painel-vendas-huambo-2026.pptx');
 
 describe('pptx-para-sql', () => {
   it('gera a migração com os mesmos meses da de Outubro', async () => {
