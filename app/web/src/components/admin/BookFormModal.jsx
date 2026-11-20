@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   X, Loader2, BookOpen, Hash, Barcode, ImageIcon, Sparkles, Copy, Check,
 } from 'lucide-react';

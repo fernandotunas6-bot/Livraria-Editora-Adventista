@@ -6,7 +6,7 @@
 #
 # Variáveis para escolher o destino:
 #   CLOUDFLARE_PAGES_PROJECT → projecto Pages (por omissão livraria-editora-adventista, na conta
-#                              Cloudflare valentinocanguele@gmail.com — é nela que o wrangler
+#                              Cloudflare <conta pessoal do dono> — é nela que o wrangler
 #                              tem de estar autenticado: `npx wrangler@4 whoami`)
 #   SITE_URL                 → o endereço público (por omissão https://livrariaadventista.ao).
 #                              Não se deriva do nome do projecto: o endereço .pages.dev deste

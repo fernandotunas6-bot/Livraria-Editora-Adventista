@@ -53,6 +53,7 @@ import {
   weeklyReportLetter,
   testLetter,
   welcomeLetter,
+  newsletterConfirmLetter,
   PREVIEW_TEMPLATES,
   unsubscribeUrlFor,
   listUnsubscribeHeaders,
@@ -63,14 +64,14 @@ import {
   assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
-import { mfaPending } from "./mfa.ts";
+import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 import { type Auth, PERMISSION_KEYS, can, isStaff } from "./permissions.ts";
 import {
   type AcessoAberto, type AcessoComSessao, type Access, equipa, permissao, permissaoCom, publica, recusa, segredo, sessao,
 } from "./access.ts";
-import { createRateLimit } from "./rateLimit.ts";
+import { createRateLimit, funcaoEmFalta } from "./rateLimit.ts";
 import { buildOpsReport } from "./opsReport.ts";
 import {
   brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, senderFor, smtpPortProblem,
@@ -78,7 +79,7 @@ import {
 } from "./emailProviders.ts";
 import {
   SHIPPING_METHODS, cleanPaymentReference, isPaidUpfront, isPngSignature, paymentAllowedForShipping,
-  saleChannelFrom, settingNumber, shippingPhrase, successPath, unpaidOrdersToCancel,
+  saleChannelFrom, settingNumber, shippingPhrase, successPath, unconfirmedOrdersToCancel, unpaidOrdersToCancel,
 } from "./checkoutRules.ts";
 import {
   type PaymentAction, type PaymentResult, customerNoticeFor, deliveryNeedsPayment, kz as kwanza, outstanding, parseAmount,
@@ -98,6 +99,8 @@ import { appLink } from "./appLinks.ts";
 import { type PushPayload, apnsConfig, apnsEndpoint, apnsTokenOf, isApnsToken, sendApns } from "./apns.ts";
 import { fcmConfig, fcmEndpoint, fcmTokenOf, isFcmToken, sendFcm } from "./fcm.ts";
 import { cleanTelemetry } from "./telemetry.ts";
+import { firstNameOnly, trackDestination, trackPersonalFields } from "./trackPrivacy.ts";
+import { TURNSTILE_MESSAGE, turnstileEnabled, verifyTurnstile } from "./turnstile.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const db: SupabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -203,20 +206,52 @@ async function logNotification(entry: Row) {
 const timelineEvent = (status: string, title: string, description = "", location = "Luanda") =>
   ({ status, title, description, location: location || "Luanda", at: nowISO() });
 
+/**
+ * A partir de quando a equipa precisa do código (migração dois_passos_obrigatorio_equipa), em
+ * cache de um minuto. Vai num objecto para o "sem prazo" (`null`) também ficar em cache; uma falha
+ * de leitura não fica, e o pedido seguinte volta a tentar. Sem a migração, sem prazo — como na base.
+ */
+async function staffMfaDeadline(): Promise<number | null> {
+  const got = await cached("staff-mfa-deadline", 60_000, async () => {
+    const { data, error } = await db.rpc("staff_mfa_deadline");
+    if (error) {
+      if (funcaoEmFalta(error)) return { value: null };
+      console.log("staff_mfa_deadline:", error.message);
+      return null;
+    }
+    return { value: deadlineFrom(data) };
+  });
+  return got?.value ?? null;
+}
+
 async function getAuth(req: Request): Promise<Auth> {
   const header = req.headers.get("Authorization") || "";
   const token = header.replace(/^Bearer\s+/i, "").trim();
   if (!token || token.startsWith("sb_")) return null;
-  const { data, error } = await db.auth.getUser(token);
+  // O perfil é lido ao mesmo tempo que o token é validado, com o id lido do próprio token: eram duas
+  // idas seguidas em cada pedido com sessão (a base está em Estocolmo). O perfil só conta se o Auth
+  // confirmar que o token é dessa mesma conta.
+  const sub = String(jwtClaims(token).sub || "");
+  const [{ data, error }, early] = await Promise.all([
+    db.auth.getUser(token),
+    /^[0-9a-f-]{36}$/i.test(sub)
+      ? db.from("profiles").select("id, role, permissions").eq("id", sub).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
   if (error || !data?.user) return null;
-  const { data: profile } = await db.from("profiles").select("role, permissions").eq("id", data.user.id).maybeSingle();
-  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1): vale como
-  // cliente até introduzir o código. É a mesma regra das funções de permissão na base de
-  // dados; ver mfa.ts. Contas sem factor verificado não são afectadas.
-  if (mfaPending(data.user.factors, token)) {
+  let profile = early?.data as Row | null;
+  if (profile?.id !== data.user.id) {
+    ({ data: profile } = await db.from("profiles").select("id, role, permissions").eq("id", data.user.id).maybeSingle());
+  }
+  const role = String(profile?.role || "member");
+  const staff = role === "admin" || role === "manager";
+  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1), ou conta da equipa
+  // sem o código depois do prazo: vale como cliente até introduzir (ou activar) o código. É a
+  // mesma regra das funções de permissão na base de dados; ver mfa.ts.
+  if (mfaPending(data.user.factors, token, { staff, enforceAfter: staff ? await staffMfaDeadline() : null })) {
     return { id: data.user.id, email: data.user.email || "", role: "member", permissions: {} };
   }
-  return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
+  return { id: data.user.id, email: data.user.email || "", role, permissions: profile?.permissions || {} };
 }
 
 // Quem pode o quê está em `permissions.ts`; quem pode chamar cada rota, em `access.ts`, e é
@@ -225,6 +260,21 @@ async function getAuth(req: Request): Promise<Auth> {
 function requirePermission(auth: Auth, key: string) {
   if (!can(auth, key)) throw new HttpError(403, "Sem permissão para esta operação.");
   return auth!;
+}
+
+// Cloudflare Turnstile nos formulários públicos que gravam (turnstile.ts). Ligado só com os dois
+// segredos, TURNSTILE_SITE_KEY e TURNSTILE_SECRET_KEY: sem eles, o site não mostra o widget e aqui
+// não se pede nada.
+const turnstileSecret = () => (Deno.env.get("TURNSTILE_SECRET_KEY") || "").trim();
+const turnstileSiteKey = () => {
+  const site = (Deno.env.get("TURNSTILE_SITE_KEY") || "").trim();
+  return turnstileEnabled(site, turnstileSecret()) ? site : "";
+};
+/** Recusa (400) quem não passou no Turnstile, quando está ligado. */
+async function requireHuman(body: Row, ip: string) {
+  if (!turnstileSiteKey()) return;
+  const result = await verifyTurnstile(body.turnstileToken, { secret: turnstileSecret(), ip });
+  if (!result.ok) throw new HttpError(400, TURNSTILE_MESSAGE);
 }
 
 // O registo de configuração activo é o mais antigo (o mesmo que o PocketBase usava).
@@ -285,6 +335,8 @@ function storeRules(settings: Row | null) {
     receiptPerOrder: clampInt(settings?.receipt_per_order_per_minute, 1, 10, 3),
     // 0 = nunca cancela (o valor por omissão): a loja decide se e quando.
     unpaidCancelDays: clampInt(settings?.unpaid_cancel_days, 0, 60, 0),
+    // Pagamento no fim, nunca confirmada pela equipa (migração cancelar_nao_confirmadas). 0 = nunca.
+    unconfirmedCancelDays: clampInt(settings?.unconfirmed_cancel_days, 0, 60, 0),
     // Encomendas por pagar ao mesmo tempo com o mesmo telefone ou email. 0 = sem limite.
     unpaidOrdersPerContact: clampInt(settings?.unpaid_orders_per_contact, 0, 20, 3),
     // Respostas com IA por dia na loja toda (custo). 0 = assistente sempre sem IA.
@@ -1560,6 +1612,7 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
       footer_columns: null, show_stores_in_footer: true, ui_glass_enabled: true, ui_glass_opacity: 0.72,
       shop_bg_mode: "image", shop_bg_image_url: DEFAULT_SHOP_BG, shop_bg_video_url: "", shop_bg_overlay: 0.55,
       about_top_image_url: DEFAULT_ABOUT_TOP, about_side_image_url: DEFAULT_ABOUT_SIDE, about_team: [],
+      turnstile_site_key: turnstileSiteKey(),
     });
   }
   const brandImage = (urlField: string, fileField: string) => {
@@ -1608,6 +1661,8 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     shipping_cost: settingNumber(rec.shipping_cost, 1500),
     shipping_express_cost: settingNumber(rec.shipping_express_cost, 0),
     maintenance_mode: !!rec.maintenance_mode,
+    // A chave pública do Turnstile: com ela, os formulários públicos mostram o widget (turnstile.ts).
+    turnstile_site_key: turnstileSiteKey(),
     order_number_prefix: storeRules(rec).orderPrefix,
     google_oauth_enabled: !!rec.google_oauth_enabled,
     header_welcome_logged: rec.header_welcome_logged || "Bem-vindo de volta, {nome}",
@@ -1620,7 +1675,7 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     show_stores_in_footer: orTrue(rec.show_stores_in_footer),
     shop_hero_title: rec.shop_hero_title || "Todos os Livros",
     shop_hero_subtitle: rec.shop_hero_subtitle || "",
-    shop_hero_badge: rec.shop_hero_badge || "Catálogo Premium",
+    shop_hero_badge: rec.shop_hero_badge || "Catálogo da livraria",
     shop_default_sort: rec.shop_default_sort || "featured",
     shop_per_page: Number(rec.shop_per_page) || 24,
     shop_show_featured: orTrue(rec.shop_show_featured),
@@ -1776,7 +1831,7 @@ async function findOrderByNumberAndEmail(orderNumber: string, email: string) {
   return data?.[0] || null;
 }
 
-route("POST", "/track", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
+route("POST", "/track", publica("só com o número e o email da encomenda; os dados pessoais mascarados sem a sessão dona (trackPrivacy.ts); limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("track", ip, storeRules(await getSettings()).trackRate)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1795,6 +1850,9 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
   // A factura do KanGest (e a nota de crédito, se foi reembolsada): o número e o QR da AGT (docs/KANGEST.md).
   const { data: docsKanGest } = await db.from("kangest_fila").select("accao, resultado")
     .eq("order_id", order.id).in("accao", ["fr", "nc"]).eq("estado", "feito");
+  // Sem a sessão dona da encomenda, os dados pessoais saem mascarados (trackPrivacy.ts).
+  const owner = sessionOwnsOrder(auth, order);
+  const personal = trackPersonalFields(order, owner);
   const docKanGest = (accao: string) => {
     const r = (docsKanGest || []).find((x: Row) => x.accao === accao)?.resultado;
     return r?.numero ? { numero: String(r.numero), total: Number(r.total || 0) / 100, url_agt: r.fe?.url_consulta || "" } : null;
@@ -1814,15 +1872,19 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
       payment_link: /^https:\/\//.test(String(method?.payment_link || "")) ? method!.payment_link : "",
     } : {}),
     order_number: order.order_number, status: order.status, delivery_status: order.delivery_status || "received",
-    total: order.total, customer_name: order.customer_name, phone: order.phone || "",
-    delivery_relative_name: order.delivery_relative_name || "", delivery_relative_phone: order.delivery_relative_phone || "",
+    total: order.total, customer_name: personal.customer_name, phone: personal.phone,
+    delivery_relative_name: personal.delivery_relative_name, delivery_relative_phone: personal.delivery_relative_phone,
+    personal_data_masked: personal.masked,
     delivery_province: order.delivery_province || "",
     delivery_municipality: order.delivery_municipality || "", delivery_locality: order.delivery_locality || "",
-    delivery_street: order.delivery_street || "", delivery_reference: order.delivery_reference || "",
-    // A morada numa linha, também nas encomendas antigas (que só tinham address/city).
-    delivery_address_full: deliveryAddressLine(order),
-    delivery_confirmed_at: order.delivery_confirmed_at || "", delivery_confirmed_by: order.delivery_confirmed_by || "",
-    delivery_recipient_name: order.delivery_recipient_name || "",
+    delivery_street: personal.delivery_street, delivery_reference: personal.delivery_reference,
+    // A morada numa linha, também nas encomendas antigas (que só tinham address/city); só até ao
+    // bairro para quem não tem a sessão dona da encomenda.
+    delivery_address_full: !personal.masked ? deliveryAddressLine(order)
+      : deliveryAddressLine(order) ? personal.delivery_address_full || String(order.city || "") : "",
+    delivery_confirmed_at: order.delivery_confirmed_at || "",
+    delivery_confirmed_by: owner ? order.delivery_confirmed_by || "" : firstNameOnly(order.delivery_confirmed_by),
+    delivery_recipient_name: owner ? order.delivery_recipient_name || "" : firstNameOnly(order.delivery_recipient_name),
     // A imagem da assinatura não sai daqui: basta o número da encomenda e o email para
     // chegar a esta rota, e o número é curto. Quem confirmou a recepção vê-a na resposta
     // do /confirm-delivery; a equipa vê-a no painel (RLS) e no recibo.
@@ -1833,8 +1895,9 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
     shipping_method: order.shipping_method || "", pickup_store: order.pickup_store || "",
     // O cliente ainda a pode cancelar sozinho (rota /order/cancel; regras em customerCancel.ts).
     can_cancel: customerCancelBlock(order) === null,
-    // O ponto de entrega (migração trajeto_gps): o cliente afina-o em /track/destination.
-    delivery_gps: destinationOf(order),
+    // O ponto de entrega (migração trajeto_gps): o cliente afina-o em /track/destination. Sem a
+    // sessão dona, só a zona (~1 km).
+    delivery_gps: trackDestination(destinationOf(order), owner),
     can_set_destination: canSetDestination(order),
   });
 });
@@ -1846,7 +1909,7 @@ route("POST", "/track", publica("só com o número e o email da encomenda; limit
 // Identifica-se como no rastreio: o número da encomenda e o email. A página pergunta de 15 em 15
 // segundos enquanto a encomenda vai a caminho; o limite por minuto dá para dois separadores.
 
-route("POST", "/track/live", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
+route("POST", "/track/live", publica("só com o número e o email da encomenda; o ponto de entrega só à zona sem a sessão dona; limite de pedidos"), async ({ body, ip, auth }) => {
   if (!await checkRateLimit("track_live", ip, 40)) throw tooMany("Demasiados pedidos. Aguarde um minuto.");
   const orderNumber = String(body.orderNumber || "").trim();
   const email = normalizeEmail(body.email || "");
@@ -1855,7 +1918,10 @@ route("POST", "/track/live", publica("só com o número e o email da encomenda; 
   if (!order) throw new HttpError(404, "Encomenda não encontrada. Verifique o número e o email.");
   // Sem a migração a tabela não existe: a leitura falha e o mapa mostra só o ponto de entrega.
   const { data: position } = await db.from("delivery_positions").select("*").eq("order_id", order.id).maybeSingle();
-  return json(liveTrackingView(order, position || null));
+  const view = liveTrackingView(order, position || null) as Row;
+  // A casa do cliente só à zona para quem não tem a sessão dona (trackPrivacy.ts).
+  if (view.destination) view.destination = trackDestination(view.destination, sessionOwnsOrder(auth, order));
+  return json(view);
 });
 
 route("POST", "/track/destination", publica("só com o número e o email da encomenda; limite de pedidos"), async ({ body, ip }) => {
@@ -2661,6 +2727,9 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
   // O site manda `${origin}/success`; fica "/success". Outro tipo (número, objecto) partia o
   // `.includes` mais abaixo com um 500.
   const successUrl = successPath(data.successUrl);
+  // O total que o cliente viu (Kz). Opcional: as apps antigas não o mandam.
+  const shownTotal = Number(data.expectedTotal);
+  const expectedTotal = Number.isFinite(shownTotal) && shownTotal > 0 && shownTotal < 1e9 ? Math.round(shownTotal * 100) / 100 : null;
   const idempotencyKey = IDEMPOTENCY_KEY.test(String(data.idempotencyKey || "")) ? String(data.idempotencyKey) : "";
   const emailQueued = !!(email && settings?.order_email_enabled);
   if (idempotencyKey) {
@@ -2688,6 +2757,10 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
     }
   }
 
+  // Depois da repetição pela chave de idempotência (que devolve a encomenda já criada sem pedir outro
+  // token) e antes de reservar o stock.
+  await requireHuman(data, ip);
+
   const { data: saved, error } = await db.rpc("place_order", {
     p_order: order,
     p_items: cartItems,
@@ -2696,13 +2769,22 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
       free_threshold: settingNumber(settings?.shipping_free_threshold, 20000),
       cost: settingNumber(settings?.shipping_cost, 1500),
       express_cost: settingNumber(settings?.shipping_express_cost, 0),
+      // O total que o carrinho mostrou: se o calculado aqui for outro, a compra pára e o cliente
+      // confirma o valor certo (migração checkout_bloqueios_e_total).
+      ...(expectedTotal !== null ? { expected_total: expectedTotal } : {}),
     },
   });
   // Só as mensagens escritas para o comprador ("Stock insuficiente para: …", "Livro
   // indisponível") saem como estão: são as do `raise exception` do place_order (P0001).
   // Outro erro do Postgres diria nomes de colunas e restrições a quem está a comprar.
   if (error) {
-    if (error.code === "P0001") throw bad(error.message);
+    if (error.code === "P0001") {
+      // O total mudou desde que o carrinho o mostrou (preço, promoção ou portes): 409 com o valor
+      // certo, para o carrinho pedir confirmação em vez de gravar outro valor sem o cliente saber.
+      const changed = /^total_changed:(\d+(?:\.\d+)?)$/.exec(String(error.hint || ""));
+      if (changed) return json({ message: error.message, code: "total_changed", total: Number(changed[1]) }, 409);
+      throw bad(error.message);
+    }
     // Dois pedidos com a mesma chave ao mesmo tempo: o índice único deixa passar um só, e o
     // outro devolve a encomenda que esse criou (o stock do segundo é reposto pelo rollback).
     if (error.code === "23505" && idempotencyKey) {
@@ -3507,6 +3589,7 @@ route("POST", "/contact-message", publica("formulário de contacto; limite de pe
   const phone = String(body.phone || "").trim().slice(0, 40);
   if (!name || !email || !message) throw bad("Nome, email e mensagem são obrigatórios.");
   if (!isDeliverableEmail(email)) throw bad("Email inválido.");
+  await requireHuman(body, ip);
   await upsertContact({ name, email, phone, source: "manual", notes: message, tags: ["formulario-contacto"] }, await getDefaultOwnerId(), { publico: true });
   return json({ message: "Mensagem recebida! Entraremos em contacto em breve." });
 });
@@ -3704,6 +3787,7 @@ route("POST", "/colportores/candidatura", publica("formulário de candidatura; l
     consent: body.consent === true,
   };
   if (payload.email && !isDeliverableEmail(payload.email)) throw bad("Email inválido.");
+  await requireHuman(body, ip);
   const { data, error } = await db.rpc("colporteur_apply", { p: payload });
   if (error) {
     // As mensagens da função são para o candidato (telefone, igreja, consentimento, repetida).
@@ -3739,7 +3823,8 @@ route("POST", "/contacts/import-sources", permissao("manage_users", "manage_mark
     }, staff.id);
     if (r.created) created++; else updated++;
   }
-  const { data: subs } = await db.from("newsletter").select("email");
+  // Só quem confirmou pelo link (migração newsletter_dupla_confirmacao) entra nos contactos e nas campanhas.
+  const { data: subs } = await db.from("newsletter").select("email").not("confirmed_at", "is", null);
   for (const s of subs || []) {
     if (!s.email) continue;
     const r = await upsertContact({ name: s.email.split("@")[0], email: s.email, source: "newsletter", tags: ["newsletter"] }, staff.id);
@@ -3999,17 +4084,50 @@ async function notifyDuty(opts: {
 }
 
 /**
+ * Cancela as encomendas de pagamento no fim (na entrega, no balcão) que ninguém da equipa confirmou em
+ * `unconfirmed_cancel_days` dias (Configurações → Regras da loja; 0 = nunca). Reservavam o stock sem
+ * que ninguém as tratasse. O stock volta ao catálogo pelo trigger orders_before_update.
+ */
+async function cancelUnconfirmedOrders(orders: Row[], upfront: Set<string>, days: number) {
+  let cancelled = 0;
+  for (const o of unconfirmedOrdersToCancel(orders, upfront, days)) {
+    // As condições repetem-se no update: se alguém da equipa a viu entretanto, não cancela.
+    const { data: saved, error } = await db.from("orders")
+      .update({ status: "cancelled", delivery_status: "cancelled" })
+      .eq("id", o.id).eq("status", "pending").eq("delivery_status", "received").is("acknowledged_at", null).eq("amount_paid", 0)
+      .select().maybeSingle();
+    if (error || !saved) continue;
+    cancelled += 1;
+    Object.assign(o, { status: "cancelled", delivery_status: "cancelled" });
+    const ref = o.order_number || o.id;
+    await notifyDuty({
+      duty: "new_order", storeId: null, kind: "order_stuck", severity: "high", orderId: o.id,
+      title: `Cancelada por ninguém a confirmar — ${ref}`,
+      body: `${o.customer_name || "Cliente"} encomendou há mais de ${days} dia(s) e ninguém da equipa a confirmou. O stock voltou ao catálogo.`,
+    });
+    try {
+      await notifyOrderStep(saved, "cancelled", { description: `Não conseguimos confirmar a encomenda em ${days} dia(s). Se ainda a quer, faça-a de novo ou contacte-nos com o número da encomenda.` });
+    } catch (err) {
+      console.log("Aviso de cancelamento por falta de confirmação:", err);
+    }
+  }
+  return cancelled;
+}
+
+/**
  * Cancela as encomendas pagas antes do envio (transferência, Multicaixa) que ficaram sem pagamento
  * nem referência durante `unpaid_cancel_days` dias (Configurações → Regras da loja; 0 = nunca).
  * O stock volta ao catálogo pelo trigger orders_before_update, como num cancelamento no painel, e o
  * cliente e a equipa são avisados. Muda as encomendas em memória, para não gerarem alertas.
  */
 async function cancelUnpaidOrders(orders: Row[]) {
-  const days = storeRules(await getSettings(true)).unpaidCancelDays;
-  if (days <= 0) return 0;
+  const rules = storeRules(await getSettings(true));
+  const days = rules.unpaidCancelDays;
+  if (days <= 0 && rules.unconfirmedCancelDays <= 0) return 0;
   const { data: methods } = await db.from("payment_methods").select("code, type");
   const upfront = new Set((methods || []).filter((m: Row) => isPaidUpfront(m.type)).map((m: Row) => String(m.code)));
-  let cancelled = 0;
+  let cancelled = await cancelUnconfirmedOrders(orders, upfront, rules.unconfirmedCancelDays);
+  if (days <= 0) return cancelled;
   for (const o of unpaidOrdersToCancel(orders, upfront, days)) {
     // As condições repetem-se no update: se a equipa confirmou o pagamento entretanto, não cancela.
     const { data: saved, error } = await db.from("orders")
@@ -4509,16 +4627,54 @@ route("POST", "/admin/orders/feedback-resolve", permissao("manage_orders"), asyn
   return json({ ok: true });
 });
 
-route("POST", "/newsletter", publica("subscrição por email; limite de pedidos"), async ({ body, ip }) => {
+// Newsletter com dupla confirmação (migração newsletter_dupla_confirmacao): o pedido manda um email
+// com o link; só o link confirma. A resposta é a mesma esteja o endereço na lista ou não, para não
+// dizer a ninguém quem é subscritor.
+const NEWSLETTER_MESSAGE = "Se o endereço estiver certo, vai receber um email para confirmar a subscrição.";
+const NEWSLETTER_LINK_DAYS = 7;
+const hexToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+route("POST", "/newsletter", publica("subscrição por email com dupla confirmação; resposta igual para todos; limite de pedidos"), async ({ body, ip }) => {
   if (!await checkRateLimit("newsletter", ip, 6)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
   const email = normalizeEmail(body.email || "");
   if (!email) throw bad("Email obrigatório.");
   if (!isDeliverableEmail(email)) throw bad("Email inválido.");
-  const { data } = await db.from("newsletter").select("id").ilike("email", likeExact(email)).limit(1);
-  if (data?.[0]) return json({ message: "Já subscrito." });
-  const { error } = await db.from("newsletter").insert({ email });
+  await requireHuman(body, ip);
+  const { data } = await db.from("newsletter").select("id, confirmed_at, confirm_sent_at").ilike("email", likeExact(email)).limit(1);
+  const row = data?.[0];
+  if (row?.confirmed_at) return json({ message: NEWSLETTER_MESSAGE });
+  // Uma confirmação por endereço e por hora: ninguém enche a caixa de outra pessoa.
+  if (row?.confirm_sent_at && Date.now() - new Date(row.confirm_sent_at).getTime() < 3600_000) {
+    return json({ message: NEWSLETTER_MESSAGE });
+  }
+  const token = hexToken();
+  const stamp = { confirm_token: token, confirm_sent_at: nowISO(), updated: nowISO() };
+  const { error } = row
+    ? await db.from("newsletter").update(stamp).eq("id", row.id)
+    : await db.from("newsletter").insert({ email, ...stamp });
   if (error) throw error;
-  return json({ message: "Subscrição realizada!" });
+  const settings = await getSettings();
+  const site = (emailBrand(settings).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  const link = `${site}/newsletter/confirmar?t=${token}`;
+  runAfterResponse("Confirmação da newsletter", () => notifyAccount(email, "", (b) => newsletterConfirmLetter(b, link)));
+  return json({ message: NEWSLETTER_MESSAGE });
+});
+
+route("POST", "/newsletter/confirm", publica("só com o token do email de confirmação; limite de pedidos"), async ({ body, ip }) => {
+  if (!await checkRateLimit("newsletter-confirm", ip, 10)) throw tooMany("Demasiadas tentativas. Aguarde um minuto.");
+  const token = String(body.token || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(token)) throw bad("Este link não é válido.");
+  const { data: row } = await db.from("newsletter").select("id, confirmed_at, confirm_sent_at").eq("confirm_token", token).maybeSingle();
+  if (!row) throw new HttpError(404, "Este link já não é válido. Peça outra vez no fundo de qualquer página do site.");
+  if (!row.confirmed_at) {
+    const sent = new Date(row.confirm_sent_at || 0).getTime();
+    if (!Number.isFinite(sent) || Date.now() - sent > NEWSLETTER_LINK_DAYS * 24 * 3600_000) {
+      throw new HttpError(410, "Este link expirou. Peça outra vez no fundo de qualquer página do site.");
+    }
+    const { error } = await db.from("newsletter").update({ confirmed_at: nowISO(), updated: nowISO() }).eq("id", row.id);
+    if (error) throw error;
+  }
+  return json({ ok: true, message: "Subscrição confirmada. Obrigado — vai receber as novidades neste email." });
 });
 
 // Resumo do catálogo para a equipa. Era público e dizia a qualquer pessoa o stock e as vendas
@@ -5213,6 +5369,34 @@ route("POST", "/admin/users/end-sessions", permissao("manage_users"), async ({ a
     emailSent = await notifyAccount(target.email, target.name, (b) => suspiciousActivityLetter(b, target.name, detail));
   }
   return json({ ok: true, ended, email_sent: emailSent });
+});
+
+/**
+ * Repõe a verificação em dois passos de uma conta (perdeu o telemóvel, trocou de aplicação). A
+ * pessoa volta a activá-la ao entrar — na equipa, depois do prazo, é obrigatória (migração
+ * dois_passos_obrigatorio_equipa). Só administradores; nunca a própria conta (essa muda-se no
+ * perfil, com o código). As sessões abertas terminam, para um telemóvel perdido não ficar com uma,
+ * e todos os administradores são avisados (registo de segurança).
+ */
+route("POST", "/admin/users/mfa-reset", permissao("manage_users"), async ({ auth, body }) => {
+  if (auth.role !== "admin") throw new HttpError(403, "Só administradores repõem a verificação em dois passos.");
+  const target = await loadTarget(auth, body.id);
+  if (target.id === auth.id) throw bad("A sua própria verificação muda-se no perfil. Para a repor, peça a outro administrador.");
+  const { data, error } = await db.auth.admin.mfa.listFactors({ userId: String(target.id) });
+  if (error) throw error;
+  const factors = (data?.factors || []) as Row[];
+  if (!factors.length) throw bad("Esta conta não tem verificação em dois passos.");
+  for (const f of factors) {
+    const { error: removeError } = await db.auth.admin.mfa.deleteFactor({ id: String(f.id), userId: String(target.id) });
+    if (removeError) throw removeError;
+  }
+  const ended = await endSessions(target.id);
+  await recordSecurity(auth, {
+    rowId: target.id,
+    alert: true,
+    summary: `Verificação em dois passos reposta: ${target.email || target.id} (${factors.length} factor(es) retirado(s), ${ended} sessão(ões) terminada(s))`,
+  });
+  return json({ ok: true, removed: factors.length, ended });
 });
 
 // --- Assistente e atendimento no chat ---

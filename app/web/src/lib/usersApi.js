@@ -111,6 +111,12 @@ export const endUserSessions = (id, { suspicious = false, detail = '' } = {}) =>
   call('POST', '/admin/users/end-sessions', { body: { id, suspicious, detail } });
 
 /**
+ * Repõe a verificação em dois passos (perdeu o telemóvel): retira os factores e termina as
+ * sessões. Só administradores; a pessoa activa o código de novo ao entrar.
+ */
+export const resetUserMfa = (id) => call('POST', '/admin/users/mfa-reset', { body: { id } });
+
+/**
  * Link para definir a palavra-passe. Pela Edge Function (devolve o link para partilhar);
  * se a publicada ainda não tiver a rota, pede ao Supabase Auth que envie o email de recuperação.
  */

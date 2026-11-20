@@ -146,6 +146,7 @@ describe("o registo das rotas no index.ts", () => {
       "POST /confirm-delivery",
       "POST /contact-message",
       "POST /newsletter",
+      "POST /newsletter/confirm",
       "POST /order-feedback",
       "POST /order/cancel",
       "POST /order/payment-reference",

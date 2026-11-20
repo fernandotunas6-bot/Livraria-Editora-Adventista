@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, BookOpen } from 'lucide-react';
 import { getFeaturedProducts, formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';

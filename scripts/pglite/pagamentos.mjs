@@ -245,9 +245,15 @@ check('gateway: sem encomenda fica órfão', r.outcome === 'orphan', r);
 const og2 = await encomenda({ payment_method_code: 'multicaixa', payment_method_name: 'Multicaixa Express' });
 r = await gw('TX-4', og2.order_number, 4000);
 check('gateway: valor a menos → pago em parte', r.payment_status === 'partially_paid' && Number(r.outstanding) === 7500, r);
+// Sem estado, o aviso pode ser um reembolso ou um pendente: recusa-se (análise crítica, 2026-11-20).
+r = await gw('TX-5', og2.order_number, 7500, '');
+check('gateway: sem estado é recusado e não mexe na encomenda', r.outcome === 'rejected' && Number((await order(og2.id)).amount_paid) === 4000, r);
+r = await rpc(`public.order_payment_gateway('generico', 'TX-6', $1, 7500::numeric)`, [og2.order_number], null);
+check('gateway: estado omitido também é recusado', r.outcome === 'rejected' && Number((await order(og2.id)).amount_paid) === 4000, r);
 const ev = await q(`select outcome, count(*)::int n from public.payment_gateway_events group by 1 order by 1`);
 check('gateway: cada chamada fica registada', JSON.stringify(ev) === JSON.stringify([
-  { outcome: 'duplicate', n: 1 }, { outcome: 'ignored', n: 1 }, { outcome: 'orphan', n: 1 }, { outcome: 'recorded', n: 2 }]), ev);
+  { outcome: 'duplicate', n: 1 }, { outcome: 'ignored', n: 1 }, { outcome: 'orphan', n: 1 }, { outcome: 'recorded', n: 2 },
+  { outcome: 'rejected', n: 2 }]), ev);
 await raises('gateway: só a Edge Function grava', () => asUser(caixa, `select public.order_payment_gateway('generico', 'TX-9', $1, 100)`, [og2.order_number]), /permission denied/);
 await raises('gateway: o registo não se altera', () => svc(`update public.payment_gateway_events set outcome = 'recorded'`), /não se altera/);
 await raises('gateway: a mesma transacção não entra à mão', async () => {
@@ -255,7 +261,7 @@ await raises('gateway: a mesma transacção não entra à mão', async () => {
   try { await q(`insert into public.order_payments (order_id, status, amount, source, provider, transaction_id, received_at) values ($1, 'confirmed', 1, 'gateway', 'generico', 'TX-1', now())`, [og2.id]); }
   finally { await db.exec(`select set_config('app.payments_write', '', false)`); }
 }, /duplicate key|order_payments_transacao_unica/);
-check('gestor vê as chamadas do gateway', (await asUser(gestor, `select count(*)::int n from public.payment_gateway_events`))[0].n === 5);
+check('gestor vê as chamadas do gateway', (await asUser(gestor, `select count(*)::int n from public.payment_gateway_events`))[0].n === 7);
 check('cliente não vê as chamadas do gateway', (await asUser(cliente, `select count(*)::int n from public.payment_gateway_events`))[0].n === 0);
 const repG = (await asUser(caixa, `select public.payments_report(current_date - 1, current_date) as r`))[0].r;
 check('relatório: automático (gateway) e manual', Number(repG.received.automatic) === 15500 && Number(repG.received.manual) > 0, repG.received);

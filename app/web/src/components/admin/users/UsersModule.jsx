@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Plus, Search, MoreHorizontal, Eye, Pencil, KeyRound, Ban, CheckCircle2, Trash2, UserPlus,
-  Users, UserCheck, ShoppingBag, ShieldAlert, Copy, MessageCircle, ChevronLeft, ChevronRight, RefreshCw, Download, LogOut,
+  Users, UserCheck, ShoppingBag, ShieldAlert, Copy, MessageCircle, ChevronLeft, ChevronRight, RefreshCw, Download, LogOut, ShieldOff,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, endUserSessions } from '@/lib/usersApi';
+import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, endUserSessions, resetUserMfa } from '@/lib/usersApi';
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
@@ -174,6 +174,8 @@ export default function UsersModule() {
       suspend: u.has_account && manageable && !self,
       remove: u.has_account && manageable && !self,
       endSessions: u.has_account && manageable && !self && !u.suspended,
+      // Só administradores, e nunca a própria conta (essa muda-se no perfil, com o código).
+      resetMfa: u.has_account && isAdmin && !self,
     };
   }, [isAdmin, me?.id]);
 
@@ -239,6 +241,14 @@ export default function UsersModule() {
     run: (suspicious) => runWithEmail(u, () => endUserSessions(u.id, { suspicious }), 'Sessões terminadas', suspicious),
   });
 
+  const askResetMfa = (u) => ask({
+    title: 'Repor a verificação em dois passos?',
+    description: `Para quem perdeu o telemóvel ou trocou de aplicação autenticadora. O código de ${u.name || u.email} deixa de valer, as sessões abertas terminam e a pessoa activa um novo ao entrar (na equipa é obrigatório). Todos os administradores são avisados.`,
+    actionLabel: 'Repor',
+    destructive: true,
+    run: () => run(u, () => resetUserMfa(u.id), 'Verificação em dois passos reposta'),
+  });
+
   const doAccessLink = async (u) => {
     const res = await run(u, () => sendAccessLink(u.id, u.email));
     if (!res) return;
@@ -290,6 +300,7 @@ export default function UsersModule() {
         {can.createAccount && <DropdownMenuItem onClick={() => openCreate(u)}><UserPlus className="h-4 w-4 mr-2" />Criar conta</DropdownMenuItem>}
         {can.accessLink && <DropdownMenuItem onClick={() => doAccessLink(u)}><KeyRound className="h-4 w-4 mr-2" />Link para definir palavra-passe</DropdownMenuItem>}
         {can.endSessions && <DropdownMenuItem onClick={() => askEndSessions(u)}><LogOut className="h-4 w-4 mr-2" />Terminar sessão em todos os aparelhos</DropdownMenuItem>}
+        {can.resetMfa && <DropdownMenuItem onClick={() => askResetMfa(u)}><ShieldOff className="h-4 w-4 mr-2" />Repor a verificação em dois passos</DropdownMenuItem>}
         {(can.suspend || can.remove) && <DropdownMenuSeparator />}
         {can.suspend && (
           <DropdownMenuItem onClick={() => askSuspend(u)}>
@@ -315,6 +326,7 @@ export default function UsersModule() {
         {can.createAccount && <Button size="sm" onClick={() => openCreate(detail)}><UserPlus className="h-4 w-4 mr-1" />Criar conta</Button>}
         {can.accessLink && <Button size="sm" variant="outline" onClick={() => doAccessLink(detail)}><KeyRound className="h-4 w-4 mr-1" />Link de acesso</Button>}
         {can.endSessions && <Button size="sm" variant="outline" onClick={() => askEndSessions(detail)}><LogOut className="h-4 w-4 mr-1" />Terminar sessões</Button>}
+        {can.resetMfa && <Button size="sm" variant="outline" onClick={() => askResetMfa(detail)}><ShieldOff className="h-4 w-4 mr-1" />Repor dois passos</Button>}
         {can.suspend && (
           <Button size="sm" variant="outline" onClick={() => askSuspend(detail)}>
             {detail.suspended ? <CheckCircle2 className="h-4 w-4 mr-1" /> : <Ban className="h-4 w-4 mr-1" />}

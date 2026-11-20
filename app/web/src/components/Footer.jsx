@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import TurnstileWidget, { TURNSTILE_WAIT, useTurnstileToken } from '@/components/TurnstileWidget';
 import { subscribeNewsletter } from '@/api/EcommerceApi';
 import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
@@ -12,7 +13,7 @@ import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
 import { fotoDaLoja, lojaSrcSet, mapsUrl } from '@/lib/stores';
 import SafeLink from '@/components/SafeLink.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import FooterCompact from '@/components/FooterCompact.jsx';
@@ -130,6 +131,7 @@ const Footer = () => {
   const [mapaAberto, setMapaAberto] = useState(null);
   const { toast } = useToast();
   const { settings } = useSiteSettings();
+  const human = useTurnstileToken();
 
   // Sem a pontuação final: a frase leva "." a seguir, e uma frase escrita no painel já com ponto
   // final saía "transforma.. Literatura cristã".
@@ -170,19 +172,21 @@ const Footer = () => {
   const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
+    if (settings.turnstile_site_key && !human.token) {
+      toast({ title: 'Um momento', description: TURNSTILE_WAIT });
+      return;
+    }
     setSubmitting(true);
     try {
-      await subscribeNewsletter(email.trim());
+      // Dupla confirmação: a subscrição só vale depois de carregar no link do email.
+      await subscribeNewsletter(email.trim(), { turnstileToken: human.token });
       setSubscribed(true);
-      toast({
-        title: 'Subscrição realizada!',
-        description: 'Vai receber as nossas novidades neste email.',
-      });
       setEmail('');
     } catch (err) {
       toast({ variant: 'destructive', title: 'Erro', description: err.message || 'Não foi possível subscrever.' });
     } finally {
       setSubmitting(false);
+      human.reset();
     }
   };
 
@@ -282,6 +286,7 @@ const Footer = () => {
                           className="bg-background/5 border-background/10 text-background placeholder:text-background/70 pl-10 focus-visible:ring-marca focus-visible:border-marca h-11 rounded-xl"
                         />
                       </div>
+                      <TurnstileWidget siteKey={settings.turnstile_site_key} onToken={human.setToken} resetKey={human.resetKey} action="newsletter" />
                       <Button 
                         type="submit" 
                         className="w-full bg-primary hover:bg-[#0891b2] text-white font-bold h-11 rounded-xl shadow-[0_4px_14px_rgba(14,165,201,0.3)] hover:shadow-[0_6px_20px_rgba(14,165,201,0.4)] transition-all flex items-center justify-center cursor-pointer" 
@@ -307,9 +312,10 @@ const Footer = () => {
                       <CheckCircle2 className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="text-lg font-bold text-background">Inscrição Confirmada!</h4>
+                      <h4 className="text-lg font-bold text-background">Confirme no seu email</h4>
                       <p className="text-xs text-background/70 mt-2 leading-relaxed">
-                        Obrigado. Vai receber as nossas novidades neste email, e pode deixar de as receber quando quiser.
+                        Enviámos uma mensagem com um link para confirmar. Sem a confirmação não lhe enviamos nada; depois,
+                        pode deixar de receber as novidades quando quiser.
                       </p>
                     </div>
                     <Button 

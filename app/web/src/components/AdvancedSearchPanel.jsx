@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, SlidersHorizontal, X, BookOpen, Hash, Sparkles, Filter, Layers } from 'lucide-react';
+import { Search, X, BookOpen, Hash, Sparkles, Filter, Layers, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -201,10 +201,13 @@ export default function AdvancedSearchPanel({
           size="icon"
           className={`rounded-full shrink-0 relative ${expanded ? 'border-(--brand-primary) bg-[rgb(var(--brand-primary-rgb)/0.1)]' : ''} ${isHero ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
           onClick={() => setExpanded(!expanded)}
-          title="Filtros avançados"
+          title="Mais opções de pesquisa"
+          aria-label="Mais opções de pesquisa"
+          aria-expanded={expanded}
           type="button"
         >
-          <SlidersHorizontal className="h-4 w-4" />
+          {/* Não o ícone dos Filtros (a barra de baixo já o tem): isto abre os campos da pesquisa. */}
+          <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
           {(advancedCount > 0 || filterCount > 0) && (
             <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-(--brand-primary) text-white text-[10px] font-bold flex items-center justify-center">
               {advancedCount || filterCount}

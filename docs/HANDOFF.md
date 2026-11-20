@@ -472,7 +472,7 @@ Estado em 2026-11-10. Ponto de partida para o próximo agente ou pessoa que pegu
 Feito no código (PR #9), **publicado em produção a 2026-11-06** (commit `d8c3e81`, à mão, com os tokens do Cloudflare e do Supabase da sessão):
 - Migração `20261106050000_pagamentos_por_envio` aplicada pela API de gestão do Supabase (numa transacção, registada em `schema_migrations` com o mesmo md5 do ficheiro). O `supabase db push` não serve a partir de uma sessão na nuvem: a ligação directa ao Postgres fica pendurada.
 - Edge Function `app` v19 (`supabase functions deploy app --use-api --no-verify-jwt`).
-- Site com `npm run deploy:site` no projecto `livraria-editora-adventista` (conta `valentinocanguele@gmail.com`); o script confirmou o deploy e as páginas.
+- Site com `npm run deploy:site` no projecto `livraria-editora-adventista` (conta `<conta pessoal do dono>`); o script confirmou o deploy e as páginas.
 
 O que entrou:
 - **Comprar sem conta**, também com entrega. **Pagar depois de encomendar** (transferência, Multicaixa): a referência indica-se na página de sucesso ou no rastreio (`/order/payment-reference`); a equipa recebe `payment_reported`.
@@ -506,7 +506,7 @@ Por decidir ou configurar (dono):
 - **Ramo:** `claude/youthful-heisenberg-rq5gnw`, 47 commits à frente do `origin/main`.
 - **`main`:** a migração do Supabase (o antigo PR #3) está integrada no `main` desde 2026-11-02 (commit `f4d9885`). Atenção: um `main` **local** antigo, da era PocketBase, ainda existe em algumas cópias de trabalho e está 114 commits atrás — usar sempre `origin/main` como referência.
 - **Supabase:** projecto "Livraria Adventista", ref `bggqkjjqbjhbjsckzopj`, organização "Colpotor" (plano grátis), região eu-north-1.
-- **Cloudflare Pages** — hoje na conta `canguelev@fata.adventist.org`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `valentinocanguele@gmail.com`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
+- **Cloudflare Pages** — hoje na conta `<conta da organização>`, com dois projectos. **A decisão de 2026-11-03 é mudar tudo para a conta `<conta pessoal do dono>`** (a que já tem o `siga-plus`), onde o domínio vai ficar; falta fazer, porque o `wrangler` desta máquina está autenticado na conta `fata` e o `login` é um OAuth no browser. Passos em [MIGRACAO-REPOSITORIO.md](MIGRACAO-REPOSITORIO.md), secção 5.
   - `livraria-editora-adventista` — **o que serve produção**, ramo `main`. Desde 2026-11-07 o endereço oficial é **`livrariaadventista.ao`**; o `www`, o `.com` e o `livraria-editora-adventista-ben.pages.dev` redireccionam para ele ([DOMINIO.md](DOMINIO.md)).
   - `livraria-adventista` — **o antigo**, em https://livraria-adventista.pages.dev. Já não recebe deploys e está desactualizado: a 2026-11-06 os livros apareciam sem capa (a CSP antiga não aceita o domínio novo das capas). Deve redireccionar para `livrariaadventista.com` ou ser desligado — decisão do dono.
   - ~~O domínio `livrariaadventista.ao` não está registado~~ (era assim a 2026-11-03): registado na AngoWeb, zona activa no Cloudflare e oficial desde 2026-11-07.
@@ -526,7 +526,7 @@ Por decidir ou configurar (dono):
    - **Variáveis: criadas a 2026-11-03.** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `CLOUDFLARE_PAGES_PROJECT` (= `livraria-editora-adventista`) e `SUPABASE_PROJECT_REF` (= `bggqkjjqbjhbjsckzopj`). A chave *publishable* é pública por desenho (vai no bundle do frontend), por isso é variável e não segredo.
    - **Segredos: por criar** — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`. Os valores não estão em parte alguma desta máquina. Criam-se sem os expor com
      `GH_TOKEN="$(gh auth token --user fernandotunas6-bot)" gh secret set <NOME> --repo fernandotunas6-bot/Livraria-Editora-Adventista`, que pede o valor sem o mostrar. É preciso o token do dono: a `ValentinoCanguele` só tem escrita, e segredos exigem admin.
-   - **Os dois do Cloudflare devem esperar pela mudança de conta.** Têm de ser da conta `valentinocanguele@gmail.com`, não da `canguelev@fata.adventist.org` — pôr os da conta antiga faz o deploy publicar no sítio errado.
+   - **Os dois do Cloudflare devem esperar pela mudança de conta.** Têm de ser da conta `<conta pessoal do dono>`, não da `<conta da organização>` — pôr os da conta antiga faz o deploy publicar no sítio errado.
    - Estado hoje: o `deploy-cloudflare.yml` falha no primeiro passo ("Confirmar segredos e variáveis") a cada push para o `main`. É ruído esperado até os segredos existirem, não um problema novo.
 3. **Supabase → Authentication:**
    - Activar o fornecedor Google, com o Client ID e o Secret da Google Cloud. O URI de redireccionamento é `https://bggqkjjqbjhbjsckzopj.supabase.co/auth/v1/callback`.
@@ -599,7 +599,7 @@ Por decidir ou configurar (dono):
   - "Encomendas" no perfil lê só do Supabase.
   - O Firebase fica só para as ferramentas do Google Workspace.
 - **Administradores:**
-  - `valentinocanguele@gmail.com` e `admin@livraria.ao` são admin.
+  - As contas de administrador vêem-se no painel (Utilizadores e Clientes → Equipa); não se listam aqui.
   - A tabela `private.admin_emails` (só na base de dados, fora da API) pré-autoriza emails: o perfil passa a admin quando a conta fica confirmada.
   - Há 1 email na lista, que ainda não tem conta.
   - **Não pôr emails desta lista no repositório.** É privado, mas o histórico do git é permanente.

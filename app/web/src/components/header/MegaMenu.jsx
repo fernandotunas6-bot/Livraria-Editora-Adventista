@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { displayPrice } from '@/lib/productSort';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
   ChevronDown, BookOpen, Star, PackageCheck, Layers, Truck, Search, Info, Mail, HelpCircle,
   RotateCcw, MessageCircle, MapPin, ArrowRight,

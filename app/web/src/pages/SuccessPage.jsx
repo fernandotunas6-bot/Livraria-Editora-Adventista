@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { CheckCircle, ArrowRight, Package, PackageSearch, User, MessageCircle, Download, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header.jsx';

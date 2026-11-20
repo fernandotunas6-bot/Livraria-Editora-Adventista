@@ -925,6 +925,29 @@ export function listUnsubscribeHeaders(pageUrl: string, apiBase: string): Record
   };
 }
 
+/**
+ * Confirmação da newsletter (dupla confirmação, migração newsletter_dupla_confirmacao). Sem `key`:
+ * não é editável no painel, porque o essencial é o link e o «se não foi você, ignore».
+ */
+export function newsletterConfirmLetter(brand: Brand, link: string): Letter {
+  return {
+    subject: `Confirme a subscrição — ${brand.siteName}`,
+    doc: {
+      symbol: "✉",
+      tone: "brand",
+      title: "Confirme o seu email",
+      subtitle: "Falta um passo para receber as novidades.",
+      lead: [
+        `Pediram para receber as novidades da ${brand.siteName} neste endereço.`,
+        "Se foi você, confirme no botão. Se não foi, ignore esta mensagem: sem confirmação não lhe enviamos mais nada.",
+      ],
+      cta: { label: "Confirmar a subscrição", url: link },
+      notes: ["O link expira dentro de 7 dias."],
+      reason: "Recebeu esta mensagem porque este endereço foi escrito no formulário de novidades do site.",
+    },
+  };
+}
+
 export function testLetter(brand: Brand): Letter {
   return {
     subject: `Teste de email — ${brand.siteName}`,

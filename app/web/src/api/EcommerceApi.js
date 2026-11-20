@@ -30,10 +30,16 @@ function resolveBookCover(book) {
   return '';
 }
 
+/**
+ * "Kz 10 000" ou "Kz 10 000,50": os cêntimos só quando existem. Em kwanzas quase tudo é redondo, e
+ * ",00" em cada preço era ruído (análise crítica de 2026-11-20). Os documentos — recibo, nota de
+ * encomenda, emails — continuam com as duas casas (lib/receipt.js e a Edge Function).
+ */
 export function formatCurrency(amountInCents, currencyInfo = CURRENCY) {
-  const amount = amountInCents / 100;
+  const amount = Math.round(Number(amountInCents) || 0) / 100;
   const symbol = currencyInfo?.symbol || 'Kz';
-  return `${symbol} ${amount.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const decimals = Number.isInteger(amount) ? 0 : 2;
+  return `${symbol} ${amount.toLocaleString('pt-AO', { minimumFractionDigits: decimals, maximumFractionDigits: 2 })}`;
 }
 
 function bookToProduct(book, collectionsMap = {}) {
@@ -475,6 +481,8 @@ export async function initializeCheckout({
   idempotencyKey,
   colporteurCode,
   customerNif,
+  expectedTotal,
+  turnstileToken,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -514,6 +522,11 @@ export async function initializeCheckout({
       ...(colporteurCode ? { colporteurCode } : {}),
       // NIF para a factura do KanGest (opcional; o servidor confere a forma).
       ...(customerNif ? { customerNif } : {}),
+      // O total que o cliente viu: se o do servidor for outro, a compra pára (409) e pede-se
+      // confirmação, em vez de gravar outro valor.
+      ...(Number.isFinite(expectedTotal) && expectedTotal > 0 ? { expectedTotal } : {}),
+      // Cloudflare Turnstile, quando a loja o liga.
+      ...(turnstileToken ? { turnstileToken } : {}),
     }),
   });
 
@@ -526,7 +539,14 @@ export async function initializeCheckout({
       ? 'A resposta do servidor chegou incompleta. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.'
       : 'A ligação ao servidor falhou. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.');
   }
-  if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
+    if (data.code === 'total_changed' && Number.isFinite(Number(data.total))) {
+      err.code = 'total_changed';
+      err.total = Number(data.total);
+    }
+    throw err;
+  }
   return {
     url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type,
     // O carrinho lê o estado do pagamento para a nota de encomenda (lib/receipt.js), mas ele não
@@ -536,11 +556,12 @@ export async function initializeCheckout({
   };
 }
 
-export async function subscribeNewsletter(email) {
+/** Pede a subscrição: o servidor manda um email com o link de confirmação (dupla confirmação). */
+export async function subscribeNewsletter(email, { turnstileToken = '' } = {}) {
   const res = await fetch(`${APP_API_URL}/newsletter`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, ...(turnstileToken ? { turnstileToken } : {}) }),
   });
 
   const data = await res.json().catch(() => ({}));

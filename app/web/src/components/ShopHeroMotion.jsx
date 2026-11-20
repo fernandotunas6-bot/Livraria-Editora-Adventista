@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 
 const ORBS = [
   { size: 280, x: '8%', y: '15%', delay: 0, duration: 18 },
