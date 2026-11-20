@@ -30,6 +30,11 @@ describe('shouldReveal', () => {
     expect(shouldReveal({ scrollY: 0, scrollable: false })).toBe(true);
   });
 
+  it('no computador o menu está sempre à vista, também no topo', () => {
+    expect(shouldReveal({ scrollY: 0, wide: true })).toBe(true);
+    expect(shouldReveal({ scrollY: 0, wide: false })).toBe(false);
+  });
+
   it('assume os valores por omissão quando não recebe nada', () => {
     expect(shouldReveal()).toBe(false);
   });

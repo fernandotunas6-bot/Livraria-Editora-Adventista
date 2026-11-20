@@ -7,7 +7,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin-allow-popups
-  Strict-Transport-Security: max-age=15552000
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   # A loja usa a localização para "lojas perto de mim" (StoresPage) e para as coordenadas das
   # lojas no painel. O microfone só para o próprio site: a narração com a própria voz no Estúdio
   # de vídeo dos relatórios (estudio-video.js), que só o pede quando alguém da equipa a liga.
@@ -49,7 +49,17 @@
   # próprio — não vem do nosso código nem aparece no `.pages.dev`. Sem esta entrada o CSP
   # bloqueava-o: duas linhas de erro na consola em cada página e nenhuma estatística recolhida.
   # O beacon reporta para `/cdn-cgi/rum`, no próprio domínio, que o `connect-src 'self'` cobre.
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://apis.google.com https://accounts.google.com https://www.googleapis.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://accounts.google.com https://*.firebaseio.com https://*.firebaseapp.com; frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://drive.google.com https://www.openstreetmap.org https://www.google.com https://www.youtube-nocookie.com; worker-src 'self' blob:; media-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
+  #
+  # `challenges.cloudflare.com` (script e moldura) é o Cloudflare Turnstile dos formulários públicos
+  # (components/TurnstileWidget.jsx), que só carrega quando a loja o liga.
+  #
+  # Os domínios da Google em `script-src` são do painel (Google Workspace, selector do Drive). Nas
+  # páginas da loja, o site junta uma segunda política só com o próprio site, o beacon e o Turnstile
+  # (lib/storeCsp.js): os navegadores aplicam as duas, por isso lá esses domínios não entram.
+  #
+  # HSTS com `includeSubDomains` (um ano): todos os subdomínios já servem HTTPS ("Always Use HTTPS"
+  # no Cloudflare). Sem `preload`, que é difícil de desfazer.
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://apis.google.com https://accounts.google.com https://www.googleapis.com https://www.gstatic.com https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://accounts.google.com https://*.firebaseio.com https://*.firebaseapp.com; frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://drive.google.com https://www.openstreetmap.org https://www.google.com https://www.youtube-nocookie.com https://challenges.cloudflare.com; worker-src 'self' blob:; media-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
 
 # Ficheiros com hash no nome: o conteúdo nunca muda para o mesmo nome.
 /assets/*

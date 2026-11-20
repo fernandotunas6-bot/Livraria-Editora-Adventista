@@ -50,7 +50,7 @@ describe('libraryActions', () => {
 
 describe('libraryHint', () => {
   it('pago em parte: quanto falta', () => {
-    expect(libraryHint({ state: 'partially_paid', total: 3000, amount_paid: 1000, order_number: 'ENC-7' })).toMatch(/^Falta pagar .*2.?000,00.* da encomenda ENC-7\.$/);
+    expect(libraryHint({ state: 'partially_paid', total: 3000, amount_paid: 1000, order_number: 'ENC-7' })).toMatch(/^Falta pagar .*2.?000.* da encomenda ENC-7\.$/);
   });
 
   it('os outros estados explicam o que acontece', () => {

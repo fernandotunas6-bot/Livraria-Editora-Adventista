@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { aplicarPptx, lerDiapositivoMensal, lerKz, lerLoja, lerPainelPptx, lerQuadroGeral, lojaDoPptx, montar } from './pptx';
 
 // O PowerPoint da Loja do Huambo que está na raiz do repositório (até Outubro de 2026).
-const FICHEIRO = path.resolve(__dirname, '../../../../Loja Huambo - Painel-Vendas 2026S (1).pptx');
+const FICHEIRO = path.resolve(__dirname, '../../e2e/dados/painel-vendas-huambo-2026.pptx');
 
 // Os valores que a migração 20261114100000_vendas_das_lojas_ate_outubro escreveu à mão.
 const HUAMBO_2025 = [218675, 189500, 743550, 1053650, 1018225, 551910, 211650, 2904902, 430902, 2623345, null, null];

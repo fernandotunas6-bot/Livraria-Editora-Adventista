@@ -705,7 +705,7 @@ login Google do separador Workspace não se pode testar sem uma conta e um naveg
 | O quê | Onde |
 |---|---|
 | `SUPABASE_ACCESS_TOKEN` | supabase.com → Account → Access Tokens → criar "github-actions-livraria"; `gh secret set SUPABASE_ACCESS_TOKEN --repo fernandotunas6-bot/Livraria-Editora-Adventista` |
-| `CLOUDFLARE_API_TOKEN` | dash.cloudflare.com → My Profile → API Tokens → modelo "Edit Cloudflare Workers", com *Cloudflare Pages: Edit* na conta valentinocanguele@gmail.com; mesmo comando |
+| `CLOUDFLARE_API_TOKEN` | dash.cloudflare.com → My Profile → API Tokens → modelo "Edit Cloudflare Workers", com *Cloudflare Pages: Edit* na conta <conta pessoal do dono>; mesmo comando |
 | Frase dos backups | passar `~/Documents/livraria-BACKUP_PASSPHRASE.txt` para um gestor de palavras-passe e apagar o ficheiro |
 | Telefones e WhatsApp verdadeiros | Configurações → Contacto, e Lojas |
 | Coordenadas de Catumbela e Lubango | Lojas → colar o link do Google Maps de cada loja |
@@ -2054,3 +2054,45 @@ ganharia pouco depois da compressão e partiria essas funções. Ficou como est�
 3. Restaurar um backup num projecto à parte (`docs/BACKUPS.md`).
 4. Confirmar com a loja do Huambo o âmbito dos números de 2025 (o crescimento de +278,8% assenta
    neles).
+
+## 9.24 Análise crítica do sistema todo e correcções (2026-11-20)
+
+Passagem sobre o código, a base de dados (as 148 migrações aplicadas em PGlite e o catálogo final
+inspeccionado: 101 tabelas, todas com RLS; todas as funções `security definer` com `search_path`
+fixo), a Edge Function, o site num navegador (telemóvel e computador) e os cabeçalhos de produção.
+
+### Achados e o que foi feito
+
+| # | Achado | Gravidade | Feito |
+|---|---|---|---|
+| 1 | Verificação em dois passos opcional, também para os administradores (nenhum a tinha a 14/11) | Alta | Obrigatória para admin e gestor depois de 7 dias (`dois_passos_obrigatorio_equipa`, `mfa.ts`, `StaffMfaGate`); reposição pelos administradores (`/admin/users/mfa-reset`); cenários em `scripts/pglite/dois-passos.mjs` |
+| 2 | `livraria-adventista.pages.dev` continua no ar, ligado à produção | Média-alta | Por fazer pelo dono: o projecto está na conta Cloudflare antiga |
+| 3 | Checkout sem CAPTCHA; encomendas na entrega reservavam stock sem prazo | Média | Turnstile (`turnstile.ts`, `TurnstileWidget`) ligado pelos segredos; regra `unconfirmed_cancel_days` (0 = nunca) |
+| 4 | Webhook do gateway: aviso sem `status` contava como pago | Média | `status` obrigatório (`gateway_estado_obrigatorio`) |
+| 5 | Newsletter sem confirmação e com resposta que revelava subscritores | Média-baixa | Dupla confirmação (`newsletter_dupla_confirmacao`, `/newsletter/confirm`, `/newsletter/confirmar`) |
+| 6 | Auth aceitava pré-visualizações `*.pages.dev` como destino | Baixa-média | Tirado de `supabase/auth/config.json` (aplicar com `scripts/configurar-auth.sh`) |
+| 7 | Emails pessoais, ID da conta Cloudflare e lista de admins nos documentos | Baixa | Retirados (ficam no histórico do git) |
+| 8 | `anon` com INSERT/UPDATE/DELETE concedidos em 29 tabelas | Baixa | Retirados (`anon_sem_escrita`), com verificação para tabelas futuras |
+| 9 | Domínios da Google no `script-src` de todas as páginas; HSTS sem subdomínios | Baixa | Segunda política só na loja (`lib/storeCsp.js`); HSTS de um ano com `includeSubDomains` |
+| 10 | `/track` com morada, telefones e GPS completos para quem tem número e email | Baixa | Mascarados sem a sessão dona (`trackPrivacy.ts`) |
+| 11 | `place_order` bloqueava os livros pela ordem do carrinho (bloqueio mútuo) | Baixa | Bloqueio por ordem do id (`checkout_bloqueios_e_total`) |
+| 12 | Preço calculado em dois sítios (SQL e `pricing.js`) sem conferência no fim | Baixa | O carrinho manda o total que mostrou; diferente → 409 com o valor certo |
+| 13 | Menu escondido no topo da página inicial no computador | UX | Visível a partir de 1024 px (`useHeaderReveal`) |
+| 14 | Na loja, no telemóvel, o primeiro livro só aos 544 px de 844 | UX | Banner compacto no telemóvel |
+| 15 | Dois botões com o ícone dos filtros; «Kz 10 000,00»; «Catálogo Premium» | UX | Ícone próprio para as opções de pesquisa; cêntimos só quando existem; «Catálogo da livraria» |
+| 16 | Framer Motion (38 KB comprimidos) no carregamento inicial | Desempenho | `LazyMotion` + `m`: carga inicial de ~283 KB para ~263 KB comprimidos |
+| 17 | Uma ida a mais à base em cada pedido com sessão | Desempenho | Perfil lido em paralelo com a validação do token |
+| 18 | Cache de imagens do service worker sem limite | Desempenho | Cache própria com 300 entradas |
+| 19 | Restos do Google AI Studio, nome do pacote `livraria-aurora`, README com cabeçalho repetido | Limpeza | Retirados / corrigidos |
+
+### Limites que ficam
+
+- **Arquitectura.** `index.ts` (~6 000 linhas), a camada `pb.collection` do PocketBase, o Firebase só
+  para o Google Workspace e o JavaScript sem tipos no site continuam. Mexer neles é trabalho de
+  semanas, que não cabe numa passagem de correcções sem testes contra a Google e a produção.
+- **Histórico do git.** Os dados retirados dos documentos e o `.pptx` com as vendas reais do Huambo
+  (fixture dos testes do painel de vendas) continuam no histórico.
+
+### Por fazer (dono)
+
+Os pontos 1, 2, 3, 10, 11 e 12 da `security_spec.md` §4.

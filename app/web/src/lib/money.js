@@ -8,5 +8,7 @@
 export function kwanza(value) {
   const n = Number(value);
   const amount = Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
-  return `Kz ${amount.toLocaleString('pt-AO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Como o formatCurrency: os cêntimos só quando existem ("Kz 7 500", "Kz 7 500,50").
+  const decimals = Number.isInteger(amount) ? 0 : 2;
+  return `Kz ${amount.toLocaleString('pt-AO', { minimumFractionDigits: decimals, maximumFractionDigits: 2 })}`;
 }

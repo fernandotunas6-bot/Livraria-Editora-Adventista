@@ -36,9 +36,15 @@ describe("parseGatewayEvent", () => {
       .toEqual({ transactionId: "TX-1", orderRef: "ENC-1", amount: 11500, status: "paid", paidAt: "2026-11-07T20:00:00.000Z", reference: "MCX 1" });
   });
 
-  it("aceita os nomes comuns dos campos e o estado por omissão", () => {
-    const e = parseGatewayEvent({ id: 77, merchant_reference: "ENC-2", amount: 3000 });
-    expect(e).toMatchObject({ transactionId: "77", orderRef: "ENC-2", amount: 3000, status: "paid", paidAt: null });
+  it("aceita os nomes comuns dos campos", () => {
+    const e = parseGatewayEvent({ id: 77, merchant_reference: "ENC-2", amount: 3000, state: "Completed" });
+    expect(e).toMatchObject({ transactionId: "77", orderRef: "ENC-2", amount: 3000, status: "completed", paidAt: null });
+  });
+
+  it("sem estado recusa: um aviso de reembolso sem `status` não vira pagamento", () => {
+    expect(parseGatewayEvent({ id: 77, merchant_reference: "ENC-2", amount: 3000 })).toEqual({ error: "status em falta." });
+    expect(parseGatewayEvent({ id: 78, order_number: "ENC-2", amount: 3000, event: "payment.refunded" })).toEqual({ error: "status em falta." });
+    expect(parseGatewayEvent({ id: 79, order_number: "ENC-2", amount: 3000, status: "  " })).toEqual({ error: "status em falta." });
   });
 
   it("diz o que falta", () => {

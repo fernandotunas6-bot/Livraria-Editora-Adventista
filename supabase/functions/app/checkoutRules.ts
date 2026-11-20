@@ -66,7 +66,7 @@ export function cleanPaymentReference(value: unknown): string {
 type OrderLike = {
   id?: string; status?: string; delivery_status?: string; payment_status?: string;
   payment_reference?: string; payment_method_code?: string; created?: string; updated?: string;
-  amount_paid?: number | string;
+  amount_paid?: number | string; acknowledged_at?: string | null; shipping_method?: string;
 };
 
 /**
@@ -92,6 +92,28 @@ export function unpaidOrdersToCancel<T extends OrderLike>(orders: T[], upfrontCo
       && !(Number(o.amount_paid) > 0)
       && !String(o.payment_reference || "").trim()
       && upfrontCodes.has(String(o.payment_method_code || ""))
+      && Number.isFinite(since) && since < limit;
+  });
+}
+
+/**
+ * Encomendas de pagamento no fim (na entrega ou no balcão: o método não está em `upfrontCodes`) que
+ * ninguém da equipa confirmou (`acknowledged_at` vazio), ainda por preparar, sem nada pago, e com mais
+ * de `days` dias. Reservam stock sem que ninguém as trate (análise crítica de 2026-11-20). `days` 0
+ * (o valor por omissão) desliga a regra.
+ */
+export function unconfirmedOrdersToCancel<T extends OrderLike>(orders: T[], upfrontCodes: Set<string>, days: number, now = Date.now()): T[] {
+  if (!(days > 0)) return [];
+  const limit = now - days * 24 * 3600_000;
+  return orders.filter((o) => {
+    const since = new Date(String(o.created || "")).getTime();
+    return (o.status || "pending") === "pending"
+      && (o.delivery_status || "received") === "received"
+      && !o.acknowledged_at
+      && ["pending", "failed"].includes(o.payment_status || "pending")
+      && !(Number(o.amount_paid) > 0)
+      && !upfrontCodes.has(String(o.payment_method_code || ""))
+      && (o.shipping_method || "") !== "digital"
       && Number.isFinite(since) && since < limit;
   });
 }

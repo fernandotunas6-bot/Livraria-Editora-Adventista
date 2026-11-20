@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { getShopSlides } from '@/api/EcommerceApi';
 import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransitions';
 import { resolveShopBgMode } from '@/lib/shopTheme';
@@ -72,6 +72,7 @@ export default function ShopHeroBackground({ settings, children }) {
         images={[settings.shop_bg_image_url, ...SHOP_BANNER_IMAGES]}
         overlayOpacity={overlay}
         contentClassName="text-left"
+        compactOnMobile
       >
         {children}
       </PageBannerSlider>
@@ -93,7 +94,7 @@ export default function ShopHeroBackground({ settings, children }) {
 
   return (
     <section
-      className="text-white pt-20 pb-14 md:py-20 relative overflow-hidden"
+      className="text-white pt-16 pb-6 sm:pt-20 sm:pb-14 md:py-20 relative overflow-hidden"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -125,7 +126,7 @@ export default function ShopHeroBackground({ settings, children }) {
       <div className="container-custom relative z-10">{children}</div>
 
       {mode === 'slides' && slides.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex gap-1.5">
           {slides.map((s, i) => (
             <button key={s.id} type="button" onClick={() => setCurrent(i)} className={`h-1.5 rounded-full transition-all ${i === current ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} aria-label={`Slide ${i + 1}`} />
           ))}

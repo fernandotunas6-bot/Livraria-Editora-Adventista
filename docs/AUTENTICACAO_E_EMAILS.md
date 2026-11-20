@@ -10,7 +10,7 @@ fornecedor é `smtp` sem servidor e não há chave da Brevo, do Cloudflare nem d
 emails da conta (Supabase Auth) também não chegam aos clientes — ver mais abaixo.
 
 O domínio oficial é **livrariaadventista.ao**, com o DNS no Cloudflare (zona `cody`/`hadlee`,
-conta valentinocanguele@gmail.com). O `.com` só redirecciona: não se usa para email.
+conta <conta pessoal do dono>). O `.com` só redirecciona: não se usa para email.
 
 **O SMTP não serve para os emails do site.** As Edge Functions do Supabase não abrem ligações de
 saída nas portas 25 e 587 (e a 465 não é garantida), por isso a configuração que quase todos os
@@ -31,7 +31,7 @@ mensagens). **Enquanto o Email Routing não estiver activo, esse endereço não 
 ainda tem os MX e o SPF da Google, e o domínio não tem conta Google.
 
 Cloudflare → zona `livrariaadventista.ao` → **Email → Email Routing** → regra `contacto` →
-destino `valentinocanguele@gmail.com` (verificar o Gmail) → **"Adicionar registos e activar"**,
+destino `<conta pessoal do dono>` (verificar o Gmail) → **"Adicionar registos e activar"**,
 aceitando apagar os MX e o SPF da Google. Repetir para `loja@` se for esse o remetente.
 
 ### 2. Enviar: Brevo, passo a passo (dono da loja, ~15 minutos)

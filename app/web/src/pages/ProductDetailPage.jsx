@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { formatCurrency, getProduct, trackBookView } from '@/api/EcommerceApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { buildBookShareMessage, buildWhatsAppShareUrl, shareBookOnWhatsApp } from '@/lib/whatsapp';

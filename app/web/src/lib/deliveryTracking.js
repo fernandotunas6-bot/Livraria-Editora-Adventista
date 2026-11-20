@@ -100,9 +100,15 @@ export function liveSummary(view) {
 // --- Pedidos ------------------------------------------------------------------------------
 
 async function post(path, body) {
+  // Com a sessão, o servidor reconhece o dono da encomenda e mostra o ponto de entrega exacto; sem
+  // ela, só a zona (supabase/functions/app/trackPrivacy.ts).
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
   const res = await fetch(`${APP_API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));

@@ -101,7 +101,7 @@ const empty = {
   show_stores_in_footer: true,
   shop_hero_title: 'Todos os Livros',
   shop_hero_subtitle: 'O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.',
-  shop_hero_badge: 'Catálogo Premium',
+  shop_hero_badge: 'Catálogo da livraria',
   shop_default_sort: 'featured',
   shop_per_page: 24,
   shop_show_featured: true,
@@ -115,6 +115,8 @@ const empty = {
   track_rate_per_minute: 20,
   receipt_per_order_per_minute: 3,
   unpaid_cancel_days: 0,
+  // Migração cancelar_nao_confirmadas: encomendas na entrega que ninguém confirmou.
+  unconfirmed_cancel_days: 0,
   chat_ai_daily_limit: 500,
   // Migração relatorio_de_pagamentos.
   unpaid_orders_per_contact: 3,
@@ -183,6 +185,7 @@ export default function SettingsTab() {
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
   const [hasNewRules, setHasNewRules] = useState(false);
+  const [hasUnconfirmedRule, setHasUnconfirmedRule] = useState(false);
   const [hasPaymentRules, setHasPaymentRules] = useState(false);
   // Colunas da migração 20261106180000 (páginas sem os botões flutuantes).
   const [hasFloating, setHasFloating] = useState(false);
@@ -207,6 +210,7 @@ export default function SettingsTab() {
         setHasAboutImages(hasColumn(r, 'about_top_image_url'));
         setHasAboutTeam(hasColumn(r, 'about_team'));
         setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
+        setHasUnconfirmedRule(hasColumn(r, 'unconfirmed_cancel_days'));
         setHasPaymentRules(hasColumn(r, 'unpaid_orders_per_contact'));
         setHasFloating(hasColumn(r, 'chat_hidden_on'));
         setHadLogoFile(!!r.logo);
@@ -268,6 +272,7 @@ export default function SettingsTab() {
           track_rate_per_minute: r.track_rate_per_minute ?? empty.track_rate_per_minute,
           receipt_per_order_per_minute: r.receipt_per_order_per_minute ?? empty.receipt_per_order_per_minute,
           unpaid_cancel_days: r.unpaid_cancel_days ?? empty.unpaid_cancel_days,
+          unconfirmed_cancel_days: r.unconfirmed_cancel_days ?? empty.unconfirmed_cancel_days,
           chat_ai_daily_limit: r.chat_ai_daily_limit ?? empty.chat_ai_daily_limit,
           unpaid_orders_per_contact: r.unpaid_orders_per_contact ?? empty.unpaid_orders_per_contact,
           company_legal_name: r.company_legal_name || '',
@@ -432,6 +437,9 @@ export default function SettingsTab() {
         [hasNewRules, {
           unpaid_cancel_days: clampInt(form.unpaid_cancel_days, 0, 60, 0),
           chat_ai_daily_limit: clampInt(form.chat_ai_daily_limit, 0, 100000, 500),
+        }],
+        [hasUnconfirmedRule, {
+          unconfirmed_cancel_days: clampInt(form.unconfirmed_cancel_days, 0, 60, 0),
         }],
         [hasPaymentRules, {
           unpaid_orders_per_contact: clampInt(form.unpaid_orders_per_contact, 0, 20, 3),
@@ -1018,6 +1026,17 @@ export default function SettingsTab() {
               </p>
             </div>
           )}
+          {hasUnconfirmedRule && (
+            <div className="space-y-2">
+              <Label htmlFor="cancelar-nao-confirmadas">Cancelar encomendas na entrega que ninguém confirmou ao fim de (dias)</Label>
+              <Input id="cancelar-nao-confirmadas" type="number" min={0} max={60} value={form.unconfirmed_cancel_days} onChange={(e) => set('unconfirmed_cancel_days', e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Pagamento na entrega ou no balcão, sem nada pago, que ninguém da equipa viu nem preparou. Cada encomenda reserva o
+                stock: sem este prazo, uma encomenda que ninguém trata tira livros da loja para sempre. O stock volta ao catálogo e o
+                cliente e a equipa são avisados. 0 = nunca.
+              </p>
+            </div>
+          )}
           {hasPaymentRules && (
             <div className="space-y-2">
               <Label htmlFor="por-pagar-contacto">Encomendas por pagar ao mesmo tempo, por cliente</Label>
@@ -1056,7 +1075,7 @@ export default function SettingsTab() {
           </p>
           <div className="space-y-2">
             <Label htmlFor="config-shop-hero-badge">Badge do hero</Label>
-            <Input id="config-shop-hero-badge" value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo Premium" />
+            <Input id="config-shop-hero-badge" value={form.shop_hero_badge} onChange={(e) => set('shop_hero_badge', e.target.value)} placeholder="Catálogo da livraria" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="config-shop-hero-title">Título do hero</Label>

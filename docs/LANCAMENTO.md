@@ -9,7 +9,7 @@ Checklist para pôr a loja em produção com o Supabase (backend) e o Cloudflare
 | Item | Detalhe |
 |------|---------|
 | Supabase | Projecto `bggqkjjqbjhbjsckzopj` (já criado, com esquema e dados) |
-| Cloudflare | Conta `valentinocanguele@gmail.com` (`701800d01d428c5141fa1fdb60ee01ae`); projecto Pages `livraria-editora-adventista`, servido em `livraria-editora-adventista-ben.pages.dev` |
+| Cloudflare | Conta `<conta pessoal do dono>` (`<ID da conta Cloudflare>`); projecto Pages `livraria-editora-adventista`, servido em `livraria-editora-adventista-ben.pages.dev` |
 | GitHub | Conta sem bloqueios de pagamento (o Actions tem de correr) |
 | Domínio | `livrariaadventista.com` — **no ar** (registado na Hostinger, zona no Cloudflare). O `.ao` continua por registar (ver secção 7) |
 | Meta Business | Conta verificada + app WhatsApp Cloud API (opcional) |
@@ -30,7 +30,7 @@ Em **Settings → Secrets and variables → Actions** do repositório:
 | Variável | `SUPABASE_PROJECT_REF` | `bggqkjjqbjhbjsckzopj` |
 | Variável (opcional) | `SITE_URL` | Por omissão `https://livrariaadventista.com` |
 | Secret | `CLOUDFLARE_API_TOKEN` | Token da conta gmail com *Cloudflare Pages: Edit* (um da conta antiga publica no sítio errado) |
-| Secret | `CLOUDFLARE_ACCOUNT_ID` | `701800d01d428c5141fa1fdb60ee01ae` |
+| Secret | `CLOUDFLARE_ACCOUNT_ID` | `<ID da conta Cloudflare>` |
 | Secret | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase (Account → Access Tokens) |
 | Secret | `SUPABASE_DB_PASSWORD` | Palavra-passe da base de dados |
 
@@ -130,7 +130,7 @@ Tudo é automático a partir do GitHub:
 Enquanto o Actions não correr, publicar à mão (faz lint, testes e build antes):
 
 ```bash
-npx wrangler@4 whoami      # tem de ser a conta valentinocanguele@gmail.com
+npx wrangler@4 whoami      # tem de ser a conta <conta pessoal do dono>
 npm run deploy:site        # projecto livraria-editora-adventista, em https://livrariaadventista.com
 ```
 
@@ -208,6 +208,29 @@ Ordem dos passos:
 - [ ] Rever quem tem papel `admin` e `manager` em Admin → Utilizadores e Clientes
 
 ---
+
+### Turnstile (formulários públicos)
+
+O checkout, o contacto, a candidatura a colportor e a newsletter aceitam o Cloudflare Turnstile
+(supabase/functions/app/turnstile.ts). Fica desligado até haver as duas chaves:
+
+1. O widget já existe: Cloudflare → Turnstile → «Livraria Adventista - formularios publicos» (modo
+   «Managed», domínios `livrariaadventista.ao` e `www.livrariaadventista.ao`, chave do site
+   `0x4AAAAAAGKUDNRe46_eQsO3`). A chave secreta está nas definições do widget.
+2. Depois de o deploy do código terminar: `supabase secrets set TURNSTILE_SITE_KEY=… TURNSTILE_SECRET_KEY=…`
+   (ou Supabase → Edge Functions → Secrets). Antes do deploy, o servidor exigiria o token a um site
+   que ainda não mostra o widget.
+
+O `/settings` passa a publicar a chave do site e os formulários mostram o widget (quase sempre
+invisível). Durante uns minutos, quem tiver o `/settings` antigo em cache pode ver «Não conseguimos
+confirmar que não é um robô» — basta recarregar.
+
+### Verificação em dois passos da equipa
+
+Desde a migração `dois_passos_obrigatorio_equipa`, admin e gestor só têm o painel com o código da
+aplicação autenticadora, sete dias depois de a migração chegar à produção. Cada pessoa da equipa
+activa-o em Perfil → Segurança (ou no aviso do painel). Quem perder o telemóvel: outro
+administrador repõe-lho em Utilizadores → a conta → «Repor a verificação em dois passos».
 
 ## Suporte técnico
 

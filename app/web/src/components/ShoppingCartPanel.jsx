@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart as ShoppingCartIcon, X, Loader2, ChevronLeft, Truck, CreditCard, MapPin, Shield, Lock, MessageCircle, ChevronDown, ChevronUp, PenLine, Copy,
   Library, Store,
@@ -41,6 +41,7 @@ import { MOTION } from '@/lib/motion';
 import { OPEN_CART_EVENT } from '@/lib/mobileNav';
 import { getReferral, normalizeColporteurCode } from '@/lib/colporteurReferral';
 import { checkoutMemoryKey, checkoutMemoryOff, readCheckoutMemory, saveCheckoutMemory, setCheckoutMemoryEnabled } from '@/lib/checkoutMemory';
+import TurnstileWidget, { TURNSTILE_WAIT, useTurnstileToken } from '@/components/TurnstileWidget';
 
 /** O NIF para a factura, sem espaços nem pontos e em maiúsculas; '' se não tiver a forma de um NIF (9 a 14). */
 const nifLimpo = (v) => {
@@ -91,6 +92,11 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
   // de um resumo recolhível; no computador (sm:) continua tudo aberto, como estava.
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+  // O total que o servidor disse ser o certo, quando o do carrinho não batia (preço, promoção ou
+  // portes mudaram entretanto). A próxima confirmação vai com ele; muda o carrinho, apaga-se.
+  const [serverTotal, setServerTotal] = useState(null);
+  // Cloudflare Turnstile, quando a loja o liga (turnstile_site_key no /settings): um token por envio.
+  const human = useTurnstileToken();
   const signatureRef = useRef(null);
   // Tentativa de checkout em curso: { fingerprint, key }. Fica entre carregamentos do botão
   // e só é limpa quando a encomenda é confirmada.
@@ -348,6 +354,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     }
   };
   const totalCents = subtotalCents + shippingCents;
+  useEffect(() => { setServerTotal(null); }, [totalCents]);
   const itemCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
   const orderItemsForReceipt = cartItems.map((item) => ({
@@ -451,6 +458,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
     }
     setErrors({});
 
+    // Sem o token do Turnstile (ainda a confirmar, ou o Cloudflare pede um clique), o servidor recusaria.
+    if (settings.turnstile_site_key && !human.token) {
+      toast({ title: 'Um momento', description: TURNSTILE_WAIT });
+      return;
+    }
+
     // Transferência e Multicaixa: paga-se depois de encomendar, com o número da encomenda; a
     // referência indica-se na página seguinte (ou no rastreio). Já não se pede aqui.
 
@@ -504,6 +517,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
         ...(gps && needsAddress ? { deliveryGpsLat: gps.lat, deliveryGpsLng: gps.lng, deliveryGpsAccuracy: gps.accuracy ?? null } : {}),
         ...(normalizeColporteurCode(form.colporteurCode) ? { colporteurCode: normalizeColporteurCode(form.colporteurCode) } : {}),
         ...(nifLimpo(form.customerNif) ? { customerNif: nifLimpo(form.customerNif) } : {}),
+        // O total mostrado (ou o que o servidor já confirmou): se o dele for outro, não grava.
+        expectedTotal: serverTotal ?? totalCents / 100,
       };
       // Se a tentativa anterior falhou com este mesmo pedido (tipicamente a rede caiu depois de o
       // servidor gravar), a chave repete-se e o servidor devolve essa encomenda em vez de outra.
@@ -511,6 +526,8 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       const { orderId, total, orderNumber, order_type, whatsapp_sent, payment_status } = await initializeCheckout({
         ...checkoutPayload,
         idempotencyKey: checkoutAttemptRef.current.key,
+        // Fora do `checkoutPayload`: muda a cada tentativa e não pode mudar a chave de idempotência.
+        ...(human.token ? { turnstileToken: human.token } : {}),
       });
       checkoutAttemptRef.current = null;
 
@@ -578,6 +595,12 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       });
       window.location.href = `/success?${params.toString()}`;
     } catch (error) {
+      if (error?.code === 'total_changed') {
+        // Nada foi gravado: o cliente vê o total certo e confirma outra vez, se quiser.
+        setServerTotal(error.total);
+        toast({ title: 'O total mudou', description: error.message, variant: 'destructive' });
+        return;
+      }
       toast({
         title: viaWhatsApp ? 'Erro no pedido WhatsApp' : 'Não foi possível finalizar a compra',
         description: error.message || 'Não foi possível finalizar.',
@@ -585,8 +608,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
       });
     } finally {
       setCheckingOut(false);
+      // Os tokens servem uma vez: o próximo envio leva outro.
+      human.reset();
     }
-  }, [cartItems, clearCart, refreshCart, deliveryAddress, digitalOnly, form, gps, maintenanceMode, needsLogin, openAuth, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shipping, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
+  }, [human, serverTotal, totalCents, cartItems, clearCart, refreshCart, deliveryAddress, digitalOnly, form, gps, maintenanceMode, needsLogin, openAuth, orderItemsForReceipt, paymentMethods, physicalStores.length, settings, shipping, shippingCents, subtotalCents, setIsCartOpen, toast, updateProfile, user, waApiActive]);
 
   const maxQty = (item) => (isDigitalCartItem(item) ? 1 : item.variant.manage_inventory ? item.variant.inventory_quantity : 99);
   // Edição digital sem forma de pagar pelo site (só há pagamento na entrega ou no balcão).
@@ -1216,7 +1241,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                 {/* Total sempre à vista: no telemóvel é a única linha de valores fora do resumo. */}
                 <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
                   <span>Total</span>
-                  <span className="text-primary">{formatCurrency(totalCents)}</span>
+                  <span className="text-primary">{formatCurrency(serverTotal !== null ? Math.round(serverTotal * 100) : totalCents)}</span>
                 </div>
 
                 {step === 'cart' ? (
@@ -1251,9 +1276,10 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                         )}
                       </div>
                     )}
+                    <TurnstileWidget siteKey={settings.turnstile_site_key} onToken={human.setToken} resetKey={human.resetKey} action="checkout" />
                     <Button className="w-full btn-primary py-6 text-base" onClick={() => handleCheckout(false)} disabled={checkingOut || maintenanceMode || noDigitalPayment}>
                       {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Confirmar Compra · {formatCurrency(totalCents)}
+                      Confirmar Compra · {formatCurrency(serverTotal !== null ? Math.round(serverTotal * 100) : totalCents)}
                     </Button>
                     {(settings.whatsapp || settings.contact_phone) && (
                       <Button

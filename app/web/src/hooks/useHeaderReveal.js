@@ -14,11 +14,18 @@ export const REVEAL_AT = 24;
  * E com `scrollable` falso, numa página curta demais para se deslocar, onde senão não
  * haveria maneira nenhuma de lá chegar — sem isto, uma página de erro ficava sem navegação.
  */
-export function shouldReveal({ scrollY = 0, forceVisible = false, scrollable = true } = {}) {
+export function shouldReveal({ scrollY = 0, forceVisible = false, scrollable = true, wide = false } = {}) {
   if (forceVisible) return true;
   if (!scrollable) return true;
+  // No computador o menu (Livros, Coleções, Ajuda…) é a porta de entrada da loja: escondê-lo no
+  // topo deixava quem chega só com o logótipo e três ícones (análise crítica de 2026-11-20). O
+  // cabeçalho imersivo fica para o telemóvel, onde a barra de baixo já leva a navegação.
+  if (wide) return true;
   return scrollY > REVEAL_AT;
 }
+
+/** A largura a partir da qual o menu completo (MegaMenu) aparece no cabeçalho: `lg` do Tailwind. */
+export const WIDE_QUERY = '(min-width: 1024px)';
 
 /**
  * No topo da página o cabeçalho sai de cena, para a imagem de entrada ficar inteira;
@@ -27,6 +34,16 @@ export function shouldReveal({ scrollY = 0, forceVisible = false, scrollable = t
 export function useHeaderReveal(forceVisible = false) {
   const [scrollY, setScrollY] = useState(0);
   const [scrollable, setScrollable] = useState(true);
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(WIDE_QUERY)?.matches);
+
+  useEffect(() => {
+    const mq = typeof window !== 'undefined' ? window.matchMedia?.(WIDE_QUERY) : null;
+    if (!mq) return undefined;
+    const update = () => setWide(!!mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
 
   useEffect(() => {
     let frame = 0;
@@ -65,7 +82,7 @@ export function useHeaderReveal(forceVisible = false) {
     };
   }, []);
 
-  return shouldReveal({ scrollY, forceVisible, scrollable });
+  return shouldReveal({ scrollY, forceVisible, scrollable, wide });
 }
 
 export default useHeaderReveal;

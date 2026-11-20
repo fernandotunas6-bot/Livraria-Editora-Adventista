@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
   shipping_express_cost: 3000,
   shop_hero_title: 'Todos os Livros',
   shop_hero_subtitle: 'O catálogo completo da livraria — pesquisa avançada, pré-visualização e compra segura.',
-  shop_hero_badge: 'Catálogo Premium',
+  shop_hero_badge: 'Catálogo da livraria',
   shop_default_sort: 'featured',
   shop_per_page: 24,
   shop_show_featured: true,
@@ -125,9 +125,15 @@ export async function getPaymentMethods() {
 }
 
 export async function trackOrder(orderNumber, email) {
+  // Com a sessão da conta da encomenda, o servidor mostra tudo; sem ela, os telefones, a rua e o
+  // ponto GPS saem mascarados (supabase/functions/app/trackPrivacy.ts).
+  const { data: { session } = {} } = await supabase.auth.getSession().catch(() => ({ data: {} }));
   const res = await fetch(`${APP_API_URL}/track`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({ orderNumber, email }),
   });
   const data = await res.json().catch(() => null);

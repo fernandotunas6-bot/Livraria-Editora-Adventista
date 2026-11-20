@@ -4,7 +4,7 @@ import PayLaterBox from '@/components/PayLaterBox';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User, XCircle, Library,
 } from 'lucide-react';
@@ -263,6 +263,12 @@ export default function TrackOrderPage() {
                           )}
                         </p>
                       </div>
+                    )}
+                    {order.personal_data_masked && (
+                      <p className="sm:col-span-2 text-xs text-muted-foreground" data-rastreio="mascarado">
+                        Por privacidade, os telefones e a morada aparecem em parte. Entre na conta com que fez a encomenda para os ver
+                        por inteiro.
+                      </p>
                     )}
                     {order.tracking_number && (
                       <div className="sm:col-span-2">

@@ -65,8 +65,8 @@ describe('editoraAttention', () => {
       today: TODAY,
     });
     expect(ids(r)).toEqual(['fornecedores-por-pagar']);
-    expect(r.items[0].title).toMatch(/^Kz 150.000,00 por pagar a 1 fornecedor$/);
-    expect(r.items[0].detail).toMatch(/^Gráfica Huambo: Kz 150.000,00\.$/);
+    expect(r.items[0].title).toMatch(/^Kz 150.000 por pagar a 1 fornecedor$/);
+    expect(r.items[0].detail).toMatch(/^Gráfica Huambo: Kz 150.000\.$/);
     expect(r.items[0].action).toEqual({ section: 'producao', view: 'contas' });
   });
 

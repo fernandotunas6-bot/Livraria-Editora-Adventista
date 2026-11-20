@@ -359,7 +359,7 @@ test('os relatórios não usam a palavra PowerPoint', async ({ page }) => {
   await rel.locator('#btn-edit').click();
   await expect(rel.locator('#ed-ppt').locator('..')).toContainText('Escolher o ficheiro');
   // O Painel de Vendas real do Huambo (raiz do repositório): 2026 já está na grelha, nada muda.
-  await rel.locator('#ed-ppt').setInputFiles('../../Loja Huambo - Painel-Vendas 2026S (1).pptx');
+  await rel.locator('#ed-ppt').setInputFiles('e2e/dados/painel-vendas-huambo-2026.pptx');
   await expect(rel.locator('#ed-ppt-go')).toBeEnabled();
   await rel.locator('#ed-ppt-go').click();
   await expect(rel.locator('#ed-ppt-st')).toContainText('a grelha já tem os valores do ficheiro');

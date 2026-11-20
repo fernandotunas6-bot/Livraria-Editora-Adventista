@@ -65,7 +65,7 @@ O `GH_TOKEN` do dono é necessário: segredos exigem admin, e a `ValentinoCangue
 escrita.
 
 **Os dois do Cloudflare devem esperar pela mudança de conta** (secção 5): têm de ser da conta
-`valentinocanguele@gmail.com`. Pôr os da `canguelev@fata.adventist.org` faz o deploy automático
+`<conta pessoal do dono>`. Pôr os da `<conta da organização>` faz o deploy automático
 publicar na conta errada.
 
 Até os segredos existirem, o `deploy-cloudflare.yml` falha a cada push para o `main`, no passo
@@ -121,13 +121,13 @@ o `deno check` não foi corrido porque o Deno não está nesta máquina.
 
 ### 5. Cloudflare — mudança de conta pendente
 
-Hoje os dois projectos vivem na conta **`canguelev@fata.adventist.org`** e publicam por
+Hoje os dois projectos vivem na conta **`<conta da organização>`** e publicam por
 Wrangler, que não depende do GitHub:
 
 - `livraria-editora-adventista` — criado a 2026-11-03, ainda sem deploy nenhum.
 - `livraria-adventista` — continua a servir produção em `livraria-adventista.pages.dev`.
 
-**A decisão (2026-11-03) é mudar tudo para a conta `valentinocanguele@gmail.com`**, a mesma
+**A decisão (2026-11-03) é mudar tudo para a conta `<conta pessoal do dono>`**, a mesma
 que já tem o projecto `siga-plus`, e é lá que o domínio `livrariaadventista.ao` vai ficar. Isso
 **não foi feito** porque o `wrangler` desta máquina está autenticado na conta `fata` e só
 alcança essa; o `wrangler login` é um OAuth no browser e tem de ser corrido por uma pessoa:
@@ -173,7 +173,7 @@ O domínio `livrariaadventista.ao` **não está registado** — ver secção 7.
 O projecto `bggqkjjqbjhbjsckzopj` não conhece o repositório — só o `deploy-supabase.yml` o
 toca, e esse depende dos segredos da secção 1.
 
-Por fazer: **convidar `valentinocanguele@gmail.com` para a organização "Colpotor"**
+Por fazer: **convidar `<conta pessoal do dono>` para a organização "Colpotor"**
 (Organization settings → Team → Invite). Tem de ser no painel.
 
 ### 7. Domínio `livrariaadventista.ao`

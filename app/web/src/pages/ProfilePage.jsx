@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   User, Mail, Shield, ShoppingBag, LogOut, Loader2, ChevronRight, BookOpen, LayoutDashboard, Truck,
   Heart, Trash2, Bell, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,
@@ -42,6 +42,7 @@ import PhoneInput from '@/components/PhoneInput';
 import PhoneVerify from '@/components/account/PhoneVerify';
 import MfaSettings from '@/components/MfaSettings';
 import GoogleWorkspaceHub from '@/components/GoogleWorkspaceHub';
+import { GOOGLE_PROFILE_TABS, hasStoreScriptPolicy } from '@/lib/storeCsp';
 import ContactsManager from '@/components/ContactsManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Switch } from '@/components/ui/switch';
@@ -147,6 +148,12 @@ const ProfilePage = () => {
   // O separador vem sempre do endereço: o «voltar» do navegador regressa ao anterior.
   const activeTab = resolveAccountView(tabFromUrl || location.state?.tab || DEFAULT_ACCOUNT_VIEW, { canAccessAdmin, canManageContacts });
   const activeView = views.find((v) => v.id === activeTab);
+  // Os separadores da equipa com a Google (Workspace, contactos) precisam dos scripts da Google, que
+  // a política da loja bloqueia (lib/storeCsp.js). Vindo de uma página da loja, recarrega-se uma vez:
+  // o separador fica no endereço e o perfil abre sem essa política.
+  useEffect(() => {
+    if (GOOGLE_PROFILE_TABS.includes(activeTab) && hasStoreScriptPolicy()) window.location.reload();
+  }, [activeTab]);
   // As outras áreas da pessoa: a de colportor (se tem ficha) e o painel (se tem permissões).
   const colporteur = useColporteurMe(user?.id, { enabled: isAuthed });
   const staffAreas = canAccessAdmin ? navAreas(buildAdminNav(adminPermissions({ isAdmin, hasPermission }))) : [];
