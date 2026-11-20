@@ -475,6 +475,7 @@ export async function initializeCheckout({
   idempotencyKey,
   colporteurCode,
   customerNif,
+  expectedTotal,
 }) {
   // A sessão vai no pedido para o servidor ligar a encomenda à conta (`customer_id`): é por
   // ela que o cliente recebe as notificações da encomenda e a vê no centro de atendimento.
@@ -514,6 +515,9 @@ export async function initializeCheckout({
       ...(colporteurCode ? { colporteurCode } : {}),
       // NIF para a factura do KanGest (opcional; o servidor confere a forma).
       ...(customerNif ? { customerNif } : {}),
+      // O total que o cliente viu: se o do servidor for outro, a compra pára (409) e pede-se
+      // confirmação, em vez de gravar outro valor.
+      ...(Number.isFinite(expectedTotal) && expectedTotal > 0 ? { expectedTotal } : {}),
     }),
   });
 
@@ -526,7 +530,14 @@ export async function initializeCheckout({
       ? 'A resposta do servidor chegou incompleta. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.'
       : 'A ligação ao servidor falhou. Veja em Rastrear encomenda se a compra ficou registada antes de a repetir.');
   }
-  if (!res.ok) throw new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || 'Não foi possível finalizar a compra.');
+    if (data.code === 'total_changed' && Number.isFinite(Number(data.total))) {
+      err.code = 'total_changed';
+      err.total = Number(data.total);
+    }
+    throw err;
+  }
   return {
     url: data.url, orderId: data.orderId, total: data.total, orderNumber: data.orderNumber, order_type: data.order_type,
     // O carrinho lê o estado do pagamento para a nota de encomenda (lib/receipt.js), mas ele não

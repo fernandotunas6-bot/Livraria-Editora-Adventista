@@ -109,6 +109,28 @@ await db.exec('create table public.zz_tabela_nova (id int primary key)');
 const naNova = await q(PRIVILEGIOS_A_MAIS);
 check('uma tabela nova já nasce sem eles', naNova.length === 0, naNova);
 await db.exec('drop table public.zz_tabela_nova');
+// O visitante sem sessão nunca escreve directamente (migração anon_sem_escrita): o que ele grava
+// passa pela Edge Function. Sem escrita concedida, a RLS deixa de ser a única barreira.
+const ANON_ESCREVE = `
+  select table_name as tabela, privilege_type as privilegio
+  from information_schema.role_table_grants
+  where table_schema = 'public' and grantee = 'anon' and privilege_type in ('INSERT', 'UPDATE', 'DELETE')
+  order by 1, 2`;
+const anonEscreve = await q(ANON_ESCREVE);
+check('anon sem INSERT, UPDATE nem DELETE em nenhuma tabela', anonEscreve.length === 0, anonEscreve.slice(0, 10));
+await db.exec('create table public.zz_tabela_nova_anon (id int primary key)');
+const anonNaNova = await q(ANON_ESCREVE);
+check('uma tabela nova já nasce sem escrita para anon', anonNaNova.length === 0, anonNaNova);
+await db.exec('drop table public.zz_tabela_nova_anon');
+const politicasAnon = await q(`select tablename, policyname, cmd from pg_policies
+  where schemaname = 'public' and roles && array['anon', 'public']::name[] and cmd <> 'SELECT'`);
+check('nenhuma política de escrita para anon (senão a escrita concedida voltava a ser precisa)', politicasAnon.length === 0, politicasAnon);
+await raises('anon não muda as definições do site, mesmo sem RLS', () => db.transaction(async (tx) => {
+  await tx.exec('alter table public.site_settings disable row level security');
+  await tx.exec('set local role anon');
+  await tx.exec(`update public.site_settings set site_name = 'X'`);
+}), /permission denied/);
+
 await raises('authenticated não consegue esvaziar uma tabela', () => db.transaction(async (tx) => {
   await tx.exec('set local role authenticated');
   await tx.exec('truncate public.newsletter');

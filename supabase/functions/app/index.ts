@@ -2693,6 +2693,9 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
   // O site manda `${origin}/success`; fica "/success". Outro tipo (número, objecto) partia o
   // `.includes` mais abaixo com um 500.
   const successUrl = successPath(data.successUrl);
+  // O total que o cliente viu (Kz). Opcional: as apps antigas não o mandam.
+  const shownTotal = Number(data.expectedTotal);
+  const expectedTotal = Number.isFinite(shownTotal) && shownTotal > 0 && shownTotal < 1e9 ? Math.round(shownTotal * 100) / 100 : null;
   const idempotencyKey = IDEMPOTENCY_KEY.test(String(data.idempotencyKey || "")) ? String(data.idempotencyKey) : "";
   const emailQueued = !!(email && settings?.order_email_enabled);
   if (idempotencyKey) {
@@ -2728,13 +2731,22 @@ route("POST", "/checkout", publica("comprar não exige conta; preços, stock e t
       free_threshold: settingNumber(settings?.shipping_free_threshold, 20000),
       cost: settingNumber(settings?.shipping_cost, 1500),
       express_cost: settingNumber(settings?.shipping_express_cost, 0),
+      // O total que o carrinho mostrou: se o calculado aqui for outro, a compra pára e o cliente
+      // confirma o valor certo (migração checkout_bloqueios_e_total).
+      ...(expectedTotal !== null ? { expected_total: expectedTotal } : {}),
     },
   });
   // Só as mensagens escritas para o comprador ("Stock insuficiente para: …", "Livro
   // indisponível") saem como estão: são as do `raise exception` do place_order (P0001).
   // Outro erro do Postgres diria nomes de colunas e restrições a quem está a comprar.
   if (error) {
-    if (error.code === "P0001") throw bad(error.message);
+    if (error.code === "P0001") {
+      // O total mudou desde que o carrinho o mostrou (preço, promoção ou portes): 409 com o valor
+      // certo, para o carrinho pedir confirmação em vez de gravar outro valor sem o cliente saber.
+      const changed = /^total_changed:(\d+(?:\.\d+)?)$/.exec(String(error.hint || ""));
+      if (changed) return json({ message: error.message, code: "total_changed", total: Number(changed[1]) }, 409);
+      throw bad(error.message);
+    }
     // Dois pedidos com a mesma chave ao mesmo tempo: o índice único deixa passar um só, e o
     // outro devolve a encomenda que esse criou (o stock do segundo é reposto pelo rollback).
     if (error.code === "23505" && idempotencyKey) {
