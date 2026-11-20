@@ -9,7 +9,8 @@
 //   Cabeçalho `X-Signature: sha256=<hex>` — HMAC-SHA256 do corpo exacto, com o segredo
 //   partilhado (PAYMENT_WEBHOOK_SECRET nos segredos da Edge Function). Aceita-se também o hex
 //   sozinho e o mesmo valor em base64, que é como alguns gateways o mandam.
-//   Corpo: { transaction_id, order_number, amount, status, paid_at?, reference? }
+//   Corpo: { transaction_id, order_number, amount, status, paid_at?, reference? } — `status` é
+//   obrigatório: um aviso sem ele é recusado (400) e fica no registo das chamadas.
 //   Um gateway com outro formato liga-se com um adaptador (ou um intermediário) que produza este.
 
 type Row = Record<string, unknown>;
@@ -88,13 +89,16 @@ export function parseGatewayEvent(body: Row | null | undefined): GatewayEvent | 
   const transactionId = pick(b, ["transaction_id", "transactionId", "payment_id", "id"]).slice(0, 120);
   const orderRef = pick(b, ["order_number", "orderNumber", "order_reference", "merchant_reference", "order_id", "orderId"]).slice(0, 80);
   const amount = amountOf(b.amount ?? b.value ?? b.total);
-  const status = (pick(b, ["status", "state", "payment_status"]) || "paid").toLowerCase().slice(0, 40);
+  // Sem estado não se sabe o que o aviso diz (pagamento? reembolso? pendente?): recusa-se, em vez de
+  // o tomar por pagamento concluído (análise crítica, 2026-11-20).
+  const status = pick(b, ["status", "state", "payment_status"]).toLowerCase().slice(0, 40);
   const when = pick(b, ["paid_at", "paidAt", "datetime", "date", "created_at"]);
   const t = when ? Date.parse(when) : NaN;
   const reference = pick(b, ["reference", "payment_reference", "reference_id"]).slice(0, 120);
   if (!transactionId) return { error: "transaction_id em falta." };
   if (!orderRef) return { error: "order_number em falta." };
   if (!Number.isFinite(amount)) return { error: "amount inválido." };
+  if (!status) return { error: "status em falta." };
   return { transactionId, orderRef, amount, status, paidAt: Number.isFinite(t) ? new Date(t).toISOString() : null, reference };
 }
 

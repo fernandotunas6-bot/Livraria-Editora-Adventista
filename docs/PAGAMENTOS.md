@@ -76,14 +76,14 @@ X-Signature: sha256=<HMAC-SHA256 em hex do corpo exacto, com o segredo partilhad
   "transaction_id": "TX-123",          obrigatório, único por pagamento no gateway
   "order_number":   "ENC-ABC123",      a encomenda (o número que o cliente usou)
   "amount":         11500,             Kz; número ou texto ("11500.00", "11 500,00")
-  "status":         "paid",            paid, completed, success… (os outros ficam registados e não mexem na encomenda)
+  "status":         "paid",            obrigatório: paid, completed, success… (os outros ficam registados e não mexem na encomenda; sem estado, 400)
   "paid_at":        "2026-11-07T20:41:00Z",  opcional
   "reference":      "MCX 123 456 789"  opcional: a referência do pagamento no gateway
 }
 ```
 
 - **Assinatura:** HMAC-SHA256 do corpo, exactamente como foi enviado, com o segredo `PAYMENT_WEBHOOK_SECRET`. Também se aceitam o hex sozinho (em maiúsculas ou minúsculas) e o mesmo valor em base64, no cabeçalho `X-Signature` ou `X-Webhook-Signature`.
-- **Respostas:** `200 {ok, outcome}` quando a chamada foi tratada. Os resultados possíveis são `recorded`, `duplicate`, `orphan` e `ignored`; o gateway não deve repetir nenhum deles. As outras respostas são `401` (assinatura errada), `400` (falta `transaction_id`, `order_number` ou `amount`), `404` (o gateway ainda não está ligado) e `429` (demasiados pedidos).
+- **Respostas:** `200 {ok, outcome}` quando a chamada foi tratada. Os resultados possíveis são `recorded`, `duplicate`, `orphan` e `ignored`; o gateway não deve repetir nenhum deles. As outras respostas são `401` (assinatura errada), `400` (falta `transaction_id`, `order_number`, `amount` ou `status`), `404` (o gateway ainda não está ligado) e `429` (demasiados pedidos).
 - **Sem duplicados:** a mesma transacção outra vez devolve `duplicate` e não conta duas vezes.
 - **Valor diferente do total:** grava o que entrou. A menos, a encomenda fica «pago em parte»; a mais, a vigilância assinala «pago a mais». A equipa é avisada em ambos os casos.
 - **Sem encomenda:** fica como `orphan` no registo, e a equipa de pagamentos é avisada para conciliar à mão.
