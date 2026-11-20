@@ -14,7 +14,7 @@ import {
  * Authenticator, Microsoft Authenticator, 1Password…). Para a equipa é o que impede que uma
  * palavra-passe roubada abra o painel; para clientes é opcional.
  */
-export default function MfaSettings({ isStaff = false }) {
+export default function MfaSettings({ isStaff = false, onEnabled }) {
   const { toast } = useToast();
   const [state, setState] = useState(null); // { verified: [...] }
   const [loading, setLoading] = useState(true);
@@ -69,6 +69,7 @@ export default function MfaSettings({ isStaff = false }) {
       setCode('');
       toast({ title: 'Verificação em dois passos activada', description: 'Na próxima entrada vamos pedir o código da aplicação.' });
       await refresh();
+      onEnabled?.();
     } catch (err) {
       setError(mfaErrorMessage(err));
     } finally {
@@ -99,7 +100,7 @@ export default function MfaSettings({ isStaff = false }) {
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
         {isStaff
-          ? 'Recomendado para a equipa: mesmo com a palavra-passe, ninguém entra no painel sem o código do seu telemóvel.'
+          ? 'Obrigatória para a equipa: mesmo com a palavra-passe, ninguém entra no painel sem o código do seu telemóvel.'
           : 'Opcional: além da palavra-passe, a entrada pede um código da aplicação autenticadora do telemóvel.'}
       </p>
 

@@ -13,6 +13,7 @@ import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
 import MfaGate from '@/components/MfaGate.jsx';
+import StaffMfaGate from '@/components/StaffMfaGate.jsx';
 import MobileBottomNav from '@/components/MobileBottomNav.jsx';
 import ReaderActivity from '@/components/ReaderActivity.jsx';
 import { toast } from 'sonner';
@@ -237,8 +238,10 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Em gestao.livrariaadventista.ao a página inicial é o Painel de Gestão (lib/gestaoHost.js). */}
-              <Route path="/" element={EM_GESTAO ? <PainelGestaoPage /> : <HomePage />} />
-              <Route path="/gestao" element={<PainelGestaoPage />} />
+              {/* A equipa só entra com a verificação em dois passos (StaffMfaGate; a regra está no servidor).
+                  No Painel de Gestão sem o aviso flutuante: pode estar numa TV. */}
+              <Route path="/" element={EM_GESTAO ? <StaffMfaGate notice={false}><PainelGestaoPage /></StaffMfaGate> : <HomePage />} />
+              <Route path="/gestao" element={<StaffMfaGate notice={false}><PainelGestaoPage /></StaffMfaGate>} />
 
               <Route path="/shop" element={<ShopPage />} />
               <Route path="/loja" element={<Navigate to="/shop" replace />} />
@@ -300,7 +303,7 @@ function App() {
               <Route path="/ser-colportor" element={<Navigate to="/colportor/candidatura" replace />} />
               <Route path="/colportores" element={<Navigate to="/colportor/candidatura" replace />} />
 
-              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin" element={<StaffMfaGate><AdminPage /></StaffMfaGate>} />
               <Route path="/admin.html" element={<Navigate to="/admin" replace />} />
               <Route path="/painel" element={<Navigate to="/admin" replace />} />
               <Route path="/painel-admin" element={<Navigate to="/admin" replace />} />

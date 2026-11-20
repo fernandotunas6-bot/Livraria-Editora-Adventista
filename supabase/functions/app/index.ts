@@ -63,14 +63,14 @@ import {
   assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
-import { mfaPending } from "./mfa.ts";
+import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 import { type Auth, PERMISSION_KEYS, can, isStaff } from "./permissions.ts";
 import {
   type AcessoAberto, type AcessoComSessao, type Access, equipa, permissao, permissaoCom, publica, recusa, segredo, sessao,
 } from "./access.ts";
-import { createRateLimit } from "./rateLimit.ts";
+import { createRateLimit, funcaoEmFalta } from "./rateLimit.ts";
 import { buildOpsReport } from "./opsReport.ts";
 import {
   brevoRequest, cloudflareRequest, emailProviderReady, interpretBrevo, interpretCloudflare, senderFor, smtpPortProblem,
@@ -203,20 +203,52 @@ async function logNotification(entry: Row) {
 const timelineEvent = (status: string, title: string, description = "", location = "Luanda") =>
   ({ status, title, description, location: location || "Luanda", at: nowISO() });
 
+/**
+ * A partir de quando a equipa precisa do código (migração dois_passos_obrigatorio_equipa), em
+ * cache de um minuto. Vai num objecto para o "sem prazo" (`null`) também ficar em cache; uma falha
+ * de leitura não fica, e o pedido seguinte volta a tentar. Sem a migração, sem prazo — como na base.
+ */
+async function staffMfaDeadline(): Promise<number | null> {
+  const got = await cached("staff-mfa-deadline", 60_000, async () => {
+    const { data, error } = await db.rpc("staff_mfa_deadline");
+    if (error) {
+      if (funcaoEmFalta(error)) return { value: null };
+      console.log("staff_mfa_deadline:", error.message);
+      return null;
+    }
+    return { value: deadlineFrom(data) };
+  });
+  return got?.value ?? null;
+}
+
 async function getAuth(req: Request): Promise<Auth> {
   const header = req.headers.get("Authorization") || "";
   const token = header.replace(/^Bearer\s+/i, "").trim();
   if (!token || token.startsWith("sb_")) return null;
-  const { data, error } = await db.auth.getUser(token);
+  // O perfil é lido ao mesmo tempo que o token é validado, com o id lido do próprio token: eram duas
+  // idas seguidas em cada pedido com sessão (a base está em Estocolmo). O perfil só conta se o Auth
+  // confirmar que o token é dessa mesma conta.
+  const sub = String(jwtClaims(token).sub || "");
+  const [{ data, error }, early] = await Promise.all([
+    db.auth.getUser(token),
+    /^[0-9a-f-]{36}$/i.test(sub)
+      ? db.from("profiles").select("id, role, permissions").eq("id", sub).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
   if (error || !data?.user) return null;
-  const { data: profile } = await db.from("profiles").select("role, permissions").eq("id", data.user.id).maybeSingle();
-  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1): vale como
-  // cliente até introduzir o código. É a mesma regra das funções de permissão na base de
-  // dados; ver mfa.ts. Contas sem factor verificado não são afectadas.
-  if (mfaPending(data.user.factors, token)) {
+  let profile = early?.data as Row | null;
+  if (profile?.id !== data.user.id) {
+    ({ data: profile } = await db.from("profiles").select("id, role, permissions").eq("id", data.user.id).maybeSingle());
+  }
+  const role = String(profile?.role || "member");
+  const staff = role === "admin" || role === "manager";
+  // Conta com verificação em dois passos e sessão só com palavra-passe (aal1), ou conta da equipa
+  // sem o código depois do prazo: vale como cliente até introduzir (ou activar) o código. É a
+  // mesma regra das funções de permissão na base de dados; ver mfa.ts.
+  if (mfaPending(data.user.factors, token, { staff, enforceAfter: staff ? await staffMfaDeadline() : null })) {
     return { id: data.user.id, email: data.user.email || "", role: "member", permissions: {} };
   }
-  return { id: data.user.id, email: data.user.email || "", role: profile?.role || "member", permissions: profile?.permissions || {} };
+  return { id: data.user.id, email: data.user.email || "", role, permissions: profile?.permissions || {} };
 }
 
 // Quem pode o quê está em `permissions.ts`; quem pode chamar cada rota, em `access.ts`, e é
@@ -5213,6 +5245,34 @@ route("POST", "/admin/users/end-sessions", permissao("manage_users"), async ({ a
     emailSent = await notifyAccount(target.email, target.name, (b) => suspiciousActivityLetter(b, target.name, detail));
   }
   return json({ ok: true, ended, email_sent: emailSent });
+});
+
+/**
+ * Repõe a verificação em dois passos de uma conta (perdeu o telemóvel, trocou de aplicação). A
+ * pessoa volta a activá-la ao entrar — na equipa, depois do prazo, é obrigatória (migração
+ * dois_passos_obrigatorio_equipa). Só administradores; nunca a própria conta (essa muda-se no
+ * perfil, com o código). As sessões abertas terminam, para um telemóvel perdido não ficar com uma,
+ * e todos os administradores são avisados (registo de segurança).
+ */
+route("POST", "/admin/users/mfa-reset", permissao("manage_users"), async ({ auth, body }) => {
+  if (auth.role !== "admin") throw new HttpError(403, "Só administradores repõem a verificação em dois passos.");
+  const target = await loadTarget(auth, body.id);
+  if (target.id === auth.id) throw bad("A sua própria verificação muda-se no perfil. Para a repor, peça a outro administrador.");
+  const { data, error } = await db.auth.admin.mfa.listFactors({ userId: String(target.id) });
+  if (error) throw error;
+  const factors = (data?.factors || []) as Row[];
+  if (!factors.length) throw bad("Esta conta não tem verificação em dois passos.");
+  for (const f of factors) {
+    const { error: removeError } = await db.auth.admin.mfa.deleteFactor({ id: String(f.id), userId: String(target.id) });
+    if (removeError) throw removeError;
+  }
+  const ended = await endSessions(target.id);
+  await recordSecurity(auth, {
+    rowId: target.id,
+    alert: true,
+    summary: `Verificação em dois passos reposta: ${target.email || target.id} (${factors.length} factor(es) retirado(s), ${ended} sessão(ões) terminada(s))`,
+  });
+  return json({ ok: true, removed: factors.length, ended });
 });
 
 // --- Assistente e atendimento no chat ---
