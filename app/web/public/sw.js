@@ -1,5 +1,17 @@
-const CACHE_NAME = 'livraria-v7';
+const CACHE_NAME = 'livraria-v8';
+// As imagens numa cache à parte e com tecto: cada capa vista ficava guardada para sempre, e num
+// telemóvel com pouco espaço a cache do site crescia sem fim (análise crítica de 2026-11-20).
+const IMAGE_CACHE = 'livraria-imagens-v1';
+const IMAGE_CACHE_MAX = 300;
 const PRECACHE = ['/', '/shop', '/manifest.webmanifest', '/icons/icon-192.svg'];
+
+/** Tira as entradas mais antigas (a ordem das chaves é a de inserção) até ficar no tecto. */
+async function trimCache(name, max) {
+  const cache = await caches.open(name);
+  const keys = await cache.keys();
+  const excess = keys.length - max;
+  for (let i = 0; i < excess; i++) await cache.delete(keys[i]);
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -12,7 +24,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== IMAGE_CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -99,11 +111,14 @@ self.addEventListener('fetch', (event) => {
 
   if (isImage) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
+      caches.open(IMAGE_CACHE).then((cache) => {
         return cache.match(event.request).then((cachedResponse) => {
           const fetchPromise = fetch(event.request).then((networkResponse) => {
             if (networkResponse.ok) {
-              cache.put(event.request, networkResponse.clone());
+              // Só depois de gravada é que se arruma; o pedido não espera por isso.
+              cache.put(event.request, networkResponse.clone())
+                .then(() => trimCache(IMAGE_CACHE, IMAGE_CACHE_MAX))
+                .catch(() => {});
             }
             return networkResponse;
           }).catch(() => cachedResponse || Response.error());

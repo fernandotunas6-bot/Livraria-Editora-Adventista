@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MOTION } from '@/lib/motion';
 import { useSwipe } from '@/hooks/useSwipe';

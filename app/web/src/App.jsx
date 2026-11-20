@@ -8,7 +8,7 @@ import { SiteSettingsProvider, useSiteSettings } from '@/hooks/useSiteSettings';
 import { IntegrationsProvider } from '@/hooks/useIntegrations';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { MotionConfig } from 'framer-motion';
+import { LazyMotion, MotionConfig } from 'framer-motion';
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import { isFloatingHidden } from '@/lib/floatingButtons';
 import { BookLoader } from '@/components/ui/book-loader';
@@ -188,6 +188,7 @@ function ColporteurReferralCapture() {
 }
 
 const NO_APP = eAppNativa();
+const loadMotionFeatures = () => import('@/lib/motionFeatures').then((mod) => mod.default);
 
 // A política de scripts da loja (lib/storeCsp.js) não sai sem recarregar: quem entra no painel vindo
 // da loja recarrega uma vez, para o painel poder usar os scripts da Google (Workspace, Drive).
@@ -236,6 +237,8 @@ function App() {
         respeitava): sem isto, as entradas e as transições corriam na mesma. Não custa bytes — o
         vendor-motion já é pré-carregado em todas as páginas (FloatingScrollTop). */}
     <MotionConfig reducedMotion="user">
+    {/* O motor das animações chega depois da primeira pintura (lib/motionFeatures.js). */}
+    <LazyMotion features={loadMotionFeatures}>
     <TooltipProvider>
     <SiteSettingsProvider>
     <IntegrationsProvider>
@@ -340,6 +343,7 @@ function App() {
     </IntegrationsProvider>
     </SiteSettingsProvider>
     </TooltipProvider>
+    </LazyMotion>
     </MotionConfig>
     </ThemeProvider>
   );

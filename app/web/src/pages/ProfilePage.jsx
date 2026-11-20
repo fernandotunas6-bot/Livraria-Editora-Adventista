@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   User, Mail, Shield, ShoppingBag, LogOut, Loader2, ChevronRight, BookOpen, LayoutDashboard, Truck,
   Heart, Trash2, Bell, Copy, Check, Wallet, BadgeCheck, ShoppingCart as CartIcon,

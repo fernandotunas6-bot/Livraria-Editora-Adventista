@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { Search, BookOpen, X } from 'lucide-react';
 import { ProductGrid } from '@/components/ProductCard';
 import { PRODUCT_GRID_CLASS } from '@/lib/productGrid';

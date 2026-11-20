@@ -13,7 +13,7 @@ import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
 import { fotoDaLoja, lojaSrcSet, mapsUrl } from '@/lib/stores';
 import SafeLink from '@/components/SafeLink.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAfterLoad } from '@/hooks/useAfterLoad';
 import FooterCompact from '@/components/FooterCompact.jsx';

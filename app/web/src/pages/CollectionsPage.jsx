@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { Layers, ChevronRight, BookOpen, Filter, X } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';

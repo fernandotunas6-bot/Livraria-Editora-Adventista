@@ -4,7 +4,7 @@ import PayLaterBox from '@/components/PayLaterBox';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   Search, Package, MapPin, Truck, CheckCircle2, Circle, Loader2, Phone, Users, Calendar, User, XCircle, Library,
 } from 'lucide-react';
