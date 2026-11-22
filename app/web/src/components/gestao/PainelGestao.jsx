@@ -435,16 +435,17 @@ function Cartoes({ r, dados, tv, est, alvo }) {
         rodape={<div className="space-y-1"><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${ideal}%`, background: MARCA.azul }} /></div><span>{dados.dia} de {dados.dias_mes} dias</span></div>}>
         <Numero valor={r.mes} compacto className={cn(grande, 'font-extrabold tracking-tight')} />
       </Cartao>
-      <Cartao titulo="Meta do mês" icone={Target} cor={corEst} className="col-span-2 lg:col-span-1 lg:row-span-1">
+      <Cartao titulo="Meta do mês" icone={Target} cor={corEst} className="@container col-span-2 lg:col-span-1 lg:row-span-1">
         {Number(r.meta) > 0 ? (
-          <div className="flex items-center gap-4">
+          // num cartão estreito (a TV com a publicidade ao lado) o texto passa para baixo do anel em vez de se partir
+          <div className="flex items-center gap-4 @max-[15rem]:flex-col @max-[15rem]:gap-2 @max-[15rem]:text-center">
             <Anel pct={pct} ideal={ideal} cor={corEst} tamanho={tv ? 120 : 104}>
               <div>
                 <p className={cn('font-extrabold tabular-nums leading-none', tv ? 'text-3xl' : 'text-2xl', cores.texto)}>{Math.round(pct)}<span className="text-sm">%</span></p>
                 <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">da meta</p>
               </div>
             </Anel>
-            <div className="min-w-0 space-y-1 text-xs">
+            <div className="min-w-0 space-y-1 whitespace-nowrap text-xs">
               <p className="font-semibold tabular-nums">{fmtCompacto(r.meta)} Kz</p>
               {est === 'atingida'
                 ? <p className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 font-bold text-emerald-600 dark:text-emerald-400"><Trophy className="h-3.5 w-3.5" />META ATINGIDA</p>
