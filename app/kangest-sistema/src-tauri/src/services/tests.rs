@@ -6382,8 +6382,8 @@ async fn sinc_catalogo_stock_e_artigos() {
         .unwrap();
     rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": artigo, "quantidade": 10, "preco_unitario": 120000 }] })).await;
     rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
-    // 2 500,00 Kz + IVA 14% = 2 850,00 por unidade
-    let fr = |q: i64| json!({ "tipo": "FR", "linhas": [{ "artigo_id": artigo, "quantidade": q }], "pagamentos": [{ "modo": "NU", "valor": 285000 * q }] });
+    // o pagamento é o preço com IVA de cada unidade: 2 500,00 + 14% = 2 850,00 (e 3 420,00 depois de o preço subir)
+    let fr = |q: i64, unidade: i64| json!({ "tipo": "FR", "linhas": [{ "artigo_id": artigo, "quantidade": q }], "pagamentos": [{ "modo": "NU", "valor": unidade * q }] });
     let conta = |sql: &'static str| {
         let pool = st.pool.clone();
         async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
@@ -6404,8 +6404,8 @@ async fn sinc_catalogo_stock_e_artigos() {
     .unwrap();
 
     // duas vendas do mesmo livro: uma linha de stock, com o contador a subir
-    rpc(&st, "documentos.emitir", fr(1)).await;
-    rpc(&st, "documentos.emitir", fr(2)).await;
+    rpc(&st, "documentos.emitir", fr(1, 285000)).await;
+    rpc(&st, "documentos.emitir", fr(2, 285000)).await;
     let linhas: Vec<(String, i64)> = sqlx::query_as("SELECT tipo, mudou FROM sinc_catalogo WHERE artigo_id = ? ORDER BY tipo").bind(artigo).fetch_all(&st.pool).await.unwrap();
     assert_eq!(linhas.len(), 1, "{linhas:?}");
     assert_eq!(linhas[0].0, "stock");
@@ -6427,7 +6427,7 @@ async fn sinc_catalogo_stock_e_artigos() {
     assert_eq!(art["artigo"]["ativo"], true);
 
     // uma venda enquanto o lote ia a caminho: o stock fica para a volta seguinte; o artigo sai
-    rpc(&st, "documentos.emitir", fr(1)).await;
+    rpc(&st, "documentos.emitir", fr(1, 342000)).await;
     catalogo::concluir(&st.pool, &pendentes, &Default::default(), agora).await.unwrap();
     let ficou: Vec<String> = sqlx::query_scalar("SELECT tipo FROM sinc_catalogo WHERE artigo_id = ?").bind(artigo).fetch_all(&st.pool).await.unwrap();
     assert_eq!(ficou, vec!["stock".to_string()]);
@@ -6463,7 +6463,7 @@ async fn sinc_catalogo_stock_e_artigos() {
     // desligar: o que estava por enviar sai, e as vendas seguintes já não marcam nada
     rpc(&st, "sinc.desligar", Value::Null).await;
     assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo").await, 0);
-    rpc(&st, "documentos.emitir", fr(1)).await;
+    rpc(&st, "documentos.emitir", fr(1, 342000)).await;
     assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo").await, 0);
 
     st.pool.close().await;
