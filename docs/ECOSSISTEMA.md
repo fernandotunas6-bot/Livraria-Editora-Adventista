@@ -204,8 +204,17 @@ A fase 5 vem antes das fases 3 e 4 porque não depende delas.
 ## 12. Por decidir (pelo dono)
 
 1. Criar neste repositório os segredos da AGT e da Facturação Electrónica (`KANGEST_AGT_*`, `KANGEST_FE_*`).
-2. A licença na edição: manter o servidor de licenças do KanGest ou dispensá-la.
+2. ~~A licença na edição~~ — **decidido (24/11)**: dispensada para a livraria. Para o NIF da livraria
+   (`NIFS_DA_LIVRARIA` em `licenca.rs`), a licença é a da edição, sem prazo, e o servidor de licenças nunca é
+   contactado. Sem esta decisão, a verificação de 12 em 12 horas levava a equipa da loja para esse servidor. Qualquer
+   outro NIF tem a licença normal, para o instalador não ser um KanGest gratuito. Desde a 1.4.5
+   ([KANGEST.md](KANGEST.md#a-licença-da-edição)).
 3. ~~Onde ficam os instaladores da edição~~ — **decidido**: ficheiros no próprio site, em
    `livrariaadventista.ao/kangest/actualizacoes`, copiados de uma Release pelo deploy (como o APK), e descarregados
    no painel. A chave minisign é própria da edição ([KANGEST.md](KANGEST.md#descarregar-e-actualizar-o-kangest-livraria)).
-4. Quando desligar o túnel e a API de entrada nas lojas.
+4. ~~Quando desligar o túnel e a API de entrada nas lojas~~ — **decidido (24/11)**: já, e de vez. A ligação antiga
+   nunca chegou a funcionar em produção. O agendador dela chamava a Edge Function de 5 em 5 minutos só para receber
+   404, e sai na migração `20261125130000`. O código fica, inerte, e no painel vai para uma secção fechada.
+   **O que a ligação antiga fazia e ainda não passou para os postos:** o stock, os preços e os artigos novos do
+   KanGest para o site, e a NE e a FR das encomendas online. É a próxima fase. Até lá, o stock do site continua a
+   vir como antes (KiGest e painel), tal como estava, porque a ligação antiga nunca correu.

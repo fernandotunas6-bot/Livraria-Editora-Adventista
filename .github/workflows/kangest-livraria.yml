@@ -214,7 +214,8 @@ jobs:
           # A assinatura tem de conferir com a chave que vai dentro do programa; senão, ninguém actualizava.
           printf '%s' "$CHAVE_PUBLICA" > "$RUNNER_TEMP/chave.pub"
           node scripts/kangest/verificar-assinatura.mjs "$RUNNER_TEMP/chave.pub" "$P/$exe.sig" "$P/$exe"
-          python3 app/kangest-sistema/scripts/manifesto-atualizacao.py "$P" "$versao"
+          # as notas da versão (o primeiro parágrafo) aparecem no programa ao oferecer a actualização
+          python3 app/kangest-sistema/scripts/manifesto-atualizacao.py "$P" "$versao" "app/kangest-sistema/docs/versoes/v${versao}.md"
           agt=false
           [ "$AGT" = sim ] && agt=true
           jq --argjson agt "$agt" --argjson tamanho "$tamanho" \

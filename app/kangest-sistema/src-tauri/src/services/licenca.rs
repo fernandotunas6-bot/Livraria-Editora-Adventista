@@ -11,6 +11,11 @@
 //!
 //! Com internet, o KanGest regista-se no servidor de licenças (servidor-licencas/, Cloudflare Workers): o cliente confirma
 //! o email com um código, recebe a experiência presa ao NIF e, depois de pagar, a licença nova chega sozinha.
+//!
+//! **KanGest Livraria** (a edição só da livraria, docs/KANGEST.md): para as empresas da Livraria Editora Adventista
+//! (NIFS_DA_LIVRARIA) a licença é a da própria edição, sem prazo, e o servidor de licenças nunca é contactado: nem o
+//! registo, nem a verificação de 12 em 12 horas, que levaria a equipa da loja para fora da base da livraria. Para
+//! qualquer outro NIF vale tudo o que está acima, para o instalador da edição não ser um KanGest gratuito.
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{Duration, NaiveDate, NaiveDateTime};
 use ring::signature::{UnparsedPublicKey, ED25519};
@@ -39,6 +44,18 @@ pub const DIAS_EXPERIENCIA: i64 = 30;
 const HORAS_RELOGIO: i64 = 36;
 /// Avisar quando faltam estes dias.
 const DIAS_AVISO: i64 = 15;
+/// NIF das empresas da Livraria Editora Adventista (o `company_nif` das configurações do site). Para estas, o KanGest
+/// Livraria tem a licença da edição. Acrescentar um NIF é um PR, com o instalador publicado outra vez.
+pub const NIFS_DA_LIVRARIA: &[&str] = &["5125004375"];
+/// O plano da licença da edição.
+pub const PLANO_LIVRARIA: &str = "LIVRARIA";
+const SEM_REGISTO_NA_LIVRARIA: &str = "O KanGest Livraria não precisa de registo nem de licença para a empresa da livraria: a licença é a da edição.";
+
+/// A empresa é da livraria: tem a licença da edição e não fala com o servidor de licenças.
+pub fn da_livraria(nif: Option<&str>) -> bool {
+    let nif = nif.map(so_algarismos).unwrap_or_default();
+    !nif.is_empty() && NIFS_DA_LIVRARIA.iter().any(|n| so_algarismos(n) == nif)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Licenca {
@@ -144,6 +161,7 @@ pub fn nome_plano(codigo: &str) -> &str {
         "ESSENCIAL" => "Essencial",
         "COMERCIO" => "Comércio",
         "EMPRESA" => "Empresa",
+        PLANO_LIVRARIA => "Edição da Livraria",
         outro => outro,
     }
 }
@@ -398,6 +416,16 @@ pub async fn calcular(st: &AppState) -> AppResult<Estado> {
         return Ok(e);
     }
 
+    // a edição da livraria: a licença é a dela, sem prazo (o selo do programa e o relógio continuam a contar, acima)
+    if da_livraria(nif_empresa.as_deref()) {
+        e.modo = "ACTIVA";
+        e.plano = PLANO_LIVRARIA.into();
+        e.modulos = vec![MODULO_API.into()];
+        e.empresa = Some("Livraria Editora Adventista".into());
+        e.mensagem = "KanGest Livraria: a licença é a da edição da Livraria Editora Adventista, sem prazo nem limite de postos.".into();
+        return Ok(e);
+    }
+
     // licença activada
     let mut problema: Option<String> = None;
     if let Some(texto) = cfg_ler(p, "licenca.chave").await?.filter(|t| !t.trim().is_empty()) {
@@ -638,6 +666,9 @@ pub struct RegistarIn {
 pub async fn registar(st: &AppState, i: RegistarIn) -> AppResult<Value> {
     st.exigir_perm("sistema.configuracoes")?;
     let (empresa, nif) = dados_empresa(st).await?;
+    if da_livraria(Some(nif.as_str())) {
+        return Err(AppError::msg(SEM_REGISTO_NA_LIVRARIA));
+    }
     let email = i.email.trim().to_lowercase();
     if !email.contains('@') || !email.contains('.') {
         return Err(AppError::msg("Indique um email válido: é para lá que vai o código de confirmação."));
@@ -660,6 +691,9 @@ pub struct ConfirmarIn {
 pub async fn confirmar(st: &AppState, i: ConfirmarIn) -> AppResult<Value> {
     let s = st.exigir_perm("sistema.configuracoes")?;
     let (_, nif) = dados_empresa(st).await?;
+    if da_livraria(Some(nif.as_str())) {
+        return Err(AppError::msg(SEM_REGISTO_NA_LIVRARIA));
+    }
     let v = chamar_servidor("/v1/confirmar", json!({ "nif": nif, "maquina": id_maquina(), "codigo": i.codigo.trim() })).await?;
     // segredo deste computador: autentica as renovações e o acesso pela Internet (o NIF e o computador não são segredos)
     if let Some(segredo) = v.get("segredo").and_then(Value::as_str) {
@@ -693,7 +727,8 @@ pub async fn sincronizar(st: &AppState, i: SincronizarIn) -> AppResult<Value> {
 /// KanGest, em segundo plano). Uma tentativa falhada fica registada no estado, para o ecrã da licença a explicar.
 pub(crate) async fn sincronizar_com(st: &AppState, forcar: bool, utilizador: Option<i64>) -> AppResult<Value> {
     let antes = calcular(st).await?;
-    if !antes.registada {
+    // a edição da livraria nunca fala com o servidor de licenças, mesmo que este computador já lá estivesse registado
+    if !antes.registada || da_livraria(antes.nif.as_deref()) {
         return Ok(json!({ "mudou": false, "estado": antes }));
     }
     if !forcar {
@@ -917,6 +952,60 @@ mod testes_sincronizacao {
         let estado = rpc(&st, "licenca.estado", Value::Null).await;
         assert!(estado["sincronizacao_erro"].as_str().is_some_and(|m| m.contains("NIF")), "{estado}");
         assert!(estado["sincronizacao_erro_em"].is_string(), "{estado}");
+        let _ = std::fs::remove_dir_all(&pasta);
+    }
+
+    #[test]
+    fn nif_da_livraria() {
+        assert!(super::da_livraria(Some("5125004375")));
+        assert!(super::da_livraria(Some(" 5125 004 375 ")), "espaços não contam");
+        assert!(!super::da_livraria(Some("5000000000")));
+        assert!(!super::da_livraria(Some("")));
+        assert!(!super::da_livraria(None));
+        assert_eq!(super::nome_plano(super::PLANO_LIVRARIA), "Edição da Livraria");
+    }
+
+    /// A empresa da livraria: a licença da edição, sem prazo, mesmo com a experiência acabada há muito; o registo é
+    /// recusado e a verificação nunca vai ao servidor de licenças, mesmo com o computador dado como registado.
+    #[tokio::test]
+    async fn licenca_da_edicao_da_livraria() {
+        let pasta = std::env::temp_dir().join(format!("kangest-livraria-licenca-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&pasta);
+        std::fs::create_dir_all(&pasta).unwrap();
+        let mut st = AppState::new(db::abrir(&pasta.join("kigest.db")).await.unwrap());
+        st.pasta_dados = pasta.clone();
+        st.pasta_exportacao = pasta.clone();
+        st.carregar_posto(1).await.unwrap();
+        rpc(&st, "setup.inicializar", json!({ "empresa": { "nome": "Livraria Editora Adventista", "nif": "5125004375" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } })).await;
+        rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+
+        let e = rpc(&st, "licenca.estado", Value::Null).await;
+        assert_eq!((e["modo"].as_str(), e["plano"].as_str(), e["pode_emitir"].as_bool()), (Some("ACTIVA"), Some("LIVRARIA"), Some(true)), "{e}");
+        assert!(e["fim"].is_null() && e["dias"] == 0 && e["postos"] == 0 && e["aviso"] == false, "sem prazo nem limite: {e}");
+        assert_eq!(super::limite_postos(&st).await.unwrap(), None);
+
+        // a experiência de 30 dias já não conta: instalado há mais de um ano, continua a emitir
+        let ha_um_ano = (chrono::Local::now().date_naive() - chrono::Duration::days(400)).format("%Y-%m-%d").to_string();
+        // (uma data mais antiga encurta a experiência, por isso conta mesmo com o selo dos dados da licença)
+        super::cfg_gravar(&st.pool, "licenca.instalada_em", &ha_um_ano).await.unwrap();
+        assert_eq!(rpc(&st, "licenca.estado", Value::Null).await["modo"], "ACTIVA");
+        assert!(super::exigir_emissao(&st).await.is_ok(), "a livraria emite sempre");
+
+        // sem registo no servidor de licenças
+        let erro = crate::services::dispatch(&st, "licenca.registar", json!({ "email": "loja@exemplo.ao", "telefone": "" })).await.unwrap_err();
+        assert!(erro.to_string().contains("não precisa de registo"), "{erro}");
+        let erro = crate::services::dispatch(&st, "licenca.confirmar", json!({ "codigo": "123456" })).await.unwrap_err();
+        assert!(erro.to_string().contains("não precisa de registo"), "{erro}");
+
+        // dado como registado (de antes da edição): a verificação não sai daqui, nem deixa erro no estado
+        super::cfg_gravar(&st.pool, "licenca.registada", "1").await.unwrap();
+        let r = super::sincronizar_com(&st, true, None).await.unwrap();
+        assert_eq!(r["mudou"], false, "{r}");
+        assert!(r["estado"]["sincronizacao_erro"].is_null() && r["estado"]["sincronizada_em"].is_null(), "{r}");
+
+        // outra empresa no mesmo programa: a licença normal (a experiência)
+        sqlx::query("UPDATE empresa SET nif = '5000000000' WHERE id = 1").execute(&st.pool).await.unwrap();
+        assert_eq!(rpc(&st, "licenca.estado", Value::Null).await["modo"], "EXPIRADA", "a experiência de há um ano já acabou");
         let _ = std::fs::remove_dir_all(&pasta);
     }
 }
