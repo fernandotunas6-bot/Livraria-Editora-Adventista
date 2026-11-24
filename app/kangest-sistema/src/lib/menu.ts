@@ -4,6 +4,7 @@
 import {
   Boxes,
   Contact,
+  Globe,
   GraduationCap,
   Landmark,
   Settings,
@@ -178,6 +179,17 @@ export const MENU: GrupoMenu[] = [
       { label: "Fidelização de Clientes", to: "/fidelizacao", perm: "relatorios.ver" },
       { label: "Fornecedores", to: "/fornecedores", perm: "fornecedores" },
       { label: "Artigos", to: "/artigos" },
+    ],
+  },
+  {
+    // a edição da livraria: o navegador e, depois, a gestão da loja online (docs/ECOSSISTEMA.md)
+    id: "livraria",
+    titulo: "Livraria",
+    icon: Globe,
+    itens: [
+      { label: "Loja online", to: "/loja-online" },
+      { label: "Internet", to: "/internet" },
+      { label: "Ligação ao site", to: "/ligacao-site", perm: "sistema.api" },
     ],
   },
   {
