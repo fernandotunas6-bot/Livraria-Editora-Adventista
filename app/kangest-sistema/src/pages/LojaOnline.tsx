@@ -6,15 +6,16 @@
  * com cada sincronização. Lê-se também sem Internet (a última cópia). As alterações fazem-se no painel do site, aberto
  * no navegador do KanGest, com o login de cada pessoa.
  */
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { CheckCircle2, CloudOff, ExternalLink, Link2, Package, Search, ShoppingBag, Store } from "lucide-react";
+import { CheckCircle2, CloudOff, ExternalLink, KeyRound, Link2, Package, Search, ShoppingBag, Store, UserRound } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
 import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
-import { Badge, Button, Card, Empty, Input, Modal, PageHeader, Table, Td, Th, cn } from "@/components/ui";
+import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Table, Td, Th, cn } from "@/components/ui";
 
 type Tom = "neutral" | "brand" | "ok" | "danger" | "accent";
 
@@ -69,6 +70,7 @@ interface Encomenda {
   criada_em: string;
   estado: string;
   pagamento: string;
+  entrega: string;
   levantamento: boolean;
   cliente: string;
   telefone: string;
@@ -111,6 +113,23 @@ function Contador({ rotulo, n, activo, onClick, tom }: { rotulo: string; n: numb
 }
 
 export default function LojaOnline() {
+  const qc = useQueryClient();
+  // tempo real: o servidor da loja avisa quando chegam novidades do site (src-tauri/src/sinc/tempo_real.rs)
+  useEffect(() => {
+    if (!NA_APP) return;
+    let desligar: (() => void) | undefined;
+    let fechado = false;
+    void listen("loja-novidades", () => {
+      for (const k of ["loja-estado", "loja-encomendas", "loja-produtos", "loja-encomenda", "loja-conta"]) qc.invalidateQueries({ queryKey: [k] });
+    }).then((f) => {
+      if (fechado) f();
+      else desligar = f;
+    });
+    return () => {
+      fechado = true;
+      desligar?.();
+    };
+  }, [qc]);
   const estado = useQuery({ queryKey: ["loja-estado"], queryFn: () => call<EstadoLoja>("loja.estado"), refetchInterval: 30000 });
   const [aba, setAba] = useState<"encomendas" | "produtos">("encomendas");
   const e = estado.data;
@@ -175,10 +194,12 @@ export default function LojaOnline() {
               ))}
             </div>
           </div>
+          <ContaSite />
           {aba === "encomendas" ? <Encomendas e={e} site={site} /> : <Produtos e={e} site={site} />}
           <p className="text-[12px] text-ink-3">
-            Esta página só lê. Para confirmar, preparar ou entregar uma encomenda, ou publicar e mudar um produto, use «Abrir no painel do
-            site»: abre no navegador do KanGest, com o seu login.
+            Com a sua conta do site, as encomendas confirmam-se, preparam-se e entregam-se aqui, com as suas permissões, e o cliente é
+            avisado como no painel. Sem Internet, a alteração fica na fila e segue quando a ligação voltar. Os produtos mudam-se no painel
+            do site («Abrir no painel do site»).
           </p>
         </div>
       )}
@@ -263,10 +284,34 @@ function Encomendas({ e, site }: { e: EstadoLoja; site: string }) {
 }
 
 function DetalheEncomenda({ id, site, onFechar }: { id: string; site: string; onFechar: () => void }) {
+  const qc = useQueryClient();
   const d = useQuery({ queryKey: ["loja-encomenda", id], queryFn: () => call<Encomenda>("loja.encomenda", { id }) });
+  const conta = useContaSite();
+  const [aFazer, setAFazer] = useState<string | null>(null);
+  const [pagar, setPagar] = useState(false);
+  const [cancelar, setCancelar] = useState(false);
   const o = d.data;
   const [estado] = ESTADOS[o?.estado ?? ""] ?? [o?.estado ?? "—"];
   const [pagamento] = PAGAMENTOS[o?.pagamento ?? ""] ?? [o?.pagamento ?? "—"];
+  const falta = o ? Math.max(Number(o.total ?? 0) - Number(o.pago ?? 0), 0) : 0;
+  const accoes = o && conta.data?.entrou ? accoesPossiveis(o) : [];
+
+  async function fazer(accao: string, extra: Record<string, unknown> = {}) {
+    setAFazer(accao);
+    try {
+      const r = await call<{ feito: boolean; na_fila?: boolean; aviso?: string | null }>("loja.conta.accao", { id, accao, ...extra });
+      if (r.na_fila) toast.warning("Sem Internet: a alteração fica na fila e segue quando a ligação voltar.");
+      else toast.success(r.aviso || "Feito. O site já tem a alteração e o cliente foi avisado.");
+      for (const k of ["loja-encomenda", "loja-encomendas", "loja-estado", "loja-conta"]) qc.invalidateQueries({ queryKey: [k] });
+      setPagar(false);
+      setCancelar(false);
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setAFazer(null);
+    }
+  }
+
   return (
     <Modal
       open
@@ -276,7 +321,7 @@ function DetalheEncomenda({ id, site, onFechar }: { id: string; site: string; on
         <>
           <Button variant="ghost" onClick={onFechar}>Fechar</Button>
           {o && (
-            <Button onClick={() => abrirNoSite(`${site}/admin?tab=orders&encomenda=${encodeURIComponent(o.numero)}`)}>
+            <Button variant="secondary" onClick={() => abrirNoSite(`${site}/admin?tab=orders&encomenda=${encodeURIComponent(o.numero)}`)}>
               <ExternalLink className="size-4" /> Abrir no painel do site
             </Button>
           )}
@@ -287,6 +332,24 @@ function DetalheEncomenda({ id, site, onFechar }: { id: string; site: string; on
         <p className="text-ink-3">{d.error ? (d.error as Error).message : "A carregar…"}</p>
       ) : (
         <div className="space-y-4 text-[14px]">
+          {accoes.length > 0 && (
+            <div className="flex flex-wrap gap-2 rounded-xl bg-sunken p-3">
+              {accoes.map((a) => (
+                <Button
+                  key={a}
+                  size="sm"
+                  variant={a === "cancelar" ? "ghost" : a === "entregue" || a === "confirmar" ? "primary" : "secondary"}
+                  loading={aFazer === a}
+                  onClick={() => (a === "cancelar" ? setCancelar(true) : a === "entregue" && falta > 0 && o.pagamento !== "paid" ? setPagar(true) : fazer(a))}
+                >
+                  {rotuloAccao(a, o.levantamento)}
+                </Button>
+              ))}
+            </div>
+          )}
+          {!conta.data?.entrou && !["cancelled", "delivered"].includes(o.estado) && (
+            <p className="text-[13px] text-ink-3">Para alterar esta encomenda aqui, entre com a sua conta do site (em cima).</p>
+          )}
           <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-1.5">
             <dt className="text-ink-3">Feita em</dt>
             <dd>{quando(o.criada_em)}</dd>
@@ -326,8 +389,26 @@ function DetalheEncomenda({ id, site, onFechar }: { id: string; site: string; on
           <p className="text-right font-semibold">
             {o.portes ? <span className="mr-3 font-normal text-ink-3">portes {emKz(o.portes)}</span> : null}
             Total {emKz(o.total)}
+            {falta > 0 && o.pagamento !== "paid" && <span className="ml-3 font-normal text-accent-ink">por receber {emKz(falta)}</span>}
           </p>
         </div>
+      )}
+      {o && pagar && <PagamentoEntrega encomenda={o} falta={falta} aFazer={aFazer === "entregue"} onFechar={() => setPagar(false)} onEntregar={(extra) => fazer("entregue", extra)} />}
+      {o && cancelar && (
+        <Modal
+          open
+          onClose={() => setCancelar(false)}
+          title={`Cancelar a encomenda ${o.numero}?`}
+          width="max-w-md"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setCancelar(false)}>Não</Button>
+              <Button variant="danger" loading={aFazer === "cancelar"} onClick={() => fazer("cancelar")}>Cancelar a encomenda</Button>
+            </>
+          }
+        >
+          <p className="text-ink-2">O stock volta à loja, o cliente é avisado e a encomenda não se reabre.</p>
+        </Modal>
       )}
     </Modal>
   );
@@ -414,5 +495,298 @@ function Produtos({ e, site }: { e: EstadoLoja; site: string }) {
         )}
       </Card>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// A conta do site de cada pessoa (src-tauri/src/sinc/pessoa.rs)
+// ---------------------------------------------------------------------------------------------------------------
+
+interface ContaSiteEstado {
+  entrou: boolean;
+  falta_codigo: boolean;
+  email: string | null;
+  aal: string | null;
+  acaba_em: number | null;
+  pendentes: number;
+}
+interface ComandoLinha {
+  id: number;
+  numero: string;
+  accao: string;
+  estado: string;
+  erro: string;
+  criado_em: string;
+  feito_em: string | null;
+}
+
+const ROTULOS: Record<string, string> = {
+  confirmar: "Confirmar",
+  preparar: "A preparar",
+  pronta: "Pronta para levantar",
+  enviada: "Enviada",
+  entregue: "Entregue",
+  cancelar: "Cancelar",
+};
+const rotuloAccao = (a: string, levantamento: boolean) => (a === "entregue" && levantamento ? "Levantada pelo cliente" : ROTULOS[a] ?? a);
+const hora = (s: number) => new Date(s * 1000).toLocaleTimeString("pt-PT", { timeZone: "Africa/Luanda", hour: "2-digit", minute: "2-digit" });
+
+/** O que se pode fazer a uma encomenda, pelo estado dela (os mesmos passos do painel). */
+function accoesPossiveis(o: Encomenda): string[] {
+  if (["cancelled", "delivered"].includes(o.estado) || ["cancelled", "delivered"].includes(o.entrega)) return [];
+  const a: string[] = [];
+  if (o.estado === "pending") a.push("confirmar");
+  if (!["preparing", "shipped", "in_transit", "out_for_delivery"].includes(o.entrega)) a.push("preparar");
+  if (o.levantamento) {
+    if (o.entrega !== "shipped") a.push("pronta");
+  } else if (!["shipped", "in_transit", "out_for_delivery"].includes(o.entrega)) {
+    a.push("enviada");
+  }
+  a.push("entregue", "cancelar");
+  return a;
+}
+
+function useContaSite() {
+  return useQuery({ queryKey: ["loja-conta"], queryFn: () => call<ContaSiteEstado>("loja.conta.estado"), refetchInterval: 30000 });
+}
+
+function ContaSite() {
+  const qc = useQueryClient();
+  const conta = useContaSite();
+  const [entrar, setEntrar] = useState(false);
+  const [verFila, setVerFila] = useState(false);
+  const c = conta.data;
+  if (!c) return null;
+  const pronto = (novo: ContaSiteEstado) => qc.setQueryData(["loja-conta"], novo);
+  async function sair() {
+    try {
+      pronto(await call<ContaSiteEstado>("loja.conta.sair"));
+      toast.success("Saiu da conta do site.");
+    } catch (x) {
+      toast.error((x as Error).message);
+    }
+  }
+  return (
+    <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
+      <UserRound className="size-4 text-ink-3" />
+      {c.entrou ? (
+        <>
+          <span className="text-[13px] text-ink-2">
+            Entrou com a conta do site <b>{c.email}</b>
+            {c.acaba_em ? ` · até às ${hora(c.acaba_em)}` : ""}
+          </span>
+          <Button size="sm" variant="ghost" onClick={sair}>Sair</Button>
+        </>
+      ) : (
+        <>
+          <span className="text-[13px] text-ink-2">Para alterar encomendas aqui, entre com a sua conta do site.</span>
+          <Button size="sm" onClick={() => setEntrar(true)}>
+            <KeyRound className="size-4" /> Entrar
+          </Button>
+        </>
+      )}
+      {c.pendentes > 0 && (
+        <button type="button" className="ml-auto" onClick={() => setVerFila(true)} title="Ver as alterações à espera">
+          <Badge tone="accent">{c.pendentes} à espera de Internet</Badge>
+        </button>
+      )}
+      {(entrar || c.falta_codigo) && (
+        <EntrarSite
+          faltaCodigo={c.falta_codigo}
+          onFechar={() => (c.falta_codigo ? sair() : setEntrar(false))}
+          onFeito={(n) => {
+            pronto(n);
+            setEntrar(false);
+          }}
+        />
+      )}
+      {verFila && <FilaAlteracoes onFechar={() => setVerFila(false)} />}
+    </Card>
+  );
+}
+
+function EntrarSite({ faltaCodigo, onFechar, onFeito }: { faltaCodigo: boolean; onFechar: () => void; onFeito: (n: ContaSiteEstado) => void }) {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [aEntrar, setAEntrar] = useState(false);
+  async function submeter(ev: FormEvent) {
+    ev.preventDefault();
+    setAEntrar(true);
+    try {
+      const r = faltaCodigo
+        ? await call<ContaSiteEstado>("loja.conta.codigo", { codigo })
+        : await call<ContaSiteEstado>("loja.conta.entrar", { email, senha });
+      setSenha("");
+      if (r.entrou) toast.success(`Entrou com a conta do site ${r.email}.`);
+      onFeito(r);
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setAEntrar(false);
+    }
+  }
+  return (
+    <Modal open onClose={onFechar} title={faltaCodigo ? "Código da aplicação de autenticação" : "Entrar com a conta do site"} width="max-w-md">
+      <form onSubmit={submeter} className="space-y-4">
+        {faltaCodigo ? (
+          <Field label="Código de 6 algarismos">
+            <Input id="conta-site-codigo" value={codigo} onChange={(x) => setCodigo(x.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus />
+          </Field>
+        ) : (
+          <>
+            <Field label="Email da conta do site">
+              <Input id="conta-site-email" type="email" value={email} onChange={(x) => setEmail(x.target.value)} autoComplete="username" autoFocus />
+            </Field>
+            <Field label="Senha">
+              <Input id="conta-site-senha" type="password" value={senha} onChange={(x) => setSenha(x.target.value)} autoComplete="current-password" />
+            </Field>
+          </>
+        )}
+        <p className="text-[12px] text-ink-3">
+          A senha não fica guardada. A sessão fica cifrada neste computador, só para si, e acaba ao fim de 12 horas ou quando sair. Cada
+          alteração fica registada no site em seu nome, com as suas permissões.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onFechar}>Cancelar</Button>
+          <Button type="submit" loading={aEntrar} disabled={faltaCodigo ? codigo.replace(/\D/g, "").length !== 6 : !email.includes("@") || !senha}>
+            {faltaCodigo ? "Confirmar" : "Entrar"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function PagamentoEntrega({
+  encomenda,
+  falta,
+  aFazer,
+  onFechar,
+  onEntregar,
+}: {
+  encomenda: Encomenda;
+  falta: number;
+  aFazer: boolean;
+  onFechar: () => void;
+  onEntregar: (extra: Record<string, unknown>) => void;
+}) {
+  const metodos = useQuery({
+    queryKey: ["loja-metodos"],
+    queryFn: () => call<{ methods?: { code: string; name: string; automatic?: boolean }[] }>("loja.conta.metodos"),
+    staleTime: 600000,
+  });
+  const lista = (metodos.data?.methods ?? []).filter((m) => !m.automatic);
+  const [valor, setValor] = useState(String(falta));
+  const [metodo, setMetodo] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [semPagamento, setSemPagamento] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const quantia = Number(valor.replace(",", "."));
+  return (
+    <Modal open onClose={onFechar} title={`${encomenda.levantamento ? "Levantada" : "Entregue"}: ${encomenda.numero}`} width="max-w-md">
+      <div className="space-y-4">
+        <p className="text-ink-2">Esta encomenda tem {emKz(falta)} por receber.</p>
+        {!semPagamento ? (
+          <>
+            <Field label="Quanto recebeu (Kz)">
+              <Input id="entrega-valor" value={valor} onChange={(x) => setValor(x.target.value)} inputMode="decimal" />
+            </Field>
+            <Field label="Como pagou">
+              <Select id="entrega-metodo" value={metodo} onChange={(x) => setMetodo(x.target.value)}>
+                <option value="">Escolha…</option>
+                {lista.map((m) => (
+                  <option key={m.code} value={m.code}>{m.name}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Referência (opcional)">
+              <Input id="entrega-referencia" value={referencia} onChange={(x) => setReferencia(x.target.value)} />
+            </Field>
+            <div className="flex flex-wrap justify-between gap-2">
+              <Button variant="ghost" onClick={() => setSemPagamento(true)}>Entregar sem receber</Button>
+              <Button
+                loading={aFazer}
+                disabled={!(quantia > 0) || !metodo}
+                onClick={() => onEntregar({ pagamento: { amount: quantia, methodCode: metodo, reference: referencia.trim() } })}
+              >
+                Registar e entregar
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="Porque entrega sem receber">
+              <Input id="entrega-motivo" value={motivo} onChange={(x) => setMotivo(x.target.value)} placeholder="Ex.: paga por transferência amanhã" />
+            </Field>
+            <p className="text-[12px] text-ink-3">Fica no registo de segurança do site e os administradores são avisados.</p>
+            <div className="flex flex-wrap justify-between gap-2">
+              <Button variant="ghost" onClick={() => setSemPagamento(false)}>Voltar</Button>
+              <Button variant="danger" loading={aFazer} disabled={motivo.trim().length < 5} onClick={() => onEntregar({ motivo: motivo.trim() })}>
+                Entregar sem receber
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function FilaAlteracoes({ onFechar }: { onFechar: () => void }) {
+  const qc = useQueryClient();
+  const fila = useQuery({ queryKey: ["loja-comandos"], queryFn: () => call<ComandoLinha[]>("loja.conta.comandos"), refetchInterval: 15000 });
+  const linhas = fila.data ?? [];
+  async function repetir() {
+    try {
+      qc.setQueryData(["loja-comandos"], await call<ComandoLinha[]>("loja.conta.repetir"));
+      qc.invalidateQueries({ queryKey: ["loja-conta"] });
+    } catch (x) {
+      toast.error((x as Error).message);
+    }
+  }
+  return (
+    <Modal
+      open
+      onClose={onFechar}
+      title="As suas alterações às encomendas"
+      footer={
+        <>
+          {linhas.some((l) => l.estado === "erro") && <Button variant="secondary" onClick={repetir}>Repetir as que falharam</Button>}
+          <Button variant="ghost" onClick={onFechar}>Fechar</Button>
+        </>
+      }
+    >
+      {linhas.length === 0 ? (
+        <p className="text-ink-3">Nenhuma alteração à espera.</p>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <Th>Encomenda</Th>
+              <Th>Alteração</Th>
+              <Th>Estado</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((l) => (
+              <tr key={l.id}>
+                <Td className="whitespace-nowrap font-medium">{l.numero || "—"}</Td>
+                <Td>{ROTULOS[l.accao] ?? l.accao}</Td>
+                <Td>
+                  {l.estado === "feito" ? (
+                    <Badge tone="ok">Enviada</Badge>
+                  ) : l.estado === "erro" ? (
+                    <span className="text-[13px] text-danger">{l.erro}</span>
+                  ) : (
+                    <Badge tone="accent">À espera de Internet</Badge>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Modal>
   );
 }

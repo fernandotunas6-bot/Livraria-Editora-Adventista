@@ -101,6 +101,19 @@ pub async fn aplicar(pool: &SqlitePool, novidades: &Value) -> AppResult<(usize, 
     Ok((encomendas, produtos))
 }
 
+/// As encomendas das novidades que a cópia ainda não tinha («número · cliente»), para o aviso de encomenda nova.
+pub async fn encomendas_novas(pool: &SqlitePool, novidades: &Value) -> AppResult<Vec<(String, String)>> {
+    let mut novas = Vec::new();
+    for e in novidades["encomendas"].as_array().into_iter().flatten() {
+        let Some(id) = e["id"].as_str() else { continue };
+        let existe: Option<i64> = sqlx::query_scalar("SELECT 1 FROM loja_encomendas WHERE id = ?").bind(id).fetch_optional(pool).await?;
+        if existe.is_none() && e["estado"].as_str() != Some("cancelled") {
+            novas.push((texto(e, "numero"), texto(e, "cliente")));
+        }
+    }
+    Ok(novas)
+}
+
 /// Os cursores para o próximo pedido: `{"encomendas": {...}, "produtos": {...}}` (vazios na primeira vez).
 pub async fn ler_cursores(pool: &SqlitePool) -> AppResult<Value> {
     let linhas: Vec<(String, String)> = sqlx::query_as("SELECT nome, valor FROM sinc_cursores").fetch_all(pool).await?;
@@ -122,7 +135,7 @@ pub async fn apagar(pool: &SqlitePool) -> AppResult<()> {
 }
 
 /// Quem trabalha com a loja online: a API e Integrações, os relatórios ou quem factura ao balcão.
-fn permitir(st: &AppState) -> AppResult<()> {
+pub(crate) fn permitir(st: &AppState) -> AppResult<()> {
     let s = st.sessao()?;
     if ["sistema.api", "relatorios.ver", "vendas.fatura_recibo"].iter().any(|p| s.tem(p)) {
         Ok(())
@@ -234,6 +247,10 @@ async fn produtos(st: &AppState, f: Filtro) -> AppResult<Value> {
 
 /// Despachante dos métodos `loja.*` (services/mod.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
+    // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs)
+    if let Some(resto) = metodo.strip_prefix("conta.") {
+        return super::pessoa::despachar(st, resto, params).await;
+    }
     let filtro = || -> AppResult<Filtro> { if params.is_null() { Ok(Filtro::default()) } else { Ok(serde_json::from_value(params.clone())?) } };
     match metodo {
         "estado" => estado(st).await,
