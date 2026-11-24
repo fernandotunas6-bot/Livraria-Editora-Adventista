@@ -186,7 +186,10 @@ export const MENU: GrupoMenu[] = [
     id: "livraria",
     titulo: "Livraria",
     icon: Globe,
-    itens: [{ label: "Internet", to: "/internet" }],
+    itens: [
+      { label: "Internet", to: "/internet" },
+      { label: "Ligação ao site", to: "/ligacao-site", perm: "sistema.api" },
+    ],
   },
   {
     id: "sistema",

@@ -6263,3 +6263,95 @@ async fn actualizacao_de_uma_base_da_1_3_4() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// A fila da ligação à base central da livraria (src/sinc/): os gatilhos só com ligação, os documentos antigos uma
+/// vez, o lote com a cadeia da AGT, a anulação, o envio sem Internet (nada se perde) e desligar.
+#[tokio::test]
+async fn sincronizacao_com_a_livraria() {
+    let pasta = std::env::temp_dir().join(format!("kigest-sinc-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.expect("posto 1");
+    rpc(
+        &st,
+        "setup.inicializar",
+        json!({ "empresa": { "nome": "Livraria Teste, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } }),
+    )
+    .await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "taxa_iva_id": 1, "preco1": 500000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": artigo, "quantidade": 10, "preco_unitario": 250000 }] })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    // 5 000,00 Kz + IVA 14% = 5 700,00 por unidade, pagos em numerário
+    let fr = |q: i64| json!({ "tipo": "FR", "linhas": [{ "artigo_id": artigo, "quantidade": q }], "pagamentos": [{ "modo": "NU", "valor": 570000 * q }] });
+    let conta = |sql: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+
+    // sem ligação, nada entra na fila
+    let a = rpc(&st, "documentos.emitir", fr(1)).await;
+    let a_id = a["documento"]["id"].as_i64().unwrap();
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_saida").await, 0);
+    assert_eq!(rpc(&st, "sinc.estado", Value::Null).await["ligada"], false);
+
+    // ligar como o emparelhamento faz, mas sem o site: um endereço onde ninguém responde
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+
+    // com ligação, o gatilho põe a factura na fila na mesma transacção
+    let b = rpc(&st, "documentos.emitir", fr(2)).await;
+    let b_id = b["documento"]["id"].as_i64().unwrap();
+    let fila: Vec<(i64, String, String)> = sqlx::query_as("SELECT documento_id, operacao, estado FROM sinc_saida").fetch_all(&st.pool).await.unwrap();
+    assert_eq!(fila, vec![(b_id, "emitido".to_string(), "pendente".to_string())]);
+
+    // o que ficou para trás (a entrada de stock e a primeira FR) entra uma vez só
+    assert_eq!(crate::sinc::enfileirar_tudo(&st.pool).await.unwrap(), 2);
+    assert_eq!(crate::sinc::enfileirar_tudo(&st.pool).await.unwrap(), 0);
+
+    // o lote: a FR 2 leva o hash da FR 1 como hash_anterior (a cadeia que o centro confere) e as linhas
+    let item = crate::sinc::item_do_documento(&st.pool, b_id).await.unwrap().unwrap();
+    assert_eq!(item["tipo"], "documento");
+    assert_eq!(item["documento"]["numero_doc"], b["documento"]["numero_doc"]);
+    assert_eq!(item["documento"]["hash"], b["documento"]["hash"]);
+    assert_eq!(item["documento"]["hash_anterior"], a["documento"]["hash"]);
+    assert_eq!(item["documento"]["total"], 1140000);
+    assert_eq!(item["linhas"][0]["quantidade"].as_f64(), Some(2.0));
+    let primeiro = crate::sinc::item_do_documento(&st.pool, a_id).await.unwrap().unwrap();
+    assert_eq!(primeiro["documento"]["hash_anterior"], "", "a primeira da série não tem anterior");
+
+    // a anulação também entra na fila, e o lote leva já o estado
+    rpc(&st, "documentos.anular", json!({ "id": b_id, "motivo": "teste da sincronização" })).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_saida WHERE operacao = 'anulado'").await, 1);
+    assert_eq!(crate::sinc::item_do_documento(&st.pool, b_id).await.unwrap().unwrap()["documento"]["estado"], "A");
+
+    // sem Internet: a volta não perde nada, não conta tentativas e diz o que se passa
+    let e = rpc(&st, "sinc.agora", Value::Null).await;
+    assert_eq!(e["ligada"], true);
+    let pendentes = conta("SELECT COUNT(*) FROM sinc_saida WHERE estado IN ('pendente', 'erro')").await;
+    assert!(pendentes >= 4, "{pendentes}");
+    assert_eq!(e["pendentes"], pendentes);
+    assert!(e["ligacao"]["ultimo_erro"].as_str().unwrap().contains("Sem ligação"), "{e}");
+    assert!(e["ligacao"].get("chave_assinatura").is_none(), "a chave do posto nunca sai para o ecrã");
+    assert_eq!(conta("SELECT COALESCE(MAX(tentativas), 0) FROM sinc_saida").await, 0);
+
+    // desligar: a chave sai e as vendas seguintes já não entram na fila
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_ligacao").await, 0);
+    rpc(&st, "documentos.emitir", fr(1)).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_saida").await, 0);
+
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
