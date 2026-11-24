@@ -6355,3 +6355,188 @@ async fn sincronizacao_com_a_livraria() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// A cópia local da Loja online (src/sinc/loja.rs): as novidades do site entram e actualizam-se sem duplicar, os
+/// filtros e a pesquisa, o stock desta loja pela referência, os cursores e, ao desligar, a cópia sai.
+#[tokio::test]
+async fn loja_online_copia_local() {
+    let pasta = std::env::temp_dir().join(format!("kigest-loja-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.expect("posto 1");
+    rpc(
+        &st,
+        "setup.inicializar",
+        json!({ "empresa": { "nome": "Livraria Teste, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } }),
+    )
+    .await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    // um artigo desta loja com a referência que o site também tem, com 7 em stock
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "referencia": "LIV-001", "taxa_iva_id": 1, "preco1": 500000 })).await["id"]
+        .as_i64()
+        .unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": artigo, "quantidade": 7, "preco_unitario": 250000 }] })).await;
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, site_url)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', 'x', '1', 'x', '2026-11-25T10:00:00', 'https://livrariaadventista.ao')",
+    )
+    .execute(&st.pool)
+    .await
+    .unwrap();
+
+    let encomenda = |id: &str, numero: &str, estado: &str, levantamento: bool, cliente: &str| {
+        json!({
+            "id": id, "numero": numero, "criada_em": format!("2026-11-25T09:0{}:00+00:00", &numero[numero.len() - 1..]),
+            "actualizada_em": "2026-11-25T09:10:00+00:00", "estado": estado, "pagamento": "pending", "entrega": "received",
+            "total": 5700, "levantamento": levantamento, "cliente": cliente, "telefone": "923000000",
+            "itens": [{ "title": "O Desejado", "quantity": 1, "price": 5700 }],
+        })
+    };
+    let novidades = json!({
+        "encomendas": [encomenda("o1", "LIV-1001", "pending", true, "Ana Silva"), encomenda("o2", "LIV-1002", "confirmed", false, "Rui Costa")],
+        "produtos": [
+            { "id": "b1", "titulo": "O Desejado", "referencia": "LIV-001", "preco": 5700, "stock": 3, "activo": true },
+            { "id": "b2", "titulo": "Rascunho do KanGest", "referencia": "NOVO-1", "preco": 0, "stock": 0, "activo": false },
+            { "id": "b3", "titulo": "Só no site", "referencia": "", "preco": 900, "stock": 5, "activo": true },
+        ],
+        "cursores": { "encomendas": { "em": "2026-11-25T09:10:00+00:00", "id": "o2" }, "produtos": { "em": "2026-11-25T09:10:00+00:00", "id": "b3" } },
+        "mais": { "encomendas": false, "produtos": false },
+    });
+    assert_eq!(crate::sinc::loja::aplicar(&st.pool, &novidades).await.unwrap(), (2, 3));
+
+    let e = rpc(&st, "loja.estado", Value::Null).await;
+    assert_eq!(e["ligacao"]["site_url"], "https://livrariaadventista.ao");
+    assert_eq!(e["encomendas"], json!({ "total": 2, "por_confirmar": 1, "em_curso": 1, "levantamentos": 1, "concluidas": 0, "canceladas": 0 }));
+    assert_eq!(e["produtos"], json!({ "total": 3, "a_venda": 2, "ocultos": 1, "sem_referencia": 1 }));
+
+    let todas = rpc(&st, "loja.encomendas", json!({})).await;
+    assert_eq!(todas.as_array().unwrap().len(), 2);
+    assert_eq!(todas[0]["numero"], "LIV-1002", "a mais recente primeiro");
+    assert_eq!(todas[1]["artigos"], 1);
+    let por_confirmar = rpc(&st, "loja.encomendas", json!({ "filtro": "por_confirmar" })).await;
+    assert_eq!(por_confirmar.as_array().unwrap().iter().map(|x| x["numero"].as_str().unwrap()).collect::<Vec<_>>(), ["LIV-1001"]);
+    assert_eq!(rpc(&st, "loja.encomendas", json!({ "q": "Rui" })).await[0]["numero"], "LIV-1002");
+    // um filtro desconhecido não é SQL: mostra tudo
+    assert_eq!(rpc(&st, "loja.encomendas", json!({ "filtro": "1=1; DROP TABLE loja_encomendas" })).await.as_array().unwrap().len(), 2);
+    assert_eq!(rpc(&st, "loja.encomenda", json!({ "id": "o1" })).await["itens"][0]["title"], "O Desejado");
+
+    // o stock desta loja, pela referência, ao lado do que o site mostra
+    let p = rpc(&st, "loja.produtos", json!({ "q": "Desejado" })).await;
+    assert_eq!(p[0]["stock"].as_f64(), Some(3.0));
+    assert_eq!(p[0]["stock_loja"].as_f64(), Some(7.0));
+    let nao_na_loja = rpc(&st, "loja.produtos", json!({ "filtro": "nao_na_loja" })).await;
+    assert_eq!(nao_na_loja.as_array().unwrap().iter().map(|x| x["titulo"].as_str().unwrap()).collect::<Vec<_>>(), ["Rascunho do KanGest"]);
+
+    // os cursores para o próximo pedido
+    let c = crate::sinc::loja::ler_cursores(&st.pool).await.unwrap();
+    assert_eq!(c["encomendas"]["id"], "o2");
+    assert_eq!(c["produtos"]["id"], "b3");
+
+    // uma alteração no site actualiza a cópia, sem duplicar
+    let alterada = json!({ "encomendas": [encomenda("o1", "LIV-1001", "cancelled", true, "Ana Silva")] });
+    assert_eq!(crate::sinc::loja::aplicar(&st.pool, &alterada).await.unwrap(), (1, 0));
+    let e = rpc(&st, "loja.estado", Value::Null).await;
+    assert_eq!((e["encomendas"]["total"].as_i64(), e["encomendas"]["canceladas"].as_i64(), e["encomendas"]["por_confirmar"].as_i64()), (Some(2), Some(1), Some(0)));
+    assert_eq!(crate::sinc::loja::ler_cursores(&st.pool).await.unwrap()["encomendas"]["id"], "o2", "sem cursor novo, fica o anterior");
+
+    // desligar apaga a cópia (tem dados de clientes)
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    let e = rpc(&st, "loja.estado", Value::Null).await;
+    assert_eq!((e["ligada"].as_bool(), e["encomendas"]["total"].as_i64(), e["produtos"]["total"].as_i64()), (Some(false), Some(0), Some(0)));
+
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// A conta do site de cada pessoa (src/sinc/pessoa.rs): sem sessão não se altera nada; a sessão fica cifrada; sem
+/// Internet, as alterações ficam na fila em nome de quem as fez; o turno acaba; sair; desligar apaga tudo.
+#[tokio::test]
+async fn loja_online_conta_do_site() {
+    let pasta = std::env::temp_dir().join(format!("kigest-conta-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.expect("posto 1");
+    rpc(
+        &st,
+        "setup.inicializar",
+        json!({ "empresa": { "nome": "Livraria Teste, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } }),
+    )
+    .await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    // ligado, com o Auth do site num endereço onde ninguém responde
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00',
+                 'http://127.0.0.1:9', 'chave-publica')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let encomenda = json!({ "encomendas": [{ "id": "o1", "numero": "LIV-1001", "estado": "pending", "total": 5700, "levantamento": true, "itens": [] }] });
+    crate::sinc::loja::aplicar(&st.pool, &encomenda).await.unwrap();
+
+    // sem sessão do site, não se altera nada
+    assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "preparar" })).await.contains("Entre com a sua conta do site"));
+    assert_eq!(rpc(&st, "loja.conta.estado", Value::Null).await["entrou"], false);
+
+    // a sessão que o «entrar» guarda (aqui sem o site): fica cifrada
+    let uid = st.sessao().unwrap().id;
+    let agora = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64;
+    let tokens = crate::sinc::pessoa::Tokens { access: "token-de-acesso-secreto".into(), refresh: "renovacao-secreta".into(), expira: agora + 3600 };
+    crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
+    let cifrada: String = sqlx::query_scalar("SELECT sessao FROM sessoes_site").fetch_one(&st.pool).await.unwrap();
+    assert!(!cifrada.contains("token-de-acesso-secreto") && !cifrada.contains("renovacao-secreta"), "a sessão do site fica cifrada");
+    let conta = rpc(&st, "loja.conta.estado", Value::Null).await;
+    assert_eq!((conta["entrou"].as_bool(), conta["email"].as_str()), (Some(true), Some("ana@livraria.ao")));
+
+    // sem Internet: as alterações ficam na fila, em nome de quem as fez
+    let r = rpc(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "preparar" })).await;
+    assert_eq!(r["na_fila"], true);
+    let r = rpc(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "entregue", "pagamento": { "amount": 5700, "methodCode": "cash" } })).await;
+    assert_eq!(r["na_fila"], true);
+    let fila: Vec<(i64, String, String, String, String)> =
+        sqlx::query_as("SELECT utilizador_id, numero, accao, estado, dados FROM loja_comandos ORDER BY id").fetch_all(&st.pool).await.unwrap();
+    assert_eq!(fila.len(), 2);
+    assert!(fila.iter().all(|(u, n, _, e, _)| *u == uid && n == "LIV-1001" && e == "pendente"), "{fila:?}");
+    assert_eq!(serde_json::from_str::<Value>(&fila[1].4).unwrap()["payment"]["amount"], 5700);
+    assert_eq!(rpc(&st, "loja.conta.comandos", Value::Null).await.as_array().unwrap().len(), 2);
+    assert_eq!(rpc(&st, "loja.conta.estado", Value::Null).await["pendentes"], 2);
+
+    // só as alterações conhecidas, e ids que podem ir num endereço
+    assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "apagar" })).await.contains("desconhecida"));
+    assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1&status=eq.x", "accao": "preparar" })).await.contains("desconhecida"));
+
+    // a volta da sincronização sem Internet não perde as alterações
+    rpc(&st, "sinc.agora", Value::Null).await;
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM loja_comandos WHERE estado = 'pendente'").fetch_one(&st.pool).await.unwrap(), 2);
+
+    // o turno acaba ao fim de 12 horas
+    sqlx::query("UPDATE sessoes_site SET entrou_em = entrou_em - 13 * 3600").execute(&st.pool).await.unwrap();
+    assert_eq!(rpc(&st, "loja.conta.estado", Value::Null).await["entrou"], false);
+    assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "preparar" })).await.contains("12 horas"));
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+
+    // sair (sem Internet, sai na mesma)
+    crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
+    assert_eq!(rpc(&st, "loja.conta.sair", Value::Null).await["entrou"], false);
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+
+    // desligar apaga as sessões e as alterações por enviar
+    crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM loja_comandos").fetch_one(&st.pool).await.unwrap(), 0);
+
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
