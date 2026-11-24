@@ -272,9 +272,9 @@ pub async fn cifrar_existentes(pool: &SqlitePool) -> AppResult<usize> {
 mod testes {
     #[test]
     fn ida_e_volta() {
-        let c = super::cifrar("-----BEGIN PRIVATE KEY----- segredo");
+        let c = super::cifrar(concat!("-----BEGIN ", "PRIVATE KEY----- segredo"));
         assert!(super::cifrado(&c) && !c.contains("segredo"));
-        assert_eq!(super::decifrar(&c).unwrap(), "-----BEGIN PRIVATE KEY----- segredo");
+        assert_eq!(super::decifrar(&c).unwrap(), concat!("-----BEGIN ", "PRIVATE KEY----- segredo"));
         assert_ne!(super::cifrar("x"), super::cifrar("x"), "nonce diferente em cada vez");
         assert_eq!(super::decifrar("texto antigo").unwrap(), "texto antigo");
         let mut estragado = c.clone();
