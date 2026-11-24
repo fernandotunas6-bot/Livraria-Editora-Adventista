@@ -27,6 +27,10 @@ alter table public.stock_books
   add column if not exists kangest_novo_em timestamptz,
   add column if not exists kangest_parecido_com text references public.stock_books (id) on delete set null;
 
+-- a chave estrangeira com o seu índice (apagar um produto procura os rascunhos que o apontam); só os marcados
+create index if not exists stock_books_kangest_parecido_com_idx
+  on public.stock_books (kangest_parecido_com) where kangest_parecido_com is not null;
+
 comment on column public.stock_books.kangest_novo_em is
   'Quando o produto entrou sozinho, oculto, a partir de um artigo novo do KanGest (null = criado no painel ou importado).';
 comment on column public.stock_books.kangest_parecido_com is
