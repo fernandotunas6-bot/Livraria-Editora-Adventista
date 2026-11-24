@@ -60,6 +60,15 @@ pub fn notificar(chave: &str, titulo: &str, texto: &str) {
     }
 }
 
+/// Avisa a janela do programa de um acontecimento (ex.: «loja-novidades»), para o ecrã se actualizar já. Sem a
+/// aplicação (testes), não faz nada. Só a janela principal: os separadores do navegador nunca recebem nada.
+pub fn avisar_ecra(evento: &str) {
+    use tauri::Emitter;
+    if let Some(app) = APP.get() {
+        let _ = app.emit_to("main", evento, ());
+    }
+}
+
 fn app() -> AppResult<&'static tauri::AppHandle> {
     APP.get().ok_or_else(|| AppError::msg("Esta função só existe na aplicação instalada."))
 }

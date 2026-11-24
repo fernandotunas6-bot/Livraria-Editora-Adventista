@@ -101,6 +101,19 @@ pub async fn aplicar(pool: &SqlitePool, novidades: &Value) -> AppResult<(usize, 
     Ok((encomendas, produtos))
 }
 
+/// As encomendas das novidades que a cópia ainda não tinha («número · cliente»), para o aviso de encomenda nova.
+pub async fn encomendas_novas(pool: &SqlitePool, novidades: &Value) -> AppResult<Vec<(String, String)>> {
+    let mut novas = Vec::new();
+    for e in novidades["encomendas"].as_array().into_iter().flatten() {
+        let Some(id) = e["id"].as_str() else { continue };
+        let existe: Option<i64> = sqlx::query_scalar("SELECT 1 FROM loja_encomendas WHERE id = ?").bind(id).fetch_optional(pool).await?;
+        if existe.is_none() && e["estado"].as_str() != Some("cancelled") {
+            novas.push((texto(e, "numero"), texto(e, "cliente")));
+        }
+    }
+    Ok(novas)
+}
+
 /// Os cursores para o próximo pedido: `{"encomendas": {...}, "produtos": {...}}` (vazios na primeira vez).
 pub async fn ler_cursores(pool: &SqlitePool) -> AppResult<Value> {
     let linhas: Vec<(String, String)> = sqlx::query_as("SELECT nome, valor FROM sinc_cursores").fetch_all(pool).await?;

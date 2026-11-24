@@ -166,6 +166,8 @@ pub fn run() {
             webhooks::iniciar(estado.clone());
             // a ligação à base central da livraria (só envia se este KanGest estiver emparelhado)
             sinc::iniciar(estado.clone());
+            // e o tempo real da Loja online (o sinal «novidades» do site)
+            sinc::tempo_real::iniciar(estado.clone());
             // Facturação electrónica da AGT: envia e consulta os documentos em segundo plano.
             services::fe::iniciar(estado.clone());
             // Cópias de segurança periódicas enquanto o programa está aberto.
