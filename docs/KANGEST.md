@@ -1,7 +1,8 @@
 # O KanGest e o site
 
 O **KanGest** é o programa de facturação das livrarias (o sucessor do KiGest). A ligação ao site substitui a
-exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos:
+exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos (o código
+está na secção [O código do KanGest neste repositório](#o-código-do-kangest-neste-repositório)):
 
 | Sentido | O quê | Como |
 |---|---|---|
@@ -178,3 +179,19 @@ site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-
 - `scripts/pglite/kangest.mjs` (cenários com as migrações reais): fila pelos gatilhos, pagamento pelo caminho real,
   cancelamentos, stock à venda, «temos / não temos», permissões, a reserva da fila (sem dobrar, presos há 10
   minutos, cancelada ou reembolsada durante a emissão) e o recálculo em lote.
+
+## O código do KanGest neste repositório
+
+O código do programa está em [app/kangest-sistema/](../app/kangest-sistema/), com o histórico, trazido do `main` do
+[fernandotunas6-bot/KanGest](https://github.com/fernandotunas6-bot/KanGest) por `git subtree` (versão 1.4.4).
+O repositório do KanGest continua a ser o sítio dos **instaladores, das versões e do site kangest.pages.dev**: os
+workflows de `app/kangest-sistema/.github/` não correm aqui, e o CI da livraria não compila nem testa o KanGest.
+
+Para trazer uma versão nova do KanGest (a partir da raiz do repositório):
+
+```bash
+git -c http.version=HTTP/1.1 subtree pull --prefix app/kangest-sistema https://github.com/fernandotunas6-bot/KanGest.git main
+```
+
+As mudanças ao programa fazem-se no repositório do KanGest e trazem-se depois com o comando acima, para os dois
+não se afastarem. Não confundir com `app/kangest/`, que é uma cópia local guardada fora do git.
