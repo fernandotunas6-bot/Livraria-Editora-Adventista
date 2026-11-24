@@ -1,0 +1,130 @@
+# KanGest Livraria → base central
+
+A **fase 3** do estudo do ecossistema (`docs/ECOSSISTEMA.md`, no PR #101): o KanGest Livraria, a edição do KanGest só
+da livraria, envia as suas facturas para o Supabase da livraria.
+
+- **As facturas continuam a ser emitidas e assinadas na loja**, mesmo sem Internet: a certificação da AGT exige-o.
+- **A base central recebe uma cópia que não se altera nem se apaga.** Confere a cadeia de assinaturas de cada série e
+  junta as vendas ao balcão às do site.
+- **O motor do lado do KanGest é a fase 4**, em `app/kangest-sistema/`: a fila local, o emparelhamento e o envio.
+- **A ligação que já existe continua a funcionar como está** ([KANGEST.md](KANGEST.md)): as NE, FR e NC das
+  encomendas pela API do KanGest, e o stock e os preços pelos avisos.
+
+## 1. Configurar (uma vez)
+
+1. **As chaves.**
+   - Corra `node scripts/kangest/chaves-sinc.mjs` e cole o comando `supabase secrets set …` que ele mostra.
+   - Isso cria dois segredos da Edge Function: `KANGEST_SINC_CHAVES`, a chave X25519 do centro, e
+     `KANGEST_DADOS_CHAVE`, a chave dos dados pessoais.
+   - Guarde a `KANGEST_DADOS_CHAVE` também num cofre de senhas e **nunca a troque**: sem ela, os NIF e os nomes que
+     já chegaram não se voltam a ler.
+2. **O posto.** No painel, em **Sistema → Ligação ao KanGest → Postos do KanGest Livraria**, crie o posto: o nome (por
+   exemplo «Loja do Huambo») e a loja. O painel mostra uma vez um código de 8 letras, que serve só uma vez e durante 10
+   minutos, e o endereço da ligação.
+3. **No KanGest Livraria**, em **Livraria → Ligação ao site**, escreva o endereço e o código. O posto gera a sua chave
+   Ed25519 e só a parte pública sobe; daí em diante, as facturas saem sozinhas.
+
+Sem os segredos, as rotas `/kangest/*` respondem 404 e o painel diz o que falta.
+
+## 2. Como um pedido viaja
+
+Um **posto** é uma instalação do KanGest Livraria: o computador servidor de uma loja, não um terminal de venda. O
+posto identifica-se só pela sua chave Ed25519; não tem conta no Supabase Auth, por isso não há um token que se possa
+roubar.
+
+`POST /functions/v1/app/kangest/sinc`. Os cabeçalhos são estes:
+
+| Cabeçalho | O quê |
+|---|---|
+| `x-kangest-posto` | O id do posto (uuid) |
+| `x-kangest-hora` | Segundos Unix; mais de 5 minutos de diferença para a hora do servidor é recusado (acerte o relógio) |
+| `x-kangest-nonce` | 16 a 64 caracteres ao acaso; o mesmo nonce outra vez é recusado (`private.kangest_nonces`) |
+| `x-kangest-assinatura` | Ed25519, em base64, de `kangest-sinc/1\n<posto>\n<hora>\n<nonce>\n<sha256 hex do corpo>` |
+
+O corpo é um envelope `{"v":1,"kid":"1","epk":"…","iv":"…","ct":"…"}`:
+1. O posto gera uma chave X25519 efémera (`epk`) e faz o acordo X25519 com a chave pública do centro (`kid`).
+2. HKDF-SHA256 com sal = `epk ‖ chave do centro` e info = `kangest-sinc/1` dá 64 bytes: os primeiros 32 são a chave do
+   pedido e os outros 32 a da resposta.
+3. O JSON `{"lote":[…]}` vai em AES-256-GCM com a chave do pedido. Os dados associados são `kangest-sinc/1\n<posto>\n
+   <hora>\n<nonce>`, para que o corpo cifrado não se possa colar noutros cabeçalhos.
+
+A resposta `{"v":1,"iv":"…","ct":"…"}` vai em AES-256-GCM com a chave da resposta e os dados associados
+`kangest-sinc/1\nresposta\n<nonce>`. Só quem fez o pedido a abre. Leva o resultado do lote, o posto (nome e loja) e a
+hora do servidor.
+
+O servidor confere por esta ordem:
+1. o formato, a hora e o posto (activo, com chave);
+2. a assinatura;
+3. o nonce;
+4. o envelope.
+Só depois toca nos dados. Os vectores de teste da sessão estão em `supabase/functions/app/kangestSinc.test.ts`, e o
+KanGest em Rust tem de chegar aos mesmos bytes.
+
+**Rodar a chave do centro.**
+1. `node scripts/kangest/chaves-sinc.mjs --rodar '<KANGEST_SINC_CHAVES actual>'` põe uma chave nova à frente; as duas
+   anteriores continuam a aceitar-se.
+2. No painel, **Rodar a chave** em cada posto dá-lhe um código novo. A chave Ed25519 antiga desse posto deixa de valer
+   no mesmo instante.
+
+**Revogar** um posto corta-o já: o pedido seguinte é recusado. As facturas que já chegaram ficam.
+
+## 3. O que fica na base
+
+| Tabela | O quê |
+|---|---|
+| `kangest_postos` | Os postos: a loja, o estado (`por_emparelhar`, `activo`, `revogado`), a chave pública, o resumo SHA-256 do código (nunca o código), a última sincronização e o último erro. Só o servidor lê e escreve |
+| `kangest_documentos` | A cópia de cada documento: a série e o número, o `hash` assinado, o `hash_anterior`, os totais em cêntimos, a loja do posto e o estado da cadeia. Única por posto e documento, e por posto, tipo, série e número |
+| `kangest_documento_linhas` | As linhas, com `book_id` = o produto do site com a mesma referência (`stock_books.kigest_ref`) |
+
+**As cópias não se alteram nem se apagam**, nem pelo servidor: um gatilho recusa-o. Só mudam:
+- a marca de anulado (ou de facturado, numa proforma), que vem do KanGest;
+- a conferência da cadeia;
+- a loja, se esta for apagada;
+- nas linhas, a ligação ao produto.
+Um posto com documentos não se apaga, revoga-se.
+
+**A cadeia da AGT.** O `hash_anterior` de um documento tem de ser o `hash` do anterior da mesma série (o primeiro da
+série tem-no vazio). Os estados são estes:
+- `certa`;
+- `partida`: o painel mostra «elos da cadeia AGT partidos»;
+- `por_conferir`: o anterior ainda não chegou ou é de antes da ligação. Quando chegar, os dois ficam conferidos.
+- `nao_assinado`.
+A assinatura RSA de cada documento (`agt.rs`) não se confere aqui: fica para o SAF-T.
+
+**Dados pessoais.**
+- O NIF e o nome do cliente chegam já cifrados pela Edge Function (AES-256-GCM, com a chave derivada de
+  `KANGEST_DADOS_CHAVE`).
+- O NIF leva também um índice cego (HMAC-SHA256) para se ligarem clientes sem os decifrar.
+- O Consumidor Final (NIF vazio ou só noves) não guarda nada.
+
+**Quem lê as cópias:** quem vê os relatórios de vendas (`private.can_read_sales_reports()`).
+
+## 4. Rotas
+
+| Rota | Quem | O quê |
+|---|---|---|
+| `GET /admin/kangest/postos` | `manage_settings` | Os postos, com os documentos recebidos e os elos partidos de cada um |
+| `POST /admin/kangest/postos` | `manage_settings` | Cria um posto e devolve o código (uma vez) e o endereço |
+| `POST /admin/kangest/postos/codigo` | `manage_settings` | Outro código: computador novo, chave perdida ou rodar a chave |
+| `POST /admin/kangest/postos/revogar` | `manage_settings` | Revoga o posto |
+| `POST /kangest/emparelhar` | o código de uso único (10 por minuto e por IP) | `{codigo, chave_publica, versao}` → o posto e a chave pública do centro |
+| `POST /kangest/sinc` | a assinatura Ed25519 do posto (240 por minuto e por IP) | O lote selado → a resposta selada |
+
+## 5. O que difere do estudo
+
+- **O posto não tem conta no Supabase Auth.** A assinatura Ed25519 de cada pedido chega para o identificar, e assim
+  não há um JWT que se possa roubar.
+- **Nesta primeira versão, o posto puxa por sondagem, sem tempo real.** Cada envio já traz a resposta do centro, e o
+  tempo real fica para quando o KanGest tiver de receber encomendas por aqui.
+- **A assinatura RSA de cada documento fica para o SAF-T**, como o estudo admitia nos riscos. Aqui confere-se a
+  continuidade da cadeia.
+
+## 6. Testes
+
+- `supabase/functions/app/kangestSinc.test.ts`: os vectores partilhados com o Rust e o pedido selado e aberto.
+  Recusa o envelope mexido, os outros cabeçalhos, outra chave, um kid desconhecido, uma assinatura de outro corpo e uma
+  hora fora da janela. Cobre também os códigos, a cifra dos dados pessoais e a preparação do lote.
+- `scripts/pglite/kangest-central.mjs` (46 cenários com as migrações reais): as permissões, o emparelhamento (código
+  errado, fora de prazo ou usado), os nonces, o lote outra vez, a cadeia (certa, partida, fora de ordem), um documento
+  estragado que não leva os outros, a anulação, as cópias que não mudam, quem as lê, e revogar e emparelhar outra vez.
+- `access.test.ts`: as duas rotas com segredo.
