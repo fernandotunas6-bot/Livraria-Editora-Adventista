@@ -3353,9 +3353,19 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   } else {
     await db.from("kangest_postos").update({ ultima_sinc: new Date().toISOString() }).eq("id", posto);
   }
+  // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
+  // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
+  let novidades = null;
+  const cursores = aberto.dados?.cursores;
+  if (cursores && typeof cursores === "object" && !Array.isArray(cursores)) {
+    const { data, error } = await db.rpc("kangest_novidades", { p_posto: posto, p_cursores: cursores, p_limite: 200 });
+    if (error) throw new Error(error.message);
+    novidades = data;
+  }
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
+  const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
+    resultado, novidades, site, posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });
 

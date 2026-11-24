@@ -139,5 +139,38 @@ check('emparelhado outra vez com a chave nova; os documentos continuam',
   (await q(`select chave_publica from public.kangest_postos where id = $1`, [posto]))[0].chave_publica === outraChave
   && (await receber(posto, [doc(18, 7, 'H7', 'H6')])).recebidos === 1);
 
+// --- novidades para o posto (20261125110000): as encomendas da loja dele e o catálogo, pela ordem da alteração ------
+const [outraLoja] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Lubango', 'Huíla', 'Lubango', true) returning id`);
+const encomenda = async (numero, store) => (await q(
+  `insert into public.orders (order_number, customer_email, customer_name, phone, items, total, shipping_method, store_id)
+   values ($1, 'c@x.ao', 'Cliente da Loja', '923000000', '[{"title":"O Desejado","quantity":1,"price":5700}]'::jsonb, 5700, 'pickup', $2) returning id`,
+  [numero, store]))[0].id;
+for (const n of ['LIV-1', 'LIV-2', 'LIV-3']) await encomenda(n, loja.id);
+await encomenda('LIV-OUTRA', outraLoja.id);
+const novidades = async (cursores, limite = 2, quem = posto) =>
+  (await q(`select public.kangest_novidades($1, $2::jsonb, $3) r`, [quem, JSON.stringify(cursores), limite]))[0].r;
+const n1 = await novidades({});
+check('primeira página: duas encomendas da loja do posto, e há mais', n1.encomendas.length === 2 && n1.mais.encomendas === true, n1.mais);
+const n2 = await novidades(n1.cursores);
+check('segunda página: a que faltava, sem repetir', n2.encomendas.length === 1 && !n1.encomendas.some((e) => e.id === n2.encomendas[0].id) && n2.mais.encomendas === false, n2.encomendas);
+check('nunca as de outra loja', ![...n1.encomendas, ...n2.encomendas].some((e) => e.numero === 'LIV-OUTRA'));
+const primeira = n1.encomendas[0];
+check('a encomenda leva o que a loja precisa', primeira.cliente === 'Cliente da Loja' && primeira.telefone === '923000000' && primeira.levantamento === true
+  && Array.isArray(primeira.itens) && primeira.itens[0].title === 'O Desejado', primeira);
+const n3 = await novidades(n2.cursores);
+check('sem nada novo: vazio, e o cursor fica onde estava', n3.encomendas.length === 0 && JSON.stringify(n3.cursores.encomendas) === JSON.stringify(n2.cursores.encomendas), n3.cursores);
+await q(`update public.orders set status = 'confirmed' where order_number = 'LIV-1'`);
+const n4 = await novidades(n3.cursores);
+check('a encomenda alterada volta a vir, com o estado novo', n4.encomendas.length === 1 && n4.encomendas[0].numero === 'LIV-1' && n4.encomendas[0].estado === 'confirmed', n4.encomendas);
+const totalProdutos = (await q(`select count(*)::int n from public.stock_books`))[0].n;
+const cat = await novidades({}, 500);
+check('o catálogo vem todo, com os ocultos', cat.produtos.length === Math.min(totalProdutos, 500) && cat.produtos.some((x) => x.activo === false), { vieram: cat.produtos.length, totalProdutos });
+const semLoja = (await q(`select public.kangest_posto_criar('Sem loja', null, 'resumo-9', null) id`))[0].id;
+await q(`select public.kangest_emparelhar('resumo-9', $1, '1.4.4')`, [Buffer.alloc(32, 5).toString('base64')]);
+check('um posto sem loja não recebe encomendas', (await novidades({}, 50, semLoja)).encomendas.length === 0);
+await q(`select public.kangest_posto_revogar($1)`, [semLoja]);
+await recusa('um posto revogado não recebe novidades', () => novidades({}, 50, semLoja), /desconhecido ou revogado/);
+await recusa('novidades: as contas não executam', () => como('authenticated', admin, `select public.kangest_novidades('${posto}'::uuid, '{}'::jsonb, 5)`), /permission denied/);
+
 console.log(`kangest-central: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

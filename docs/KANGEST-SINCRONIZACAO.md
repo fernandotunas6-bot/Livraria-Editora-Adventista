@@ -128,3 +128,31 @@ A assinatura RSA de cada documento (`agt.rs`) não se confere aqui: fica para o 
   errado, fora de prazo ou usado), os nonces, o lote outra vez, a cadeia (certa, partida, fora de ordem), um documento
   estragado que não leva os outros, a anulação, as cópias que não mudam, quem as lê, e revogar e emparelhar outra vez.
 - `access.test.ts`: as duas rotas com segredo.
+
+## 7. As novidades para o posto (a Loja online no KanGest)
+
+A fase 6 do estudo. Em cada sincronização, o posto pode mandar os seus cursores (`{"lote": […], "cursores": {…}}`). A
+resposta selada traz então, além do resultado do lote, as `novidades` (`public.kangest_novidades`):
+- **as encomendas da loja do posto**, só o que mudou desde o cursor. Levam o que a loja precisa para as preparar: o
+  estado, o pagamento, a entrega, os totais, os artigos, o levantamento ou a morada, e o nome e o telefone do cliente;
+- **o catálogo todo**, também os ocultos: o título, a referência, o preço e a promoção, o stock, se está à venda e a
+  capa.
+
+A paginação vai pela alteração `(updated, id)`, por isso nada se perde nem se repete, mesmo quando muitas linhas mudam
+na mesma transacção. Uma encomenda ou um produto alterado volta a vir, com o estado novo. Há até 200 de cada por
+pedido, e `mais` diz se ficou alguma coisa para trás.
+
+A resposta traz também o endereço público do site (`site`, das definições ou o domínio principal). O KanGest usa-o para
+abrir o painel do site no navegador dele.
+
+O KanGest guarda isto numa cópia local, na base cifrada, e mostra-a em **Livraria → Loja online**, também sem Internet
+(a última cópia). **Esta parte só lê.** As alterações (confirmar, preparar, publicar um produto) fazem-se no painel do
+site, aberto no navegador do KanGest, com o login e o MFA de cada pessoa. O posto não guarda sessões de pessoas.
+
+Testes: as novidades estão em `scripts/pglite/kangest-central.mjs`:
+- a paginação sem perder nem repetir;
+- só a loja do posto;
+- a encomenda alterada volta a vir;
+- o catálogo com os ocultos;
+- o posto sem loja e o revogado;
+- as permissões.
