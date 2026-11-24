@@ -15,6 +15,7 @@
 //! - Só o servidor da loja corre o ciclo: num posto em rede, a base e a fila estão no servidor.
 
 pub mod cifra;
+pub mod loja;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -208,15 +209,16 @@ async fn anotar_erro(pool: &SqlitePool, erro: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Uma volta: os documentos devidos saem num lote; cada um fica feito ou com erro, conforme a resposta do centro.
-pub async fn ciclo(st: &AppState) -> AppResult<Value> {
-    let Some(_vez) = Vez::tentar(&A_CORRER) else {
-        return Ok(json!({ "ocupado": true }));
-    };
-    let pool = &st.pool;
-    let Some(l) = ligacao(pool).await? else {
-        return Ok(json!({ "ligada": false }));
-    };
+/// O que deu um pedido ao site.
+enum Volta {
+    Feita { enviados: usize, encomendas: usize, produtos: usize, resultado: Value, continuar: bool },
+    Falhou(String),
+}
+
+/// Um pedido: os documentos devidos (se os houver) e os cursores da Loja online. Cada documento fica feito ou com erro,
+/// conforme a resposta; as novidades vão para a cópia local (loja.rs). Mesmo sem documentos o pedido sai: traz as
+/// novidades e mostra logo um posto revogado.
+async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
     let agora = agora_s();
     let fila: Vec<(i64, i64, i64)> = sqlx::query_as(
         "SELECT id, documento_id, tentativas FROM sinc_saida WHERE estado IN ('pendente', 'erro') AND proximo_em <= ? ORDER BY id LIMIT ?",
@@ -225,9 +227,6 @@ pub async fn ciclo(st: &AppState) -> AppResult<Value> {
     .bind(LOTE)
     .fetch_all(pool)
     .await?;
-    if fila.is_empty() {
-        return Ok(json!({ "ligada": true, "enviados": 0 }));
-    }
     let mut ids: Vec<i64> = fila.iter().map(|f| f.1).collect();
     ids.sort_unstable();
     ids.dedup();
@@ -237,7 +236,8 @@ pub async fn ciclo(st: &AppState) -> AppResult<Value> {
             lote.push(item);
         }
     }
-    match enviar(&l, &json!({ "lote": lote })).await {
+    let cursores = loja::ler_cursores(pool).await?;
+    match enviar(l, &json!({ "lote": lote, "cursores": cursores })).await {
         Ok(r) => {
             let erros: HashMap<i64, String> = r["resultado"]["erros"]
                 .as_array()
@@ -261,20 +261,34 @@ pub async fn ciclo(st: &AppState) -> AppResult<Value> {
                     }
                 }
             }
-            sqlx::query("UPDATE sinc_ligacao SET ultima_sinc = ?, ultimo_erro = '', posto_nome = COALESCE(?, posto_nome), loja = COALESCE(?, loja) WHERE id = 1")
-                .bind(&feito)
-                .bind(r["posto"]["nome"].as_str())
-                .bind(r["posto"]["loja"].as_str())
+            sqlx::query(
+                "UPDATE sinc_ligacao SET ultima_sinc = ?, ultimo_erro = '', posto_nome = COALESCE(?, posto_nome), loja = COALESCE(?, loja),
+                   site_url = COALESCE(NULLIF(?, ''), site_url) WHERE id = 1",
+            )
+            .bind(&feito)
+            .bind(r["posto"]["nome"].as_str())
+            .bind(r["posto"]["loja"].as_str())
+            .bind(r["site"].as_str().unwrap_or_default())
+            .execute(pool)
+            .await?;
+            let (encomendas, produtos) = loja::aplicar(pool, &r["novidades"]).await?;
+            // o que já seguiu há mais de 30 dias sai da fila
+            sqlx::query("DELETE FROM sinc_saida WHERE estado = 'feito' AND feito_em < strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-30 days')")
                 .execute(pool)
                 .await?;
-            // o que já seguiu há mais de 30 dias sai da fila
-            sqlx::query("DELETE FROM sinc_saida WHERE estado = 'feito' AND feito_em < strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-30 days')").execute(pool).await?;
-            Ok(json!({ "ligada": true, "enviados": ids.len(), "resultado": r["resultado"] }))
+            let mais = r["novidades"]["mais"]["encomendas"].as_bool() == Some(true) || r["novidades"]["mais"]["produtos"].as_bool() == Some(true);
+            Ok(Volta::Feita {
+                enviados: ids.len(),
+                encomendas,
+                produtos,
+                resultado: r["resultado"].clone(),
+                continuar: fila.len() as i64 == LOTE || mais,
+            })
         }
         Err(Falha::SemLigacao(m)) => {
             let erro = Falha::SemLigacao(m).to_string();
             anotar_erro(pool, &erro).await?;
-            Ok(json!({ "ligada": true, "enviados": 0, "erro": erro }))
+            Ok(Volta::Falhou(erro))
         }
         Err(Falha::Recusado(m)) => {
             // o pedido inteiro foi recusado (posto revogado, relógio errado…): os documentos esperam, cada vez mais
@@ -286,9 +300,37 @@ pub async fn ciclo(st: &AppState) -> AppResult<Value> {
                     .await?;
             }
             anotar_erro(pool, &m).await?;
-            Ok(json!({ "ligada": true, "enviados": 0, "erro": m }))
+            Ok(Volta::Falhou(m))
         }
     }
+}
+
+/// Uma volta: até 10 pedidos seguidos, enquanto houver documentos na fila ou novidades no site.
+pub async fn ciclo(st: &AppState) -> AppResult<Value> {
+    let Some(_vez) = Vez::tentar(&A_CORRER) else {
+        return Ok(json!({ "ocupado": true }));
+    };
+    let pool = &st.pool;
+    let Some(l) = ligacao(pool).await? else {
+        return Ok(json!({ "ligada": false }));
+    };
+    let (mut enviados, mut encomendas, mut produtos) = (0, 0, 0);
+    let mut resultado = Value::Null;
+    for _ in 0..10 {
+        match volta(pool, &l).await? {
+            Volta::Feita { enviados: e, encomendas: n, produtos: p, resultado: r, continuar } => {
+                enviados += e;
+                encomendas += n;
+                produtos += p;
+                resultado = r;
+                if !continuar {
+                    break;
+                }
+            }
+            Volta::Falhou(erro) => return Ok(json!({ "ligada": true, "enviados": enviados, "erro": erro })),
+        }
+    }
+    Ok(json!({ "ligada": true, "enviados": enviados, "encomendas": encomendas, "produtos": produtos, "resultado": resultado }))
 }
 
 /// O ciclo em segundo plano, como os avisos da API (webhooks.rs): só no servidor da loja.
@@ -361,9 +403,11 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
     .bind(db::agora())
     .execute(&st.pool)
     .await?;
-    // outro posto: o que já tinha seguido foi para o anterior, por isso volta tudo à fila
+    // outro posto: o que já tinha seguido foi para o anterior, por isso volta tudo à fila; e a cópia da Loja online
+    // era de outra loja
     if anterior.as_deref().is_some_and(|a| a != posto_id) {
         sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
+        loja::apagar(&st.pool).await?;
     }
     enfileirar_tudo(&st.pool).await?;
     let mut e = estado(st).await?;
@@ -416,12 +460,14 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
     estado(st).await
 }
 
-/// Desliga este KanGest do site: a chave deste posto é apagada. O posto continua no painel do site até alguém o
-/// revogar lá.
+/// Desliga este KanGest do site: a chave deste posto e a cópia da Loja online são apagadas. O posto continua no painel
+/// do site até alguém o revogar lá.
 async fn desligar(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
     sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await?;
     sqlx::query("DELETE FROM sinc_saida WHERE estado <> 'feito'").execute(&st.pool).await?;
+    // a cópia da Loja online tem dados de clientes: sem ligação, não fica
+    loja::apagar(&st.pool).await?;
     estado(st).await
 }
 

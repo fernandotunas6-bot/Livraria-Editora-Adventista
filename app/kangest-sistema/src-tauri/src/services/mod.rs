@@ -124,6 +124,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
     }
     // Módulos com despachante próprio, num futuro em caixa: o `match` abaixo já é muito grande e cada caso
     // novo aumenta a pilha que ele usa (nas compilações de desenvolvimento chegava ao limite da pilha).
+    if let Some(resto) = metodo.strip_prefix("loja.") {
+        return Box::pin(crate::sinc::loja::despachar(st, resto, params)).await;
+    }
     if let Some(resto) = metodo.strip_prefix("sinc.") {
         return Box::pin(crate::sinc::despachar(st, resto, params)).await;
     }
