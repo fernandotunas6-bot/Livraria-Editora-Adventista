@@ -17,6 +17,7 @@
 
 pub mod cifra;
 pub mod loja;
+pub mod pessoa;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -269,12 +270,15 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
             }
             sqlx::query(
                 "UPDATE sinc_ligacao SET ultima_sinc = ?, ultimo_erro = '', posto_nome = COALESCE(?, posto_nome), loja = COALESCE(?, loja),
-                   site_url = COALESCE(NULLIF(?, ''), site_url) WHERE id = 1",
+                   site_url = COALESCE(NULLIF(?, ''), site_url), auth_url = COALESCE(NULLIF(?, ''), auth_url),
+                   auth_apikey = COALESCE(NULLIF(?, ''), auth_apikey) WHERE id = 1",
             )
             .bind(&feito)
             .bind(r["posto"]["nome"].as_str())
             .bind(r["posto"]["loja"].as_str())
             .bind(r["site"].as_str().unwrap_or_default())
+            .bind(r["auth"]["url"].as_str().unwrap_or_default())
+            .bind(r["auth"]["apikey"].as_str().unwrap_or_default())
             .execute(pool)
             .await?;
             let (encomendas, produtos) = loja::aplicar(pool, &r["novidades"]).await?;
@@ -331,7 +335,7 @@ async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
             .bind(agora_s())
             .fetch_one(pool)
             .await?;
-        if devidos == 0 && agora_s() - ULTIMA_SONDAGEM.load(Ordering::Relaxed) < SONDAGEM {
+        if devidos == 0 && !pessoa::ha_comandos(pool).await? && agora_s() - ULTIMA_SONDAGEM.load(Ordering::Relaxed) < SONDAGEM {
             return Ok(json!({ "ligada": true, "enviados": 0, "em_espera": true }));
         }
     }
@@ -352,7 +356,14 @@ async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
             Volta::Falhou(erro) => return Ok(json!({ "ligada": true, "enviados": enviados, "erro": erro })),
         }
     }
-    Ok(json!({ "ligada": true, "enviados": enviados, "encomendas": encomendas, "produtos": produtos, "resultado": resultado }))
+    // com ligação, as alterações às encomendas que ficaram à espera (pessoa.rs), em nome de quem as fez
+    let comandos = pessoa::enviar_comandos(pool).await.unwrap_or(0);
+    Ok(json!({ "ligada": true, "enviados": enviados, "encomendas": encomendas, "produtos": produtos, "comandos": comandos, "resultado": resultado }))
+}
+
+/// Sincroniza já, mesmo sem documentos na fila (depois de uma alteração a uma encomenda, para a cópia local a ter).
+pub(crate) async fn sincronizar_ja(st: &AppState) -> AppResult<Value> {
+    ciclo_com(st, true).await
 }
 
 /// O ciclo em segundo plano, como os avisos da API (webhooks.rs): só no servidor da loja.
@@ -425,6 +436,12 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
     .bind(db::agora())
     .execute(&st.pool)
     .await?;
+    // para as pessoas entrarem com a conta do site (pessoa.rs)
+    sqlx::query("UPDATE sinc_ligacao SET auth_url = ?, auth_apikey = ? WHERE id = 1")
+        .bind(v["auth"]["url"].as_str().unwrap_or_default())
+        .bind(v["auth"]["apikey"].as_str().unwrap_or_default())
+        .execute(&st.pool)
+        .await?;
     // outro posto: o que já tinha seguido foi para o anterior, por isso volta tudo à fila; e a cópia da Loja online
     // era de outra loja
     if anterior.as_deref().is_some_and(|a| a != posto_id) {
@@ -488,8 +505,9 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
     sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await?;
     sqlx::query("DELETE FROM sinc_saida WHERE estado <> 'feito'").execute(&st.pool).await?;
-    // a cópia da Loja online tem dados de clientes: sem ligação, não fica
+    // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
+    pessoa::apagar_tudo(&st.pool).await?;
     estado(st).await
 }
 

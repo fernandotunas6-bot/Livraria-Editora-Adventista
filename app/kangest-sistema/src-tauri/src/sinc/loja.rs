@@ -122,7 +122,7 @@ pub async fn apagar(pool: &SqlitePool) -> AppResult<()> {
 }
 
 /// Quem trabalha com a loja online: a API e Integrações, os relatórios ou quem factura ao balcão.
-fn permitir(st: &AppState) -> AppResult<()> {
+pub(crate) fn permitir(st: &AppState) -> AppResult<()> {
     let s = st.sessao()?;
     if ["sistema.api", "relatorios.ver", "vendas.fatura_recibo"].iter().any(|p| s.tem(p)) {
         Ok(())
@@ -234,6 +234,10 @@ async fn produtos(st: &AppState, f: Filtro) -> AppResult<Value> {
 
 /// Despachante dos métodos `loja.*` (services/mod.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
+    // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs)
+    if let Some(resto) = metodo.strip_prefix("conta.") {
+        return super::pessoa::despachar(st, resto, params).await;
+    }
     let filtro = || -> AppResult<Filtro> { if params.is_null() { Ok(Filtro::default()) } else { Ok(serde_json::from_value(params.clone())?) } };
     match metodo {
         "estado" => estado(st).await,
