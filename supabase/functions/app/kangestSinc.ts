@@ -20,9 +20,12 @@
 // Este ficheiro só usa a WebCrypto (Deno na Edge Function, Node nos testes) e não toca na base de dados.
 
 type Row = Record<string, any>;
+/** Bytes num ArrayBuffer próprio: é o que a WebCrypto aceita (BufferSource) no TypeScript do Deno. */
+type Bytes = Uint8Array<ArrayBuffer>;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
+const utf8 = (s: string): Bytes => new Uint8Array(enc.encode(s));
 
 export const VERSAO = "kangest-sinc/1";
 /** Diferença máxima entre a hora do pedido e a do servidor. */
@@ -36,14 +39,14 @@ export function paraB64(b: Uint8Array): string {
   return btoa(s);
 }
 
-export function deB64(s: string): Uint8Array {
+export function deB64(s: string): Bytes {
   const t = atob(String(s ?? ""));
   const out = new Uint8Array(t.length);
   for (let i = 0; i < t.length; i++) out[i] = t.charCodeAt(i);
   return out;
 }
 
-function juntar(a: Uint8Array, b: Uint8Array): Uint8Array {
+function juntar(a: Uint8Array, b: Uint8Array): Bytes {
   const out = new Uint8Array(a.length + b.length);
   out.set(a);
   out.set(b, a.length);
@@ -52,8 +55,8 @@ function juntar(a: Uint8Array, b: Uint8Array): Uint8Array {
 
 const hex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
 
-export async function sha256Hex(dados: Uint8Array | string): Promise<string> {
-  const bytes = typeof dados === "string" ? enc.encode(dados) : dados;
+export async function sha256Hex(dados: Bytes | string): Promise<string> {
+  const bytes = typeof dados === "string" ? utf8(dados) : dados;
   return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 }
 
@@ -88,9 +91,9 @@ export function lerChavesSinc(texto: string | undefined | null): ChaveCentro[] {
 // PKCS#8 de uma chave privada X25519 (RFC 8410): a WebCrypto não importa a privada «raw».
 const PKCS8_X25519 = Uint8Array.from([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20]);
 
-const privadaX25519 = (raw: Uint8Array) =>
+const privadaX25519 = (raw: Bytes) =>
   crypto.subtle.importKey("pkcs8", juntar(PKCS8_X25519, raw), { name: "X25519" }, false, ["deriveBits"]);
-const publicaX25519 = (raw: Uint8Array) => crypto.subtle.importKey("raw", raw, { name: "X25519" }, false, []);
+const publicaX25519 = (raw: Bytes) => crypto.subtle.importKey("raw", raw, { name: "X25519" }, false, []);
 
 // ---------------------------------------------------------------------------------------------------------------
 // A sessão de um pedido: X25519 → HKDF-SHA256 → AES-256-GCM
@@ -101,22 +104,22 @@ const publicaX25519 = (raw: Uint8Array) => crypto.subtle.importKey("raw", raw, {
  * HKDF-SHA256 com sal = chave efémera ‖ chave do centro e info = «kangest-sinc/1»; 64 bytes, metade para cada uma.
  * O KanGest faz o mesmo em Rust (src-tauri/src/sinc/cifra.rs), com os vectores de teste de kangestSinc.test.ts.
  */
-export async function chavesDaSessao(partilhado: Uint8Array, epk: Uint8Array, centro: Uint8Array): Promise<{ pedido: Uint8Array; resposta: Uint8Array }> {
+export async function chavesDaSessao(partilhado: Bytes, epk: Bytes, centro: Bytes): Promise<{ pedido: Bytes; resposta: Bytes }> {
   const base = await crypto.subtle.importKey("raw", partilhado, "HKDF", false, ["deriveBits"]);
   const bits = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: juntar(epk, centro), info: enc.encode(VERSAO) }, base, 512),
+    await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: juntar(epk, centro), info: utf8(VERSAO) }, base, 512),
   );
   return { pedido: bits.slice(0, 32), resposta: bits.slice(32) };
 }
 
-export async function cifrarAesGcm(chave: Uint8Array, iv: Uint8Array, aad: string, dados: Uint8Array): Promise<Uint8Array> {
+export async function cifrarAesGcm(chave: Bytes, iv: Bytes, aad: string, dados: Bytes): Promise<Bytes> {
   const k = await crypto.subtle.importKey("raw", chave, "AES-GCM", false, ["encrypt"]);
-  return new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(aad) }, k, dados));
+  return new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: utf8(aad) }, k, dados));
 }
 
-export async function decifrarAesGcm(chave: Uint8Array, iv: Uint8Array, aad: string, ct: Uint8Array): Promise<Uint8Array> {
+export async function decifrarAesGcm(chave: Bytes, iv: Bytes, aad: string, ct: Bytes): Promise<Bytes> {
   const k = await crypto.subtle.importKey("raw", chave, "AES-GCM", false, ["decrypt"]);
-  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: enc.encode(aad) }, k, ct));
+  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: utf8(aad) }, k, ct));
 }
 
 /** O que o posto assina em cada pedido. */
@@ -137,7 +140,7 @@ export async function assinaturaValida(publicaB64: string, mensagem: string, ass
     const sig = deB64(assinaturaB64);
     if (pk.length !== 32 || sig.length !== 64) return false;
     const k = await crypto.subtle.importKey("raw", pk, { name: "Ed25519" }, false, ["verify"]);
-    return await crypto.subtle.verify({ name: "Ed25519" }, k, sig, enc.encode(mensagem));
+    return await crypto.subtle.verify({ name: "Ed25519" }, k, sig, utf8(mensagem));
   } catch {
     return false;
   }
@@ -156,7 +159,7 @@ export const uuidValido = (u: string | null) => !!u && /^[0-9a-f]{8}-[0-9a-f]{4}
 export type Envelope = { v: number; kid: string; epk: string; iv: string; ct: string };
 
 /** Abre o envelope de um pedido e devolve o JSON e a chave da resposta. Lança se tiver sido mexido. */
-export async function abrirPedido(env: Envelope, chaves: ChaveCentro[], aad: string): Promise<{ dados: any; chaveResposta: Uint8Array }> {
+export async function abrirPedido(env: Envelope, chaves: ChaveCentro[], aad: string): Promise<{ dados: any; chaveResposta: Bytes }> {
   if (!env || env.v !== 1) throw new Error("Envelope desconhecido.");
   const chave = chaves.find((c) => c.kid === env.kid);
   if (!chave) throw new Error("Chave do centro desconhecida: volte a emparelhar o posto.");
@@ -172,25 +175,25 @@ export async function abrirPedido(env: Envelope, chaves: ChaveCentro[], aad: str
 }
 
 /** Sela a resposta com a chave da sessão do pedido. */
-export async function selarResposta(chave: Uint8Array, nonce: string, dados: unknown): Promise<{ v: 1; iv: string; ct: string }> {
+export async function selarResposta(chave: Bytes, nonce: string, dados: unknown): Promise<{ v: 1; iv: string; ct: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await cifrarAesGcm(chave, iv, aadDaResposta(nonce), enc.encode(JSON.stringify(dados)));
+  const ct = await cifrarAesGcm(chave, iv, aadDaResposta(nonce), utf8(JSON.stringify(dados)));
   return { v: 1, iv: paraB64(iv), ct: paraB64(ct) };
 }
 
 /** O lado do posto em TypeScript, para os testes e como referência do que o KanGest faz em Rust. */
-export async function selarPedido(centroPublicaB64: string, kid: string, aad: string, dados: unknown): Promise<{ envelope: Envelope; chaveResposta: Uint8Array }> {
+export async function selarPedido(centroPublicaB64: string, kid: string, aad: string, dados: unknown): Promise<{ envelope: Envelope; chaveResposta: Bytes }> {
   const eph = (await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"])) as CryptoKeyPair;
   const epk = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
   const centro = deB64(centroPublicaB64);
   const partilhado = new Uint8Array(await crypto.subtle.deriveBits({ name: "X25519", public: await publicaX25519(centro) }, eph.privateKey, 256));
   const k = await chavesDaSessao(partilhado, epk, centro);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await cifrarAesGcm(k.pedido, iv, aad, enc.encode(JSON.stringify(dados)));
+  const ct = await cifrarAesGcm(k.pedido, iv, aad, utf8(JSON.stringify(dados)));
   return { envelope: { v: 1, kid, epk: paraB64(epk), iv: paraB64(iv), ct: paraB64(ct) }, chaveResposta: k.resposta };
 }
 
-export async function abrirResposta(chave: Uint8Array, nonce: string, r: { iv: string; ct: string }): Promise<any> {
+export async function abrirResposta(chave: Bytes, nonce: string, r: { iv: string; ct: string }): Promise<any> {
   return JSON.parse(dec.decode(await decifrarAesGcm(chave, deB64(r.iv), aadDaResposta(nonce), deB64(r.ct))));
 }
 
@@ -219,7 +222,7 @@ export type CifraDados = { cifra: CryptoKey; indice: CryptoKey };
 
 /** As duas chaves dos dados pessoais a partir de KANGEST_DADOS_CHAVE (32 bytes): a da cifra e a do índice cego. */
 export async function lerCifraDados(segredoB64: string | undefined | null): Promise<CifraDados | null> {
-  let raw: Uint8Array;
+  let raw: Bytes;
   try {
     raw = deB64(String(segredoB64 ?? "").trim());
   } catch {
@@ -228,7 +231,7 @@ export async function lerCifraDados(segredoB64: string | undefined | null): Prom
   if (raw.length !== 32) return null;
   const base = await crypto.subtle.importKey("raw", raw, "HKDF", false, ["deriveKey"]);
   const derivar = (info: string, alg: AesKeyGenParams | HmacImportParams, usos: KeyUsage[]) =>
-    crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: enc.encode(info) }, base, alg, false, usos);
+    crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: utf8(info) }, base, alg, false, usos);
   return {
     cifra: await derivar("kangest-dados/cifra", { name: "AES-GCM", length: 256 }, ["encrypt", "decrypt"]),
     indice: await derivar("kangest-dados/indice", { name: "HMAC", hash: "SHA-256", length: 256 }, ["sign"]),
@@ -239,7 +242,7 @@ export async function lerCifraDados(segredoB64: string | undefined | null): Prom
 export async function cifrarCampo(c: CifraDados, texto: string): Promise<string> {
   if (!texto) return "";
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, c.cifra, enc.encode(texto)));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, c.cifra, utf8(texto)));
   return `v1:${paraB64(juntar(iv, ct))}`;
 }
 
@@ -254,7 +257,7 @@ export async function decifrarCampo(c: CifraDados, valor: string): Promise<strin
 export async function indiceCego(c: CifraDados, texto: string): Promise<string> {
   const normal = String(texto ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!normal) return "";
-  return hex(new Uint8Array(await crypto.subtle.sign("HMAC", c.indice, enc.encode(normal))));
+  return hex(new Uint8Array(await crypto.subtle.sign("HMAC", c.indice, utf8(normal))));
 }
 
 /** O NIF do Consumidor Final (vazio, só noves ou zero): não é um dado pessoal e não se guarda. */

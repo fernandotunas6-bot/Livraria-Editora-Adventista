@@ -67,8 +67,8 @@ import {
   assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import {
-  aadDoPedido, abrirPedido, assinaturaValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados, mensagemAssinada,
-  nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex, uuidValido, type CifraDados,
+  aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados,
+  mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido, type CifraDados,
 } from "./kangestSinc.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
@@ -3276,7 +3276,7 @@ route("POST", "/admin/kangest/postos", permissao("manage_settings"), async ({ bo
   }
   const codigo = codigoEmparelhamento();
   const { data: id, error } = await db.rpc("kangest_posto_criar", {
-    p_nome: nome, p_store_id: loja || null, p_codigo_resumo: await sha256Hex(normalizarCodigo(codigo)), p_criado_por: auth.id,
+    p_nome: nome, p_store_id: loja || null, p_codigo_resumo: await resumoSinc(normalizarCodigo(codigo)), p_criado_por: auth.id,
   });
   if (error) throw new Error(error.message);
   return json({ id, codigo, expira_em: new Date(Date.now() + 10 * 60_000).toISOString(), endereco: `${SUPABASE_URL}/functions/v1/app` });
@@ -3287,7 +3287,7 @@ route("POST", "/admin/kangest/postos/codigo", permissao("manage_settings"), asyn
   const id = String(body.id ?? "");
   if (!uuidValido(id)) throw bad("Indique o posto.");
   const codigo = codigoEmparelhamento();
-  const { error } = await db.rpc("kangest_posto_novo_codigo", { p_id: id, p_codigo_resumo: await sha256Hex(normalizarCodigo(codigo)) });
+  const { error } = await db.rpc("kangest_posto_novo_codigo", { p_id: id, p_codigo_resumo: await resumoSinc(normalizarCodigo(codigo)) });
   if (error) throw bad(error.message);
   return json({ id, codigo, expira_em: new Date(Date.now() + 10 * 60_000).toISOString(), endereco: `${SUPABASE_URL}/functions/v1/app` });
 });
@@ -3307,7 +3307,7 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
   const codigo = normalizarCodigo(body.codigo);
   if (codigo.length !== 8) throw bad("Escreva o código de 8 letras que o painel mostrou.");
   const { data, error } = await db.rpc("kangest_emparelhar", {
-    p_codigo_resumo: await sha256Hex(codigo), p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
+    p_codigo_resumo: await resumoSinc(codigo), p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
   });
   if (error) throw bad(error.message);
   return json({ posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, hora: Math.floor(Date.now() / 1000) });
@@ -3326,13 +3326,13 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
   const { data: p } = await db.from("kangest_postos").select("id, nome, estado, chave_publica, store_id").eq("id", posto).maybeSingle();
   if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
-  if (!await assinaturaValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await sha256Hex(raw)), assinatura)) {
+  if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
     throw new HttpError(401, "Assinatura inválida.");
   }
   const { data: novo, error: eNonce } = await db.rpc("kangest_nonce", { p_posto: posto, p_nonce: nonce });
   if (eNonce) throw new Error(eNonce.message);
   if (novo !== true) throw new HttpError(409, "Pedido repetido.");
-  let aberto: { dados: Record<string, unknown>; chaveResposta: Uint8Array };
+  let aberto: Awaited<ReturnType<typeof abrirPedido>>;
   try {
     aberto = await abrirPedido(JSON.parse(raw), chaves, aadDoPedido(posto, hora, nonce));
   } catch (e) {
