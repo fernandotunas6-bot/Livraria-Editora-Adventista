@@ -4,9 +4,9 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
-  assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas, modoPagamento,
-  corpoNC, PERMISSOES_LIGACAO, pedir, precoDoArtigo, processarFila, proximaTentativa, testarLigacao, vendaDoDocumento, versaoAntiga,
-  type Ligacao,
+  artigoParaCriar, assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas,
+  modoPagamento, corpoNC, PERMISSOES_LIGACAO, pedir, precoDoArtigo, processarFila, proximaTentativa, sincronizarArtigos, testarLigacao,
+  tratarAviso, vendaDoDocumento, versaoAntiga, type Ligacao,
 } from "./kangest.ts";
 
 const CHAVE = `kg_${"a".repeat(48)}`;
@@ -361,5 +361,90 @@ describe("testarLigacao", () => {
     const r = await testarLigacao(central, lojas, recusa);
     expect([r.ok, r.verificacoes[0].texto]).toEqual([false, "A chave da API não é aceite (revogada, expirada ou de outro KanGest)."]);
     expect([versaoAntiga("1.2.9"), versaoAntiga("1.3.0"), versaoAntiga("1.10.0"), versaoAntiga("2.0.0-beta")]).toEqual([true, false, false, false]);
+  });
+});
+
+describe("artigos novos do KanGest (ocultos, à espera de fotografia)", () => {
+  const artigo = (extra: Record<string, unknown> = {}) => ({
+    id: 7, referencia: "NOVO-1", codigo_barras: "9786586391999", descricao: "  Um   Livro Novo ", tipo: "P", preco1_iva: 750000, ativo: true,
+    ...extra,
+  });
+
+  it("um produto activo dá um rascunho com o PVP com IVA em Kz, o nome arrumado e o código de barras", () => {
+    expect(artigoParaCriar(central, artigo())).toEqual({ referencia: "NOVO-1", titulo: "Um Livro Novo", preco: 7500, ean: "9786586391999" });
+    // mesmo com a ligação sem mandar nos preços: é só o ponto de partida do rascunho
+    expect(artigoParaCriar({ ...central, precos: false }, artigo())?.preco).toBe(7500);
+    expect(artigoParaCriar(central, artigo({ preco1_iva: null }))?.preco).toBe(0);
+  });
+
+  it("serviços, desactivados, sem nome e os artigos dos portes e genérico não dão produto", () => {
+    expect(artigoParaCriar(central, artigo({ tipo: "S" }))).toBeNull();
+    expect(artigoParaCriar(central, artigo({ ativo: false }))).toBeNull();
+    expect(artigoParaCriar(central, artigo({ ativo: 0 }))).toBeNull();
+    expect(artigoParaCriar(central, artigo({ descricao: "   " }))).toBeNull();
+    expect(artigoParaCriar(central, artigo({ referencia: "PORTES" }))).toBeNull();
+    expect(artigoParaCriar({ ...central, generico: "DIGITAL" }, artigo({ referencia: "DIGITAL" }))).toBeNull();
+  });
+
+  /** Base falsa: regista os pedidos e responde ao kangest_artigo_novo com `feito`. */
+  function base(feito: string, refsDoSite: string[] = [], cursor?: string) {
+    const rpcs: { f: string; a: Record<string, unknown> }[] = [];
+    const updates: Record<string, unknown>[] = [];
+    const upserts: Record<string, unknown>[] = [];
+    const db = {
+      rpc: async (f: string, a: Record<string, unknown>) => { rpcs.push({ f, a }); return { data: { feito }, error: null }; },
+      from: (tabela: string) => {
+        const q: any = {
+          select: () => q, eq: () => q, neq: () => q,
+          maybeSingle: async () => ({ data: tabela === "kangest_estado" && cursor ? { valor: cursor } : null }),
+          update: (patch: Record<string, unknown>) => { updates.push(patch); return q; },
+          upsert: async (linha: Record<string, unknown>) => { upserts.push(linha); return { error: null }; },
+          then: (ok: (v: unknown) => unknown) =>
+            Promise.resolve({ data: tabela === "stock_books" ? refsDoSite.map((r) => ({ kigest_ref: r })) : [], error: null }).then(ok),
+        };
+        return q;
+      },
+    };
+    return { db, rpcs, updates, upserts };
+  }
+
+  it("aviso artigo.alterado: o preço como até aqui e, se o site não o tiver, o rascunho oculto", async () => {
+    const criado = base("criado");
+    expect(await tratarAviso(criado.db, central, { evento: "artigo.alterado", dados: artigo() })).toBe("produto novo, oculto");
+    expect(criado.updates).toEqual([{ price: 7500 }]);
+    expect(criado.rpcs).toEqual([{ f: "kangest_artigo_novo", a: { p_referencia: "NOVO-1", p_titulo: "Um Livro Novo", p_preco: 7500, p_ean: "9786586391999" } }]);
+
+    const existe = base("existe");
+    expect(await tratarAviso(existe.db, central, { evento: "artigo.alterado", dados: artigo() })).toBe("preço");
+
+    const semPrecos = base("existe");
+    expect(await tratarAviso(semPrecos.db, { ...central, precos: false }, { evento: "artigo.alterado", dados: artigo() })).toBe("sem preço");
+    expect(semPrecos.updates).toEqual([]);
+
+    const servico = base("criado");
+    expect(await tratarAviso(servico.db, central, { evento: "artigo.alterado", dados: artigo({ tipo: "S" }) })).toBe("preço");
+    expect(servico.rpcs).toEqual([]);
+  });
+
+  it("de hora a hora: só pergunta pelas referências que o site não tem, página a página, e guarda o cursor", async () => {
+    const pedidos: string[] = [];
+    const paginas = [
+      { dados: [artigo({ referencia: "JA-NO-SITE" }), artigo({ referencia: "NOVO-1" })], mais: true, seguinte: 2 },
+      { dados: [artigo({ referencia: "NOVO-2", tipo: "S" }), artigo({ referencia: "NOVO-3" })], mais: false, seguinte: 4 },
+    ];
+    const f = (async (u: string) => { pedidos.push(u); return new Response(JSON.stringify(paginas[pedidos.length - 1])); }) as unknown as typeof fetch;
+    const b = base("criado", ["JA-NO-SITE"]);
+    const agora = new Date("2026-11-24T18:00:00Z");
+    expect(await sincronizarArtigos(b.db, central, f, agora)).toEqual({ vistos: 4, novos: 2 });
+    // a primeira volta lê o catálogo activo todo; a seguinte, só o que mudou desde 10 minutos antes desta
+    expect(pedidos).toEqual([`${central.url}/artigos?limite=500&desde_id=0`, `${central.url}/artigos?limite=500&desde_id=2`]);
+    expect(b.rpcs.map((r) => r.a.p_referencia)).toEqual(["NOVO-1", "NOVO-3"]);
+    expect(b.upserts).toEqual([{ chave: "artigos:central", valor: "2026-11-24T17:50:00", actualizado: agora.toISOString() }]);
+    expect(b.updates).toEqual([]);
+
+    const seguinte: string[] = [];
+    const g = (async (u: string) => { seguinte.push(u); return new Response(JSON.stringify({ dados: [], mais: false })); }) as unknown as typeof fetch;
+    await sincronizarArtigos(base("criado", [], "2026-11-24T17:50:00").db, central, g, agora);
+    expect(seguinte).toEqual([`${central.url}/artigos?limite=500&desde_id=0&alterado_desde=2026-11-24T17%3A50%3A00`]);
   });
 });

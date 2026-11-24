@@ -202,6 +202,23 @@ export function precoDoArtigo(lig: Ligacao, dados: Row): number | null {
 }
 
 /**
+ * Um artigo do KanGest que pode dar um produto novo no site (oculto, à espera de fotografia — docs/KANGEST.md §4.1), ou
+ * null: sem referência ou sem nome, desactivado, serviço (tipo S: portes, digital, mão-de-obra…) ou um dos artigos de
+ * serviço da ligação. O preço é o PVP com IVA, mesmo que a ligação não mande nos preços: é só o ponto de partida do
+ * rascunho. Se o site já tem a referência, ou se ela já foi vista, quem decide é a base (kangest_artigo_novo).
+ */
+export function artigoParaCriar(lig: Ligacao, dados: Row): { referencia: string; titulo: string; preco: number; ean: string } | null {
+  const referencia = String(dados?.referencia ?? "").trim();
+  const titulo = String(dados?.descricao ?? "").replace(/\s+/g, " ").trim();
+  if (!referencia || !titulo) return null;
+  if (dados?.ativo === false || dados?.ativo === 0) return null;
+  if (dados?.tipo != null && String(dados.tipo).trim().toUpperCase() !== "P") return null;
+  if (referencia === lig.portes || referencia === lig.generico) return null;
+  const p = Number(dados?.preco1_iva) / 100;
+  return { referencia, titulo: titulo.slice(0, 200), preco: Number.isFinite(p) && p > 0 ? p : 0, ean: String(dados?.codigo_barras ?? "").trim() };
+}
+
+/**
  * Linhas de kangest_vendas a partir de GET /relatorios/vendas?agrupar=mes_armazem (servidor central: cada armazém é
  * a loja dele) ou agrupar=mes (um KanGest por loja: tudo é da loja da ligação).
  */
@@ -512,13 +529,57 @@ export async function tratarAviso(db: Db, lig: Ligacao, aviso: Row): Promise<str
     return venda.anulado ? "venda anulada" : "venda";
   }
   if (aviso?.evento === "artigo.alterado") {
+    if (!dados.referencia) return "sem referência";
     const preco = precoDoArtigo(lig, dados);
-    if (preco == null || !dados.referencia) return "sem preço";
-    const { error } = await db.from("stock_books").update({ price: preco }).eq("kigest_ref", String(dados.referencia)).neq("price", preco);
-    if (error) throw new Error(error.message);
-    return "preço";
+    if (preco != null) {
+      const { error } = await db.from("stock_books").update({ price: preco }).eq("kigest_ref", String(dados.referencia)).neq("price", preco);
+      if (error) throw new Error(error.message);
+    }
+    if (await criarArtigoNovo(db, lig, dados) === "criado") return "produto novo, oculto";
+    return preco == null ? "sem preço" : "preço";
   }
   return "ignorado";
+}
+
+/** Cria o rascunho oculto de um artigo que o site não tem; devolve o que a base fez («criado», «existe», «já visto»…). */
+export async function criarArtigoNovo(db: Db, lig: Ligacao, dados: Row): Promise<string | null> {
+  const a = artigoParaCriar(lig, dados);
+  if (!a) return null;
+  const { data, error } = await db.rpc("kangest_artigo_novo", { p_referencia: a.referencia, p_titulo: a.titulo, p_preco: a.preco, p_ean: a.ean });
+  if (error) throw new Error(error.message);
+  return typeof data?.feito === "string" ? data.feito : null;
+}
+
+/**
+ * Artigos novos que um aviso perdido não trouxe: os alterados desde a última volta (a primeira volta lê o catálogo
+ * activo todo). Só pergunta à base pelas referências que o site ainda não tem; não mexe em preços. A próxima volta
+ * começa 10 minutos antes desta, para não perder o que mudou enquanto se lia.
+ */
+export async function sincronizarArtigos(db: Db, lig: Ligacao, fetchFn: typeof fetch = fetch, agora = new Date()): Promise<{ vistos: number; novos: number }> {
+  const chave = `artigos:${lig.id}`;
+  const { data: cursor } = await db.from("kangest_estado").select("valor").eq("chave", chave).maybeSingle();
+  const desde = typeof cursor?.valor === "string" ? cursor.valor : "";
+  const { data: livros, error } = await db.from("stock_books").select("kigest_ref").neq("kigest_ref", "");
+  if (error) throw new Error(error.message);
+  const conhecidas = new Set<string>((livros || []).map((b: Row) => String(b.kigest_ref)));
+  let id = 0;
+  let vistos = 0;
+  let novos = 0;
+  for (let i = 0; i < 200; i++) {
+    const filtro = desde ? `&alterado_desde=${encodeURIComponent(desde)}` : "";
+    const p = await pedir(lig, "GET", `/artigos?limite=500&desde_id=${id}${filtro}`, undefined, undefined, fetchFn);
+    for (const artigo of p.dados || []) {
+      vistos++;
+      if (conhecidas.has(String(artigo?.referencia ?? "").trim())) continue;
+      if (await criarArtigoNovo(db, lig, artigo) === "criado") novos++;
+    }
+    if (!p.mais) break;
+    id = p.seguinte;
+  }
+  const proxima = new Date(agora.getTime() - 10 * 60_000).toISOString().slice(0, 19);
+  const { error: e2 } = await db.from("kangest_estado").upsert({ chave, valor: proxima, actualizado: agora.toISOString() });
+  if (e2) throw new Error(e2.message);
+  return { vistos, novos };
 }
 
 /** Stock completo de uma ligação, página a página (recupera avisos perdidos). */
