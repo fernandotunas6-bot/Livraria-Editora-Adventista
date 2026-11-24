@@ -15,6 +15,7 @@ import { Button, Field, Input, MenuItem, Modal, Popover, Segmentado, cn } from "
 import { Logo } from "@/components/Logo";
 import { bloquearSessao } from "@/components/Sessao";
 import { AvisoLicenca } from "@/components/AvisoLicenca";
+import { EstadoLivraria } from "@/components/EstadoLivraria";
 import { PaletaComandos } from "@/components/Comandos";
 import DocumentoModal from "@/components/DocumentoModal";
 import DoisPassos from "@/components/DoisPassos";
@@ -259,6 +260,7 @@ export default function AppShell() {
             <kbd>K</kbd>
           </button>
 
+          <EstadoLivraria />
           <MenuNovo visivel={(to) => !!destinoPorEndereco(to) && visivel(destinoPorEndereco(to)!)} />
           <span className="hidden sm:contents">
             <BotaoTema />

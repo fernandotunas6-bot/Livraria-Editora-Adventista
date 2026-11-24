@@ -38,6 +38,9 @@ livraria). Do lado do site, o protocolo, as tabelas e o painel estão em
   corrigir, use **Repetir os com erro**.
 - **Repetir é seguro**: o site não grava a mesma factura duas vezes.
 
+**Na barra de cima**, quem gere a ligação vê o estado: um ponto verde («Livraria») ou âmbar («Sem ligação»), com os
+documentos por enviar; carregar leva a este ecrã.
+
 **Desligar** apaga a chave deste posto, e as facturas que ainda não seguiram ficam por enviar. No painel do site,
 revogue também o posto. Para mudar de computador ou rodar a chave, peça outro código no painel e ligue de novo.
 
