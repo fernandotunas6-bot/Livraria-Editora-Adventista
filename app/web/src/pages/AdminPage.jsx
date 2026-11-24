@@ -45,7 +45,7 @@ import { orderUnits, unitsLabel } from '@/lib/customerOrders';
 import { displayAngolaPhone } from '@/lib/angolaPhone';
 import { getLowStockBooks } from '@/api/EcommerceApi';
 import { isBookVisible, isSaleActive, isSaleScheduled } from '@/lib/pricing';
-import { hasCover, hasDescription } from '@/lib/bookContent';
+import { hasCover, hasDescription, isKanGestDraft } from '@/lib/bookContent';
 import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 // Pequeno: os gráficos (a parte pesada) carregam lá dentro, só quando se abre a secção.
@@ -88,7 +88,7 @@ const FinanceTab = lazy(() => import('@/components/admin/FinanceTab'));
 // cada) e a linha temporal. Com `select *` o painel descarregava tudo isso de todas as
 // encomendas a cada abertura.
 // Filtros da lista de produtos que o endereço pode trazer (?filtro=…).
-const BOOK_FILTERS = ['featured', 'low_stock', 'no_cover', 'no_description', 'hidden', 'promo'];
+const BOOK_FILTERS = ['featured', 'low_stock', 'no_cover', 'no_description', 'hidden', 'promo', 'kangest_novos'];
 
 const ORDER_LIST_FIELDS = [
   'id', 'order_number', 'created', 'updated', 'customer_email', 'customer_name', 'phone',
@@ -359,6 +359,23 @@ const AdminPage = () => {
     }
   };
 
+  // Rascunho de um artigo novo do KanGest marcado como parecido com um produto do site (docs/KANGEST.md §4.1).
+  const bookTitleById = (id) => books.find((x) => x.id === id)?.title || 'outro produto';
+  const decideKanGestDraft = async (b, decisao) => {
+    const outro = bookTitleById(b.kangest_parecido_com);
+    const pergunta = decisao === 'mesmo'
+      ? `«${b.title}» é o mesmo produto que «${outro}»?\n\n«${outro}» passa a receber o stock e o preço do KanGest, e este rascunho é apagado.`
+      : `«${b.title}» é outro produto, diferente de «${outro}»?\n\nO rascunho fica oculto, à espera de capa e descrição.`;
+    if (!confirm(pergunta)) return;
+    const { error } = await supabase.rpc('kangest_rascunho_decidir', { p_rascunho: b.id, p_decisao: decisao });
+    if (error) {
+      toast({ variant: 'destructive', title: 'Não foi possível decidir', description: error.message });
+      return;
+    }
+    toast({ title: decisao === 'mesmo' ? `Ligado a «${outro}»` : 'Marcado como outro produto' });
+    loadAll();
+  };
+
   const toggleFeatured = async (b) => {
     const featured = !b.featured;
     setBooks((prev) => prev.map((x) => (x.id === b.id ? { ...x, featured } : x)));
@@ -379,6 +396,7 @@ const AdminPage = () => {
     if (bookFilter === 'no_description' && hasDescription(b)) return false;
     if (bookFilter === 'hidden' && isBookVisible(b)) return false;
     if (bookFilter === 'promo' && !(isSaleActive(b) || isSaleScheduled(b))) return false;
+    if (bookFilter === 'kangest_novos' && !isKanGestDraft(b)) return false;
     const q = bookSearch.trim().toLowerCase();
     if (!q) return true;
     // Código escrito de qualquer forma ("liv63", "UNI-4") encontra o produto exacto.
@@ -923,6 +941,7 @@ const AdminPage = () => {
                         <SelectItem value="no_description">Sem descrição</SelectItem>
                         <SelectItem value="hidden">Ocultos da loja</SelectItem>
                         <SelectItem value="promo">Em promoção</SelectItem>
+                        <SelectItem value="kangest_novos">Novos do KanGest, por rever</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1003,6 +1022,27 @@ const AdminPage = () => {
                                 </span>
                               )}
                               {!isBookVisible(b) && <span className="inline-block mt-0.5 text-[10px] font-semibold uppercase bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-1.5 py-0.5 rounded">Oculto</span>}
+                              {isKanGestDraft(b) && (
+                                <span
+                                  className="inline-block mt-0.5 ml-1 text-[10px] font-semibold uppercase bg-marca/10 text-marca px-1.5 py-0.5 rounded"
+                                  title="Entrou sozinho a partir de um artigo novo do KanGest. Reveja o nome, ponha a capa e a descrição e publique."
+                                >
+                                  Novo do KanGest
+                                </span>
+                              )}
+                              {isKanGestDraft(b) && b.kangest_parecido_com && (
+                                <span className="block mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-400">
+                                  <span className="block truncate" title={`Tem o mesmo nome ou código de barras que «${bookTitleById(b.kangest_parecido_com)}».`}>
+                                    Parece «{bookTitleById(b.kangest_parecido_com)}»
+                                  </span>
+                                  {canManageCatalog && (
+                                    <span className="flex gap-2 mt-0.5">
+                                      <button type="button" className="underline hover:no-underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded" onClick={() => decideKanGestDraft(b, 'mesmo')}>É o mesmo</button>
+                                      <button type="button" className="underline hover:no-underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded" onClick={() => decideKanGestDraft(b, 'outro')}>É outro produto</button>
+                                    </span>
+                                  )}
+                                </span>
+                              )}
                             </td>
                             <td className="p-4 text-muted-foreground hidden lg:table-cell">{b.author}</td>
                             <td className="p-4 text-muted-foreground hidden md:table-cell">{b.genre}</td>

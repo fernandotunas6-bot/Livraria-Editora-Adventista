@@ -11,7 +11,7 @@
 // Função pura (os dados entram, a lista sai), para se poder testar com datas fixas.
 
 import { isSaleActive } from '@/lib/pricing';
-import { hasCover, hasDescription } from '@/lib/bookContent';
+import { hasCover, hasDescription, isKanGestDraft } from '@/lib/bookContent';
 import { formatOrderNumber } from '@/lib/orderUtils';
 
 const HOUR = 3600 * 1000;
@@ -90,6 +90,17 @@ export function attentionItems({ orders = [], books = [], perms = {}, now = Date
   }
 
   if (perms.catalog) {
+    const drafts = books.filter(isKanGestDraft);
+    if (drafts.length) {
+      const similar = drafts.filter((b) => b.kangest_parecido_com).length;
+      items.push({
+        id: 'kangest-novos',
+        severity: 'info',
+        title: `${drafts.length} ${plural(drafts.length, 'artigo novo do KanGest por rever', 'artigos novos do KanGest por rever')}`,
+        detail: `Entraram ocultos: precisam de capa e descrição antes de se publicarem.${similar ? ` ${similar} ${plural(similar, 'parece', 'parecem')} um produto que o site já tem.` : ''}`,
+        action: { section: 'books', filter: 'kangest_novos' },
+      });
+    }
     const visible = books.filter((b) => b.active !== false);
     const featuredOut = visible.filter((b) => b.featured && Number(b.stock) <= 0);
     if (featuredOut.length) {
