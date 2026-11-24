@@ -1,0 +1,284 @@
+# Build do KanGest para Windows (instalador NSIS .exe) e macOS (.dmg).
+# Corre ao publicar uma etiqueta "v*" (ex.: v1.0.0) ou manualmente em Actions → Build → Run workflow.
+# Um push para um ramo «build/…» compila sem publicar (os instaladores ficam nos artefactos da execução).
+# O texto da release vem de docs/versoes/<etiqueta>.md (ex.: docs/versoes/v1.2.0.md), se existir.
+#
+# Assinatura de código (docs/ASSINATURA.md): activa-se sozinha quando os segredos existem no repositório.
+#   macOS:   APPLE_CERTIFICATE (.p12 em base64), APPLE_CERTIFICATE_PASSWORD; notarização: APPLE_ID,
+#            APPLE_PASSWORD (palavra-passe de aplicação), APPLE_TEAM_ID. Sem eles: assinatura «ad-hoc».
+#   Windows: WINDOWS_ASSINATURA_CONTA, WINDOWS_ASSINATURA_SEGREDO, WINDOWS_ASSINATURA_CERTIFICADO
+#            (SSL.com eSigner, via jsign); WINDOWS_ASSINATURA_TIPO muda o serviço. Sem eles: não assina.
+#
+# Selo de integridade do executável (docs/SEGURANCA.md): KANGEST_SELO_PRIVADA e KANGEST_SELO_PUBLICA, gerados com
+#   cargo run --manifest-path scripts/selo/Cargo.toml -- chaves
+# Sem eles, os instaladores saem sem selo (como até aqui).
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["build/**"]
+  workflow_dispatch:
+
+# para criar a release e anexar os instaladores
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: windows
+            plataforma: windows-latest
+            alvo: ""
+            args: "--bundles nsis"
+          - nome: macos-apple-silicon
+            plataforma: macos-latest
+            alvo: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin --bundles app,dmg"
+          # o GitHub já não tem runners macOS Intel: compila-se de forma cruzada no Apple Silicon
+          - nome: macos-intel
+            plataforma: macos-latest
+            alvo: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin --bundles app,dmg"
+    name: ${{ matrix.nome }}
+    runs-on: ${{ matrix.plataforma }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.alvo }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # numa etiqueta, os instaladores têm de sair com o número da etiqueta (é por ele que as actualizações e o site os
+      # encontram): pára já, antes de compilar, se package.json, tauri.conf.json e Cargo.toml dizem outra coisa
+      - name: Versão da etiqueta igual à do programa
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          p=$(node -p "require('./package.json').version")
+          t=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          c=$(sed -n 's/^version *= *"\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          echo "etiqueta $v · package.json $p · tauri.conf.json $t · Cargo.toml $c"
+          if [ "$v" != "$p" ] || [ "$v" != "$t" ] || [ "$v" != "$c" ]; then
+            echo "::error::A etiqueta $GITHUB_REF_NAME não corresponde à versão do programa ($p / $t / $c). Acerte as três e volte a etiquetar."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # os testes correm no Windows (código só de Windows: impressão, consola, instalador) e no Apple Silicon;
+      # um teste a falhar trava a publicação (o CI em cada push corre-os também no Linux)
+      - name: Testes
+        if: matrix.nome != 'macos-intel'
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Assinatura (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            # sem certificado da Apple: assinatura «ad-hoc» (evita o aviso «danificado» nos Mac Apple Silicon)
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "Sem certificado da Apple: assinatura ad-hoc."
+            exit 0
+          fi
+          KC="$RUNNER_TEMP/assinatura.keychain-db"
+          KP="$(openssl rand -hex 24)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificado.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security import "$RUNNER_TEMP/certificado.p12" -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KP" "$KC" > /dev/null
+          rm -f "$RUNNER_TEMP/certificado.p12"
+          ID="$(security find-identity -v -p codesigning "$KC" | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"')"
+          if [ -z "$ID" ]; then
+            echo "::error::O certificado não é «Developer ID Application» (é o necessário para distribuir fora da App Store)."
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
+          # com o certificado, a assinatura fica a mesma entre versões: a chave mestra pode ir para o Porta-chaves
+          # sem o Mac pedir a senha depois de cada actualização (src-tauri/src/segredos.rs, cofre_do_sistema)
+          echo "KANGEST_COFRE_MACOS=1" >> "$GITHUB_ENV"
+          echo "A assinar com: $ID"
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            { echo "APPLE_ID=$APPLE_ID"; echo "APPLE_PASSWORD=$APPLE_PASSWORD"; echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"; } >> "$GITHUB_ENV"
+            echo "Com notarização."
+          else
+            echo "::warning::Sem APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID: assinado mas não notarizado (o macOS continua a avisar)."
+          fi
+
+      - name: Assinatura (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_ASSINATURA_CONTA: ${{ secrets.WINDOWS_ASSINATURA_CONTA }}
+          WINDOWS_ASSINATURA_SEGREDO: ${{ secrets.WINDOWS_ASSINATURA_SEGREDO }}
+          WINDOWS_ASSINATURA_CERTIFICADO: ${{ secrets.WINDOWS_ASSINATURA_CERTIFICADO }}
+          WINDOWS_ASSINATURA_TIPO: ${{ secrets.WINDOWS_ASSINATURA_TIPO }}
+        run: |
+          if (-not $env:WINDOWS_ASSINATURA_CONTA) { Write-Host "Sem certificado de assinatura do Windows: o instalador sai sem assinatura."; exit 0 }
+          $jar = Join-Path $env:RUNNER_TEMP "jsign.jar"
+          Invoke-WebRequest "https://github.com/ebourg/jsign/releases/download/7.6/jsign-7.6.jar" -OutFile $jar
+          $script = Join-Path $env:GITHUB_WORKSPACE "scripts\assinar-windows.ps1"
+          $conf = Join-Path $env:RUNNER_TEMP "assinatura.json"
+          @{ bundle = @{ windows = @{ signCommand = "pwsh -NoProfile -File $script %1" } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $conf
+          @(
+            "JSIGN_JAR=$jar",
+            "ARGS_ASSINATURA=--config $conf",
+            "WINDOWS_ASSINATURA_CONTA=$env:WINDOWS_ASSINATURA_CONTA",
+            "WINDOWS_ASSINATURA_SEGREDO=$env:WINDOWS_ASSINATURA_SEGREDO",
+            "WINDOWS_ASSINATURA_CERTIFICADO=$env:WINDOWS_ASSINATURA_CERTIFICADO",
+            "WINDOWS_ASSINATURA_TIPO=$env:WINDOWS_ASSINATURA_TIPO"
+          ) | Add-Content -Encoding utf8 $env:GITHUB_ENV
+          Write-Host "A assinar o Windows com o jsign ($(if ($env:WINDOWS_ASSINATURA_TIPO) { $env:WINDOWS_ASSINATURA_TIPO } else { 'ESIGNER' }))."
+
+      # notas da versão mostradas na página da release (só ao publicar uma etiqueta)
+      - name: Notas da versão
+        id: notas
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          f="docs/versoes/${GITHUB_REF_NAME}.md"
+          [ -f "$f" ] || echo "::warning::Sem notas da versão em $f: a release fica só com o quadro dos instaladores."
+          {
+            echo "corpo<<FIM_DAS_NOTAS"
+            [ -f "$f" ] && cat "$f" && echo
+            # quadro «Qual instalador escolher», igual em todas as versões
+            sed "s/{{VERSAO}}/${GITHUB_REF_NAME#v}/g" docs/versoes/_instaladores.md
+            echo "FIM_DAS_NOTAS"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Assinatura das actualizações (opcional): chave gerada com «npx tauri signer generate»
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Segredos do produtor embutidos no programa (docs/CERTIFICACAO-AGT.md). Nunca vão para a base de
+          # dados dos clientes. Sem eles a compilação sai como versão de desenvolvimento.
+          KANGEST_AGT_CHAVE: ${{ secrets.KANGEST_AGT_CHAVE }}
+          KANGEST_AGT_CERTIFICADO: ${{ secrets.KANGEST_AGT_CERTIFICADO }}
+          KANGEST_AGT_VERSAO_CHAVE: ${{ secrets.KANGEST_AGT_VERSAO_CHAVE }}
+          KANGEST_FE_UTILIZADOR: ${{ secrets.KANGEST_FE_UTILIZADOR }}
+          KANGEST_FE_SENHA: ${{ secrets.KANGEST_FE_SENHA }}
+          KANGEST_FE_CHAVE_SOFTWARE: ${{ secrets.KANGEST_FE_CHAVE_SOFTWARE }}
+          KANGEST_FE_NUMERO_VALIDACAO: ${{ secrets.KANGEST_FE_NUMERO_VALIDACAO }}
+          # públicos: variáveis do repositório (Settings → Secrets and variables → Actions → Variables)
+          KANGEST_CHAVE_ACTUALIZACOES: ${{ vars.KANGEST_CHAVE_ACTUALIZACOES }}
+          KANGEST_EXIGIR_CERTIFICACAO: ${{ vars.KANGEST_EXIGIR_CERTIFICACAO }}
+          # Selo de integridade: a pública vai compilada no executável; a privada só serve ao scripts/selar-executavel.mjs
+          KANGEST_SELO_PUBLICA: ${{ secrets.KANGEST_SELO_PUBLICA }}
+          KANGEST_SELO_PRIVADA: ${{ secrets.KANGEST_SELO_PRIVADA }}
+        with:
+          args: ${{ matrix.args }} ${{ env.ARGS_ASSINATURA }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: "KanGest ${{ github.ref_name }}"
+          releaseBody: ${{ steps.notas.outputs.corpo }}
+          # publicada logo: os instaladores ficam com link público em Releases
+          releaseDraft: false
+
+      - name: Confirmar a assinatura (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          for app in src-tauri/target/*/release/bundle/macos/*.app; do
+            codesign --verify --deep --strict --verbose=2 "$app" && codesign -dv "$app" 2>&1 | grep -E "Authority|Signature|TeamIdentifier" || true
+          done
+
+      # um selo errado impediria todas as instalações de facturar: confirma-se antes de publicar
+      - name: Confirmar o selo de integridade
+        shell: bash
+        env:
+          KANGEST_SELO_PUBLICA: ${{ secrets.KANGEST_SELO_PUBLICA }}
+        run: |
+          if [ -z "$KANGEST_SELO_PUBLICA" ]; then
+            echo "::warning::Sem KANGEST_SELO_PRIVADA/KANGEST_SELO_PUBLICA: instaladores sem selo de integridade (docs/SEGURANCA.md)."
+            exit 0
+          fi
+          selo() { cargo run --quiet --release --manifest-path scripts/selo/Cargo.toml -- verificar "$1" "$2"; }
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            for app in src-tauri/target/*/release/bundle/macos/*.app; do
+              for exe in "$app"/Contents/MacOS/*; do selo "$exe" "$app/Contents/Resources/selo.json"; done
+            done
+          else
+            selo src-tauri/target/release/kigest.exe src-tauri/selo/selo.json
+          fi
+
+      - name: Confirmar a assinatura (Windows)
+        if: runner.os == 'Windows' && env.ARGS_ASSINATURA != ''
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse src-tauri\target\release\bundle\nsis\*.exe | ForEach-Object {
+            $a = Get-AuthenticodeSignature $_.FullName
+            Write-Host "$($_.Name): $($a.Status) · $($a.SignerCertificate.Subject)"
+            if ($a.Status -ne 'Valid') { throw "O instalador não ficou assinado." }
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kangest-${{ matrix.nome }}
+          path: |
+            src-tauri/target/**/release/bundle/nsis/*.exe
+            src-tauri/target/**/release/bundle/dmg/*.dmg
+          if-no-files-found: ignore
+
+  # Depois dos três instaladores: assina-os para as actualizações automáticas e anexa à release o manifesto
+  # (kangest-atualizacao.json) e as somas SHA-256. O KanGest com a origem
+  # https://kangest.pages.dev/actualizacoes (o site.yml copia para lá o manifesto e os instaladores da versão do site)
+  # passa a encontrar sozinho cada versão nova.
+  manifesto:
+    name: manifesto das actualizações
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kangest-*
+          path: instaladores
+          merge-multiple: true
+
+      - name: Assinar, gerar o manifesto e anexar à release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          mkdir -p publicar
+          find instaladores -type f \( -name '*.exe' -o -name '*.dmg' \) -exec cp {} publicar/ \;
+          ls -l publicar
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npm ci --ignore-scripts
+            for f in publicar/*.exe publicar/*.dmg; do npx tauri signer sign "$f"; done
+          else
+            echo "::warning::Sem TAURI_SIGNING_PRIVATE_KEY: o manifesto sai só com o SHA-256 (sem assinaturas)."
+          fi
+          python3 scripts/manifesto-atualizacao.py publicar "$GITHUB_REF_NAME" "docs/versoes/$GITHUB_REF_NAME.md"
+          gh release upload "$GITHUB_REF_NAME" publicar/kangest-atualizacao.json publicar/SHA256SUMS.txt $(ls publicar/*.sig 2>/dev/null) --clobber

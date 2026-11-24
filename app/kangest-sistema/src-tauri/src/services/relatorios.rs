@@ -1,0 +1,787 @@
+// KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
+use serde::Deserialize;
+use serde_json::{json, Value};
+
+use crate::db;
+use crate::error::{AppError, AppResult};
+use crate::state::AppState;
+
+// Vendas líquidas: facturas (FR/FT/ND) somam, notas de crédito subtraem.
+pub(crate) const SINAL: &str = "CASE WHEN d.tipo_codigo = 'NC' THEN -1 ELSE 1 END";
+pub(crate) const VENDAS: &str = "d.tipo_codigo IN ('FR','FT','ND','NC') AND d.estado <> 'A'";
+// Filtros opcionais do relatório de vendas: ?3 entidade (cliente), ?4 posto, ?5 armazém (a loja, num servidor
+// central) e ?6 canal ('api' = documentos emitidos por uma chave da API, como a loja online; 'balcao' = os outros).
+const ENT: &str = "AND (?3 IS NULL OR d.entidade_id = ?3) AND (?4 IS NULL OR d.posto_id = ?4) AND (?5 IS NULL OR d.armazem_id = ?5)
+     AND (?6 IS NULL OR (?6 = 'api') = (d.api_chave_id IS NOT NULL))";
+
+/// Canal de venda: `api` (loja online e outras integrações) ou `balcao` (programa e POS).
+fn canal_valido(c: &Option<String>) -> AppResult<()> {
+    match c.as_deref() {
+        None | Some("api") | Some("balcao") => Ok(()),
+        Some(_) => Err(AppError::msg("Canal inválido: use «api» ou «balcao».")),
+    }
+}
+
+pub async fn dashboard(st: &AppState) -> AppResult<Value> {
+    st.sessao()?;
+    let p = &st.pool;
+    // um utilizador de uma loja vê o painel dessa loja (o id vem da sessão: é um inteiro, não texto do pedido)
+    let loja = st.loja().map(|a| format!(" AND d.armazem_id = {a}")).unwrap_or_default();
+    let hoje = db::hoje();
+    let mes = format!("{}-01", &hoje[..7]);
+    let (vendas_hoje, docs_hoje): (i64, i64) = sqlx::query_as(&format!(
+        "SELECT COALESCE(SUM({SINAL} * d.total), 0), COUNT(*) FROM documentos d WHERE {VENDAS} AND d.data_emissao = ?{loja}"
+    ))
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+    let (vendas_mes, docs_mes, iva_mes): (i64, i64, i64) = sqlx::query_as(&format!(
+        "SELECT COALESCE(SUM({SINAL} * d.total), 0), COUNT(*), COALESCE(SUM({SINAL} * d.total_iva), 0)
+         FROM documentos d WHERE {VENDAS} AND d.data_emissao >= ?{loja}"
+    ))
+    .bind(&mes)
+    .fetch_one(p)
+    .await?;
+    let (a_receber, a_pagar): (i64, i64) = sqlx::query_as(&format!(
+        "SELECT COALESCE(SUM(CASE WHEN t.grupo = 'VENDAS' THEN d.valor_pendente END), 0),
+                COALESCE(SUM(CASE WHEN t.grupo = 'COMPRAS' THEN d.valor_pendente END), 0)
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo WHERE d.estado = 'N' AND d.valor_pendente > 0{loja}",
+    ))
+    .fetch_one(p)
+    .await?;
+    let stock_baixo: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM artigos a LEFT JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?
+         WHERE a.controla_stock = 1 AND a.ativo = 1 AND COALESCE(s.quantidade, 0) <= a.qtd_minima",
+    )
+    .bind(st.loja().unwrap_or(st.posto().armazem_id))
+    .fetch_one(p)
+    .await?;
+    let serie = sqlx::query(&format!(
+        "SELECT d.data_emissao AS dia, SUM({SINAL} * d.total) AS total, COUNT(*) AS docs
+         FROM documentos d WHERE {VENDAS} AND d.data_emissao >= date(?, '-29 day'){loja}
+         GROUP BY d.data_emissao ORDER BY d.data_emissao"
+    ))
+    .bind(&hoje)
+    .fetch_all(p)
+    .await?;
+    let top = sqlx::query(&format!(
+        "SELECT l.referencia, l.descricao, SUM({SINAL} * l.quantidade) AS quantidade, SUM({SINAL} * l.total) AS total
+         FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+         WHERE {VENDAS} AND d.data_emissao >= ?{loja} GROUP BY l.referencia, l.descricao ORDER BY total DESC LIMIT 8"
+    ))
+    .bind(&mes)
+    .fetch_all(p)
+    .await?;
+    let ultimos = sqlx::query(&format!(
+        "SELECT d.id, d.numero_doc, d.entidade_nome, d.total, d.data_hora, d.estado FROM documentos d
+         JOIN tipos_documento t ON t.codigo = d.tipo_codigo WHERE t.classe IN ('VENDA','RECIBO'){loja}
+         ORDER BY d.data_hora DESC, d.id DESC LIMIT 8"
+    ))
+    .fetch_all(p)
+    .await?;
+
+    // Comparação com o período anterior: ontem e o mês passado até ao mesmo dia
+    // (até ao último dia, quando o mês passado é mais curto: 31/03 compara com 01/02–28/02).
+    let vendas_ontem: i64 = sqlx::query_scalar(&format!(
+        "SELECT COALESCE(SUM({SINAL} * d.total), 0) FROM documentos d WHERE {VENDAS} AND d.data_emissao = date(?, '-1 day'){loja}"
+    ))
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+    let vendas_mes_anterior: i64 = sqlx::query_scalar(&format!(
+        "SELECT COALESCE(SUM({SINAL} * d.total), 0) FROM documentos d WHERE {VENDAS}
+           AND d.data_emissao >= date(?1, 'start of month', '-1 month')
+           AND d.data_emissao <= min(date(?1, '-1 month'), date(?1, 'start of month', '-1 day')){loja}"
+    ))
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+
+    // Antiguidade dos saldos de clientes (dias desde o vencimento), como o «Aged Receivable» do Odoo
+    // e os mapas de antiguidade do Primavera. A soma das faixas é o «A receber».
+    let antiguidade = sqlx::query(&format!(
+        "SELECT COALESCE(SUM(CASE WHEN dias <= 0 THEN v END), 0) AS por_vencer,
+                COALESCE(SUM(CASE WHEN dias BETWEEN 1 AND 30 THEN v END), 0) AS d1_30,
+                COALESCE(SUM(CASE WHEN dias BETWEEN 31 AND 60 THEN v END), 0) AS d31_60,
+                COALESCE(SUM(CASE WHEN dias BETWEEN 61 AND 90 THEN v END), 0) AS d61_90,
+                COALESCE(SUM(CASE WHEN dias > 90 THEN v END), 0) AS mais_90,
+                COUNT(CASE WHEN dias > 0 THEN 1 END) AS docs_vencidos
+         FROM (SELECT d.valor_pendente AS v,
+                      CAST(julianday(?) - julianday(COALESCE(d.data_vencimento, d.data_emissao)) AS INTEGER) AS dias
+               FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+               WHERE d.estado = 'N' AND d.valor_pendente > 0 AND t.grupo = 'VENDAS'{loja})"
+    ))
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+    let (compras_vencidas, valor_compras_vencidas): (i64, i64) = sqlx::query_as(&format!(
+        "SELECT COUNT(*), COALESCE(SUM(d.valor_pendente), 0) FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.estado = 'N' AND d.valor_pendente > 0 AND t.grupo = 'COMPRAS' AND COALESCE(d.data_vencimento, d.data_emissao) < ?{loja}"
+    ))
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+
+    // Alertas («A sua atenção»): o que precisa de acção hoje
+    let proformas_a_expirar: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE t.classe = 'PROFORMA' AND d.estado = 'N' AND d.data_vencimento BETWEEN ?1 AND date(?1, '+7 day')",
+    )
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+    let (lotes_expirados, lotes_a_expirar): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(CASE WHEN l.validade < ?1 THEN 1 END),
+                COUNT(CASE WHEN l.validade >= ?1 AND l.validade <= date(?1, '+' || a.aviso_validade_dias || ' day') THEN 1 END)
+         FROM lotes l JOIN artigos a ON a.id = l.artigo_id
+         WHERE l.ativo = 1 AND l.quantidade > 0 AND COALESCE(l.validade, '') <> ''",
+    )
+    .bind(&hoje)
+    .fetch_one(p)
+    .await?;
+    let (fe_pendentes, fe_rejeitadas): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(CASE WHEN estado IN ('PENDENTE','ENVIADO') THEN 1 END), COUNT(CASE WHEN estado = 'INVALIDO' THEN 1 END) FROM fe_envios",
+    )
+    .fetch_one(p)
+    .await?;
+
+    let avencas_por_facturar = super::avencas::por_facturar(p).await?;
+    let propinas_por_facturar = super::escola::por_facturar(p).await?;
+
+    // Integrações paradas: uma chave da API usada com regularidade (20 pedidos ou mais) que não fala há mais de
+    // 3 horas — a loja online sincroniza o stock e as vendas pelo menos de hora a hora — ou um webhook com 3 falhas
+    // seguidas. Foi assim que a ligação da Livraria esteve parada dias sem ninguém dar por isso.
+    let integracoes_paradas: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM api_chaves
+                  WHERE ativa = 1 AND revogada_em IS NULL AND (IFNULL(expira_em, '') = '' OR expira_em >= date('now', 'localtime'))
+                    AND pedidos >= 20 AND ultimo_uso IS NOT NULL
+                    AND ultimo_uso < strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-3 hours'))
+              + (SELECT COUNT(*) FROM api_webhooks WHERE ativo = 1 AND falhas_seguidas >= 3)",
+    )
+    .fetch_one(p)
+    .await?;
+
+    // Recebimentos do mês por meio de pagamento (facturas/recibo, recibos e adiantamentos)
+    let por_modo = sqlx::query(
+        "SELECT m.descricao, SUM(dp.valor) AS total FROM documento_pagamentos dp
+         JOIN documentos d ON d.id = dp.documento_id JOIN modos_pagamento m ON m.codigo = dp.modo_codigo
+         WHERE d.estado = 'N' AND d.tipo_codigo IN ('FR','RC','RA') AND d.data_emissao >= ?
+         GROUP BY m.codigo ORDER BY total DESC",
+    )
+    .bind(&mes)
+    .fetch_all(p)
+    .await?;
+
+    Ok(json!({
+        "vendas_hoje": vendas_hoje, "docs_hoje": docs_hoje,
+        "vendas_mes": vendas_mes, "docs_mes": docs_mes, "iva_mes": iva_mes,
+        "ticket_medio": if docs_mes > 0 { vendas_mes / docs_mes } else { 0 },
+        "a_receber": a_receber, "a_pagar": a_pagar, "stock_baixo": stock_baixo,
+        "vendas_ontem": vendas_ontem, "vendas_mes_anterior": vendas_mes_anterior,
+        "antiguidade": db::row_json(&antiguidade),
+        "alertas": {
+            "proformas_a_expirar": proformas_a_expirar, "lotes_expirados": lotes_expirados, "lotes_a_expirar": lotes_a_expirar,
+            "fe_pendentes": fe_pendentes, "fe_rejeitadas": fe_rejeitadas,
+            "compras_vencidas": compras_vencidas, "valor_compras_vencidas": valor_compras_vencidas,
+            "avencas_por_facturar": avencas_por_facturar,
+            "propinas_por_facturar": propinas_por_facturar,
+            "integracoes_paradas": integracoes_paradas,
+        },
+        "por_modo": db::rows_json(&por_modo),
+        "serie": db::rows_json(&serie), "top_artigos": db::rows_json(&top), "ultimos": db::rows_json(&ultimos),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct VendasIn {
+    de: String,
+    ate: String,
+    /// dia | mes | artigo | familia | operador | vendedor | posto | armazem | mes_posto | mes_armazem | pagamento | cliente |
+    /// artigo_operador | artigo_entidade | documento | iva | iva_dia | iva_familia | irt_c
+    agrupar: String,
+    #[serde(default)]
+    entidade_id: Option<i64>,
+    #[serde(default)]
+    posto_id: Option<i64>,
+    #[serde(default)]
+    armazem_id: Option<i64>,
+    /// api | balcao
+    #[serde(default)]
+    canal: Option<String>,
+}
+
+pub async fn vendas(st: &AppState, f: VendasIn) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    canal_valido(&f.canal)?;
+    let taxa_c = taxa_grupo_c(&st.pool).await?;
+    let sql = match f.agrupar.as_str() {
+        // IRT Grupo C: imposto sobre o volume de vendas (sem IVA) de cada mês, à taxa configurada
+        "irt_c" => format!(
+            "SELECT substr(d.data_emissao, 1, 7) AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total,
+                    CAST(ROUND(SUM({SINAL}*d.total_liquido) * {taxa_c} / 100.0) AS INTEGER) AS irt
+             FROM documentos d WHERE {VENDAS} AND d.importado = 0 AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY 1"
+        ),
+        // total por mês (AAAA-MM), com o histórico importado do KIGEST
+        "mes" => format!(
+            "SELECT substr(d.data_emissao, 1, 7) AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY 1"
+        ),
+        "dia" => format!(
+            "SELECT d.data_emissao AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY 1"
+        ),
+        "artigo" => format!(
+            "SELECT l.referencia || ' — ' || l.descricao AS chave, MAX(l.artigo_id) AS artigo_id, l.referencia,
+                    SUM({SINAL}*l.quantidade) AS quantidade,
+                    SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total,
+                    SUM({SINAL}*(l.valor_liquido - CAST(ROUND(l.custo * l.quantidade) AS INTEGER))) AS lucro
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY l.referencia, l.descricao ORDER BY total DESC"
+        ),
+        "familia" => format!(
+            "SELECT COALESCE(f.descricao, '(sem família)') AS chave, SUM({SINAL}*l.quantidade) AS quantidade,
+                    SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             LEFT JOIN artigos a ON a.id = l.artigo_id LEFT JOIN familias f ON f.id = a.familia_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY total DESC"
+        ),
+        "operador" => format!(
+            "SELECT u.nome AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d JOIN utilizadores u ON u.id = d.utilizador_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY u.nome ORDER BY total DESC"
+        ),
+        "cliente" => format!(
+            "SELECT d.entidade_nome || ' (' || d.entidade_nif || ')' AS chave, COUNT(*) AS docs,
+                    SUM({SINAL}*d.total_liquido) AS liquido, SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY total DESC"
+        ),
+        "pagamento" => format!(
+            "SELECT m.descricao AS chave, COUNT(DISTINCT d.id) AS docs, SUM(p.valor) AS total
+             FROM documento_pagamentos p JOIN documentos d ON d.id = p.documento_id
+             JOIN modos_pagamento m ON m.codigo = p.modo_codigo
+             WHERE d.estado <> 'A' AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY m.descricao ORDER BY total DESC"
+        ),
+        // total por vendedor (funcionário escolhido no documento)
+        "vendedor" => format!(
+            "SELECT COALESCE(f.nome, '(sem vendedor)') AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d LEFT JOIN funcionarios f ON f.id = d.vendedor_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY total DESC"
+        ),
+        // vendas por ponto de venda (posto)
+        "posto" => format!(
+            "SELECT COALESCE(ps.descricao, 'Sem posto') AS chave, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d LEFT JOIN postos ps ON ps.id = d.posto_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY total DESC"
+        ),
+        // vendas por armazém (num servidor central, cada loja tem o seu armazém)
+        "armazem" => format!(
+            "SELECT COALESCE(ar.nome, 'Sem armazém') AS chave, d.armazem_id, COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido,
+                    SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d LEFT JOIN armazens ar ON ar.id = d.armazem_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY d.armazem_id ORDER BY total DESC"
+        ),
+        // cada mês de cada posto / de cada armazém (para os relatórios por loja e por mês)
+        "mes_posto" => format!(
+            "SELECT substr(d.data_emissao, 1, 7) || ' · ' || COALESCE(ps.descricao, 'Sem posto') AS chave,
+                    substr(d.data_emissao, 1, 7) AS mes, d.posto_id, ps.descricao AS posto,
+                    COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido, SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d LEFT JOIN postos ps ON ps.id = d.posto_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY substr(d.data_emissao, 1, 7), d.posto_id ORDER BY 2, ps.descricao"
+        ),
+        "mes_armazem" => format!(
+            "SELECT substr(d.data_emissao, 1, 7) || ' · ' || COALESCE(ar.nome, 'Sem armazém') AS chave,
+                    substr(d.data_emissao, 1, 7) AS mes, d.armazem_id, ar.nome AS armazem,
+                    COUNT(*) AS docs, SUM({SINAL}*d.total_liquido) AS liquido, SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
+             FROM documentos d LEFT JOIN armazens ar ON ar.id = d.armazem_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY substr(d.data_emissao, 1, 7), d.armazem_id ORDER BY 2, ar.nome"
+        ),
+        // artigos por operador: o que cada vendedor vendeu
+        "artigo_operador" => format!(
+            "SELECT u.nome || ' · ' || l.descricao AS chave, SUM({SINAL}*l.quantidade) AS quantidade,
+                    SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN utilizadores u ON u.id = d.utilizador_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY u.nome, l.descricao ORDER BY u.nome, total DESC"
+        ),
+        // artigos por entidade: o que cada cliente comprou
+        "artigo_entidade" => format!(
+            "SELECT d.entidade_nome || ' · ' || l.descricao AS chave, SUM({SINAL}*l.quantidade) AS quantidade,
+                    SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY d.entidade_nome, l.descricao ORDER BY d.entidade_nome, total DESC"
+        ),
+        // detalhe documento a documento (quantidades, base, IVA e total de cada um)
+        "documento" => format!(
+            "SELECT d.data_emissao || '  ' || d.numero_doc || ' · ' || d.entidade_nome || ' · ' || u.nome AS chave,
+                    SUM({SINAL}*l.quantidade) AS quantidade, SUM({SINAL}*l.valor_liquido) AS liquido,
+                    SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN utilizadores u ON u.id = d.utilizador_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY d.id ORDER BY d.data_emissao, d.id"
+        ),
+        "iva" => format!(
+            "SELECT 'IVA ' || l.taxa_iva_pct || '%' || COALESCE(' — ' || l.motivo_isencao, '') AS chave,
+                    SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY l.taxa_iva_pct, l.motivo_isencao ORDER BY l.taxa_iva_pct DESC"
+        ),
+        // mapa de imposto por dia (uma linha por dia e taxa)
+        "iva_dia" => format!(
+            "SELECT d.data_emissao || '  ·  IVA ' || l.taxa_iva_pct || '%' || COALESCE(' — ' || l.motivo_isencao, '') AS chave,
+                    COUNT(DISTINCT d.id) AS docs, SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY d.data_emissao, l.taxa_iva_pct, l.motivo_isencao ORDER BY d.data_emissao, l.taxa_iva_pct DESC"
+        ),
+        // mapa de imposto por família (uma linha por família e taxa)
+        "iva_familia" => format!(
+            "SELECT COALESCE(f.descricao, '(sem família)') || '  ·  IVA ' || l.taxa_iva_pct || '%' || COALESCE(' — ' || l.motivo_isencao, '') AS chave,
+                    SUM({SINAL}*l.quantidade) AS quantidade, SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+             LEFT JOIN artigos a ON a.id = l.artigo_id LEFT JOIN familias f ON f.id = a.familia_id
+             WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
+             GROUP BY f.descricao, l.taxa_iva_pct, l.motivo_isencao ORDER BY f.descricao, l.taxa_iva_pct DESC"
+        ),
+        _ => return Err(AppError::msg("Agrupamento inválido.")),
+    };
+    let rows = sqlx::query(&sql)
+        .bind(&f.de)
+        .bind(&f.ate)
+        .bind(f.entidade_id)
+        .bind(f.posto_id)
+        // um utilizador de uma loja só vê as vendas dela, peça o que pedir
+        .bind(st.loja().or(f.armazem_id))
+        .bind(&f.canal)
+        .fetch_all(&st.pool)
+        .await?;
+    Ok(db::rows_json(&rows))
+}
+
+// ============================== relatório síntese ==============================
+
+#[derive(Deserialize)]
+pub struct SinteseIn {
+    ano: i32,
+    /// Só um posto / um armazém (uma loja) / um canal (api | balcao), como no relatório de vendas.
+    #[serde(default)]
+    posto_id: Option<i64>,
+    #[serde(default)]
+    armazem_id: Option<i64>,
+    #[serde(default)]
+    canal: Option<String>,
+}
+
+/// Relatório síntese: vendas de cada mês de um ano ao lado do ano anterior (como o «Relatório Síntese»
+/// da livraria), com o histórico importado do KIGEST. O mês corrente vai assinalado (valor parcial).
+pub async fn sintese(st: &AppState, s: SinteseIn) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    if !(1990..=2100).contains(&s.ano) {
+        return Err(AppError::msg("Ano inválido."));
+    }
+    canal_valido(&s.canal)?;
+    let rows: Vec<(i64, i64, i64, i64, i64, i64)> = sqlx::query_as(&format!(
+        "SELECT CAST(substr(d.data_emissao, 1, 4) AS INTEGER), CAST(substr(d.data_emissao, 6, 2) AS INTEGER), COUNT(*),
+                COALESCE(SUM({SINAL}*d.total), 0), COALESCE(SUM({SINAL}*d.total_liquido), 0),
+                COALESCE(SUM(CASE WHEN d.importado = 1 THEN {SINAL}*d.total ELSE 0 END), 0)
+         FROM documentos d WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao < ?2
+           AND (?3 IS NULL OR d.posto_id = ?3) AND (?4 IS NULL OR d.armazem_id = ?4)
+           AND (?5 IS NULL OR (?5 = 'api') = (d.api_chave_id IS NOT NULL))
+         GROUP BY 1, 2"
+    ))
+    .bind(format!("{}-01-01", s.ano - 1))
+    .bind(format!("{}-01-01", s.ano + 1))
+    .bind(s.posto_id)
+    .bind(st.loja().or(s.armazem_id))
+    .bind(&s.canal)
+    .fetch_all(&st.pool)
+    .await?;
+    let valor = |ano: i32, mes: i64| rows.iter().find(|r| r.0 == ano as i64 && r.1 == mes);
+    let meses: Vec<Value> = (1..=12)
+        .map(|m| {
+            let a = valor(s.ano, m);
+            let b = valor(s.ano - 1, m);
+            json!({
+                "mes": m,
+                "atual": a.map(|r| r.3), "docs_atual": a.map(|r| r.2).unwrap_or(0), "liquido_atual": a.map(|r| r.4),
+                "anterior": b.map(|r| r.3), "docs_anterior": b.map(|r| r.2).unwrap_or(0), "liquido_anterior": b.map(|r| r.4),
+            })
+        })
+        .collect();
+    let historico: i64 = rows.iter().map(|r| r.5).sum();
+    let anos: Vec<i64> = sqlx::query_scalar(&format!(
+        "SELECT DISTINCT CAST(substr(d.data_emissao, 1, 4) AS INTEGER) FROM documentos d WHERE {VENDAS} ORDER BY 1 DESC"
+    ))
+    .fetch_all(&st.pool)
+    .await?;
+    let hoje = db::hoje();
+    let mes_em_curso = (hoje[..4] == s.ano.to_string()).then(|| hoje[5..7].parse::<i64>().unwrap_or(0));
+    Ok(json!({ "ano": s.ano, "anterior": s.ano - 1, "meses": meses, "anos": anos, "mes_em_curso": mes_em_curso, "historico_kigest": historico }))
+}
+
+// ============================== stock ==============================
+
+#[derive(Deserialize)]
+pub struct StockIn {
+    armazem_id: Option<i64>,
+    /// ruptura | minimo | excesso | validade | parado
+    situacao: String,
+    /// validade: dias até expirar; parado: dias sem saída
+    #[serde(default)]
+    dias: Option<i64>,
+}
+
+/// Relatórios de stock do GC: ruptura, abaixo do mínimo, excesso, validade e artigos parados.
+pub async fn stock(st: &AppState, f: StockIn) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    let armazem = st.loja().or(f.armazem_id).unwrap_or(st.posto().armazem_id);
+    let dias = f.dias.unwrap_or(30);
+
+    // Validade olha para os lotes, não para o saldo do artigo.
+    if f.situacao == "validade" {
+        let rows = sqlx::query(
+            "SELECT a.referencia, a.descricao, ar.nome AS armazem, l.lote, l.validade, l.quantidade,
+                    CAST(julianday(l.validade) - julianday(date('now','localtime')) AS INTEGER) AS dias_validade,
+                    CAST(ROUND(l.quantidade * l.custo) AS INTEGER) AS valor_custo
+             FROM lotes l JOIN artigos a ON a.id = l.artigo_id JOIN armazens ar ON ar.id = l.armazem_id
+             WHERE l.armazem_id = ?1 AND l.quantidade > 0 AND l.validade IS NOT NULL
+               AND julianday(l.validade) - julianday(date('now','localtime')) <= ?2
+             ORDER BY l.validade, a.descricao",
+        )
+        .bind(armazem)
+        .bind(dias)
+        .fetch_all(&st.pool)
+        .await?;
+        return Ok(db::rows_json(&rows));
+    }
+
+    // Lista de preços (ListaPreco do KIGEST): todos os artigos activos, por família e subfamília
+    if f.situacao == "precos" {
+        let pvp = |n: u8| format!("CAST(ROUND(a.preco{n} * (1 + t.percentagem / 100.0)) AS INTEGER) AS pvp{n}");
+        let rows = sqlx::query(&format!(
+            "SELECT a.referencia, a.descricao, u.abreviatura AS unidade, f.descricao AS familia, sf.descricao AS subfamilia,
+                    a.custo, t.percentagem AS taxa_pct, a.preco1, {}, {}, {}, {},
+                    COALESCE(s.quantidade, 0) AS quantidade, 0 AS valor_custo,
+                    CASE WHEN a.promo_desconto > 0 AND COALESCE(a.promo_inicio, '') <= date('now', 'localtime')
+                              AND (a.promo_fim IS NULL OR a.promo_fim = '' OR a.promo_fim >= date('now', 'localtime'))
+                         THEN a.promo_desconto ELSE 0 END AS promo_atual
+             FROM artigos a
+             JOIN taxas_iva t ON t.id = a.taxa_iva_id
+             LEFT JOIN unidades u ON u.id = a.unidade_id
+             LEFT JOIN familias f ON f.id = a.familia_id
+             LEFT JOIN subfamilias sf ON sf.id = a.subfamilia_id
+             LEFT JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?1
+             WHERE a.ativo = 1
+             ORDER BY COALESCE(f.descricao, 'zzz'), COALESCE(sf.descricao, ''), a.descricao",
+            pvp(1),
+            pvp(2),
+            pvp(3),
+            pvp(4)
+        ))
+        .bind(armazem)
+        .fetch_all(&st.pool)
+        .await?;
+        return Ok(db::rows_json(&rows));
+    }
+    // Lista de stock do armazém (ListaStock / ListaStockArmazem do KIGEST): todos os artigos com controlo de stock
+    if f.situacao == "existencias" {
+        let rows = sqlx::query(
+            "SELECT a.referencia, a.descricao, u.abreviatura AS unidade, f.descricao AS familia,
+                    COALESCE(s.quantidade, 0) AS quantidade, a.custo_medio, a.qtd_minima,
+                    CAST(ROUND(COALESCE(s.quantidade, 0) * a.custo_medio) AS INTEGER) AS valor_custo
+             FROM artigos a
+             LEFT JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?1
+             LEFT JOIN unidades u ON u.id = a.unidade_id
+             LEFT JOIN familias f ON f.id = a.familia_id
+             WHERE a.ativo = 1 AND a.controla_stock = 1
+             ORDER BY COALESCE(f.descricao, 'zzz'), a.descricao",
+        )
+        .bind(armazem)
+        .fetch_all(&st.pool)
+        .await?;
+        return Ok(db::rows_json(&rows));
+    }
+    // Previsão de venda (PrevisaoVenda do KIGEST): o stock existente ao custo e ao preço de venda (PVP 1 s/ IVA)
+    if f.situacao == "previsao" {
+        let rows = sqlx::query(
+            "SELECT a.referencia, a.descricao, u.abreviatura AS unidade, f.descricao AS familia,
+                    s.quantidade, a.custo_medio, a.preco1,
+                    CAST(ROUND(s.quantidade * a.custo_medio) AS INTEGER) AS valor_custo,
+                    CAST(ROUND(s.quantidade * a.preco1) AS INTEGER) AS valor_venda,
+                    CAST(ROUND(s.quantidade * a.preco1) AS INTEGER) - CAST(ROUND(s.quantidade * a.custo_medio) AS INTEGER) AS lucro
+             FROM artigos a
+             JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?1
+             LEFT JOIN unidades u ON u.id = a.unidade_id
+             LEFT JOIN familias f ON f.id = a.familia_id
+             WHERE a.ativo = 1 AND a.controla_stock = 1 AND s.quantidade > 0
+             ORDER BY COALESCE(f.descricao, 'zzz'), a.descricao",
+        )
+        .bind(armazem)
+        .fetch_all(&st.pool)
+        .await?;
+        return Ok(db::rows_json(&rows));
+    }
+
+    let condicao = match f.situacao.as_str() {
+        "ruptura" => "COALESCE(s.quantidade, 0) <= 0",
+        "minimo" => "COALESCE(s.quantidade, 0) > 0 AND COALESCE(s.quantidade, 0) <= a.qtd_minima",
+        "excesso" => "a.qtd_maxima > 0 AND COALESCE(s.quantidade, 0) > a.qtd_maxima",
+        "parado" => "COALESCE(s.quantidade, 0) > 0 AND (s.ultima_saida IS NULL OR julianday(date('now','localtime')) - julianday(s.ultima_saida) >= ?2)",
+        _ => return Err(AppError::msg("Situação de stock inválida.")),
+    };
+    let rows = sqlx::query(&format!(
+        "SELECT a.referencia, a.descricao, u.abreviatura AS unidade, ar.nome AS armazem,
+                COALESCE(s.quantidade, 0) AS quantidade, a.qtd_minima, a.qtd_maxima, a.custo_medio, a.preco1,
+                CAST(ROUND(COALESCE(s.quantidade, 0) * a.custo_medio) AS INTEGER) AS valor_custo,
+                s.ultima_entrada, s.ultima_saida,
+                CAST(julianday(date('now','localtime')) - julianday(s.ultima_saida) AS INTEGER) AS dias_sem_saida
+         FROM artigos a
+         LEFT JOIN unidades u ON u.id = a.unidade_id
+         LEFT JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?1
+         LEFT JOIN armazens ar ON ar.id = ?1
+         WHERE a.controla_stock = 1 AND a.ativo = 1 AND ({condicao})
+         ORDER BY a.descricao"
+    ))
+    .bind(armazem)
+    .bind(dias)
+    .fetch_all(&st.pool)
+    .await?;
+    Ok(db::rows_json(&rows))
+}
+
+// ============================== rastreabilidade de lotes ==============================
+
+#[derive(Deserialize)]
+pub struct RastreioIn {
+    #[serde(default)]
+    lote: Option<String>,
+    #[serde(default)]
+    artigo_id: Option<i64>,
+}
+
+/// Rastreio de lotes: de quem veio cada lote e para quem foi, documento a documento.
+pub async fn rastreio(st: &AppState, f: RastreioIn) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    let lote = f.lote.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(|s| format!("%{s}%"));
+    if lote.is_none() && f.artigo_id.is_none() {
+        return Err(AppError::msg("Indique o lote ou o artigo a rastrear."));
+    }
+    let lotes = sqlx::query(
+        "SELECT l.id, l.lote, l.data_fabrico, l.validade, l.quantidade AS saldo, l.custo,
+                a.id AS artigo_id, a.referencia, a.descricao, ar.nome AS armazem
+         FROM lotes l JOIN artigos a ON a.id = l.artigo_id JOIN armazens ar ON ar.id = l.armazem_id
+         WHERE (?1 IS NULL OR l.lote LIKE ?1) AND (?2 IS NULL OR l.artigo_id = ?2)
+         ORDER BY a.descricao, l.validade IS NULL, l.validade",
+    )
+    .bind(&lote)
+    .bind(f.artigo_id)
+    .fetch_all(&st.pool)
+    .await?;
+
+    let mut saida = Vec::with_capacity(lotes.len());
+    for l in &lotes {
+        let id: i64 = sqlx::Row::get(l, "id");
+        // Os movimentos de lote guardam o documento; a entidade diz de quem veio ou para quem foi.
+        let movs = sqlx::query(
+            "SELECT d.id, d.numero_doc, d.data_emissao, d.entidade_nome, d.entidade_nif, d.estado,
+                    t.descricao AS tipo, t.grupo, m.quantidade
+             FROM lote_movimentos m JOIN documentos d ON d.id = m.documento_id
+             JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+             WHERE m.lote_id = ?1 ORDER BY d.data_emissao, d.id",
+        )
+        .bind(id)
+        .fetch_all(&st.pool)
+        .await?;
+        let mut obj = db::row_json(l);
+        obj["movimentos"] = db::rows_json(&movs);
+        saida.push(obj);
+    }
+    Ok(Value::Array(saida))
+}
+
+// ============================== mapa de fornecedor ==============================
+
+#[derive(Deserialize)]
+pub struct FornecedorIn {
+    de: String,
+    ate: String,
+    /// Com fornecedor escolhido, devolve também os documentos um a um.
+    #[serde(default)]
+    entidade_id: Option<i64>,
+}
+
+/// Mapa de fornecedor: compras, pagamentos, saldo em dívida e (por fornecedor) os documentos.
+pub async fn fornecedores(st: &AppState, f: FornecedorIn) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    let resumo = sqlx::query(
+        "SELECT e.id, e.nome, e.nif, e.telefone,
+                SUM(CASE WHEN t.classe = 'COMPRA' THEN (CASE WHEN t.credito = 1 THEN -d.total ELSE d.total END) ELSE 0 END) AS compras,
+                SUM(CASE WHEN t.classe = 'COMPRA' THEN (CASE WHEN t.credito = 1 THEN -d.total_iva ELSE d.total_iva END) ELSE 0 END) AS iva,
+                SUM(CASE WHEN t.classe = 'PAGAMENTO' THEN d.total ELSE 0 END) AS pagamentos,
+                COUNT(CASE WHEN t.classe = 'COMPRA' THEN 1 END) AS docs
+         FROM documentos d
+         JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         JOIN entidades e ON e.id = d.entidade_id
+         WHERE t.grupo = 'COMPRAS' AND d.estado <> 'A' AND d.data_emissao BETWEEN ?1 AND ?2
+           AND (?3 IS NULL OR e.id = ?3)
+         GROUP BY e.id HAVING compras <> 0 OR pagamentos <> 0
+         ORDER BY compras DESC",
+    )
+    .bind(&f.de)
+    .bind(&f.ate)
+    .bind(f.entidade_id)
+    .fetch_all(&st.pool)
+    .await?;
+
+    // Dívida actual (toda, não só do período) para fechar o mapa com o saldo real.
+    let pendente = sqlx::query(
+        "SELECT d.entidade_id AS id, SUM(d.valor_pendente) AS pendente
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE t.grupo = 'COMPRAS' AND d.estado = 'N' AND d.valor_pendente > 0 AND (?1 IS NULL OR d.entidade_id = ?1)
+         GROUP BY d.entidade_id",
+    )
+    .bind(f.entidade_id)
+    .fetch_all(&st.pool)
+    .await?;
+
+    let documentos = match f.entidade_id {
+        None => Value::Array(vec![]),
+        Some(id) => {
+            let rows = sqlx::query(
+                "SELECT d.id, d.numero_doc, d.doc_externo, d.data_emissao, d.data_vencimento, t.descricao AS tipo, t.classe,
+                        d.total, d.total_iva, d.valor_pendente, d.estado, d.moeda, d.cambio
+                 FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+                 WHERE t.grupo = 'COMPRAS' AND d.entidade_id = ?1 AND d.data_emissao BETWEEN ?2 AND ?3
+                 ORDER BY d.data_emissao, d.id",
+            )
+            .bind(id)
+            .bind(&f.de)
+            .bind(&f.ate)
+            .fetch_all(&st.pool)
+            .await?;
+            db::rows_json(&rows)
+        }
+    };
+    Ok(json!({ "resumo": db::rows_json(&resumo), "pendentes": db::rows_json(&pendente), "documentos": documentos }))
+}
+
+
+/// Taxa do IRT Grupo C sobre o volume de vendas (configurável; 6,5% por defeito).
+pub async fn taxa_grupo_c(p: &sqlx::SqlitePool) -> AppResult<f64> {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'irt.grupo_c_taxa'").fetch_optional(p).await?;
+    Ok(v.and_then(|x| x.parse::<f64>().ok()).filter(|t| (0.0..=100.0).contains(t)).unwrap_or(6.5))
+}
+
+#[derive(Deserialize)]
+pub struct TaxaIn {
+    taxa: f64,
+}
+
+pub async fn irt_c_obter(st: &AppState) -> AppResult<Value> {
+    st.exigir_perm("relatorios.ver")?;
+    Ok(json!({ "taxa": taxa_grupo_c(&st.pool).await? }))
+}
+
+pub async fn irt_c_guardar(st: &AppState, t: TaxaIn) -> AppResult<Value> {
+    st.exigir_perm("sistema.parametrizacao")?;
+    if !(0.0..=100.0).contains(&t.taxa) {
+        return Err(AppError::msg("Taxa inválida."));
+    }
+    sqlx::query("INSERT INTO config (chave, valor) VALUES ('irt.grupo_c_taxa', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
+        .bind(t.taxa.to_string())
+        .execute(&st.pool)
+        .await?;
+    Ok(Value::Null)
+}
+
+#[derive(Deserialize)]
+pub struct TopIn {
+    /// artigos | clientes | familias | vendedores | operadores
+    #[serde(default)]
+    tipo: Option<String>,
+    /// hoje | semana | mes | 30dias | ano
+    #[serde(default)]
+    periodo: Option<String>,
+    /// valor | quantidade (nos artigos e nas famílias, unidades; nos outros, documentos)
+    #[serde(default)]
+    ordem: Option<String>,
+    #[serde(default)]
+    n: Option<i64>,
+}
+
+/// Os «tops» do painel, à escolha de cada um: o que mais vendeu (artigos, clientes, famílias, vendedores ou quem
+/// emitiu), num período, por valor ou por quantidade. Vendas líquidas de notas de crédito; só a loja do utilizador.
+pub async fn top(st: &AppState, t: TopIn) -> AppResult<Value> {
+    st.sessao()?;
+    let loja = st.loja().map(|a| format!(" AND d.armazem_id = {a}")).unwrap_or_default();
+    let hoje = db::hoje();
+    let periodo = t.periodo.as_deref().unwrap_or("mes");
+    let desde = match periodo {
+        "hoje" => hoje.clone(),
+        "semana" => (chrono::NaiveDate::parse_from_str(&hoje, "%Y-%m-%d").unwrap_or_default() - chrono::Days::new(6)).to_string(),
+        "30dias" => (chrono::NaiveDate::parse_from_str(&hoje, "%Y-%m-%d").unwrap_or_default() - chrono::Days::new(29)).to_string(),
+        "ano" => format!("{}-01-01", &hoje[..4]),
+        "mes" => format!("{}-01", &hoje[..7]),
+        _ => return Err(AppError::msg("Período inválido: hoje, semana, mes, 30dias ou ano.")),
+    };
+    let por_qtd = t.ordem.as_deref() == Some("quantidade");
+    let n = t.n.unwrap_or(6).clamp(3, 20);
+    // (chave e nome do grupo, junções, quantidade)
+    let (grupo, juntar, quantidade) = match t.tipo.as_deref().unwrap_or("artigos") {
+        "artigos" => ("l.referencia AS chave, MAX(l.descricao) AS nome", "", format!("SUM({SINAL} * l.quantidade)")),
+        "familias" => (
+            "COALESCE(f.id, 0) AS chave, COALESCE(MAX(f.descricao), '(sem família)') AS nome",
+            " LEFT JOIN artigos a ON a.id = l.artigo_id LEFT JOIN familias f ON f.id = a.familia_id",
+            format!("SUM({SINAL} * l.quantidade)"),
+        ),
+        // o nome da ficha de hoje (os documentos guardam o nome da altura, que pode ter mudado)
+        "clientes" => (
+            "COALESCE(d.entidade_id, 1) AS chave, COALESCE(MAX(e.nome), MAX(d.entidade_nome), 'Consumidor Final') AS nome",
+            " LEFT JOIN entidades e ON e.id = d.entidade_id",
+            "COUNT(DISTINCT d.id)".to_string(),
+        ),
+        "vendedores" => (
+            "COALESCE(v.id, 0) AS chave, COALESCE(MAX(v.nome), '(sem vendedor)') AS nome",
+            " LEFT JOIN funcionarios v ON v.id = d.vendedor_id",
+            "COUNT(DISTINCT d.id)".to_string(),
+        ),
+        "operadores" => ("COALESCE(u.id, 0) AS chave, COALESCE(MAX(u.nome), '—') AS nome", " LEFT JOIN utilizadores u ON u.id = d.utilizador_id", "COUNT(DISTINCT d.id)".to_string()),
+        _ => return Err(AppError::msg("Tipo inválido: artigos, clientes, familias, vendedores ou operadores.")),
+    };
+    // nos documentos (clientes, vendedores, operadores) o valor vem do total do documento; nos artigos e famílias, das linhas
+    let por_documento = matches!(t.tipo.as_deref(), Some("clientes" | "vendedores" | "operadores"));
+    let sql = if por_documento {
+        format!(
+            "SELECT {grupo}, {quantidade} AS quantidade, SUM({SINAL} * d.total) AS total
+             FROM documentos d{juntar}
+             WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao <= ?2{loja}
+             GROUP BY chave ORDER BY {} DESC LIMIT {n}",
+            if por_qtd { "quantidade" } else { "total" }
+        )
+    } else {
+        format!(
+            "SELECT {grupo}, {quantidade} AS quantidade, SUM({SINAL} * l.total) AS total
+             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id{juntar}
+             WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao <= ?2{loja}
+             GROUP BY chave ORDER BY {} DESC LIMIT {n}",
+            if por_qtd { "quantidade" } else { "total" }
+        )
+    };
+    let rows = sqlx::query(&sql).bind(&desde).bind(&hoje).fetch_all(&st.pool).await?;
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COALESCE(SUM({SINAL} * d.total), 0) FROM documentos d WHERE {VENDAS} AND d.data_emissao >= ? AND d.data_emissao <= ?{loja}"))
+        .bind(&desde)
+        .bind(&hoje)
+        .fetch_one(&st.pool)
+        .await?;
+    Ok(json!({ "desde": desde, "ate": hoje, "total_periodo": total, "linhas": db::rows_json(&rows) }))
+}

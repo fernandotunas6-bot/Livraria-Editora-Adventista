@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+/* Paleta KanGest: verde-petróleo, creme quente, âmbar. */
+@theme {
+  /* Títulos e números grandes um pouco mais compactos, sem as letras se tocarem (o -0,025em do Tailwind juntava-as
+     com a fonte do sistema em negrito: «KanGest», os valores do POS e do modo TV). */
+  --tracking-tight: -0.01em;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+
+  --color-bg: #f6f4ef;
+  --color-surface: #ffffff;
+  --color-sunken: #efece5;
+  --color-line: #e3dfd6;
+  --color-line-strong: #cfc9bc;
+  --color-ink: #1d2422;
+  --color-ink-2: #4b5552;
+  --color-ink-3: #7c8582;
+
+  --color-brand: #146b63;
+  --color-brand-600: #0f5a53;
+  --color-brand-700: #0c4a44;
+  --color-brand-50: #e6f2f0;
+  --color-brand-100: #cce5e1;
+
+  --color-chart: #00897b; /* validado: banda de luminosidade, croma e contraste vs superfície */
+  --color-grid: #ebe8e1;
+
+  --color-accent: #e09a2b;
+  --color-accent-50: #fdf3e2;
+
+  --color-danger: #c2412d;
+  --color-danger-50: #fbeae6;
+  --color-ok: #2f855a;
+  --color-ok-50: #e7f4ec;
+
+  /* Cores semânticas (iguais nos dois temas onde o fundo também não muda). */
+  --color-accent-ink: #9a6514;   /* texto sobre accent-50 (avisos, valores em dívida) */
+  --color-on-accent: #1d2422;    /* texto sobre os botões âmbar (Abrir POS, Pagar) */
+  --color-nav: #0c4a44;          /* menu lateral */
+  --color-scrim: rgb(29 36 34 / 0.4); /* fundo por trás das janelas */
+
+  --radius-xl: 14px;
+  --shadow-card: 0 1px 2px rgb(29 36 34 / 0.05), 0 1px 1px rgb(29 36 34 / 0.03);
+  --shadow-pop: 0 18px 50px -12px rgb(29 36 34 / 0.35);
+}
+
+/* Densidade das tabelas (Utilizador → Aparência): «Compacta» mostra mais linhas, como as grelhas do Primavera. */
+:root {
+  --kg-celula-y: 0.625rem;
+  --kg-cab-y: 0.625rem;
+  color-scheme: light;
+}
+/*
+ * Telemóveis (< 640 px): as grelhas de 3+ colunas dos ecrãs de gestão passam a 2 colunas e os campos
+ * largos (col-span-3+) ocupam a linha inteira — na área de conteúdo (<main>) e nas janelas. Os teclados
+ * numéricos e de PIN (.kg-teclas), que precisam das suas colunas, ficam como estão.
+ */
+@media (max-width: 639px) {
+  :is(main, [role="dialog"]) :is(.grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6, .grid-cols-8, .grid-cols-12):not(.kg-teclas) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  :is(main, [role="dialog"]) :is(.grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6, .grid-cols-8, .grid-cols-12):not(.kg-teclas) > :is(.col-span-3, .col-span-4, .col-span-5, .col-span-6, .col-span-8, .col-span-12) {
+    grid-column: 1 / -1;
+  }
+}
+/* Modo táctil (telemóveis, tablets, terminais POS): linhas e alvos com altura para o dedo (≥ 44 px) */
+:root[data-toque="1"] {
+  --kg-celula-y: 0.8rem;
+  --kg-cab-y: 0.7rem;
+}
+:root[data-toque="1"] .kg-btn { min-height: 2.75rem; }
+:root[data-toque="1"] .kg-btn.kg-btn-sm { min-height: 2.5rem; }
+:root[data-toque="1"] .kg-campo { min-height: 2.75rem; }
+:root[data-densidade="compacta"] {
+  --kg-celula-y: 0.3125rem;
+  --kg-cab-y: 0.4375rem;
+}
+
+/*
+ * Tema escuro (Utilizador → Aparência). Só no ecrã: na impressão valem sempre as cores claras.
+ * Os fundos com o nome de uma cor (bg-brand, bg-danger, bg-ok) mantêm texto branco legível;
+ * o texto com essas cores precisa de tons mais claros, daí as regras .text-* a seguir.
+ */
+@media screen {
+  :root[data-tema="escuro"] {
+    color-scheme: dark;
+    --color-bg: #101513;
+    --color-surface: #171d1b;
+    --color-sunken: #222a27;
+    --color-line: #2a3330;
+    --color-line-strong: #3a4541;
+    --color-ink: #e7ece9;
+    --color-ink-2: #b4bfba;
+    --color-ink-3: #85918c;
+
+    --color-brand: #1d8073;
+    --color-brand-600: #22907f;
+    --color-brand-700: #0f3b36;
+    --color-brand-50: #15302c;
+    --color-brand-100: #1c3f3a;
+
+    --color-chart: #24a596;
+    --color-grid: #26302d;
+
+    --color-accent-50: #2d2416;
+    --color-danger-50: #34201c;
+    --color-ok-50: #16301f;
+
+    --color-accent-ink: #f0b54f;
+    --color-nav: #0c1715;
+    --color-scrim: rgb(0 0 0 / 0.6);
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-pop: 0 18px 50px -12px rgb(0 0 0 / 0.7);
+  }
+  /* com outro jogo de cores (Configurações → Aparência), estes tons vêm de src/lib/cores.ts */
+  :root[data-tema="escuro"] :is(.text-brand, .hover\:text-brand:hover) { color: var(--cor-texto-marca, #5cc3b5); }
+  :root[data-tema="escuro"] .text-brand-700 { color: var(--cor-texto-marca-700, #7fd1c6); }
+  :root[data-tema="escuro"] :is(.text-danger, .hover\:text-danger:hover) { color: #ef7a63; }
+  :root[data-tema="escuro"] .text-ok { color: #4cc18a; }
+}
+
+html, body, #root { height: 100%; }
+/* aplicação, não página: sem «puxar para recarregar» (perdia a venda em curso) nem zoom com toque duplo */
+html, body { overscroll-behavior: none; }
+html { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* iPhone/iPad: campos com letra abaixo de 16px fazem o Safari ampliar a página ao tocar-lhes */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: max(16px, 1em) !important; }
+}
+/* telemóveis com recorte (notch) e barra de gestos: o conteúdo fica dentro da zona segura */
+#root {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Teclas nos atalhos (Ctrl K, F12…); na camada base para as classes poderem mudar o tamanho e as cores */
+@layer base {
+  kbd {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1;
+    padding: 3px 5px;
+    border-radius: 5px;
+    border: 1px solid var(--color-line-strong);
+    border-bottom-width: 2px;
+    background: var(--color-surface);
+    color: var(--color-ink-2);
+  }
+}
+input, textarea, select, [data-selectable] { user-select: text; -webkit-user-select: text; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Tabelas densas (linhas dos documentos, salários, stock): margens laterais menores para caberem em ecrãs de 1280 px. */
+.tabela-compacta th, .tabela-compacta td { padding-left: 0.5rem; padding-right: 0.5rem; }
+.tabela-compacta th:first-child, .tabela-compacta td:first-child { padding-left: 1rem; }
+.tabela-compacta th:last-child, .tabela-compacta td:last-child { padding-right: 0.75rem; }
+/* Caixas de escolha: seta própria (igual no macOS e no Windows) em vez da nativa, que ocupava espaço a dobrar. */
+.select-kg {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b8189' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 14px 14px;
+  text-overflow: ellipsis;
+}
+/* Na camada base para que as classes (ex.: outline-none das caixas de texto, que usam o anel) a possam substituir. */
+@layer base {
+  :focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 10px; border: 2px solid var(--color-bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* grelha do motor de dados (components/dados/Grelha.tsx): bordas separadas, para o total preso ao fundo tapar bem as
+   linhas que passam por baixo (com as bordas fundidas o Chrome deixava ver bocados delas) */
+.grelha-dados table { border-collapse: separate; border-spacing: 0; }
+
+/* barra do ecrã de arranque (App.tsx): vai e vem */
+@keyframes kg-arranque {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+/* ---------- Impressão: só a área #print-area ---------- */
+@media screen {
+  #print-area { display: none; }
+}
+@media print {
+  /* só o #print-area vai para o papel: o resto do programa sai da página (com «visibility: hidden» continuava a ocupar
+     espaço e a impressora puxava metros de papel em branco) */
+  body > *:not(#print-area) { display: none !important; }
+  html, body { height: auto !important; min-height: 0 !important; overflow: visible !important; background: white !important; }
+  #print-area { display: block !important; position: static; width: 100%; background: white; }
+  @page { margin: 10mm; }
+  .print-ticket { width: 72mm !important; }
+  .print-ticket.talao-58 { width: 48mm !important; }
+  /* cada via do talão na sua página (a impressora corta entre elas) */
+  .via-talao + .via-talao { break-before: page; }
+}
+/* medição do talão antes de imprimir (lib/print.ts): a mesma largura que no papel */
+#print-area.a-medir .print-ticket { width: 72mm !important; }
+#print-area.a-medir .print-ticket.talao-58 { width: 48mm !important; }
+
+/* Capturas do KanGest tiradas no jogo verde-petróleo (cartões do ecrã de entrada): nos outros jogos ficam a cinzento e
+   o véu do cartão dá-lhes a cor do jogo, para não misturar o verde com o azul, o vinho… */
+:root[data-paleta]:not([data-paleta="petroleo"]) .kg-captura-verde {
+  filter: grayscale(1) contrast(1.05);
+}

@@ -1,0 +1,412 @@
+// KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Link, useSearchParams } from "react-router-dom";
+import { BookOpen, Database, Download, Info, Keyboard, Mail, Phone, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { call, MODO_WEB } from "@/lib/api";
+import { numero } from "@/lib/format";
+import { MENU } from "@/lib/menu";
+import { Button, Card, Field, Input, PageHeader, cn } from "@/components/ui";
+import { useSession } from "@/store/session";
+import { useLicenca } from "@/lib/licenca";
+
+interface Info {
+  versao: string;
+  plataforma: string;
+  sqlite: string;
+  migracoes: number;
+  pasta_dados: string;
+  pasta_exportacao: string;
+  base_bytes: number;
+  ultima_copia: string | null;
+  artigos: number;
+  entidades: number;
+  documentos: number;
+  importados: number;
+  utilizadores: number;
+}
+
+const ATALHOS_POS: [string, string][] = [
+  ["F2", "Pesquisar artigo / ler código de barras (3*código = 3 unidades)"],
+  ["F3", "Quantidade da linha"],
+  ["F4", "Escolher cliente"],
+  ["F5", "Novo cliente / alterar dados do cliente"],
+  ["F6", "Desconto da linha"],
+  ["F7", "Alterar preço (permissão ou PIN de supervisor)"],
+  ["F8", "Desconto global (% ou valor)"],
+  ["F9", "Descrição da linha"],
+  ["F10", "Suspender documento"],
+  ["F11", "Abrir documentos suspensos"],
+  ["F12", "Pagamento e finalizar"],
+  ["Del", "Apagar linha (permissão ou PIN)"],
+  ["↑ / ↓", "Mudar de linha"],
+  ["Ctrl+G", "Abrir a gaveta (impressora térmica)"],
+  ["Alt+N", "Abrir outra venda em paralelo (a actual fica à espera)"],
+  ["Alt+← / Alt+→", "Passar para a venda anterior / seguinte"],
+];
+
+const ATALHOS_GESTAO: [string, string][] = [
+  ["Ctrl+K", "Pesquisar ou ir para: ecrãs, documentos, clientes, NIF e artigos (⌘K no Mac)"],
+  ["↑ / ↓", "Escolher um resultado da pesquisa; Enter abre"],
+  ["Esc", "Fechar a pesquisa, menus e janelas"],
+];
+
+const MANUAL: { titulo: string; texto: string }[] = [
+  { titulo: "Navegação", texto: "Prima Ctrl+K (⌘K no Mac) em qualquer ecrã para ir para um ecrã ou encontrar um documento, cliente ou artigo. Marque com a estrela os ecrãs que mais usa: ficam em Favoritos, no topo do menu. O menu pode recolher-se (fica só com os ícones) e, no menu do utilizador (canto superior direito), escolhe o tema claro ou escuro e tabelas compactas." },
+  { titulo: "Primeiros passos", texto: "Preencha a empresa (Configurações), crie os utilizadores e as permissões, configure o posto e a impressora e, se vem do KIGEST ou de outro programa, use «Importar dados» (KIGEST, SAF-T ou Excel) antes de começar a facturar." },
+  { titulo: "Documentos", texto: "Todos os documentos (facturas, recibos, notas de crédito, guias, compras e stock) usam o mesmo ecrã. As séries são automáticas por posto e ano. Um documento emitido não se altera: anula-se com motivo ou corrige-se com nota de crédito." },
+  { titulo: "POS", texto: "O caixa tem de estar aberto para vender. No fecho conte o dinheiro: o sistema mostra a diferença para o valor esperado. Os talões podem sair na impressora térmica (ESC/POS) ou pelo diálogo de impressão." },
+  { titulo: "Stock", texto: "O stock muda em cada documento. Artigos com lotes saem pelo lote que expira primeiro. Use o Inventário para acertar contagens e o Recálculo de Stock se suspeitar de existências erradas." },
+  { titulo: "Tesouraria", texto: "Recebimentos e pagamentos dos documentos entram sozinhos no fluxo de caixa. Movimentos manuais, transferências entre contas e centros de custo estão em Tesouraria. Em Tesouraria › Conciliação Bancária importa o extracto do banco: cada linha casa com os movimentos da conta e o que sobra fica à vista. Em Sistema › Regras de Aprovação o administrador escolhe que operações (anular, saídas de tesouraria, vales de caixa, notas de crédito) pedem o PIN de quem pode aprovar, e a partir de que valor. O administrador fecha os meses já conferidos em Gestão de Finanças › Fecho de Períodos: depois disso, nada com data desses meses se lança nem se anula (os documentos corrigem-se com nota de crédito)." },
+  { titulo: "Relatórios e análise", texto: "Em Gestão de Finanças › Construtor de Relatórios escolhe a fonte (vendas, linhas vendidas, tesouraria, stock, compras ou contas a receber), o período, o que agrupar e somar e os filtros; o resultado actualiza-se sozinho e sai em Excel, CSV ou impresso. Compare com o período anterior ou com o ano anterior, abra um dos relatórios prontos ou guarde o seu como modelo (só seu ou partilhado). No Painel, clique no nome de um indicador para ver o detalhe. Em Sistema › Qualidade dos Dados vê o que está repetido ou incompleto (NIF, códigos de barras, isentos sem motivo, preços, stock) e o ecrã onde se corrige." },
+  { titulo: "Recursos humanos", texto: "Lance as alterações do mês (horas extra, faltas, subsídios), simule, processe e pague pela tesouraria. Confirme a tabela de IRT na Configuração Salarial antes do primeiro processamento." },
+  { titulo: "SAF-T e AGT", texto: "Exporte o SAF-T (facturação, aquisição ou Estado) em Gestão de Finanças. Carregue a chave privada da empresa em Configurações para assinar os documentos." },
+  { titulo: "Cópias de segurança", texto: "É feita uma cópia automática por dia (as últimas 14 ficam guardadas). Faça também cópias manuais para um disco externo ou para a nuvem." },
+];
+
+const mb = (b: number) => (b < 1024 * 1024 ? `${numero(Math.max(1, Math.round(b / 1024)), 0)} KB` : `${numero(b / 1024 / 1024, 1)} MB`);
+
+/** Sobre o KanGest, manual rápido e atalhos de teclado. */
+export default function Sobre() {
+  const [sp, setSp] = useSearchParams();
+  const vista = sp.get("vista") === "manual" ? "manual" : "sobre";
+  const info = useQuery({ queryKey: ["sistema-info"], queryFn: () => call<Info>("sistema.info") }).data;
+
+  return (
+    <>
+      <PageHeader title={vista === "manual" ? "Manual e Atalhos" : "Sobre o KanGest"} subtitle="Gestão comercial e ponto de venda para Angola" />
+      <div className="mb-4 flex w-fit gap-1 rounded-lg bg-sunken p-1">
+        {(
+          [
+            ["sobre", "Sobre"],
+            ["manual", "Manual e atalhos"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSp({ vista: id })}
+            className={cn("rounded-md px-3 py-1.5 text-[13px]", vista === id ? "bg-surface font-medium shadow-sm" : "text-ink-2 hover:text-ink")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {vista === "sobre" ? (
+        <div className="grid grid-cols-2 gap-4">
+          <Autoria />
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-2 font-medium">
+              <Info className="size-4 text-brand" /> Aplicação
+            </div>
+            <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-y-2 text-[13.5px]">
+              <dt className="text-ink-3">Versão</dt>
+              <dd className="num font-medium">{info?.versao ?? "…"}</dd>
+              <dt className="text-ink-3">Sistema</dt>
+              <dd>{info?.plataforma}</dd>
+              <dt className="text-ink-3">Motor da base</dt>
+              <dd>
+                SQLite {info?.sqlite} · {info?.migracoes} actualizações de estrutura aplicadas
+              </dd>
+            </dl>
+          </Card>
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-2 font-medium">
+              <Database className="size-4 text-brand" /> Dados
+            </div>
+            <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-y-2 text-[13.5px]">
+              <dt className="text-ink-3">Pasta de dados</dt>
+              <dd className="break-all font-mono text-[12px]">{info?.pasta_dados}</dd>
+              <dt className="text-ink-3">Exportações</dt>
+              <dd className="break-all font-mono text-[12px]">{info?.pasta_exportacao}</dd>
+              <dt className="text-ink-3">Tamanho da base</dt>
+              <dd className="num">{info ? mb(info.base_bytes) : "…"}</dd>
+              <dt className="text-ink-3">Última cópia</dt>
+              <dd>{info?.ultima_copia ?? "nenhuma ainda"}</dd>
+              <dt className="text-ink-3">Registos</dt>
+              <dd>
+                {info && (
+                  <>
+                    {info.artigos} artigos · {info.entidades} entidades · {info.documentos} documentos
+                    {info.importados ? ` (${info.importados} importados do KIGEST)` : ""} · {info.utilizadores} {info.utilizadores === 1 ? "utilizador" : "utilizadores"}
+                  </>
+                )}
+              </dd>
+            </dl>
+          </Card>
+          {MODO_WEB ? (
+            <Card className="p-5 text-[13px] text-ink-2">
+              No browser, o KanGest é sempre o do servidor da loja: as actualizações instalam-se no computador servidor (Sobre → Actualizações, lá) e este aparelho
+              recebe-as ao recarregar a página.
+            </Card>
+          ) : (
+            <Atualizacoes />
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-2 font-medium">
+              <BookOpen className="size-4 text-brand" /> Manual rápido
+            </div>
+            <div className="space-y-4">
+              {MANUAL.map((m) => (
+                <div key={m.titulo}>
+                  <div className="font-medium">{m.titulo}</div>
+                  <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-2">{m.texto}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 border-t border-line pt-4">
+              <div className="mb-2 text-[12px] uppercase tracking-wide text-ink-3">Menus</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px]">
+                {MENU.map((g) => (
+                  <div key={g.id}>
+                    <div className="font-medium">{g.titulo}</div>
+                    <div className="text-ink-3">
+                      {g.itens
+                        .filter((i) => i.to)
+                        .map((i, k) => (
+                          <span key={i.label}>
+                            {k > 0 && " · "}
+                            <Link className="hover:text-brand hover:underline" to={i.to!}>
+                              {i.label}
+                            </Link>
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+          <Card className="h-fit p-6">
+            {(
+              [
+                ["Atalhos da gestão", ATALHOS_GESTAO],
+                ["Atalhos do POS", ATALHOS_POS],
+              ] as const
+            ).map(([titulo, lista], n) => (
+              <div key={titulo} className={n > 0 ? "mt-6" : ""}>
+                <div className="mb-4 flex items-center gap-2 font-medium">
+                  <Keyboard className="size-4 text-brand" /> {titulo}
+                </div>
+                <table className="w-full text-[13.5px]">
+                  <tbody>
+                    {lista.map(([k, d]) => (
+                      <tr key={k} className="border-b border-line last:border-0">
+                        <td className="w-20 py-1.5 align-top">
+                          <kbd className="rounded border border-line bg-sunken px-1.5 py-0.5 font-mono text-[12px]">{k}</kbd>
+                        </td>
+                        <td className="py-1.5 text-ink-2">{d}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
+    </>
+  );
+}
+
+interface EstadoAtualizacao {
+  versao_atual: string;
+  plataforma: string;
+  fonte: string;
+  /** a origem usada de facto (a antiga do GitHub passa à do site) */
+  fonte_efectiva?: string | null;
+  /** origem oficial: o site do KanGest */
+  origem_oficial?: string;
+  chave_publica: boolean;
+  /** A chave das actualizações vem com o programa: assinatura obrigatória. */
+  chave_embutida?: boolean;
+  ultima_verificacao: string | null;
+}
+interface Verificacao {
+  versao_atual: string;
+  versao: string;
+  data: string | null;
+  notas: string | null;
+  disponivel: boolean;
+  pacote: string | null;
+}
+
+/** Verificar Atualização (KIGEST GC → Sistema): origem num endereço ou numa pasta partilhada na rede. */
+function Atualizacoes() {
+  const qc = useQueryClient();
+  const admin = useSession((s) => s.tem)("sistema.atualizacoes");
+  const estado = useQuery({ queryKey: ["atualizacao"], queryFn: () => call<EstadoAtualizacao>("atualizacao.estado") }).data;
+  const [fonte, setFonte] = useState<string | null>(null);
+  const [chave, setChave] = useState("");
+  const [v, setV] = useState<Verificacao | null>(null);
+  const [baixado, setBaixado] = useState<{ ficheiro: string; versao: string; copia: string | null } | null>(null);
+  const [busy, setBusy] = useState<"" | "gravar" | "verificar" | "descarregar" | "instalar">("");
+
+  async function executar<T>(qual: typeof busy, f: () => Promise<T>) {
+    setBusy(qual);
+    try {
+      return await f();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+  const gravar = () =>
+    executar("gravar", async () => {
+      await call("atualizacao.guardar", { fonte: fonte ?? estado?.fonte ?? "", chave_publica: chave.trim() ? chave : undefined });
+      toast.success("Origem das actualizações gravada.");
+      setFonte(null);
+      setChave("");
+      qc.invalidateQueries({ queryKey: ["atualizacao"] });
+    });
+  const verificar = () =>
+    executar("verificar", async () => {
+      const r = await call<Verificacao>("atualizacao.verificar");
+      setV(r);
+      qc.invalidateQueries({ queryKey: ["atualizacao"] });
+      if (!r.disponivel) toast.success(`Já tem a versão mais recente (${r.versao_atual}).`);
+    });
+  const descarregar = () =>
+    executar("descarregar", async () => {
+      const r = await call<{ ficheiro: string; versao: string; copia: string | null }>("atualizacao.descarregar");
+      setBaixado(r);
+      toast.success(`Versão ${r.versao} descarregada e conferida.${r.copia ? " Foi feita uma cópia de segurança da base." : ""}`);
+    });
+  const instalar = () =>
+    executar("instalar", async () => {
+      await call("atualizacao.instalar", { ficheiro: baixado?.ficheiro });
+      toast.success("O instalador foi aberto. Feche o KanGest para concluir a instalação.", { duration: 12000 });
+    });
+
+  return (
+    <Card className="col-span-2 p-6">
+      <div className="mb-4 flex items-center gap-2 font-medium">
+        <RefreshCw className="size-4 text-brand" /> Actualizações
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="space-y-3">
+          <Field
+            label="Origem (endereço ou pasta partilhada na rede)"
+            hint={
+              estado?.fonte_efectiva && estado.fonte_efectiva !== estado.fonte.trim().replace(/[/\\]+$/, "")
+                ? `Esta origem antiga lê-se agora em ${estado.fonte_efectiva}.`
+                : "Onde está o ficheiro kangest-atualizacao.json, ex.: https://… ou \\\\SERVIDOR\\KanGest"
+            }
+          >
+            <Input disabled={!admin} value={fonte ?? estado?.fonte ?? ""} onChange={(e) => setFonte(e.target.value)} placeholder="https://… ou \\SERVIDOR\KanGest" />
+          </Field>
+          {admin && estado?.origem_oficial && (fonte ?? estado.fonte).trim() !== estado.origem_oficial && (
+            <button type="button" className="text-[13px] font-medium text-brand-700 hover:underline" onClick={() => setFonte(estado.origem_oficial ?? "")}>
+              Usar a origem oficial ({estado.origem_oficial})
+            </button>
+          )}
+          {estado?.chave_embutida ? (
+            <p className="rounded-lg bg-ok-50 px-3 py-2 text-[13px] text-ok">
+              Só se instalam pacotes assinados pelo produtor do KanGest: a chave pública vem com o programa e não se altera aqui.
+            </p>
+          ) : (
+            <Field
+              label="Chave pública de assinatura (opcional)"
+              hint={estado?.chave_publica ? "Configurada: só se instalam pacotes assinados com esta chave." : "Sem chave, o pacote é conferido apenas pelo SHA-256 do manifesto."}
+            >
+              <Input disabled={!admin} value={chave} onChange={(e) => setChave(e.target.value)} placeholder={estado?.chave_publica ? "•••• (deixe vazio para manter)" : "Chave minisign (tauri signer)"} />
+            </Field>
+          )}
+          {admin && (
+            <Button variant="secondary" loading={busy === "gravar"} disabled={fonte === null && !chave.trim()} onClick={gravar}>
+              Gravar origem
+            </Button>
+          )}
+        </div>
+        <div className="text-[13.5px]">
+          <dl className="grid grid-cols-[130px_minmax(0,1fr)] gap-y-2">
+            <dt className="text-ink-3">Versão instalada</dt>
+            <dd className="num font-medium">{estado?.versao_atual ?? "…"}</dd>
+            <dt className="text-ink-3">Sistema</dt>
+            <dd>{estado?.plataforma}</dd>
+            <dt className="text-ink-3">Última verificação</dt>
+            <dd>{estado?.ultima_verificacao?.replace("T", " ") ?? "nunca"}</dd>
+            {v && (
+              <>
+                <dt className="text-ink-3">Versão publicada</dt>
+                <dd className="num">
+                  {v.versao}
+                  {v.data ? ` · ${v.data}` : ""}
+                </dd>
+              </>
+            )}
+          </dl>
+          {v?.notas && <p className="mt-3 whitespace-pre-line rounded-lg bg-sunken p-3 text-ink-2">{v.notas}</p>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="secondary" loading={busy === "verificar"} disabled={!estado?.fonte} onClick={verificar}>
+              <RefreshCw className="size-4" /> Verificar atualização
+            </Button>
+            {admin && v?.disponivel && !baixado && (
+              <Button loading={busy === "descarregar"} disabled={!v.pacote} onClick={descarregar}>
+                <Download className="size-4" /> Descarregar {v.versao}
+              </Button>
+            )}
+            {admin && baixado && (
+              <Button loading={busy === "instalar"} onClick={instalar}>
+                Instalar {baixado.versao}
+              </Button>
+            )}
+          </div>
+          {v?.disponivel && !v.pacote && <p className="mt-2 text-danger">A versão {v.versao} não tem pacote para este sistema.</p>}
+          <p className="mt-3 text-[12.5px] text-ink-3">Os dados e as cópias ficam na pasta de dados e não são apagados pela instalação. Cada posto actualiza-se a si próprio.</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/** Autoria e direitos: quem desenvolveu o KanGest e o aviso de protecção (igual ao do ficheiro LICENSE). */
+/**
+ * O selo de integridade do executável, dito por palavras (ver src-tauri/src/selo). Só se mostra quando diz alguma
+ * coisa: válido ou alterado (sem selo — compilação sem as chaves do selo — e «a confirmar» não se mostram).
+ */
+const SELOS: Partial<Record<string, { texto: string; alerta: boolean }>> = {
+  VALIDO: { texto: "Selo de integridade válido: este KanGest é o original, sem alterações.", alerta: false },
+  ALTERADO: { texto: "O executável foi alterado: reinstale o KanGest a partir do site. Até lá não se emitem documentos.", alerta: true },
+};
+
+function Autoria() {
+  const selo = useLicenca().data?.selo;
+  const s = selo ? SELOS[selo] : undefined;
+  return (
+    <Card className="col-span-2 flex flex-wrap items-center gap-x-8 gap-y-3 border-brand/25 bg-brand-50/40 p-5">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
+          <ShieldCheck className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <div className="font-semibold">Desenvolvido por Valentino Canguele</div>
+          <div className="text-[12.5px] text-ink-2">
+            © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar, descompilar ou redistribuir o KanGest sem autorização escrita do autor.
+          </div>
+          {s && (
+            <div className={cn("mt-1.5 flex items-center gap-1.5 text-[12.5px] font-medium", s.alerta ? "text-danger" : "text-ok")}>
+              {s.alerta ? <ShieldAlert className="size-4 shrink-0" /> : <ShieldCheck className="size-4 shrink-0" />}
+              {s.texto}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13.5px]">
+        <a className="inline-flex items-center gap-1.5 text-brand-700 hover:underline" href="tel:+244926445277">
+          <Phone className="size-4" /> 926 445 277
+        </a>
+        <a className="inline-flex items-center gap-1.5 text-brand-700 hover:underline" href="mailto:valentinocanguele@gmail.com">
+          <Mail className="size-4" /> valentinocanguele@gmail.com
+        </a>
+      </div>
+    </Card>
+  );
+}

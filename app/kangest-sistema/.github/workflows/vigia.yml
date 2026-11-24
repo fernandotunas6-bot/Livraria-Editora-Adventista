@@ -1,0 +1,41 @@
+# Vigia do servidor de licenças e do site (docs/ARQUITETURA.md): de 6 em 6 horas confirma que respondem. Se algum falhar,
+# a execução falha e o GitHub avisa por email.
+name: Vigia
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: site-fonte/config.json
+          sparse-checkout-cone-mode: false
+
+      - name: Servidor de licenças (Worker e D1 na Cloudflare)
+        run: |
+          U=$(jq -r .web.licencas site-fonte/config.json)
+          curl -fsS --retry 3 --retry-delay 10 --max-time 30 "$U/" | grep -q '"servico"'
+          curl -fsS --retry 3 --retry-delay 10 --max-time 30 "$U/v1/planos" | grep -q '"ok":true'
+
+      # temporário: os KanGest 1.4.0 falam com o encaminhamento no Supabase (servidor-licencas/encaminhamento-supabase)
+      - name: Encaminhamento no Supabase (KanGest 1.4.0)
+        run: curl -fsS --retry 3 --retry-delay 10 --max-time 30 https://fissktkxilseymadzppn.supabase.co/functions/v1/kangest/v1/planos | grep -q '"ok":true'
+
+      - name: Site
+        run: |
+          S=$(jq -r .site site-fonte/config.json)
+          # o mesmo site também em kangest.livrariaadventista.com (domínio do projecto Pages, por enquanto)
+          for base in "$S" https://kangest.livrariaadventista.com; do
+            for p in "" admin.html conta.html aderir baixar; do
+              curl -fsSL --retry 3 --retry-delay 10 --max-time 30 -o /dev/null "$base/$p" || { echo "$base/$p não responde"; exit 1; }
+            done
+          done

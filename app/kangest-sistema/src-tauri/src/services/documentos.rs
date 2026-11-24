@@ -1,0 +1,2266 @@
+// KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+// © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
+
+//! Emissão de documentos comerciais — o coração do sistema.
+//! Um único motor para todos os tipos do KIGEST (vendas, compras, stock, recibos e pagamentos):
+//! o comportamento vem dos atributos do tipo (`tipos_documento`). Numeração por série, assinatura
+//! AGT encadeada, stock, conta corrente, retenções e caixa — tudo numa única transacção.
+
+use serde::Deserialize;
+use serde_json::{json, Value};
+use sqlx::{Row, Sqlite, Transaction};
+
+use super::catalogo::IdIn;
+use crate::agt;
+use crate::db;
+use crate::error::{AppError, AppResult};
+use crate::state::AppState;
+
+#[derive(Deserialize)]
+pub struct LinhaIn {
+    artigo_id: Option<i64>,
+    descricao: Option<String>,
+    /// Quantidade (no inventário: quantidade contada).
+    quantidade: f64,
+    /// Preço unitário SEM IVA em cêntimos (na moeda do documento). Se omitido, usa o preço do artigo.
+    preco_unitario: Option<i64>,
+    /// Preço unitário COM IVA em cêntimos (modo «preços com IVA incluído»); tem precedência sobre o anterior.
+    #[serde(default)]
+    pvp_unitario: Option<i64>,
+    desconto_pct: Option<f64>,
+    /// Lote (obrigatório nas entradas de artigos com controlo de lotes; nas saídas, se omitido, FEFO).
+    lote: Option<String>,
+    validade: Option<String>,
+}
+
+/// Preço com IVA a partir do preço sem IVA (cêntimos).
+pub fn com_iva(sem: i64, taxa: f64) -> i64 {
+    (sem as f64 * (100.0 + taxa) / 100.0).round() as i64
+}
+
+/// Preço sem IVA a partir do preço com IVA (cêntimos).
+pub fn sem_iva(com: i64, taxa: f64) -> i64 {
+    (com as f64 * 100.0 / (100.0 + taxa)).round() as i64
+}
+
+/// Opção «Preços com IVA incluído»: as vendas calculam-se a partir do PVP com IVA (o total da linha é
+/// quantidade × PVP, menos descontos) e o IVA sai do total, em vez de se somar a um preço sem IVA
+/// arredondado ao cêntimo (3 × 1 000,00 Kz dava 2 999,99 Kz).
+pub async fn precos_com_iva<'e, E: sqlx::SqliteExecutor<'e>>(e: E) -> AppResult<bool> {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'vendas.precos_com_iva'").fetch_optional(e).await?;
+    Ok(v.as_deref() == Some("1"))
+}
+
+/// Desconto da promoção do artigo se `data` (AAAA-MM-DD) estiver dentro do período; 0 fora dele.
+fn promocao_vigente(a: &sqlx::sqlite::SqliteRow, data: &str) -> f64 {
+    let pct: f64 = a.try_get("promo_desconto").unwrap_or(0.0);
+    if pct <= 0.0 {
+        return 0.0;
+    }
+    let ini: Option<String> = a.try_get("promo_inicio").unwrap_or(None);
+    let fim: Option<String> = a.try_get("promo_fim").unwrap_or(None);
+    let depois_inicio = ini.as_deref().filter(|x| !x.is_empty()).is_none_or(|i| data >= i);
+    let antes_fim = fim.as_deref().filter(|x| !x.is_empty()).is_none_or(|f| data <= f);
+    if depois_inicio && antes_fim {
+        pct.min(100.0)
+    } else {
+        0.0
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CustoIn {
+    tipo: String,
+    descricao: Option<String>,
+    /// Valor em Kz (cêntimos).
+    valor: i64,
+}
+
+#[derive(Deserialize)]
+pub struct PagamentoIn {
+    modo: String,
+    valor: i64,
+    /// Numerário em moeda estrangeira (ex.: "USD"): o valor em Kz calcula-se aqui, ao câmbio do dia (Moedas).
+    #[serde(default)]
+    moeda: Option<String>,
+    /// Recebido na moeda estrangeira (cêntimos dessa moeda).
+    #[serde(default)]
+    valor_moeda: Option<i64>,
+}
+
+/// Recebido numa moeda estrangeira: (moeda, valor na moeda em cêntimos, câmbio).
+type Estrangeira = Option<(String, i64, f64)>;
+
+#[derive(Deserialize)]
+pub struct LiquidarIn {
+    documento_id: i64,
+    valor: i64,
+}
+
+#[derive(Deserialize)]
+pub struct RetencaoIn {
+    codigo: String,
+    /// Se omitida, usa a taxa configurada.
+    percentagem: Option<f64>,
+    /// Num recibo ou pagamento: o valor retido escrito (o do comprovativo do cliente); sem ele, calcula-se.
+    #[serde(default)]
+    valor: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct EmitirIn {
+    tipo: String,
+    entidade_id: Option<i64>,
+    data_vencimento: Option<String>,
+    armazem_id: Option<i64>,
+    armazem_destino_id: Option<i64>,
+    #[serde(default)]
+    linhas: Vec<LinhaIn>,
+    #[serde(default)]
+    pagamentos: Vec<PagamentoIn>,
+    #[serde(default)]
+    liquidar: Vec<LiquidarIn>,
+    #[serde(default)]
+    retencoes: Vec<RetencaoIn>,
+    desconto_global_pct: Option<f64>,
+    /// Desconto global em valor (cêntimos), distribuído proporcionalmente pelas linhas.
+    desconto_global_valor: Option<i64>,
+    doc_origem_id: Option<i64>,
+    observacoes: Option<String>,
+    /// PIN de um supervisor quando o operador não tem permissão para preço/desconto.
+    autorizacao_pin: Option<String>,
+    /// N.º do documento do fornecedor (compras).
+    doc_externo: Option<String>,
+    /// 4 caracteres de controlo (assinatura) impressos no documento do fornecedor.
+    doc_externo_hash: Option<String>,
+    /// Data do documento do fornecedor (AAAA-MM-DD).
+    doc_externo_data: Option<String>,
+    /// Tipo de dedução do IVA para o SAF-T de aquisição (MFI, INV, OBC, SERV, IMPT, SCE).
+    deducao_tipo: Option<String>,
+    /// Motivo de emissão (notas de crédito / débito).
+    motivo: Option<String>,
+    /// V/ Referência (requisição, obra…).
+    referencia: Option<String>,
+    /// Prazo de pagamento (código de `prazos_pagamento`).
+    prazo: Option<String>,
+    /// Guias: { carga_local, carga_data, descarga_local, descarga_data, matricula, motorista }.
+    transporte: Option<Value>,
+    /// Moeda dos preços indicados (AOA por omissão) e câmbio (Kz por unidade).
+    moeda: Option<String>,
+    cambio: Option<f64>,
+    /// Custos adicionais de compra (frete, desalfandegamento…), repartidos pelo custo dos artigos.
+    #[serde(default)]
+    custos: Vec<CustoIn>,
+    /// Série escolhida (vazio = série por defeito do tipo ou série automática do posto).
+    serie: Option<String>,
+    /// Recuperação de um documento emitido à mão: { numero, data } (exige série de documentos manuais).
+    manual: Option<ManualIn>,
+    /// Valor do recibo de adiantamento.
+    valor: Option<i64>,
+    /// Cupão de desconto (vendas): aplica-se como desconto global, sem pedir autorização.
+    #[serde(default)]
+    cupao: Option<String>,
+    /// Vendedor (funcionário) e local de entrega.
+    vendedor_id: Option<i64>,
+    endereco_entrega: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ManualIn {
+    numero: String,
+    data: String,
+}
+
+/// Pagamentos do pedido → (modo, valor em Kz) e, em paralelo, o recebido noutra moeda (numerário estrangeiro ao câmbio
+/// do dia). Fora de `emitir` de propósito: a função de emissão já é muito grande e cada variável a mais pesa na pilha
+/// das compilações de desenvolvimento.
+async fn ler_pagamentos(
+    tx: &mut Transaction<'_, Sqlite>,
+    pedidos: &[PagamentoIn],
+    pago_no_acto: bool,
+) -> AppResult<(Vec<(String, i64)>, Vec<Estrangeira>)> {
+    let mut pagamentos: Vec<(String, i64)> = Vec::new();
+    let mut estrangeiras: Vec<Estrangeira> = Vec::new();
+    for pg in pedidos {
+        match pg.moeda.as_deref().map(str::trim).filter(|m| !m.is_empty() && *m != "AOA") {
+            None if pg.valor > 0 => {
+                pagamentos.push((pg.modo.clone(), pg.valor));
+                estrangeiras.push(None);
+            }
+            None => {}
+            Some(m) => {
+                let vm = pg.valor_moeda.unwrap_or(0);
+                if vm <= 0 {
+                    continue;
+                }
+                if pg.modo != "NU" {
+                    return Err(AppError::msg("Moeda estrangeira só em numerário (o troco sai em kwanzas)."));
+                }
+                if !pago_no_acto {
+                    return Err(AppError::msg("A moeda estrangeira recebe-se em documentos pagos no acto (factura/recibo, recibo)."));
+                }
+                let cambio: Option<f64> = sqlx::query_scalar("SELECT cambio FROM moedas WHERE codigo = ? AND ativo = 1").bind(m).fetch_optional(&mut **tx).await?;
+                let cambio = cambio.filter(|c| *c > 0.0).ok_or_else(|| AppError::msg(format!("Defina o câmbio do dia de {m} em Tabelas → Moedas.")))?;
+                pagamentos.push(("NU".into(), (vm as f64 * cambio).round() as i64));
+                estrangeiras.push(Some((m.to_string(), vm, cambio)));
+            }
+        }
+    }
+    Ok((pagamentos, estrangeiras))
+}
+
+async fn gravar_pagamentos(tx: &mut Transaction<'_, Sqlite>, doc_id: i64, pagamentos: &[(String, i64)], estrangeiras: &[Estrangeira]) -> AppResult<()> {
+    for (k, (modo, valor)) in pagamentos.iter().enumerate() {
+        let e = estrangeiras.get(k).cloned().flatten();
+        sqlx::query("INSERT INTO documento_pagamentos (documento_id, modo_codigo, valor, moeda, valor_moeda, cambio) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(doc_id)
+            .bind(modo)
+            .bind(valor)
+            .bind(e.as_ref().map(|x| x.0.clone()))
+            .bind(e.as_ref().map(|x| x.1))
+            .bind(e.as_ref().map(|x| x.2))
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Troco: sai do numerário em kwanzas; se não chegar (ex.: pagou só em dólares), da linha em moeda estrangeira.
+fn tirar_troco(pagamentos: &mut [(String, i64)], estrangeiras: &[Estrangeira], troco: i64) -> AppResult<()> {
+    let kz = pagamentos.iter().zip(estrangeiras).position(|(p, e)| p.0 == "NU" && e.is_none() && p.1 >= troco);
+    let qualquer = pagamentos.iter().position(|p| p.0 == "NU" && p.1 >= troco);
+    match kz.or(qualquer) {
+        Some(k) => {
+            pagamentos[k].1 -= troco;
+            Ok(())
+        }
+        None => Err(AppError::msg("O troco só pode ser dado em numerário.")),
+    }
+}
+
+/// Escolhe a série do documento: a indicada, a série por defeito do tipo (em vigor) ou a automática do posto.
+#[allow(clippy::too_many_arguments)]
+async fn escolher_serie(
+    tx: &mut Transaction<'_, Sqlite>,
+    tipo: &str,
+    posto_id: i64,
+    prefixo: &str,
+    data: &str,
+    pedida: Option<&str>,
+    manual: bool,
+) -> AppResult<String> {
+    // Facturação electrónica: os documentos comunicados à AGT usam séries atribuídas pela AGT.
+    let fe = !manual
+        && super::fe::TIPOS_FE.contains(&tipo)
+        && sqlx::query_scalar::<_, String>("SELECT valor FROM config WHERE chave = 'fe.ativo'").fetch_optional(&mut **tx).await?.as_deref() == Some("1");
+    if let Some(sr) = pedida.map(str::trim).filter(|x| !x.is_empty()) {
+        let row = sqlx::query("SELECT ativa, manual, data_inicio, data_fim, posto_id, fe_agt FROM series WHERE tipo_codigo = ? AND serie = ?")
+            .bind(tipo)
+            .bind(sr)
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or_else(|| AppError::msg(format!("A série {sr} não existe para {tipo}.")))?;
+        if row.get::<i64, _>("ativa") == 0 {
+            return Err(AppError::msg(format!("A série {sr} está bloqueada.")));
+        }
+        let e_manual = row.get::<i64, _>("manual") == 1;
+        if manual && !e_manual {
+            return Err(AppError::msg("Os documentos manuais só podem ser recuperados numa série de documentos manuais."));
+        }
+        if !manual && e_manual {
+            return Err(AppError::msg(format!("A série {sr} é de documentos manuais.")));
+        }
+        if fe && row.get::<i64, _>("fe_agt") == 0 {
+            return Err(AppError::msg(format!("A série {sr} não foi atribuída pela AGT. Com a facturação electrónica, use uma série pedida à AGT.")));
+        }
+        if row.get::<Option<i64>, _>("posto_id").is_some_and(|p| p != posto_id) {
+            return Err(AppError::msg(format!("A série {sr} pertence a outro posto.")));
+        }
+        let ini: Option<String> = row.get("data_inicio");
+        let fim: Option<String> = row.get("data_fim");
+        if ini.as_deref().is_some_and(|d| data < d) || fim.as_deref().is_some_and(|d| data > d) {
+            return Err(AppError::msg(format!("A série {sr} não está em vigor em {data}.")));
+        }
+        return Ok(sr.to_string());
+    }
+    if manual {
+        return Err(AppError::msg("Seleccione a série de documentos manuais."));
+    }
+    let padrao: Option<String> = sqlx::query_scalar(
+        "SELECT serie FROM series WHERE tipo_codigo = ?1 AND padrao = 1 AND ativa = 1 AND manual = 0
+           AND (posto_id IS NULL OR posto_id = ?2) AND (data_inicio IS NULL OR data_inicio <= ?3) AND (data_fim IS NULL OR data_fim >= ?3)
+           AND (?4 = 0 OR fe_agt = 1)
+         ORDER BY posto_id IS NULL, id DESC LIMIT 1",
+    )
+    .bind(tipo)
+    .bind(posto_id)
+    .bind(data)
+    .bind(fe as i64)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some(sr) = padrao {
+        return Ok(sr);
+    }
+    if fe {
+        return Err(AppError::msg(format!(
+            "Não há série da AGT em vigor para {tipo}. Peça-a em Sistema → Facturação Electrónica antes de emitir."
+        )));
+    }
+    // Série automática = prefixo do posto + ano (ex.: "2026" ou "P22026"), como as séries por posto do KIGEST.
+    let ano = &data[..4];
+    let sr = format!("{prefixo}{ano}");
+    sqlx::query(
+        "INSERT OR IGNORE INTO series (tipo_codigo, serie, descricao, data_inicio, data_fim) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(tipo)
+    .bind(&sr)
+    .bind(format!("Automática {ano}"))
+    .bind(format!("{ano}-01-01"))
+    .bind(format!("{ano}-12-31"))
+    .execute(&mut **tx)
+    .await?;
+    let ativa: i64 = sqlx::query_scalar("SELECT ativa FROM series WHERE tipo_codigo = ? AND serie = ?").bind(tipo).bind(&sr).fetch_one(&mut **tx).await?;
+    if ativa == 0 {
+        return Err(AppError::msg(format!("A série {sr} está bloqueada. Defina uma série por defeito em Séries de Documentos.")));
+    }
+    Ok(sr)
+}
+
+struct Tipo {
+    codigo: String,
+    descricao: String,
+    classe: String,
+    grupo: String,
+    entidade: Option<String>,
+    stock: i64,
+    conta_corrente: i64,
+    pago_no_acto: bool,
+    assinado: bool,
+    credito: bool,
+    externo: bool,
+    validade_dias: i64,
+}
+
+struct Linha {
+    artigo_id: Option<i64>,
+    referencia: String,
+    descricao: String,
+    quantidade: f64,
+    unidade: Option<String>,
+    preco: i64,
+    /// Preço unitário com IVA (só no modo «preços com IVA incluído»).
+    pvp: Option<i64>,
+    desconto_pct: f64,
+    valor_desconto: i64,
+    taxa_id: Option<i64>,
+    taxa_pct: f64,
+    motivo: Option<String>,
+    liquido: i64,
+    iva: i64,
+    total: i64,
+    custo: i64,
+    controla_stock: bool,
+    permite_negativo: bool,
+    controla_lote: bool,
+    lote: Option<String>,
+    validade: Option<String>,
+    /// Kit: (componente, quantidade por unidade, permite stock negativo, controla stock)
+    componentes: Vec<(i64, f64, bool, bool)>,
+    /// Parte dos custos adicionais da compra imputada a esta linha (Kz, cêntimos).
+    custo_extra: i64,
+}
+
+fn r(x: f64) -> i64 {
+    x.round() as i64
+}
+
+fn txt(s: &Option<String>) -> Option<String> {
+    s.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from)
+}
+
+async fn carregar_tipo(tx: &mut Transaction<'_, Sqlite>, codigo: &str) -> AppResult<Tipo> {
+    let row = sqlx::query("SELECT * FROM tipos_documento WHERE codigo = ? AND ativo = 1")
+        .bind(codigo)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(|| AppError::msg(format!("Tipo de documento inválido: {codigo}")))?;
+    Ok(Tipo {
+        codigo: row.get("codigo"),
+        descricao: row.get("descricao"),
+        classe: row.get("classe"),
+        grupo: row.get("grupo"),
+        entidade: row.get("entidade"),
+        stock: row.get("stock"),
+        conta_corrente: row.get("conta_corrente"),
+        pago_no_acto: row.get::<i64, _>("pago_no_acto") == 1,
+        assinado: row.get::<i64, _>("assinado") == 1,
+        credito: row.get::<i64, _>("credito") == 1,
+        externo: row.get::<i64, _>("externo") == 1,
+        validade_dias: row.get("validade_dias"),
+    })
+}
+
+/// O que fazer quando uma venda (ou saída) pede mais do que a existência: «nao» (por omissão: nunca), «autorizar»
+/// (quem tem a permissão `stock.sem_stock`, ou com o PIN de um supervisor que a tenha) ou «artigo» (o que diz a
+/// ficha de cada artigo em «Permite stock negativo», como no KIGEST).
+pub async fn politica_sem_stock<'e, E: sqlx::SqliteExecutor<'e>>(e: E) -> AppResult<&'static str> {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'stock.sem_stock'").fetch_optional(e).await?;
+    Ok(match v.as_deref().map(str::trim) {
+        Some("autorizar") => "autorizar",
+        Some("artigo") => "artigo",
+        _ => "nao",
+    })
+}
+
+/// A mensagem de stock insuficiente com o que se pode fazer, conforme a política.
+fn sem_stock_explicado(e: AppError, politica: &str) -> AppError {
+    match e {
+        AppError::Msg(m) if m.starts_with("Stock insuficiente") => AppError::Msg(match politica {
+            "autorizar" => format!("{m} Para vender sem stock é necessária a autorização de um supervisor (PIN)."),
+            "nao" => format!("{m} Registe primeiro a entrada (compra ou entrada de stock), ou acerte-o no inventário."),
+            _ => m,
+        }),
+        e => e,
+    }
+}
+
+/// Aplica um movimento de stock e devolve a existência resultante.
+#[allow(clippy::too_many_arguments)]
+async fn mover_stock(
+    tx: &mut Transaction<'_, Sqlite>,
+    artigo_id: i64,
+    armazem_id: i64,
+    delta: f64,
+    custo_entrada: Option<i64>,
+    documento_id: i64,
+    descricao: &str,
+    permite_negativo: bool,
+    agora: &str,
+) -> AppResult<f64> {
+    let atual = existencia(tx, artigo_id, armazem_id).await?;
+    let novo = atual + delta;
+    if delta < 0.0 && novo < -1e-9 && !permite_negativo {
+        return Err(AppError::msg(format!(
+            "Stock insuficiente para \"{descricao}\": existência {atual}, pedido {}.",
+            -delta
+        )));
+    }
+    // Custo médio ponderado (global, como no KIGEST) nas entradas com custo.
+    if let Some(custo) = custo_entrada.filter(|_| delta > 0.0) {
+        let (total_qtd, cm): (f64, i64) = sqlx::query_as(
+            "SELECT COALESCE((SELECT SUM(quantidade) FROM stock WHERE artigo_id = ?1), 0.0), custo_medio FROM artigos WHERE id = ?1",
+        )
+        .bind(artigo_id)
+        .fetch_one(&mut **tx)
+        .await?;
+        let base = total_qtd.max(0.0);
+        let novo_cm = if base + delta > 0.0 { r((base * cm as f64 + delta * custo as f64) / (base + delta)) } else { custo };
+        sqlx::query("UPDATE artigos SET custo = ?, custo_medio = ? WHERE id = ?")
+            .bind(custo)
+            .bind(novo_cm)
+            .bind(artigo_id)
+            .execute(&mut **tx)
+            .await?;
+    }
+    let (col_e, col_s) = if delta >= 0.0 { (Some(agora), None) } else { (None, Some(agora)) };
+    sqlx::query(
+        "INSERT INTO stock (artigo_id, armazem_id, quantidade, ultima_entrada, ultima_saida) VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(artigo_id, armazem_id) DO UPDATE SET quantidade = ?3,
+           ultima_entrada = COALESCE(?4, ultima_entrada), ultima_saida = COALESCE(?5, ultima_saida)",
+    )
+    .bind(artigo_id)
+    .bind(armazem_id)
+    .bind(novo)
+    .bind(col_e)
+    .bind(col_s)
+    .execute(&mut **tx)
+    .await?;
+    let cm: i64 = sqlx::query_scalar("SELECT custo_medio FROM artigos WHERE id = ?").bind(artigo_id).fetch_one(&mut **tx).await?;
+    sqlx::query(
+        "INSERT INTO movimentos_stock (data_hora, artigo_id, armazem_id, quantidade, saldo, custo, documento_id, descricao)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(agora)
+    .bind(artigo_id)
+    .bind(armazem_id)
+    .bind(delta)
+    .bind(novo)
+    .bind(cm)
+    .bind(documento_id)
+    .bind(descricao)
+    .execute(&mut **tx)
+    .await?;
+    Ok(novo)
+}
+
+async fn existencia(tx: &mut Transaction<'_, Sqlite>, artigo_id: i64, armazem_id: i64) -> AppResult<f64> {
+    Ok(sqlx::query_scalar("SELECT quantidade FROM stock WHERE artigo_id = ? AND armazem_id = ?")
+        .bind(artigo_id)
+        .bind(armazem_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .unwrap_or(0.0))
+}
+
+fn qtd_txt(q: f64) -> String {
+    let s = format!("{q:.3}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+/// Entrada num lote (cria-o se não existir) e regista o movimento.
+#[allow(clippy::too_many_arguments)]
+async fn lote_entrada(
+    tx: &mut Transaction<'_, Sqlite>,
+    artigo: i64,
+    armazem: i64,
+    qtd: f64,
+    lote: &str,
+    validade: Option<&str>,
+    custo: i64,
+    documento_id: i64,
+    agora: &str,
+) -> AppResult<()> {
+    sqlx::query(
+        "INSERT INTO lotes (artigo_id, armazem_id, lote, validade, quantidade, custo, ultima_entrada) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(artigo_id, armazem_id, lote) DO UPDATE SET quantidade = quantidade + ?5, validade = COALESCE(?4, validade),
+           custo = CASE WHEN ?6 > 0 THEN ?6 ELSE custo END, ultima_entrada = ?7, ativo = 1",
+    )
+    .bind(artigo)
+    .bind(armazem)
+    .bind(lote)
+    .bind(validade)
+    .bind(qtd)
+    .bind(custo)
+    .bind(agora)
+    .execute(&mut **tx)
+    .await?;
+    let id: i64 = sqlx::query_scalar("SELECT id FROM lotes WHERE artigo_id = ? AND armazem_id = ? AND lote = ?")
+        .bind(artigo)
+        .bind(armazem)
+        .bind(lote)
+        .fetch_one(&mut **tx)
+        .await?;
+    sqlx::query("INSERT INTO lote_movimentos (lote_id, documento_id, quantidade) VALUES (?, ?, ?)")
+        .bind(id)
+        .bind(documento_id)
+        .bind(qtd)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// Saída de lotes: o lote indicado, ou FEFO (primeiro o que expira mais cedo).
+/// Devolve os lotes consumidos: (lote, validade, quantidade, custo).
+async fn lote_saida(
+    tx: &mut Transaction<'_, Sqlite>,
+    artigo: i64,
+    armazem: i64,
+    qtd: f64,
+    lote: Option<&str>,
+    documento_id: i64,
+    agora: &str,
+) -> AppResult<Vec<(String, Option<String>, f64, i64)>> {
+    let candidatos: Vec<(i64, String, Option<String>, f64, i64)> = match lote {
+        Some(l) => {
+            let v: Vec<(i64, String, Option<String>, f64, i64)> =
+                sqlx::query_as("SELECT id, lote, validade, quantidade, custo FROM lotes WHERE artigo_id = ? AND armazem_id = ? AND lote = ?")
+                    .bind(artigo)
+                    .bind(armazem)
+                    .bind(l)
+                    .fetch_all(&mut **tx)
+                    .await?;
+            if v.is_empty() {
+                return Err(AppError::msg(format!("O lote {l} não existe neste armazém.")));
+            }
+            v
+        }
+        None => {
+            sqlx::query_as(
+                "SELECT id, lote, validade, quantidade, custo FROM lotes WHERE artigo_id = ? AND armazem_id = ? AND quantidade > 0 AND ativo = 1
+                 ORDER BY validade IS NULL, validade, id",
+            )
+            .bind(artigo)
+            .bind(armazem)
+            .fetch_all(&mut **tx)
+            .await?
+        }
+    };
+    let mut resto = qtd;
+    let mut usados = Vec::new();
+    for (id, nome, validade, disp, custo) in candidatos {
+        if resto <= 1e-9 {
+            break;
+        }
+        if lote.is_some() && disp + 1e-9 < resto {
+            return Err(AppError::msg(format!("O lote {nome} só tem {} em stock.", qtd_txt(disp))));
+        }
+        let tira = resto.min(disp);
+        if tira <= 0.0 {
+            continue;
+        }
+        sqlx::query("UPDATE lotes SET quantidade = quantidade - ?, ultima_saida = ? WHERE id = ?").bind(tira).bind(agora).bind(id).execute(&mut **tx).await?;
+        sqlx::query("INSERT INTO lote_movimentos (lote_id, documento_id, quantidade) VALUES (?, ?, ?)").bind(id).bind(documento_id).bind(-tira).execute(&mut **tx).await?;
+        usados.push((nome, validade, tira, custo));
+        resto -= tira;
+    }
+    Ok(usados)
+}
+
+fn lotes_txt(usados: &[(String, Option<String>, f64, i64)]) -> Option<String> {
+    (!usados.is_empty()).then(|| usados.iter().map(|u| if usados.len() == 1 { u.0.clone() } else { format!("{} ({})", u.0, qtd_txt(u.2)) }).collect::<Vec<_>>().join(", "))
+}
+
+/// Um artigo de uma factura, visto por uma nota de crédito.
+struct ArtigoCreditavel {
+    descricao: String,
+    quantidade: f64,
+    /// Valor facturado com IVA (cêntimos).
+    total: i64,
+    /// Preço unitário sem IVA e desconto da primeira linha do artigo (os valores por omissão da nota).
+    preco: i64,
+    /// PVP com IVA dessa linha (vendas feitas com «preços com IVA incluído»).
+    pvp: Option<i64>,
+    desconto: f64,
+    creditado_qtd: f64,
+    creditado_total: i64,
+}
+
+/// O que uma factura ainda pode creditar: por artigo e no total (NC não anuladas descontadas).
+struct Creditavel {
+    artigos: std::collections::BTreeMap<i64, ArtigoCreditavel>,
+    total: i64,
+    creditado: i64,
+}
+
+async fn creditavel_tx(tx: &mut Transaction<'_, Sqlite>, origem_id: i64) -> AppResult<Creditavel> {
+    let mut artigos = std::collections::BTreeMap::new();
+    type LinhaOrigem = (i64, f64, i64, i64, Option<i64>, f64, String);
+    let linhas: Vec<LinhaOrigem> = sqlx::query_as(
+        "SELECT artigo_id, quantidade, total, preco_unitario, pvp_unitario, desconto_pct, descricao FROM documento_linhas
+         WHERE documento_id = ? AND artigo_id IS NOT NULL ORDER BY linha",
+    )
+    .bind(origem_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    for (aid, q, t, preco, pvp, desconto, descricao) in linhas {
+        let e = artigos.entry(aid).or_insert(ArtigoCreditavel { descricao, quantidade: 0.0, total: 0, preco, pvp, desconto, creditado_qtd: 0.0, creditado_total: 0 });
+        e.quantidade += q;
+        e.total += t;
+    }
+    let creditados: Vec<(i64, f64, i64)> = sqlx::query_as(
+        "SELECT l.artigo_id, SUM(l.quantidade), SUM(l.total) FROM documento_linhas l
+         JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.doc_origem_id = ? AND t.credito = 1 AND d.estado <> 'A' AND l.artigo_id IS NOT NULL
+         GROUP BY l.artigo_id",
+    )
+    .bind(origem_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    for (aid, q, t) in creditados {
+        if let Some(e) = artigos.get_mut(&aid) {
+            e.creditado_qtd += q;
+            e.creditado_total += t;
+        }
+    }
+    let (total, creditado): (i64, i64) = sqlx::query_as(
+        "SELECT d.total, COALESCE((SELECT SUM(n.total) FROM documentos n JOIN tipos_documento t ON t.codigo = n.tipo_codigo
+                                   WHERE n.doc_origem_id = d.id AND t.credito = 1 AND n.estado <> 'A'), 0)
+         FROM documentos d WHERE d.id = ?",
+    )
+    .bind(origem_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(Creditavel { artigos, total, creditado })
+}
+
+/// Formulário da nota de crédito: o que cada artigo da factura ainda pode creditar.
+pub async fn creditavel(st: &AppState, i: IdIn) -> AppResult<Value> {
+    st.sessao()?;
+    let mut tx = st.pool.begin().await?;
+    let c = creditavel_tx(&mut tx, i.id).await?;
+    tx.rollback().await?;
+    let artigos: Vec<Value> = c
+        .artigos
+        .iter()
+        .map(|(aid, a)| {
+            json!({
+                "artigo_id": aid, "descricao": a.descricao, "facturado": a.quantidade, "creditado": a.creditado_qtd,
+                "disponivel": (a.quantidade - a.creditado_qtd).max(0.0),
+                "valor_facturado": a.total, "valor_creditado": a.creditado_total, "valor_disponivel": (a.total - a.creditado_total).max(0),
+            })
+        })
+        .collect();
+    Ok(json!({ "artigos": artigos, "total": c.total, "creditado": c.creditado, "disponivel": (c.total - c.creditado).max(0) }))
+}
+
+fn permissao_tipo(st: &AppState, tipo: &str) -> AppResult<i64> {
+    let perm = match tipo {
+        "FR" => "vendas.fatura_recibo",
+        "FT" | "GT" => "vendas.fatura",
+        "PP" | "OR" | "NE" => "vendas.proforma",
+        "NC" => "vendas.nota_credito",
+        "ND" => "vendas.nota_debito",
+        "RC" => "tesouraria.recibo",
+        "FC" | "VFR" | "VNC" | "VND" | "VNE" | "VOR" | "VGT" | "AF" => "compras.fatura",
+        "VRC" => "tesouraria.pagamento",
+        "ES" => "stock.entrada",
+        "SS" | "CI" => "stock.saida",
+        "TS" => "stock.transferencia",
+        "IN" => "stock.inventario",
+        _ => "sistema.utilizadores",
+    };
+    Ok(st.exigir_perm(perm)?.id)
+}
+
+pub async fn emitir(st: &AppState, i: EmitirIn) -> AppResult<Value> {
+    // licença: terminada a assinatura (ou a experiência), consulta-se mas não se emitem documentos novos
+    super::licenca::exigir_emissao(st).await?;
+    let utilizador_id = permissao_tipo(st, &i.tipo)?;
+    // Chave carregada fora da transacção (a primeira geração pode demorar).
+    let chave = agt::chave(&st.pool).await?;
+    let versao_chave = agt::versao_assinatura(&st.pool).await?;
+    let _guard = st.emissao.lock().await;
+
+    let posto = st.posto();
+    let mut tx = crate::db::transacao(&st.pool).await?;
+    let tipo = carregar_tipo(&mut tx, &i.tipo).await?;
+    let agora = db::agora();
+    let hoje = db::hoje();
+    let armazem_id = i.armazem_id.unwrap_or(posto.armazem_id);
+    let liquida = matches!(tipo.classe.as_str(), "RECIBO" | "PAGAMENTO");
+    let adiantamento = tipo.classe == "ADIANTAMENTO";
+
+    // ---------- documento manual (recuperação de documentos emitidos à mão) ----------
+    let manual: Option<(String, String)> = match &i.manual {
+        Some(m) => {
+            st.exigir_perm("vendas.documento_manual")?;
+            if !(tipo.assinado && tipo.grupo == "VENDAS" && matches!(tipo.classe.as_str(), "VENDA" | "TRANSPORTE")) {
+                return Err(AppError::msg("Só facturas, notas de crédito e de débito e guias emitidas à mão podem ser recuperadas."));
+            }
+            let numero = m.numero.trim();
+            if numero.is_empty() {
+                return Err(AppError::msg("Indique o número do documento manual."));
+            }
+            let d = m.data.trim();
+            if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() || d > hoje.as_str() {
+                return Err(AppError::msg("Data do documento manual inválida."));
+            }
+            let dup: Option<String> = sqlx::query_scalar("SELECT numero_doc FROM documentos WHERE tipo_codigo = ? AND doc_manual = ? AND estado <> 'A'")
+                .bind(&tipo.codigo)
+                .bind(numero)
+                .fetch_optional(&mut *tx)
+                .await?;
+            if let Some(n) = dup {
+                return Err(AppError::msg(format!("O documento manual {numero} já foi recuperado em {n}.")));
+            }
+            Some((numero.to_string(), d.to_string()))
+        }
+        None => None,
+    };
+    // Data do documento: a do original manual, ou hoje.
+    let data_doc = manual.as_ref().map(|m| m.1.clone()).unwrap_or_else(|| hoje.clone());
+    let vendedor_id = match i.vendedor_id {
+        Some(v) => {
+            let ok: Option<i64> = sqlx::query_scalar("SELECT id FROM funcionarios WHERE id = ? AND ativo = 1").bind(v).fetch_optional(&mut *tx).await?;
+            Some(ok.ok_or_else(|| AppError::msg("Vendedor inválido."))?)
+        }
+        None => None,
+    };
+
+    // ---------- moeda (preços indicados em moeda estrangeira são convertidos ao câmbio) ----------
+    let moeda = i.moeda.as_deref().map(str::trim).filter(|m| !m.is_empty()).unwrap_or("AOA").to_uppercase();
+    let cambio = if moeda == "AOA" {
+        1.0
+    } else {
+        let c = match i.cambio.filter(|c| *c > 0.0) {
+            Some(c) => c,
+            None => sqlx::query_scalar::<_, f64>("SELECT cambio FROM moedas WHERE codigo = ?").bind(&moeda).fetch_optional(&mut *tx).await?.unwrap_or(0.0),
+        };
+        if c <= 0.0 {
+            return Err(AppError::msg(format!("Indique o câmbio de {moeda} (Kz por unidade).")));
+        }
+        c
+    };
+
+    // ---------- entidade ----------
+    let entidade_id = match tipo.entidade.as_deref() {
+        None => None,
+        Some("F") => Some(i.entidade_id.filter(|id| *id != 1).ok_or_else(|| AppError::msg("Seleccione o fornecedor."))?),
+        _ => Some(i.entidade_id.unwrap_or(1)),
+    };
+    let (ent_nome, ent_nif, ent_end, ent_loc, nivel_preco, ent_desconto) = match entidade_id {
+        Some(id) => {
+            let row = sqlx::query("SELECT tipo, nome, nif, endereco, localidade, nivel_preco, desconto FROM entidades WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or_else(|| AppError::msg("Entidade não encontrada."))?;
+            let et: String = row.get("tipo");
+            match tipo.entidade.as_deref() {
+                Some("F") if et == "C" => return Err(AppError::msg("A entidade seleccionada não é um fornecedor.")),
+                Some("C") if et == "F" => return Err(AppError::msg("A entidade seleccionada não é um cliente.")),
+                _ => {}
+            }
+            (
+                row.get::<String, _>("nome"),
+                row.get::<String, _>("nif"),
+                row.get::<Option<String>, _>("endereco"),
+                row.get::<Option<String>, _>("localidade"),
+                row.get::<i64, _>("nivel_preco"),
+                row.get::<f64, _>("desconto"),
+            )
+        }
+        None => {
+            let (n, nif): (String, String) = sqlx::query_as("SELECT nome, nif FROM empresa WHERE id = 1").fetch_one(&mut *tx).await?;
+            (n, nif, None, None, 1, 0.0)
+        }
+    };
+    if tipo.conta_corrente == 1 && entidade_id == Some(1) {
+        return Err(AppError::msg(format!("{} a crédito exige um cliente identificado (não Consumidor Final).", tipo.descricao)));
+    }
+    // vendedor habitual do cliente: nas vendas que não indicam outro (POS, facturas, avenças, API)
+    let vendedor_id = match (vendedor_id, entidade_id) {
+        (None, Some(id)) if tipo.grupo == "VENDAS" && id != 1 => sqlx::query_scalar::<_, i64>(
+            "SELECT e.vendedor_id FROM entidades e JOIN funcionarios f ON f.id = e.vendedor_id AND f.ativo = 1 WHERE e.id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?,
+        (v, _) => v,
+    };
+    if adiantamento && entidade_id == Some(1) {
+        return Err(AppError::msg("Identifique o cliente do adiantamento (não Consumidor Final)."));
+    }
+    if tipo.stock == 2 {
+        match i.armazem_destino_id {
+            Some(d) if d != armazem_id => {}
+            _ => return Err(AppError::msg("Seleccione um armazém de destino diferente do de origem.")),
+        }
+    }
+    let motivo = txt(&i.motivo);
+    if (tipo.credito || matches!(tipo.codigo.as_str(), "ND" | "VND")) && motivo.is_none() {
+        return Err(AppError::msg("Indique o motivo de emissão do documento."));
+    }
+    let doc_externo = txt(&i.doc_externo);
+    if tipo.externo && tipo.classe == "COMPRA" && doc_externo.is_none() {
+        return Err(AppError::msg("Indique o número do documento do fornecedor."));
+    }
+    let doc_externo_hash = txt(&i.doc_externo_hash);
+    if let Some(h) = &doc_externo_hash {
+        if h != "0" && h.chars().count() != 4 {
+            return Err(AppError::msg("A assinatura do documento do fornecedor tem 4 caracteres (ou 0 quando não se aplica)."));
+        }
+    }
+    let doc_externo_data = txt(&i.doc_externo_data);
+    if let Some(d) = &doc_externo_data {
+        if chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").is_err() || d.as_str() > db::hoje().as_str() {
+            return Err(AppError::msg("Data do documento do fornecedor inválida."));
+        }
+        // mês fechado: não se registam compras com a data do fornecedor nesse mês
+        super::periodos::exigir_aberto(&mut *tx, d, "Não se registam documentos de fornecedor com data desse mês.").await?;
+    }
+    // O mesmo documento do fornecedor registado duas vezes (como o aviso de facturas em duplicado do Odoo):
+    // mesmo tipo, mesmo fornecedor, mesmo número e mesmo ano, e não anulado. Duplicaria o custo, o stock e o IVA dedutível.
+    if let (Some(ext), Some(ent)) = (&doc_externo, entidade_id.filter(|_| tipo.classe == "COMPRA")) {
+        let ano_ext = doc_externo_data.as_deref().unwrap_or(data_doc.as_str())[..4].to_string();
+        let repetido: Option<String> = sqlx::query_scalar(
+            "SELECT numero_doc FROM documentos WHERE tipo_codigo = ? AND entidade_id = ? AND estado <> 'A'
+               AND UPPER(REPLACE(TRIM(doc_externo), ' ', '')) = UPPER(REPLACE(TRIM(?), ' ', ''))
+               AND substr(COALESCE(doc_externo_data, data_emissao), 1, 4) = ?
+             LIMIT 1",
+        )
+        .bind(&tipo.codigo)
+        .bind(ent)
+        .bind(ext)
+        .bind(&ano_ext)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(n) = repetido {
+            return Err(AppError::msg(format!(
+                "O documento «{ext}» deste fornecedor já foi registado em {n}. Confirme o número; se for outro documento, escreva-o como aparece no original (com a série)."
+            )));
+        }
+    }
+    // O vencimento não pode ser anterior à data do documento (estragaria a antiguidade de saldos e os avisos).
+    if let Some(v) = i.data_vencimento.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        if v < data_doc.as_str() {
+            return Err(AppError::msg("A data de vencimento não pode ser anterior à data do documento."));
+        }
+    }
+    let deducao_tipo = txt(&i.deducao_tipo).map(|t| t.to_uppercase());
+    if let Some(t) = &deducao_tipo {
+        if !matches!(t.as_str(), "MFI" | "INV" | "OBC" | "SERV" | "IMPT" | "SCE") {
+            return Err(AppError::msg("Tipo de dedução do IVA inválido."));
+        }
+    }
+
+    // ---------- documento de origem (notas de crédito / conversões) ----------
+    struct Origem {
+        id: i64,
+        tipo: String,
+        classe: String,
+        grupo: String,
+        credito: bool,
+        entidade: i64,
+        pendente: i64,
+        total: i64,
+        pago: bool,
+    }
+    let mut origem: Option<Origem> = None;
+    if let Some(oid) = i.doc_origem_id {
+        let row = sqlx::query(
+            "SELECT d.id, d.tipo_codigo, d.entidade_id, d.valor_pendente, d.estado, d.total, t.pago_no_acto, t.classe, t.grupo, t.credito
+             FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo WHERE d.id = ?",
+        )
+        .bind(oid)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::msg("Documento de origem não encontrado."))?;
+        if row.get::<String, _>("estado") == "A" {
+            return Err(AppError::msg("O documento de origem está anulado."));
+        }
+        origem = Some(Origem {
+            id: row.get("id"),
+            tipo: row.get("tipo_codigo"),
+            classe: row.get("classe"),
+            grupo: row.get("grupo"),
+            credito: row.get::<i64, _>("credito") == 1,
+            entidade: row.get::<Option<i64>, _>("entidade_id").unwrap_or(1),
+            pendente: row.get("valor_pendente"),
+            total: row.get("total"),
+            pago: row.get::<i64, _>("pago_no_acto") == 1,
+        });
+    }
+    if tipo.credito {
+        match &origem {
+            Some(o) if !o.credito && o.grupo == tipo.grupo && matches!(o.classe.as_str(), "VENDA" | "COMPRA") && Some(o.entidade) == entidade_id => {}
+            Some(_) => return Err(AppError::msg("A nota de crédito deve referir uma factura da mesma entidade.")),
+            None => return Err(AppError::msg("A nota de crédito exige o documento de origem.")),
+        }
+    }
+    // Nota de crédito: o que a origem facturou e o que já foi creditado por notas não anuladas.
+    // Só se credita o que foi facturado (artigos, quantidades e valores), ao preço da factura.
+    let creditavel = match (&origem, tipo.credito) {
+        (Some(o), true) => Some(creditavel_tx(&mut tx, o.id).await?),
+        _ => None,
+    };
+
+    // ---------- linhas ----------
+    if adiantamento && !i.linhas.is_empty() {
+        return Err(AppError::msg("O recibo de adiantamento não tem linhas: indique só o valor recebido."));
+    }
+    if !liquida && !adiantamento && i.linhas.is_empty() {
+        return Err(AppError::msg("O documento não tem linhas."));
+    }
+    // promoções por regras e cupões: só nas vendas novas (não nas conversões nem nas notas de crédito)
+    let aplica_promocoes = tipo.grupo == "VENDAS" && matches!(tipo.classe.as_str(), "VENDA" | "PROFORMA") && i.doc_origem_id.is_none() && manual.is_none();
+    let cupao: Option<(String, String, f64)> = match txt(&i.cupao) {
+        Some(c) if aplica_promocoes => {
+            let (t, v, _) = super::promocoes::cupao_valido(&mut tx, &c, i64::MAX, &hoje).await?;
+            Some((c.to_uppercase(), t, v))
+        }
+        Some(_) => return Err(AppError::msg("Os cupões só se usam em vendas novas.")),
+        None => None,
+    };
+    let (desc_global, desc_global_valor) = match &cupao {
+        Some((_, t, v)) if t == "PCT" => (v.clamp(0.0, 100.0), 0),
+        Some((_, _, v)) => (0.0, v.round() as i64),
+        None => (i.desconto_global_pct.unwrap_or(0.0).clamp(0.0, 100.0), i.desconto_global_valor.unwrap_or(0).max(0)),
+    };
+    let regras: Vec<(f64, Option<String>)> = if aplica_promocoes {
+        let mut lp = Vec::with_capacity(i.linhas.len());
+        for l in &i.linhas {
+            let aid = l.artigo_id.unwrap_or_default();
+            let familia: Option<i64> = sqlx::query_scalar("SELECT familia_id FROM artigos WHERE id = ?").bind(aid).fetch_optional(&mut *tx).await?.flatten();
+            lp.push(super::promocoes::LinhaPromo { artigo_id: aid, familia_id: familia, quantidade: l.quantidade });
+        }
+        super::promocoes::descontos(&mut tx, &lp, chrono::Local::now().naive_local()).await?
+    } else {
+        vec![(0.0, None); i.linhas.len()]
+    };
+    // Preço/desconto alterados em vendas exigem permissão (ou PIN de supervisor).
+    // Documentos com origem (NC, conversão de proforma) herdam os valores já autorizados.
+    let verificar = tipo.grupo == "VENDAS" && matches!(tipo.classe.as_str(), "VENDA" | "PROFORMA" | "TRANSPORTE") && i.doc_origem_id.is_none();
+    // preços com IVA incluído (opção de venda): a linha calcula-se a partir do PVP com IVA
+    let modo_iva = tipo.grupo == "VENDAS" && precos_com_iva(&mut *tx).await?;
+    let inventario = tipo.stock == 3;
+    let mut preco_alterado = false;
+    // o desconto global do cupão não precisa de autorização
+    let mut desconto_extra = cupao.is_none() && (desc_global > 0.0 || desc_global_valor > 0);
+    let mut linhas: Vec<Linha> = Vec::with_capacity(i.linhas.len());
+    for (idx, l) in i.linhas.iter().enumerate() {
+        if (inventario && l.quantidade < 0.0) || (!inventario && l.quantidade <= 0.0) {
+            return Err(AppError::msg("As quantidades têm de ser positivas."));
+        }
+        let aid = l.artigo_id.ok_or_else(|| AppError::msg("Linha sem artigo."))?;
+        let a = sqlx::query(
+            "SELECT a.*, t.percentagem, u.abreviatura FROM artigos a JOIN taxas_iva t ON t.id = a.taxa_iva_id
+             LEFT JOIN unidades u ON u.id = a.unidade_id WHERE a.id = ?",
+        )
+        .bind(aid)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::msg(format!("Artigo {aid} não encontrado.")))?;
+        // nível de preço do cliente; um nível sem preço usa o nível 1 (como o POS)
+        let nivel_preco = match nivel_preco {
+            2 if a.get::<i64, _>("preco2") > 0 => 2,
+            3 if a.get::<i64, _>("preco3") > 0 => 3,
+            4 if a.get::<i64, _>("preco4") > 0 => 4,
+            _ => 1,
+        };
+        let preco_artigo = match tipo.grupo.as_str() {
+            "COMPRAS" => a.get::<i64, _>("custo"),
+            "STOCK" => a.get::<i64, _>("custo_medio"),
+            _ => a.get::<i64, _>(match nivel_preco {
+                2 => "preco2",
+                3 => "preco3",
+                4 => "preco4",
+                _ => "preco1",
+            }),
+        };
+        // nota de crédito: o artigo tem de constar da origem, e o preço e o desconto por omissão são os dela
+        let na_origem = match &creditavel {
+            Some(c) => Some(c.artigos.get(&aid).ok_or_else(|| {
+                AppError::msg(format!("\"{}\" não consta do documento de origem: só se credita o que foi facturado.", a.get::<String, _>("descricao")))
+            })?),
+            None => None,
+        };
+        // kit: o stock movimentado é o dos componentes
+        let componentes: Vec<(i64, f64, bool, bool)> = if a.get::<i64, _>("composto") == 1 {
+            sqlx::query_as::<_, (i64, f64, i64, i64)>(
+                "SELECT c.componente_id, c.quantidade, ar.permite_negativo, ar.controla_stock
+                 FROM artigo_componentes c JOIN artigos ar ON ar.id = c.componente_id WHERE c.artigo_id = ?",
+            )
+            .bind(aid)
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .map(|(id, q, neg, ctl)| (id, q, neg == 1, ctl == 1))
+            .collect()
+        } else {
+            Vec::new()
+        };
+        let (taxa_id, taxa_pct, motivo_isencao) = if tipo.classe == "STOCK" {
+            (None, 0.0, None)
+        } else {
+            (Some(a.get::<i64, _>("taxa_iva_id")), a.get::<f64, _>("percentagem"), a.get::<Option<String>, _>("motivo_isencao"))
+        };
+        let (preco, pvp) = if modo_iva {
+            // PVP do artigo: o guardado, se ainda bater com o preço sem IVA (pode ter sido mexido por
+            // importações ou versões antigas); senão, calculado a partir dele
+            let coluna = match nivel_preco {
+                2 => "pvp2",
+                3 => "pvp3",
+                4 => "pvp4",
+                _ => "pvp1",
+            };
+            let g_artigo = a
+                .try_get::<Option<i64>, _>(coluna)
+                .ok()
+                .flatten()
+                .filter(|g| sem_iva(*g, taxa_pct) == preco_artigo)
+                .unwrap_or_else(|| com_iva(preco_artigo, taxa_pct));
+            let g = match (l.pvp_unitario, l.preco_unitario) {
+                (Some(g), _) => g,
+                (None, Some(p)) => com_iva(p, taxa_pct),
+                (None, None) => match na_origem {
+                    Some(o) => o.pvp.unwrap_or_else(|| com_iva(o.preco, taxa_pct)),
+                    None => g_artigo,
+                },
+            }
+            .max(0);
+            if g != g_artigo {
+                preco_alterado = true;
+            }
+            (sem_iva(g, taxa_pct), Some(g))
+        } else {
+            let preco = match l.preco_unitario {
+                Some(p) if moeda != "AOA" => r(p as f64 * cambio),
+                Some(p) => p,
+                None => na_origem.map(|o| o.preco).unwrap_or(preco_artigo),
+            }
+            .max(0);
+            if preco != preco_artigo {
+                preco_alterado = true;
+            }
+            (preco, None)
+        };
+        // promoção do artigo em vigor na data do documento (só vendas): é o desconto por omissão
+        // e, até esse valor, não precisa de autorização
+        let promo = if tipo.grupo == "VENDAS" { promocao_vigente(&a, &data_doc).max(regras[idx].0) } else { 0.0 };
+        // desconto de linha combinado com o desconto global
+        let dl = l.desconto_pct.unwrap_or_else(|| na_origem.map(|o| o.desconto).unwrap_or(promo)).clamp(0.0, 100.0);
+        if dl > ent_desconto.max(promo) + 1e-9 {
+            desconto_extra = true;
+        }
+        let desconto_pct = 100.0 - (100.0 - dl) * (100.0 - desc_global) / 100.0;
+        let (valor_desconto, liquido, iva, total) = match pvp {
+            // com IVA incluído: o total da linha é quantidade × PVP menos o desconto; o IVA sai do total
+            Some(g) => {
+                let bruto_g = r(l.quantidade * g as f64);
+                let desconto_g = r(bruto_g as f64 * desconto_pct / 100.0);
+                let total = bruto_g - desconto_g;
+                let iva = r(total as f64 * taxa_pct / (100.0 + taxa_pct));
+                (sem_iva(desconto_g, taxa_pct), total - iva, iva, total)
+            }
+            None => {
+                let bruto = r(l.quantidade * preco as f64);
+                let valor_desconto = r(bruto as f64 * desconto_pct / 100.0);
+                let liquido = bruto - valor_desconto;
+                let iva = r(liquido as f64 * taxa_pct / 100.0);
+                (valor_desconto, liquido, iva, liquido + iva)
+            }
+        };
+        linhas.push(Linha {
+            artigo_id: Some(aid),
+            referencia: a.get("referencia"),
+            descricao: l.descricao.clone().filter(|d| !d.trim().is_empty()).unwrap_or_else(|| a.get("descricao")),
+            quantidade: l.quantidade,
+            unidade: a.get("abreviatura"),
+            preco,
+            pvp,
+            desconto_pct,
+            valor_desconto,
+            taxa_id,
+            taxa_pct,
+            motivo: if taxa_pct == 0.0 && tipo.classe != "STOCK" { motivo_isencao.or(Some("M00".into())) } else { None },
+            liquido,
+            iva,
+            total,
+            custo: a.get("custo_medio"),
+            controla_stock: a.get::<i64, _>("controla_stock") == 1 && a.get::<String, _>("tipo") == "P" && componentes.is_empty(),
+            permite_negativo: a.get::<i64, _>("permite_negativo") == 1,
+            controla_lote: a.get::<i64, _>("controla_lote") == 1,
+            lote: l.lote.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from),
+            validade: l.validade.as_deref().map(str::trim).filter(|s| s.len() == 10).map(String::from),
+            componentes,
+            custo_extra: 0,
+        });
+    }
+
+    // ---------- desconto global em valor (distribuído pelas linhas) ----------
+    // com IVA incluído, o valor (em Kz, como o cliente o vê) abate ao total com IVA de cada linha
+    if desc_global_valor > 0 && !linhas.is_empty() && modo_iva {
+        let base: i64 = linhas.iter().map(|l| l.total).sum();
+        if desc_global_valor > base {
+            return Err(AppError::msg("O desconto global não pode ser superior ao total."));
+        }
+        let n = linhas.len();
+        let mut restante = desc_global_valor;
+        for (k, l) in linhas.iter_mut().enumerate() {
+            let quota = if k + 1 == n { restante } else { r(desc_global_valor as f64 * l.total as f64 / base as f64) };
+            let d = quota.min(l.total).min(restante);
+            restante -= d;
+            l.total -= d;
+            l.iva = r(l.total as f64 * l.taxa_pct / (100.0 + l.taxa_pct));
+            l.liquido = l.total - l.iva;
+            l.valor_desconto += sem_iva(d, l.taxa_pct);
+            let bruto = l.liquido + l.valor_desconto;
+            l.desconto_pct = if bruto > 0 { (l.valor_desconto as f64 * 1_000_000.0 / bruto as f64).round() / 10_000.0 } else { 0.0 };
+        }
+    } else if desc_global_valor > 0 && !linhas.is_empty() {
+        let base: i64 = linhas.iter().map(|l| l.liquido).sum();
+        if desc_global_valor > base {
+            return Err(AppError::msg("O desconto global não pode ser superior ao total."));
+        }
+        let n = linhas.len();
+        let mut restante = desc_global_valor;
+        for (k, l) in linhas.iter_mut().enumerate() {
+            let quota = if k + 1 == n { restante } else { r(desc_global_valor as f64 * l.liquido as f64 / base as f64) };
+            let d = quota.min(l.liquido).min(restante);
+            restante -= d;
+            l.liquido -= d;
+            l.valor_desconto += d;
+            l.iva = r(l.liquido as f64 * l.taxa_pct / 100.0);
+            l.total = l.liquido + l.iva;
+            let bruto = l.liquido + l.valor_desconto;
+            l.desconto_pct = if bruto > 0 { (l.valor_desconto as f64 * 1_000_000.0 / bruto as f64).round() / 10_000.0 } else { 0.0 };
+        }
+    }
+
+    // ---------- custos adicionais de compra (repartidos pelo valor das linhas) ----------
+    let custos: Vec<(String, Option<String>, i64)> = i.custos.iter().filter(|c| c.valor > 0).map(|c| (c.tipo.clone(), txt(&c.descricao), c.valor)).collect();
+    if !custos.is_empty() {
+        if tipo.grupo != "COMPRAS" {
+            return Err(AppError::msg("Os custos adicionais só se aplicam a documentos de compra."));
+        }
+        let total_custos: i64 = custos.iter().map(|c| c.2).sum();
+        let base: i64 = linhas.iter().map(|l| l.liquido).sum();
+        if base > 0 {
+            let n = linhas.len();
+            let mut resto = total_custos;
+            for (k, l) in linhas.iter_mut().enumerate() {
+                let quota = if k + 1 == n { resto } else { r(total_custos as f64 * l.liquido as f64 / base as f64) };
+                l.custo_extra = quota.min(resto);
+                resto -= l.custo_extra;
+            }
+        }
+    }
+
+    // ---------- autorização (preço / desconto) ----------
+    let mut autorizado_por: Option<i64> = None;
+    if verificar && (preco_alterado || desconto_extra) {
+        let mut precisa: Vec<&str> = Vec::new();
+        if preco_alterado {
+            precisa.push("pos.alterar_preco");
+        }
+        if desconto_extra {
+            precisa.push("pos.desconto");
+        }
+        let max_desc = if desconto_extra { linhas.iter().map(|l| l.desconto_pct).fold(0.0, f64::max) } else { 0.0 };
+        let s = st.sessao()?;
+        let perms_ok = precisa.iter().all(|p| s.tem(p));
+        let limite_ok = !desconto_extra || s.limite_desconto <= 0.0 || max_desc <= s.limite_desconto + 1e-9;
+        if !(perms_ok && limite_ok) {
+            let pin = i.autorizacao_pin.as_deref().unwrap_or("");
+            if pin.trim().is_empty() {
+                return Err(AppError::msg(if perms_ok {
+                    format!("O desconto ({max_desc:.2}%) excede o seu limite. É necessária a autorização de um supervisor (PIN).")
+                } else {
+                    "Alteração de preço ou desconto: é necessária a autorização de um supervisor (PIN).".to_string()
+                }));
+            }
+            match super::auth::supervisor_por_pin(st, pin, &precisa, max_desc).await? {
+                Some(sup) => autorizado_por = Some(sup.id),
+                None => return Err(AppError::msg("PIN de autorização inválido.")),
+            }
+        }
+    }
+
+    // ---------- vender sem stock: política da empresa e, se for o caso, a autorização ----------
+    let sem_stock = politica_sem_stock(&mut *tx).await?;
+    let sem_stock_autorizado = sem_stock == "autorizar"
+        && match st.sessao() {
+            Ok(s) if s.tem("stock.sem_stock") => true,
+            _ => match i.autorizacao_pin.as_deref().filter(|p| !p.trim().is_empty()) {
+                Some(pin) => match super::auth::supervisor_por_pin(st, pin, &["stock.sem_stock"], 0.0).await? {
+                    Some(sup) => {
+                        autorizado_por = autorizado_por.or(Some(sup.id));
+                        true
+                    }
+                    None => false,
+                },
+                None => false,
+            },
+        };
+    // o que cada saída pode fazer: com «artigo», o que diz a ficha; senão, a política (e a autorização)
+    let pode_negativo = |ficha: bool| match sem_stock {
+        "artigo" => ficha,
+        "autorizar" => sem_stock_autorizado,
+        _ => false,
+    };
+
+    // ---------- liquidações (recibo de cliente / pagamento a fornecedor) ----------
+    let mut liquidacoes: Vec<(i64, i64)> = Vec::new();
+    // retenção na fonte feita no pagamento (o cliente retém ao pagar, ou a empresa ao pagar ao fornecedor): a base é a
+    // parte sem IVA (e o IVA, no IVA cativo) do que se liquida de cada documento
+    let (mut base_liq_rec, mut base_iva_rec) = (0i64, 0i64);
+    if liquida {
+        if i.liquidar.is_empty() {
+            return Err(AppError::msg("Seleccione os documentos a liquidar."));
+        }
+        for lq in &i.liquidar {
+            let (ent, pend, estado, d_total, d_liq, d_iva, d_ret, d_num): (Option<i64>, i64, String, i64, i64, i64, i64, String) = sqlx::query_as(
+                "SELECT entidade_id, valor_pendente, estado, total, total_liquido, total_iva, total_retencao, numero_doc FROM documentos WHERE id = ?",
+            )
+            .bind(lq.documento_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::msg("Documento a liquidar não encontrado."))?;
+            if ent != entidade_id || estado != "N" {
+                return Err(AppError::msg("Documento a liquidar inválido para esta entidade."));
+            }
+            if lq.valor <= 0 || lq.valor > pend {
+                return Err(AppError::msg("Valor a liquidar superior ao valor em dívida."));
+            }
+            if !i.retencoes.is_empty() && d_ret > 0 {
+                return Err(AppError::msg(format!("O documento {d_num} já tem a retenção na fonte na factura: não se repete no pagamento.")));
+            }
+            if d_total > 0 {
+                let f = lq.valor as f64 / d_total as f64;
+                base_liq_rec += (d_liq as f64 * f).round() as i64;
+                base_iva_rec += (d_iva as f64 * f).round() as i64;
+            }
+            liquidacoes.push((lq.documento_id, lq.valor));
+        }
+    }
+
+    // ---------- totais ----------
+    let (total_bruto, total_desconto, total_liquido, total_iva) = linhas.iter().fold((0, 0, 0, 0), |acc, l| {
+        (acc.0 + l.liquido + l.valor_desconto, acc.1 + l.valor_desconto, acc.2 + l.liquido, acc.3 + l.iva)
+    });
+    let total: i64 = if liquida {
+        liquidacoes.iter().map(|x| x.1).sum()
+    } else if adiantamento {
+        match i.valor {
+            Some(v) if v > 0 => v,
+            _ => return Err(AppError::msg("Indique o valor do adiantamento.")),
+        }
+    } else {
+        total_liquido + total_iva
+    };
+
+    // ---------- nota de crédito: nunca mais do que o facturado ----------
+    if let Some(c) = &creditavel {
+        // por artigo: quantidade, valor (c/ IVA) e n.º de linhas desta nota
+        let mut pedido: std::collections::BTreeMap<i64, (f64, i64, i64)> = std::collections::BTreeMap::new();
+        for l in &linhas {
+            let e = pedido.entry(l.artigo_id.unwrap_or_default()).or_insert((0.0, 0, 0));
+            e.0 += l.quantidade;
+            e.1 += l.total;
+            e.2 += 1;
+        }
+        for (aid, (q, t, n)) in &pedido {
+            let o = &c.artigos[aid];
+            let disp_q = (o.quantidade - o.creditado_qtd).max(0.0);
+            if *q > disp_q + 1e-9 {
+                return Err(AppError::msg(format!(
+                    "\"{}\": só pode creditar {} (facturado {}, já creditado {}).",
+                    o.descricao,
+                    qtd_txt(disp_q),
+                    qtd_txt(o.quantidade),
+                    qtd_txt(o.creditado_qtd)
+                )));
+            }
+            // tolerância de 1 cêntimo por linha (arredondamento de devoluções parciais)
+            let disp_v = (o.total - o.creditado_total).max(0);
+            if *t > disp_v + n {
+                return Err(AppError::msg(format!(
+                    "\"{}\": o valor a creditar ({}) excede o valor ainda por creditar ({}).",
+                    o.descricao,
+                    agt::valor_pt(*t),
+                    agt::valor_pt(disp_v)
+                )));
+            }
+        }
+        let disp = (c.total - c.creditado).max(0);
+        if total > disp + linhas.len() as i64 {
+            return Err(AppError::msg(format!(
+                "O total da nota de crédito ({}) excede o valor ainda por creditar do documento de origem ({}).",
+                agt::valor_pt(total),
+                agt::valor_pt(disp)
+            )));
+        }
+    }
+
+    // ---------- retenção na fonte ----------
+    let mut retencoes: Vec<(String, String, f64, i64, i64)> = Vec::new(); // codigo, descricao, %, base, valor
+    for rt in &i.retencoes {
+        let row = sqlx::query("SELECT * FROM retencoes WHERE codigo = ? AND ativo = 1")
+            .bind(rt.codigo.trim())
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::msg(format!("Retenção desconhecida: {}", rt.codigo)))?;
+        let pct = rt.percentagem.unwrap_or_else(|| row.get("percentagem")).clamp(0.0, 100.0);
+        let (b_liq, b_iva) = if liquida { (base_liq_rec, base_iva_rec) } else { (total_liquido, total_iva) };
+        let base = if row.get::<String, _>("base") == "IVA" { b_iva } else { b_liq };
+        let valor = match rt.valor.filter(|_| liquida) {
+            Some(v) if v < 0 => return Err(AppError::msg("O valor retido não pode ser negativo.")),
+            Some(v) => v,
+            None => r(base as f64 * pct / 100.0),
+        };
+        if valor > 0 {
+            retencoes.push((row.get("codigo"), row.get("descricao"), pct, base, valor));
+        }
+    }
+    let total_retencao: i64 = retencoes.iter().map(|x| x.4).sum();
+    if total_retencao > total {
+        return Err(AppError::msg("A retenção não pode exceder o total do documento."));
+    }
+    let a_pagar = total - total_retencao;
+    // compra mínima do cupão (sobre o total antes do desconto do cupão)
+    if let Some((codigo, t, v)) = &cupao {
+        let antes = if t == "PCT" { if *v < 100.0 { (total as f64 / (1.0 - v / 100.0)).round() as i64 } else { i64::MAX } } else { total + v.round() as i64 };
+        super::promocoes::cupao_valido(&mut tx, codigo, antes, &hoje).await?;
+    }
+
+    // ---------- pagamentos ----------
+    let (mut pagamentos, mut estrangeiras) = Box::pin(ler_pagamentos(&mut tx, &i.pagamentos, tipo.pago_no_acto)).await?;
+    // Compensação de saldo (CS): usa adiantamentos e notas de crédito ainda por utilizar — nos recibos e pagamentos
+    // e, como nos grandes POS, para pagar uma Factura/Recibo do cliente (o POS oferece-a ao cliente identificado).
+    let compensacao: i64 = pagamentos.iter().filter(|p| p.0 == "CS").map(|p| p.1).sum();
+    let mut creditos_usar: Vec<(i64, i64)> = Vec::new();
+    if compensacao > 0 {
+        let venda_a_pronto = tipo.pago_no_acto && tipo.grupo == "VENDAS" && tipo.classe == "VENDA";
+        if !liquida && !venda_a_pronto {
+            return Err(AppError::msg("A compensação de saldo só se usa em recibos, pagamentos a fornecedor e facturas/recibo."));
+        }
+        if entidade_id.is_none_or(|e| e == 1) {
+            return Err(AppError::msg("Identifique o cliente para pagar com o crédito dele (adiantamentos e notas de crédito)."));
+        }
+        let disponiveis: Vec<(i64, i64)> = sqlx::query_as(
+            "SELECT d.id, d.credito_disponivel FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+             WHERE d.entidade_id = ? AND d.estado = 'N' AND d.credito_disponivel > 0 AND t.grupo = ? ORDER BY d.data_emissao, d.id",
+        )
+        .bind(entidade_id)
+        .bind(&tipo.grupo)
+        .fetch_all(&mut *tx)
+        .await?;
+        let disponivel: i64 = disponiveis.iter().map(|x| x.1).sum();
+        if compensacao > disponivel {
+            return Err(AppError::msg(format!("Crédito disponível insuficiente para compensar: {}.", agt::valor_pt(disponivel))));
+        }
+        let mut resto = compensacao;
+        for (id, disp) in disponiveis {
+            if resto == 0 {
+                break;
+            }
+            let usa = resto.min(disp);
+            creditos_usar.push((id, usa));
+            resto -= usa;
+        }
+    }
+    let entregue: i64 = pagamentos.iter().map(|p| p.1).sum();
+    let mut troco = 0;
+    if tipo.pago_no_acto {
+        if entregue < a_pagar {
+            return Err(AppError::msg(format!("Valor pago insuficiente. Falta {}.", agt::valor_pt(a_pagar - entregue))));
+        }
+        troco = entregue - a_pagar;
+        if troco > 0 {
+            tirar_troco(&mut pagamentos, &estrangeiras, troco)?;
+        }
+    } else {
+        pagamentos.clear();
+        estrangeiras.clear();
+    }
+    // pagamento com pontos de fidelização (SAF-T: «DE»): só em vendas e recibos de um cliente identificado
+    let fidelizacao = super::fidelizacao::cfg(&mut *tx).await?;
+    let pago_pontos: i64 = pagamentos.iter().filter(|p| p.0 == "DE").map(|p| p.1).sum();
+    let pontos_gastos = match entidade_id.filter(|e| *e != 1 && tipo.grupo == "VENDAS") {
+        Some(eid) if pago_pontos > 0 => super::fidelizacao::validar_resgate(&mut tx, &fidelizacao, eid, pago_pontos).await?,
+        None if pago_pontos > 0 => return Err(AppError::msg("O pagamento com pontos exige um cliente identificado (vendas e recibos).")),
+        _ => 0,
+    };
+    let valor_pendente = if tipo.conta_corrente == 1 { a_pagar } else { 0 };
+
+    // ---------- limite de crédito do cliente ----------
+    if tipo.conta_corrente == 1 && tipo.grupo == "VENDAS" && manual.is_none() {
+        if let Some(eid) = entidade_id.filter(|e| *e != 1) {
+            let (limite, saldo): (i64, i64) = sqlx::query_as(
+                "SELECT e.limite_credito, COALESCE((SELECT SUM(d.valor_pendente) - SUM(d.credito_disponivel) FROM documentos d
+                                                    WHERE d.entidade_id = e.id AND d.estado = 'N'), 0)
+                 FROM entidades e WHERE e.id = ?",
+            )
+            .bind(eid)
+            .fetch_one(&mut *tx)
+            .await?;
+            if limite > 0 && saldo + a_pagar > limite {
+                let s = st.sessao()?;
+                if !s.tem("vendas.limite_credito") {
+                    let pin = i.autorizacao_pin.as_deref().unwrap_or("");
+                    let msg = format!(
+                        "Limite de crédito excedido: saldo {} + documento {} > limite {}.",
+                        agt::valor_pt(saldo),
+                        agt::valor_pt(a_pagar),
+                        agt::valor_pt(limite)
+                    );
+                    if pin.trim().is_empty() {
+                        return Err(AppError::msg(format!("{msg} É necessária a autorização de um supervisor (PIN).")));
+                    }
+                    match super::auth::supervisor_por_pin(st, pin, &["vendas.limite_credito"], 0.0).await? {
+                        Some(sup) => autorizado_por = autorizado_por.or(Some(sup.id)),
+                        None => return Err(AppError::msg("PIN de autorização inválido.")),
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- regras de aprovação: notas de crédito e pagamentos a fornecedores (services/aprovacoes.rs) ----------
+    let regra = match tipo.codigo.as_str() {
+        "NC" => Some((super::aprovacoes::Regra::Creditos, "Nota de crédito")),
+        "VRC" => Some((super::aprovacoes::Regra::Saidas, "Pagamento a fornecedor")),
+        _ => None,
+    };
+    let aprovacao = match regra {
+        Some((r, nome)) => super::aprovacoes::exigir(st, r, total, Some(&data_doc), format!("{nome} de {}", super::aprovacoes::kz(total)), i.autorizacao_pin.as_deref()).await?,
+        None => None,
+    };
+    if let Some(a) = &aprovacao {
+        autorizado_por = autorizado_por.or(Some(a.aprovado_por));
+    }
+
+    // ---------- numeração + assinatura ----------
+    let serie = escolher_serie(&mut tx, &tipo.codigo, posto.id, &posto.serie_prefixo, &data_doc, i.serie.as_deref(), manual.is_some()).await?;
+    let (ultimo, hash_ant, data_ultimo): (i64, String, Option<String>) =
+        sqlx::query_as("SELECT ultimo_numero, ultimo_hash, data_ultimo FROM series WHERE tipo_codigo = ? AND serie = ?")
+            .bind(&tipo.codigo)
+            .bind(&serie)
+            .fetch_one(&mut *tx)
+            .await?;
+    // Ordem cronológica dentro da série (requisito da AGT).
+    if let Some(u) = data_ultimo.as_deref().filter(|u| data_doc.as_str() < *u) {
+        return Err(AppError::msg(format!("A data do documento ({data_doc}) é anterior à do último documento da série {serie} ({u}).")));
+    }
+    let numero = ultimo + 1;
+    let numero_doc = format!("{} {}/{}", tipo.codigo, serie, numero);
+    if tipo.assinado {
+        agt::exigir_certificacao(&st.pool).await?;
+    }
+    let (hash, controlo) = if tipo.assinado {
+        let h = agt::assinar(&chave, &agt::mensagem(&data_doc, &agora, &numero_doc, total, &hash_ant));
+        let c = agt::controlo(&h);
+        (h, c)
+    } else {
+        (String::new(), String::new())
+    };
+    sqlx::query("UPDATE series SET ultimo_numero = ?, ultimo_hash = ?, data_ultimo = ? WHERE tipo_codigo = ? AND serie = ?")
+        .bind(numero)
+        .bind(if tipo.assinado { &hash } else { &hash_ant })
+        .bind(&data_doc)
+        .bind(&tipo.codigo)
+        .bind(&serie)
+        .execute(&mut *tx)
+        .await?;
+
+    // Dinheiro recebido no POS fica associado ao caixa aberto do posto (não nos documentos manuais recuperados,
+    // nem nos emitidos pela API de integração: uma venda da loja online não passa pela gaveta de nenhum posto).
+    let api_chave = crate::state::contexto().and_then(|c| c.api_chave);
+    let sessao_caixa: Option<i64> = if manual.is_none() && api_chave.is_none() && tipo.grupo == "VENDAS" && (tipo.pago_no_acto || tipo.credito) {
+        sqlx::query_scalar("SELECT id FROM caixa_sessoes WHERE posto_id = ? AND estado = 'ABERTA' ORDER BY id DESC LIMIT 1")
+            .bind(posto.id)
+            .fetch_optional(&mut *tx)
+            .await?
+    } else {
+        None
+    };
+
+    let transporte = i.transporte.as_ref().filter(|v| v.is_object()).map(|v| v.to_string());
+    let doc_id = sqlx::query(
+        "INSERT INTO documentos (tipo_codigo, serie, numero, numero_doc, data_emissao, data_hora, data_vencimento,
+            entidade_id, entidade_nome, entidade_nif, entidade_endereco, entidade_localidade, utilizador_id, posto_id, armazem_id,
+            armazem_destino_id, doc_origem_id, total_bruto, total_desconto, total_liquido, total_iva, total_retencao, total,
+            valor_entregue, troco, valor_pendente, hash, hash_controlo, caixa_sessao_id, observacoes, autorizado_por,
+            doc_externo, motivo, referencia, prazo, transporte, moeda, cambio, total_moeda)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&tipo.codigo)
+    .bind(&serie)
+    .bind(numero)
+    .bind(&numero_doc)
+    .bind(&data_doc)
+    .bind(&agora)
+    .bind(i.data_vencimento.clone().filter(|d| !d.is_empty()).unwrap_or_else(|| somar_dias(&data_doc, tipo.validade_dias)))
+    .bind(entidade_id)
+    .bind(&ent_nome)
+    .bind(&ent_nif)
+    .bind(&ent_end)
+    .bind(&ent_loc)
+    .bind(utilizador_id)
+    .bind(posto.id)
+    .bind(armazem_id)
+    .bind(i.armazem_destino_id)
+    .bind(i.doc_origem_id)
+    .bind(total_bruto)
+    .bind(total_desconto)
+    .bind(total_liquido)
+    .bind(total_iva)
+    .bind(total_retencao)
+    .bind(total)
+    .bind(entregue)
+    .bind(troco)
+    .bind(valor_pendente)
+    .bind(&hash)
+    .bind(&controlo)
+    .bind(sessao_caixa)
+    .bind(txt(&i.observacoes))
+    .bind(autorizado_por)
+    .bind(&doc_externo)
+    .bind(&motivo)
+    .bind(txt(&i.referencia))
+    .bind(txt(&i.prazo))
+    .bind(&transporte)
+    .bind(&moeda)
+    .bind(cambio)
+    .bind(if moeda == "AOA" { None } else { Some(r(total as f64 / cambio)) })
+    .execute(&mut *tx)
+    .await?
+    .last_insert_rowid();
+    sqlx::query("UPDATE documentos SET origem = ?, doc_manual = ?, credito_disponivel = ?, vendedor_id = ?, endereco_entrega = ?, hash_versao = ?, cupao = ?, api_chave_id = ? WHERE id = ?")
+        .bind(if manual.is_some() { "M" } else { "P" })
+        .bind(manual.as_ref().map(|m| m.0.clone()))
+        .bind(if adiantamento { total } else { 0 })
+        .bind(vendedor_id)
+        .bind(txt(&i.endereco_entrega))
+        .bind(if tipo.assinado { Some(versao_chave.as_str()) } else { None })
+        .bind(cupao.as_ref().map(|c| c.0.clone()))
+        .bind(api_chave)
+        .bind(doc_id)
+        .execute(&mut *tx)
+        .await?;
+    if let Some((codigo, _, _)) = &cupao {
+        sqlx::query("UPDATE cupoes SET utilizacoes = utilizacoes + 1 WHERE codigo = ? COLLATE NOCASE").bind(codigo).execute(&mut *tx).await?;
+    }
+    for (cid, valor) in &creditos_usar {
+        sqlx::query("INSERT INTO credito_utilizacoes (documento_id, credito_id, valor) VALUES (?, ?, ?)").bind(doc_id).bind(cid).bind(valor).execute(&mut *tx).await?;
+        sqlx::query("UPDATE documentos SET credito_disponivel = credito_disponivel - ? WHERE id = ?").bind(valor).bind(cid).execute(&mut *tx).await?;
+    }
+    if tipo.grupo == "COMPRAS" && (doc_externo_hash.is_some() || doc_externo_data.is_some() || deducao_tipo.is_some()) {
+        sqlx::query("UPDATE documentos SET doc_externo_hash = ?, doc_externo_data = ?, deducao_tipo = ? WHERE id = ?")
+            .bind(&doc_externo_hash)
+            .bind(&doc_externo_data)
+            .bind(&deducao_tipo)
+            .bind(doc_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    for (n, l) in linhas.iter().enumerate() {
+        let linha_id = sqlx::query(
+            "INSERT INTO documento_linhas (documento_id, linha, artigo_id, referencia, descricao, quantidade, unidade,
+                preco_unitario, desconto_pct, valor_desconto, taxa_iva_id, taxa_iva_pct, motivo_isencao, valor_liquido, valor_iva, total, custo, pvp_unitario)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(doc_id)
+        .bind(n as i64 + 1)
+        .bind(l.artigo_id)
+        .bind(&l.referencia)
+        .bind(&l.descricao)
+        .bind(l.quantidade)
+        .bind(&l.unidade)
+        .bind(l.preco)
+        .bind(l.desconto_pct)
+        .bind(l.valor_desconto)
+        .bind(l.taxa_id)
+        .bind(l.taxa_pct)
+        .bind(&l.motivo)
+        .bind(l.liquido)
+        .bind(l.iva)
+        .bind(l.total)
+        .bind(l.custo)
+        .bind(l.pvp)
+        .execute(&mut *tx)
+        .await?
+        .last_insert_rowid();
+
+        // ---------- stock (artigo, componentes de kits e lotes) ----------
+        let mut usados_lote: Vec<(String, Option<String>, f64, i64)> = Vec::new();
+        if tipo.stock != 0 {
+            let txt_mov = format!("{} — {}", numero_doc, l.descricao);
+            // (artigo, quantidade, permite stock negativo, é o artigo da própria linha)
+            let alvos: Vec<(i64, f64, bool, bool)> = if !l.componentes.is_empty() {
+                if tipo.stock == 3 {
+                    Vec::new()
+                } else {
+                    l.componentes.iter().filter(|c| c.3).map(|c| (c.0, l.quantidade * c.1, c.2, false)).collect()
+                }
+            } else if l.controla_stock {
+                vec![(l.artigo_id.unwrap_or_default(), l.quantidade, l.permite_negativo, true)]
+            } else {
+                Vec::new()
+            };
+            for (aid, qtd, neg, principal) in alvos {
+                let com_lote = principal && l.controla_lote;
+                match tipo.stock {
+                    1 => {
+                        // entradas com custo (compras e documento de stock) actualizam o custo médio
+                        let custo = if principal && (tipo.classe == "COMPRA" || tipo.codigo == "ES") {
+                            Some(if qtd > 0.0 { r((l.liquido + l.custo_extra) as f64 / qtd) } else { l.preco })
+                        } else {
+                            None
+                        };
+                        mover_stock(&mut tx, aid, armazem_id, qtd, custo, doc_id, &txt_mov, true, &agora).await?;
+                        if com_lote {
+                            // Devolução sem lote indicado (ex.: POS): volta ao lote da factura de origem.
+                            let do_origem: Option<(String, Option<String>)> = match (&l.lote, &origem) {
+                                (None, Some(o)) => sqlx::query_as::<_, (String, Option<String>)>(
+                                    "SELECT lote, validade FROM documento_linhas WHERE documento_id = ? AND artigo_id = ? AND lote IS NOT NULL ORDER BY linha LIMIT 1",
+                                )
+                                .bind(o.id)
+                                .bind(aid)
+                                .fetch_optional(&mut *tx)
+                                .await?
+                                .map(|(t, v)| (t.split(" (").next().unwrap_or(&t).split(", ").next().unwrap_or("").trim().to_string(), v))
+                                .filter(|(t, _)| !t.is_empty()),
+                                _ => None,
+                            };
+                            let (lote, validade) = match (&l.lote, do_origem) {
+                                (Some(x), _) => (x.clone(), l.validade.clone()),
+                                (None, Some((x, v))) => (x, l.validade.clone().or(v)),
+                                (None, None) => return Err(AppError::msg(format!("Indique o lote de \"{}\" (artigo com controlo de lotes).", l.descricao))),
+                            };
+                            lote_entrada(&mut tx, aid, armazem_id, qtd, &lote, validade.as_deref(), custo.unwrap_or(l.custo), doc_id, &agora).await?;
+                            usados_lote.push((lote, validade, qtd, 0));
+                        }
+                    }
+                    -1 => {
+                        mover_stock(&mut tx, aid, armazem_id, -qtd, None, doc_id, &l.descricao, pode_negativo(neg), &agora)
+                            .await
+                            .map_err(|e| sem_stock_explicado(e, sem_stock))?;
+                        if com_lote {
+                            usados_lote = lote_saida(&mut tx, aid, armazem_id, qtd, l.lote.as_deref(), doc_id, &agora).await?;
+                        }
+                    }
+                    2 => {
+                        let dest = i.armazem_destino_id.unwrap_or_default();
+                        mover_stock(&mut tx, aid, armazem_id, -qtd, None, doc_id, &l.descricao, pode_negativo(neg), &agora)
+                            .await
+                            .map_err(|e| sem_stock_explicado(e, sem_stock))?;
+                        mover_stock(&mut tx, aid, dest, qtd, None, doc_id, &txt_mov, true, &agora).await?;
+                        if com_lote {
+                            usados_lote = lote_saida(&mut tx, aid, armazem_id, qtd, l.lote.as_deref(), doc_id, &agora).await?;
+                            for (nome, validade, q, custo) in &usados_lote {
+                                lote_entrada(&mut tx, aid, dest, *q, nome, validade.as_deref(), *custo, doc_id, &agora).await?;
+                            }
+                        }
+                    }
+                    3 => {
+                        // inventário: acerta a existência para a quantidade contada.
+                        // Com lote indicado, a contagem é desse lote e o stock do artigo acerta pela diferença do lote.
+                        if let (true, Some(lote)) = (com_lote, l.lote.as_deref()) {
+                            let no_lote: f64 = sqlx::query_scalar("SELECT quantidade FROM lotes WHERE artigo_id = ? AND armazem_id = ? AND lote = ?")
+                                .bind(aid)
+                                .bind(armazem_id)
+                                .bind(lote)
+                                .fetch_optional(&mut *tx)
+                                .await?
+                                .unwrap_or(0.0);
+                            let delta = qtd - no_lote;
+                            if delta.abs() > 1e-9 {
+                                mover_stock(&mut tx, aid, armazem_id, delta, None, doc_id, &txt_mov, true, &agora).await?;
+                                lote_entrada(&mut tx, aid, armazem_id, delta, lote, l.validade.as_deref(), 0, doc_id, &agora).await?;
+                            }
+                            usados_lote.push((lote.to_string(), l.validade.clone(), qtd, 0));
+                        } else {
+                            let atual = existencia(&mut tx, aid, armazem_id).await?;
+                            let delta = qtd - atual;
+                            if delta.abs() > 1e-9 {
+                                mover_stock(&mut tx, aid, armazem_id, delta, None, doc_id, &txt_mov, true, &agora).await?;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if let Some(t_lotes) = lotes_txt(&usados_lote) {
+            let validade = if usados_lote.len() == 1 { usados_lote[0].1.clone() } else { None };
+            sqlx::query("UPDATE documento_linhas SET lote = ?, validade = ? WHERE id = ?")
+                .bind(t_lotes)
+                .bind(validade)
+                .bind(linha_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
+
+    Box::pin(gravar_pagamentos(&mut tx, doc_id, &pagamentos, &estrangeiras)).await?;
+    for (codigo, descricao, pct, base, valor) in &retencoes {
+        sqlx::query("INSERT INTO documento_retencoes (documento_id, codigo, descricao, percentagem, base, valor) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(doc_id)
+            .bind(codigo)
+            .bind(descricao)
+            .bind(pct)
+            .bind(base)
+            .bind(valor)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    for (tipo_custo, descricao, valor) in &custos {
+        sqlx::query("INSERT INTO documento_custos (documento_id, tipo, descricao, valor) VALUES (?, ?, ?, ?)")
+            .bind(doc_id)
+            .bind(tipo_custo)
+            .bind(descricao)
+            .bind(valor)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // ---------- conta corrente ----------
+    for (did, valor) in &liquidacoes {
+        sqlx::query("INSERT INTO recibo_documentos (recibo_id, documento_id, valor) VALUES (?, ?, ?)")
+            .bind(doc_id)
+            .bind(did)
+            .bind(valor)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE documentos SET valor_pendente = valor_pendente - ? WHERE id = ?")
+            .bind(valor)
+            .bind(did)
+            .execute(&mut *tx)
+            .await?;
+    }
+    if let Some(o) = &origem {
+        if tipo.credito {
+            let abate = o.pendente.min(total);
+            if abate > 0 {
+                sqlx::query("INSERT INTO recibo_documentos (recibo_id, documento_id, valor) VALUES (?, ?, ?)")
+                    .bind(doc_id)
+                    .bind(o.id)
+                    .bind(abate)
+                    .execute(&mut *tx)
+                    .await?;
+                sqlx::query("UPDATE documentos SET valor_pendente = valor_pendente - ? WHERE id = ?")
+                    .bind(abate)
+                    .bind(o.id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            // pontos de fidelização: estorna os ganhos e devolve em pontos a parte paga com pontos
+            let em_pontos = match entidade_id {
+                Some(eid) if tipo.grupo == "VENDAS" => {
+                    super::fidelizacao::nota_credito(&mut tx, doc_id, &numero_doc, eid, o.id, o.total, total, utilizador_id, &agora).await?
+                }
+                _ => 0,
+            };
+            // Devolução em dinheiro de uma venda a pronto (POS com caixa aberto).
+            let mut devolvido = 0;
+            if o.pago && tipo.grupo == "VENDAS" && total - abate - em_pontos > 0 {
+                if let Some(sid) = sessao_caixa {
+                    let cm = sqlx::query("INSERT INTO caixa_movimentos (sessao_id, data_hora, tipo, valor, descricao) VALUES (?, ?, 'SAIDA', ?, ?)")
+                        .bind(sid)
+                        .bind(&agora)
+                        .bind(total - abate - em_pontos)
+                        .bind(format!("Devolução {numero_doc}"))
+                        .execute(&mut *tx)
+                        .await?
+                        .last_insert_rowid();
+                    devolvido = total - abate - em_pontos;
+                    sqlx::query("INSERT INTO credito_devolucoes (credito_id, caixa_movimento_id, valor, data) VALUES (?, ?, ?, ?)")
+                        .bind(doc_id)
+                        .bind(cm)
+                        .bind(devolvido)
+                        .bind(&data_doc)
+                        .execute(&mut *tx)
+                        .await?;
+                }
+            }
+            // O que não abateu à dívida nem foi devolvido fica como crédito a favor da entidade.
+            let credito = (total - abate - devolvido - em_pontos).max(0);
+            if credito > 0 {
+                sqlx::query("UPDATE documentos SET credito_disponivel = ? WHERE id = ?").bind(credito).bind(doc_id).execute(&mut *tx).await?;
+            }
+        } else if matches!(o.classe.as_str(), "PROFORMA" | "COMPRA_DOC" | "TRANSPORTE") {
+            // proforma / orçamento / encomenda / guia convertidos em factura
+            sqlx::query("UPDATE documentos SET estado = 'F' WHERE id = ?").bind(o.id).execute(&mut *tx).await?;
+        }
+        let _ = &o.tipo;
+    }
+
+    // ---------- fidelização: pontos gastos no pagamento e ganhos na compra ----------
+    if let Some(eid) = entidade_id.filter(|e| *e != 1 && tipo.grupo == "VENDAS") {
+        let venda = super::fidelizacao::Venda {
+            documento_id: doc_id,
+            numero: &numero_doc,
+            entidade_id: eid,
+            ganha: tipo.classe == "VENDA" && !tipo.credito,
+            a_pagar,
+            pago_pontos,
+            pontos_gastos,
+            utilizador_id,
+            agora: &agora,
+        };
+        super::fidelizacao::registar_venda(&mut tx, &fidelizacao, venda).await?;
+    }
+
+    sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (?, 'EMITIR', ?)")
+        .bind(utilizador_id)
+        .bind(&numero_doc)
+        .execute(&mut *tx)
+        .await?;
+    super::aprovacoes::registar(&mut tx, aprovacao.as_ref(), &numero_doc).await?;
+    tx.commit().await?;
+    drop(_guard);
+
+    obter(st, IdIn { id: doc_id }).await
+}
+
+#[derive(Deserialize)]
+pub struct Filtro {
+    tipo: Option<String>,
+    classe: Option<String>,
+    grupo: Option<String>,
+    de: Option<String>,
+    ate: Option<String>,
+    q: Option<String>,
+    entidade_id: Option<i64>,
+    estado: Option<String>,
+    limite: Option<i64>,
+}
+
+pub async fn listar(st: &AppState, f: Filtro) -> AppResult<Value> {
+    st.sessao()?;
+    // Só os filtros pedidos entram na consulta. Com «(? IS NULL OR …)» o SQLite não sabia, ao preparar, que filtro
+    // vinha preenchido e não usava os índices: a lista de um cliente lia os documentos todos por data.
+    let mut q = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+        "SELECT d.id, d.numero_doc, d.tipo_codigo, t.descricao AS tipo_desc, t.classe, t.grupo, d.data_emissao, d.data_hora,
+                d.data_vencimento, d.entidade_id, d.entidade_nome, d.entidade_nif, d.total_liquido, d.total_iva, d.total,
+                d.total_retencao, d.valor_pendente, d.estado, d.hash_controlo, d.doc_externo, d.importado, u.nome AS utilizador
+         FROM documentos d
+         JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         JOIN utilizadores u ON u.id = d.utilizador_id
+         WHERE 1 = 1",
+    );
+    let texto = |v: Option<String>| v.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    if let Some(v) = texto(f.tipo) {
+        q.push(" AND d.tipo_codigo = ").push_bind(v);
+    }
+    if let Some(v) = texto(f.classe) {
+        q.push(" AND t.classe = ").push_bind(v);
+    }
+    if let Some(v) = texto(f.de) {
+        q.push(" AND d.data_emissao >= ").push_bind(v);
+    }
+    if let Some(v) = texto(f.ate) {
+        q.push(" AND d.data_emissao <= ").push_bind(v);
+    }
+    if let Some(v) = texto(f.q) {
+        let p = format!("%{v}%");
+        q.push(" AND (d.numero_doc LIKE ").push_bind(p.clone());
+        q.push(" OR d.entidade_nome LIKE ").push_bind(p.clone());
+        q.push(" OR d.entidade_nif LIKE ").push_bind(p.clone());
+        q.push(" OR IFNULL(d.doc_externo, '') LIKE ").push_bind(p).push(")");
+    }
+    if let Some(v) = f.entidade_id {
+        q.push(" AND d.entidade_id = ").push_bind(v);
+    }
+    if let Some(v) = texto(f.estado) {
+        q.push(" AND d.estado = ").push_bind(v);
+    }
+    if let Some(v) = texto(f.grupo) {
+        q.push(" AND t.grupo = ").push_bind(v);
+    }
+    // um utilizador de uma loja só vê os documentos dela
+    if let Some(loja) = st.loja() {
+        q.push(" AND d.armazem_id = ").push_bind(loja);
+    }
+    q.push(" ORDER BY d.data_hora DESC, d.id DESC LIMIT ").push_bind(f.limite.unwrap_or(1000));
+    let rows = q.build().fetch_all(&st.pool).await?;
+    Ok(db::rows_json(&rows))
+}
+
+pub async fn obter(st: &AppState, i: IdIn) -> AppResult<Value> {
+    st.sessao()?;
+    let p = &st.pool;
+    let doc = sqlx::query(
+        "SELECT d.*, t.descricao AS tipo_desc, t.classe, t.grupo, t.credito, t.externo, t.vias, u.nome AS utilizador,
+                t.validade_dias, t.prefixo_extenso, t.texto_rodape, t.formato,
+                o.numero_doc AS doc_origem, a.nome AS armazem, ad.nome AS armazem_destino, ua.nome AS autorizado_por_nome,
+                pz.descricao AS prazo_desc
+         FROM documentos d
+         JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         JOIN utilizadores u ON u.id = d.utilizador_id
+         LEFT JOIN utilizadores ua ON ua.id = d.autorizado_por
+         LEFT JOIN documentos o ON o.id = d.doc_origem_id
+         LEFT JOIN armazens a ON a.id = d.armazem_id
+         LEFT JOIN armazens ad ON ad.id = d.armazem_destino_id
+         LEFT JOIN prazos_pagamento pz ON pz.codigo = d.prazo
+         WHERE d.id = ?",
+    )
+    .bind(i.id)
+    .fetch_optional(p)
+    .await?
+    .ok_or(AppError::NaoEncontrado)?;
+    // um utilizador de uma loja não abre os documentos das outras
+    if let Some(loja) = st.loja() {
+        if doc.try_get::<Option<i64>, _>("armazem_id").ok().flatten().is_some_and(|a| a != loja) {
+            return Err(AppError::msg("Este documento é de outra loja."));
+        }
+    }
+    let linhas = sqlx::query("SELECT * FROM documento_linhas WHERE documento_id = ? ORDER BY linha").bind(i.id).fetch_all(p).await?;
+    let pags = sqlx::query(
+        "SELECT p.modo_codigo, m.descricao, p.valor, p.moeda, p.valor_moeda, p.cambio FROM documento_pagamentos p
+         JOIN modos_pagamento m ON m.codigo = p.modo_codigo WHERE p.documento_id = ?",
+    )
+    .bind(i.id)
+    .fetch_all(p)
+    .await?;
+    let liq = sqlx::query(
+        "SELECT r.valor, d.id, d.numero_doc, d.data_emissao, d.total FROM recibo_documentos r
+         JOIN documentos d ON d.id = r.documento_id WHERE r.recibo_id = ?",
+    )
+    .bind(i.id)
+    .fetch_all(p)
+    .await?;
+    // Documentos ligados a este (como os «smart buttons» do Odoo): recibos que o liquidaram
+    // e documentos emitidos a partir dele (factura de uma proforma, nota de crédito…).
+    let recibos = sqlx::query(
+        "SELECT r.valor, d.id, d.numero_doc, d.tipo_codigo, t.descricao AS tipo_desc, d.data_emissao, d.estado FROM recibo_documentos r
+         JOIN documentos d ON d.id = r.recibo_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE r.documento_id = ? ORDER BY d.data_emissao, d.id",
+    )
+    .bind(i.id)
+    .fetch_all(p)
+    .await?;
+    let derivados = sqlx::query(
+        "SELECT d.id, d.numero_doc, d.tipo_codigo, t.descricao AS tipo_desc, d.data_emissao, d.total, d.estado
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo WHERE d.doc_origem_id = ? ORDER BY d.data_hora, d.id",
+    )
+    .bind(i.id)
+    .fetch_all(p)
+    .await?;
+    let ret = sqlx::query("SELECT codigo, descricao, percentagem, base, valor FROM documento_retencoes WHERE documento_id = ? ORDER BY id")
+        .bind(i.id)
+        .fetch_all(p)
+        .await?;
+    let custos = sqlx::query("SELECT c.*, t.descricao AS tipo_desc FROM documento_custos c JOIN tipos_custo t ON t.codigo = c.tipo WHERE c.documento_id = ? ORDER BY c.id")
+        .bind(i.id)
+        .fetch_all(p)
+        .await?;
+    // resumo de IVA por taxa (quadro obrigatório na factura)
+    let iva = sqlx::query(
+        "SELECT taxa_iva_pct AS taxa, motivo_isencao, SUM(valor_liquido) AS base, SUM(valor_iva) AS iva
+         FROM documento_linhas WHERE documento_id = ? GROUP BY taxa_iva_pct, motivo_isencao ORDER BY taxa_iva_pct DESC",
+    )
+    .bind(i.id)
+    .fetch_all(p)
+    .await?;
+    let empresa = super::setup::empresa_obter(st).await?;
+    let mut documento = db::row_json(&doc);
+    if let Some(t) = documento.get("transporte").and_then(|t| t.as_str()).and_then(|s| serde_json::from_str::<Value>(s).ok()) {
+        documento["transporte"] = t;
+    }
+    // Facturação electrónica: estado da comunicação à AGT (o impresso mostra o QR code da AGT).
+    let tipo_doc = documento.get("tipo_codigo").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let fe_info = if super::fe::ativo(p).await? && super::fe::TIPOS_FE.contains(&tipo_doc.as_str()) && documento.get("importado").and_then(|x| x.as_i64()) == Some(0) {
+        let est: Option<String> = sqlx::query_scalar("SELECT estado FROM fe_envios WHERE documento_id = ?").bind(i.id).fetch_optional(p).await?;
+        let nif: Option<String> = sqlx::query_scalar("SELECT nif FROM empresa WHERE id = 1").fetch_optional(p).await?;
+        json!({ "estado": est.unwrap_or_else(|| "PENDENTE".into()), "nif": nif.unwrap_or_default() })
+    } else {
+        Value::Null
+    };
+    Ok(json!({
+        "documento": documento,
+        "linhas": db::rows_json(&linhas),
+        "pagamentos": db::rows_json(&pags),
+        "liquidacoes": db::rows_json(&liq),
+        "recibos": db::rows_json(&recibos),
+        "derivados": db::rows_json(&derivados),
+        "retencoes": db::rows_json(&ret),
+        "custos": db::rows_json(&custos),
+        "resumo_iva": db::rows_json(&iva),
+        "empresa": empresa,
+        "opcoes": super::parametros::opcoes(p).await?,
+        "fe": fe_info,
+        "fidelizacao": super::fidelizacao::do_documento(p, i.id).await?,
+    }))
+}
+
+/// Data ISO + n dias (validade dos documentos por defeito).
+fn somar_dias(data: &str, dias: i64) -> String {
+    if dias <= 0 {
+        return data.to_string();
+    }
+    chrono::NaiveDate::parse_from_str(data, "%Y-%m-%d")
+        .map(|d| (d + chrono::Duration::days(dias)).format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|_| data.to_string())
+}
+
+#[derive(Deserialize)]
+pub struct AnularIn {
+    id: i64,
+    motivo: String,
+    /// PIN de quem aprova, quando a regra de aprovação «anular» se aplica (services/aprovacoes.rs)
+    #[serde(default)]
+    autorizacao_pin: Option<String>,
+}
+
+pub async fn anular(st: &AppState, a: AnularIn) -> AppResult<Value> {
+    let s = st.exigir_perm("documentos.anular")?;
+    if a.motivo.trim().len() < 5 {
+        return Err(AppError::msg("Indique o motivo da anulação."));
+    }
+    let _guard = st.emissao.lock().await;
+    let mut tx = crate::db::transacao(&st.pool).await?;
+    let row = sqlx::query("SELECT numero_doc, estado, importado, tipo_codigo, data_emissao, total FROM documentos WHERE id = ?")
+        .bind(a.id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(AppError::NaoEncontrado)?;
+    let numero: String = row.get("numero_doc");
+    if row.get::<String, _>("estado") == "A" {
+        return Err(AppError::msg("O documento já está anulado."));
+    }
+    if row.get::<i64, _>("importado") == 1 {
+        return Err(AppError::msg("Os documentos importados do KIGEST não podem ser anulados no sistema novo. Emita uma nota de crédito."));
+    }
+    // mês fechado: o documento já não se anula
+    super::periodos::exigir_aberto(&mut *tx, &row.get::<String, _>("data_emissao"), "Os documentos desse mês já não se anulam: corrija com uma nota de crédito.").await?;
+    // Facturação electrónica: o documento comunicado (ou em fila) à AGT não se anula só no KanGest,
+    // senão o KanGest e a AGT ficariam diferentes. Os rejeitados pela AGT podem ser anulados.
+    let tipo_doc: String = row.get("tipo_codigo");
+    if super::fe::TIPOS_FE.contains(&tipo_doc.as_str()) {
+        let fe = sqlx::query_as::<_, (String, String)>(
+            "SELECT (SELECT valor FROM config WHERE chave = 'fe.ativo'), COALESCE((SELECT valor FROM config WHERE chave = 'fe.desde'), '')",
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let data_doc: String = row.get("data_emissao");
+        let estado_fe: Option<String> = sqlx::query_scalar("SELECT estado FROM fe_envios WHERE documento_id = ?").bind(a.id).fetch_optional(&mut *tx).await?;
+        let comunicado = match estado_fe.as_deref() {
+            Some("INVALIDO") => false,
+            Some(_) => true,
+            None => fe.0 == "1" && !fe.1.is_empty() && data_doc >= fe.1,
+        };
+        if comunicado {
+            return Err(AppError::msg(if tipo_doc == "RC" {
+                "Este recibo foi comunicado à AGT (facturação electrónica) e não pode ser anulado só no KanGest. Regularize com a AGT ou emita os documentos de correcção."
+            } else {
+                "Este documento foi comunicado à AGT (facturação electrónica) e não pode ser anulado só no KanGest. Corrija-o com uma nota de crédito, que também é comunicada."
+            }));
+        }
+    }
+    let liquidado: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM recibo_documentos r JOIN documentos d ON d.id = r.recibo_id WHERE r.documento_id = ? AND d.estado = 'N'")
+        .bind(a.id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if liquidado > 0 {
+        return Err(AppError::msg("O documento tem recibos ou notas de crédito associados. Anule-os primeiro."));
+    }
+    let usado: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM credito_utilizacoes u JOIN documentos r ON r.id = u.documento_id WHERE u.credito_id = ?1 AND r.estado = 'N')
+              + (SELECT COUNT(*) FROM credito_devolucoes v LEFT JOIN movimentos_tesouraria m ON m.id = v.movimento_id
+                  WHERE v.credito_id = ?1 AND (v.movimento_id IS NULL OR m.anulado = 0))
+              + (SELECT COUNT(*) FROM cc_regularizacao_docs x JOIN cc_regularizacoes g ON g.id = x.regularizacao_id WHERE x.documento_id = ?1 AND g.anulado = 0)",
+    )
+    .bind(a.id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if usado > 0 {
+        return Err(AppError::msg("O crédito ou a dívida deste documento já foi movimentado (compensação, devolução ou regularização). Anule primeiro esse movimento."));
+    }
+    // regra de aprovação «anular» (se ligada): o PIN de quem pode aprovar
+    let total_doc: i64 = row.get("total");
+    let aprovacao = super::aprovacoes::exigir(
+        st,
+        super::aprovacoes::Regra::Anular,
+        total_doc,
+        Some(&row.get::<String, _>("data_emissao")),
+        format!("Anular {numero} ({})", super::aprovacoes::kz(total_doc)),
+        a.autorizacao_pin.as_deref(),
+    )
+    .await?;
+    // recibo pago com compensação: devolve o crédito utilizado
+    let usados: Vec<(i64, i64)> = sqlx::query_as("SELECT credito_id, valor FROM credito_utilizacoes WHERE documento_id = ?").bind(a.id).fetch_all(&mut *tx).await?;
+    for (cid, valor) in usados {
+        sqlx::query("UPDATE documentos SET credito_disponivel = credito_disponivel + ? WHERE id = ?").bind(valor).bind(cid).execute(&mut *tx).await?;
+    }
+    sqlx::query("DELETE FROM credito_utilizacoes WHERE documento_id = ?").bind(a.id).execute(&mut *tx).await?;
+    let agora = db::agora();
+    // repõe stock com movimentos inversos
+    let movs: Vec<(i64, i64, f64)> = sqlx::query_as("SELECT artigo_id, armazem_id, quantidade FROM movimentos_stock WHERE documento_id = ?")
+        .bind(a.id)
+        .fetch_all(&mut *tx)
+        .await?;
+    for (artigo, armazem, qtd) in movs {
+        mover_stock(&mut tx, artigo, armazem, -qtd, None, a.id, &format!("Anulação {numero}"), true, &agora).await?;
+    }
+    // repõe os lotes
+    let lms: Vec<(i64, f64)> = sqlx::query_as("SELECT lote_id, quantidade FROM lote_movimentos WHERE documento_id = ?").bind(a.id).fetch_all(&mut *tx).await?;
+    for (lote_id, q) in lms {
+        sqlx::query("UPDATE lotes SET quantidade = quantidade - ? WHERE id = ?").bind(q).bind(lote_id).execute(&mut *tx).await?;
+    }
+    sqlx::query("DELETE FROM lote_movimentos WHERE documento_id = ?").bind(a.id).execute(&mut *tx).await?;
+    // repõe pendentes liquidados por este documento (recibo / pagamento / nota de crédito)
+    let liqs: Vec<(i64, i64)> = sqlx::query_as("SELECT documento_id, valor FROM recibo_documentos WHERE recibo_id = ?")
+        .bind(a.id)
+        .fetch_all(&mut *tx)
+        .await?;
+    for (did, valor) in liqs {
+        sqlx::query("UPDATE documentos SET valor_pendente = valor_pendente + ? WHERE id = ?").bind(valor).bind(did).execute(&mut *tx).await?;
+    }
+    sqlx::query("UPDATE cupoes SET utilizacoes = MAX(utilizacoes - 1, 0) WHERE codigo = (SELECT cupao FROM documentos WHERE id = ?) COLLATE NOCASE")
+        .bind(a.id)
+        .execute(&mut *tx)
+        .await?;
+    super::fidelizacao::anular(&mut tx, a.id, &numero, s.id, &agora).await?;
+    sqlx::query("UPDATE documentos SET estado = 'A', motivo_anulacao = ?, valor_pendente = 0, credito_disponivel = 0 WHERE id = ?")
+        .bind(a.motivo.trim())
+        .bind(a.id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (?, 'ANULAR', ?)")
+        .bind(s.id)
+        .bind(format!("{numero}: {}", a.motivo.trim()))
+        .execute(&mut *tx)
+        .await?;
+    super::aprovacoes::registar(&mut tx, aprovacao.as_ref(), &numero).await?;
+    tx.commit().await?;
+    Ok(Value::Null)
+}
+
+/// Tabelas do formulário de documento: prazos de pagamento e retenções.
+pub async fn auxiliares(st: &AppState) -> AppResult<Value> {
+    st.sessao()?;
+    Ok(json!({
+        "prazos": db::query_json(&st.pool, "SELECT * FROM prazos_pagamento ORDER BY dias").await?,
+        "retencoes": db::query_json(&st.pool, "SELECT * FROM retencoes WHERE ativo = 1 ORDER BY codigo").await?,
+        "moedas": db::query_json(&st.pool, "SELECT * FROM moedas WHERE ativo = 1 ORDER BY codigo = 'AOA' DESC, codigo").await?,
+        "tipos_custo": db::query_json(&st.pool, "SELECT * FROM tipos_custo ORDER BY descricao").await?,
+    }))
+}
+
+#[cfg(test)]
+mod testes_sem_stock {
+    use serde_json::{json, Value};
+
+    use crate::db;
+    use crate::state::AppState;
+
+    async fn rpc(st: &AppState, m: &str, p: Value) -> Value {
+        match crate::services::dispatch(st, m, p).await {
+            Ok(v) => v,
+            Err(e) => panic!("{m} falhou: {e}"),
+        }
+    }
+    async fn erro(st: &AppState, m: &str, p: Value) -> String {
+        match crate::services::dispatch(st, m, p).await {
+            Ok(v) => panic!("{m} devia falhar: {v}"),
+            Err(e) => e.to_string(),
+        }
+    }
+
+    /// Vender sem stock: por omissão nunca (mesmo com «Permite stock negativo» na ficha, como nos artigos importados do
+    /// KIGEST); «conforme a ficha» segue a ficha; «só com autorização» deixa quem tem a permissão e pede o PIN aos outros.
+    #[tokio::test]
+    async fn vender_sem_stock_segue_a_politica() {
+        let pasta = std::env::temp_dir().join(format!("kangest-sem-stock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&pasta);
+        std::fs::create_dir_all(&pasta).unwrap();
+        let mut st = AppState::new(db::abrir(&pasta.join("kigest.db")).await.unwrap());
+        st.pasta_dados = pasta.clone();
+        st.pasta_exportacao = pasta.clone();
+        st.carregar_posto(1).await.unwrap();
+        rpc(&st, "setup.inicializar", json!({ "empresa": { "nome": "Loja, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } })).await;
+        rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+        rpc(&st, "utilizadores.guardar", json!({ "id": 1, "nome": "Admin", "login": "admin", "perfil": "ADMIN", "pin": "4321" })).await;
+        rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
+        // como os artigos importados do KIGEST: «Permite stock negativo» ligado na ficha
+        let art = rpc(&st, "artigos.guardar", json!({ "descricao": "Arroz 5kg", "taxa_iva_id": 1, "preco1": 100000, "permite_negativo": true })).await["id"].as_i64().unwrap();
+        rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": art, "quantidade": 2, "preco_unitario": 50000 }] })).await;
+        rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+        let venda = |q: f64, pin: Option<&str>| json!({ "tipo": "FR", "linhas": [{ "artigo_id": art, "quantidade": q }], "pagamentos": [{ "modo": "NU", "valor": 10_000_000 }], "autorizacao_pin": pin });
+        let stock = || async { rpc(&st, "artigos.obter", json!({ "id": art })).await["stock"].as_f64().unwrap() };
+
+        // por omissão: nunca, e explica o que fazer; o POS sabe a política pelas tabelas
+        assert_eq!(rpc(&st, "tabelas", Value::Null).await["sem_stock"], "nao");
+        let e = erro(&st, "documentos.emitir", venda(3.0, None)).await;
+        assert!(e.contains("Stock insuficiente") && e.contains("Registe primeiro a entrada"), "{e}");
+        assert_eq!(stock().await, 2.0);
+
+        // conforme a ficha (o comportamento do KIGEST)
+        rpc(&st, "parametros.opcoesGuardar", json!({ "sem_stock": "artigo" })).await;
+        rpc(&st, "documentos.emitir", venda(3.0, None)).await;
+        assert_eq!(stock().await, -1.0);
+
+        // só com autorização: o administrador tem a permissão; o operador pede o PIN de um supervisor
+        rpc(&st, "parametros.opcoesGuardar", json!({ "sem_stock": "autorizar" })).await;
+        assert_eq!(rpc(&st, "parametros.obter", Value::Null).await["sem_stock"], "autorizar");
+        rpc(&st, "documentos.emitir", venda(1.0, None)).await;
+        assert_eq!(stock().await, -2.0);
+        rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+        let e = erro(&st, "documentos.emitir", venda(1.0, None)).await;
+        assert!(e.contains("supervisor (PIN)"), "{e}");
+        assert!(erro(&st, "documentos.emitir", venda(1.0, Some("0000"))).await.contains("Stock insuficiente"));
+        let d = rpc(&st, "documentos.emitir", venda(1.0, Some("4321"))).await;
+        assert_eq!(d["documento"]["autorizado_por_nome"], "Admin", "fica quem autorizou");
+        assert_eq!(stock().await, -3.0);
+
+        // valor desconhecido recusado
+        rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+        assert!(erro(&st, "parametros.opcoesGuardar", json!({ "sem_stock": "sempre" })).await.contains("Escolha"));
+        let _ = std::fs::remove_dir_all(&pasta);
+    }
+}
