@@ -28,17 +28,18 @@ use crate::state::AppState;
 
 pub const MANIFESTO: &str = "kangest-atualizacao.json";
 
-/// Origem oficial das actualizações: o próprio site, onde a GitHub Actions publica o manifesto e os instaladores
-/// de cada versão (site.yml). Funciona também com o repositório privado.
-pub const ORIGEM_OFICIAL: &str = "https://kangest.pages.dev/actualizacoes";
-/// Origem antiga (as releases do GitHub): as instalações que a têm gravada passam a usar a oficial, para continuarem
-/// a actualizar-se quando o repositório deixar de ser público.
-const ORIGEM_GITHUB: &str = "https://github.com/fernandotunas6-bot/KanGest/releases";
+/// Origem oficial das actualizações da edição da livraria. Nunca a do KanGest oficial: as versões dele não servem a
+/// esta edição (outro identificador, outra base, a ligação à livraria).
+pub const ORIGEM_OFICIAL: &str = "https://livrariaadventista.ao/kangest/actualizacoes";
+/// As origens do KanGest oficial (as releases do GitHub e o site dele). Uma configuração copiada do oficial que as
+/// tenha gravadas passa a usar a da edição, para nunca instalar por cima a versão genérica.
+const ORIGENS_DO_OFICIAL: [&str; 2] = ["https://github.com/fernandotunas6-bot/KanGest/releases", "https://kangest.pages.dev"];
 
-/// A origem a usar de facto: a gravada, com a antiga do GitHub trocada pela oficial.
+/// A origem a usar de facto: a gravada, com as do KanGest oficial trocadas pela da edição.
 pub fn fonte_efectiva(fonte: &str) -> String {
     let f = fonte.trim().trim_end_matches(['/', '\\']);
-    if f.to_ascii_lowercase().starts_with(&ORIGEM_GITHUB.to_ascii_lowercase()) {
+    let minusculas = f.to_ascii_lowercase();
+    if ORIGENS_DO_OFICIAL.iter().any(|o| minusculas.starts_with(&o.to_ascii_lowercase())) {
         return ORIGEM_OFICIAL.to_string();
     }
     f.to_string()
@@ -364,12 +365,14 @@ mod testes {
         assert_eq!(localizar("https://x.ao/kigest/").0, "https://x.ao/kigest/kangest-atualizacao.json");
         assert_eq!(localizar("https://x.ao/k/m.json"), ("https://x.ao/k/m.json".into(), "https://x.ao/k".into()));
         assert_eq!(juntar("https://x.ao/k", "a.exe"), "https://x.ao/k/a.exe");
-        // a origem antiga do GitHub passa a ser a do site; as outras ficam como estão
+        // as origens do KanGest oficial (GitHub e o site dele) passam à da edição; as outras ficam como estão
         assert_eq!(fonte_efectiva("https://github.com/fernandotunas6-bot/KanGest/releases/latest/download/"), ORIGEM_OFICIAL);
         assert_eq!(fonte_efectiva("https://github.com/fernandotunas6-bot/KanGest/releases/latest/download/kangest-atualizacao.json"), ORIGEM_OFICIAL);
+        assert_eq!(fonte_efectiva("https://kangest.pages.dev/actualizacoes"), ORIGEM_OFICIAL);
+        assert_eq!(fonte_efectiva("HTTPS://KANGEST.PAGES.DEV/actualizacoes/kangest-atualizacao.json"), ORIGEM_OFICIAL);
         assert_eq!(fonte_efectiva(r"\\SERVIDOR\KanGest\"), r"\\SERVIDOR\KanGest");
         assert_eq!(fonte_efectiva("https://x.ao/k"), "https://x.ao/k");
-        assert_eq!(localizar(&fonte_efectiva(ORIGEM_OFICIAL)).0, "https://kangest.pages.dev/actualizacoes/kangest-atualizacao.json");
+        assert_eq!(localizar(&fonte_efectiva(ORIGEM_OFICIAL)).0, "https://livrariaadventista.ao/kangest/actualizacoes/kangest-atualizacao.json");
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 

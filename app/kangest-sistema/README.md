@@ -1,5 +1,12 @@
 # KanGest — Gestão Comercial e POS (Tauri 2)
 
+> **Esta é a edição KanGest Livraria**, só da Livraria Editora Adventista. Partiu do KanGest oficial 1.4.4 (`fd6f8f5`)
+> e segue à parte: outro identificador (`ao.livrariaadventista.kangest`), outra pasta de dados, outro registo no cofre
+> do sistema e actualizações próprias. Nada volta ao oficial nem vem dele. O que muda face ao oficial está em
+> [docs/KANGEST.md](../../docs/KANGEST.md#a-edição-da-livraria-o-código-neste-repositório) e o plano da ligação ao
+> Supabase da livraria em [docs/ECOSSISTEMA.md](../../docs/ECOSSISTEMA.md), na raiz do repositório da livraria.
+> O resto deste ficheiro descreve o oficial e vale para a edição onde não houver nota em contrário.
+
 Sistema de facturação, stock, caixa e ponto de venda para Windows e macOS, inspirado no KIGEST GC/POS (Delphi/SQL Server).
 A análise do sistema antigo e o roteiro estão em [docs/ANALISE-KIGEST.md](docs/ANALISE-KIGEST.md).
 

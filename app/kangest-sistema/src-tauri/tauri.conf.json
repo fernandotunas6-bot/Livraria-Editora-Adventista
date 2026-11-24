@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "KanGest",
+  "productName": "KanGest Livraria",
   "version": "1.4.4",
-  "identifier": "ao.kigest.app",
+  "identifier": "ao.livrariaadventista.kangest",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "KanGest",
+        "title": "KanGest Livraria",
         "width": 1366,
         "height": 820,
         "minWidth": 1024,
@@ -34,7 +34,7 @@
       "dmg"
     ],
     "category": "Business",
-    "shortDescription": "Gestão Comercial e Ponto de Venda",
+    "shortDescription": "Gestão Comercial e Ponto de Venda — edição da Livraria Adventista",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

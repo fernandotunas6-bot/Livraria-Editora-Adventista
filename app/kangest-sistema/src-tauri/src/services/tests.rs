@@ -3138,11 +3138,11 @@ async fn actualizacao_conferida_antes_de_instalar() {
     let manifesto = json!({ "versao": "9.9.9", "data": "2026-12-01", "notas": "teste",
         "pacotes": { plat: { "ficheiro": "KanGest_9.9.9.bin", "sha256": crate::services::atualizacao::sha256_hex(pacote) } } });
     std::fs::write(origem.join("kangest-atualizacao.json"), manifesto.to_string()).unwrap();
-    // a origem antiga (releases do GitHub) passa a ler-se no site; a oficial vem no estado para o botão
+    // a origem do KanGest oficial (releases do GitHub) passa à da edição; a da edição vem no estado para o botão
     rpc(&st, "atualizacao.guardar", json!({ "fonte": "https://github.com/fernandotunas6-bot/KanGest/releases/latest/download" })).await;
     let e = rpc(&st, "atualizacao.estado", Value::Null).await;
-    assert_eq!(e["fonte_efectiva"], "https://kangest.pages.dev/actualizacoes");
-    assert_eq!(e["origem_oficial"], "https://kangest.pages.dev/actualizacoes");
+    assert_eq!(e["fonte_efectiva"], crate::services::atualizacao::ORIGEM_OFICIAL);
+    assert_eq!(e["origem_oficial"], crate::services::atualizacao::ORIGEM_OFICIAL);
     rpc(&st, "atualizacao.guardar", json!({ "fonte": origem.display().to_string() })).await;
     assert_eq!(rpc(&st, "atualizacao.estado", Value::Null).await["fonte_efectiva"], origem.display().to_string());
     let d = rpc(&st, "atualizacao.descarregar", Value::Null).await;

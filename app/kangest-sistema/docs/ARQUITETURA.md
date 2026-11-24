@@ -3,6 +3,24 @@
 Uma regra para tudo: **cada coisa vive num só sítio e há uma só forma de lhe chegar.** Este documento é a
 referência. Quando uma peça muda de sítio, este documento muda no mesmo pull request.
 
+## 0. A edição da livraria
+
+Este código é o **KanGest Livraria**, a edição só da livraria, separada do KanGest oficial desde a 1.4.4. A regra do
+§2 («os produtos não partilham bases de dados») continua a valer para o oficial. **A edição é a excepção, por decisão
+do dono (24/11/2026):** os dados da livraria passam a ter uma base central no projecto Supabase da livraria, e cada
+KanGest Livraria continua a ter a sua base local (SQLite cifrado), a funcionar sem Internet e a assinar as facturas
+da AGT. O desenho, as ligações e a cifra estão em [docs/ECOSSISTEMA.md](../../../docs/ECOSSISTEMA.md) (raiz do
+repositório da livraria). Até essa ligação existir, a edição fala com o site como o oficial: pela API do KanGest
+([docs/KANGEST.md](../../../docs/KANGEST.md)).
+
+| | KanGest oficial | KanGest Livraria |
+|---|---|---|
+| Repositório | `fernandotunas6-bot/KanGest` | `app/kangest-sistema/` no repositório da livraria |
+| Identificador (pasta de dados, instância) | `ao.kigest.app` | `ao.livrariaadventista.kangest` |
+| Cofre do sistema | `ao.kigest.app` | `ao.livrariaadventista.kangest` |
+| Actualizações | kangest.pages.dev/actualizacoes | livrariaadventista.ao/kangest/actualizacoes |
+| CI | `.github/workflows/` do oficial | `.github/workflows/kangest-livraria.yml` da livraria |
+
 ## 1. Três camadas
 
 | Camada | O que guarda | Onde vive | Tecnologia |

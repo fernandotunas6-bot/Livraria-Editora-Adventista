@@ -64,7 +64,9 @@ impl Cofre for CofreSistema {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-const SERVICO: &str = "ao.kigest.app";
+/// O da edição da livraria, diferente do KanGest oficial (`ao.kigest.app`): os dois programas no mesmo computador
+/// não partilham a chave mestra.
+const SERVICO: &str = "ao.livrariaadventista.kangest";
 /// O ficheiro `kangest.chave` guarda, em vez da chave, «cofre1:<identificador>» (mover a pasta de dados leva o
 /// identificador consigo). Nas versões anteriores tinha os 32 bytes da chave.
 const ID_PREFIXO: &str = "cofre1:";
