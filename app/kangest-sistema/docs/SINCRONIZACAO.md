@@ -25,7 +25,7 @@ livraria). Do lado do site, o protocolo, as tabelas e o painel estão em
 | Peça | Onde | O quê |
 |---|---|---|
 | A fila | `sinc_saida` (migração 0053) | Um gatilho põe cada documento emitido, anulado ou facturado na fila, **na mesma transacção** que o grava, só enquanto houver ligação. Sobrevive a um fecho inesperado e a dias sem Internet |
-| O envio | `src/sinc/mod.rs` | De 30 em 30 segundos, no servidor da loja (num posto em rede, a base está no servidor), até 100 documentos num lote. Cada um leva o `hash` assinado, o `hash_anterior` (o do anterior da mesma série) e as linhas |
+| O envio | `src/sinc/mod.rs` | Com documentos na fila, de 30 em 30 segundos; sem nada para enviar, só as novidades, de 2 em 2 minutos. Sempre no servidor da loja (num posto em rede, a base está no servidor), até 100 documentos num lote. Cada um leva o `hash` assinado, o `hash_anterior` (o do anterior da mesma série) e as linhas |
 | A cifra | `src/sinc/cifra.rs` | O pedido vai assinado com a chave Ed25519 deste posto e selado para o site (X25519 + HKDF-SHA256 + AES-256-GCM); a resposta vem selada para este pedido. Os vectores de teste são os mesmos da Edge Function |
 | A ligação | `sinc_ligacao` | O endereço, o posto, a semente cifrada e a chave pública do centro. Nunca sai para o ecrã |
 

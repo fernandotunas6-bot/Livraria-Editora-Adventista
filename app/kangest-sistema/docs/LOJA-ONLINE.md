@@ -36,7 +36,9 @@ e **apaga-se ao desligar** a ligação, ou ao ligar a outro posto.
 
 ## Como chega
 
-Em cada volta da sincronização (de 30 em 30 segundos), o KanGest manda os seus cursores. O site responde com o que
+Em cada pedido da sincronização, o KanGest manda os seus cursores. Os documentos da fila saem logo (de 30 em 30
+segundos); sem nada para enviar, as novidades pedem-se de 2 em 2 minutos, porque cada pedido conta na quota da Edge
+Function. «Sincronizar agora», no ecrã da ligação, pede-as já. O site responde com o que
 mudou desde então (`public.kangest_novidades`, docs/KANGEST-SINCRONIZACAO.md §7 na raiz da livraria):
 - até 200 encomendas e 200 produtos por pedido;
 - mais pedidos seguidos na mesma volta, enquanto houver.

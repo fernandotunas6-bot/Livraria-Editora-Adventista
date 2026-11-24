@@ -6,8 +6,9 @@
 //!
 //! - **A fila.** Cada documento emitido, anulado ou facturado entra em `sinc_saida` por um gatilho, na mesma
 //!   transacção que o grava (migração 0053). A fila sobrevive a um fecho inesperado e a dias sem Internet.
-//! - **O envio.** De 30 em 30 segundos, havendo ligação, até 100 documentos saem num lote assinado com a chave Ed25519
-//!   deste posto e selado para o centro (`cifra.rs`). O centro não grava nada em dobro, por isso repetir um lote é
+//! - **O envio.** De 30 em 30 segundos, havendo ligação e documentos na fila, até 100 saem num lote assinado com a
+//!   chave Ed25519 deste posto e selado para o centro (`cifra.rs`). Sem documentos, as novidades da Loja online
+//!   (loja.rs) pedem-se de 2 em 2 minutos. O centro não grava nada em dobro, por isso repetir um lote é
 //!   seguro.
 //! - **Sem Internet**, a loja vende como sempre e a fila espera; volta a tentar na volta seguinte. Um documento que o
 //!   centro recusa fica com erro e volta a tentar ao fim de 1, 2, 4… minutos (até 6 horas).
@@ -18,7 +19,7 @@ pub mod cifra;
 pub mod loja;
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,6 +39,11 @@ const LOTE: i64 = 100;
 pub const INTERVALO: u64 = 30;
 /// Permissão para ligar, ver e desligar (a mesma da API e Integrações).
 const PERMISSAO: &str = "sistema.api";
+/// Sem documentos na fila, pergunta pelas novidades de 2 em 2 minutos: cada pedido é uma chamada à Edge Function, que
+/// conta na quota do Supabase (de 30 em 30 segundos seriam ~2 900 por dia e por loja).
+const SONDAGEM: i64 = 120;
+/// Quando foi o último pedido que o site atendeu.
+static ULTIMA_SONDAGEM: AtomicI64 = AtomicI64::new(0);
 
 /// Uma volta de cada vez (o ciclo e o «Sincronizar agora» podiam cruzar-se).
 static A_CORRER: AtomicBool = AtomicBool::new(false);
@@ -305,8 +311,14 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
     }
 }
 
-/// Uma volta: até 10 pedidos seguidos, enquanto houver documentos na fila ou novidades no site.
+/// Uma volta do ciclo em segundo plano: os documentos saem logo; sem documentos, as novidades de 2 em 2 minutos.
 pub async fn ciclo(st: &AppState) -> AppResult<Value> {
+    ciclo_com(st, false).await
+}
+
+/// Uma volta: até 10 pedidos seguidos, enquanto houver documentos na fila ou novidades no site. `forcar` (o
+/// «Sincronizar agora») pergunta ao site mesmo sem documentos e antes dos 2 minutos.
+async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
     let Some(_vez) = Vez::tentar(&A_CORRER) else {
         return Ok(json!({ "ocupado": true }));
     };
@@ -314,11 +326,21 @@ pub async fn ciclo(st: &AppState) -> AppResult<Value> {
     let Some(l) = ligacao(pool).await? else {
         return Ok(json!({ "ligada": false }));
     };
+    if !forcar {
+        let devidos: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sinc_saida WHERE estado IN ('pendente', 'erro') AND proximo_em <= ?")
+            .bind(agora_s())
+            .fetch_one(pool)
+            .await?;
+        if devidos == 0 && agora_s() - ULTIMA_SONDAGEM.load(Ordering::Relaxed) < SONDAGEM {
+            return Ok(json!({ "ligada": true, "enviados": 0, "em_espera": true }));
+        }
+    }
     let (mut enviados, mut encomendas, mut produtos) = (0, 0, 0);
     let mut resultado = Value::Null;
     for _ in 0..10 {
         match volta(pool, &l).await? {
             Volta::Feita { enviados: e, encomendas: n, produtos: p, resultado: r, continuar } => {
+                ULTIMA_SONDAGEM.store(agora_s(), Ordering::Relaxed);
                 enviados += e;
                 encomendas += n;
                 produtos += p;
@@ -448,7 +470,7 @@ async fn estado(st: &AppState) -> AppResult<Value> {
 
 async fn agora(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
-    let r = ciclo(st).await?;
+    let r = ciclo_com(st, true).await?;
     let mut e = estado(st).await?;
     e["volta"] = r;
     Ok(e)
