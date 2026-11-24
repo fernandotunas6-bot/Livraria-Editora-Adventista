@@ -66,8 +66,16 @@ Guarde a `KANGEST_DADOS_CHAVE` num cofre de senhas.
 
 ## 3. O instalador
 
-No GitHub: **Actions → KanGest Livraria → Run workflow**, com «Gerar também o instalador do Windows». No fim da
-corrida, descarregue o artefacto `kangest-livraria-windows`.
+No GitHub: **Actions → KanGest Livraria → Run workflow**, no `main`, com «Publicar o instalador no site». No fim da
+corrida, descarregue-o no painel, em **Sistema → Ligação ao KanGest → Descarregar o KanGest Livraria**.
+
+- **Deve ver:** a versão, o SHA-256, «Assinado com a chave das actualizações da edição» e, sem os segredos da AGT, o
+  aviso âmbar «Versão de ensaio».
+- **Se o «Publicar no site» falhar com «Falta a chave das actualizações»:** faltam os segredos
+  `KANGEST_LIVRARIA_ACTUALIZACOES_*` e a variável `KANGEST_LIVRARIA_CHAVE_ACTUALIZACOES`
+  ([KANGEST.md](KANGEST.md#descarregar-e-actualizar-o-kangest-livraria)).
+- **Sem publicar no site:** «Gerar também o instalador do Windows» e, no fim da corrida, o artefacto
+  `kangest-livraria-windows`.
 
 ## 4. O KanGest de ensaio, ligado a um posto com loja
 

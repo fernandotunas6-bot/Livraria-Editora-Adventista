@@ -69,7 +69,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="$(gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("android-v"))][0].tagName // empty')"
+          tag="$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | startswith("android-v"))][0].tagName // empty')"
           if [ -z "$tag" ]; then
             echo "Ainda não há APK publicado (workflow «App Android»): /downloads/ fica vazio."
             exit 0
@@ -78,6 +78,26 @@ jobs:
           gh release download "$tag" --pattern livraria-adventista.apk --dir dist/app/web/downloads --clobber
           ls -la dist/app/web/downloads
           echo "APK de $tag em /downloads/livraria-adventista.apk" >> "$GITHUB_STEP_SUMMARY"
+
+      # O KanGest Livraria (kangest-livraria.yml, «publicar no site»): o instalador do Windows e o manifesto das
+      # actualizações vivem numa Release «kangest-livraria-v…». Vão para /kangest/actualizacoes/: o painel dá-o a
+      # descarregar (Sistema → Ligação ao KanGest) e o programa vai lá buscar as versões novas. Uma versão de ensaio
+      # (sem a AGT, marcada como pré-lançamento) só serve enquanto não houver nenhuma certificada: nunca passa à
+      # frente de uma que factura a sério. Sem nenhuma Release, segue sem ele.
+      - name: KanGest Livraria para descarregar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release list --limit 100 --json tagName,isPrerelease --jq '[.[] | select(.tagName | startswith("kangest-livraria-v"))] | ((map(select(.isPrerelease | not))[0] // .[0]) | .tagName) // empty')"
+          if [ -z "$tag" ]; then
+            echo "Ainda não há instalador do KanGest Livraria publicado: /kangest/actualizacoes/ fica vazio."
+            exit 0
+          fi
+          d=dist/app/web/kangest/actualizacoes
+          mkdir -p "$d"
+          gh release download "$tag" --pattern '*_x64-setup.exe' --pattern kangest-atualizacao.json --pattern SHA256SUMS.txt --dir "$d" --clobber
+          ls -la "$d"
+          echo "KanGest Livraria de $tag em /kangest/actualizacoes/" >> "$GITHUB_STEP_SUMMARY"
 
       - name: SEO e partilha do catálogo
         run: node scripts/seo-catalogo.mjs dist/app/web "$SITE_URL"

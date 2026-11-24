@@ -13,5 +13,6 @@ Disallow: /track
 Disallow: /confirmar-encomenda
 Disallow: /sugestoes
 Disallow: /painel-vendas
+Disallow: /kangest/
 
 Sitemap: https://livrariaadventista.ao/sitemap.xml
