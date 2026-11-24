@@ -194,10 +194,10 @@ seguinte é recusado. Rodar gera um par novo. Tudo fica na auditoria.
 | 0 | Edição separada (identidade, cofre, actualizações, CI) — **feito** | #101 |
 | 1 | Este estudo | #101 |
 | 2 | Artigo novo no KanGest → produto **oculto** no site, à espera de fotografia (nunca publica sozinho) — **em PR (#102)** | site |
-| 5 | Navegador: janela «Internet», separadores sem acesso ao programa, histórico, favoritos, transferências — **em PR** ([NAVEGADOR.md](../app/kangest-sistema/docs/NAVEGADOR.md)) | edição |
-| 3 | Base central: postos e emparelhamento, cópias que não se alteram, `kangest_receber()`, verificação da cadeia AGT, cifra por coluna, «Postos do KanGest» | site (migrações) |
-| 4 | Motor de sincronização: fila local, selo e assinatura, puxar e Realtime, conflitos, indicador e «Ligação à Livraria» | edição |
-| 6 | Gestão da loja online no KanGest: produtos, encomendas, clientes, pagamentos, relatórios | edição |
+| 5 | Navegador: janela «Internet», separadores sem acesso ao programa, histórico, favoritos, transferências — **em PR (#103)** ([NAVEGADOR.md](../app/kangest-sistema/docs/NAVEGADOR.md)) | edição |
+| 3 | Base central: postos e emparelhamento, cópias que não se alteram, `kangest_receber()`, verificação da cadeia AGT, cifra por coluna, «Postos do KanGest» — **em PR (#104)** ([KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md)) | site (migrações) |
+| 4 | Motor de sincronização: fila local, selo e assinatura e o ecrã «Ligação ao site» — **em PR (#105)** ([SINCRONIZACAO.md](../app/kangest-sistema/docs/SINCRONIZACAO.md)). Ficam para depois o tempo real, os conflitos (só com a fase 6, quando o KanGest escrever no site) e o indicador fora do ecrã | edição |
+| 6 | Gestão da loja online no KanGest — **primeira parte em PR (#106 no site, e este no KanGest)**: as encomendas da loja e o catálogo numa cópia local que se lê sem Internet, e as alterações no painel do site, aberto no navegador do KanGest ([LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md)). Fica para depois escrever a partir de ecrãs nativos (pede uma decisão sobre como as pessoas entram no KanGest com a conta do site) | edição |
 
 A fase 5 vem antes das fases 3 e 4 porque não depende delas.
 

@@ -16,6 +16,7 @@ mod rede;
 mod segredos;
 pub mod selo;
 mod services;
+mod sinc;
 mod smtp;
 mod state;
 mod web;
@@ -163,6 +164,10 @@ pub fn run() {
             services::acesso_web::arrancar(estado.clone());
             // avisos automáticos da API (webhooks) às lojas online e outros sistemas
             webhooks::iniciar(estado.clone());
+            // a ligação à base central da livraria (só envia se este KanGest estiver emparelhado)
+            sinc::iniciar(estado.clone());
+            // e o tempo real da Loja online (o sinal «novidades» do site)
+            sinc::tempo_real::iniciar(estado.clone());
             // Facturação electrónica da AGT: envia e consulta os documentos em segundo plano.
             services::fe::iniciar(estado.clone());
             // Cópias de segurança periódicas enquanto o programa está aberto.
