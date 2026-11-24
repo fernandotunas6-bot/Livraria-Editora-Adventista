@@ -18,6 +18,7 @@
 pub mod cifra;
 pub mod loja;
 pub mod pessoa;
+pub mod tempo_real;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -244,7 +245,7 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
         }
     }
     let cursores = loja::ler_cursores(pool).await?;
-    match enviar(l, &json!({ "lote": lote, "cursores": cursores })).await {
+    match enviar(l, &json!({ "lote": lote, "cursores": &cursores })).await {
         Ok(r) => {
             let erros: HashMap<i64, String> = r["resultado"]["erros"]
                 .as_array()
@@ -271,7 +272,7 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
             sqlx::query(
                 "UPDATE sinc_ligacao SET ultima_sinc = ?, ultimo_erro = '', posto_nome = COALESCE(?, posto_nome), loja = COALESCE(?, loja),
                    site_url = COALESCE(NULLIF(?, ''), site_url), auth_url = COALESCE(NULLIF(?, ''), auth_url),
-                   auth_apikey = COALESCE(NULLIF(?, ''), auth_apikey) WHERE id = 1",
+                   auth_apikey = COALESCE(NULLIF(?, ''), auth_apikey), tempo_real_topico = COALESCE(?, tempo_real_topico) WHERE id = 1",
             )
             .bind(&feito)
             .bind(r["posto"]["nome"].as_str())
@@ -279,9 +280,17 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
             .bind(r["site"].as_str().unwrap_or_default())
             .bind(r["auth"]["url"].as_str().unwrap_or_default())
             .bind(r["auth"]["apikey"].as_str().unwrap_or_default())
+            .bind(r["tempo_real"]["topico"].as_str())
             .execute(pool)
             .await?;
+            // as encomendas novas (não na primeira cópia, que traz todas de uma vez) avisam no computador da loja
+            let primeira = cursores["encomendas"].as_object().is_none_or(|o| o.is_empty());
+            let novas = if primeira { Vec::new() } else { loja::encomendas_novas(pool, &r["novidades"]).await? };
             let (encomendas, produtos) = loja::aplicar(pool, &r["novidades"]).await?;
+            avisar_encomendas_novas(&novas);
+            if encomendas > 0 || produtos > 0 {
+                crate::nativo::avisar_ecra("loja-novidades");
+            }
             // o que já seguiu há mais de 30 dias sai da fila
             sqlx::query("DELETE FROM sinc_saida WHERE estado = 'feito' AND feito_em < strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-30 days')")
                 .execute(pool)
@@ -312,6 +321,18 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
             anotar_erro(pool, &m).await?;
             Ok(Volta::Falhou(m))
         }
+    }
+}
+
+/// Um aviso do sistema por encomenda nova (até 3; mais do que isso, um só com o número).
+fn avisar_encomendas_novas(novas: &[(String, String)]) {
+    if novas.len() > 3 {
+        crate::nativo::notificar("loja-encomendas-novas", "Encomendas novas na loja online", &format!("{} encomendas novas para esta loja.", novas.len()));
+        return;
+    }
+    for (numero, cliente) in novas {
+        let texto = if cliente.is_empty() { numero.clone() } else { format!("{numero} · {cliente}") };
+        crate::nativo::notificar(&format!("loja-encomenda-{numero}"), "Encomenda nova na loja online", &texto);
     }
 }
 
@@ -436,10 +457,11 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
     .bind(db::agora())
     .execute(&st.pool)
     .await?;
-    // para as pessoas entrarem com a conta do site (pessoa.rs)
-    sqlx::query("UPDATE sinc_ligacao SET auth_url = ?, auth_apikey = ? WHERE id = 1")
+    // para as pessoas entrarem com a conta do site (pessoa.rs) e o tempo real (tempo_real.rs)
+    sqlx::query("UPDATE sinc_ligacao SET auth_url = ?, auth_apikey = ?, tempo_real_topico = ? WHERE id = 1")
         .bind(v["auth"]["url"].as_str().unwrap_or_default())
         .bind(v["auth"]["apikey"].as_str().unwrap_or_default())
+        .bind(v["tempo_real"]["topico"].as_str().unwrap_or_default())
         .execute(&st.pool)
         .await?;
     // outro posto: o que já tinha seguido foi para o anterior, por isso volta tudo à fila; e a cópia da Loja online
@@ -504,7 +526,9 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
 async fn desligar(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
     sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await?;
-    sqlx::query("DELETE FROM sinc_saida WHERE estado <> 'feito'").execute(&st.pool).await?;
+    // a fila toda: ao ligar outra vez (ao mesmo posto ou a outro), tudo o que este KanGest emitiu volta a seguir; o
+    // mesmo posto não grava nada em dobro, e outro posto fica com tudo, como ao ligar a outro posto sem desligar
+    sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;

@@ -55,6 +55,9 @@ tauri-plugin-autostart = "=2.7.0"
 tauri-plugin-notification = "=2.8.0"
 # Janelas nativas de guardar e abrir (cópias de segurança, restauro, pasta externa).
 tauri-plugin-dialog = "=2.8.4"
+# o tempo real da Loja online (src/sinc/tempo_real.rs): um cliente WebSocket para o Realtime do site
+tokio-tungstenite = { version = "=0.24.0", default-features = false, features = ["connect", "native-tls"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
 # Importação: as instâncias locais do SQL Server (registo do Windows). A mesma versão que já vem com o Tauri.
 [target.'cfg(target_os = "windows")'.dependencies.winreg]

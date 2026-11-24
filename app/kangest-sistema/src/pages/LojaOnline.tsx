@@ -6,9 +6,10 @@
  * com cada sincronização. Lê-se também sem Internet (a última cópia). As alterações fazem-se no painel do site, aberto
  * no navegador do KanGest, com o login de cada pessoa.
  */
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { CheckCircle2, CloudOff, ExternalLink, KeyRound, Link2, Package, Search, ShoppingBag, Store, UserRound } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
@@ -112,6 +113,23 @@ function Contador({ rotulo, n, activo, onClick, tom }: { rotulo: string; n: numb
 }
 
 export default function LojaOnline() {
+  const qc = useQueryClient();
+  // tempo real: o servidor da loja avisa quando chegam novidades do site (src-tauri/src/sinc/tempo_real.rs)
+  useEffect(() => {
+    if (!NA_APP) return;
+    let desligar: (() => void) | undefined;
+    let fechado = false;
+    void listen("loja-novidades", () => {
+      for (const k of ["loja-estado", "loja-encomendas", "loja-produtos", "loja-encomenda", "loja-conta"]) qc.invalidateQueries({ queryKey: [k] });
+    }).then((f) => {
+      if (fechado) f();
+      else desligar = f;
+    });
+    return () => {
+      fechado = true;
+      desligar?.();
+    };
+  }, [qc]);
   const estado = useQuery({ queryKey: ["loja-estado"], queryFn: () => call<EstadoLoja>("loja.estado"), refetchInterval: 30000 });
   const [aba, setAba] = useState<"encomendas" | "produtos">("encomendas");
   const e = estado.data;

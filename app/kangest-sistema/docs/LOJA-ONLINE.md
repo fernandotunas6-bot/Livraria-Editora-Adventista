@@ -56,6 +56,20 @@ KanGest.
 
 Contas que só entram com o Google não têm senha: para entrar no KanGest, a pessoa define uma senha na conta do site.
 
+## Tempo real
+
+O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
+docs/KANGEST-SINCRONIZACAO.md §9 na raiz da livraria). Quando muda uma encomenda da loja, o site manda o sinal
+«novidades», **sem dados**, e o KanGest vai logo buscá-las pelo canal assinado e cifrado. A encomenda aparece em
+segundos, em vez de até 2 minutos, e o ecrã actualiza-se sozinho.
+
+**Uma encomenda nova dá um aviso** no computador da loja («Encomenda nova na loja online · LIV-1234 · Ana Silva»). Com
+mais de três de uma vez, o aviso é um só, com o número. A primeira cópia não avisa, porque traz todas as encomendas de
+uma vez.
+
+Se a ligação ao Realtime cair, volta a tentar (5 s, 10 s… até 5 minutos). Entretanto a pergunta de 2 em 2 minutos
+continua, por isso nada se perde. O tópico vem do site no emparelhamento e muda a cada emparelhamento.
+
 ## Quem vê
 
 Quem tem a API e Integrações (`sistema.api`), os relatórios (`relatorios.ver`) ou quem factura ao balcão
