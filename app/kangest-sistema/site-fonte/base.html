@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{titulo}}</title>
+<meta name="description" content="{{descricao}}">
+<link rel="canonical" href="{{url}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KanGest">
+<meta property="og:title" content="{{titulo}}">
+<meta property="og:description" content="{{descricao}}">
+<meta property="og:url" content="{{url}}">
+<meta property="og:image" content="{{config.site}}/{{imagem}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0c4a44">
+<link rel="icon" href="assets/kangest-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="estilo.css?v={{versao_ficheiros}}">
+</head>
+<body>
+<a class="saltar" href="#conteudo">Saltar para o conteúdo</a>
+<header class="topo" id="topo">
+  <div class="cont">
+    <a class="marca" href="index.html" aria-label="KanGest, página inicial">
+      <img src="assets/kangest-logo.svg" alt="" width="36" height="36">
+      <span>KanGest<small>Sistemas de gestão</small></span>
+    </a>
+    <nav class="menu" id="menu" aria-label="Principal">
+{{menu}}
+      <a class="so-telemovel" href="conta.html">Conta da empresa</a>
+      <a class="so-telemovel" href="baixar.html">Transferir o KanGest</a>
+    </nav>
+    <div class="topo-accoes">
+      <a class="entrar-topo" href="conta.html" title="A conta da empresa: licença, pagamentos, computadores, equipa e segurança">{{icone:conta}}Conta</a>
+      <a class="btn btn-verde btn-pequeno" href="baixar.html">{{icone:baixar}}Transferir</a>
+    </div>
+    <button class="abrir-menu" id="abrirMenu" aria-label="Abrir o menu" aria-expanded="false" aria-controls="menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="conteudo">
+{{conteudo}}
+</main>
+
+<footer>
+  <div class="cont">
+    <div class="rodape">
+      <div>
+        <a class="marca" href="index.html"><img src="assets/kangest-logo.svg" alt="" width="36" height="36"><span>KanGest<small>Sistemas de gestão</small></span></a>
+        <p style="max-width:34ch">Facturação, ponto de venda e stock para o comércio angolano, gestão escolar e projectos à medida.</p>
+      </div>
+      <div>
+        <h4>KanGest</h4>
+        <ul>
+          <li><a href="kangest.html">O produto</a></li>
+          <li><a href="aderir.html">Preços e planos</a></li>
+          <li><a href="baixar.html">Transferir</a></li>
+          <li><a href="equipamento.html">Equipamento POS</a></li>
+          <li><a href="migracao-kigest.html">Migração de dados</a></li>
+          <li><a href="{{config.downloads.versoes}}" target="_blank" rel="noopener">Todas as versões</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Conta</h4>
+        <ul>
+          <li><a href="conta.html">Conta da empresa</a></li>
+          <li><a href="conta.html#criar">Criar conta</a></li>
+          <li><a href="entrar.html">KanGest pela Internet</a></li>
+          <li><a href="contacto.html">Pedir uma demonstração</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Outros sistemas</h4>
+        <ul>
+          <li><a href="siga-plus.html">SIGA Plus</a></li>
+          <li><a href="projectos.html">Projectos à medida</a></li>
+          <li><a href="{{config.livraria}}" target="_blank" rel="noopener">Livraria Adventista</a></li>
+          <li><a href="{{config.siga.portal}}" target="_blank" rel="noopener">Portal SIGA</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul>
+          <li><a href="tel:{{config.contacto.telefoneLink}}">Tel. {{config.contacto.telefone}}</a></li>
+          <li><a href="https://wa.me/{{config.contacto.whatsapp}}" target="_blank" rel="noopener">WhatsApp</a></li>
+          <li><a href="contacto.html">Formulário de contacto</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="rodape-fim">
+      <span>© <span id="ano">{{ano}}</span> KanGest. Feito em Angola. Desenvolvido por Valentino Canguele · <a href="tel:+244926445277">926 445 277</a> · <a href="mailto:valentinocanguele@gmail.com">valentinocanguele@gmail.com</a></span>
+      <span>KanGest {{config.versao}} para Windows e macOS</span>
+    </div>
+  </div>
+</footer>
+<script>window.KANGEST = {{config_json}};</script>
+<script src="site.js?v={{versao_ficheiros}}" defer></script>
+</body>
+</html>

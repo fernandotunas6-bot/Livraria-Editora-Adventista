@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "KanGest Livraria",
+  "version": "1.4.4",
+  "identifier": "ao.livrariaadventista.kangest",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "beforeBundleCommand": "node scripts/selar-executavel.mjs",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "KanGest Livraria",
+        "width": 1366,
+        "height": 820,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "devCsp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' ws: http://localhost:1420 ipc: http://ipc.localhost; img-src 'self' data: blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "app",
+      "dmg"
+    ],
+    "category": "Business",
+    "shortDescription": "Gestão Comercial e Ponto de Venda — edição da Livraria Adventista",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "selo/selo.json": "selo.json"
+    },
+    "publisher": "KanGest",
+    "copyright": "© 2026 Valentino Canguele. Todos os direitos reservados.",
+    "longDescription": "Gestão comercial e ponto de venda para Angola: facturação certificada AGT, POS, stock com lotes, tesouraria, recursos humanos, oficina, SAF-T e facturação electrónica.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "languages": [
+          "Portuguese"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-cabecalho.bmp",
+        "sidebarImage": "icons/nsis-lateral.bmp"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

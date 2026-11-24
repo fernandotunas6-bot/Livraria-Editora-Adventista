@@ -1,0 +1,133 @@
+name: KanGest Livraria
+
+# A edição do KanGest só da livraria (app/kangest-sistema/, separada do KanGest oficial desde a 1.4.4 —
+# docs/KANGEST.md). Os workflows dentro de app/kangest-sistema/.github/ são os do oficial e não correm aqui.
+#
+# - verificar: em cada PR e push ao main que mexa na edição — tipos, CSS para o WebKit antigo, clippy e testes
+#   (numa compilação de desenvolvimento e numa com uma chave de produtor de teste, o caminho da versão certificada).
+#   É o compilador da edição: no computador de desenvolvimento não há espaço para o target do Rust.
+# - instalador: só à mão (Actions → KanGest Livraria → Run workflow, «instalador»). Gera o .exe do Windows com os
+#   segredos da AGT, da Facturação Electrónica e do selo, se existirem neste repositório; sem eles, o instalador
+#   assina com a chave de desenvolvimento e não vale para a AGT (o KanGest oficial 1.4.4 também ainda não os tem).
+on:
+  pull_request:
+    paths:
+      - "app/kangest-sistema/**"
+      - ".github/workflows/kangest-livraria.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/kangest-sistema/**"
+      - ".github/workflows/kangest-livraria.yml"
+  workflow_dispatch:
+    inputs:
+      instalador:
+        description: "Gerar também o instalador do Windows"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kangest-livraria-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app/kangest-sistema
+
+jobs:
+  verificar:
+    name: Verificar a edição
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/kangest-sistema/package-lock.json
+
+      - name: Rust (stable, com clippy)
+        run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: app/kangest-sistema/src-tauri -> target
+
+      - name: Dependências do sistema (WebKitGTK do Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev librsvg2-dev
+
+      - run: npm ci
+
+      - name: Tipos do frontend
+        run: npm run typecheck
+
+      # o CSS compilado tem de funcionar no WebKit do macOS 12 e anteriores (docs/BUILD.md da edição)
+      - name: CSS para o WebKit do macOS 12
+        run: |
+          npx vite build
+          node scripts/verificar-css.mjs
+
+      - name: Clippy
+        working-directory: app/kangest-sistema/src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Testes (desenvolvimento)
+        working-directory: app/kangest-sistema/src-tauri
+        run: cargo test --locked
+
+      - name: Testes (com chave do produtor embutida)
+        working-directory: app/kangest-sistema/src-tauri
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out "$RUNNER_TEMP/produtor-teste.pem"
+          KANGEST_AGT_CHAVE_FICHEIRO="$RUNNER_TEMP/produtor-teste.pem" KANGEST_AGT_CERTIFICADO=999 cargo test --locked
+
+  instalador:
+    name: Instalador do Windows
+    if: github.event_name == 'workflow_dispatch' && inputs.instalador
+    needs: verificar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/kangest-sistema/package-lock.json
+
+      - name: Rust (stable)
+        run: rustup toolchain install stable --profile minimal; rustup default stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: app/kangest-sistema/src-tauri -> target
+
+      - run: npm ci
+
+      - name: Compilar (NSIS)
+        env:
+          KANGEST_AGT_CHAVE: ${{ secrets.KANGEST_AGT_CHAVE }}
+          KANGEST_AGT_CERTIFICADO: ${{ secrets.KANGEST_AGT_CERTIFICADO }}
+          KANGEST_AGT_VERSAO_CHAVE: ${{ secrets.KANGEST_AGT_VERSAO_CHAVE }}
+          KANGEST_FE_UTILIZADOR: ${{ secrets.KANGEST_FE_UTILIZADOR }}
+          KANGEST_FE_SENHA: ${{ secrets.KANGEST_FE_SENHA }}
+          KANGEST_FE_CHAVE_SOFTWARE: ${{ secrets.KANGEST_FE_CHAVE_SOFTWARE }}
+          KANGEST_FE_NUMERO_VALIDACAO: ${{ secrets.KANGEST_FE_NUMERO_VALIDACAO }}
+          # a chave das actualizações é a da edição, nunca a do KanGest oficial
+          KANGEST_CHAVE_ACTUALIZACOES: ${{ vars.KANGEST_LIVRARIA_CHAVE_ACTUALIZACOES }}
+          KANGEST_EXIGIR_CERTIFICACAO: ${{ vars.KANGEST_EXIGIR_CERTIFICACAO }}
+          KANGEST_SELO_PUBLICA: ${{ secrets.KANGEST_SELO_PUBLICA }}
+          KANGEST_SELO_PRIVADA: ${{ secrets.KANGEST_SELO_PRIVADA }}
+        run: npm run tauri build -- --bundles nsis
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kangest-livraria-windows
+          path: app/kangest-sistema/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error

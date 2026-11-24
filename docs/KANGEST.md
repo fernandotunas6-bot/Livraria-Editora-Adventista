@@ -1,7 +1,8 @@
 # O KanGest e o site
 
 O **KanGest** é o programa de facturação das livrarias (o sucessor do KiGest). A ligação ao site substitui a
-exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos:
+exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos (a edição do
+programa só da livraria está em [A edição da livraria](#a-edição-da-livraria-o-código-neste-repositório)):
 
 | Sentido | O quê | Como |
 |---|---|---|
@@ -216,3 +217,33 @@ site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-
 - `scripts/pglite/kangest.mjs` (cenários com as migrações reais): fila pelos gatilhos, pagamento pelo caminho real,
   cancelamentos, stock à venda, «temos / não temos», permissões, a reserva da fila (sem dobrar, presos há 10
   minutos, cancelada ou reembolsada durante a emissão) e o recálculo em lote.
+
+## A edição da livraria (o código neste repositório)
+
+Em [app/kangest-sistema/](../app/kangest-sistema/) está o **KanGest Livraria**, a edição do KanGest só da livraria.
+Partiu do KanGest oficial 1.4.4 ([fernandotunas6-bot/KanGest](https://github.com/fernandotunas6-bot/KanGest), commit
+`fd6f8f5`, trazido com o histórico) e **é um programa à parte desde então**:
+
+- **Nada volta ao oficial e nada vem dele.** Não se faz `git subtree pull`. Uma correcção do oficial que interesse à
+  livraria copia-se à mão, num PR próprio, depois de lida.
+- **Outra identidade no computador:** o identificador `ao.livrariaadventista.kangest` dá outra pasta de dados, outra
+  instância e outro instalador («KanGest Livraria»). A chave mestra fica noutro registo do cofre do sistema. Os dois
+  programas podem estar instalados lado a lado sem se tocarem.
+- **Actualizações próprias:** a origem oficial é `https://livrariaadventista.ao/kangest/actualizacoes`. Uma origem do
+  oficial que venha numa configuração copiada (as releases do GitHub ou o kangest.pages.dev) passa a esta, por isso a
+  versão genérica nunca se instala por cima. Enquanto não houver lá manifesto, «Verificar» dá erro e não instala nada.
+- **Trazer os dados de um KanGest oficial:** no oficial, *Configurações → Sistema → Fazer cópia* (a cópia exportada,
+  portátil) ou uma cópia externa com senha; na edição, «Já tem uma cópia de segurança do KanGest?» no primeiro
+  arranque, ou *Configurações → Sistema → Cópias guardadas → Restaurar*. A pasta de dados copiada à mão não abre (a
+  base vai cifrada com a chave do cofre do oficial), e uma cópia de um oficial mais recente do que a edição é recusada
+  ([COPIAS.md](../app/kangest-sistema/docs/COPIAS.md)).
+- **CI:** [`.github/workflows/kangest-livraria.yml`](../.github/workflows/kangest-livraria.yml) verifica a edição
+  (tipos, clippy e testes) em cada PR que lhe mexa, e gera o instalador do Windows à mão. Os workflows de
+  `app/kangest-sistema/.github/` são os do oficial e não correm aqui.
+- **AGT:** as facturas só valem com a chave e o certificado do produtor embutidos na compilação (segredos
+  `KANGEST_AGT_*` neste repositório, [CERTIFICACAO-AGT.md](../app/kangest-sistema/docs/CERTIFICACAO-AGT.md)). Sem
+  eles, o instalador assina com a chave de desenvolvimento. O oficial 1.4.4 também ainda não os tem.
+
+O que a edição vai ganhar (base central no Supabase da livraria, ligação cifrada, navegador e gestão da loja online)
+está no estudo [ECOSSISTEMA.md](ECOSSISTEMA.md). Não confundir com `app/kangest/`, a cópia local do oficial guardada
+fora do git.
