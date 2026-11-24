@@ -526,7 +526,9 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
 async fn desligar(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
     sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await?;
-    sqlx::query("DELETE FROM sinc_saida WHERE estado <> 'feito'").execute(&st.pool).await?;
+    // a fila toda: ao ligar outra vez (ao mesmo posto ou a outro), tudo o que este KanGest emitiu volta a seguir; o
+    // mesmo posto não grava nada em dobro, e outro posto fica com tudo, como ao ligar a outro posto sem desligar
+    sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;
