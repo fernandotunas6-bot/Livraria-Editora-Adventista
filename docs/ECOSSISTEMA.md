@@ -205,6 +205,7 @@ A fase 5 vem antes das fases 3 e 4 porque não depende delas.
 
 1. Criar neste repositório os segredos da AGT e da Facturação Electrónica (`KANGEST_AGT_*`, `KANGEST_FE_*`).
 2. A licença na edição: manter o servidor de licenças do KanGest ou dispensá-la.
-3. Onde ficam os instaladores da edição (`livrariaadventista.ao/kangest/actualizacoes`): ficheiros no site ou no
-   bucket `apps` do Supabase, e a chave minisign própria da edição (`KANGEST_LIVRARIA_CHAVE_ACTUALIZACOES`).
+3. ~~Onde ficam os instaladores da edição~~ — **decidido**: ficheiros no próprio site, em
+   `livrariaadventista.ao/kangest/actualizacoes`, copiados de uma Release pelo deploy (como o APK), e descarregados
+   no painel. A chave minisign é própria da edição ([KANGEST.md](KANGEST.md#descarregar-e-actualizar-o-kangest-livraria)).
 4. Quando desligar o túnel e a API de entrada nas lojas.

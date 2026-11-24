@@ -84,6 +84,8 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname === '/version.json') return;
   // A app Android para descarregar (~5 MB, muda a cada versão): nunca na cache do site.
   if (url.pathname.startsWith('/downloads/')) return;
+  // O KanGest Livraria e o manifesto das actualizações dele: sempre pela rede, nunca a página do site no lugar.
+  if (url.pathname.startsWith('/kangest/')) return;
   // API do Supabase (login, dados, Edge Functions, tempo real): sempre pela rede, nunca da cache,
   // para não mostrar dados antigos nem misturar sessões. As imagens do Storage continuam em cache.
   if (/\/(auth|rest|functions|realtime)\/v1\//.test(url.pathname)) return;

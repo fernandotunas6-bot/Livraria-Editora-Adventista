@@ -231,7 +231,8 @@ Partiu do KanGest oficial 1.4.4 ([fernandotunas6-bot/KanGest](https://github.com
   programas podem estar instalados lado a lado sem se tocarem.
 - **Actualizações próprias:** a origem oficial é `https://livrariaadventista.ao/kangest/actualizacoes`. Uma origem do
   oficial que venha numa configuração copiada (as releases do GitHub ou o kangest.pages.dev) passa a esta, por isso a
-  versão genérica nunca se instala por cima. Enquanto não houver lá manifesto, «Verificar» dá erro e não instala nada.
+  versão genérica nunca se instala por cima. Enquanto não houver lá manifesto, «Verificar» dá erro e não instala nada
+  (ver «Descarregar e actualizar», abaixo).
 - **Trazer os dados de um KanGest oficial:** no oficial, *Configurações → Sistema → Fazer cópia* (a cópia exportada,
   portátil) ou uma cópia externa com senha; na edição, «Já tem uma cópia de segurança do KanGest?» no primeiro
   arranque, ou *Configurações → Sistema → Cópias guardadas → Restaurar*. A pasta de dados copiada à mão não abre (a
@@ -247,3 +248,40 @@ Partiu do KanGest oficial 1.4.4 ([fernandotunas6-bot/KanGest](https://github.com
 O que a edição vai ganhar (base central no Supabase da livraria, ligação cifrada, navegador e gestão da loja online)
 está no estudo [ECOSSISTEMA.md](ECOSSISTEMA.md). Não confundir com `app/kangest/`, a cópia local do oficial guardada
 fora do git.
+
+### Descarregar e actualizar o KanGest Livraria
+
+Descarrega-se no painel, em **Sistema → Ligação ao KanGest → Descarregar o KanGest Livraria**, ao lado dos postos. O
+cartão mostra a versão, o tamanho e o SHA-256, e um aviso âmbar quando o instalador é de ensaio. Não há página pública
+nem subdomínio: os ficheiros ficam em `https://livrariaadventista.ao/kangest/actualizacoes/`, fora dos motores de
+pesquisa (`robots.txt` e `X-Robots-Tag`) e do service worker. É a mesma pasta de onde o programa vai buscar as
+versões novas.
+
+**Publicar uma versão** (à mão, como o APK da app Android):
+1. Subir a versão em `app/kangest-sistema/src-tauri/tauri.conf.json` (e no `package.json` e `Cargo.toml` dela), num
+   PR. O programa só se actualiza para uma versão **maior** do que a instalada.
+2. Depois do merge: **Actions → KanGest Livraria → Run workflow**, no `main`, com «Publicar o instalador no site».
+3. O trabalho **Publicar no site**:
+   - assina o instalador com a chave das actualizações e confere a assinatura com a pública que vai dentro do
+     programa (`scripts/kangest/verificar-assinatura.mjs`);
+   - escreve o `kangest-atualizacao.json`, com o SHA-256, a assinatura, o tamanho e `certificado_agt`;
+   - guarda tudo numa Release `kangest-livraria-v<versão>-b<corrida>`;
+   - publica o site outra vez. O deploy (`deploy-cloudflare.yml`) copia os ficheiros da Release para a pasta.
+4. Nas lojas, a versão nova aparece em *Sistema → Sobre o KanGest → Actualizações* (com a origem oficial). O programa
+   confere o SHA-256 e a assinatura e faz uma cópia da base antes de instalar.
+
+**As chaves das actualizações** (minisign, as do `tauri signer`):
+- a privada e a senha nos segredos `KANGEST_LIVRARIA_ACTUALIZACOES_PRIVADA` e `KANGEST_LIVRARIA_ACTUALIZACOES_SENHA`;
+- a pública na variável `KANGEST_LIVRARIA_CHAVE_ACTUALIZACOES`. Vai embutida em cada instalador, e com ela o programa
+  recusa qualquer actualização sem a assinatura certa.
+
+Sem elas, o «publicar» recusa-se a correr. **Não se trocam:** os programas já instalados só aceitam versões
+assinadas com a chave que levam dentro. Perder a privada obriga a reinstalar à mão em todas as lojas.
+
+**Ensaio e AGT.** Um instalador compilado sem os segredos `KANGEST_AGT_*` sai como **versão de ensaio**:
+- a Release fica como pré-lançamento;
+- o manifesto leva `certificado_agt: false`;
+- o painel avisa que as facturas não valem para vender ao público.
+
+O site serve sempre a versão certificada mais recente. Uma de ensaio só lá fica enquanto não houver nenhuma
+certificada, por isso nunca chega por actualização a uma loja que já factura a sério.
