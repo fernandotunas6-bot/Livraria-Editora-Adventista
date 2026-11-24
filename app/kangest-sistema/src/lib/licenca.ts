@@ -51,7 +51,11 @@ export const NOMES_PLANO: Record<string, string> = {
   ESSENCIAL: "Essencial",
   COMERCIO: "Comércio",
   EMPRESA: "Empresa",
+  LIVRARIA: "Edição da Livraria",
 };
+
+/** O plano da licença da edição da livraria (licenca.rs, PLANO_LIVRARIA): sem prazo e sem servidor de licenças. */
+export const PLANO_LIVRARIA = "LIVRARIA";
 
 export function useLicenca() {
   const sessao = useSession((s) => s.sessao);

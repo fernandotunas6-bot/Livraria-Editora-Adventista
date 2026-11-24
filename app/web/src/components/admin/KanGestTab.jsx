@@ -43,9 +43,10 @@ function Passo({ feito, children }) {
 }
 
 /**
- * Ligação ao KanGest (docs/KANGEST.md): se está activa, as ligações e as lojas de cada uma, quantos livros estão
- * ligados por referência, a fila dos documentos (NE, FR, anulações, notas de crédito) e os erros — repetem-se daqui
- * depois de corrigidos —, e sincronizar já.
+ * Ligação ao KanGest (docs/KANGEST.md). Em cima, o KanGest Livraria: o instalador para descarregar e os postos. Em
+ * baixo, fechada, a ligação antiga pela API de cada KanGest, desligada desde 2026-11-24: se está activa, as ligações e
+ * as lojas de cada uma, quantos livros estão ligados por referência, a fila dos documentos (NE, FR, anulações, notas de
+ * crédito) e os erros, e sincronizar já.
  */
 export default function KanGestTab() {
   const [estado, setEstado] = useState(null);
@@ -55,6 +56,7 @@ export default function KanGestTab() {
   const [configurar, setConfigurar] = useState(false);
   const [livros, setLivros] = useState(null);
   const [aSincronizar, setASincronizar] = useState(false);
+  const [antiga, setAntiga] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -107,17 +109,43 @@ export default function KanGestTab() {
     }
   }
 
-  if (!estado) return <p className="text-sm text-muted-foreground">A ler o estado da ligação…</p>;
-  const valor = (chave) => (estado.estado || []).find((e) => e.chave === chave)?.valor;
+  const valor = (chave) => (estado?.estado || []).find((e) => e.chave === chave)?.valor;
   const activo = valor('activo') === true;
   const sincronizado = valor('sincronizado');
-  const ligacoes = estado.ligacoes || [];
-  const fila = estado.fila || {};
+  const ligacoes = estado?.ligacoes || [];
+  const fila = estado?.fila || {};
   const nomeLoja = Object.fromEntries(lojas.map((l) => [l.id, l.name]));
   const copiar = (txt) => navigator.clipboard?.writeText(txt).then(() => toast.success('Copiado.'), () => toast.error('Não foi possível copiar.'));
 
   return (
     <div className="space-y-6">
+      {/* O KanGest Livraria: o instalador e os postos (docs/KANGEST.md, «A edição da livraria»). */}
+      <Suspense fallback={null}>
+        <KanGestDescarregar />
+        <KanGestPostos lojas={lojas} />
+      </Suspense>
+
+      {/*
+        A ligação antiga (o site a chamar a API de cada KanGest por um túnel): desligada desde 2026-11-24, nunca chegou a
+        funcionar em produção. Fica para consulta, fechada.
+      */}
+      <section className="rounded-xl border">
+        <button type="button" className="flex w-full flex-wrap items-center gap-2 p-4 text-left font-semibold" onClick={() => setAntiga((v) => !v)} aria-expanded={antiga}>
+          Ligação antiga pela API de cada KanGest
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', activo ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
+            {activo ? 'Activa' : 'Desligada'}
+          </span>
+          <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', antiga && 'rotate-180')} />
+        </button>
+        {antiga && (
+          <div className="space-y-6 border-t p-4">
+            <p className="text-sm text-muted-foreground">
+              O site chamava a API de cada KanGest por um túnel de entrada em cada loja. Nunca chegou a funcionar em produção e está
+              desligada, sem agendador. O KanGest Livraria liga-se pelos postos, acima: é ele que chama o site, sem túnel. Fica aqui só
+              para consulta (<code>docs/KANGEST.md</code>).
+            </p>
+            {!estado ? <p className="text-sm text-muted-foreground">A ler o estado da ligação…</p> : (
+            <>
       <div className="flex flex-wrap items-center gap-3">
         <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold', activo ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
           <span className={cn('h-2 w-2 rounded-full', activo ? 'bg-emerald-500' : 'bg-slate-400')} />
@@ -233,11 +261,11 @@ export default function KanGestTab() {
           </ul>
         )}
       </section>
-
-      <Suspense fallback={null}>
-        <KanGestDescarregar />
-        <KanGestPostos lojas={lojas} />
-      </Suspense>
+            </>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

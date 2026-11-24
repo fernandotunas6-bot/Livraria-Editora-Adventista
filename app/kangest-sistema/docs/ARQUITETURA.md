@@ -10,8 +10,11 @@ Este código é o **KanGest Livraria**, a edição só da livraria, separada do 
 do dono (24/11/2026):** os dados da livraria passam a ter uma base central no projecto Supabase da livraria, e cada
 KanGest Livraria continua a ter a sua base local (SQLite cifrado), a funcionar sem Internet e a assinar as facturas
 da AGT. O desenho, as ligações e a cifra estão em [docs/ECOSSISTEMA.md](../../../docs/ECOSSISTEMA.md) (raiz do
-repositório da livraria). Até essa ligação existir, a edição fala com o site como o oficial: pela API do KanGest
-([docs/KANGEST.md](../../../docs/KANGEST.md)).
+repositório da livraria). A edição liga-se ao site pelos postos (`src-tauri/src/sinc/`). A ligação antiga pela API do
+KanGest, com o túnel de entrada em cada loja, está desligada desde 24/11/2026 ([docs/KANGEST.md](../../../docs/KANGEST.md)).
+
+**Licença:** para o NIF da livraria (`NIFS_DA_LIVRARIA` em `services/licenca.rs`), a licença é a da edição, sem prazo,
+e o servidor de licenças nunca é contactado. Para qualquer outro NIF, vale a licença do oficial (desde a 1.4.5).
 
 | | KanGest oficial | KanGest Livraria |
 |---|---|---|

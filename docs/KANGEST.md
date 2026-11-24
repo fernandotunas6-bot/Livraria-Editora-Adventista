@@ -1,5 +1,12 @@
 # O KanGest e o site
 
+> **A ligação descrita nas secções 1 a 7 está desligada desde 24/11/2026.** É a ligação antiga: o site chamava a API
+> de cada KanGest por um túnel de entrada em cada loja, e nunca chegou a funcionar em produção. O agendador saiu na
+> migração `20261125130000`, e o código fica inerte. O caminho actual é o do **KanGest Livraria**, ligado pelos
+> postos: é ele que chama o site, sem túnel ([KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md) e
+> [A edição da livraria](#a-edição-da-livraria-o-código-neste-repositório)). O stock, os preços, os artigos novos e
+> a NE e a FR das encomendas ainda não passaram para os postos ([ECOSSISTEMA.md](ECOSSISTEMA.md) §12).
+
 O **KanGest** é o programa de facturação das livrarias (o sucessor do KiGest). A ligação ao site substitui a
 exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos (a edição do
 programa só da livraria está em [A edição da livraria](#a-edição-da-livraria-o-código-neste-repositório)):
@@ -244,6 +251,21 @@ Partiu do KanGest oficial 1.4.4 ([fernandotunas6-bot/KanGest](https://github.com
 - **AGT:** as facturas só valem com a chave e o certificado do produtor embutidos na compilação (segredos
   `KANGEST_AGT_*` neste repositório, [CERTIFICACAO-AGT.md](../app/kangest-sistema/docs/CERTIFICACAO-AGT.md)). Sem
   eles, o instalador assina com a chave de desenvolvimento. O oficial 1.4.4 também ainda não os tem.
+
+### A licença da edição
+
+Desde a 1.4.5, para o NIF da livraria (`NIFS_DA_LIVRARIA` em
+[licenca.rs](../app/kangest-sistema/src-tauri/src/services/licenca.rs), hoje `5125004375`, o `company_nif` do site):
+- a licença é a da edição: plano «Edição da Livraria», sem prazo nem limite de postos;
+- a emissão nunca pára por causa da licença. Continuam a contar a protecção do relógio e o selo do programa;
+- o KanGest **não fala com o servidor de licenças**: não há registo, e a verificação de 12 em 12 horas não corre.
+  Essa verificação mandava para o servidor a equipa da loja (logins, nomes, perfis, lojas e postos) e o estado das
+  cópias de segurança;
+- *Sistema → Licença e Assinatura* mostra «Edição da Livraria · Sem prazo», sem os cartões de registo e de pedido.
+
+Uma empresa com outro NIF tem a licença normal do KanGest: 30 dias de experiência e, depois, uma licença do produtor.
+O instalador, que se descarrega por um endereço que não é secreto, não serve assim de KanGest gratuito. Para outra
+empresa da livraria com NIF próprio, acrescenta-se o NIF à lista num PR e publica-se o instalador outra vez.
 
 O que a edição vai ganhar (base central no Supabase da livraria, ligação cifrada, navegador e gestão da loja online)
 está no estudo [ECOSSISTEMA.md](ECOSSISTEMA.md). Não confundir com `app/kangest/`, a cópia local do oficial guardada

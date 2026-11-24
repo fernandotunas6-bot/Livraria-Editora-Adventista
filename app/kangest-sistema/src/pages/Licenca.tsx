@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, Clock, BadgeCheck, Copy, ExternalLink, KeyRound, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import { call, copiarTexto } from "@/lib/api";
 import { data, dataHora } from "@/lib/format";
-import { NOMES_PLANO, urlPedirLicenca, useLicenca, useSincronizarLicenca, type LicencaEstado, type Sincronizacao } from "@/lib/licenca";
+import { NOMES_PLANO, PLANO_LIVRARIA, urlPedirLicenca, useLicenca, useSincronizarLicenca, type LicencaEstado, type Sincronizacao } from "@/lib/licenca";
 import { useSession } from "@/store/session";
 import { Badge, Button, Card, Field, Input, PageHeader, cn } from "@/components/ui";
 
@@ -187,6 +187,8 @@ export default function Licenca() {
   if (isLoading || !e) return <PageHeader title="Licença e Assinatura" subtitle="A carregar…" />;
   const modo = MODOS[e.modo];
   const Icone = e.modo === "ACTIVA" ? CheckCircle2 : e.pode_emitir ? Clock : AlertTriangle;
+  // a edição da livraria: a licença é a dela, sem prazo; não há registo, pedido nem activação a fazer
+  const daLivraria = e.plano === PLANO_LIVRARIA;
 
   return (
     <>
@@ -210,7 +212,7 @@ export default function Licenca() {
         </div>
         <dl className="mt-6 grid grid-cols-2 gap-x-8 gap-y-3 border-t border-line pt-5 text-[13.5px] md:grid-cols-4">
           <div><dt className="text-ink-3">Plano</dt><dd className="font-medium">{NOMES_PLANO[e.plano] ?? e.plano}</dd></div>
-          <div><dt className="text-ink-3">{e.modo === "EXPERIENCIA" ? "Experiência até" : "Válida até"}</dt><dd className="font-medium">{e.fim ? data(e.fim) : "—"}</dd></div>
+          <div><dt className="text-ink-3">{e.modo === "EXPERIENCIA" ? "Experiência até" : "Válida até"}</dt><dd className="font-medium">{e.fim ? data(e.fim) : daLivraria ? "Sem prazo" : "—"}</dd></div>
           <div><dt className="text-ink-3">Postos</dt><dd className="font-medium">{e.postos > 0 ? e.postos : "Sem limite"}</dd></div>
           <div><dt className="text-ink-3">Empresa (NIF)</dt><dd className="font-medium">{e.nif ?? "—"}</dd></div>
           {e.licenca_id && <div><dt className="text-ink-3">Licença</dt><dd className="font-mono text-[12.5px]">{e.licenca_id}</dd></div>}
@@ -231,6 +233,16 @@ export default function Licenca() {
         )}
       </Card>
 
+      {daLivraria ? (
+        <Card className="mt-6 p-6">
+          <div className="mb-1 flex items-center gap-2 font-semibold"><BadgeCheck className="size-4 text-brand" /> KanGest Livraria</div>
+          <p className="text-[13.5px] text-ink-2">
+            Esta edição é só da Livraria Editora Adventista. Para a empresa da livraria não há licença a pedir, a pagar nem a renovar, e este
+            KanGest não fala com o servidor de licenças: a equipa e os dados da loja ficam na base da livraria.
+          </p>
+        </Card>
+      ) : (
+      <>
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RegistoOnline e={e} podeGerir={podeActivar} />
 
@@ -268,6 +280,8 @@ export default function Licenca() {
           <p className="mt-3 text-[13px] text-ink-3">Só um administrador pode activar a licença.</p>
         )}
       </Card>
+      </>
+      )}
     </>
   );
 }
