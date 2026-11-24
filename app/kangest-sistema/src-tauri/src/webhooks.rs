@@ -136,7 +136,7 @@ async fn distribuir(p: &SqlitePool) -> AppResult<()> {
 }
 
 /// O que o aviso leva: o estado actual do documento, do stock ou do artigo (sem custos).
-async fn dados_evento(p: &SqlitePool, tipo: &str, objecto: Option<i64>) -> AppResult<Value> {
+pub(crate) async fn dados_evento(p: &SqlitePool, tipo: &str, objecto: Option<i64>) -> AppResult<Value> {
     let Some(id) = objecto else {
         return Ok(json!({ "mensagem": "Teste de ligação do KanGest." }));
     };

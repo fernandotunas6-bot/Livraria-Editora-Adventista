@@ -160,4 +160,32 @@ describe("dados pessoais cifrados por coluna", () => {
     await expect(prepararLote({}, c)).rejects.toThrow(/lista/);
     await expect(prepararLote(Array.from({ length: 201 }, () => ({ tipo: "documento" })), c)).rejects.toThrow(/200/);
   });
+
+  it("o stock e os artigos: o estado de cada armazém e o artigo, só com os campos conhecidos", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const [s, a, outro] = await prepararLote([
+      {
+        tipo: "stock", artigo_id: 7, referencia: " LIV-001 ", descricao: "fora",
+        armazens: [{ armazem_id: 1, armazem: "Loja", quantidade: 5, reservado: 1, disponivel: 4, ultima_entrada: "x" }],
+      },
+      {
+        tipo: "artigo", artigo_id: 7,
+        artigo: { referencia: "LIV-001", descricao: "Caminho a Cristo", tipo: "P", preco1_iva: 285000.4, ativo: true, codigo_barras: "978", custo_medio: 1 },
+      },
+      { tipo: "outra-coisa", x: 1 },
+    ], c);
+    expect(s).toEqual({ tipo: "stock", artigo_id: 7, referencia: "LIV-001", armazens: [{ armazem_id: 1, quantidade: 5, reservado: 1, disponivel: 4 }] });
+    expect(a).toEqual({
+      tipo: "artigo", artigo_id: 7,
+      artigo: { referencia: "LIV-001", descricao: "Caminho a Cristo", tipo: "P", preco1_iva: 285000, ativo: true, codigo_barras: "978" },
+    });
+    expect(outro).toEqual({ tipo: "outra-coisa" });
+    // inactivo como no SQLite do KanGest (0) ou como no aviso (false)
+    const [i0, i1] = await prepararLote([
+      { tipo: "artigo", artigo: { referencia: "A", ativo: 0 } },
+      { tipo: "artigo", artigo: { referencia: "B", ativo: false } },
+    ], c);
+    expect([i0.artigo.ativo, i1.artigo.ativo]).toEqual([false, false]);
+    await expect(prepararLote([{ tipo: "stock", referencia: "X", armazens: Array.from({ length: 101 }, (_, i) => ({ armazem_id: i })) }], c)).rejects.toThrow(/armazéns/);
+  });
 });

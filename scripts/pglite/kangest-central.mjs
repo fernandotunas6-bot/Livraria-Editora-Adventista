@@ -190,5 +190,78 @@ check('emparelhar outra vez dá um tópico novo', (await topico(outroPosto)) && 
 await q(`select public.kangest_posto_revogar($1)`, [outroPosto]);
 check('revogar apaga o tópico', (await topico(outroPosto)) === null);
 
+// --- o stock, os preços e os artigos pelos postos (20261125140000) ------------------------------------------------
+const emparelhado = async (nome, loja_id, resumo, byte) => {
+  const id = (await q(`select public.kangest_posto_criar($1, $2, $3, null) id`, [nome, loja_id, resumo]))[0].id;
+  await q(`select public.kangest_emparelhar($1, $2, '1.4.5')`, [resumo, Buffer.alloc(32, byte).toString('base64')]);
+  return id;
+};
+const [lojaA] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Lubango', 'Huíla', 'Lubango', true) returning id`);
+const [lojaB] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Bié', 'Bié', 'Cuíto', true) returning id`);
+const [livroS] = await q(`insert into public.stock_books (title, price, stock, active, kigest_ref) values ('Caminho a Cristo', 2500, 9, true, 'LIV-STK') returning id`);
+const pA = await emparelhado('Loja do Lubango', lojaA.id, 'resumo-stk-a', 11);
+const pB = await emparelhado('Loja do Bié', lojaB.id, 'resumo-stk-b', 12);
+const pSem = await emparelhado('Escritório', null, 'resumo-stk-c', 13);
+const stock = (ref, armazens, artigo_id = 7) => ({ tipo: 'stock', artigo_id, referencia: ref, armazens });
+const artigo = (a, artigo_id = 7) => ({ tipo: 'artigo', artigo_id, artigo: { tipo: 'P', ativo: true, codigo_barras: '', ...a } });
+const linhasDe = async (p) => q(`select armazem_id, disponivel::int, online, store_id from public.kangest_stock where ligacao = $1 order by armazem_id`, [`posto:${p}`]);
+const temos = async (store) => (await q(`select available from public.store_stock where store_id = $1 and book_id = $2`, [store, livroS.id]))[0]?.available;
+const stockDoLivro = async () => (await q(`select stock::int from public.stock_books where id = $1`, [livroS.id]))[0].stock;
+
+let r = await receber(pA, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 5, reservado: 1, disponivel: 4 }])]);
+check('stock: o posto com loja grava o estado do armazém', r.stock === 1 && r.erros.length === 0, r);
+check('stock: fica na loja do posto e não conta para o site por omissão', JSON.stringify(await linhasDe(pA)) === JSON.stringify([{ armazem_id: 1, disponivel: 4, online: false, store_id: lojaA.id }]), await linhasDe(pA));
+check('stock: o «temos» da loja do posto', (await temos(lojaA.id)) === true);
+check('stock: o stock à venda no site não muda (a primeira loja ligada não é o site todo)', (await stockDoLivro()) === 9, await stockDoLivro());
+await receber(pA, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 5, reservado: 1, disponivel: 4 }])]);
+check('stock: o mesmo lote outra vez não dobra nada', (await linhasDe(pA)).length === 1);
+await receber(pA, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 0, reservado: 0, disponivel: 0 }, { armazem_id: 2, quantidade: 3, reservado: 0, disponivel: 3 }])]);
+await receber(pA, [stock('LIV-STK', [{ armazem_id: 2, quantidade: 0, reservado: 0, disponivel: 0 }])]);
+check('stock: o armazém que já não vem sai, e o que ficou a zero fica a zero', JSON.stringify((await linhasDe(pA)).map((l) => [l.armazem_id, l.disponivel])) === '[[2,0]]', await linhasDe(pA));
+check('stock: a loja sem nada fica «não temos»', (await temos(lojaA.id)) === false);
+
+const conf = async (p, stock_online, manda_catalogo) => (await q(`select public.kangest_posto_configurar($1, $2, $3) r`, [p, stock_online, manda_catalogo]))[0].r;
+await receber(pA, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 4, reservado: 0, disponivel: 4 }])]);
+await receber(pB, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 7, reservado: 1, disponivel: 6 }])]);
+check('stock: ainda nenhum posto conta, o site fica como estava', (await stockDoLivro()) === 9);
+let c = await conf(pA, true, null);
+check('configurar: o posto passa a contar para o site', c.stock_online === true && c.manda_catalogo === false, c);
+check('configurar: o stock que já tinha mandado passa a contar', (await stockDoLivro()) === 4, await stockDoLivro());
+await conf(pB, true, null);
+check('stock: dois postos que contam somam-se', (await stockDoLivro()) === 10, await stockDoLivro());
+check('stock: cada loja com o seu «temos»', (await temos(lojaA.id)) === true && (await temos(lojaB.id)) === true);
+await conf(pB, false, null);
+check('configurar: deixar de contar tira o stock dele do site', (await stockDoLivro()) === 4, await stockDoLivro());
+
+r = await receber(pSem, [stock('LIV-STK', [{ armazem_id: 1, quantidade: 50, reservado: 0, disponivel: 50 }])]);
+check('stock: um posto sem loja e sem contar para o site é ignorado, sem erro', r.ignorados === 1 && r.stock === 0 && r.erros.length === 0, r);
+check('stock: e não grava nada', (await linhasDe(pSem)).length === 0);
+r = await receber(pA, [stock('', [])]);
+check('stock: sem referência é um erro desse item', r.erros.length === 1 && r.erros[0].tipo === 'stock' && /referência/.test(r.erros[0].erro), r);
+
+r = await receber(pA, [artigo({ referencia: 'LIV-STK', descricao: 'Caminho a Cristo', preco1_iva: 300000 })]);
+check('artigo: de um posto que não manda no catálogo é ignorado', r.ignorados === 1 && r.artigos === 0, r);
+check('artigo: e o preço do site fica', (await q(`select price::int p from public.stock_books where id = $1`, [livroS.id]))[0].p === 2500);
+await conf(pA, null, true);
+r = await receber(pA, [artigo({ referencia: 'LIV-STK', descricao: 'Caminho a Cristo', preco1_iva: 300000 })]);
+check('artigo: o posto do catálogo manda no preço (PVP com IVA, de cêntimos para kwanzas)', r.artigos === 1 && (await q(`select price::int p from public.stock_books where id = $1`, [livroS.id]))[0].p === 3000, r);
+r = await receber(pA, [artigo({ referencia: 'LIV-NOVO-A', descricao: '  Nosso   Hinário  ', preco1_iva: 450000, codigo_barras: '978000' })]);
+const novo = (await q(`select title, price::int p, active, kangest_novo_em is not null novo from public.stock_books where kigest_ref = 'LIV-NOVO-A'`))[0];
+check('artigo: um artigo que o site não tem entra oculto, à espera de fotografia', novo && novo.active === false && novo.novo && novo.title === 'Nosso Hinário' && novo.p === 4500, novo);
+await receber(pA, [artigo({ referencia: 'LIV-SERV', descricao: 'Portes', tipo: 'S', preco1_iva: 100000 }), artigo({ referencia: 'LIV-INACT', descricao: 'Velho', ativo: false })]);
+check('artigo: os serviços e os inactivos não dão produto', (await q(`select count(*)::int n from public.stock_books where kigest_ref in ('LIV-SERV', 'LIV-INACT')`))[0].n === 0);
+c = await conf(pB, null, true);
+check('configurar: só um posto manda no catálogo', c.manda_catalogo === true && (await q(`select manda_catalogo from public.kangest_postos where id = $1`, [pA]))[0].manda_catalogo === false);
+r = await receber(pA, [{ tipo: 'outra-coisa', artigo_id: 3 }]);
+check('lote: um tipo desconhecido é um erro desse item', r.erros.length === 1 && /Tipo desconhecido/.test(r.erros[0].erro) && r.erros[0].artigo_id === 3, r);
+
+await conf(pB, true, null);
+check('antes de revogar, os dois contam', (await stockDoLivro()) === 10);
+await q(`select public.kangest_posto_revogar($1)`, [pB]);
+check('revogar: o stock do posto sai do site', (await linhasDe(pB)).length === 0 && (await stockDoLivro()) === 4, await stockDoLivro());
+check('revogar: e os interruptores desligam-se', (await q(`select stock_online, manda_catalogo from public.kangest_postos where id = $1`, [pB]))[0].manda_catalogo === false);
+await recusa('configurar: as contas não executam', () => como('authenticated', null, `select public.kangest_posto_configurar('${pA}'::uuid, true, true)`), /permission denied/);
+await recusa('configurar: posto desconhecido', () => conf('00000000-0000-4000-8000-000000000009', true, null), /desconhecido/);
+
 console.log(`kangest-central: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

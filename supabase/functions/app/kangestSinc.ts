@@ -30,8 +30,11 @@ const utf8 = (s: string): Bytes => new Uint8Array(enc.encode(s));
 export const VERSAO = "kangest-sinc/1";
 /** Diferença máxima entre a hora do pedido e a do servidor. */
 export const JANELA_SEG = 300;
+/** Itens por lote: documentos, stock e artigos juntos. */
 export const MAX_DOCUMENTOS = 200;
 export const MAX_LINHAS = 500;
+/** Armazéns por artigo no stock (um KanGest tem poucos; isto só trava um lote absurdo). */
+export const MAX_ARMAZENS = 100;
 
 export function paraB64(b: Uint8Array): string {
   let s = "";
@@ -276,9 +279,43 @@ const numero = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
  */
 export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Row[]> {
   if (!Array.isArray(lote)) throw new Error("O lote tem de ser uma lista.");
-  if (lote.length > MAX_DOCUMENTOS) throw new Error(`No máximo ${MAX_DOCUMENTOS} documentos por lote.`);
+  if (lote.length > MAX_DOCUMENTOS) throw new Error(`No máximo ${MAX_DOCUMENTOS} itens por lote.`);
   const out: Row[] = [];
   for (const item of lote) {
+    // o stock de um artigo em cada armazém, como no aviso stock.alterado do KanGest (webhooks.rs)
+    if (item?.tipo === "stock") {
+      const armazens = Array.isArray(item.armazens) ? item.armazens : [];
+      if (armazens.length > MAX_ARMAZENS) throw new Error(`No máximo ${MAX_ARMAZENS} armazéns por artigo.`);
+      out.push({
+        tipo: "stock",
+        artigo_id: inteiro(item.artigo_id),
+        referencia: texto(item.referencia, 60).trim(),
+        armazens: armazens.map((a: Row) => ({
+          armazem_id: inteiro(a.armazem_id),
+          quantidade: numero(a.quantidade),
+          reservado: numero(a.reservado),
+          disponivel: numero(a.disponivel),
+        })),
+      });
+      continue;
+    }
+    // o artigo (nome, preço com IVA, se está activo), como no aviso artigo.alterado
+    if (item?.tipo === "artigo") {
+      const a = item.artigo || {};
+      out.push({
+        tipo: "artigo",
+        artigo_id: inteiro(item.artigo_id),
+        artigo: {
+          referencia: texto(a.referencia, 60).trim(),
+          descricao: texto(a.descricao, 300),
+          tipo: texto(a.tipo, 2),
+          preco1_iva: inteiro(a.preco1_iva),
+          ativo: a.ativo !== false && a.ativo !== 0,
+          codigo_barras: texto(a.codigo_barras, 60),
+        },
+      });
+      continue;
+    }
     if (item?.tipo !== "documento") {
       out.push({ tipo: texto(item?.tipo, 40) });
       continue;

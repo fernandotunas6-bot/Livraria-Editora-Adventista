@@ -138,15 +138,15 @@ Faça outra encomenda de ensaio. Desligue a rede e carregue em **A preparar**.
 3. Faça uma entrada de stock do artigo e emita uma FR.
 
 - **Deve ver:**
-  - em Livraria → Ligação ao site, «Por enviar» volta a 0 em segundos;
+  - em Livraria → Ligação ao site, «Documentos por enviar» volta a 0 em segundos;
   - no painel, no posto «Ensaio», os documentos recebidos e nenhum elo da cadeia AGT partido.
 
 ## 11. As vendas sem Internet
 
 1. Desligue a rede do computador e emita mais duas FR.
-   - **Deve ver:** a venda faz-se como sempre, a barra mostra «Sem ligação» (âmbar) e «Por enviar: 2».
+   - **Deve ver:** a venda faz-se como sempre, a barra mostra «Sem ligação» (âmbar) e «Documentos por enviar: 2».
 2. Volte a ligar a rede.
-   - **Deve ver:** em 30 segundos, «Por enviar: 0», e no painel todos os documentos, sem repetidos e sem elos partidos.
+   - **Deve ver:** em 30 segundos, «Documentos por enviar: 0», e no painel todos os documentos, sem repetidos e sem elos partidos.
 
 ## 12. Arrumar
 

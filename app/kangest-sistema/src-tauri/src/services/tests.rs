@@ -6356,6 +6356,120 @@ async fn sincronizacao_com_a_livraria() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// O catálogo para o site (src/sinc/catalogo.rs, migração 0057): os gatilhos marcam o stock e o artigo só com ligação,
+/// uma linha por artigo; o lote leva o estado de cada armazém e o preço com IVA; uma mudança feita enquanto o lote ia a
+/// caminho não se perde; os erros do centro esperam e o «Repetir» trá-los de volta; desligar apaga tudo.
+#[tokio::test]
+async fn sinc_catalogo_stock_e_artigos() {
+    use crate::sinc::catalogo;
+    let pasta = std::env::temp_dir().join(format!("kigest-sinc-catalogo-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.expect("posto 1");
+    rpc(
+        &st,
+        "setup.inicializar",
+        json!({ "empresa": { "nome": "Livraria Teste, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } }),
+    )
+    .await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "Caminho a Cristo", "referencia": "LIV-CAT", "taxa_iva_id": 1, "preco1": 250000 })).await["id"]
+        .as_i64()
+        .unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": artigo, "quantidade": 10, "preco_unitario": 120000 }] })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    // 2 500,00 Kz + IVA 14% = 2 850,00 por unidade
+    let fr = |q: i64| json!({ "tipo": "FR", "linhas": [{ "artigo_id": artigo, "quantidade": q }], "pagamentos": [{ "modo": "NU", "valor": 285000 * q }] });
+    let conta = |sql: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+    let agora = chrono::Local::now().timestamp();
+
+    // sem ligação, nada se marca
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo").await, 0);
+
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+
+    // duas vendas do mesmo livro: uma linha de stock, com o contador a subir
+    rpc(&st, "documentos.emitir", fr(1)).await;
+    rpc(&st, "documentos.emitir", fr(2)).await;
+    let linhas: Vec<(String, i64)> = sqlx::query_as("SELECT tipo, mudou FROM sinc_catalogo WHERE artigo_id = ? ORDER BY tipo").bind(artigo).fetch_all(&st.pool).await.unwrap();
+    assert_eq!(linhas.len(), 1, "{linhas:?}");
+    assert_eq!(linhas[0].0, "stock");
+    assert!(linhas[0].1 >= 2, "{linhas:?}");
+
+    // o preço muda: o artigo marca-se; o custo médio (que muda a cada compra) não
+    sqlx::query("UPDATE artigos SET preco1 = 300000 WHERE id = ?").bind(artigo).execute(&st.pool).await.unwrap();
+    let (pendentes, itens) = catalogo::devidos(&st.pool, agora, catalogo::LOTE).await.unwrap();
+    assert_eq!(pendentes.len(), 2, "{pendentes:?}");
+    let stock = itens.iter().find(|i| i["tipo"] == "stock").expect("item do stock");
+    assert_eq!(stock["referencia"], "LIV-CAT");
+    assert_eq!(stock["artigo_id"], artigo);
+    assert_eq!(stock["armazens"][0]["quantidade"].as_f64(), Some(7.0), "{stock}");
+    assert_eq!(stock["armazens"][0]["disponivel"].as_f64(), Some(7.0), "{stock}");
+    assert!(stock["armazens"][0].get("armazem").is_none(), "só o que o site usa: {stock}");
+    let art = itens.iter().find(|i| i["tipo"] == "artigo").expect("item do artigo");
+    assert_eq!(art["artigo"]["referencia"], "LIV-CAT");
+    assert_eq!(art["artigo"]["preco1_iva"], 342000, "3 000,00 + 14%: {art}");
+    assert_eq!(art["artigo"]["ativo"], true);
+
+    // uma venda enquanto o lote ia a caminho: o stock fica para a volta seguinte; o artigo sai
+    rpc(&st, "documentos.emitir", fr(1)).await;
+    catalogo::concluir(&st.pool, &pendentes, &Default::default(), agora).await.unwrap();
+    let ficou: Vec<String> = sqlx::query_scalar("SELECT tipo FROM sinc_catalogo WHERE artigo_id = ?").bind(artigo).fetch_all(&st.pool).await.unwrap();
+    assert_eq!(ficou, vec!["stock".to_string()]);
+    let (pendentes, itens) = catalogo::devidos(&st.pool, agora, catalogo::LOTE).await.unwrap();
+    assert_eq!(itens[0]["armazens"][0]["quantidade"].as_f64(), Some(6.0), "o estado novo: {}", itens[0]);
+
+    // o centro recusa o item: espera, e o «Repetir» trá-lo já
+    let erros = catalogo::erros_do_resultado(&json!({ "erros": [
+        { "tipo": "stock", "artigo_id": artigo, "erro": "Stock sem referência." },
+        { "tipo": "documento", "documento_id": 3, "artigo_id": null, "erro": "outro" },
+    ] }));
+    assert_eq!(erros.len(), 1, "só os do catálogo: {erros:?}");
+    catalogo::concluir(&st.pool, &pendentes, &erros, agora).await.unwrap();
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo WHERE erro <> '' AND tentativas = 1").await, 1);
+    assert!(catalogo::devidos(&st.pool, agora, catalogo::LOTE).await.unwrap().0.is_empty(), "espera antes de voltar a tentar");
+    let e = rpc(&st, "sinc.estado", Value::Null).await;
+    assert_eq!((e["catalogo"]["pendentes"].as_i64(), e["catalogo"]["com_erro"].as_i64()), (Some(1), Some(1)), "{e}");
+    rpc(&st, "sinc.repetir", Value::Null).await;
+    assert_eq!(catalogo::devidos(&st.pool, agora, catalogo::LOTE).await.unwrap().0.len(), 1);
+
+    // um artigo que deixou de existir para o site (sem controlar stock) sai sem seguir
+    sqlx::query("UPDATE artigos SET controla_stock = 0 WHERE id = ?").bind(artigo).execute(&st.pool).await.unwrap();
+    let (_, itens) = catalogo::devidos(&st.pool, agora, catalogo::LOTE).await.unwrap();
+    assert!(itens.iter().all(|i| i["tipo"] != "stock"), "{itens:?}");
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo WHERE tipo = 'stock'").await, 0);
+    sqlx::query("UPDATE artigos SET controla_stock = 1 WHERE id = ?").bind(artigo).execute(&st.pool).await.unwrap();
+
+    // ao emparelhar segue o catálogo todo, uma vez
+    catalogo::apagar(&st.pool).await.unwrap();
+    assert_eq!(catalogo::enfileirar_tudo(&st.pool).await.unwrap(), 2, "o artigo e o stock");
+    assert_eq!(catalogo::enfileirar_tudo(&st.pool).await.unwrap(), 0);
+
+    // desligar: o que estava por enviar sai, e as vendas seguintes já não marcam nada
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo").await, 0);
+    rpc(&st, "documentos.emitir", fr(1)).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_catalogo").await, 0);
+
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// A cópia local da Loja online (src/sinc/loja.rs): as novidades do site entram e actualizam-se sem duplicar, os
 /// filtros e a pesquisa, o stock desta loja pela referência, os cursores e, ao desligar, a cópia sai.
 #[tokio::test]
