@@ -12,6 +12,10 @@ da livraria, envia as suas facturas para o Supabase da livraria.
 
 ## 1. Configurar (uma vez)
 
+O ensaio completo, passo a passo, antes de ligar uma loja a sério, está em [KANGEST-ENSAIO.md](KANGEST-ENSAIO.md),
+com o posto de ensaio `scripts/kangest/ensaio-posto.mjs`.
+
+
 1. **As chaves.**
    - Corra `node scripts/kangest/chaves-sinc.mjs` e cole o comando `supabase secrets set …` que ele mostra.
    - Isso cria dois segredos da Edge Function: `KANGEST_SINC_CHAVES`, a chave X25519 do centro, e
