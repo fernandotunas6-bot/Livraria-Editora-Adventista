@@ -5,8 +5,8 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   artigoParaCriar, assinaturaValida, corpoFR, corpoNE, ErroKanGest, lerLigacoes, ligacaoDaEncomenda, linhasStock, linhasVendas,
-  modoPagamento, corpoNC, PERMISSOES_LIGACAO, pedir, precoDoArtigo, processarFila, proximaTentativa, sincronizarArtigos, testarLigacao,
-  tratarAviso, vendaDoDocumento, versaoAntiga, type Ligacao,
+  ligacaoDoPosto, modoPagamento, corpoNC, PERMISSOES_LIGACAO, pedir, precoDoArtigo, processarFila, proximaTentativa, resultadosDoPosto,
+  sincronizarArtigos, tarefasDoPosto, testarLigacao, tratarAviso, vendaDoDocumento, versaoAntiga, type Ligacao,
 } from "./kangest.ts";
 
 const CHAVE = `kg_${"a".repeat(48)}`;
@@ -243,9 +243,23 @@ function baseFalsa(tabelas: Record<string, Record<string, any>[]>) {
     if (job) Object.assign(job, { estado: "processando", actualizado: agora });
     return job ? [job] : [];
   };
+  // kangest_reservar_posto como a função da base: só as linhas das encomendas da loja do posto, que fica com elas
+  const reservarPosto = (a: any) => {
+    const agora = new Date().toISOString();
+    const posto = (tabelas.kangest_postos || []).find((p) => p.id === a?.p_posto && p.emitir_encomendas);
+    if (!posto) return [];
+    const daLoja = (r: Record<string, any>) => {
+      const o = (tabelas.orders || []).find((x) => x.id === r.order_id);
+      return o && (o.store_id || o.pickup_store_id) === posto.store_id;
+    };
+    const jobs = [...(tabelas.kangest_fila || [])].sort((x, y) => x.id - y.id)
+      .filter((r) => r.estado === "pendente" && String(r.proxima) <= agora && daLoja(r)).slice(0, a?.p_limite ?? 10);
+    jobs.forEach((j) => Object.assign(j, { estado: "processando", actualizado: agora, posto_id: posto.id }));
+    return jobs;
+  };
   const rpc = async (f: string, a: unknown) => {
     rpcs.push({ f, a });
-    return { data: f === "kangest_reservar" ? reservar() : 1, error: null };
+    return { data: f === "kangest_reservar" ? reservar() : f === "kangest_reservar_posto" ? reservarPosto(a) : 1, error: null };
   };
   return { db: { from: consulta, rpc }, rpcs };
 }
@@ -320,6 +334,77 @@ describe("processarFila", () => {
     const { db } = baseFalsa({ kangest_fila: fila, orders: [encomenda({ items: [{ book_id: "b1", quantity: 1, price: 10 }], shipping_cost: 0 })], stock_books: [{ id: "b1", kigest_ref: "LIV-001" }] });
     await processarFila(db, [central], 20, (async () => { throw new Error("timeout"); }) as unknown as typeof fetch);
     expect([fila[0].estado, fila[0].tentativas]).toEqual(["pendente", 1]);
+  });
+});
+
+describe("a fila pelos postos do KanGest Livraria (§11)", () => {
+  const passado = new Date(Date.now() - 60_000).toISOString();
+  const cenario = () => baseFalsa({
+    orders: [
+      { id: "o1", order_number: "LIV-1", store_id: "s1", items: [{ book_id: "b1", quantity: 2, price: 2850, title: "Caminho a Cristo" }], payment_status: "paid", shipping_cost: 0 },
+      { id: "o2", order_number: "LIV-2", store_id: "s2", items: [{ book_id: "b1", quantity: 1, price: 2850 }], payment_status: "pending", shipping_cost: 0 },
+    ],
+    stock_books: [{ id: "b1", kigest_ref: "LIV-CAT" }],
+    kangest_postos: [{ id: "p1", store_id: "s1", emitir_encomendas: true, artigo_portes: "", artigo_generico: "", pagamentos: { "*": "MB" } }],
+    kangest_fila: [
+      { id: 1, order_id: "o1", accao: "ne", estado: "pendente", proxima: passado, tentativas: 0 },
+      { id: 2, order_id: "o1", accao: "fr", estado: "pendente", proxima: passado, tentativas: 0 },
+      { id: 3, order_id: "o2", accao: "ne", estado: "pendente", proxima: passado, tentativas: 0 },
+    ],
+  });
+
+  it("a ligação do posto: os artigos e o modo de pagamento do painel", () => {
+    const lig = ligacaoDoPosto({ id: "p1", artigo_portes: " PORTES ", artigo_generico: "", pagamentos: { "*": "MB" } });
+    expect(lig).toMatchObject({ id: "posto:p1", portes: "PORTES", generico: undefined, pagamentos: { "*": "MB" } });
+    expect(modoPagamento({ payment_method_code: "multicaixa" }, lig)).toBe("MB");
+    expect(modoPagamento({ payment_method_code: "multicaixa" }, ligacaoDoPosto({ id: "p2" }))).toBe("TB");
+  });
+
+  it("as tarefas: só da loja do posto; a NE vai, a FR espera por ela", async () => {
+    const { db, rpcs } = cenario();
+    const posto = { id: "p1", store_id: "s1", emitir_encomendas: true, pagamentos: { "*": "MB" } };
+    const tarefas = await tarefasDoPosto(db, posto);
+    expect(tarefas.map((t) => [t.id, t.accao, t.caminho, t.idem])).toEqual([[1, "ne", "/documentos", "ne-LIV-1"]]);
+    expect(tarefas[0].corpo).toMatchObject({ tipo: "NE", referencia: "LIV-1", linhas: [{ referencia: "LIV-CAT", quantidade: 2, preco_com_iva: 285000 }] });
+    expect(rpcs.find((r) => r.f === "kangest_reservar_posto")?.a).toEqual({ p_posto: "p1", p_limite: 10 });
+    const fila = (db as any).from("kangest_fila");
+    const linhas = (await fila).data as Record<string, any>[];
+    expect(linhas.find((l) => l.id === 2)).toMatchObject({ estado: "pendente", erro: "À espera da nota de encomenda." });
+    expect(linhas.find((l) => l.id === 3)).toMatchObject({ estado: "pendente" });
+    expect(linhas.find((l) => l.id === 1)).toMatchObject({ estado: "processando", posto_id: "p1" });
+  });
+
+  it("o resultado da NE: feita, com o documento do KanGest, e o stock recalculado; a FR sai a seguir", async () => {
+    const { db, rpcs } = cenario();
+    const posto = { id: "p1", store_id: "s1", emitir_encomendas: true, pagamentos: { "*": "MB" } };
+    await tarefasDoPosto(db, posto);
+    const r = await resultadosDoPosto(db, posto, [{ tipo: "tarefa", id: 1, ok: true, documento: { id: 55, numero_doc: "NE A2026/1", total: 570000, armazem_id: 1 } }]);
+    expect(r).toEqual({ feitos: 1, falhas: 0 });
+    const linhas = (await (db as any).from("kangest_fila")).data as Record<string, any>[];
+    expect(linhas.find((l) => l.id === 1)).toMatchObject({
+      estado: "feito", resultado: { ligacao: "posto:p1", id: 55, numero: "NE A2026/1", total: 570000, linhas: [{ referencia: "LIV-CAT", quantidade: 2, preco_com_iva: 285000 }] },
+    });
+    expect(rpcs.find((x) => x.f === "kangest_recalcular_stock_lote")?.a).toEqual({ p_referencias: ["LIV-CAT"] });
+    // a FR esperava pela NE: na volta seguinte, vem da NE, com o modo de pagamento do posto
+    linhas.find((l) => l.id === 2)!.proxima = passado;
+    const [fr] = await tarefasDoPosto(db, posto);
+    expect(fr).toMatchObject({ id: 2, accao: "fr", idem: "fr-LIV-1", corpo: { tipo: "FR", doc_origem_id: 55, pagamentos: [{ modo: "MB", valor: 570000 }] } });
+  });
+
+  it("um erro de validação do KanGest pede alguém; um sem ligação volta a tentar; o de outro posto não conta", async () => {
+    const { db } = cenario();
+    const posto = { id: "p1", store_id: "s1", emitir_encomendas: true };
+    await tarefasDoPosto(db, posto);
+    const linhas = (await (db as any).from("kangest_fila")).data as Record<string, any>[];
+    await resultadosDoPosto(db, { id: "p9" }, [{ id: 1, ok: true, documento: { id: 1 } }]);
+    expect(linhas.find((l) => l.id === 1)?.estado).toBe("processando");
+    await resultadosDoPosto(db, posto, [{ id: 1, ok: false, erro: "Linha 1: o artigo LIV-CAT não existe.", estado: 422 }]);
+    expect(linhas.find((l) => l.id === 1)).toMatchObject({ estado: "erro", erro: "Linha 1: o artigo LIV-CAT não existe.", tentativas: 1 });
+    linhas.find((l) => l.id === 1)!.estado = "processando";
+    linhas.find((l) => l.id === 1)!.tentativas = 0;
+    await resultadosDoPosto(db, posto, [{ id: 1, ok: false, erro: "A base estava ocupada.", estado: 503 }]);
+    expect(linhas.find((l) => l.id === 1)).toMatchObject({ estado: "pendente", tentativas: 1 });
+    expect((await resultadosDoPosto(db, posto, [{ id: "x" }, { id: -1 }, null as any])).feitos).toBe(0);
   });
 });
 

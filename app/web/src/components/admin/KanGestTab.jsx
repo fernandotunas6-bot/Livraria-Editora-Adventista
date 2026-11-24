@@ -126,6 +126,37 @@ export default function KanGestTab() {
       </Suspense>
 
       {/*
+        Os documentos das encomendas online (NE, FR, NC, anulações): a fila é a mesma para os postos do KanGest Livraria
+        (que os emitem pela ligação, docs/KANGEST-SINCRONIZACAO.md §11) e para a ligação antiga. Só aparece quando há
+        alguma coisa na fila.
+      */}
+      {estado && Object.values(fila).some((n) => n > 0) && (
+      <section className="space-y-3">
+        <h3 className="font-semibold">Documentos das encomendas para o KanGest</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {FILA.map(([k, rot, cor]) => (
+            <div key={k} className="rounded-xl border p-3">
+              <p className="text-xs text-muted-foreground">{rot}</p>
+              <p className={cn('text-2xl font-bold tabular-nums', cor)}>{fila[k] || 0}</p>
+            </div>
+          ))}
+        </div>
+        {(estado.erros || []).length > 0 && (
+          <ul className="divide-y rounded-xl border">
+            {estado.erros.map((e) => (
+              <li key={e.id} className="flex flex-wrap items-center gap-2 p-3 text-sm">
+                <span className="font-semibold">{ACCOES[e.accao] || e.accao}</span>
+                <span className="text-xs text-muted-foreground">encomenda {e.order_id} · {e.tentativas} tentativa(s) · {dataHora(e.actualizado)}</span>
+                <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => repetir(e.id)}><RotateCcw className="mr-1 h-3.5 w-3.5" />Repetir</Button>
+                <p className="w-full text-xs text-red-700 dark:text-red-400">{e.erro}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      )}
+
+      {/*
         A ligação antiga (o site a chamar a API de cada KanGest por um túnel): desligada desde 2026-11-24, nunca chegou a
         funcionar em produção. Fica para consulta, fechada.
       */}
@@ -238,29 +269,6 @@ export default function KanGestTab() {
         })}
       </section>
 
-      <section className="space-y-3">
-        <h3 className="font-semibold">Documentos para o KanGest</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {FILA.map(([k, rot, cor]) => (
-            <div key={k} className="rounded-xl border p-3">
-              <p className="text-xs text-muted-foreground">{rot}</p>
-              <p className={cn('text-2xl font-bold tabular-nums', cor)}>{fila[k] || 0}</p>
-            </div>
-          ))}
-        </div>
-        {(estado.erros || []).length > 0 && (
-          <ul className="divide-y rounded-xl border">
-            {estado.erros.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center gap-2 p-3 text-sm">
-                <span className="font-semibold">{ACCOES[e.accao] || e.accao}</span>
-                <span className="text-xs text-muted-foreground">encomenda {e.order_id} · {e.tentativas} tentativa(s) · {dataHora(e.actualizado)}</span>
-                <Button size="sm" variant="outline" className="ml-auto h-7" onClick={() => repetir(e.id)}><RotateCcw className="mr-1 h-3.5 w-3.5" />Repetir</Button>
-                <p className="w-full text-xs text-red-700 dark:text-red-400">{e.erro}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
             </>
             )}
           </div>

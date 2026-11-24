@@ -245,3 +245,67 @@ Testes (`scripts/pglite/kangest-central.mjs`):
 - o revogar e as permissões.
 
 A limpeza do lote (`prepararLote`) está em `kangestSinc.test.ts`.
+
+## 11. Os documentos das encomendas online pelo posto
+
+Desde a migração `20261125150000`, o KanGest Livraria da loja pode emitir os documentos das encomendas online:
+- a **NE** de cada encomenda (reserva o stock na loja);
+- a **FR** quando o pagamento é confirmado no site;
+- a **NC** dos reembolsos;
+- a **anulação** das canceladas.
+
+Reutiliza tudo o que a ligação antiga tinha:
+- **a fila** (`kangest_fila`) e os gatilhos das encomendas;
+- **a reserva** sem dobrar e o tratamento do cancelamento a meio;
+- **os corpos dos documentos** (`corpoNE`, `corpoFR` e `corpoNC`, em `kangest.ts`);
+- **as regras** dos erros e das tentativas;
+- **o quadro do painel** «Documentos das encomendas para o KanGest», com os contadores, os erros e o «Repetir».
+
+**A diferença é quem emite.** Em vez de a Edge Function chamar a API de cada KanGest por um túnel:
+1. **A reserva** — na sincronização, `kangest_reservar_posto` reserva as linhas das encomendas da loja do posto, com o
+   `posto_id` e «processando». Uma linha reservada há mais de 10 minutos volta a sair.
+2. **As tarefas** — `tarefasDoPosto` monta o passo de cada linha (`passoDaFila`, o mesmo da ligação antiga) e manda-as
+   na resposta selada: `tarefas: [{ id, accao, metodo, caminho, corpo, idem }]`. A FR espera pela NE.
+3. **A emissão** — o KanGest emite-as pela **própria API**, por dentro (`api::chamar_interno`), com a chave interna «Loja
+   online (ligação ao site)». São as mesmas validações, as mesmas permissões e a mesma `Idempotency-Key`
+   (`ne-<número>`, `fr-<número>`…).
+4. **O resultado** — segue no lote seguinte: `{ tipo: "tarefa", id, ok, documento }` ou `{ …, ok: false, erro, estado }`.
+   `resultadosDoPosto` marca a linha feita (e recalcula o stock das referências da NE), ou com erro. Um 4xx do KanGest
+   pede alguém, salvo o 408 e o 429, como na ligação antiga.
+
+**Garantias:**
+- **Repetir não dobra nada.** Uma tarefa que volte a sair depois de emitida, porque o resultado não chegou, dá o mesmo
+  documento, pela chave de idempotência. O KanGest também guarda o resultado (`sinc_tarefas`) e manda-o outra vez em
+  vez de emitir.
+- **Só a loja do posto.** Só conta o resultado de uma linha que **este** posto tem reservada.
+- **O pagamento confirma-se no site.** A FR só sai depois de o site dizer que está pago.
+
+**No painel** (Sistema → Ligação ao KanGest → Postos), em cada posto com loja:
+- «Emitir os documentos das encomendas online», desligado por omissão. **Só um posto por loja**, e um posto sem loja
+  não emite;
+- o artigo dos portes e o artigo genérico, os da ligação antiga;
+- o modo de pagamento do KanGest por omissão: `pagamentos["*"]`, e sem ele TB.
+
+Rota: `POST /admin/kangest/postos/configurar` com `{ emitir_encomendas?, artigo_portes?, artigo_generico?, modo_pagamento? }`.
+
+**No KanGest** (Livraria → Ligação ao site → Encomendas online), escolhe-se:
+- **em nome de quem** se emite, um utilizador com as permissões dos documentos (o KanGest recusa um que não as tenha);
+- **o posto**, que dá a série e o armazém.
+
+Sem isso, as tarefas voltam ao site com o erro «ainda não tem quem emita», e repetem-se depois de configurar.
+
+**Testes:**
+- `scripts/pglite/kangest-central.mjs`:
+  - o interruptor e a fila só da loja do posto;
+  - um emissor por loja e o posto sem loja;
+  - a reserva sem dobrar e a volta ao fim de 10 minutos;
+  - o cancelamento, o revogar e as permissões.
+- `kangest.test.ts`:
+  - as tarefas e a espera da FR;
+  - o resultado da NE e o stock;
+  - os erros 4xx e 5xx, e o resultado de outro posto.
+- `cargo test` (`sinc_encomendas_pela_api_interna`):
+  - sem quem emita;
+  - a NE pela API, sem dobrar;
+  - a FR a partir da NE e a anulação;
+  - o pedido recusado e desligar.

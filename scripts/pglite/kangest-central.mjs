@@ -263,5 +263,47 @@ check('revogar: e os interruptores desligam-se', (await q(`select stock_online, 
 await recusa('configurar: as contas não executam', () => como('authenticated', null, `select public.kangest_posto_configurar('${pA}'::uuid, true, true)`), /permission denied/);
 await recusa('configurar: posto desconhecido', () => conf('00000000-0000-4000-8000-000000000009', true, null), /desconhecido/);
 
+// --- os documentos das encomendas online pelos postos (20261125150000) ------------------------------------------
+const [lojaE] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Benguela', 'Benguela', 'Benguela', true) returning id`);
+const pE = await emparelhado('Loja de Benguela', lojaE.id, 'resumo-enc-e', 21);
+const pE2 = await emparelhado('Segundo de Benguela', lojaE.id, 'resumo-enc-e2', 22);
+const filaDe = async (order_id) => q(`select accao, estado, posto_id from public.kangest_fila where order_id = $1 order by accao`, [order_id]);
+const encomendasDo = async (p, emitir, portes = null, generico = null, modo = null) =>
+  (await q(`select public.kangest_posto_encomendas($1, $2, $3, $4, $5) r`, [p, emitir, portes, generico, modo]))[0].r;
+
+const antes = await encomenda('LIV-E-0', lojaE.id);
+check('encomendas: sem o interruptor, a fila não enche (como até aqui)', (await filaDe(antes)).length === 0);
+const cfg = await encomendasDo(pE, true, ' PORTES ', '', 'MB');
+check('encomendas: o posto liga a emissão, com os portes e o modo por omissão', cfg.emitir_encomendas === true && cfg.artigo_portes === 'PORTES' && cfg.pagamentos['*'] === 'MB', cfg);
+await recusa('encomendas: dois postos não emitem pela mesma loja', () => encomendasDo(pE2, true), /Outro posto já emite/);
+await recusa('encomendas: um posto sem loja não emite', () => encomendasDo(pSem, true), /sem loja/);
+await recusa('encomendas: o modo de pagamento tem de ser um código do KanGest', () => encomendasDo(pE, null, null, null, 'multicaixa'), /2 a 4 letras/);
+const e1 = await encomenda('LIV-E-1', lojaE.id);
+check('encomendas: uma encomenda da loja do posto entra na fila (a NE)', JSON.stringify(await filaDe(e1)) === JSON.stringify([{ accao: 'ne', estado: 'pendente', posto_id: null }]), await filaDe(e1));
+const eOutra = await encomenda('LIV-E-OUTRA', lojaB.id);
+check('encomendas: a de uma loja sem posto que emite não entra', (await filaDe(eOutra)).length === 0);
+// pago como o faz private.order_payments_sync (o pagamento resulta dos pagamentos registados; ver kangest.mjs)
+await db.transaction(async (tx) => {
+  await tx.query(`select set_config('app.payment_sync', 'on', true)`);
+  await tx.query(`update public.orders set amount_paid = total, payment_status = payment_status where id = $1`, [e1]);
+});
+check('encomendas: paga, a FR entra a seguir à NE', (await filaDe(e1)).map((l) => l.accao).join() === 'fr,ne', await filaDe(e1));
+const res = await q(`select id, accao, posto_id, estado from public.kangest_reservar_posto($1, 10) order by id`, [pE]);
+check('reserva: o posto fica com as linhas da loja dele', res.length === 2 && res.every((l) => l.posto_id === pE && l.estado === 'processando'), res);
+check('reserva: o que já está reservado não sai outra vez', (await q(`select count(*)::int n from public.kangest_reservar_posto($1, 10)`, [pE]))[0].n === 0);
+check('reserva: outro posto da mesma loja (que não emite) não leva nada', (await q(`select count(*)::int n from public.kangest_reservar_posto($1, 10)`, [pE2]))[0].n === 0);
+await q(`update public.kangest_fila set actualizado = now() - interval '11 minutes' where order_id = $1`, [e1]);
+check('reserva: uma linha presa há mais de 10 minutos volta a sair (o KanGest repete com a mesma chave)', (await q(`select count(*)::int n from public.kangest_reservar_posto($1, 10)`, [pE]))[0].n === 2);
+const e2 = await encomenda('LIV-E-2', lojaE.id);
+await q(`update public.orders set status = 'cancelled' where id = $1`, [e2]);
+check('encomendas: cancelada antes de chegar ao KanGest, a NE fica de parte', (await filaDe(e2))[0]?.estado === 'ignorado', await filaDe(e2));
+await recusa('reserva: as contas não executam', () => como('authenticated', null, `select * from public.kangest_reservar_posto('${pE}'::uuid, 1)`), /permission denied/);
+await recusa('configurar encomendas: as contas não executam', () => como('authenticated', null, `select public.kangest_posto_encomendas('${pE}'::uuid, true, null, null, null)`), /permission denied/);
+await q(`select public.kangest_posto_revogar($1)`, [pE]);
+check('revogar: o posto deixa de emitir', (await q(`select emitir_encomendas from public.kangest_postos where id = $1`, [pE]))[0].emitir_encomendas === false);
+const e3 = await encomenda('LIV-E-3', lojaE.id);
+check('revogar: as encomendas seguintes da loja já não entram na fila', (await filaDe(e3)).length === 0);
+check('revogar: e a reserva não lhe dá nada', (await q(`select count(*)::int n from public.kangest_reservar_posto($1, 10)`, [pE]))[0].n === 0);
+
 console.log(`kangest-central: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

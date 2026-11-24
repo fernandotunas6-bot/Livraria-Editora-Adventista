@@ -39,9 +39,57 @@ function CodigoNovo({ codigo, endereco, expira, onFechar }) {
 }
 
 /**
+ * Os documentos das encomendas online de um posto (docs/KANGEST-SINCRONIZACAO.md §11): o KanGest da loja emite a NE, a
+ * FR, a NC e as anulações pela ligação. Os artigos dos portes e genérico e o modo de pagamento são os que a ligação
+ * antiga pedia, agora por posto.
+ */
+function EncomendasDoPosto({ p, onGuardar }) {
+  const [emitir, setEmitir] = useState(!!p.emitir_encomendas);
+  const [portes, setPortes] = useState(p.artigo_portes || '');
+  const [generico, setGenerico] = useState(p.artigo_generico || '');
+  const [modo, setModo] = useState((p.pagamentos || {})['*'] || '');
+  const [aGuardar, setAGuardar] = useState(false);
+  const mudou = emitir !== !!p.emitir_encomendas || portes !== (p.artigo_portes || '') || generico !== (p.artigo_generico || '')
+    || modo !== ((p.pagamentos || {})['*'] || '');
+  async function guardar() {
+    if (emitir && !p.emitir_encomendas && !confirm(`O KanGest de «${p.nome}» passa a emitir a nota de encomenda de cada encomenda online da loja dele, a factura/recibo quando o pagamento for confirmado no site, a nota de crédito dos reembolsos e a anulação das canceladas.\n\nConfirme no KanGest dessa loja, em Livraria → Ligação ao site, quem emite as encomendas online.`)) return;
+    setAGuardar(true);
+    try {
+      await onGuardar({ emitir_encomendas: emitir, artigo_portes: portes, artigo_generico: generico, modo_pagamento: modo });
+    } finally {
+      setAGuardar(false);
+    }
+  }
+  return (
+    <div className="w-full space-y-2 rounded-lg border border-dashed p-2 text-xs">
+      <label className="inline-flex items-center gap-1.5 font-medium">
+        <input type="checkbox" checked={emitir} onChange={(e) => setEmitir(e.target.checked)} />
+        Emitir os documentos das encomendas online desta loja (NE, FR, NC e anulações)
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex items-center gap-1">Artigo dos portes
+          <input className="h-7 w-28 rounded border bg-background px-2" maxLength={60} value={portes} onChange={(e) => setPortes(e.target.value)} placeholder="ex.: PORTES" />
+        </label>
+        <label className="inline-flex items-center gap-1">Artigo genérico
+          <input className="h-7 w-28 rounded border bg-background px-2" maxLength={60} value={generico} onChange={(e) => setGenerico(e.target.value)} placeholder="ex.: DIVERSOS" />
+        </label>
+        <label className="inline-flex items-center gap-1">Modo de pagamento
+          <input className="h-7 w-16 rounded border bg-background px-2 uppercase" maxLength={4} value={modo} onChange={(e) => setModo(e.target.value.toUpperCase())} placeholder="TB" />
+        </label>
+        <Button size="sm" variant="outline" className="h-7" onClick={guardar} disabled={!mudou || aGuardar}>{aGuardar ? 'A guardar…' : 'Guardar'}</Button>
+      </div>
+      <p className="text-muted-foreground">
+        Os portes vão numa linha com o artigo dos portes; um produto do site sem referência no KanGest vai com o artigo genérico.
+        O modo de pagamento é o do KanGest para as encomendas pagas no site (por omissão, TB).
+      </p>
+    </div>
+  );
+}
+
+/**
  * Postos do KanGest Livraria (docs/KANGEST-SINCRONIZACAO.md): cada instalação da edição da livraria que envia as
  * facturas, já assinadas, para a base central. Emparelhar com um código de uso único, pedir outro (computador novo ou
- * rodar a chave) e revogar.
+ * rodar a chave) e revogar. Em cada posto, os interruptores do stock e do catálogo (§10) e as encomendas online (§11).
  */
 export default function KanGestPostos({ lojas = [] }) {
   const [estado, setEstado] = useState(null);
@@ -171,6 +219,21 @@ export default function KanGestPostos({ lojas = [] }) {
                     </label>
                     {!p.store_id && !p.stock_online && <span className="text-muted-foreground">Sem loja e sem contar para o site: o stock dele não é usado.</span>}
                   </div>
+                )}
+                {p.estado !== 'revogado' && p.store_id && (
+                  <EncomendasDoPosto
+                    key={`${p.id}-${p.emitir_encomendas}-${p.artigo_portes}-${p.artigo_generico}-${(p.pagamentos || {})['*'] || ''}`}
+                    p={p}
+                    onGuardar={async (opcoes) => {
+                      try {
+                        await kangestPostoConfigurar(p.id, opcoes);
+                        toast.success('Encomendas do posto guardadas.');
+                        carregar();
+                      } catch (e) {
+                        toast.error(e?.message || 'Não foi possível guardar.');
+                      }
+                    }}
+                  />
                 )}
               </li>
             );

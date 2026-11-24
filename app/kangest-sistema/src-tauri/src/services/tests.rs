@@ -6470,6 +6470,128 @@ async fn sinc_catalogo_stock_e_artigos() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// Os documentos das encomendas online (src/sinc/encomendas.rs): as tarefas do site emitem-se pela própria API, com a
+/// chave interna; sem quem emita, o erro volta ao site; a mesma tarefa (ou a mesma chave de idempotência) não dá outro
+/// documento; a FR sai da NE; a anulação; um pedido que a ligação não faz é recusado aqui; desligar apaga tudo.
+#[tokio::test]
+async fn sinc_encomendas_pela_api_interna() {
+    use crate::sinc::encomendas;
+    let pasta = std::env::temp_dir().join(format!("kigest-sinc-encomendas-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.expect("posto 1");
+    rpc(
+        &st,
+        "setup.inicializar",
+        json!({ "empresa": { "nome": "Livraria Teste, Lda", "nif": "5000000000" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } }),
+    )
+    .await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "Caminho a Cristo", "referencia": "LIV-CAT", "taxa_iva_id": 1, "preco1": 250000 })).await["id"]
+        .as_i64()
+        .unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": artigo, "quantidade": 10, "preco_unitario": 120000 }] })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let conta = |sql: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+    // a NE de uma encomenda, como o site a manda (corpoNE em kangest.ts): os preços com IVA que o site cobrou
+    let ne = |id: i64, numero: &str| {
+        json!({ "id": id, "accao": "ne", "metodo": "POST", "caminho": "/documentos", "idem": format!("ne-{numero}"),
+                "corpo": { "tipo": "NE", "referencia": numero, "observacoes": format!("Loja online · encomenda {numero}"),
+                           "linhas": [{ "referencia": "LIV-CAT", "quantidade": 2, "preco_com_iva": 285000 }] } })
+    };
+    let resultado = |pool: sqlx::SqlitePool| async move {
+        let (ids, itens) = encomendas::resultados(&pool).await.unwrap();
+        encomendas::marcar_enviados(&pool, &ids).await.unwrap();
+        itens
+    };
+
+    // sem quem emita: nada se emite, e o erro volta ao site (para o painel o mostrar)
+    assert_eq!(encomendas::executar(&st, &json!([ne(11, "LIV-1")])).await.unwrap(), 1);
+    let r = resultado(st.pool.clone()).await;
+    assert_eq!((r[0]["tipo"].as_str(), r[0]["id"].as_i64(), r[0]["ok"].as_bool(), r[0]["estado"].as_i64()), (Some("tarefa"), Some(11), Some(false), Some(409)), "{r:?}");
+    assert!(r[0]["erro"].as_str().unwrap().contains("quem emita"), "{r:?}");
+    assert_eq!(conta("SELECT COUNT(*) FROM documentos WHERE tipo_codigo = 'NE'").await, 0);
+
+    // escolher quem emite: a chave interna, em nome do administrador e com a série do posto 1
+    let admin: i64 = sqlx::query_scalar("SELECT id FROM utilizadores WHERE login = 'admin'").fetch_one(&st.pool).await.unwrap();
+    let e = rpc(&st, "sinc.encomendas.configurar", json!({ "utilizador_id": admin, "posto_id": 1 })).await;
+    assert_eq!((e["chave"]["utilizador"].as_str(), e["chave"]["ativa"].as_i64()), (Some("Admin"), Some(1)), "{e}");
+    let (prefixo, nome): (String, String) = sqlx::query_as("SELECT prefixo, nome FROM api_chaves WHERE id = ?").bind(e["chave"]["id"].as_i64()).fetch_one(&st.pool).await.unwrap();
+    assert!(!prefixo.starts_with("kg_"), "nenhum token verdadeiro tem este prefixo: {prefixo}");
+    assert_eq!(nome, "Loja online (ligação ao site)");
+
+    // o site manda outra vez (depois do «Repetir»): a falha antiga não conta, e a NE emite-se pela API
+    encomendas::executar(&st, &json!([ne(11, "LIV-1")])).await.unwrap();
+    let r = resultado(st.pool.clone()).await;
+    assert_eq!(r[0]["ok"], true, "{r:?}");
+    let ne_id = r[0]["documento"]["id"].as_i64().expect("o número interno da NE");
+    assert!(r[0]["documento"]["numero_doc"].as_str().unwrap().starts_with("NE"), "{r:?}");
+    assert_eq!(r[0]["documento"]["total"], 570000, "{r:?}");
+
+    // a mesma tarefa outra vez (o resultado perdeu-se): não sai outra NE, segue o mesmo resultado
+    assert_eq!(encomendas::executar(&st, &json!([ne(11, "LIV-1")])).await.unwrap(), 1);
+    assert_eq!(resultado(st.pool.clone()).await[0]["documento"]["id"].as_i64(), Some(ne_id));
+    // outra linha da fila com a mesma chave de idempotência: a API devolve o mesmo documento
+    encomendas::executar(&st, &json!([ne(12, "LIV-1")])).await.unwrap();
+    assert_eq!(resultado(st.pool.clone()).await[0]["documento"]["id"].as_i64(), Some(ne_id));
+    assert_eq!(conta("SELECT COUNT(*) FROM documentos WHERE tipo_codigo = 'NE'").await, 1);
+
+    // a FR a partir da NE, com o pagamento que o site confirmou (corpoFR)
+    let fr = json!({ "id": 13, "accao": "fr", "metodo": "POST", "caminho": "/documentos", "idem": "fr-LIV-1",
+                     "corpo": { "tipo": "FR", "doc_origem_id": ne_id, "referencia": "LIV-1", "linhas": [{ "referencia": "LIV-CAT", "quantidade": 2 }],
+                                "pagamentos": [{ "modo": "NU", "valor": 570000 }] } });
+    encomendas::executar(&st, &json!([fr])).await.unwrap();
+    let r = resultado(st.pool.clone()).await;
+    assert_eq!(r[0]["ok"], true, "{r:?}");
+    assert!(r[0]["documento"]["numero_doc"].as_str().unwrap().starts_with("FR"), "{r:?}");
+
+    // uma encomenda cancelada: a NE dela anula-se
+    encomendas::executar(&st, &json!([ne(14, "LIV-2")])).await.unwrap();
+    let ne2 = resultado(st.pool.clone()).await[0]["documento"]["id"].as_i64().unwrap();
+    let anular = json!({ "id": 15, "accao": "anular", "metodo": "POST", "caminho": format!("/documentos/{ne2}/anular"),
+                         "corpo": { "motivo": "Encomenda LIV-2 cancelada no site" } });
+    encomendas::executar(&st, &json!([anular])).await.unwrap();
+    let r = resultado(st.pool.clone()).await;
+    assert_eq!((r[0]["ok"].as_bool(), r[0]["documento"]["estado"].as_str()), (Some(true), Some("A")), "{r:?}");
+
+    // um pedido que a ligação não faz é recusado aqui, sem chegar à API
+    let mau = json!({ "id": 16, "accao": "fr", "metodo": "POST", "caminho": "/artigos", "corpo": { "tipo": "FR" } });
+    encomendas::executar(&st, &json!([mau])).await.unwrap();
+    let r = resultado(st.pool.clone()).await;
+    assert_eq!((r[0]["ok"].as_bool(), r[0]["estado"].as_i64()), (Some(false), Some(400)), "{r:?}");
+
+    // deixar de emitir: a chave desactiva-se e as tarefas seguintes voltam com o erro de quem emita
+    rpc(&st, "sinc.encomendas.desligar", Value::Null).await;
+    encomendas::executar(&st, &json!([ne(17, "LIV-3")])).await.unwrap();
+    assert_eq!(resultado(st.pool.clone()).await[0]["estado"].as_i64(), Some(409));
+
+    // desligar do site: os resultados saem e a chave fica desactivada
+    encomendas::executar(&st, &json!([ne(18, "LIV-4")])).await.unwrap();
+    assert!(encomendas::por_enviar(&st.pool).await.unwrap() > 0);
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_tarefas").await, 0);
+    assert_eq!(conta("SELECT COUNT(*) FROM api_chaves WHERE nome = 'Loja online (ligação ao site)' AND ativa = 1").await, 0);
+
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// A cópia local da Loja online (src/sinc/loja.rs): as novidades do site entram e actualizam-se sem duplicar, os
 /// filtros e a pesquisa, o stock desta loja pela referência, os cursores e, ao desligar, a cópia sai.
 #[tokio::test]
