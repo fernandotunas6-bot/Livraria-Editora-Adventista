@@ -5,7 +5,7 @@ exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e traba
 
 | Sentido | O quê | Como |
 |---|---|---|
-| KanGest → site | Stock e preços | O KanGest avisa (webhook assinado) quando muda o stock ou o artigo; de hora a hora o site traz o stock todo |
+| KanGest → site | Stock, preços e artigos novos | O KanGest avisa (webhook assinado) quando muda o stock ou o artigo; de hora a hora o site traz o stock todo e os artigos que mudaram. Um artigo que o site não tem entra **oculto**, à espera de fotografia (§4.1) |
 | Site → KanGest | Encomendas | Encomenda feita → **NE** (reserva o stock na loja); pagamento confirmado → **FR** a partir da NE; cancelada → a NE é anulada |
 | KanGest → painel | Vendas ao balcão | Totais de cada loja e de cada mês (`kangest_vendas`), ao lado das vendas do site |
 
@@ -101,6 +101,42 @@ Internet, por exemplo). No histórico de stock aparece com o motivo **KanGest**.
 (`store_stock`) passa a vir do disponível do armazém dela. Produtos com tamanhos e variantes (`versions`) não são
 tocados: o stock é de cada variante, e o KanGest não o tem.
 
+## 4.1 Artigos novos: entram ocultos, à espera de fotografia
+
+Um artigo que o site não conhece (nenhum produto com aquela `kigest_ref`) entra no catálogo **oculto**:
+- leva o nome, o PVP com IVA, o código de barras (no ISBN) e o stock do KanGest;
+- vai sem capa e sem descrição, como os 201 da importação do KiGest;
+- **nunca se publica sozinho**: alguém revê o nome, põe a capa e a descrição e publica.
+
+Chega pelo aviso `artigo.alterado`, que sai quando o artigo é criado ou mudado. Se esse aviso se perder, chega na
+sincronização de hora a hora: `GET /artigos?alterado_desde=…`, a começar 10 minutos antes da volta anterior, com o
+cursor em `kangest_estado` (`artigos:<ligação>`). A primeira volta lê o catálogo activo todo. A sincronização só
+pergunta à base pelas referências que o site não tem e não mexe em preços.
+
+**Ficam de fora:**
+- os serviços (tipo `S`);
+- os artigos desactivados;
+- os artigos dos portes e genérico da ligação.
+
+**Uma vez só.** Cada referência dá no máximo um rascunho (`private.kangest_referencias_vistas`): se alguém o apagar por
+não o querer na loja, não volta. As **397 referências** que passaram por pessoas na importação de 12/11 (as ligadas,
+as novas, as repetidas e as ambíguas que ficaram para o dono; [catalogo/KIGEST.md](catalogo/KIGEST.md)) entram já como
+vistas, para o que foi decidido à mão não voltar.
+
+**Parecidos.** Um rascunho com o nome (sem acentos, caixa nem pontuação) ou o código de barras de um produto do site
+fica marcado (`stock_books.kangest_parecido_com`). Nada se liga sozinho, porque foi assim que os lenços de membro
+apanharam o preço dos de líder.
+
+**No painel:**
+- **Produtos → Mostrar: Novos do KanGest, por rever** e o aviso no Início («N artigos novos do KanGest por rever»);
+- cada rascunho leva a marca **Novo do KanGest**;
+- os parecidos dizem «Parece «…»» e têm duas acções, só para quem gere o catálogo:
+  - **É o mesmo**: a referência passa para o produto que o site já tinha, que passa a receber o stock e o preço do
+    KanGest, e o rascunho é apagado. Não se faz se esse produto já tiver outra referência.
+  - **É outro produto**: a marca sai e o rascunho fica, à espera de capa e descrição.
+
+As funções são `public.kangest_artigo_novo` (só o servidor) e `public.kangest_rascunho_decidir` (`manage_catalog`).
+
 ## 5. Encomendas e documentos
 
 | Na encomenda | Na fila | No KanGest |
@@ -175,6 +211,8 @@ site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-
 - `supabase/functions/app/kangest.test.ts` (vitest, com `npm test`): ligações, documentos, assinatura, stock, vendas
   a fila com um KanGest falso (incluindo dois ciclos ao mesmo tempo) e o **Testar ligação**.
 - `app/web/src/lib/kangestConfig.test.js`: o assistente da configuração (JSON, erros, comandos, SQL do Vault).
+- `scripts/pglite/kangest-artigos.mjs`: os artigos novos (oculto, uma vez só, as referências de 12/11, os parecidos,
+  o stock que já tinha chegado, as permissões, e o «é o mesmo» e o «é outro produto»).
 - `scripts/pglite/kangest.mjs` (cenários com as migrações reais): fila pelos gatilhos, pagamento pelo caminho real,
   cancelamentos, stock à venda, «temos / não temos», permissões, a reserva da fila (sem dobrar, presos há 10
   minutos, cancelada ou reembolsada durante a emissão) e o recálculo em lote.

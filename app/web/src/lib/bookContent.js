@@ -24,3 +24,9 @@ export function visibleText(html) {
 export const hasCover = (book) => Boolean(String(book?.cover || book?.cover_image || '').trim());
 
 export const hasDescription = (book) => visibleText(book?.description).length >= MIN_DESCRIPTION_CHARS;
+
+/**
+ * Rascunho de um artigo novo do KanGest ainda por rever: entrou sozinho, oculto (docs/KANGEST.md §4.1). Quando alguém
+ * o publica, deixa de ser rascunho.
+ */
+export const isKanGestDraft = (book) => Boolean(book?.kangest_novo_em) && book?.active === false;

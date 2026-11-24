@@ -2,7 +2,7 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 import { describe, it, expect } from 'vitest';
-import { hasCover, hasDescription, visibleText, MIN_DESCRIPTION_CHARS } from '@/lib/bookContent';
+import { hasCover, hasDescription, isKanGestDraft, visibleText, MIN_DESCRIPTION_CHARS } from '@/lib/bookContent';
 
 describe('visibleText', () => {
   it('tira as etiquetas, os espaços de HTML e os espaços a mais', () => {
@@ -40,5 +40,15 @@ describe('hasCover', () => {
   it('espaços em branco não são capa', () => {
     expect(hasCover({ cover: '  ', cover_image: '' })).toBe(false);
     expect(hasCover({})).toBe(false);
+  });
+});
+
+describe('isKanGestDraft', () => {
+  it('só o rascunho oculto que entrou do KanGest; publicado deixa de o ser', () => {
+    expect(isKanGestDraft({ active: false, kangest_novo_em: '2026-11-24T18:00:00Z' })).toBe(true);
+    expect(isKanGestDraft({ active: true, kangest_novo_em: '2026-11-24T18:00:00Z' })).toBe(false);
+    expect(isKanGestDraft({ active: false, kangest_novo_em: null })).toBe(false);
+    expect(isKanGestDraft({ active: false })).toBe(false);
+    expect(isKanGestDraft(null)).toBe(false);
   });
 });

@@ -74,6 +74,20 @@ describe('attentionItems', () => {
     expect(items[0].detail).not.toContain('Oculto');
   });
 
+  it('artigos novos do KanGest por rever: só os ocultos, com os parecidos contados', () => {
+    const books = [
+      book({ id: '1', title: 'Rascunho', active: false, kangest_novo_em: hoursAgo(2) }),
+      book({ id: '2', title: 'Parecido', active: false, kangest_novo_em: hoursAgo(1), kangest_parecido_com: '9' }),
+      book({ id: '3', title: 'Já publicado', kangest_novo_em: hoursAgo(30) }),
+    ];
+    const items = attentionItems({ books, perms: { catalog: true }, now: NOW });
+    expect(ids(items)).toEqual(['kangest-novos']);
+    expect(items[0].title).toBe('2 artigos novos do KanGest por rever');
+    expect(items[0].detail).toContain('1 parece um produto que o site já tem');
+    expect(items[0].action).toEqual({ section: 'books', filter: 'kangest_novos' });
+    expect(attentionItems({ books, perms: { orders: true }, now: NOW })).toEqual([]);
+  });
+
   it('só o que a pessoa pode tratar; urgente primeiro', () => {
     const orders = [{ id: '1', status: 'pending', created: hoursAgo(100) }];
     const books = [book({ featured: true, stock: 0 })];

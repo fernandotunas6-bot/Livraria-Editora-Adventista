@@ -64,7 +64,7 @@ import {
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
 import {
-  assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
+  assinaturaValida, lerLigacoes, processarFila, sincronizarArtigos, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados,
@@ -3161,7 +3161,11 @@ async function cicloKanGest(completo: boolean) {
   if (completo || passou) {
     for (const l of ligs) {
       try {
-        sinc[l.id] = { stock: await sincronizarStock(db, l), vendas: await sincronizarVendas(db, l, agora.getFullYear()) };
+        sinc[l.id] = {
+          stock: await sincronizarStock(db, l),
+          vendas: await sincronizarVendas(db, l, agora.getFullYear()),
+          artigos: await sincronizarArtigos(db, l),
+        };
       } catch (e) {
         sinc[l.id] = { erro: (e as Error).message };
       }
