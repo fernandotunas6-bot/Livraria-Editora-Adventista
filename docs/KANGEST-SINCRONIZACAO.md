@@ -24,6 +24,9 @@ da livraria, envia as suas facturas para o Supabase da livraria.
 3. **No KanGest Livraria**, em **Livraria → Ligação ao site**, escreva o endereço e o código. O posto gera a sua chave
    Ed25519 e só a parte pública sobe; daí em diante, as facturas saem sozinhas.
 
+Para as pessoas entrarem no KanGest com a conta do site (§8), o script mostra também o comando de
+`KANGEST_CHAVE_PUBLICA_SITE`, que é a chave pública do site e não um segredo.
+
 Sem os segredos, as rotas `/kangest/*` respondem 404 e o painel diz o que falta.
 
 ## 2. Como um pedido viaja
@@ -156,3 +159,21 @@ Testes: as novidades estão em `scripts/pglite/kangest-central.mjs`:
 - o catálogo com os ocultos;
 - o posto sem loja e o revogado;
 - as permissões.
+
+## 8. As pessoas no KanGest com a conta do site
+
+Para alterar encomendas a partir do KanGest (Livraria → Loja online), cada pessoa entra lá com a **sua** conta do site:
+o email, a senha e o código MFA, se o tiver. As respostas do emparelhamento e da sincronização trazem o que o KanGest
+precisa para isso: `auth: {url, apikey}`, o endereço do Supabase e a chave pública. Esta é a mesma que o site usa no
+navegador, e não é segredo: sem a senha e o código de cada pessoa não serve para nada.
+
+A chave vem de `KANGEST_CHAVE_PUBLICA_SITE` (o valor de `VITE_SUPABASE_PUBLISHABLE_KEY`), se o segredo existir; senão,
+da chave anon do projecto, que a Edge Function já tem. Sem nenhuma das duas, `auth` vem vazio e o KanGest diz que não é
+possível entrar.
+
+Cada alteração vai com a sessão da pessoa, pelos mesmos caminhos do painel, com as permissões dela e os avisos ao
+cliente:
+- confirmar, pelo PostgREST e com a RLS;
+- os passos da entrega, o «entregue» com o pagamento recebido e o cancelamento, por `POST /delivery-event`.
+
+O site não sabe que vem do KanGest; fica registado em nome da pessoa.

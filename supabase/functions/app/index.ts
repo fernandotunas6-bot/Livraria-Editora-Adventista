@@ -3246,6 +3246,15 @@ let cifraDadosCache: Promise<CifraDados | null> | null = null;
 const cifraDadosKanGest = () => (cifraDadosCache ??= lerCifraDados(Deno.env.get("KANGEST_DADOS_CHAVE")));
 const sincConfigurada = async () => chavesSinc().length > 0 && !!(await cifraDadosKanGest());
 const SINC_POR_CONFIGURAR = "Falta configurar as chaves da sincronização (KANGEST_SINC_CHAVES e KANGEST_DADOS_CHAVE): veja docs/KANGEST-SINCRONIZACAO.md.";
+/**
+ * Para as pessoas entrarem no KanGest com a conta do site (Livraria → Loja online): o endereço do Supabase e a chave
+ * pública, a mesma que o site usa no navegador (VITE_SUPABASE_PUBLISHABLE_KEY). Não é segredo: sem a senha e o código
+ * de cada pessoa não serve para nada. KANGEST_CHAVE_PUBLICA_SITE, se definida; senão, a chave anon do projecto.
+ */
+const authParaPostos = () => {
+  const apikey = (Deno.env.get("KANGEST_CHAVE_PUBLICA_SITE") || Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+  return apikey ? { url: SUPABASE_URL.replace(/\/+$/, ""), apikey } : null;
+};
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
@@ -3310,7 +3319,7 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
     p_codigo_resumo: await resumoSinc(codigo), p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
   });
   if (error) throw bad(error.message);
-  return json({ posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, hora: Math.floor(Date.now() / 1000) });
+  return json({ posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(), hora: Math.floor(Date.now() / 1000) });
 });
 
 route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest Livraria (a chave do emparelhamento), hora e nonce, conferidos no handler"), async ({ req, raw, ip }) => {
@@ -3365,7 +3374,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, site, posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
+    resultado, novidades, site, auth: authParaPostos(), posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });
 

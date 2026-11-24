@@ -47,4 +47,7 @@ if (i >= 0) {
   console.log('Chaves novas da sincronização do KanGest Livraria. Guarde a KANGEST_DADOS_CHAVE também num cofre de senhas:');
   console.log('sem ela, os NIF e os nomes dos clientes guardados não se voltam a ler.\n');
   console.log(`npx supabase secrets set --project-ref <projecto> KANGEST_SINC_CHAVES='${JSON.stringify(chaves)}' KANGEST_DADOS_CHAVE='${dados}'`);
+  console.log('\nPara as pessoas entrarem no KanGest com a conta do site (Loja online), a chave pública do site, a mesma do');
+  console.log('navegador (não é segredo). Sem ela, usa-se a chave anon do projecto:\n');
+  console.log('npx supabase secrets set --project-ref <projecto> KANGEST_CHAVE_PUBLICA_SITE="$(gh variable get VITE_SUPABASE_PUBLISHABLE_KEY)"');
 }
