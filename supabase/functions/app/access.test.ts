@@ -118,6 +118,10 @@ describe("o registo das rotas no index.ts", () => {
     expect(comSegredo).toContain("POST /webhooks/pagamentos");
     // os avisos do KanGest: assinatura HMAC com o segredo da ligação (docs/KANGEST.md)
     expect(comSegredo).toContain("POST /webhooks/kangest");
+    // o KanGest Livraria: o código de emparelhamento de uso único e a assinatura Ed25519 de cada pedido
+    // (docs/KANGEST-SINCRONIZACAO.md)
+    expect(comSegredo).toContain("POST /kangest/emparelhar");
+    expect(comSegredo).toContain("POST /kangest/sinc");
     expect(rotas.filter((r) => r.rota.startsWith("POST /cron/") && r.tipo !== "segredo")).toEqual([]);
   });
 

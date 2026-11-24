@@ -64,8 +64,12 @@ import {
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
 import {
-  assinaturaValida, lerLigacoes, processarFila, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
+  assinaturaValida, lerLigacoes, processarFila, sincronizarArtigos, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
+import {
+  aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados,
+  mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido, type CifraDados,
+} from "./kangestSinc.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
@@ -3157,7 +3161,11 @@ async function cicloKanGest(completo: boolean) {
   if (completo || passou) {
     for (const l of ligs) {
       try {
-        sinc[l.id] = { stock: await sincronizarStock(db, l), vendas: await sincronizarVendas(db, l, agora.getFullYear()) };
+        sinc[l.id] = {
+          stock: await sincronizarStock(db, l),
+          vendas: await sincronizarVendas(db, l, agora.getFullYear()),
+          artigos: await sincronizarArtigos(db, l),
+        };
       } catch (e) {
         sinc[l.id] = { erro: (e as Error).message };
       }
@@ -3231,6 +3239,152 @@ route("POST", "/admin/kangest/testar", permissao("manage_settings"), async ({ ip
 
 /** Corre já o ciclo (fila, stock completo e vendas). */
 route("POST", "/admin/kangest/sincronizar", permissao("manage_settings"), async () => json(await cicloKanGest(true)));
+
+// ---------------------------------------------------------------------------------------------------------------
+// KanGest Livraria: os postos e a sincronização com a base central (docs/KANGEST-SINCRONIZACAO.md).
+// Um posto é uma instalação do KanGest Livraria (o servidor de uma loja). Emparelha-se com um código de uso único e
+// passa a assinar cada pedido com a sua chave Ed25519; o corpo vem selado para o centro (kangestSinc.ts).
+// ---------------------------------------------------------------------------------------------------------------
+const chavesSinc = () => lerChavesSinc(Deno.env.get("KANGEST_SINC_CHAVES"));
+let cifraDadosCache: Promise<CifraDados | null> | null = null;
+const cifraDadosKanGest = () => (cifraDadosCache ??= lerCifraDados(Deno.env.get("KANGEST_DADOS_CHAVE")));
+const sincConfigurada = async () => chavesSinc().length > 0 && !!(await cifraDadosKanGest());
+const SINC_POR_CONFIGURAR = "Falta configurar as chaves da sincronização (KANGEST_SINC_CHAVES e KANGEST_DADOS_CHAVE): veja docs/KANGEST-SINCRONIZACAO.md.";
+/**
+ * Para as pessoas entrarem no KanGest com a conta do site (Livraria → Loja online): o endereço do Supabase e a chave
+ * pública, a mesma que o site usa no navegador (VITE_SUPABASE_PUBLISHABLE_KEY). Não é segredo: sem a senha e o código
+ * de cada pessoa não serve para nada. KANGEST_CHAVE_PUBLICA_SITE, se definida; senão, a chave anon do projecto.
+ */
+const authParaPostos = () => {
+  const apikey = (Deno.env.get("KANGEST_CHAVE_PUBLICA_SITE") || Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+  return apikey ? { url: SUPABASE_URL.replace(/\/+$/, ""), apikey } : null;
+};
+
+route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
+  const { data, error } = await db.from("kangest_postos")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro")
+    .order("criado_em", { ascending: true });
+  if (error) throw new Error(error.message);
+  const postos = [];
+  for (const p of data || []) {
+    const conta = async (soPartidas: boolean) => {
+      let q = db.from("kangest_documentos").select("id", { count: "exact", head: true }).eq("posto_id", p.id);
+      if (soPartidas) q = q.eq("cadeia", "partida");
+      const { count } = await q;
+      return count ?? 0;
+    };
+    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true) });
+  }
+  return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos });
+});
+
+route("POST", "/admin/kangest/postos", permissao("manage_settings"), async ({ body, auth }) => {
+  if (!await sincConfigurada()) throw new HttpError(503, SINC_POR_CONFIGURAR);
+  const nome = String(body.nome ?? "").trim();
+  if (!nome || nome.length > 80) throw bad("Dê um nome ao posto (até 80 letras), por exemplo «Loja do Huambo».");
+  const loja = String(body.store_id ?? "").trim();
+  if (loja) {
+    const { data: s } = await db.from("physical_stores").select("id").eq("id", loja).maybeSingle();
+    if (!s) throw bad("Essa loja não existe.");
+  }
+  const codigo = codigoEmparelhamento();
+  const { data: id, error } = await db.rpc("kangest_posto_criar", {
+    p_nome: nome, p_store_id: loja || null, p_codigo_resumo: await resumoSinc(normalizarCodigo(codigo)), p_criado_por: auth.id,
+  });
+  if (error) throw new Error(error.message);
+  return json({ id, codigo, expira_em: new Date(Date.now() + 10 * 60_000).toISOString(), endereco: `${SUPABASE_URL}/functions/v1/app` });
+});
+
+route("POST", "/admin/kangest/postos/codigo", permissao("manage_settings"), async ({ body }) => {
+  if (!await sincConfigurada()) throw new HttpError(503, SINC_POR_CONFIGURAR);
+  const id = String(body.id ?? "");
+  if (!uuidValido(id)) throw bad("Indique o posto.");
+  const codigo = codigoEmparelhamento();
+  const { error } = await db.rpc("kangest_posto_novo_codigo", { p_id: id, p_codigo_resumo: await resumoSinc(normalizarCodigo(codigo)) });
+  if (error) throw bad(error.message);
+  return json({ id, codigo, expira_em: new Date(Date.now() + 10 * 60_000).toISOString(), endereco: `${SUPABASE_URL}/functions/v1/app` });
+});
+
+route("POST", "/admin/kangest/postos/revogar", permissao("manage_settings"), async ({ body }) => {
+  const id = String(body.id ?? "");
+  if (!uuidValido(id)) throw bad("Indique o posto.");
+  const { error } = await db.rpc("kangest_posto_revogar", { p_id: id });
+  if (error) throw bad(error.message);
+  return json({ ok: true });
+});
+
+route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso único (10 minutos, só o resumo na base), conferido no handler; limite de pedidos"), async ({ body, ip }) => {
+  const chaves = chavesSinc();
+  if (!chaves.length || !await cifraDadosKanGest()) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("kangest-emparelhar", ip, 10)) throw tooMany("Demasiadas tentativas. Espere um minuto.");
+  const codigo = normalizarCodigo(body.codigo);
+  if (codigo.length !== 8) throw bad("Escreva o código de 8 letras que o painel mostrou.");
+  const { data, error } = await db.rpc("kangest_emparelhar", {
+    p_codigo_resumo: await resumoSinc(codigo), p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
+  });
+  if (error) throw bad(error.message);
+  return json({
+    posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(),
+    tempo_real: { topico: (data as Row)?.topico ?? null }, hora: Math.floor(Date.now() / 1000),
+  });
+});
+
+route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest Livraria (a chave do emparelhamento), hora e nonce, conferidos no handler"), async ({ req, raw, ip }) => {
+  const chaves = chavesSinc();
+  const cifra = await cifraDadosKanGest();
+  if (!chaves.length || !cifra) return json({ message: "Rota não encontrada." }, 404);
+  if (!await checkRateLimit("kangest-sinc", ip, 240)) throw tooMany("Demasiados pedidos.");
+  const posto = req.headers.get("x-kangest-posto") || "";
+  const hora = req.headers.get("x-kangest-hora") || "";
+  const nonce = req.headers.get("x-kangest-nonce") || "";
+  const assinatura = req.headers.get("x-kangest-assinatura") || "";
+  if (!uuidValido(posto) || !nonceValido(nonce) || !assinatura) throw new HttpError(401, "Pedido sem assinatura válida.");
+  if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
+  const { data: p } = await db.from("kangest_postos").select("id, nome, estado, chave_publica, store_id, topico").eq("id", posto).maybeSingle();
+  if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
+  if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
+    throw new HttpError(401, "Assinatura inválida.");
+  }
+  const { data: novo, error: eNonce } = await db.rpc("kangest_nonce", { p_posto: posto, p_nonce: nonce });
+  if (eNonce) throw new Error(eNonce.message);
+  if (novo !== true) throw new HttpError(409, "Pedido repetido.");
+  let aberto: Awaited<ReturnType<typeof abrirPedido>>;
+  try {
+    aberto = await abrirPedido(JSON.parse(raw), chaves, aadDoPedido(posto, hora, nonce));
+  } catch (e) {
+    throw bad(`Envelope inválido: ${(e as Error).message}`);
+  }
+  let resultado = null;
+  const lote = aberto.dados?.lote;
+  if (Array.isArray(lote) && lote.length) {
+    let preparado;
+    try {
+      preparado = await prepararLote(lote, cifra);
+    } catch (e) {
+      throw bad((e as Error).message);
+    }
+    const { data, error } = await db.rpc("kangest_receber", { p_posto: posto, p_lote: preparado });
+    if (error) throw new Error(error.message);
+    resultado = data;
+  } else {
+    await db.from("kangest_postos").update({ ultima_sinc: new Date().toISOString() }).eq("id", posto);
+  }
+  // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
+  // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
+  let novidades = null;
+  const cursores = aberto.dados?.cursores;
+  if (cursores && typeof cursores === "object" && !Array.isArray(cursores)) {
+    const { data, error } = await db.rpc("kangest_novidades", { p_posto: posto, p_cursores: cursores, p_limite: 200 });
+    if (error) throw new Error(error.message);
+    novidades = data;
+  }
+  const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
+  const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  return json(await selarResposta(aberto.chaveResposta, nonce, {
+    resultado, novidades, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
+  }));
+});
 
 route("POST", "/cron/email-queue", segredo("x-queue-token do agendador (EMAIL_QUEUE_TOKEN), conferido no handler"), async ({ req, body, ip }) => {
   const expected = Deno.env.get("EMAIL_QUEUE_TOKEN") || "";
