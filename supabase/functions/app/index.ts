@@ -3319,7 +3319,10 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
     p_codigo_resumo: await resumoSinc(codigo), p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
   });
   if (error) throw bad(error.message);
-  return json({ posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(), hora: Math.floor(Date.now() / 1000) });
+  return json({
+    posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(),
+    tempo_real: { topico: (data as Row)?.topico ?? null }, hora: Math.floor(Date.now() / 1000),
+  });
 });
 
 route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest Livraria (a chave do emparelhamento), hora e nonce, conferidos no handler"), async ({ req, raw, ip }) => {
@@ -3333,7 +3336,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const assinatura = req.headers.get("x-kangest-assinatura") || "";
   if (!uuidValido(posto) || !nonceValido(nonce) || !assinatura) throw new HttpError(401, "Pedido sem assinatura válida.");
   if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
-  const { data: p } = await db.from("kangest_postos").select("id, nome, estado, chave_publica, store_id").eq("id", posto).maybeSingle();
+  const { data: p } = await db.from("kangest_postos").select("id, nome, estado, chave_publica, store_id, topico").eq("id", posto).maybeSingle();
   if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
   if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
     throw new HttpError(401, "Assinatura inválida.");
@@ -3374,7 +3377,8 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, site, auth: authParaPostos(), posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
+    resultado, novidades, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });
 

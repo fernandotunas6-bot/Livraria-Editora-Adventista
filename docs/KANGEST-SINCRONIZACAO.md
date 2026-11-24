@@ -177,3 +177,24 @@ cliente:
 - os passos da entrega, o «entregue» com o pagamento recebido e o cancelamento, por `POST /delivery-event`.
 
 O site não sabe que vem do KanGest; fica registado em nome da pessoa.
+
+## 9. Tempo real
+
+Quando muda uma encomenda da loja de um posto (nova, paga, cancelada…), o gatilho `orders_kangest_realtime_signal`
+manda um sinal pelo Realtime: o evento `novidades`, **sem dados**, no tópico público `kangest:<topico>`. O KanGest
+desse posto ouve-o e vai logo buscar as novidades pelo canal assinado e cifrado (§7); a encomenda aparece em segundos,
+em vez de até 2 minutos, com um aviso no computador da loja.
+
+O tópico é um nome secreto ao acaso de cada posto (122 bits):
+- nasce no emparelhamento e chega ao posto na resposta do emparelhamento e na resposta selada da sincronização
+  (`tempo_real: {topico}`);
+- muda a cada emparelhamento e apaga-se ao revogar.
+
+Sem o tópico, ninguém sabe quando a loja tem encomendas, e mesmo com ele só se fica a saber que algo mudou. Sem o
+serviço de tempo real, o sinal perde-se e o KanGest continua a perguntar de 2 em 2 minutos.
+
+Testes (`scripts/pglite/kangest-central.mjs`):
+- o tópico de cada posto;
+- as encomendas gravam-se com o gatilho;
+- novo código e revogar apagam o tópico;
+- emparelhar outra vez dá um tópico novo.

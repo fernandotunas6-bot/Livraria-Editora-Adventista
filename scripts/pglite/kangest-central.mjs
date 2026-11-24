@@ -172,5 +172,23 @@ await q(`select public.kangest_posto_revogar($1)`, [semLoja]);
 await recusa('um posto revogado não recebe novidades', () => novidades({}, 50, semLoja), /desconhecido ou revogado/);
 await recusa('novidades: as contas não executam', () => como('authenticated', admin, `select public.kangest_novidades('${posto}'::uuid, '{}'::jsonb, 5)`), /permission denied/);
 
+// --- tempo real (20261125120000): o tópico secreto de cada posto e o sinal sem dados --------------------------------
+const topico = async (id) => (await q(`select topico from public.kangest_postos where id = $1`, [id]))[0].topico;
+const t1 = await topico(posto);
+check('o posto emparelhado tem um tópico secreto (32 caracteres ao acaso)', /^[0-9a-f]{32}$/.test(t1 || ''), t1);
+const outroPosto = (await q(`select public.kangest_posto_criar('Outro', $1, 'resumo-tr', null) id`, [loja.id]))[0].id;
+const empar = (await q(`select public.kangest_emparelhar('resumo-tr', $1, '1.4.4') r`, [Buffer.alloc(32, 6).toString('base64')]))[0].r;
+check('o emparelhamento devolve o tópico, e cada posto tem o seu', empar.topico && empar.topico === (await topico(outroPosto)) && empar.topico !== t1, empar);
+// as encomendas continuam a gravar-se com o gatilho do sinal (sem o serviço de tempo real, o sinal perde-se)
+await encomenda('LIV-TR-1', loja.id);
+await q(`update public.orders set status = 'confirmed' where order_number = 'LIV-TR-1'`);
+check('as encomendas gravam-se com o sinal do KanGest', (await q(`select count(*)::int n from public.orders where order_number = 'LIV-TR-1' and status = 'confirmed'`))[0].n === 1);
+await q(`select public.kangest_posto_novo_codigo($1, 'resumo-tr2')`, [outroPosto]);
+check('pedir novo código apaga o tópico', (await topico(outroPosto)) === null);
+await q(`select public.kangest_emparelhar('resumo-tr2', $1, '1.4.4')`, [Buffer.alloc(32, 7).toString('base64')]);
+check('emparelhar outra vez dá um tópico novo', (await topico(outroPosto)) && (await topico(outroPosto)) !== empar.topico);
+await q(`select public.kangest_posto_revogar($1)`, [outroPosto]);
+check('revogar apaga o tópico', (await topico(outroPosto)) === null);
+
 console.log(`kangest-central: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);
