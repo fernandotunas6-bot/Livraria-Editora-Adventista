@@ -97,5 +97,39 @@ const r7 = await novo('NOVO-6', 'Caneta', null, '123');
 const p7 = await produto('NOVO-6');
 check('sem preço fica a 0 (oculto); código de barras curto não conta', r7.feito === 'criado' && p7?.price === 0 && p7?.isbn === '', p7);
 
+// --- no painel: «é o mesmo» ou «é outro produto», só para quem gere o catálogo ---------------------------------
+const membro = (await q(`insert into auth.users (email, email_confirmed_at) values ('m@x.ao', now()) returning id`))[0].id;
+const gestor = (await q(`insert into auth.users (email, email_confirmed_at) values ('g@x.ao', now()) returning id`))[0].id;
+await q(`update public.profiles set role = 'manager', permissions = '{"manage_catalog": true}'::jsonb where id = $1`, [gestor]);
+const decidir = (quem, id, decisao) => como('authenticated', quem, `select public.kangest_rascunho_decidir($1, $2) r`, [id, decisao]);
+const p2 = await produto('NOVO-2');
+await recusa('decidir: o público não executa', () => como('anon', null, `select public.kangest_rascunho_decidir('x', 'outro')`), /permission denied/);
+await recusa('decidir: uma conta sem «gerir o catálogo»', () => decidir(membro, p2.id, 'mesmo'), /Sem permissão/);
+await recusa('decidir: um produto publicado não é rascunho', () => decidir(gestor, caminho.id, 'outro'), /não é um rascunho/);
+await recusa('decidir: sem decisão não liga nada', () => decidir(gestor, p2.id, null), /Decisão desconhecida/);
+
+// «é o mesmo»: a referência passa para o produto do site, que recebe o stock do KanGest, e o rascunho sai
+await q(`insert into public.kangest_stock (ligacao, referencia, armazem_id, quantidade, reservado, disponivel, online, store_id)
+         values ('central', 'NOVO-2', 1, 7, 0, 7, true, $1)`, [loja.id]);
+const d1 = (await decidir(gestor, p2.id, 'mesmo'))[0].r;
+const ligado = (await q(`select kigest_ref, stock::float8 stock, price::float8 price from public.stock_books where id = $1`, [caminho.id]))[0];
+check('«mesmo»: o produto do site fica com a referência e o stock do KanGest', d1.feito === 'mesmo' && d1.book_id === caminho.id && ligado.kigest_ref === 'NOVO-2' && ligado.stock === 7, { d1, ligado });
+check('«mesmo»: o rascunho sai', (await q(`select 1 from public.stock_books where id = $1`, [p2.id])).length === 0);
+check('«mesmo»: a referência vista aponta para o produto do site',
+  (await q(`select book_id from private.kangest_referencias_vistas where referencia = 'NOVO-2'`))[0].book_id === caminho.id);
+check('depois de ligado, o aviso seguinte encontra o produto', (await novo('NOVO-2', 'CAMINHO A CRISTO', 1000)).feito === 'existe');
+
+// um produto que já tem outra referência não recebe uma segunda
+const [ligadoOutro] = await q(`insert into public.stock_books (title, price, stock, active, kigest_ref) values ('Hinário Adventista', 8000, 4, true, 'HIN-01') returning id`);
+await novo('NOVO-7', 'HINARIO ADVENTISTA', 8000);
+const p7b = await produto('NOVO-7');
+check('parecido com um produto já ligado', p7b?.kangest_parecido_com === ligadoOutro.id, p7b);
+await recusa('«mesmo» num produto já ligado a outro artigo', () => decidir(gestor, p7b.id, 'mesmo'), /já está ligado a outro artigo do KanGest/);
+
+// «é outro produto»: a marca sai e o rascunho fica
+const d2 = (await decidir(gestor, p7b.id, 'outro'))[0].r;
+const p7c = await produto('NOVO-7');
+check('«outro»: o rascunho fica, sem a marca', d2.feito === 'outro' && p7c?.kangest_parecido_com === null && p7c?.active === false, { d2, p7c });
+
 console.log(`kangest-artigos: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

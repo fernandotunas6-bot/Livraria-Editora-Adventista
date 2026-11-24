@@ -156,3 +156,55 @@ end;
 $$;
 revoke all on function public.kangest_artigo_novo(text, text, numeric, text) from public, anon, authenticated;
 grant execute on function public.kangest_artigo_novo(text, text, numeric, text) to service_role;
+
+-- No painel, num rascunho marcado como parecido, quem gere o catálogo decide:
+--  «mesmo»: é o produto que o site já tinha. A referência passa para ele (que passa a receber o stock e o preço do
+--           KanGest, como os outros produtos ligados) e o rascunho é apagado. Só se o produto ainda não tiver outra
+--           referência: dois artigos da loja no mesmo produto seriam o mesmo stock contado duas vezes.
+--  «outro»: é outro produto. A marca sai e o rascunho fica, à espera de capa e descrição.
+create or replace function public.kangest_rascunho_decidir(p_rascunho text, p_decisao text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+  alvo record;
+begin
+  if not private.has_permission('manage_catalog') then
+    raise exception 'Sem permissão para gerir o catálogo.' using errcode = '42501';
+  end if;
+  select id, kigest_ref, active, kangest_novo_em, kangest_parecido_com into r
+    from public.stock_books where id = p_rascunho for update;
+  if r.id is null or r.kangest_novo_em is null or r.active then
+    raise exception 'Este produto não é um rascunho do KanGest por rever.' using errcode = '22023';
+  end if;
+
+  if p_decisao = 'outro' then
+    update public.stock_books set kangest_parecido_com = null where id = r.id;
+    return jsonb_build_object('feito', 'outro', 'book_id', r.id);
+  end if;
+  if coalesce(p_decisao, '') <> 'mesmo' then
+    raise exception 'Decisão desconhecida: use «mesmo» ou «outro».' using errcode = '22023';
+  end if;
+  if r.kangest_parecido_com is null then
+    raise exception 'Este rascunho não está marcado como parecido com outro produto.' using errcode = '22023';
+  end if;
+  select id, title, kigest_ref into alvo from public.stock_books where id = r.kangest_parecido_com for update;
+  if alvo.id is null then
+    raise exception 'O produto parecido já não existe.' using errcode = '22023';
+  end if;
+  if coalesce(alvo.kigest_ref, '') <> '' then
+    raise exception 'O produto «%» já está ligado a outro artigo do KanGest (%).', alvo.title, alvo.kigest_ref using errcode = '22023';
+  end if;
+
+  delete from public.stock_books where id = r.id;
+  update public.stock_books set kigest_ref = r.kigest_ref where id = alvo.id;
+  update private.kangest_referencias_vistas set book_id = alvo.id where referencia = r.kigest_ref;
+  perform public.kangest_recalcular_stock(r.kigest_ref);
+  return jsonb_build_object('feito', 'mesmo', 'book_id', alvo.id);
+end;
+$$;
+revoke all on function public.kangest_rascunho_decidir(text, text) from public, anon;
+grant execute on function public.kangest_rascunho_decidir(text, text) to authenticated, service_role;
