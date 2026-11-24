@@ -22,12 +22,10 @@ use crate::state::AppState;
 /// O endereço do Realtime a partir do do Supabase: `https://x.supabase.co` → `wss://x.supabase.co/realtime/v1/websocket`.
 pub fn endereco_ws(auth_url: &str, apikey: &str) -> Option<String> {
     let base = auth_url.trim().trim_end_matches('/');
-    let ws = if let Some(resto) = base.strip_prefix("https://") {
-        format!("wss://{resto}")
-    } else if let Some(resto) = base.strip_prefix("http://") {
-        format!("ws://{resto}")
-    } else {
-        return None;
+    let ws = match base.split_once("://") {
+        Some(("https", resto)) => format!("wss://{resto}"),
+        Some(("http", resto)) => format!("ws://{resto}"),
+        _ => return None,
     };
     if apikey.is_empty() || !apikey.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
         return None;
