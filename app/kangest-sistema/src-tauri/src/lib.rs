@@ -8,6 +8,7 @@ mod db;
 mod enderecos;
 mod error;
 mod nativo;
+mod navegador;
 pub mod http;
 pub mod internet;
 mod produtor;
@@ -35,8 +36,12 @@ use state::AppState;
 
 /// Ponto único de entrada do frontend: `invoke("rpc", { method, params })`.
 /// Em modo cliente o mesmo pedido segue para o servidor da rede (ver `rede.rs`).
+/// Os separadores do navegador (`web-*`) não chegam aqui, mesmo que carreguem uma página do programa (navegador.rs).
 #[tauri::command]
-async fn rpc(state: tauri::State<'_, Arc<AppState>>, method: String, params: Option<Value>) -> Result<Value, AppError> {
+async fn rpc(webview: tauri::Webview, state: tauri::State<'_, Arc<AppState>>, method: String, params: Option<Value>) -> Result<Value, AppError> {
+    if !navegador::janela_do_programa(webview.label()) {
+        return Err(AppError::msg("Os separadores do navegador não usam o programa."));
+    }
     rede::chamar(&state, &method, params.unwrap_or(Value::Null)).await
 }
 
@@ -44,12 +49,18 @@ async fn rpc(state: tauri::State<'_, Arc<AppState>>, method: String, params: Opt
 /// por isso o frontend usa este comando; no Windows (WebView2) usa `window.print()`.
 #[tauri::command]
 fn imprimir(janela: tauri::WebviewWindow) -> Result<(), String> {
+    if !navegador::janela_do_programa(janela.label()) {
+        return Err("Os separadores do navegador não usam o programa.".into());
+    }
     janela.print().map_err(|e| e.to_string())
 }
 
 /// Reinicia a aplicação (depois de marcar um restauro de cópia de segurança).
 #[tauri::command]
-fn reiniciar(app: tauri::AppHandle) {
+fn reiniciar(app: tauri::AppHandle, webview: tauri::Webview) -> Result<(), String> {
+    if !navegador::janela_do_programa(webview.label()) {
+        return Err("Os separadores do navegador não usam o programa.".into());
+    }
     app.restart();
 }
 
@@ -163,7 +174,7 @@ pub fn run() {
             app.manage(estado);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![rpc, imprimir, reiniciar])
+        .invoke_handler(tauri::generate_handler![rpc, imprimir, reiniciar, navegador::navegador])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o KanGest");
 }

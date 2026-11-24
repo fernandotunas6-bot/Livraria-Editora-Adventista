@@ -70,6 +70,7 @@ import Ordens from "@/pages/oficina/Ordens";
 import Utilizadores from "@/pages/Utilizadores";
 import Licenca from "@/pages/Licenca";
 import Integracoes from "@/pages/Integracoes";
+import Internet from "@/pages/Internet";
 import { EcraBloqueado, MudarSenhaObrigatoria, usePolitica, useInatividade } from "@/components/Sessao";
 
 /** Em desenvolvimento, o browser pode falar com um servidor indicado nas variáveis VITE_RPC_*. */
@@ -246,6 +247,7 @@ function Principal() {
         <Route path="/relatorios/fornecedores" element={<MapaFornecedor />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/integracoes" element={<Integracoes />} />
+        <Route path="/internet" element={<Internet />} />
         <Route path="/lotes" element={<Lotes />} />
         <Route path="/etiquetas" element={<Etiquetas />} />
         <Route path="/promocoes" element={<Promocoes />} />

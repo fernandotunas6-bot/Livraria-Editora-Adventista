@@ -193,8 +193,8 @@ seguinte é recusado. Rodar gera um par novo. Tudo fica na auditoria.
 |---|---|---|
 | 0 | Edição separada (identidade, cofre, actualizações, CI) — **feito** | #101 |
 | 1 | Este estudo | #101 |
-| 2 | Artigo novo no KanGest → produto **oculto** no site, à espera de fotografia (nunca publica sozinho) | site |
-| 5 | Navegador: janela «Internet», separadores sem acesso ao programa, histórico, favoritos, transferências | edição |
+| 2 | Artigo novo no KanGest → produto **oculto** no site, à espera de fotografia (nunca publica sozinho) — **em PR (#102)** | site |
+| 5 | Navegador: janela «Internet», separadores sem acesso ao programa, histórico, favoritos, transferências — **em PR** ([NAVEGADOR.md](../app/kangest-sistema/docs/NAVEGADOR.md)) | edição |
 | 3 | Base central: postos e emparelhamento, cópias que não se alteram, `kangest_receber()`, verificação da cadeia AGT, cifra por coluna, «Postos do KanGest» | site (migrações) |
 | 4 | Motor de sincronização: fila local, selo e assinatura, puxar e Realtime, conflitos, indicador e «Ligação à Livraria» | edição |
 | 6 | Gestão da loja online no KanGest: produtos, encomendas, clientes, pagamentos, relatórios | edição |
