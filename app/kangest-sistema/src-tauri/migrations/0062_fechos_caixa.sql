@@ -1,8 +1,8 @@
 -- KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
 -- © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
--- O fecho de caixa arquivado, com as vendas online à parte e a cópia no site (services/caixa_fechos.rs;
--- docs/UTILIZADORES.md §Fecho de caixa; docs/SINCRONIZACAO.md §Fechos de caixa).
+-- O fecho de caixa arquivado, com as vendas online à parte (services/caixa_fechos.rs; docs/UTILIZADORES.md §Fecho de
+-- caixa). A cópia no site vem numa migração própria.
 --
 -- caixa_fechos: o relatório Z como ficou no momento do fecho (o instantâneo em JSON), gravado na mesma transacção que
 -- fecha o caixa, com um selo SHA-256 do texto gravado. A reimpressão lê o instantâneo: um documento anulado depois do
@@ -62,21 +62,3 @@ END;
 
 -- Uma encomenda paga «sem FR» procura a FR pela referência (o n.º da encomenda).
 CREATE INDEX IF NOT EXISTS idx_docs_referencia ON documentos(referencia) WHERE referencia <> '';
-
--- A cópia do fecho no site (src/sinc/fechos.rs): uma fila própria, ao lado da dos documentos (a sinc_saida só leva
--- documentos). Entra pelo gatilho, na mesma transacção que arquiva o fecho, só com a ligação activa; os fechos
--- importados do KIGEST não seguem. Sai quando o centro o recebe.
-CREATE TABLE sinc_fechos (
-    fecho_id INTEGER PRIMARY KEY REFERENCES caixa_fechos(id),
-    tentativas INTEGER NOT NULL DEFAULT 0,
-    proximo_em INTEGER NOT NULL DEFAULT 0,      -- segundos Unix; 0 = já
-    erro TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX idx_sinc_fechos_devidos ON sinc_fechos(proximo_em);
-
-CREATE TRIGGER trg_sinc_fecho AFTER INSERT ON caixa_fechos
-WHEN EXISTS (SELECT 1 FROM sinc_ligacao WHERE ativa = 1)
-  AND NOT EXISTS (SELECT 1 FROM caixa_sessoes s WHERE s.id = NEW.sessao_id AND s.id_origem IS NOT NULL)
-BEGIN
-    INSERT OR IGNORE INTO sinc_fechos (fecho_id) VALUES (NEW.id);
-END;

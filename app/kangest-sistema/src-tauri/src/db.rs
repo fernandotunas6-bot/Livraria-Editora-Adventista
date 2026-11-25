@@ -161,6 +161,10 @@ pub async fn abrir(caminho: &Path) -> AppResult<SqlitePool> {
         .busy_timeout(std::time::Duration::from_secs(10));
     let pool = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
+    // os fechos de caixa de antes do arquivo (0062) ficam arquivados, reconstruídos com os valores de hoje
+    if let Err(e) = crate::services::caixa_fechos::arquivar_antigos(&pool).await {
+        eprintln!("Fechos de caixa: os antigos ficaram por arquivar ({e}).");
+    }
     // linhas de auditoria ainda sem selo (as de antes da 0037, na primeira vez): ver auditoria.rs
     if let Err(e) = crate::auditoria::selar(&pool).await {
         eprintln!("Auditoria: não foi possível selar o registo ao abrir ({e}).");
