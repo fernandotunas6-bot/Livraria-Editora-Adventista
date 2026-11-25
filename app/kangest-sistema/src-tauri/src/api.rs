@@ -2176,10 +2176,21 @@ fn mensagem_da_resposta(r: &Resposta) -> String {
     v["erro"]["mensagem"].as_str().map(str::to_string).or_else(|| r.erro.clone()).unwrap_or_else(|| format!("HTTP {}", r.estado))
 }
 
+/// O futuro de uma chamada interna, com o tipo apagado (ver `chamar_interno`).
+pub(crate) type ChamadaInterna<'a> = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, (u16, String)>> + Send + 'a>>;
+
 /// Uma chamada à API por dentro (a ligação à livraria emite os documentos das encomendas online): a mesma rota, as
 /// mesmas validações, as mesmas permissões e a mesma `Idempotency-Key` de um pedido pela rede, com a chave interna.
 /// Devolve o corpo da resposta, ou o estado HTTP e a mensagem do erro.
-pub(crate) async fn chamar_interno(st: &AppState, chave_id: i64, metodo: &str, caminho: &str, corpo: &Value, idem: Option<&str>) -> Result<Value, (u16, String)> {
+///
+/// Não é uma `async fn` de propósito: a ligação chama a API, a API chama os serviços e os serviços chamam a ligação.
+/// Com o futuro apagado aqui, na assinatura, quem espera por ele (sinc/encomendas.rs) vê um tipo declarado `Send`, e o
+/// compilador não tem de saber se um futuro opaco é `Send` enquanto o está a definir.
+pub(crate) fn chamar_interno<'a>(st: &'a AppState, chave_id: i64, metodo: &'a str, caminho: &'a str, corpo: &'a Value, idem: Option<&'a str>) -> ChamadaInterna<'a> {
+    Box::pin(chamar_interno_corpo(st, chave_id, metodo, caminho, corpo, idem))
+}
+
+async fn chamar_interno_corpo(st: &AppState, chave_id: i64, metodo: &str, caminho: &str, corpo: &Value, idem: Option<&str>) -> Result<Value, (u16, String)> {
     let row = sqlx::query(
         "SELECT c.*, u.nome AS u_nome, u.login AS u_login, u.perfil AS u_perfil, u.permissoes AS u_permissoes,
                 u.limite_desconto AS u_limite, u.ativo AS u_ativo
@@ -2211,10 +2222,7 @@ pub(crate) async fn chamar_interno(st: &AppState, chave_id: i64, metodo: &str, c
         cabecalhos,
         corpo: serde_json::to_vec(corpo).unwrap_or_default(),
     };
-    // a ligação à livraria chama a API e a API chama os serviços, que chamam a ligação: o futuro vai numa caixa com o
-    // tipo apagado, para o ciclo (e o Send da tarefa em segundo plano) não ter de se resolver a si próprio
-    let pedido: std::pin::Pin<Box<dyn std::future::Future<Output = Res> + Send + '_>> = Box::pin(rotear(st, &c, &p, &segs));
-    let r = match pedido.await {
+    let r = match rotear(st, &c, &p, &segs).await {
         Ok(r) => r,
         Err(r) => r,
     };
