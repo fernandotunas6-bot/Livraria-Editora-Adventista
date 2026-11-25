@@ -29,6 +29,7 @@ livraria). Do lado do site, o protocolo, as tabelas e o painel estão em
 | A cifra | `src/sinc/cifra.rs` | O pedido vai assinado com a chave Ed25519 deste posto e selado para o site (X25519 + HKDF-SHA256 + AES-256-GCM); a resposta vem selada para este pedido. Os vectores de teste são os mesmos da Edge Function |
 | A ligação | `sinc_ligacao` | O endereço, o posto, a semente cifrada e a chave pública do centro. Nunca sai para o ecrã |
 | O catálogo | `sinc_catalogo` (migração 0057), `src/sinc/catalogo.rs` | O stock de cada armazém e o preço de cada artigo, para o site. Ver abaixo |
+| Os relatórios do site | `item_do_documento`, migração 0062 | Cada documento leva também o canal (`balcao`, ou `api` se foi a loja online), o operador, o vencimento, o valor pendente e o documento de origem. Quando o pendente muda (um recibo), o documento volta à fila, uma vez só enquanto espera, e o site actualiza as dívidas. No site, os documentos do balcão entram sozinhos no Painel de Gestão e nos relatórios das lojas (docs/KANGEST.md §5.2) |
 
 ## Catálogo: o stock e os preços para o site
 
@@ -112,6 +113,7 @@ revogue também o posto. Para mudar de computador ou rodar a chave, peça outro 
   - os documentos antigos entram uma vez só;
   - o lote com o `hash_anterior`;
   - a anulação;
+  - o canal, o operador e o pendente no lote, e o pendente que muda a voltar à fila uma vez só;
   - sem Internet nada se perde e não se contam tentativas;
   - a chave nunca sai para o ecrã;
   - desligar.

@@ -350,6 +350,13 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
         hash_anterior: texto(d.hash_anterior, 400),
         hash_controlo: texto(d.hash_controlo, 10),
         hash_versao: inteiro(d.hash_versao),
+        // os da 1.4.5 (o canal, o operador, o vencimento, o pendente e o documento de origem), só quando o posto os
+        // manda: um posto antigo não os tem, e a recepção distingue «não mandou» de «vazio»
+        ...(d.canal === "balcao" || d.canal === "api" ? { canal: d.canal } : {}),
+        ...(d.operador != null ? { operador: texto(d.operador, 120) } : {}),
+        ...(typeof d.vencimento === "string" && /^\d{4}-\d{2}-\d{2}/.test(d.vencimento) ? { vencimento: d.vencimento.slice(0, 10) } : {}),
+        ...(d.valor_pendente != null ? { valor_pendente: inteiro(d.valor_pendente) } : {}),
+        ...(d.doc_origem != null ? { doc_origem: texto(d.doc_origem, 60) } : {}),
       },
       linhas: linhas.map((l: Row) => ({
         linha: inteiro(l.linha),

@@ -203,6 +203,21 @@ servidor nem ficam guardados.
 Em **Relatórios → Todas as livrarias → Carregar vendas do sistema**, as vendas ao balcão do KanGest somam-se às do
 site, loja a loja e mês a mês. O Painel de Gestão mostra-as ao vivo ([PAINEL-GESTAO.md](PAINEL-GESTAO.md)).
 
+**Os postos alimentam os relatórios sozinhos** (migração `20261125160000`). Antes vinha tudo da ligação antiga, que
+foi desligada. Agora, cada documento que um posto manda preenche:
+- as vendas ao vivo do Painel de Gestão (`vendas_ao_vivo`, origem `kangest:posto:<posto>:<documento>`);
+- o mês da loja (`kangest_vendas`, ligação `posto:<posto>`): *Todas as livrarias*, *Vendas por loja* e os fechos do mês.
+
+A regra é a da ligação antiga:
+- **Contam:** as FR, FT e ND; as NC abatem.
+- **Ficam de fora** as da loja online, porque entram pelas encomendas pagas e contavam duas vezes. São as do canal
+  `api` (a chave da API do KanGest) e as que têm na referência o número de uma encomenda.
+- **Uma anulação** marca a venda ao vivo e tira-a do mês.
+
+Os documentos trazem também o canal, o operador, o vencimento, o valor pendente e o documento de origem. Os postos com
+a versão anterior não os mandam, e ficam vazios. O pendente é o único campo da cópia que muda depois, com os recibos.
+Os gerentes de loja lêem as cópias da loja deles, como no Painel de Gestão.
+
 ## 6. Rotas da Edge Function
 
 | Rota | Quem | O quê |
