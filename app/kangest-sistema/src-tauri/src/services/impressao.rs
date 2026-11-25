@@ -377,6 +377,8 @@ pub(super) fn rodape_agt(d: &Value) -> Option<String> {
 /// centro; documento, data e hora; cliente (o NIF só quando o tem); cada linha com a descrição e, por baixo,
 /// quantidade × preço sem IVA, taxa e desconto, com o total à direita; total sem IVA, desconto, IVA e TOTAL; o que se
 /// pagou e o troco; o IVA por taxa só com mais de uma taxa ou isenções; o código de certificação.
+/// O talão sem reimpressão (os testes; o talão a sério usa `render_com`).
+#[cfg(test)]
 fn render(cfg: &Config, d: &Value, via: &str) -> Vec<u8> {
     render_com(cfg, d, via, None)
 }
