@@ -3401,12 +3401,12 @@ async fn oficial_recusado_com_dados_ou_mais_recente() {
     assert!(erro.contains("já tem dados (1 artigo)") && erro.contains("cópia exportada"), "{erro}");
     assert!(!edicao.join("restaurar.json").exists() && !pendente.exists(), "nada fica marcado");
 
-    // um oficial mais recente: uma 0053 que não é a desta edição e uma 0060 que ela não tem
+    // um oficial mais recente: uma 0053 que não é a desta edição e uma 9001 que ela não tem
     {
         let o = db::com_chave(sqlx::sqlite::SqliteConnectOptions::new().filename(oficial.join("kigest.db")), &crate::segredos::chave_base_de(&mestra));
         let p = sqlx::SqlitePool::connect_with(o).await.unwrap();
         sqlx::query("UPDATE _sqlx_migrations SET checksum = x'00' WHERE version = 53").execute(&p).await.unwrap();
-        sqlx::query("INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES (60, 'do oficial mais recente', 1, x'00', 0)")
+        sqlx::query("INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES (9001, 'do oficial mais recente', 1, x'00', 0)")
             .execute(&p)
             .await
             .unwrap();
@@ -3415,7 +3415,7 @@ async fn oficial_recusado_com_dados_ou_mais_recente() {
     let nova = raiz.join("edicao-nova");
     let st2 = edicao_em(&nova).await;
     let erro = rpc_err(&st2, "setup.importarOficial", Value::Null).await;
-    assert!(erro.contains("mais recente") && erro.contains("0053") && erro.contains("0060"), "{erro}");
+    assert!(erro.contains("mais recente") && erro.contains("0053") && erro.contains("9001"), "{erro}");
     for f in ["restaurar.json", "importar-oficial", "copias/restauro-pendente.db"] {
         assert!(!nova.join(f).exists(), "{f} não devia ficar");
     }
@@ -3423,7 +3423,7 @@ async fn oficial_recusado_com_dados_ou_mais_recente() {
     let exportada = raiz.join("exportada-do-oficial.db");
     db::recifrar(&oficial.join("kigest.db"), Some(crate::segredos::chave_base_de(&mestra).as_str()), &exportada, &crate::segredos::chave_base().unwrap()).await.unwrap();
     let erro = rpc_err(&st2, "setup.restaurar", json!({ "ficheiro": exportada.display().to_string() })).await;
-    assert!(erro.contains("0053 (diferente da desta versão)") && erro.contains("0060 (que esta versão não tem)"), "{erro}");
+    assert!(erro.contains("0053 (diferente da desta versão)") && erro.contains("9001 (que esta versão não tem)"), "{erro}");
     assert!(!nova.join("restaurar.json").exists());
     let _ = std::fs::remove_dir_all(&raiz);
 }
