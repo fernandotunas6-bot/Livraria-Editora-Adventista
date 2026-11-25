@@ -273,7 +273,7 @@ interface EstadoAtualizacao {
   fonte: string;
   /** a origem usada de facto (a antiga do GitHub passa à do site) */
   fonte_efectiva?: string | null;
-  /** origem oficial: o site do KanGest */
+  /** origem oficial: o site da livraria (livrariaadventista.ao/kangest/actualizacoes) */
   origem_oficial?: string;
   chave_publica: boolean;
   /** A chave das actualizações vem com o programa: assinatura obrigatória. */

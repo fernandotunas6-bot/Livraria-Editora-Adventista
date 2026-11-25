@@ -93,9 +93,15 @@ código QR em Configurações → Rede, no servidor) e entram com a chave de red
 Vender não precisa de Internet. A licença, as actualizações, a Facturação Electrónica da AGT, o email e os avisos da API
 precisam. Em **Configurações → Rede → Ligação à Internet**:
 
-- **Testar ligação** experimenta, a partir desta máquina, o site do KanGest, o servidor de licenças, a origem das
-  actualizações, a Facturação Electrónica (se estiver ligada) e o servidor de email, e mostra para cada um se respondeu,
-  em quanto tempo, por onde (directo ou proxy) e, se falhou, porquê.
+- **Testar ligação** experimenta, a partir desta máquina:
+  - o site da livraria;
+  - a ligação ao site, se o posto estiver emparelhado;
+  - a origem das actualizações;
+  - a Facturação Electrónica, se estiver ligada;
+  - o servidor de email.
+
+  Para cada um, mostra se respondeu, em quanto tempo, por onde (directo ou proxy) e, se falhou, porquê. O servidor de
+  licenças só se testa fora da livraria: a licença da edição não o contacta.
 - **Proxy**: num escritório onde a Internet passa por um proxy, indique `http://endereço:porta` e, se ele pedir, o
   utilizador e a senha (fica cifrada nesta máquina). Sem proxy escrito aqui, o KanGest usa o do sistema: as variáveis
   `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` e, no Windows, o proxy das Opções da Internet. A rede local (o servidor dos
