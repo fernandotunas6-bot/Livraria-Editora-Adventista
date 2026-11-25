@@ -195,6 +195,10 @@ impl Talao {
     fn centrar(&mut self, on: bool) {
         self.cmd(&[ESC, b'a', if on { 1 } else { 0 }]);
     }
+    /// Encostado à direita pela própria impressora (ESC a 2), sem encher a linha de espaços.
+    fn direita(&mut self) {
+        self.cmd(&[ESC, b'a', 2]);
+    }
     fn negrito(&mut self, on: bool) {
         self.cmd(&[ESC, b'E', on as u8]);
     }
@@ -398,10 +402,11 @@ fn render_com(cfg: &Config, d: &Value, via: &str, reimpressao: Option<&str>) -> 
     let segunda = via.starts_with("2.");
 
     // ---------- a via, no canto superior direito (Original, Duplicado… ou 2.ª via), como no A4 ----------
-    t.centrar(false);
+    t.direita();
     t.negrito(true);
-    t.par("", via);
+    t.linha(via);
     t.negrito(false);
+    t.centrar(false);
 
     // ---------- empresa ----------
     if let Some(logo) = &cfg.logo {
