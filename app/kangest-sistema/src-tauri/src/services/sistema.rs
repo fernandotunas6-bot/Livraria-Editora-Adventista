@@ -192,11 +192,7 @@ pub async fn verificar_ficheiro(f: &Path) -> AppResult<()> {
     let tabelas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('documentos', 'config', 'empresa', '_sqlx_migrations')")
         .fetch_one(&mut c)
         .await?;
-    let migracao: Option<i64> = if tabelas == 4 {
-        sqlx::query_scalar("SELECT MAX(version) FROM _sqlx_migrations").fetch_one(&mut c).await.ok().flatten()
-    } else {
-        None
-    };
+    let estranhas = if tabelas == 4 { Some(crate::db::migracoes_estranhas(&mut c).await) } else { None };
     c.close().await.ok();
     if r != "ok" {
         return Err(AppError::msg(format!("A cópia está danificada ({r}).")));
@@ -204,9 +200,17 @@ pub async fn verificar_ficheiro(f: &Path) -> AppResult<()> {
     if tabelas < 4 {
         return Err(AppError::msg("O ficheiro não é uma cópia de segurança do KanGest."));
     }
-    // com migrações que esta versão não conhece, a base não voltaria a abrir depois do restauro
-    if migracao.unwrap_or(0) > crate::db::ultima_migracao() {
-        return Err(AppError::msg("A cópia é de uma versão mais recente do KanGest. Actualize este KanGest antes de a restaurar."));
+    // com migrações que esta versão não conhece (pela versão e pelo checksum), a base não voltaria a abrir depois do
+    // restauro e o programa não arrancava
+    let estranhas = estranhas.transpose()?.unwrap_or_default();
+    if !estranhas.is_empty() {
+        return Err(AppError::msg(format!(
+            "A cópia é de uma versão mais recente do KanGest, ou de outro ramo dele (por exemplo, um KanGest oficial mais \
+             recente do que esta edição): tem migrações que esta versão não conhece ({}; esta vai até à {:04}). Depois do \
+             restauro, a base não voltaria a abrir. Actualize este KanGest antes de a restaurar.",
+            estranhas.join(", "),
+            crate::db::ultima_migracao()
+        )));
     }
     Ok(())
 }
@@ -513,9 +517,7 @@ async fn preparar_restauro(st: &AppState, r: &RestaurarIn, guardar_atual: bool) 
     if !origem.is_file() {
         return Err(AppError::msg(format!("Não encontro o ficheiro {}.", origem.display())));
     }
-    let dir = pasta_copias(&st.pasta_dados);
-    std::fs::create_dir_all(&dir).map_err(|e| AppError::msg(e.to_string()))?;
-    let pronto = dir.join("restauro-pendente.db");
+    let pronto = ficheiro_pendente(&st.pasta_dados)?;
     if e_cifrada(&origem) {
         let senha = match r.senha.as_deref().map(str::trim).filter(|x| !x.is_empty()) {
             Some(x) => x.to_string(),
@@ -530,19 +532,36 @@ async fn preparar_restauro(st: &AppState, r: &RestaurarIn, guardar_atual: bool) 
         let _ = std::fs::remove_file(&pronto);
         return Err(e);
     }
-    let seguranca = if guardar_atual {
-        let f = dir.join(format!("kangest-antes-do-restauro-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S")));
-        copiar(&st.pool, &f).await?;
-        Some(f.display().to_string())
-    } else {
-        None
-    };
-    std::fs::write(
-        st.pasta_dados.join(MARCA_RESTAURO),
-        json!({ "ficheiro": pronto.display().to_string(), "origem": origem.display().to_string(), "pedido_em": crate::db::agora() }).to_string(),
-    )
-    .map_err(|e| AppError::msg(e.to_string()))?;
+    let seguranca = marcar_restauro(st, &pronto, &origem.display().to_string(), guardar_atual.then_some("kangest-antes-do-restauro"), None).await?;
     Ok(json!({ "reiniciar": true, "copia_da_base_atual": seguranca }))
+}
+
+/// O ficheiro que a troca do arranque seguinte põe no lugar da base (`copias/restauro-pendente.db`).
+pub(crate) fn ficheiro_pendente(pasta_dados: &Path) -> AppResult<PathBuf> {
+    let dir = pasta_copias(pasta_dados);
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::msg(e.to_string()))?;
+    Ok(dir.join("restauro-pendente.db"))
+}
+
+/// Marca a troca da base por `pronto` (já conferido com `verificar_ficheiro`) no próximo arranque. Com
+/// `guardar_atual`, guarda antes a base actual em `copias/<nome>-AAAAMMDD-HHMMSS.db` e devolve onde. `posto`: o n.º
+/// do posto desta máquina depois da troca (o do KanGest oficial, services/oficial.rs), gravado no posto.json só
+/// quando a troca se faz.
+pub(crate) async fn marcar_restauro(st: &AppState, pronto: &Path, origem: &str, guardar_atual: Option<&str>, posto: Option<i64>) -> AppResult<Option<String>> {
+    let seguranca = match guardar_atual {
+        Some(nome) => {
+            let f = pasta_copias(&st.pasta_dados).join(format!("{nome}-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+            copiar(&st.pool, &f).await?;
+            Some(f.display().to_string())
+        }
+        None => None,
+    };
+    let mut marca = json!({ "ficheiro": pronto.display().to_string(), "origem": origem, "pedido_em": crate::db::agora() });
+    if let Some(p) = posto {
+        marca["posto_id"] = json!(p);
+    }
+    std::fs::write(st.pasta_dados.join(MARCA_RESTAURO), marca.to_string()).map_err(|e| AppError::msg(e.to_string()))?;
+    Ok(seguranca)
 }
 
 pub async fn restaurar(st: &AppState, r: RestaurarIn) -> AppResult<Value> {
@@ -586,6 +605,12 @@ pub fn aplicar_restauro_pendente(pasta_dados: &Path) -> AppResult<Option<String>
     std::fs::copy(&pronto, &novo).map_err(|e| AppError::msg(format!("Não foi possível restaurar a cópia: {e}")))?;
     std::fs::rename(&novo, &base).map_err(|e| AppError::msg(format!("Não foi possível restaurar a cópia: {e}")))?;
     let _ = std::fs::remove_file(&pronto);
+    // o posto que vinha com os dados (o do KanGest oficial): só depois de a base ter sido trocada
+    if let Some(posto) = v["posto_id"].as_i64() {
+        if let Err(e) = std::fs::write(pasta_dados.join("posto.json"), json!({ "posto_id": posto }).to_string()) {
+            eprintln!("Não foi possível gravar o posto {posto} desta máquina: {e}");
+        }
+    }
     Ok(v["origem"].as_str().map(String::from))
 }
 

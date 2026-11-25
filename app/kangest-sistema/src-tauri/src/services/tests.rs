@@ -3239,6 +3239,195 @@ async fn copias_externas_cifradas_e_restauro() {
     let _ = std::fs::remove_dir_all(&pasta2);
 }
 
+/// Uma edição numa pasta de dados (a base aberta como no arranque), ainda por configurar.
+async fn edicao_em(pasta: &std::path::Path) -> AppState {
+    std::fs::create_dir_all(pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.to_path_buf();
+    st.pasta_exportacao = pasta.to_path_buf();
+    st.carregar_posto(1).await.expect("posto 1");
+    st
+}
+
+/// Um KanGest oficial em `<raiz>/ao.kigest.app`, como no computador da loja: configurado (empresa, administrador, 2
+/// artigos e uma entrada de stock), com a base cifrada pela chave que vem da chave mestra dele (`mestra`, no
+/// kangest.chave) e os segredos cifrados com ela, um deles dentro da configuração em JSON da importação do KIGEST.
+/// Leva também um segredo de outro computador (não abre), o posto 2 e uma rede em modo servidor (que não vem).
+/// Devolve a pasta do oficial e quantos documentos tem.
+async fn oficial_de_teste(raiz: &std::path::Path, mestra: &[u8; 32]) -> (std::path::PathBuf, i64) {
+    let construir = raiz.join("a-construir");
+    let st = edicao_em(&construir).await;
+    rpc(&st, "setup.inicializar", json!({ "empresa": { "nome": "Loja Oficial, Lda", "nif": "5000000001" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } })).await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let arroz = rpc(&st, "artigos.guardar", json!({ "descricao": "Arroz 5kg", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "artigos.guardar", json!({ "descricao": "Óleo 1L", "taxa_iva_id": 1, "preco1": 80000 })).await;
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": arroz, "quantidade": 10, "preco_unitario": 50000 }] })).await;
+    sqlx::query("INSERT INTO postos (id, descricao) VALUES (2, 'Caixa 2')").execute(&st.pool).await.unwrap();
+    crate::segredos::gravar(&st.pool, "fe.senha", "senha-da-fe").await.unwrap();
+    // os segredos passam para a chave mestra do oficial
+    let cifrados: Vec<(String, String)> = sqlx::query_as("SELECT chave, valor FROM config WHERE valor LIKE 'kgs1:%'").fetch_all(&st.pool).await.unwrap();
+    for (chave, valor) in cifrados {
+        let texto = crate::segredos::decifrar(&valor).unwrap();
+        sqlx::query("UPDATE config SET valor = ? WHERE chave = ?").bind(crate::segredos::cifrar_com(mestra, &texto)).bind(chave).execute(&st.pool).await.unwrap();
+    }
+    sqlx::query("UPDATE utilizadores SET totp_segredo = ? WHERE login = 'admin'").bind(crate::segredos::cifrar_com(mestra, "JBSWY3DPEHPK3PXP")).execute(&st.pool).await.unwrap();
+    let auto = json!({ "ativo": false, "senha_cifrada": crate::segredos::cifrar_com(mestra, "sa-123"), "conexao": { "servidor": "LOJA", "base": "KigestGC" } });
+    for (chave, valor) in [("importar.automatico", auto.to_string()), ("email.senha", crate::segredos::cifrar_com(&[3u8; 32], "de outro computador"))] {
+        sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").bind(chave).bind(valor).execute(&st.pool).await.unwrap();
+    }
+    let docs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documentos").fetch_one(&st.pool).await.unwrap();
+    fechar_de_vez(&st.pool).await;
+    // a base passa da chave desta edição para a do oficial
+    let oficial = raiz.join("ao.kigest.app");
+    std::fs::create_dir_all(&oficial).unwrap();
+    let chave_edicao = crate::segredos::chave_base().unwrap();
+    db::recifrar(&construir.join("kigest.db"), Some(chave_edicao.as_str()), &oficial.join("kigest.db"), &crate::segredos::chave_base_de(mestra)).await.unwrap();
+    std::fs::write(oficial.join("kangest.chave"), mestra).unwrap();
+    std::fs::write(oficial.join("posto.json"), r#"{"posto_id":2}"#).unwrap();
+    std::fs::write(oficial.join("rede.json"), r#"{"modo":"servidor","porta":7799}"#).unwrap();
+    let _ = std::fs::remove_dir_all(&construir);
+    (oficial, docs)
+}
+
+/// Os ficheiros de uma pasta e o conteúdo de cada um (para conferir que a pasta do oficial não mudou).
+fn ficheiros_de(p: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+    let mut v: Vec<(String, Vec<u8>)> =
+        std::fs::read_dir(p).unwrap().filter_map(|e| e.ok()).map(|e| (e.file_name().to_string_lossy().to_string(), std::fs::read(e.path()).unwrap_or_default())).collect();
+    v.sort();
+    v
+}
+
+/// O KanGest oficial deste computador trazido no primeiro arranque: a base copiada sem lhe tocar, passada para a chave
+/// desta edição com as mesmas linhas, os segredos recifrados (também dentro de JSON), o posto dele, a linha
+/// IMPORTAR_OFICIAL na auditoria e a troca feita no arranque seguinte.
+#[tokio::test]
+async fn oficial_trazido_no_primeiro_arranque() {
+    let raiz = std::env::temp_dir().join(format!("kigest-oficial-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&raiz);
+    let mestra = [0x4bu8; 32];
+    let (oficial, docs) = oficial_de_teste(&raiz, &mestra).await;
+    let antes = ficheiros_de(&oficial);
+    let edicao = raiz.join("ao.livrariaadventista.kangest");
+    let st = edicao_em(&edicao).await;
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!(e["oficial"]["pasta"], oficial.display().to_string());
+    assert!(e["oficial"]["aviso"].as_str().unwrap().contains("não pode continuar a emitir"));
+
+    let r = rpc(&st, "setup.importarOficial", Value::Null).await;
+    assert_eq!(r["reiniciar"], true);
+    assert_eq!(r["contagens"]["documentos"], docs);
+    assert_eq!((r["contagens"]["artigos"].as_i64(), r["contagens"]["utilizadores"].as_i64()), (Some(2), Some(1)));
+    assert!(r["segredos"]["recifrados"].as_u64().unwrap() >= 3, "{r}");
+    assert_eq!(r["segredos"]["ilegiveis"], json!(["email.senha"]));
+    assert_eq!(r["posto"], 2);
+    assert!(r["copia_da_base_atual"].is_null(), "no primeiro arranque não há base a guardar");
+    assert!(r["aviso"].as_str().unwrap().contains("AGT"));
+    // o oficial ficou como estava, e não sobra nada da cópia
+    assert_eq!(ficheiros_de(&oficial), antes, "nada se criou nem mudou na pasta do oficial");
+    assert!(!edicao.join("importar-oficial").exists());
+    assert!(!edicao.join("rede.json").exists(), "a rede do oficial não vem");
+
+    // o arranque seguinte faz a troca, com o posto do oficial
+    fechar_de_vez(&st.pool).await;
+    let origem = super::sistema::aplicar_restauro_pendente(&edicao).unwrap().expect("troca marcada");
+    assert!(origem.contains("KanGest oficial"), "{origem}");
+    assert_eq!(crate::posto_local(&edicao), 2);
+    let pool = db::abrir(&edicao.join("kigest.db")).await.unwrap();
+    let empresa: String = sqlx::query_scalar("SELECT nome FROM empresa WHERE id = 1").fetch_one(&pool).await.unwrap();
+    assert_eq!(empresa, "Loja Oficial, Lda");
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documentos").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, docs);
+    // os segredos abrem com a chave desta edição; o de outro computador volta a pedir-se
+    assert_eq!(crate::segredos::ler(&pool, "fe.senha").await.unwrap().as_deref(), Some("senha-da-fe"));
+    let totp: String = sqlx::query_scalar("SELECT totp_segredo FROM utilizadores WHERE login = 'admin'").fetch_one(&pool).await.unwrap();
+    assert_eq!(crate::segredos::decifrar(&totp).unwrap(), "JBSWY3DPEHPK3PXP");
+    let auto: String = sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'importar.automatico'").fetch_one(&pool).await.unwrap();
+    let auto: Value = serde_json::from_str(&auto).unwrap();
+    assert_eq!(crate::segredos::decifrar(auto["senha_cifrada"].as_str().unwrap()).unwrap(), "sa-123");
+    assert_eq!(auto["conexao"]["servidor"], "LOJA");
+    assert!(crate::segredos::ler(&pool, "email.senha").await.is_err());
+    // a linha da auditoria, selada com as outras
+    let linha: String = sqlx::query_scalar("SELECT detalhe FROM auditoria WHERE acao = 'IMPORTAR_OFICIAL'").fetch_one(&pool).await.unwrap();
+    assert!(linha.contains("no primeiro arranque") && linha.contains(&format!("{docs} documentos")) && linha.contains("email.senha"), "{linha}");
+    assert_eq!(crate::auditoria::verificar(&pool).await.unwrap()["integra"], true);
+    let mut st = AppState::new(pool);
+    st.pasta_dados = edicao.clone();
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!((e["inicializado"].as_bool(), e["oficial"].is_null()), (Some(true), true));
+    fechar_de_vez(&st.pool).await;
+    let _ = std::fs::remove_dir_all(&raiz);
+}
+
+/// Em Configurações → Sistema, os dados do oficial só vêm para uma edição sem dados (e a base dela fica guardada
+/// antes); com dados, não se substituem: recusa e explica o caminho à mão. Um oficial mais recente do que esta edição
+/// (com migrações que ela não conhece, ou com outro conteúdo) é recusado sem marcar nada.
+#[tokio::test]
+async fn oficial_recusado_com_dados_ou_mais_recente() {
+    let raiz = std::env::temp_dir().join(format!("kigest-oficial-recusas-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&raiz);
+    let mestra = [0x2cu8; 32];
+    let (oficial, _) = oficial_de_teste(&raiz, &mestra).await;
+    // uma edição já configurada, ainda sem dados
+    let edicao = raiz.join("edicao");
+    let st = edicao_em(&edicao).await;
+    rpc(&st, "setup.inicializar", json!({ "empresa": { "nome": "Livraria Teste", "nif": "5000000002" }, "admin": { "nome": "Gestor", "login": "gestor", "senha": "1234" } })).await;
+    assert!(rpc_err(&st, "setup.importarOficial", Value::Null).await.contains("já está configurado"));
+    assert!(rpc_err(&st, "sistema.importarOficial", Value::Null).await.contains("Sessão"));
+    rpc(&st, "auth.login", json!({ "login": "gestor", "senha": "1234" })).await;
+    let e = rpc(&st, "sistema.oficial", Value::Null).await;
+    assert_eq!(e["oficial"]["pasta"], oficial.display().to_string());
+    assert_eq!(e["dados"], json!([]));
+    let r = rpc(&st, "sistema.importarOficial", Value::Null).await;
+    let copia = r["copia_da_base_atual"].as_str().expect("a base actual fica guardada antes").to_string();
+    assert!(std::path::Path::new(&copia).is_file());
+    assert!(edicao.join("restaurar.json").exists());
+    let pendente = super::sistema::ficheiro_pendente(&edicao).unwrap();
+    {
+        let o = db::com_chave(sqlx::sqlite::SqliteConnectOptions::new().filename(&pendente).read_only(true), &crate::segredos::chave_base().unwrap());
+        let p = sqlx::SqlitePool::connect_with(o).await.unwrap();
+        let linha: String = sqlx::query_scalar("SELECT detalhe FROM auditoria WHERE acao = 'IMPORTAR_OFICIAL'").fetch_one(&p).await.unwrap();
+        assert!(linha.contains("pedido por gestor"), "{linha}");
+        p.close().await;
+    }
+    // a troca não se faz aqui: desmarca-se, para conferir as recusas
+    std::fs::remove_file(edicao.join("restaurar.json")).unwrap();
+    std::fs::remove_file(&pendente).unwrap();
+
+    // com dados, recusa e explica o caminho à mão
+    rpc(&st, "artigos.guardar", json!({ "descricao": "Livro da edição", "taxa_iva_id": 1, "preco1": 100000 })).await;
+    assert_eq!(rpc(&st, "sistema.oficial", Value::Null).await["dados"], json!(["1 artigo"]));
+    let erro = rpc_err(&st, "sistema.importarOficial", Value::Null).await;
+    assert!(erro.contains("já tem dados (1 artigo)") && erro.contains("cópia exportada"), "{erro}");
+    assert!(!edicao.join("restaurar.json").exists() && !pendente.exists(), "nada fica marcado");
+
+    // um oficial mais recente: uma 0053 que não é a desta edição e uma 0060 que ela não tem
+    {
+        let o = db::com_chave(sqlx::sqlite::SqliteConnectOptions::new().filename(oficial.join("kigest.db")), &crate::segredos::chave_base_de(&mestra));
+        let p = sqlx::SqlitePool::connect_with(o).await.unwrap();
+        sqlx::query("UPDATE _sqlx_migrations SET checksum = x'00' WHERE version = 53").execute(&p).await.unwrap();
+        sqlx::query("INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES (60, 'do oficial mais recente', 1, x'00', 0)")
+            .execute(&p)
+            .await
+            .unwrap();
+        p.close().await;
+    }
+    let nova = raiz.join("edicao-nova");
+    let st2 = edicao_em(&nova).await;
+    let erro = rpc_err(&st2, "setup.importarOficial", Value::Null).await;
+    assert!(erro.contains("mais recente") && erro.contains("0053") && erro.contains("0060"), "{erro}");
+    for f in ["restaurar.json", "importar-oficial", "copias/restauro-pendente.db"] {
+        assert!(!nova.join(f).exists(), "{f} não devia ficar");
+    }
+    // e uma cópia dele restaurada à mão também é recusada (a base deixava de abrir e o programa não arrancava)
+    let exportada = raiz.join("exportada-do-oficial.db");
+    db::recifrar(&oficial.join("kigest.db"), Some(crate::segredos::chave_base_de(&mestra).as_str()), &exportada, &crate::segredos::chave_base().unwrap()).await.unwrap();
+    let erro = rpc_err(&st2, "setup.restaurar", json!({ "ficheiro": exportada.display().to_string() })).await;
+    assert!(erro.contains("0053 (diferente da desta versão)") && erro.contains("0060 (que esta versão não tem)"), "{erro}");
+    assert!(!nova.join("restaurar.json").exists());
+    let _ = std::fs::remove_dir_all(&raiz);
+}
+
 /// Dois postos a gravar ao mesmo tempo: a segunda gravação espera pela primeira em vez de falhar com
 /// «database is locked» (as transacções de escrita começam com BEGIN IMMEDIATE).
 #[tokio::test]
