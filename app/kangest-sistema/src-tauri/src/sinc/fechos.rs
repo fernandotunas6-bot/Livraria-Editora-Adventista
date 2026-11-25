@@ -22,6 +22,9 @@ use crate::error::AppResult;
 /// Fechos num lote.
 pub const LOTE: i64 = 20;
 
+/// Uma linha da fila com o fecho: o id, as tentativas, a sessão, o n.º Z, o instantâneo, o selo e se é reconstruído.
+type Linha = (i64, i64, i64, Option<i64>, String, String, i64);
+
 /// Os fechos que ainda não seguiram, para a primeira ligação (ou depois de ligar a outro posto).
 pub async fn enfileirar_tudo(pool: &SqlitePool) -> AppResult<i64> {
     let r = sqlx::query(
@@ -68,7 +71,7 @@ pub fn resumo_sem_dados_pessoais(instantaneo: &Value) -> Value {
 
 /// Os fechos devidos, já como itens do lote.
 pub async fn devidos(pool: &SqlitePool, agora: i64, limite: i64) -> AppResult<(Vec<(i64, i64)>, Vec<Value>)> {
-    let linhas: Vec<(i64, i64, i64, Option<i64>, String, String, i64)> = sqlx::query_as(
+    let linhas: Vec<Linha> = sqlx::query_as(
         "SELECT q.fecho_id, q.tentativas, f.sessao_id, f.numero_z, f.instantaneo, f.selo, f.reconstruido
          FROM sinc_fechos q JOIN caixa_fechos f ON f.id = q.fecho_id
          WHERE q.estado = 'pendente' AND q.proximo_em <= ? ORDER BY q.fecho_id LIMIT ?",
