@@ -374,3 +374,27 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
   }
   return out;
 }
+
+/**
+ * As dívidas por loja para o painel (GET /admin/relatorios/dividas): os nomes dos clientes do balcão vêm cifrados
+ * (como os mandou o posto) e decifram-se aqui, no servidor, só para quem vê os relatórios. Um nome que não abra fica
+ * «(cifrado)»: a dívida mostra-se na mesma. Os do site vêm em claro, das encomendas.
+ */
+export async function dividasParaOPainel(linhas: Row[], cifra: CifraDados | null): Promise<Row[]> {
+  const out: Row[] = [];
+  for (const r of linhas) {
+    let cliente = String(r.cliente ?? "");
+    if (!cliente && r.cliente_cifrado) {
+      try {
+        cliente = cifra ? await decifrarCampo(cifra, String(r.cliente_cifrado)) : "(cifrado)";
+      } catch {
+        cliente = "(cifrado)";
+      }
+    }
+    out.push({
+      store_id: r.store_id ?? null, origem: r.origem === "site" ? "site" : "balcao", numero: String(r.numero ?? ""),
+      data: r.data ?? null, vencimento: r.vencimento ?? null, total: numero(r.total), pendente: numero(r.pendente), cliente,
+    });
+  }
+  return out;
+}

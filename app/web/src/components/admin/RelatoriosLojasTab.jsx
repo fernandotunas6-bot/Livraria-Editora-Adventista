@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { createConsolidadoApi, detectMultiStore } from '@/painel-vendas/adapter';
+import ProdutosEDividas from '@/components/admin/ProdutosEDividas';
 import { mountConsolidado } from '@/painel-vendas/consolidado-ui.js';
 import cssPainel from '@/painel-vendas/painel.css?inline';
 import cssConjunto from '@/painel-vendas/consolidado.css?inline';
@@ -63,7 +64,12 @@ const RelatoriosLojasTab = ({ onOpenStore }) => {
     );
   }
 
-  return <div ref={hostRef} data-theme={theme === 'dark' ? 'dark' : 'light'} />;
+  return (
+    <>
+      <div ref={hostRef} data-theme={theme === 'dark' ? 'dark' : 'light'} />
+      <ProdutosEDividas />
+    </>
+  );
 };
 
 export default RelatoriosLojasTab;

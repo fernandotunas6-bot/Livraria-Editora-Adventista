@@ -218,6 +218,24 @@ Os documentos trazem também o canal, o operador, o vencimento, o valor pendente
 a versão anterior não os mandam, e ficam vazios. O pendente é o único campo da cópia que muda depois, com os recibos.
 Os gerentes de loja lêem as cópias da loja deles, como no Painel de Gestão.
 
+**Produtos e dívidas** fica em *Relatórios → Todas as livrarias*, no fim (migração `20261125170000`). Junta o balcão e
+o site, por loja e por período (por omissão, o mês em curso e todas as lojas):
+- **Mais vendidos e menos vendidos** (`public.produtos_vendidos`): as unidades do balcão e do site, com as NC a abater
+  e sem contar duas vezes as da loja online. Os menos vendidos são os que venderam pouco, a começar pelo que vendeu
+  menos.
+- **Sem vendas** (`public.produtos_sem_vendas`): os produtos activos com stock, na loja ou no site, que não venderam
+  nada no período.
+- **Dívidas** (`GET /admin/relatorios/dividas`, `public.dividas_por_loja`):
+  - as facturas a crédito do balcão, com o pendente que o KanGest manda;
+  - as encomendas do site entregues, ou pagas em parte, que ainda não estão pagas.
+
+  Os nomes dos clientes do balcão chegam cifrados e só a Edge Function os decifra, para quem vê os relatórios. A
+  função só a Edge Function a chama.
+
+Quem vê:
+- quem vê os relatórios (`view_reports`, `edit_reports`): todas as lojas e as dívidas;
+- o gerente de loja: os produtos da loja dele.
+
 ## 6. Rotas da Edge Function
 
 | Rota | Quem | O quê |

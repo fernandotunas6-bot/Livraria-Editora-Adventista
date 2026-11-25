@@ -124,5 +124,37 @@ check('o gerente lê só as da loja dele', doGerente.length === 1 && doGerente[0
 check('e as linhas delas', (await como(gerente, `select count(*)::int n from public.kangest_documento_linhas`))[0].n === 1);
 check('um cliente não lê nada', (await como(cliente, `select count(*)::int n from public.kangest_documentos`))[0].n === 0);
 
+// --- os mais e os menos vendidos, os sem vendas e as dívidas (20261125170000) ------------------------------------
+// uma encomenda do site paga hoje, com o mesmo livro, na loja do Huambo
+const [paga] = await q(`insert into public.orders (order_number, customer_email, customer_name, phone, items, total, shipping_method, store_id)
+         values ('LIV-901', 'c@x.ao', 'Cliente do Site', '923000001', $2::jsonb, 11400, 'pickup', $1) returning id`,
+  [loja.id, JSON.stringify([{ book_id: livro.id, title: 'O Desejado', quantity: 2, price: 5700 }])]);
+// paga como o faz private.order_payments_sync (o estado resulta do que se pagou; ver kangest.mjs)
+await db.transaction(async (tx) => {
+  await tx.query(`select set_config('app.payment_sync', 'on', true)`);
+  await tx.query(`update public.orders set amount_paid = total, payment_status = payment_status where id = $1`, [paga.id]);
+});
+const [outroLivro] = await q(`insert into public.stock_books (title, price, stock, active, kigest_ref) values ('Caminho a Cristo', 2500, 9, true, 'LIV-002') returning id`);
+const vendidos = await como(direccao, `select * from public.produtos_vendidos('2026-11-01', '2026-11-30', $1)`, [loja.id]);
+const d1 = vendidos.find((v) => v.book_id === livro.id);
+// no Huambo: a FT (2) e a NC (−1) do balcão (a FR 1 foi anulada); o site: 2
+check('vendidos: o balcão e o site juntos, com as NC a abater', d1 && num(d1.unidades_balcao) === 1 && num(d1.unidades_site) === 2 && num(d1.unidades) === 3, vendidos);
+check('vendidos: sem a FR da encomenda online nem a da API', d1 && num(d1.unidades_balcao) === 1);
+const todas = await como(direccao, `select * from public.produtos_vendidos('2026-11-01', '2026-11-30')`);
+check('vendidos: todas as lojas somam o posto antigo do Lubango', num(todas.find((v) => v.book_id === livro.id)?.unidades_balcao) === 3, todas);
+const sem = await como(direccao, `select * from public.produtos_sem_vendas('2026-11-01', '2026-11-30')`);
+check('sem vendas: o livro com stock que não vendeu', sem.some((r) => r.book_id === outroLivro.id) && !sem.some((r) => r.book_id === livro.id), sem);
+await recusa('período ao contrário', () => como(direccao, `select * from public.produtos_vendidos('2026-11-30', '2026-11-01')`), /Período inválido/);
+check('o gerente vê os vendidos da loja dele', (await como(gerente, `select count(*)::int n from public.produtos_vendidos('2026-11-01', '2026-11-30', $1)`, [outra.id]))[0].n === 1);
+await recusa('o gerente não vê os de outra loja', () => como(gerente, `select * from public.produtos_vendidos('2026-11-01', '2026-11-30', $1)`, [loja.id]), /Sem permissão/);
+await recusa('nem todas as lojas', () => como(gerente, `select * from public.produtos_vendidos('2026-11-01', '2026-11-30')`), /Escolha a sua loja/);
+await recusa('um cliente não vê nada', () => como(cliente, `select * from public.produtos_vendidos('2026-11-01', '2026-11-30', $1)`, [loja.id]), /Sem permissão/);
+// as dívidas: a FT do Huambo com 57 Kz por pagar, e uma encomenda entregue e por pagar
+await q(`insert into public.orders (order_number, customer_email, customer_name, phone, items, total, shipping_method, store_id, payment_status, delivery_status, amount_paid)
+         values ('LIV-902', 'd@x.ao', 'Cliente Devedor', '923000002', '[]'::jsonb, 9000, 'pickup', $1, 'pending', 'delivered', 0)`, [loja.id]);
+const div = await q(`select * from public.dividas_por_loja($1) order by origem`, [loja.id]);
+check('dívidas: a FT do balcão e a encomenda entregue', div.length === 2 && num(div[0].pendente) === 57 && div[1].numero === 'LIV-902' && num(div[1].pendente) === 9000, div);
+await recusa('as dívidas não se lêem pela API (só a Edge Function)', () => como(direccao, `select * from public.dividas_por_loja(null)`), /permission denied/);
+
 console.log(`kangest-relatorios: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

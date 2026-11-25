@@ -337,3 +337,5 @@ export const kangestPostoCodigo = (id) => pb.send('/admin/kangest/postos/codigo'
 export const kangestPostoRevogar = (id) => pb.send('/admin/kangest/postos/revogar', { method: 'POST', body: { id } });
 /** Os interruptores do posto: `{ stock_online?, manda_catalogo? }` (só um posto manda no catálogo). */
 export const kangestPostoConfigurar = (id, opcoes) => pb.send('/admin/kangest/postos/configurar', { method: 'POST', body: { id, ...opcoes } });
+/** As dívidas por loja (o balcão dos postos e as encomendas do site), com os nomes dos clientes; só quem vê os relatórios. */
+export const relatorioDividas = (loja = '') => pb.send(`/admin/relatorios/dividas${loja ? `?loja=${encodeURIComponent(loja)}` : ''}`, { method: 'GET' });
