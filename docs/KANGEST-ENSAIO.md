@@ -122,6 +122,31 @@ Faça outra encomenda de ensaio. Desligue a rede e carregue em **A preparar**.
 - **Deve ver:** «Sem Internet: a alteração fica na fila» e, na barra, «1 à espera de Internet».
 - **Ao ligar a rede,** a alteração segue e a encomenda fica «a preparar» no painel.
 
+## 8.1 Os documentos das encomendas (numa loja de ensaio)
+
+Este passo **emite documentos**. Os documentos chegam à base central, não se apagam e contam nas vendas da loja do
+posto. Por isso faz-se numa loja só de ensaio, nunca numa loja verdadeira.
+
+1. No painel, em Lojas, crie a loja **«Ensaio»**. No fim do passo, desactive-a.
+2. No KanGest de ensaio: **Desligar**. No painel, revogue o posto do passo 4 e crie o posto **«Ensaio — encomendas»**
+   com a loja «Ensaio». Emparelhe-o.
+3. No posto, ligue **«Emitir os documentos das encomendas online»**, com o artigo dos portes, se as encomendas tiverem
+   portes.
+4. No KanGest: **Livraria → Ligação ao site → Encomendas online**. Escolha um utilizador com as permissões dos documentos
+   e o posto, e carregue em **Guardar**.
+5. No site, faça uma encomenda de levantamento na loja «Ensaio». Depois, confirme o pagamento no painel.
+
+- **Deve ver:**
+  - em segundos, uma **NE** no KanGest com a referência da encomenda;
+  - depois do pagamento confirmado, a **FR** feita a partir da NE;
+  - no painel, «Documentos das encomendas para o KanGest» com 2 feitos;
+  - cancelando outra encomenda de ensaio, a **anulação** da NE dela.
+- **Se aparecer «ainda não tem quem emita»:** faltou o ponto 4. Depois de o fazer, use **Repetir** no painel.
+- **No fim:**
+  1. Desligue o interruptor do posto e revogue-o.
+  2. Desactive a loja «Ensaio».
+  3. No KanGest de ensaio, **Desligar**, para seguir para o passo 10.
+
 ## 9. O navegador
 
 **Livraria → Internet:** abra o painel da livraria pelo favorito. Depois, tente abrir `192.168.1.1` e

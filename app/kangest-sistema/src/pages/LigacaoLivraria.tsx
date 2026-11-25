@@ -8,10 +8,10 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Link2, RefreshCw, RotateCcw, ShieldCheck, Unplug } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CloudOff, KeyRound, Link2, PackageCheck, RefreshCw, RotateCcw, ShieldCheck, Unplug } from "lucide-react";
 import { call } from "@/lib/api";
 import { dataHora } from "@/lib/format";
-import { Badge, Button, Card, Field, Input, Modal, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select, Table, Td, Th } from "@/components/ui";
 
 interface ErroFila {
   id: number;
@@ -36,6 +36,113 @@ interface EstadoSinc {
 }
 
 const OPERACOES: Record<string, string> = { emitido: "emissão", anulado: "anulação", facturado: "facturação" };
+
+interface EstadoEncomendas {
+  chave: { id: number; ativa: number; utilizador_id: number; utilizador: string; posto_id: number | null; posto: string | null } | null;
+  utilizadores: { id: number; nome: string; login: string }[];
+  postos: { id: number; descricao: string }[];
+  feitas: number;
+  com_erro: number;
+  erros: { id: number; accao: string; erro: string; feito_em: string }[];
+  por_enviar: number;
+}
+
+const ACCOES: Record<string, string> = { ne: "Nota de encomenda", fr: "Factura/Recibo", nc: "Nota de crédito", anular: "Anulação" };
+
+/**
+ * As encomendas online (docs/SINCRONIZACAO.md §Encomendas online): com «Emitir os documentos das encomendas online»
+ * ligado no painel do site, este KanGest emite a NE, a FR, a NC e as anulações de cada encomenda da loja, pela própria
+ * API e em nome do utilizador escolhido aqui (a chave interna «Loja online (ligação ao site)»).
+ */
+function EncomendasOnline() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["sinc-encomendas"], queryFn: () => call<EstadoEncomendas>("sinc.encomendas"), refetchInterval: 30000 });
+  const [utilizador, setUtilizador] = useState<string>("");
+  const [posto, setPosto] = useState<string>("");
+  const [aGuardar, setAGuardar] = useState(false);
+  const e = q.data;
+  if (!e) return null;
+  const activa = !!e.chave && e.chave.ativa === 1;
+  const uSel = utilizador || (e.chave ? String(e.chave.utilizador_id) : "");
+  const pSel = posto || (e.chave?.posto_id ? String(e.chave.posto_id) : e.postos[0] ? String(e.postos[0].id) : "");
+  async function guardar() {
+    setAGuardar(true);
+    try {
+      const r = await call<EstadoEncomendas>("sinc.encomendas.configurar", { utilizador_id: Number(uSel), posto_id: Number(pSel) });
+      qc.setQueryData(["sinc-encomendas"], r);
+      toast.success("As encomendas online passam a ser emitidas em nome de " + (e!.utilizadores.find((u) => String(u.id) === uSel)?.nome || "") + ".");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setAGuardar(false);
+    }
+  }
+  async function desligar() {
+    try {
+      qc.setQueryData(["sinc-encomendas"], await call<EstadoEncomendas>("sinc.encomendas.desligar"));
+      toast.success("Este KanGest deixou de emitir as encomendas online.");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+  return (
+    <Card>
+      <div className="space-y-4 px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <PackageCheck className="size-4 text-brand" />
+          <h2 className="text-[15px] font-semibold text-ink">Encomendas online</h2>
+          <Badge tone={activa ? "ok" : "neutral"}>{activa ? `Emitidas em nome de ${e.chave!.utilizador}` : "Ninguém emite"}</Badge>
+        </div>
+        <p className="text-[13px] text-ink-2">
+          Com «Emitir os documentos das encomendas online» ligado no painel do site, este KanGest emite a nota de encomenda de cada
+          encomenda da loja, a factura/recibo quando o pagamento for confirmado no site, a nota de crédito dos reembolsos e a anulação
+          das canceladas. O utilizador escolhido tem de poder emitir esses documentos; o posto dá a série e o armazém.
+        </p>
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <Field label="Em nome de">
+            <Select value={uSel} onChange={(ev) => setUtilizador(ev.target.value)}>
+              <option value="">Escolha…</option>
+              {e.utilizadores.map((u) => <option key={u.id} value={u.id}>{u.nome} ({u.login})</option>)}
+            </Select>
+          </Field>
+          <Field label="Posto (série e armazém)">
+            <Select value={pSel} onChange={(ev) => setPosto(ev.target.value)}>
+              {e.postos.map((p) => <option key={p.id} value={p.id}>{p.descricao}</option>)}
+            </Select>
+          </Field>
+          <div className="flex gap-2">
+            <Button onClick={guardar} loading={aGuardar} disabled={!uSel || !pSel}>Guardar</Button>
+            {activa && <Button variant="ghost" onClick={desligar}>Deixar de emitir</Button>}
+          </div>
+        </div>
+        <p className="text-[12.5px] text-ink-3">
+          Últimos 30 dias: {e.feitas} documento(s) emitido(s){e.com_erro > 0 ? `, ${e.com_erro} com erro` : ""}{e.por_enviar > 0 ? ` · ${e.por_enviar} resultado(s) a seguir para o site` : ""}.
+          Os erros aparecem também no painel do site, onde se repete depois de corrigir.
+        </p>
+        {e.erros.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Documento</Th>
+                <Th>Quando</Th>
+                <Th>Erro</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {e.erros.map((x) => (
+                <tr key={x.id}>
+                  <Td className="whitespace-nowrap font-medium">{ACCOES[x.accao] || x.accao}</Td>
+                  <Td className="whitespace-nowrap">{dataHora(x.feito_em)}</Td>
+                  <Td className="text-danger">{x.erro}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 export default function LigacaoLivraria() {
   const qc = useQueryClient();
@@ -207,6 +314,8 @@ export default function LigacaoLivraria() {
               </Table>
             </Card>
           )}
+
+          <EncomendasOnline />
 
           <p className="flex items-start gap-2 text-[12px] text-ink-3">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-brand" />

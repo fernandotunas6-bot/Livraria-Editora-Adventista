@@ -56,6 +56,32 @@ O que a ligação antiga fazia com os avisos da API passa a ir pela ligação, n
 - No ecrã **Livraria → Ligação ao site**, «Stock e preços por enviar» mostra quantos artigos faltam. «Repetir os com
   erro» também trata destes.
 
+## Encomendas online: a NE, a FR, a NC e as anulações
+
+Com «Emitir os documentos das encomendas online» ligado no painel do site (só um posto por loja), a resposta da
+sincronização traz **tarefas**: a NE de cada encomenda da loja, a FR quando o pagamento é confirmado no site, a NC
+dos reembolsos e a anulação das canceladas (docs/KANGEST-SINCRONIZACAO.md §11 na raiz da livraria).
+
+- **Quem emite:** a própria API deste KanGest, por dentro (`api::chamar_interno`), com a chave interna «Loja online
+  (ligação ao site)». São as mesmas validações, as mesmas permissões e a mesma `Idempotency-Key` de um pedido pela rede.
+  A chave não tem token: o prefixo não é o de uma chave verdadeira e o hash é o de um segredo que ninguém tem. Vê-se,
+  e desactiva-se, em API e Integrações.
+- **Em nome de quem:** em **Livraria → Ligação ao site → Encomendas online** escolhe-se o utilizador e o posto (a série e
+  o armazém). O utilizador tem de ter as permissões dos documentos:
+  - nota de encomenda (`vendas.proforma`), factura/recibo e nota de crédito;
+  - anular documentos;
+  - clientes, e vender com o preço do site.
+
+  O KanGest recusa um que não as tenha.
+- **Só o que a ligação faz:** `POST /documentos` com uma NE, uma FR ou uma NC, e `POST /documentos/{id}/anular`
+  (`encomendas::conferir`). Outra coisa é recusada aqui, sem chegar à API.
+- **O resultado** fica em `sinc_tarefas` (migração 0058) e segue no pedido seguinte. Uma tarefa já feita não se emite
+  outra vez; se o site a mandar de novo, segue o mesmo resultado. Uma que falhou tenta-se outra vez.
+- **Sem quem emita** (ou depois de «Deixar de emitir»), as tarefas voltam ao site com esse erro. Depois de configurar,
+  use «Repetir» no painel do site.
+- **Desligar** desactiva a chave interna e apaga os resultados por enviar.
+- Um pagamento nunca se confirma aqui: a FR só chega depois de o site dizer que está pago.
+
 **Quando algo falha:**
 - **Sem resposta** (sem Internet, o site em baixo): tenta-se na volta seguinte, sem contar tentativas. O ecrã diz «Sem
   ligação ao site».

@@ -795,6 +795,13 @@ async fn autenticar(st: &AppState, token: &str, ip: IpAddr) -> Result<Chave, Rec
         return Err(invalida());
     }
     // a partir daqui a chave é verdadeira: as mensagens podem dizer porque é recusada
+    chave_da_linha(st, &row, Some(ip)).await
+}
+
+/// A chave a partir da linha de `api_chaves` (com o utilizador): revogada, inactiva, expirada, o IP (só nos pedidos que
+/// chegam pela rede; a chamada interna da ligação à livraria não tem IP) e o utilizador inactivo. As permissões são as
+/// pedidas que o utilizador também tem.
+async fn chave_da_linha(st: &AppState, row: &sqlx::sqlite::SqliteRow, ip: Option<IpAddr>) -> Result<Chave, Recusa> {
     let id: i64 = row.get("id");
     let recusa = |estado: u16, codigo: &str, msg: String| Err((Resposta::erro(estado, codigo, msg), Some(id)));
     if row.get::<Option<String>, _>("revogada_em").is_some() {
@@ -808,12 +815,14 @@ async fn autenticar(st: &AppState, token: &str, ip: IpAddr) -> Result<Chave, Rec
             return recusa(401, "chave_expirada", format!("Esta chave de API expirou em {exp}."));
         }
     }
-    let redes = match ler_redes(row.get::<Option<String>, _>("ips").as_deref().unwrap_or("")) {
-        Ok(r) => r,
-        Err(_) => return recusa(403, "ip_nao_autorizado", "A lista de IPs desta chave é inválida.".into()),
-    };
-    if !ip_permitido(&redes, ip) {
-        return recusa(403, "ip_nao_autorizado", format!("O endereço {ip} não está autorizado a usar esta chave."));
+    if let Some(ip) = ip {
+        let redes = match ler_redes(row.get::<Option<String>, _>("ips").as_deref().unwrap_or("")) {
+            Ok(r) => r,
+            Err(_) => return recusa(403, "ip_nao_autorizado", "A lista de IPs desta chave é inválida.".into()),
+        };
+        if !ip_permitido(&redes, ip) {
+            return recusa(403, "ip_nao_autorizado", format!("O endereço {ip} não está autorizado a usar esta chave."));
+        }
     }
     if row.get::<i64, _>("u_ativo") == 0 {
         return recusa(403, "utilizador_inactivo", "O utilizador em nome de quem esta chave age está inactivo.".into());
@@ -2118,6 +2127,109 @@ async fn emitir(st: &AppState, c: &Chave, p: &Pedido) -> Res {
         sqlx::query("INSERT OR IGNORE INTO api_idempotencia (chave_id, idem, documento_id) VALUES (?, ?, ?)").bind(c.id).bind(k).bind(id).execute(&st.pool).await?;
     }
     Ok(Resposta::json(201, &formatar_documento(v, c)).com("Location", format!("/api/v1/documentos/{id}")))
+}
+
+// ---------------------------------------------------------------- chamadas internas (a ligação à livraria)
+
+/// Prefixo da chave interna da ligação à livraria (src/sinc/encomendas.rs). Nunca é o de uma chave verdadeira (essas
+/// começam por «kg_»), e o hash é o de um segredo que ninguém tem: não há token que a use pela rede.
+const PREFIXO_INTERNA_LOJA: &str = "kg-interna1";
+/// O que a chave interna precisa para os documentos das encomendas online: os mesmos da ligação antiga
+/// (PERMISSOES_LIGACAO no site), menos as leituras do stock e dos relatórios.
+pub(crate) const PERMISSOES_LOJA_ONLINE: [&str; 7] =
+    ["api.documentos", "vendas.proforma", "vendas.fatura_recibo", "vendas.nota_credito", "documentos.anular", "clientes", "pos.alterar_preco"];
+
+/// Cria (ou actualiza) a chave interna «Loja online (ligação ao site)»: em nome de `utilizador_id`, com a série e o
+/// armazém do `posto_id`. Aparece em API e Integrações, onde se vê e se desactiva como as outras.
+pub(crate) async fn chave_interna_loja(st: &AppState, utilizador_id: i64, posto_id: i64, criado_por: Option<i64>) -> AppResult<i64> {
+    let permissoes = serde_json::to_string(&PERMISSOES_LOJA_ONLINE)?;
+    let existente: Option<i64> = sqlx::query_scalar("SELECT id FROM api_chaves WHERE prefixo = ?").bind(PREFIXO_INTERNA_LOJA).fetch_optional(&st.pool).await?;
+    if let Some(id) = existente {
+        sqlx::query("UPDATE api_chaves SET utilizador_id = ?, posto_id = ?, permissoes = ?, ativa = 1, revogada_em = NULL, limite_minuto = 0 WHERE id = ?")
+            .bind(utilizador_id)
+            .bind(posto_id)
+            .bind(&permissoes)
+            .bind(id)
+            .execute(&st.pool)
+            .await?;
+        return Ok(id);
+    }
+    let hash = hash_chave(&format!("interna-{}", crate::sinc::cifra::nonce()?));
+    let r = sqlx::query(
+        "INSERT INTO api_chaves (nome, prefixo, hash, utilizador_id, posto_id, permissoes, limite_minuto, criado_por) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+    )
+    .bind("Loja online (ligação ao site)")
+    .bind(PREFIXO_INTERNA_LOJA)
+    .bind(hash)
+    .bind(utilizador_id)
+    .bind(posto_id)
+    .bind(&permissoes)
+    .bind(criado_por)
+    .execute(&st.pool)
+    .await?;
+    Ok(r.last_insert_rowid())
+}
+
+/// A mensagem de uma resposta de erro da API (`{"erro": {"mensagem": …}}`).
+fn mensagem_da_resposta(r: &Resposta) -> String {
+    let v: Value = serde_json::from_slice(&r.corpo).unwrap_or(Value::Null);
+    v["erro"]["mensagem"].as_str().map(str::to_string).or_else(|| r.erro.clone()).unwrap_or_else(|| format!("HTTP {}", r.estado))
+}
+
+/// O futuro de uma chamada interna, com o tipo apagado (ver `chamar_interno`).
+pub(crate) type ChamadaInterna<'a> = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, (u16, String)>> + Send + 'a>>;
+
+/// Uma chamada à API por dentro (a ligação à livraria emite os documentos das encomendas online): a mesma rota, as
+/// mesmas validações, as mesmas permissões e a mesma `Idempotency-Key` de um pedido pela rede, com a chave interna.
+/// Devolve o corpo da resposta, ou o estado HTTP e a mensagem do erro.
+///
+/// Não é uma `async fn` de propósito: a ligação chama a API, a API chama os serviços e os serviços chamam a ligação.
+/// Com o futuro apagado aqui, na assinatura, quem espera por ele (sinc/encomendas.rs) vê um tipo declarado `Send`, e o
+/// compilador não tem de saber se um futuro opaco é `Send` enquanto o está a definir.
+pub(crate) fn chamar_interno<'a>(st: &'a AppState, chave_id: i64, metodo: &'a str, caminho: &'a str, corpo: &'a Value, idem: Option<&'a str>) -> ChamadaInterna<'a> {
+    Box::pin(chamar_interno_corpo(st, chave_id, metodo, caminho, corpo, idem))
+}
+
+async fn chamar_interno_corpo(st: &AppState, chave_id: i64, metodo: &str, caminho: &str, corpo: &Value, idem: Option<&str>) -> Result<Value, (u16, String)> {
+    let row = sqlx::query(
+        "SELECT c.*, u.nome AS u_nome, u.login AS u_login, u.perfil AS u_perfil, u.permissoes AS u_permissoes,
+                u.limite_desconto AS u_limite, u.ativo AS u_ativo
+         FROM api_chaves c JOIN utilizadores u ON u.id = c.utilizador_id WHERE c.id = ?",
+    )
+    .bind(chave_id)
+    .fetch_optional(&st.pool)
+    .await
+    .map_err(|e| (500u16, e.to_string()))?
+    .ok_or_else(|| (401u16, "A chave interna da ligação ao site já não existe: escolha outra vez quem emite as encomendas online.".to_string()))?;
+    let c = chave_da_linha(st, &row, None).await.map_err(|(r, _)| (r.estado, mensagem_da_resposta(&r)))?;
+    match services::licenca::calcular(st).await {
+        Ok(e) => services::licenca::api_incluida(&e).map_err(|m| (403u16, m))?,
+        Err(e) => return Err((500, e.to_string())),
+    }
+    let segs: Vec<&str> = caminho.split('/').filter(|s| !s.is_empty()).collect();
+    if !rota_existe(&segs) {
+        return Err((404, format!("Rota desconhecida: {metodo} {caminho}.")));
+    }
+    let mut cabecalhos = HashMap::new();
+    if let Some(k) = idem.map(str::trim).filter(|k| !k.is_empty()) {
+        cabecalhos.insert("idempotency-key".to_string(), k.to_string());
+    }
+    let p = Pedido {
+        metodo: metodo.to_string(),
+        caminho: format!("/api/v1{caminho}"),
+        alvo: format!("/api/v1{caminho}"),
+        consulta: HashMap::new(),
+        cabecalhos,
+        corpo: serde_json::to_vec(corpo).unwrap_or_default(),
+    };
+    let r = match rotear(st, &c, &p, &segs).await {
+        Ok(r) => r,
+        Err(r) => r,
+    };
+    if r.estado >= 300 {
+        return Err((r.estado, mensagem_da_resposta(&r)));
+    }
+    Ok(serde_json::from_slice(&r.corpo).unwrap_or(Value::Null))
 }
 
 // ---------------------------------------------------------------- relatórios e SAF-T

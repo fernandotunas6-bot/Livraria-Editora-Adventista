@@ -64,11 +64,13 @@ import {
 } from "./emailTemplates.ts";
 import { createMemo, runAfterResponse } from "./runtime.ts";
 import {
-  assinaturaValida, lerLigacoes, processarFila, sincronizarArtigos, sincronizarStock, sincronizarVendas, testarLigacao, tratarAviso, type Ligacao,
+  assinaturaValida, lerLigacoes, processarFila, resultadosDoPosto, sincronizarArtigos, sincronizarStock, sincronizarVendas, tarefasDoPosto,
+  testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados,
-  mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido, type CifraDados,
+  MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
+  type CifraDados,
 } from "./kangestSinc.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
@@ -3262,7 +3264,7 @@ const authParaPostos = () => {
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
-    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos")
     .order("criado_em", { ascending: true });
   if (error) throw new Error(error.message);
   const postos = [];
@@ -3319,10 +3321,24 @@ route("POST", "/admin/kangest/postos/configurar", permissao("manage_settings"), 
   const id = String(body.id ?? "");
   if (!uuidValido(id)) throw bad("Indique o posto.");
   const opcao = (v: unknown) => (typeof v === "boolean" ? v : null);
-  const { data, error } = await db.rpc("kangest_posto_configurar", {
-    p_id: id, p_stock_online: opcao(body.stock_online), p_manda_catalogo: opcao(body.manda_catalogo),
-  });
-  if (error) throw bad(error.message);
+  const textoOuNulo = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 60) : null);
+  let data: Record<string, unknown> = { id };
+  if ("stock_online" in body || "manda_catalogo" in body) {
+    const r = await db.rpc("kangest_posto_configurar", {
+      p_id: id, p_stock_online: opcao(body.stock_online), p_manda_catalogo: opcao(body.manda_catalogo),
+    });
+    if (r.error) throw bad(r.error.message);
+    data = { ...data, ...r.data };
+  }
+  // os documentos das encomendas online (§11): o interruptor, os artigos dos portes e genérico e o modo de pagamento
+  if (["emitir_encomendas", "artigo_portes", "artigo_generico", "modo_pagamento"].some((k) => k in body)) {
+    const r = await db.rpc("kangest_posto_encomendas", {
+      p_id: id, p_emitir: opcao(body.emitir_encomendas), p_artigo_portes: textoOuNulo(body.artigo_portes),
+      p_artigo_generico: textoOuNulo(body.artigo_generico), p_modo_pagamento: textoOuNulo(body.modo_pagamento)?.toUpperCase() ?? null,
+    });
+    if (r.error) throw bad(r.error.message);
+    data = { ...data, ...r.data };
+  }
   return json(data);
 });
 
@@ -3353,7 +3369,9 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const assinatura = req.headers.get("x-kangest-assinatura") || "";
   if (!uuidValido(posto) || !nonceValido(nonce) || !assinatura) throw new HttpError(401, "Pedido sem assinatura válida.");
   if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
-  const { data: p } = await db.from("kangest_postos").select("id, nome, estado, chave_publica, store_id, topico").eq("id", posto).maybeSingle();
+  const { data: p } = await db.from("kangest_postos")
+    .select("id, nome, estado, chave_publica, store_id, topico, emitir_encomendas, artigo_portes, artigo_generico, pagamentos")
+    .eq("id", posto).maybeSingle();
   if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
   if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
     throw new HttpError(401, "Assinatura inválida.");
@@ -3368,8 +3386,17 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     throw bad(`Envelope inválido: ${(e as Error).message}`);
   }
   let resultado = null;
-  const lote = aberto.dados?.lote;
-  if (Array.isArray(lote) && lote.length) {
+  const tudo = Array.isArray(aberto.dados?.lote) ? aberto.dados.lote : [];
+  // o que o KanGest fez com as tarefas da volta anterior (os documentos das encomendas online, §11): primeiro, para a
+  // FR de uma encomenda poder sair já nesta resposta, a seguir à NE
+  const feitas = tudo.filter((i: any) => i?.tipo === "tarefa");
+  let tarefasFeitas = null;
+  if (feitas.length) {
+    if (feitas.length > MAX_DOCUMENTOS) throw bad(`No máximo ${MAX_DOCUMENTOS} resultados por lote.`);
+    tarefasFeitas = await resultadosDoPosto(db, p, feitas);
+  }
+  const lote = tudo.filter((i: any) => i?.tipo !== "tarefa");
+  if (lote.length) {
     let preparado;
     try {
       preparado = await prepararLote(lote, cifra);
@@ -3391,10 +3418,21 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     if (error) throw new Error(error.message);
     novidades = data;
   }
+  // os documentos das encomendas online que este KanGest tem de emitir (só com «Emitir os documentos das encomendas
+  // online» ligado no painel): a NE, a FR, a NC e as anulações, com os mesmos corpos da ligação antiga
+  let tarefas: unknown[] = [];
+  if (p.emitir_encomendas && p.store_id) {
+    try {
+      tarefas = await tarefasDoPosto(db, p, 10);
+    } catch (e) {
+      // as tarefas nunca impedem a sincronização das facturas e do stock: ficam para a volta seguinte
+      console.error("KanGest: tarefas do posto", posto, (e as Error).message);
+    }
+  }
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
     posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });

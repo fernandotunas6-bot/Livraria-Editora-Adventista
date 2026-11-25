@@ -11,6 +11,8 @@
 //!   (loja.rs) pedem-se de 2 em 2 minutos. O centro não grava nada em dobro, por isso repetir um lote é
 //!   seguro.
 //! - **O catálogo** (catalogo.rs): no mesmo lote, até 100 artigos cujo stock ou preço mudou, com o estado de agora.
+//! - **As encomendas online** (encomendas.rs): a resposta traz as tarefas (NE, FR, NC, anulações) que este KanGest
+//!   emite pela própria API; os resultados seguem no pedido seguinte.
 //! - **Sem Internet**, a loja vende como sempre e a fila espera; volta a tentar na volta seguinte. Um documento que o
 //!   centro recusa fica com erro e volta a tentar ao fim de 1, 2, 4… minutos (até 6 horas).
 //! - As facturas são emitidas e assinadas aqui (AGT); o centro guarda uma cópia que não se altera.
@@ -18,6 +20,7 @@
 
 pub mod catalogo;
 pub mod cifra;
+pub mod encomendas;
 pub mod loja;
 pub mod pessoa;
 pub mod tempo_real;
@@ -228,7 +231,8 @@ enum Volta {
 /// Um pedido: os documentos devidos (se os houver) e os cursores da Loja online. Cada documento fica feito ou com erro,
 /// conforme a resposta; as novidades vão para a cópia local (loja.rs). Mesmo sem documentos o pedido sai: traz as
 /// novidades e mostra logo um posto revogado.
-async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
+async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
+    let pool = &st.pool;
     let agora = agora_s();
     let fila: Vec<(i64, i64, i64)> = sqlx::query_as(
         "SELECT id, documento_id, tentativas FROM sinc_saida WHERE estado IN ('pendente', 'erro') AND proximo_em <= ? ORDER BY id LIMIT ?",
@@ -249,10 +253,16 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
     // o catálogo que mudou (stock, preço, artigos), no mesmo pedido
     let (cat_pendentes, cat_itens) = catalogo::devidos(pool, agora, catalogo::LOTE).await?;
     lote.extend(cat_itens);
+    // o que este KanGest fez com as tarefas da volta anterior (as encomendas online)
+    let (tarefas_feitas, tarefas_itens) = encomendas::resultados(pool).await?;
+    lote.extend(tarefas_itens);
     let cursores = loja::ler_cursores(pool).await?;
     match enviar(l, &json!({ "lote": lote, "cursores": &cursores })).await {
         Ok(r) => {
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
+            encomendas::marcar_enviados(pool, &tarefas_feitas).await?;
+            // as tarefas novas emitem-se já; os resultados seguem na volta seguinte (logo a seguir, por causa do «continuar»)
+            let por_seguir = encomendas::executar(st, &r["tarefas"]).await?;
             let erros: HashMap<i64, String> = r["resultado"]["erros"]
                 .as_array()
                 .into_iter()
@@ -308,7 +318,7 @@ async fn volta(pool: &SqlitePool, l: &Ligacao) -> AppResult<Volta> {
                 encomendas,
                 produtos,
                 resultado: r["resultado"].clone(),
-                continuar: fila.len() as i64 == LOTE || cat_pendentes.len() as i64 == catalogo::LOTE || mais,
+                continuar: fila.len() as i64 == LOTE || cat_pendentes.len() as i64 == catalogo::LOTE || por_seguir > 0 || mais,
             })
         }
         Err(Falha::SemLigacao(m)) => {
@@ -364,7 +374,8 @@ async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
             .bind(agora_s())
             .fetch_one(pool)
             .await?
-            + catalogo::devidos_agora(pool, agora_s()).await?;
+            + catalogo::devidos_agora(pool, agora_s()).await?
+            + encomendas::por_enviar(pool).await?;
         if devidos == 0 && !pessoa::ha_comandos(pool).await? && agora_s() - ULTIMA_SONDAGEM.load(Ordering::Relaxed) < SONDAGEM {
             return Ok(json!({ "ligada": true, "enviados": 0, "em_espera": true }));
         }
@@ -372,7 +383,7 @@ async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
     let (mut enviados, mut cat, mut encomendas, mut produtos) = (0, 0, 0, 0);
     let mut resultado = Value::Null;
     for _ in 0..10 {
-        match volta(pool, &l).await? {
+        match volta(st, &l).await? {
             Volta::Feita { enviados: e, catalogo: c, encomendas: n, produtos: p, resultado: r, continuar } => {
                 ULTIMA_SONDAGEM.store(agora_s(), Ordering::Relaxed);
                 enviados += e;
@@ -540,6 +551,8 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
 /// do site até alguém o revogar lá.
 async fn desligar(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
+    // a chave interna das encomendas online desactiva-se (antes de a ligação sair, que é ela que a aponta)
+    encomendas::apagar(&st.pool).await?;
     sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await?;
     // a fila toda: ao ligar outra vez (ao mesmo posto ou a outro), tudo o que este KanGest emitiu volta a seguir; o
     // mesmo posto não grava nada em dobro, e outro posto fica com tudo, como ao ligar a outro posto sem desligar
@@ -559,6 +572,9 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "agora" => agora(st).await,
         "repetir" => repetir(st).await,
         "desligar" => desligar(st).await,
+        "encomendas" => encomendas::estado(st).await,
+        "encomendas.configurar" => encomendas::configurar(st, serde_json::from_value(params)?).await,
+        "encomendas.desligar" => encomendas::desligar(st).await,
         _ => Err(AppError::msg(format!("Método desconhecido: sinc.{metodo}"))),
     }
 }

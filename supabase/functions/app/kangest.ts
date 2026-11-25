@@ -123,10 +123,13 @@ export function corpoNE(order: Row, refs: Map<string, string>, lig: Ligacao, arm
   return { corpo, erros };
 }
 
-/** Modo de pagamento do KanGest para a encomenda: pelo código do método, pela categoria, ou transferência (TB). */
+/**
+ * Modo de pagamento do KanGest para a encomenda: pelo código do método, pela categoria, pelo modo por omissão («*»,
+ * o que um posto escolhe no painel), ou transferência (TB).
+ */
 export function modoPagamento(order: Row, lig: Ligacao): string {
   const m = lig.pagamentos || {};
-  return m[String(order.payment_method_code || "")] || m[String(order.payment_category || "")] || "TB";
+  return m[String(order.payment_method_code || "")] || m[String(order.payment_category || "")] || m["*"] || "TB";
 }
 
 /** Corpo da Factura/Recibo a partir da NE: as mesmas linhas sem preço (vêm da NE) e o pagamento do total da NE. */
@@ -426,6 +429,87 @@ async function reservar(db: Db): Promise<Row | null> {
   return Array.isArray(data) ? data[0] ?? null : data ?? null;
 }
 
+/**
+ * O passo de uma linha da fila: o pedido a fazer ao KanGest (e o que fica no resultado quando ele responde), esperar
+ * pela NE, ou nada. É o mesmo para a ligação antiga (pedido pelo túnel, processarFila) e para os postos do KanGest
+ * Livraria (o pedido vai na resposta selada e o KanGest emite-o pela própria API, tarefasDoPosto/resultadosDoPosto).
+ * Lança ErroKanGest para o que pede alguém (uma linha sem artigo, a FR sem NE…).
+ */
+export type Passo =
+  | { tipo: "pedido"; metodo: "POST"; caminho: string; corpo: Row; idem?: string; resultado: (d: Row) => Row; refs: string[] }
+  | { tipo: "esperar"; minutos: number; motivo: string };
+
+export async function passoDaFila(db: Db, job: Row, order: Row, irmaos: Row[], lig: Ligacao, armazem_id?: number): Promise<Passo> {
+  const ne = irmaos.find((x: Row) => x.accao === "ne");
+  const fr = irmaos.find((x: Row) => x.accao === "fr");
+  const numero = String(order.order_number || order.id);
+  if (job.accao === "ne") {
+    const ids = [...new Set((order.items || []).map((i: Row) => String(i.book_id || "")).filter(Boolean))];
+    const { data: livros } = ids.length ? await db.from("stock_books").select("id, kigest_ref").in("id", ids) : { data: [] };
+    const refs = new Map<string, string>((livros || []).map((b: Row) => [b.id, b.kigest_ref || ""]));
+    const { corpo, erros } = corpoNE(order, refs, lig, armazem_id);
+    if (erros.length) throw new ErroKanGest(erros.join(" "), 0, "", true);
+    return {
+      tipo: "pedido", metodo: "POST", caminho: "/documentos", corpo, idem: `ne-${numero}`,
+      resultado: (d) => ({ ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, armazem_id: d.armazem_id, linhas: corpo.linhas }),
+      // a encomenda passa a estar reservada no KanGest: o stock do site deixa de a descontar à parte
+      refs: [...new Set<string>(corpo.linhas.map((l: Row) => String(l.referencia)))],
+    };
+  }
+  if (job.accao === "fr") {
+    if (!ne || ne.estado !== "feito") {
+      if (ne && (ne.estado === "erro" || ne.estado === "ignorado")) throw new ErroKanGest("A nota de encomenda não chegou ao KanGest: resolva-a primeiro.", 0, "", true);
+      return { tipo: "esperar", minutos: 1, motivo: "À espera da nota de encomenda." };
+    }
+    const r = ne.resultado;
+    return {
+      tipo: "pedido", metodo: "POST", caminho: "/documentos", corpo: corpoFR(order, { id: r.id, total: r.total, linhas: r.linhas || [] }, lig), idem: `fr-${numero}`,
+      resultado: (d) => ({ ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null, hash: d.hash_controlo ?? null }),
+      refs: [],
+    };
+  }
+  if (job.accao === "nc") {
+    if (fr?.estado !== "feito" || !fr.resultado?.id) {
+      throw new ErroKanGest("Não há factura no KanGest para fazer a nota de crédito.", 0, "", true);
+    }
+    return {
+      tipo: "pedido", metodo: "POST", caminho: "/documentos", corpo: corpoNC(order, { id: fr.resultado.id }, ne?.resultado?.linhas || []), idem: `nc-${numero}`,
+      resultado: (d) => ({ ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null }),
+      refs: [],
+    };
+  }
+  if (job.accao === "anular") {
+    if (fr?.estado === "feito") {
+      throw new ErroKanGest(`A encomenda já foi facturada (${fr.resultado?.numero}): faça a nota de crédito no KanGest.`, 0, "", true);
+    }
+    if (!ne?.resultado?.id) throw new ErroKanGest("Não há nota de encomenda no KanGest para anular.", 0, "", true);
+    // (o gatilho já pôs de parte a FR que ainda não tinha saído)
+    return {
+      tipo: "pedido", metodo: "POST", caminho: `/documentos/${ne.resultado.id}/anular`, corpo: { motivo: `Encomenda ${numero} cancelada no site` },
+      resultado: (d) => ({ ligacao: lig.id, id: d.id, numero: d.numero_doc, estado: d.estado }),
+      refs: [],
+    };
+  }
+  throw new ErroKanGest(`Acção desconhecida na fila: ${job.accao}`, 0, "", true);
+}
+
+/** A encomenda e as linhas irmãs de uma linha da fila; sem encomenda, a linha fica «ignorado» e devolve null. */
+async function carregarLinha(db: Db, job: Row): Promise<{ order: Row; irmaos: Row[] } | null> {
+  const { data: order } = await db.from("orders").select("*").eq("id", job.order_id).maybeSingle();
+  if (!order) {
+    await db.from("kangest_fila").update({ estado: "ignorado", erro: "A encomenda já não existe." }).eq("id", job.id);
+    return null;
+  }
+  const { data: irmaos } = await db.from("kangest_fila").select("id, accao, estado, resultado").eq("order_id", job.order_id);
+  return { order, irmaos: irmaos || [] };
+}
+
+/** O KanGest respondeu ao passo: a linha fica feita, e o stock das referências da NE recalcula-se. */
+async function concluirPasso(db: Db, job: Row, passo: Extract<Passo, { tipo: "pedido" }>, d: Row) {
+  await feito(db, job, passo.resultado(d));
+  if (passo.refs.length) await recalcularStock(db, passo.refs);
+}
+
 /** Emite no KanGest o que está na fila (NE, FR, anulações), pela ordem. Devolve um resumo. */
 export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchFn: typeof fetch = fetch, prazoMs = 90_000): Promise<Row> {
   const resumo = { feitos: 0, falhas: 0, adiados: 0 };
@@ -436,54 +520,98 @@ export async function processarFila(db: Db, ligs: Ligacao[], limite = 20, fetchF
     const job = await reservar(db);
     if (!job) break;
     try {
-      const { data: order } = await db.from("orders").select("*").eq("id", job.order_id).maybeSingle();
-      if (!order) {
-        await db.from("kangest_fila").update({ estado: "ignorado", erro: "A encomenda já não existe." }).eq("id", job.id);
-        continue;
-      }
-      const { data: irmaos } = await db.from("kangest_fila").select("id, accao, estado, resultado").eq("order_id", job.order_id);
-      const ne = (irmaos || []).find((x: Row) => x.accao === "ne");
-      const fr = (irmaos || []).find((x: Row) => x.accao === "fr");
-      const escolha = ne?.resultado?.ligacao ? { ligacao: ligs.find((l) => l.id === ne.resultado.ligacao) } : ligacaoDaEncomenda(ligs, order);
+      const linha = await carregarLinha(db, job);
+      if (!linha) continue;
+      const ne = linha.irmaos.find((x: Row) => x.accao === "ne");
+      const escolha = ne?.resultado?.ligacao ? { ligacao: ligs.find((l) => l.id === ne.resultado.ligacao) } : ligacaoDaEncomenda(ligs, linha.order);
       const lig = escolha?.ligacao;
       if (!lig) throw new ErroKanGest(`A ligação ${ne?.resultado?.ligacao} já não está em KANGEST_LIGACOES.`, 0, "", true);
-      const numero = String(order.order_number || order.id);
-
-      if (job.accao === "ne") {
-        const ids = [...new Set((order.items || []).map((i: Row) => String(i.book_id || "")).filter(Boolean))];
-        const { data: livros } = ids.length ? await db.from("stock_books").select("id, kigest_ref").in("id", ids) : { data: [] };
-        const refs = new Map<string, string>((livros || []).map((b: Row) => [b.id, b.kigest_ref || ""]));
-        const { corpo, erros } = corpoNE(order, refs, lig, (escolha as any).armazem_id);
-        if (erros.length) throw new ErroKanGest(erros.join(" "), 0, "", true);
-        const d = await pedir(lig, "POST", "/documentos", corpo, `ne-${numero}`, fetchFn);
-        await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, armazem_id: d.armazem_id, linhas: corpo.linhas });
-        // a encomenda passa a estar reservada no KanGest: o stock do site deixa de a descontar à parte
-        await recalcularStock(db, [...new Set<string>(corpo.linhas.map((l: Row) => String(l.referencia)))]);
-      } else if (job.accao === "fr") {
-        if (!ne || ne.estado !== "feito") {
-          if (ne && (ne.estado === "erro" || ne.estado === "ignorado")) throw new ErroKanGest("A nota de encomenda não chegou ao KanGest: resolva-a primeiro.", 0, "", true);
-          await adiar(db, job, 1, "À espera da nota de encomenda.");
-          resumo.adiados++;
-          continue;
-        }
-        const r = ne.resultado;
-        const d = await pedir(lig, "POST", "/documentos", corpoFR(order, { id: r.id, total: r.total, linhas: r.linhas || [] }, lig), `fr-${numero}`, fetchFn);
-        await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null, hash: d.hash_controlo ?? null });
-      } else if (job.accao === "nc") {
-        if (fr?.estado !== "feito" || !fr.resultado?.id) {
-          throw new ErroKanGest("Não há factura no KanGest para fazer a nota de crédito.", 0, "", true);
-        }
-        const d = await pedir(lig, "POST", "/documentos", corpoNC(order, { id: fr.resultado.id }, ne?.resultado?.linhas || []), `nc-${numero}`, fetchFn);
-        await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, total: d.total, fe: d.fe ?? null });
-      } else if (job.accao === "anular") {
-        if (fr?.estado === "feito") {
-          throw new ErroKanGest(`A encomenda já foi facturada (${fr.resultado?.numero}): faça a nota de crédito no KanGest.`, 0, "", true);
-        }
-        if (!ne?.resultado?.id) throw new ErroKanGest("Não há nota de encomenda no KanGest para anular.", 0, "", true);
-        // (o gatilho já pôs de parte a FR que ainda não tinha saído)
-        const d = await pedir(lig, "POST", `/documentos/${ne.resultado.id}/anular`, { motivo: `Encomenda ${numero} cancelada no site` }, undefined, fetchFn);
-        await feito(db, job, { ligacao: lig.id, id: d.id, numero: d.numero_doc, estado: d.estado });
+      const passo = await passoDaFila(db, job, linha.order, linha.irmaos, lig, (escolha as any).armazem_id);
+      if (passo.tipo === "esperar") {
+        await adiar(db, job, passo.minutos, passo.motivo);
+        resumo.adiados++;
+        continue;
       }
+      const d = await pedir(lig, passo.metodo, passo.caminho, passo.corpo, passo.idem, fetchFn);
+      await concluirPasso(db, job, passo, d);
+      resumo.feitos++;
+    } catch (e) {
+      await falhou(db, job, e);
+      resumo.falhas++;
+    }
+  }
+  return resumo;
+}
+
+// ------------------------------------------------------------------ a fila pelos postos do KanGest Livraria
+
+/**
+ * A «ligação» de um posto, para os corpos dos documentos: os artigos dos portes e genérico e os modos de pagamento
+ * configurados no painel (kangest_postos). O armazém fica o do posto do KanGest (o da série dos documentos).
+ */
+export function ligacaoDoPosto(p: Row): Ligacao {
+  return {
+    id: `posto:${p.id}`, url: "", chave: "",
+    portes: String(p.artigo_portes || "").trim() || undefined,
+    generico: String(p.artigo_generico || "").trim() || undefined,
+    pagamentos: p.pagamentos && typeof p.pagamentos === "object" ? p.pagamentos : {},
+  };
+}
+
+/** Uma tarefa para o KanGest do posto: o pedido à API dele, com a chave de idempotência. */
+export type Tarefa = { id: number; accao: string; metodo: "POST"; caminho: string; corpo: Row; idem: string | null };
+
+/**
+ * As tarefas do posto: reserva as linhas da fila das encomendas da loja dele (kangest_reservar_posto) e devolve os
+ * pedidos que o KanGest tem de fazer à própria API. As que têm de esperar pela NE voltam à fila; as que pedem alguém
+ * ficam com erro, como na ligação antiga.
+ */
+export async function tarefasDoPosto(db: Db, posto: Row, limite = 10): Promise<Tarefa[]> {
+  const lig = ligacaoDoPosto(posto);
+  const { data, error } = await db.rpc("kangest_reservar_posto", { p_posto: posto.id, p_limite: limite });
+  if (error) throw new Error(error.message);
+  const tarefas: Tarefa[] = [];
+  for (const job of (Array.isArray(data) ? data : [])) {
+    try {
+      const linha = await carregarLinha(db, job);
+      if (!linha) continue;
+      const passo = await passoDaFila(db, job, linha.order, linha.irmaos, lig);
+      if (passo.tipo === "esperar") {
+        await adiar(db, job, passo.minutos, passo.motivo);
+        continue;
+      }
+      tarefas.push({ id: job.id, accao: job.accao, metodo: passo.metodo, caminho: passo.caminho, corpo: passo.corpo, idem: passo.idem ?? null });
+    } catch (e) {
+      await falhou(db, job, e);
+    }
+  }
+  return tarefas;
+}
+
+/**
+ * O que o KanGest do posto fez com as tarefas (vêm no lote seguinte): `{ id, ok, documento }` ou
+ * `{ id, ok: false, erro, estado }`. Só conta para as linhas que este posto tem reservadas; o resto (uma linha que já
+ * voltou à fila, ou de outro posto) ignora-se. Um erro 4xx do KanGest pede alguém, como na ligação antiga.
+ */
+export async function resultadosDoPosto(db: Db, posto: Row, resultados: Row[]): Promise<{ feitos: number; falhas: number }> {
+  const lig = ligacaoDoPosto(posto);
+  const resumo = { feitos: 0, falhas: 0 };
+  for (const r of resultados) {
+    const id = Number(r?.id);
+    if (!Number.isInteger(id) || id <= 0) continue;
+    const { data: job } = await db.from("kangest_fila").select("*").eq("id", id).eq("posto_id", posto.id).eq("estado", "processando").maybeSingle();
+    if (!job) continue;
+    try {
+      if (r.ok !== true) {
+        const estado = Number(r.estado) || 0;
+        throw new ErroKanGest(String(r.erro || "O KanGest não emitiu o documento.").slice(0, 1000), estado, String(r.codigo || ""),
+          estado >= 400 && estado < 500 && estado !== 408 && estado !== 429);
+      }
+      const linha = await carregarLinha(db, job);
+      if (!linha) continue;
+      const passo = await passoDaFila(db, job, linha.order, linha.irmaos, lig);
+      if (passo.tipo !== "pedido") continue;
+      await concluirPasso(db, job, passo, r.documento && typeof r.documento === "object" ? r.documento : {});
       resumo.feitos++;
     } catch (e) {
       await falhou(db, job, e);
