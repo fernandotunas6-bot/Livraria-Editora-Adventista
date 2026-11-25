@@ -265,6 +265,8 @@ impl AppState {
             "saft" => "SAF-T",
             "copias" => "Cópias de segurança",
             "documentos" => "Documentos emitidos",
+            // o arquivo de cada fecho de caixa (services/caixa_fechos.rs)
+            "fechos" => "Fechos de caixa",
             _ => "Relatórios e listas",
         };
         let p = raiz.join(nome);

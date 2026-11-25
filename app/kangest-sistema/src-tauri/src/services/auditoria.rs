@@ -10,6 +10,7 @@
 
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
+use sqlx::SqliteConnection;
 
 use crate::auditoria::{self as cadeia, Linha};
 use crate::db;
@@ -53,6 +54,9 @@ pub const FICHAS: &[(&str, &str)] = &[
     ("conciliacao_linhas", "Linha de extracto bancário"),
     ("regras_aprovacao", "Regra de aprovação"),
     ("documentos", "Documento"),
+    ("caixa_sessoes", "Sessão de caixa"),
+    ("caixa_movimentos", "Movimento de caixa"),
+    ("caixa_fechos", "Fecho de caixa"),
     ("empresa", "Empresa"),
     ("config", "Configurações"),
 ];
@@ -364,6 +368,53 @@ pub(super) async fn registar_nota(st: &AppState, tabela: &'static str, id: i64, 
         },
     )
     .await
+}
+
+/// Um acontecimento numa ficha que não passa pelo `dispatch` com o antes e o depois (a abertura e o fecho do caixa, um
+/// vale, a reimpressão de um fecho): fica com a acção, a ficha e o que interessa em `depois`.
+pub(super) async fn registar_evento(st: &AppState, acao: &str, tabela: &'static str, id: i64, detalhe: &str, depois: Option<&Value>) -> AppResult<()> {
+    cadeia::registar(
+        &st.pool,
+        Linha {
+            utilizador_id: st.sessao_opcional().map(|s| s.id),
+            acao,
+            detalhe,
+            entidade: Some(tabela),
+            registo_id: Some(&id.to_string()),
+            antes: None,
+            depois,
+            posto_id: Some(st.posto().id),
+            origem: origem(),
+        },
+    )
+    .await
+}
+
+/// O mesmo dentro da transacção da operação: o acontecimento fica gravado com ela, ou nada fica (o fecho de caixa e as
+/// vendas online que ele fecha). O selo põe-se no fim do pedido (`dispatch` → `selar_novas`).
+pub(super) async fn registar_evento_em(
+    con: &mut SqliteConnection,
+    st: &AppState,
+    acao: &str,
+    tabela: &'static str,
+    id: i64,
+    detalhe: &str,
+    depois: Option<&Value>,
+) -> AppResult<()> {
+    sqlx::query(
+        "INSERT INTO auditoria (utilizador_id, acao, detalhe, entidade, registo_id, depois, posto_id, origem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(st.sessao_opcional().map(|s| s.id))
+    .bind(acao)
+    .bind(detalhe)
+    .bind(tabela)
+    .bind(id.to_string())
+    .bind(depois.map(|v| v.to_string()))
+    .bind(st.posto().id)
+    .bind(origem())
+    .execute(&mut *con)
+    .await?;
+    Ok(())
 }
 
 async fn registar_mudanca(st: &AppState, a: Alvo, chave: Option<&str>, antes: Option<Value>, agora: Option<Value>, motivo: Option<&str>) -> AppResult<()> {

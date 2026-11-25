@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, History, Lock, Plus, Printer, ShoppingCart, Trash2, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, FolderOpen, History, Lock, Plus, Printer, ShoppingCart, Trash2, Wallet } from "lucide-react";
 import { call } from "@/lib/api";
 import { useTabelas, useTalao58 } from "@/lib/hooks";
 import { dataHora, extenso, kz, kzNum, parseKz, qtd } from "@/lib/format";
@@ -27,6 +27,11 @@ interface SessaoLista {
   estado: string;
   total_vendido: number;
   numero_z?: number | null;
+  /** o total das vendas online que o fecho incluiu (à parte da gaveta) */
+  online_total?: number;
+  /** o fecho arquivado: 1 se é de antes do arquivo, refeito com os valores do dia do arquivo */
+  reconstruido?: number | null;
+  fecho_id?: number | null;
 }
 
 export default function Caixa() {
@@ -443,6 +448,9 @@ function Fechar({ resumo, onClose, onDone }: { resumo: CaixaResumo; onClose: () 
   const [contado, setContado] = useState("");
   const [outros, setOutros] = useState<Record<string, string>>({});
   const [obs, setObs] = useState("");
+  // as vendas online da loja: vem marcado o que diz a opção do posto; escolhe-se aqui só para este fecho
+  const online = resumo.online;
+  const [incluirOnline, setIncluirOnline] = useState(online?.incluidas ?? true);
   const [busy, setBusy] = useState(false);
   const totalNotas = [...NOTAS, ...MOEDAS].reduce((s, d) => s + d * 100 * (Number(qtds[d]) || 0), 0);
   const valor = porNotas ? totalNotas : parseKz(contado || "0");
@@ -461,6 +469,7 @@ function Fechar({ resumo, onClose, onDone }: { resumo: CaixaResumo; onClose: () 
         valor_contado: porNotas ? undefined : parseKz(contado || "0"),
         contado_modos,
         observacoes: obs || undefined,
+        incluir_online: incluirOnline,
       });
       toast.success(`Caixa fechado (Z n.º ${r.sessao.numero_z ?? r.sessao.id}).`);
       onDone(r);
@@ -529,6 +538,20 @@ function Fechar({ resumo, onClose, onDone }: { resumo: CaixaResumo; onClose: () 
       <Field label="Observações" className="mt-3">
         <Input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: nota de 1000 Kz rasgada; reforço de trocos" />
       </Field>
+      {online && (online.cego || (online.quantidade ?? 0) > 0) && (
+        <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+          <input type="checkbox" className="mt-1" checked={incluirOnline} onChange={(e) => setIncluirOnline(e.target.checked)} />
+          <span>
+            <span className="font-medium">Incluir as vendas online da loja neste fecho</span>
+            <span className="block text-[12.5px] text-ink-2">
+              {online.cego
+                ? "As vendas da loja online e as encomendas pagas no site para esta loja."
+                : `${online.quantidade} venda(s), ${kz(online.total ?? 0)}${online.na_entrega ? `, das quais ${kz(online.na_entrega)} pagas na entrega` : ""}.`}{" "}
+              Ficam numa secção à parte do relatório e não contam para o numerário da gaveta. Cada venda fecha uma só vez.
+            </span>
+          </span>
+        </label>
+      )}
       <div className="mt-4 space-y-1 rounded-xl bg-sunken p-4">
         <div className="flex justify-between font-medium">
           <span>Numerário contado</span>
@@ -552,9 +575,41 @@ function Fechar({ resumo, onClose, onDone }: { resumo: CaixaResumo; onClose: () 
 }
 
 function Historico({ onClose, onAbrir }: { onClose: () => void; onAbrir: (id: number) => void }) {
-  const { data } = useQuery({ queryKey: ["caixa-sessoes"], queryFn: () => call<SessaoLista[]>("caixa.sessoes") });
+  const postos = useTabelas().data?.postos ?? [];
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [posto, setPosto] = useState("");
+  const [numero, setNumero] = useState("");
+  const filtros = { de: de || undefined, ate: ate || undefined, posto_id: posto ? Number(posto) : undefined, numero: numero ? Number(numero) : undefined };
+  const { data } = useQuery({ queryKey: ["caixa-sessoes", filtros], queryFn: () => call<SessaoLista[]>("caixa.sessoes", filtros) });
   return (
-    <Modal open onClose={onClose} title="Fechos de caixa" width="max-w-4xl">
+    <Modal open onClose={onClose} title="Fechos de caixa" width="max-w-5xl">
+      <div className="mb-3 flex flex-wrap items-end gap-3">
+        <Field label="De">
+          <Input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+        </Field>
+        <Field label="Até">
+          <Input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+        </Field>
+        {postos.length > 1 && (
+          <Field label="Posto">
+            <Select value={posto} onChange={(e) => setPosto(e.target.value)}>
+              <option value="">Todos</option>
+              {postos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.descricao}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        <Field label="N.º Z">
+          <Input className="num w-24" inputMode="numeric" value={numero} onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))} />
+        </Field>
+        <Button variant="secondary" size="sm" onClick={() => call("sistema.exportarAbrir", { pasta: "fechos" }).catch((e) => toast.error((e as Error).message))}>
+          <FolderOpen className="size-4" /> Abrir a pasta dos fechos
+        </Button>
+      </div>
       <Table className="max-h-[60vh]">
         <thead>
           <tr>
@@ -564,6 +619,7 @@ function Historico({ onClose, onAbrir }: { onClose: () => void; onAbrir: (id: nu
             <Th>Abertura</Th>
             <Th>Fecho</Th>
             <Th className="text-right">Vendido</Th>
+            <Th className="text-right">Online</Th>
             <Th className="text-right">Contado</Th>
             <Th />
           </tr>
@@ -571,12 +627,20 @@ function Historico({ onClose, onAbrir }: { onClose: () => void; onAbrir: (id: nu
         <tbody>
           {data?.map((s) => (
             <tr key={s.id}>
-              <Td className="num text-ink-2">{s.numero_z ?? "—"}</Td>
+              <Td className="num text-ink-2">
+                {s.numero_z ?? "—"}
+                {s.reconstruido === 1 && (
+                  <Badge tone="neutral" className="ml-1.5">
+                    reconstruído
+                  </Badge>
+                )}
+              </Td>
               <Td>{s.posto ?? "—"}</Td>
               <Td>{s.utilizador}</Td>
               <Td className="text-ink-2">{dataHora(s.aberta_em)}</Td>
               <Td className="text-ink-2">{s.estado === "ABERTA" ? <Badge tone="ok">Aberto</Badge> : dataHora(s.fechada_em)}</Td>
               <Td className="num text-right">{kz(s.total_vendido)}</Td>
+              <Td className="num text-right text-ink-2">{s.online_total ? kz(s.online_total) : "—"}</Td>
               <Td className="num text-right">{s.valor_contado === null ? "—" : kz(s.valor_contado)}</Td>
               <Td>
                 <Button size="sm" variant="ghost" onClick={() => onAbrir(s.id)}>
@@ -595,6 +659,41 @@ function Historico({ onClose, onAbrir }: { onClose: () => void; onAbrir: (id: nu
 function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void }) {
   const dif = (r.sessao.valor_contado ?? 0) - (r.numerario_esperado ?? 0);
   const t58 = useTalao58();
+  // a lista dos documentos da sessão: sai por omissão no talão de 80 mm; no de 58 mm, à escolha
+  const [comDocumentos, setComDocumentos] = useState(!t58);
+  // a reimpressão de um fecho sai como 2.ª via (como os documentos): sabe-se pelo registo das impressões
+  const [segundaVia, setSegundaVia] = useState((r.arquivo?.impressoes.total ?? 0) > 0);
+  const [aImprimir, setAImprimir] = useState(false);
+  const online = r.online;
+  const nomeFicheiro = r.arquivo?.ficheiro.replace(/\.html$/, "");
+
+  async function imprimirFecho() {
+    if (!r.arquivo) {
+      imprimir(nomeFicheiro);
+      return;
+    }
+    setAImprimir(true);
+    try {
+      const i = await call<{ segunda_via: boolean }>("caixa.fechoImpressao", { id: r.sessao.id, formato: t58 ? "talao58" : "talao80" });
+      setSegundaVia(i.segunda_via);
+      // depois de o talão mostrar a via certa
+      window.setTimeout(() => imprimir(i.segunda_via ? `${nomeFicheiro} (2.ª via)` : nomeFicheiro), 60);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setAImprimir(false);
+    }
+  }
+
+  async function guardarOutraVez() {
+    try {
+      const f = await call<{ nome: string; conteudo: string }>("caixa.fechoFicheiro", { id: r.sessao.id });
+      await call("sistema.exportar", { nome: f.nome, conteudo: f.conteudo, pasta: "fechos" });
+      toast.success(`Guardado em «Fechos de caixa»: ${f.nome}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
   const e = useEmpresa();
   const tabelas = useTabelas();
   const armazem = tabelas.data?.armazens.find((a) => a.id === tabelas.data?.armazem_id);
@@ -618,9 +717,11 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
           {e.telefone && <div>Tel. {e.telefone}</div>}
         </div>
       )}
+      {segundaVia && r.sessao.estado !== "ABERTA" && <div className="mt-2 text-right font-bold">2.ª via em conformidade com o original</div>}
       <div className="mt-2 text-[12.5px] font-bold">
         {r.sessao.estado === "ABERTA" ? "CAIXA EM ABERTO (X)" : `FECHO DE CAIXA (Z) Nº ${r.sessao.numero_z ?? r.sessao.id}`}
       </div>
+      {r.arquivo?.reconstruido && <div className="mt-1 border border-black px-1 text-[0.9em]">Reconstruído: fecho de antes do arquivo, refeito com os valores do dia em que se arquivou.</div>}
       {linha("Data Abertura:", dataHora(r.sessao.aberta_em))}
       {linha("Data de Fecho:", r.sessao.fechada_em ? dataHora(r.sessao.fechada_em) : "(em aberto)")}
       {armazem && linha("Armazém:", armazem.nome)}
@@ -677,13 +778,85 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
           ))}
         </>
       )}
+      {comDocumentos && (r.documentos_lista ?? []).length > 0 && (
+        <>
+          <div className="mt-2 border-y border-black py-0.5 text-center">Documentos da sessão</div>
+          {(r.documentos_lista ?? []).map((d) => (
+            <div key={d.id} className={cn("flex justify-between gap-2", d.estado === "A" && "line-through")}>
+              <span className="truncate">
+                {d.numero_doc} {d.data_hora.slice(11, 16)}
+                {d.cliente ? ` · ${d.cliente}` : ""}
+              </span>
+              <span>{kz(d.total)}</span>
+            </div>
+          ))}
+        </>
+      )}
+      {online && online.incluidas && !online.cego && (online.quantidade ?? 0) > 0 && (
+        <>
+          <div className="mt-2 border-y border-black py-0.5 text-center font-bold">Vendas online (fora da gaveta)</div>
+          {(online.documentos ?? []).map((d) => (
+            <div key={`d${d.documento_id}`} className="flex justify-between gap-2">
+              <span className="truncate">
+                {d.numero_doc}
+                {d.cliente ? ` · ${d.cliente}` : ""}
+              </span>
+              <span>{kz(d.total)}</span>
+            </div>
+          ))}
+          {(online.encomendas ?? []).map((d) => (
+            <div key={`e${d.encomenda_id}`} className="flex justify-between gap-2">
+              <span className="truncate">
+                Encomenda {d.numero}
+                {d.cliente ? ` · ${d.cliente}` : ""}
+                {d.na_entrega ? " (na entrega)" : ""}
+              </span>
+              <span>{kz(d.total)}</span>
+            </div>
+          ))}
+          <div className="mt-1 border-t border-black pt-1">
+            {(online.por_modo ?? []).map((m) => (
+              <div key={m.descricao}>{linha(m.descricao, kz(m.total))}</div>
+            ))}
+            {linha(`Total online (${online.quantidade}):`, kz(online.total ?? 0), true)}
+          </div>
+        </>
+      )}
       {e?.rodape && <div className="mt-2 text-center">{e.rodape}</div>}
+      {r.arquivo && <div className="mt-2 break-all text-[0.8em]">Arquivado em {dataHora(r.arquivo.criado_em)} · selo {r.arquivo.selo.slice(0, 16)}</div>}
     </div>
   );
   return (
-    <Modal open onClose={onClose} title="Relatório de fecho" width="max-w-md" footer={<Button onClick={imprimir}><Printer className="size-4" /> Imprimir</Button>}>
+    <Modal
+      open
+      onClose={onClose}
+      title="Relatório de fecho"
+      width="max-w-md"
+      footer={
+        <>
+          {r.arquivo && (
+            <Button variant="secondary" onClick={guardarOutraVez}>
+              <FolderOpen className="size-4" /> Guardar outra vez
+            </Button>
+          )}
+          <Button loading={aImprimir} onClick={imprimirFecho}>
+            <Printer className="size-4" /> {segundaVia && r.arquivo ? "Imprimir a 2.ª via" : "Imprimir"}
+          </Button>
+        </>
+      }
+    >
       <div className="flex max-h-[60vh] justify-center overflow-y-auto rounded-xl bg-sunken p-4">{conteudo}</div>
-      {r.sessao.valor_contado !== null && dif !== 0 && <Badge tone={dif < 0 ? "danger" : "accent"} className="mt-3">Diferença de {kz(dif)}</Badge>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {r.sessao.valor_contado !== null && dif !== 0 && <Badge tone={dif < 0 ? "danger" : "accent"}>Diferença de {kz(dif)}</Badge>}
+        {r.arquivo && !r.arquivo.selo_confere && <Badge tone="danger">O selo do arquivo não confere</Badge>}
+        {r.arquivo && r.arquivo.impressoes.total > 0 && <Badge tone="neutral">Impresso {r.arquivo.impressoes.total}×</Badge>}
+        {r.arquivo?.erro_ficheiro && <Badge tone="danger">O ficheiro não ficou gravado: use «Guardar outra vez»</Badge>}
+        {(r.documentos_lista ?? []).length > 0 && (
+          <label className="ml-auto flex items-center gap-1.5 text-[12.5px] text-ink-2">
+            <input type="checkbox" checked={comDocumentos} onChange={(ev) => setComDocumentos(ev.target.checked)} /> Com a lista dos documentos
+          </label>
+        )}
+      </div>
       <PrintPortal>{conteudo}</PrintPortal>
     </Modal>
   );

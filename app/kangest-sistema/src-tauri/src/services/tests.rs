@@ -7237,3 +7237,97 @@ async fn actualizacoes_procuram_se_sozinhas() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+
+/// O fecho arquivado (migração 0061, services/caixa_fechos.rs): o instantâneo com o selo, que não se altera; um
+/// documento anulado depois já não muda o Z; as devoluções abatem os artigos; o ficheiro do fecho na pasta; a
+/// reimpressão sai 2.ª via e fica na auditoria; as vendas online à parte, fora do numerário, e cada uma fecha uma vez.
+#[tokio::test]
+async fn fecho_arquivado_com_vendas_online_a_parte() {
+    let (st, pasta) = base_com_admin("fecho-arquivado").await;
+    let a = rpc(&st, "artigos.guardar", json!({ "descricao": "Livro A", "tipo": "S", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    // as vendas online são as da loja do posto (o armazém dele)
+    rpc(&st, "posto.guardar", json!({ "id": 1, "descricao": "Caixa 1", "armazem_id": 1, "opcoes": {} })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    let fr = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": a, "quantidade": 2 }], "pagamentos": [{ "modo": "NU", "valor": 228000 }] })).await;
+    let fr_id = fr["documento"]["id"].as_i64().unwrap();
+    let fr2 = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": a, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+    let fr3 = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": a, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+    // uma devolução de 1 unidade: abate o artigo
+    rpc(&st, "documentos.emitir", json!({ "tipo": "NC", "entidade_id": 1, "doc_origem_id": fr_id, "motivo": "Devolução", "linhas": [{ "artigo_id": a, "quantidade": 1 }] })).await;
+    // uma venda da loja online (emitida pela API, sem caixa) e uma encomenda paga da cópia local, ainda sem FR
+    let agora = db::agora();
+    sqlx::query("UPDATE documentos SET api_chave_id = 1, caixa_sessao_id = NULL WHERE id = ?").bind(fr2["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
+    let pago_em = chrono::Local::now().to_rfc3339();
+    sqlx::query("INSERT INTO loja_encomendas (id, numero, estado, pagamento, total, cliente, dados) VALUES ('e-1', 'LIV-77', 'processing', 'paid', 2500, 'Rui', ?)")
+        .bind(json!({ "pago_em": pago_em, "pago": 2500, "metodo_pagamento": "Pagamento na entrega", "canal": "site" }).to_string())
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let aberto = rpc(&st, "caixa.estado", Value::Null).await;
+    assert_eq!(aberto["online"]["quantidade"], 2, "no caixa aberto, o que o fecho incluiria: {}", aberto["online"]);
+    assert_eq!(aberto["online"]["incluidas"], true, "a opção do posto vem ligada");
+
+    let z = rpc(&st, "caixa.fechar", json!({ "valor_contado": 228000 })).await;
+    assert!(agora.as_str() <= z["sessao"]["fechada_em"].as_str().unwrap());
+    assert_eq!(z["arquivo"]["selo_confere"], true, "{}", z["arquivo"]);
+    assert_eq!(z["arquivo"]["reconstruido"], false);
+    // o numerário: as duas FR do balcão (2 280 + 1 140) menos a devolução em dinheiro (a saída que a NC faz, 1 140);
+    // a venda online e a encomenda ficam à parte
+    assert_eq!(z["numerario_esperado"], 228000, "{z}");
+    assert_eq!(z["total_vendido"], 342000);
+    assert_eq!(z["online"]["total"], 114000 + 250000);
+    assert_eq!(z["online"]["na_entrega"], 250000);
+    let livro = z["artigos"].as_array().unwrap().iter().find(|l| l["descricao"] == "Livro A").cloned().unwrap();
+    assert_eq!(livro["quantidade"].as_f64(), Some(2.0), "3 vendidos ao balcão − 1 devolvido: {livro}");
+    assert!(z["documentos_lista"].as_array().unwrap().len() >= 2);
+    let ficheiro = z["arquivo"]["ficheiro_gravado"].as_str().expect("o ficheiro do fecho fica gravado");
+    assert!(ficheiro.contains("Fechos de caixa") && std::fs::read_to_string(ficheiro).unwrap().contains("FECHO DE CAIXA (Z) N.º 1"));
+
+    // o arquivo não se altera nem se apaga
+    assert!(sqlx::query("UPDATE caixa_fechos SET selo = 'x'").execute(&st.pool).await.is_err());
+    assert!(sqlx::query("DELETE FROM caixa_fechos").execute(&st.pool).await.is_err());
+    assert!(sqlx::query("DELETE FROM caixa_fecho_online").execute(&st.pool).await.is_err());
+    let sid = z["sessao"]["id"].as_i64().unwrap();
+    // um documento anulado depois do fecho já não muda o Z
+    rpc(&st, "documentos.anular", json!({ "id": fr3["documento"]["id"], "motivo": "erro de teste" })).await;
+    let de_novo = rpc(&st, "caixa.obter", json!({ "id": sid })).await;
+    assert_eq!(de_novo["numerario_esperado"], 228000);
+    assert_eq!(de_novo["total_vendido"], z["total_vendido"]);
+
+    // a primeira impressão é a do fecho; a seguinte é 2.ª via; as duas na auditoria
+    assert_eq!(rpc(&st, "caixa.fechoImpressao", json!({ "id": sid, "formato": "talao80" })).await["segunda_via"], false);
+    let i2 = rpc(&st, "caixa.fechoImpressao", json!({ "id": sid, "formato": "a4" })).await;
+    assert_eq!((i2["segunda_via"].as_bool(), i2["total"].as_i64()), (Some(true), Some(2)));
+    let auditoria: Vec<String> = sqlx::query_scalar("SELECT acao FROM auditoria WHERE acao IN ('ABRIR_CAIXA', 'FECHO_CAIXA', 'FECHO_ONLINE', 'IMPRIMIR_FECHO', 'REIMPRIMIR_FECHO') ORDER BY id")
+        .fetch_all(&st.pool)
+        .await
+        .unwrap();
+    assert_eq!(auditoria, ["ABRIR_CAIXA", "FECHO_CAIXA", "FECHO_ONLINE", "FECHO_ONLINE", "IMPRIMIR_FECHO", "REIMPRIMIR_FECHO"]);
+    assert!(rpc(&st, "caixa.fechoFicheiro", json!({ "id": sid })).await["conteudo"].as_str().unwrap().contains("Vendas online"));
+
+    // o fecho seguinte não volta a incluir as mesmas vendas online; com a opção desligada neste fecho, não inclui nada
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    assert_eq!(rpc(&st, "caixa.estado", Value::Null).await["online"]["quantidade"], 0);
+    let z2 = rpc(&st, "caixa.fechar", json!({ "valor_contado": 0, "incluir_online": false })).await;
+    assert_eq!((z2["sessao"]["numero_z"].as_i64(), z2["online"]["incluidas"].as_bool()), (Some(2), Some(false)));
+    // o histórico filtra pelo número
+    let lista = rpc(&st, "caixa.sessoes", json!({ "numero": 1 })).await;
+    assert_eq!(lista.as_array().unwrap().len(), 1);
+    assert_eq!(lista[0]["online_total"], 364000);
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// Um fecho de antes do arquivo (sem linha em caixa_fechos) arquiva-se ao abrir a base, reconstruído.
+#[tokio::test]
+async fn fechos_antigos_arquivados_ao_abrir_reconstruidos() {
+    let (st, pasta) = base_com_admin("fechos-antigos").await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    sqlx::query("UPDATE caixa_sessoes SET estado = 'FECHADA', fechada_em = ?, numero_z = 1, valor_contado = 0").bind(db::agora()).execute(&st.pool).await.unwrap();
+    assert_eq!(super::caixa_fechos::arquivar_antigos(&st.pool).await.unwrap(), 1);
+    assert_eq!(super::caixa_fechos::arquivar_antigos(&st.pool).await.unwrap(), 0, "só uma vez");
+    let sid: i64 = sqlx::query_scalar("SELECT id FROM caixa_sessoes").fetch_one(&st.pool).await.unwrap();
+    let v = rpc(&st, "caixa.obter", json!({ "id": sid })).await;
+    assert_eq!((v["arquivo"]["reconstruido"].as_bool(), v["online"]["incluidas"].as_bool()), (Some(true), Some(false)));
+    let _ = std::fs::remove_dir_all(&pasta);
+}
