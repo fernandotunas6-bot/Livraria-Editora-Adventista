@@ -117,6 +117,10 @@ no cofre do sistema no Windows, e no ficheiro `kangest.chave` no macOS sem certi
   Windows: a chave ficou no cofre do utilizador do computador antigo. Uma base que não abre com a chave deste computador
   fica de parte (`kigest.db.ilegivel-…`, nunca apagada) e o KanGest arranca com uma base nova, onde se restaura a cópia.
 - **Suporte:** para analisar uma base, use a cópia exportada (em claro); `kigest.db` só abre com a chave.
+- **O KanGest oficial no mesmo computador:** a conta da chave da base (`segredos::chave_base_de`) é a mesma do oficial
+  1.4.4, por isso a edição abre uma **cópia** da base dele com a chave mestra dele, lida do `kangest.chave` dele ou do
+  cofre com o serviço dele (`ao.kigest.app`), e passa-a para a sua. Só se lê: nunca se cria nem se grava nada no
+  ficheiro nem no cofre do oficial ([COPIAS.md](COPIAS.md), «Trazer os dados do KanGest oficial»).
 
 ## 6. Limites (o que estas protecções não fazem)
 

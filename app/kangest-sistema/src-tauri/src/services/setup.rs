@@ -22,6 +22,8 @@ pub async fn estado(st: &AppState) -> AppResult<Value> {
         "cores": super::aparencia::cores(&st.pool).await?,
         // a base que não abriu com a chave deste computador e ficou de parte (db.rs, por_de_parte): o ecrã inicial explica
         "base_de_parte": if inicializado { None } else { ultima_de_parte(&st.pasta_dados) },
+        // o KanGest oficial neste computador: o ecrã inicial oferece trazer os dados dele (services/oficial.rs)
+        "oficial": if empresa > 0 { Value::Null } else { super::oficial::encontrado(st) },
     }))
 }
 

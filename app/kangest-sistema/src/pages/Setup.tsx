@@ -4,13 +4,13 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Building2, Check, Coins, DatabaseBackup, GraduationCap, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowRightLeft, Building2, Check, Coins, DatabaseBackup, GraduationCap, ShieldAlert, ShieldCheck } from "lucide-react";
 import { call } from "@/lib/api";
 import { Badge, Button, Card, Field, Input, Select, cn } from "@/components/ui";
 import { Logo } from "@/components/Logo";
 import { FAMILIA_ENSINO, MODOS, MOTIVO_ENSINO, artigosEscola, modoPorId, type ModoId } from "@/lib/modos";
 import { kz, parseKz } from "@/lib/format";
-import { RestaurarCopia } from "@/pages/Configuracoes";
+import { LinhaOficial, RestaurarCopia, TrazerOficial, type OficialEncontrado } from "@/pages/Configuracoes";
 import { escolherCopia, useEscolherNoComputador } from "@/lib/dialogos";
 
 /** Moedas que se podem aceitar em numerário no POS logo na instalação (as da tabela de moedas de origem). */
@@ -46,11 +46,14 @@ export default function Setup({ onDone }: { onDone: () => void }) {
   // computador novo: restaurar uma cópia de segurança em vez de configurar do zero
   const [copia, setCopia] = useState("");
   const [restaurar, setRestaurar] = useState(false);
+  // o KanGest oficial neste computador: trazer os dados dele em vez de configurar do zero
+  const [trazerOficial, setTrazerOficial] = useState(false);
   const noComputador = useEscolherNoComputador();
-  // a base que estava neste computador não abriu com a chave dele (pasta vinda de outro computador) e ficou de parte
+  // a base que estava neste computador não abriu com a chave dele (pasta vinda de outro computador) e ficou de parte;
+  // e o KanGest oficial, se estiver neste computador
   const { data: estado } = useQuery({
     queryKey: ["setup-estado"],
-    queryFn: () => call<{ base_de_parte?: string | null }>("setup.estado"),
+    queryFn: () => call<{ base_de_parte?: string | null; oficial?: OficialEncontrado | null }>("setup.estado"),
     staleTime: Infinity,
   });
 
@@ -117,6 +120,25 @@ export default function Setup({ onDone }: { onDone: () => void }) {
               Para continuar com os dados da loja, restaure em baixo uma <b>cópia externa</b> (pen, OneDrive) ou a <b>cópia
               exportada</b> do computador antigo.
             </p>
+          </Card>
+        )}
+
+        {estado?.oficial && (
+          <Card className="mb-5 border-brand/40 bg-brand-50/60 p-5 text-[13.5px]">
+            <div className="mb-1.5 flex items-center gap-2 font-semibold">
+              <ArrowRightLeft className="size-5 text-brand" /> Encontrei o KanGest oficial neste computador: trazer os dados?
+            </div>
+            <p className="text-ink-2">
+              Os clientes, os artigos, o stock, os documentos e os utilizadores dele passam para este KanGest Livraria, sem mexer no oficial. Depois, entra-se com os
+              utilizadores e as senhas que já usava.
+            </p>
+            <LinhaOficial oficial={estado.oficial} />
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={() => setTrazerOficial(true)}>
+                <ArrowRightLeft className="size-4" /> Trazer os dados
+              </Button>
+              <span className="text-[12.5px] text-ink-3">Ou configure do zero, em baixo.</span>
+            </div>
           </Card>
         )}
 
@@ -364,6 +386,7 @@ export default function Setup({ onDone }: { onDone: () => void }) {
           metodo="setup.restaurar"
         />
       )}
+      {trazerOficial && estado?.oficial && <TrazerOficial oficial={estado.oficial} metodo="setup.importarOficial" onClose={() => setTrazerOficial(false)} />}
     </div>
   );
 }
