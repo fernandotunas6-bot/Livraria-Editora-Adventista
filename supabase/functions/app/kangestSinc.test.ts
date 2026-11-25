@@ -157,6 +157,17 @@ describe("dados pessoais cifrados por coluna", () => {
     expect(consumidorFinal("")).toBe(true);
     expect(consumidorFinal("5000123456")).toBe(false);
 
+    // um posto antigo não manda os campos da 1.4.5; um novo manda-os, limpos
+    expect(d.documento).not.toHaveProperty("canal");
+    expect(d.documento).not.toHaveProperty("valor_pendente");
+    const [novo] = await prepararLote([{ tipo: "documento", documento: {
+      ...documento, canal: "api", operador: "Rui", vencimento: "2026-12-25T00:00:00", valor_pendente: "5700", doc_origem: "FT W2026/1",
+    } }], c);
+    expect(novo.documento).toMatchObject({ canal: "api", operador: "Rui", vencimento: "2026-12-25", valor_pendente: 5700, doc_origem: "FT W2026/1" });
+    const [mau] = await prepararLote([{ tipo: "documento", documento: { ...documento, canal: "outro", vencimento: "amanhã" } }], c);
+    expect(mau.documento).not.toHaveProperty("canal");
+    expect(mau.documento).not.toHaveProperty("vencimento");
+
     await expect(prepararLote({}, c)).rejects.toThrow(/lista/);
     await expect(prepararLote(Array.from({ length: 201 }, () => ({ tipo: "documento" })), c)).rejects.toThrow(/200/);
   });
