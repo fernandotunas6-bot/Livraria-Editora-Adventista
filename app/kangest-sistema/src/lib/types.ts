@@ -65,6 +65,8 @@ export interface PostoOpcoes {
   pos_ecra_inteiro?: boolean;
   /** fecho de caixa cego: o operador conta sem ver o valor esperado */
   fecho_cego?: boolean;
+  /** o fecho de caixa inclui as vendas online da loja, à parte da gaveta (ligada por omissão: sem a chave, vale true) */
+  fecho_online?: boolean;
 }
 
 export interface Posto {
@@ -436,6 +438,36 @@ export interface CaixaResumo {
   cego?: boolean;
   /** Depois do fecho: esperado × contado de cada forma de pagamento. */
   conferencia?: { codigo: string; descricao: string; esperado: number; contado: number | null; diferenca: number | null }[];
+  /** Os documentos da sessão, um a um (o total já com o sinal das notas de crédito). */
+  documentos_lista?: { id: number; numero_doc: string; tipo_codigo: string; data_hora: string; cliente: string | null; estado: string; total: number; pagamento: string | null }[];
+  /** As vendas online da loja, à parte: não contam para o numerário da gaveta (services/caixa_fechos.rs). */
+  online?: VendasOnlineFecho;
+  /** O arquivo do fecho (só num fecho): o selo, se é reconstruído, as impressões e o ficheiro. */
+  arquivo?: {
+    id: number;
+    selo: string;
+    selo_confere: boolean;
+    reconstruido: boolean;
+    criado_em: string;
+    criado_por: string | null;
+    impressoes: { total: number; primeira?: { em: string; utilizador: string } | null; ultima?: { em: string; utilizador: string } | null };
+    ficheiro: string;
+    ficheiro_gravado?: string;
+    erro_ficheiro?: string;
+  };
+}
+
+export interface VendasOnlineFecho {
+  /** o fecho incluiu-as (no caixa aberto: o que vem marcado, pela opção do posto) */
+  incluidas: boolean;
+  /** fecho cego com o caixa aberto: os valores não se mostram */
+  cego?: boolean;
+  documentos?: { documento_id: number; numero_doc: string; tipo: string; data_hora: string; cliente: string; referencia: string; pagamento: string; total: number }[];
+  encomendas?: { encomenda_id: string; numero: string; pago_em: string; cliente: string; canal: string; pagamento: string; na_entrega: boolean; total: number }[];
+  por_modo?: { descricao: string; total: number }[];
+  total?: number;
+  na_entrega?: number;
+  quantidade?: number;
 }
 
 // ---------------- Oficina ----------------

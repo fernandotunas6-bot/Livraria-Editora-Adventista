@@ -449,6 +449,9 @@ function Postos() {
               <label className="flex items-center gap-2" title="Quem fecha o caixa conta o dinheiro sem ver o valor esperado (excepto quem tem a permissão «ver o valor esperado»)">
                 <input type="checkbox" checked={!!o.fecho_cego} onChange={(e) => setO({ fecho_cego: e.target.checked })} /> Fecho de caixa cego
               </label>
+              <label className="flex items-center gap-2" title="As vendas da loja online e as encomendas pagas no site para esta loja entram numa secção à parte do fecho, fora do numerário da gaveta. Quem fecha pode desmarcar só para esse fecho.">
+                <input type="checkbox" checked={o.fecho_online !== false} onChange={(e) => setO({ fecho_online: e.target.checked })} /> Incluir as vendas online no fecho de caixa
+              </label>
             </div>
             <div className="space-y-3">
               <div className="text-[12px] font-medium uppercase tracking-wide text-ink-2">Impressão</div>
