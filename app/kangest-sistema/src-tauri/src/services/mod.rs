@@ -12,6 +12,8 @@ mod auth;
 // motor central de dados (construtor de relatórios, BI, qualidade dos dados)
 mod dados;
 mod caixa;
+// o fecho de caixa arquivado (o instantâneo, as vendas online, o ficheiro)
+pub(crate) mod caixa_fechos;
 mod comissoes;
 pub(crate) mod catalogo;
 mod contas;
@@ -397,7 +399,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- caixa ----
         "caixa.estado" => caixa::estado(st).await,
         "caixa.obter" => caixa::obter(st, p(params)?).await,
-        "caixa.sessoes" => caixa::sessoes(st).await,
+        "caixa.sessoes" => caixa::sessoes(st, p(params)?).await,
+        "caixa.fechoImpressao" => caixa_fechos::impressao(st, p(params)?).await,
+        "caixa.fechoFicheiro" => caixa_fechos::ficheiro(st, p(params)?).await,
         "caixa.abrir" => caixa::abrir(st, p(params)?).await,
         "caixa.movimento" => caixa::movimento(st, p(params)?).await,
         "caixa.movimentoObter" => caixa::movimento_obter(st, p(params)?).await,

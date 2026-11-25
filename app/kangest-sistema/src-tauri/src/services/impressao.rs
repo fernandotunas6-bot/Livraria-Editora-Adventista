@@ -870,12 +870,17 @@ pub async fn historico(st: &AppState, i: HistoricoIn) -> AppResult<Value> {
         i.id,
     )
     .await?;
-    let lista = linhas.as_array().cloned().unwrap_or_default();
-    Ok(json!({
+    Ok(resumo_das_impressoes(linhas.as_array().cloned().unwrap_or_default()))
+}
+
+/// As impressões de um documento ou de um fecho de caixa (services/caixa_fechos.rs), da primeira para a última: quantas
+/// foram, a primeira e a última. Com `total` > 0, a impressão seguinte sai como 2.ª via.
+pub(crate) fn resumo_das_impressoes(lista: Vec<Value>) -> Value {
+    json!({
         "total": lista.len(),
         "primeira": lista.first().cloned().unwrap_or(Value::Null),
         "ultima": lista.last().cloned().unwrap_or(Value::Null),
-    }))
+    })
 }
 
 #[derive(Deserialize)]

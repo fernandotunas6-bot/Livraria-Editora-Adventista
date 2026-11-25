@@ -3,7 +3,7 @@
 
 use serde::Deserialize;
 use serde_json::{json, Value};
-use sqlx::Row;
+use sqlx::{Row, SqliteConnection};
 
 use super::catalogo::IdIn;
 use crate::db;
@@ -17,14 +17,17 @@ async fn sessao_aberta(st: &AppState) -> AppResult<Option<i64>> {
         .await?)
 }
 
-pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
-    let p = &st.pool;
+/// O relatório de uma sessão calculado agora, na ligação dada: uma do pool (o caixa aberto, o X) ou a transacção do
+/// fecho (o Z que fica arquivado, services/caixa_fechos.rs). Sem o fecho cego nem as vendas online: quem chama
+/// acrescenta-os.
+pub(super) async fn calcular(con: &mut SqliteConnection, sid: i64) -> AppResult<Value> {
     let s = sqlx::query(
-        "SELECT c.*, u.nome AS utilizador, ps.descricao AS posto FROM caixa_sessoes c
-         JOIN utilizadores u ON u.id = c.utilizador_id LEFT JOIN postos ps ON ps.id = c.posto_id WHERE c.id = ?",
+        "SELECT c.*, u.nome AS utilizador, ps.descricao AS posto, ps.armazem_id AS armazem_id, a.nome AS armazem, uf.nome AS fechado_por
+         FROM caixa_sessoes c JOIN utilizadores u ON u.id = c.utilizador_id LEFT JOIN postos ps ON ps.id = c.posto_id
+         LEFT JOIN armazens a ON a.id = ps.armazem_id LEFT JOIN utilizadores uf ON uf.id = c.fechada_por WHERE c.id = ?",
     )
     .bind(sid)
-    .fetch_optional(p)
+    .fetch_optional(&mut *con)
     .await?
     .ok_or(AppError::NaoEncontrado)?;
     let por_modo = sqlx::query(
@@ -37,31 +40,46 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
          ORDER BY m.ordem",
     )
     .bind(sid)
-    .fetch_all(p)
+    .fetch_all(&mut *con)
     .await?;
     let (docs, vendido): (i64, i64) = sqlx::query_as(
         "SELECT COUNT(*), COALESCE(SUM(total), 0) FROM documentos WHERE caixa_sessao_id = ? AND estado = 'N' AND tipo_codigo IN ('FR','RC')",
     )
     .bind(sid)
-    .fetch_one(p)
+    .fetch_one(&mut *con)
     .await?;
     let (entradas, saidas): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(CASE WHEN tipo='ENTRADA' THEN valor END), 0), COALESCE(SUM(CASE WHEN tipo='SAIDA' THEN valor END), 0)
          FROM caixa_movimentos WHERE sessao_id = ? AND COALESCE(modo_codigo, 'NU') = 'NU'",
     )
     .bind(sid)
-    .fetch_one(p)
+    .fetch_one(&mut *con)
     .await?;
-    let movimentos = sqlx::query("SELECT * FROM caixa_movimentos WHERE sessao_id = ? ORDER BY id").bind(sid).fetch_all(p).await?;
-    // Artigos vendidos na sessão (o talão de fecho do KIGEST lista-os)
+    let movimentos = sqlx::query("SELECT * FROM caixa_movimentos WHERE sessao_id = ? ORDER BY id").bind(sid).fetch_all(&mut *con).await?;
+    // Artigos vendidos na sessão (o talão de fecho do KIGEST lista-os), com o sinal das notas de crédito: uma
+    // devolução abate a quantidade e o valor do artigo
     let artigos = sqlx::query(
-        "SELECT l.referencia, l.descricao, SUM(l.quantidade) AS quantidade, SUM(l.total) AS total
-         FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
-         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND d.tipo_codigo = 'FR'
+        "SELECT l.referencia, l.descricao,
+                SUM(CASE WHEN t.credito = 1 THEN -l.quantidade ELSE l.quantidade END) AS quantidade,
+                SUM(CASE WHEN t.credito = 1 THEN -l.total ELSE l.total END) AS total
+         FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'
          GROUP BY l.referencia, l.descricao ORDER BY total DESC",
     )
     .bind(sid)
-    .fetch_all(p)
+    .fetch_all(&mut *con)
+    .await?;
+    // os documentos da sessão, um a um: o número, o cliente, o total (com o sinal das notas de crédito) e como se pagou
+    let lista = sqlx::query(
+        "SELECT d.id, d.numero_doc, d.tipo_codigo, d.data_hora, d.entidade_nome AS cliente, d.estado,
+                CASE WHEN t.credito = 1 THEN -d.total ELSE d.total END AS total,
+                (SELECT group_concat(COALESCE(m.descricao, dp.modo_codigo), ', ') FROM documento_pagamentos dp
+                   LEFT JOIN modos_pagamento m ON m.codigo = dp.modo_codigo WHERE dp.documento_id = d.id) AS pagamento
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? ORDER BY d.data_hora, d.id",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
     .await?;
     // numerário recebido noutras moedas: fica na gaveta em dólares/euros, não em kwanzas; o troco desses
     // pagamentos saiu dos kwanzas (Kz na gaveta = numerário líquido − equivalente bruto do que entrou em moeda)
@@ -71,7 +89,7 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
          WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND dp.moeda IS NOT NULL GROUP BY dp.moeda ORDER BY dp.moeda",
     )
     .bind(sid)
-    .fetch_all(p)
+    .fetch_all(&mut *con)
     .await?;
     let em_moeda_kz: i64 = estrangeiras.iter().map(|r| r.get::<i64, _>("kz")).sum();
     let numerario: i64 = por_modo.iter().filter(|r| r.get::<String, _>("codigo") == "NU").map(|r| r.get::<i64, _>("total")).sum::<i64>() - em_moeda_kz;
@@ -105,10 +123,11 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
             })
             .collect()
     };
-    let mut v = json!({
+    Ok(json!({
         "sessao": sessao,
         "por_modo": db::rows_json(&por_modo),
         "documentos": docs,
+        "documentos_lista": db::rows_json(&lista),
         "total_vendido": vendido,
         "entradas": entradas,
         "saidas": saidas,
@@ -118,19 +137,39 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
         "moedas_estrangeiras": db::rows_json(&estrangeiras),
         "conferencia": conferencia,
         "cego": false,
-    });
+    }))
+}
+
+/// O relatório de uma sessão como está agora (o X do caixa aberto; num fecho sem arquivo, os valores de hoje). Com o
+/// caixa aberto, leva também as vendas online que o fecho incluiria e, no fecho cego, esconde os totais.
+pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
+    let mut con = st.pool.acquire().await?;
+    let mut v = calcular(&mut con, sid).await?;
+    let aberta = v["sessao"]["estado"] == "ABERTA";
+    if aberta {
+        // as vendas online que o fecho incluiria (à parte: o dinheiro não passou pela gaveta); quem fecha decide no
+        // diálogo, e a opção do posto diz o que vem marcado
+        let armazem = v["sessao"]["armazem_id"].as_i64();
+        let desde = v["sessao"]["aberta_em"].as_str().unwrap_or_default().to_string();
+        let vendas = super::caixa_fechos::online(&mut con, armazem, &desde, &db::agora()).await?;
+        v["online"] = super::caixa_fechos::online_json(&vendas, fecho_online(st));
+    }
+    drop(con);
     // fecho cego: com o caixa aberto, quem conta não vê o que o sistema espera
     if aberta && fecho_cego(st) && !st.sessao().map(|u| u.tem("caixa.ver_totais")).unwrap_or(false) {
         v["cego"] = json!(true);
         v["numerario_esperado"] = Value::Null;
         v["total_vendido"] = Value::Null;
         v["artigos"] = json!([]);
+        v["documentos_lista"] = json!([]);
         v["moedas_estrangeiras"] = json!([]);
         if let Some(modos) = v["por_modo"].as_array_mut() {
             for m in modos {
                 m["total"] = Value::Null;
             }
         }
+        // as vendas online também: só fica o que vem marcado
+        v["online"] = json!({ "incluidas": fecho_online(st), "cego": true });
     }
     Ok(v)
 }
@@ -138,6 +177,12 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
 /// O posto fecha o caixa às cegas (opção do posto «Fecho de caixa cego»).
 fn fecho_cego(st: &AppState) -> bool {
     st.posto().opcoes.get("fecho_cego").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+/// O fecho inclui as vendas online da loja (opção do posto «Incluir as vendas online no fecho»; ligada por omissão).
+/// Ao lado, quem fecha escolhe no diálogo só para esse fecho (`FecharIn::incluir_online`).
+fn fecho_online(st: &AppState) -> bool {
+    st.posto().opcoes.get("fecho_online").and_then(|v| v.as_bool()).unwrap_or(true)
 }
 
 /// Notas e moedas de kwanza aceites na contagem.
@@ -151,22 +196,60 @@ pub async fn estado(st: &AppState) -> AppResult<Value> {
     }
 }
 
-/// Resumo de qualquer sessão (reimpressão de fechos anteriores).
+/// Uma sessão para ver ou reimprimir: um fecho lê o arquivo (o Z como ficou no fecho, services/caixa_fechos.rs); o
+/// caixa aberto, o X de agora.
 pub async fn obter(st: &AppState, i: IdIn) -> AppResult<Value> {
     st.sessao()?;
+    if let Some(v) = super::caixa_fechos::obter(st, i.id).await? {
+        return Ok(v);
+    }
+    // um fecho ainda sem arquivo (importado do KIGEST depois de abrir a base): arquiva-se já, reconstruído
+    let estado: Option<String> = sqlx::query_scalar("SELECT estado FROM caixa_sessoes WHERE id = ?").bind(i.id).fetch_optional(&st.pool).await?;
+    if estado.as_deref() == Some("FECHADA") {
+        super::caixa_fechos::arquivar_reconstruido(&st.pool, i.id).await?;
+        if let Some(v) = super::caixa_fechos::obter(st, i.id).await? {
+            return Ok(v);
+        }
+    }
     resumo(st, i.id).await
 }
 
-/// Fechos de caixa (menu "Fechos de Caixa (POS)" do GC).
-pub async fn sessoes(st: &AppState) -> AppResult<Value> {
+/// Filtros do histórico dos fechos: as datas (AAAA-MM-DD), o posto e o n.º Z.
+#[derive(Deserialize, Default)]
+pub struct SessoesIn {
+    #[serde(default)]
+    de: Option<String>,
+    #[serde(default)]
+    ate: Option<String>,
+    #[serde(default)]
+    posto_id: Option<i64>,
+    #[serde(default)]
+    numero: Option<i64>,
+}
+
+/// Fechos de caixa (menu "Fechos de Caixa (POS)" do GC), com o arquivo de cada um. O vendido de um fecho arquivado é o
+/// do arquivo.
+pub async fn sessoes(st: &AppState, f: SessoesIn) -> AppResult<Value> {
     st.sessao()?;
+    let data = |d: Option<String>| d.map(|x| x.trim().to_string()).filter(|x| x.len() == 10);
     let rows = sqlx::query(
         "SELECT c.id, c.posto_id, ps.descricao AS posto, u.nome AS utilizador, c.aberta_em, c.fechada_em, c.valor_inicial,
                 c.valor_contado, c.estado, c.numero_z,
-                (SELECT COALESCE(SUM(total), 0) FROM documentos d WHERE d.caixa_sessao_id = c.id AND d.estado = 'N' AND d.tipo_codigo IN ('FR','RC')) AS total_vendido
+                COALESCE(json_extract(f.instantaneo, '$.total_vendido'),
+                         (SELECT COALESCE(SUM(total), 0) FROM documentos d WHERE d.caixa_sessao_id = c.id AND d.estado = 'N' AND d.tipo_codigo IN ('FR','RC'))) AS total_vendido,
+                json_extract(f.instantaneo, '$.numerario_esperado') AS numerario_esperado,
+                COALESCE(json_extract(f.instantaneo, '$.online.total'), 0) AS online_total,
+                f.id AS fecho_id, f.reconstruido, f.selo, f.criado_em AS arquivado_em
          FROM caixa_sessoes c JOIN utilizadores u ON u.id = c.utilizador_id LEFT JOIN postos ps ON ps.id = c.posto_id
-         ORDER BY c.aberta_em DESC, c.id DESC LIMIT 200",
+         LEFT JOIN caixa_fechos f ON f.sessao_id = c.id
+         WHERE (?1 IS NULL OR COALESCE(c.fechada_em, c.aberta_em) >= ?1) AND (?2 IS NULL OR c.aberta_em < date(?2, '+1 day'))
+           AND (?3 IS NULL OR c.posto_id = ?3) AND (?4 IS NULL OR c.numero_z = ?4)
+         ORDER BY c.aberta_em DESC, c.id DESC LIMIT 500",
     )
+    .bind(data(f.de))
+    .bind(data(f.ate))
+    .bind(f.posto_id)
+    .bind(f.numero)
     .fetch_all(&st.pool)
     .await?;
     Ok(db::rows_json(&rows))
@@ -182,14 +265,29 @@ pub async fn abrir(st: &AppState, i: AbrirIn) -> AppResult<Value> {
     if sessao_aberta(st).await?.is_some() {
         return Err(AppError::msg("Já existe um caixa aberto neste posto."));
     }
+    let posto = st.posto();
+    let valor = i.valor_inicial.max(0);
+    let mut tx = db::transacao(&st.pool).await?;
     let id = sqlx::query("INSERT INTO caixa_sessoes (posto_id, utilizador_id, aberta_em, valor_inicial) VALUES (?, ?, ?, ?)")
-        .bind(st.posto().id)
+        .bind(posto.id)
         .bind(s.id)
         .bind(db::agora())
-        .bind(i.valor_inicial.max(0))
-        .execute(&st.pool)
+        .bind(valor)
+        .execute(&mut *tx)
         .await?
         .last_insert_rowid();
+    // na auditoria selada, com a abertura (o selo põe-se no fim do pedido)
+    super::auditoria::registar_evento_em(
+        &mut tx,
+        st,
+        "ABRIR_CAIXA",
+        "caixa_sessoes",
+        id,
+        &format!("Caixa aberto no posto {} com o fundo de maneio de {}", posto.descricao, crate::agt::valor_pt(valor)),
+        Some(&json!({ "posto": posto.descricao, "valor_inicial": valor })),
+    )
+    .await?;
+    tx.commit().await?;
     resumo(st, id).await
 }
 
@@ -301,6 +399,20 @@ pub async fn movimento(st: &AppState, m: MovIn) -> AppResult<Value> {
             .await?;
     }
     super::aprovacoes::registar(&mut tx, aprovacao.as_ref(), &format!("Vale n.º {id}")).await?;
+    let saida = m.tipo == "SAIDA";
+    super::auditoria::registar_evento_em(
+        &mut tx,
+        st,
+        if saida { "SAIDA_CAIXA" } else { "ENTRADA_CAIXA" },
+        "caixa_movimentos",
+        id,
+        &format!("Vale n.º {id}: {} de {} ({descricao})", if saida { "saída" } else { "entrada" }, crate::agt::valor_pt(valor)),
+        Some(&json!({
+            "sessao_id": sid, "tipo": m.tipo, "valor": valor, "descricao": descricao, "rubrica": rubrica,
+            "modo": m.modo.as_deref().unwrap_or("NU"), "beneficiario": limpo(&m.beneficiario), "linhas": m.linhas.len(),
+        })),
+    )
+    .await?;
     tx.commit().await?;
     let mut r = resumo(st, sid).await?;
     r["movimento_id"] = json!(id);
@@ -339,6 +451,9 @@ pub struct FecharIn {
     contado_modos: Option<std::collections::BTreeMap<String, i64>>,
     #[serde(default)]
     observacoes: Option<String>,
+    /// Incluir as vendas online da loja neste fecho; sem ele, a opção do posto (ligada por omissão).
+    #[serde(default)]
+    incluir_online: Option<bool>,
 }
 
 pub async fn fechar(st: &AppState, f: FecharIn) -> AppResult<Value> {
@@ -370,18 +485,18 @@ pub async fn fechar(st: &AppState, f: FecharIn) -> AppResult<Value> {
         return Err(AppError::msg("O valor contado não pode ser negativo."));
     }
     let modos: std::collections::BTreeMap<String, i64> = f.contado_modos.unwrap_or_default().into_iter().filter(|(k, v)| k != "NU" && *v >= 0).collect();
+    let incluir_online = f.incluir_online.unwrap_or_else(|| fecho_online(st));
     let mut tx = crate::db::transacao(&st.pool).await?;
-    let numero_z: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(numero_z), 0) + 1 FROM caixa_sessoes WHERE posto_id IS ?")
-        .bind(st.posto().id)
-        .fetch_one(&mut *tx)
-        .await?;
-    sqlx::query(
-        "UPDATE caixa_sessoes SET estado = 'FECHADA', fechada_em = ?, valor_contado = ?, numero_z = ?, contagem = ?, contado_modos = ?,
-                cego = ?, fechada_por = ?, observacoes = ? WHERE id = ?",
+    // fecha e numera numa só instrução (o n.º Z do posto e a marca de fechado, com o bloqueio de escrita já preso)
+    let feito = sqlx::query(
+        "UPDATE caixa_sessoes SET estado = 'FECHADA', fechada_em = ?, valor_contado = ?,
+                numero_z = (SELECT COALESCE(MAX(numero_z), 0) + 1 FROM caixa_sessoes WHERE posto_id IS ?),
+                contagem = ?, contado_modos = ?, cego = ?, fechada_por = ?, observacoes = ?
+          WHERE id = ? AND estado = 'ABERTA'",
     )
     .bind(db::agora())
     .bind(valor_contado)
-    .bind(numero_z)
+    .bind(st.posto().id)
     .bind((!contagem.is_empty()).then(|| serde_json::to_string(&contagem).unwrap_or_default()))
     .bind((!modos.is_empty()).then(|| serde_json::to_string(&modos).unwrap_or_default()))
     .bind(fecho_cego(st) as i64)
@@ -390,14 +505,49 @@ pub async fn fechar(st: &AppState, f: FecharIn) -> AppResult<Value> {
     .bind(sid)
     .execute(&mut *tx)
     .await?;
-    tx.commit().await?;
-    let r = resumo(st, sid).await?;
-    let dif = valor_contado - r["numerario_esperado"].as_i64().unwrap_or(0);
-    sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (?, 'FECHO_CAIXA', ?)")
-        .bind(s.id)
-        .bind(format!("Z n.º {numero_z} (sessão {sid}): contado {}, diferença {}", crate::agt::total_fmt(valor_contado), crate::agt::total_fmt(dif)))
-        .execute(&st.pool)
+    if feito.rows_affected() == 0 {
+        return Err(AppError::msg("Este caixa já foi fechado."));
+    }
+    // o Z fica arquivado na mesma transacção (o instantâneo, o selo e as vendas online que ele fecha), e a auditoria
+    // com ele: o fecho e cada venda online incluída
+    let arquivo = super::caixa_fechos::arquivar(&mut tx, sid, incluir_online, Some(s.id), false).await?;
+    let numero_z = arquivo.v["sessao"]["numero_z"].as_i64().unwrap_or(0);
+    let dif = valor_contado - arquivo.v["numerario_esperado"].as_i64().unwrap_or(0);
+    super::auditoria::registar_evento_em(
+        &mut tx,
+        st,
+        "FECHO_CAIXA",
+        "caixa_sessoes",
+        sid,
+        &format!("Z n.º {numero_z} (sessão {sid}): contado {}, diferença {}", crate::agt::total_fmt(valor_contado), crate::agt::total_fmt(dif)),
+        Some(&json!({
+            "numero_z": numero_z, "fecho_id": arquivo.id, "selo": arquivo.selo, "valor_contado": valor_contado, "diferenca": dif,
+            "vendas_online": arquivo.vendas.len(), "online_incluidas": incluir_online,
+        })),
+    )
+    .await?;
+    for venda in &arquivo.vendas {
+        super::auditoria::registar_evento_em(
+            &mut tx,
+            st,
+            "FECHO_ONLINE",
+            "caixa_fechos",
+            arquivo.id,
+            &format!("Z n.º {numero_z} fecha a venda online {} ({})", venda.descricao(), crate::agt::valor_pt(venda.valor)),
+            Some(&venda.linha),
+        )
         .await?;
+    }
+    tx.commit().await?;
+    let mut r = super::caixa_fechos::obter(st, sid).await?.ok_or(AppError::NaoEncontrado)?;
+    // o documento do fecho na pasta dos documentos («Fechos de caixa»); se falhar, o fecho está feito na mesma
+    match super::caixa_fechos::guardar_ficheiro(st, &r) {
+        Ok(f) => r["arquivo"]["ficheiro_gravado"] = json!(f),
+        Err(e) => {
+            eprintln!("Fecho de caixa: o ficheiro do Z n.º {numero_z} não ficou gravado ({e}).");
+            r["arquivo"]["erro_ficheiro"] = json!(e.to_string());
+        }
+    }
     // o fecho de caixa é um bom momento para uma cópia de segurança
     super::sistema::copia_evento(st, "Cópia no fecho de caixa").await;
     Ok(r)
