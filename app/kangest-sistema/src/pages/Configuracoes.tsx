@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Activity, CheckCircle2, DatabaseBackup, Globe, ImagePlus, Inbox, Monitor, MonitorSmartphone, Network, Plus, Printer, ScanBarcode, Server, Wifi, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRightLeft, CheckCircle2, DatabaseBackup, Globe, ImagePlus, Inbox, Monitor, MonitorSmartphone, Network, Plus, Printer, ScanBarcode, Server, Wifi, XCircle } from "lucide-react";
 import { abrirVisorEcra, logoParaRaster } from "@/lib/equipamento";
 import { CabecalhoEmpresa, useEmpresa } from "@/components/PrintCabecalho";
 import { PrintPortal } from "@/components/DocumentoPrint";
@@ -1001,6 +1001,7 @@ function Sistema() {
           </Button>
         </div>
       </Card>
+      <OficialDesteComputador />
       {restaurar && <RestaurarCopia alvo={restaurar} temSenha={!!data?.config.tem_senha} onClose={() => setRestaurar(null)} metodo="sistema.restaurar" />}
     </div>
   );
@@ -1048,6 +1049,141 @@ export function RestaurarCopia({
         </Button>
         <Button loading={busy} onClick={confirmar}>
           Restaurar e reiniciar
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** O KanGest oficial encontrado neste computador (services/oficial.rs). */
+export type OficialEncontrado = { pasta: string; bytes: number; alterada_em: string | null; aberto: boolean; aviso: string };
+
+type OficialTrazido = {
+  origem: string;
+  copia_da_base_atual: string | null;
+  contagens: { tabelas: number; linhas: number; documentos: number; artigos: number; entidades: number; utilizadores: number };
+  segredos: { recifrados: number; ilegiveis: string[] };
+  posto: number;
+  aviso: string;
+};
+
+/** Configurações → Sistema: trazer os dados do KanGest oficial deste computador (só para uma edição ainda sem dados). */
+function OficialDesteComputador() {
+  const { data } = useQuery({
+    queryKey: ["oficial"],
+    queryFn: () => call<{ oficial: OficialEncontrado | null; procura_em: string; dados: string[]; a_mao: string }>("sistema.oficial"),
+    enabled: !MODO_WEB,
+  });
+  const [trazer, setTrazer] = useState(false);
+  // no browser, a pasta seria a do servidor: só na aplicação deste computador
+  if (MODO_WEB || !data) return null;
+  return (
+    <Card className="p-6">
+      <div className="mb-1 flex items-center gap-2 font-semibold">
+        <ArrowRightLeft className="size-5 text-brand" /> Dados do KanGest oficial
+      </div>
+      {!data.oficial ? (
+        <p className="text-ink-2">
+          Não encontrei o KanGest oficial neste computador (procurei em <span className="break-all font-mono text-[12.5px]">{data.procura_em}</span>). {data.a_mao}
+        </p>
+      ) : data.dados.length ? (
+        <>
+          <p className="text-ink-2">
+            Encontrei o KanGest oficial neste computador, mas este KanGest Livraria já tem dados ({data.dados.join(", ")}): trazer os do oficial substituía-os, por isso
+            não se faz aqui.
+          </p>
+          <LinhaOficial oficial={data.oficial} />
+          <p className="mt-2 text-[13px] text-ink-3">{data.a_mao}</p>
+        </>
+      ) : (
+        <>
+          <p className="text-ink-2">
+            Encontrei o KanGest oficial neste computador. Os dados dele (clientes, artigos, stock, documentos, utilizadores e as senhas guardadas) podem passar para aqui,
+            sem mexer no oficial.
+          </p>
+          <LinhaOficial oficial={data.oficial} />
+          <Button className="mt-3" onClick={() => setTrazer(true)}>
+            Trazer os dados do oficial
+          </Button>
+        </>
+      )}
+      {trazer && data.oficial && <TrazerOficial oficial={data.oficial} metodo="sistema.importarOficial" onClose={() => setTrazer(false)} />}
+    </Card>
+  );
+}
+
+/** Onde está o KanGest oficial, o tamanho e a última alteração da base dele. */
+export function LinhaOficial({ oficial }: { oficial: OficialEncontrado }) {
+  return (
+    <p className="mt-1.5 text-[12.5px] text-ink-3">
+      <span className="break-all font-mono">{oficial.pasta}</span> · {(oficial.bytes / 1024 / 1024).toFixed(1)} MB · alterada em {dataHora(oficial.alterada_em)}
+      {oficial.aberto && <span className="text-accent-ink"> · parece estar aberto: feche-o antes, para vir tudo o que ele gravou</span>}
+    </p>
+  );
+}
+
+/** Trazer os dados do oficial: a confirmação e o resultado, com o aviso da AGT antes e depois. A troca faz-se ao reiniciar. */
+export function TrazerOficial({ oficial, metodo, onClose }: { oficial: OficialEncontrado; metodo: "setup.importarOficial" | "sistema.importarOficial"; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [feito, setFeito] = useState<OficialTrazido | null>(null);
+  async function trazer() {
+    setBusy(true);
+    try {
+      setFeito(await call<OficialTrazido>(metodo));
+    } catch (e) {
+      toast.error((e as Error).message, { duration: 15000 });
+    } finally {
+      setBusy(false);
+    }
+  }
+  const aviso = (texto: string) => (
+    <div className="mt-4 flex gap-2 rounded-lg border border-accent/40 bg-accent-50 p-3 text-[13px] text-accent-ink">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      <span>{texto}</span>
+    </div>
+  );
+  if (feito) {
+    const c = feito.contagens;
+    return (
+      <Modal open onClose={onClose} title="Dados do KanGest oficial prontos" width="max-w-lg">
+        <p className="text-ink-2">
+          Conferidos tabela a tabela: <b>{c.documentos}</b> documentos, <b>{c.artigos}</b> artigos, <b>{c.entidades}</b> clientes e fornecedores e <b>{c.utilizadores}</b>{" "}
+          utilizadores ({c.tabelas} tabelas, {c.linhas} linhas).
+          {feito.segredos.recifrados > 0 && ` Vieram também ${feito.segredos.recifrados} senhas e chaves guardadas.`}
+        </p>
+        {feito.segredos.ilegiveis.length > 0 && (
+          <p className="mt-2 text-[13px] text-ink-3">Por introduzir outra vez (não abriram neste computador): {feito.segredos.ilegiveis.join(", ")}.</p>
+        )}
+        {feito.copia_da_base_atual && (
+          <p className="mt-2 text-[13px] text-ink-3">
+            A base anterior ficou guardada em <span className="break-all font-mono">{feito.copia_da_base_atual}</span>.
+          </p>
+        )}
+        <p className="mt-2 text-ink-2">
+          O KanGest reinicia para passar a usar estes dados (este computador fica como o posto {feito.posto}). Depois, entre com os utilizadores e as senhas do KanGest oficial.
+        </p>
+        {aviso(feito.aviso)}
+        <div className="mt-5 flex justify-end">
+          <Button onClick={() => reiniciar()}>Reiniciar agora</Button>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal open onClose={onClose} title="Trazer os dados do KanGest oficial" width="max-w-lg">
+      <p className="text-ink-2">
+        A base do KanGest oficial é copiada (o oficial fica como está), cifrada com a chave deste KanGest Livraria e conferida tabela a tabela. As senhas guardadas
+        (Facturação Electrónica, email) e o n.º do posto vêm também; a rede, o proxy e a pasta dos documentos ficam como estão aqui.
+        {metodo === "sistema.importarOficial" && " Antes, guarda-se uma cópia da base actual (em «copias»)."} O programa reinicia no fim.
+      </p>
+      <LinhaOficial oficial={oficial} />
+      {aviso(oficial.aviso)}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button loading={busy} onClick={trazer}>
+          Trazer os dados
         </Button>
       </div>
     </Modal>

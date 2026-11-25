@@ -46,20 +46,23 @@ trait Cofre {
     fn gravar(&self, id: &str, chave: &[u8; 32]) -> Result<(), String>;
 }
 
+/// Um registo do cofre do sistema por serviço: o desta edição e, só para ler, o do KanGest oficial.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-struct CofreSistema;
+struct CofreSistema {
+    servico: &'static str,
+}
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 impl Cofre for CofreSistema {
     fn ler(&self, id: &str) -> Result<Option<[u8; 32]>, String> {
-        match keyring::Entry::new(SERVICO, id).map_err(|e| e.to_string())?.get_secret() {
+        match keyring::Entry::new(self.servico, id).map_err(|e| e.to_string())?.get_secret() {
             Ok(b) => b.try_into().map(Some).map_err(|_| "a chave no cofre está danificada".to_string()),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(e.to_string()),
         }
     }
     fn gravar(&self, id: &str, chave: &[u8; 32]) -> Result<(), String> {
-        keyring::Entry::new(SERVICO, id).map_err(|e| e.to_string())?.set_secret(chave).map_err(|e| e.to_string())
+        keyring::Entry::new(self.servico, id).map_err(|e| e.to_string())?.set_secret(chave).map_err(|e| e.to_string())
     }
 }
 
@@ -67,6 +70,14 @@ impl Cofre for CofreSistema {
 /// O da edição da livraria, diferente do KanGest oficial (`ao.kigest.app`): os dois programas no mesmo computador
 /// não partilham a chave mestra.
 const SERVICO: &str = "ao.livrariaadventista.kangest";
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+/// O do KanGest oficial (o identificador dele). Só se lê, para trazer os dados dele (services/oficial.rs): nunca se
+/// grava nada lá.
+const SERVICO_OFICIAL: &str = "ao.kigest.app";
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+static COFRE_EDICAO: CofreSistema = CofreSistema { servico: SERVICO };
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+static COFRE_OFICIAL: CofreSistema = CofreSistema { servico: SERVICO_OFICIAL };
 /// O ficheiro `kangest.chave` guarda, em vez da chave, «cofre1:<identificador>» (mover a pasta de dados leva o
 /// identificador consigo). Nas versões anteriores tinha os 32 bytes da chave.
 const ID_PREFIXO: &str = "cofre1:";
@@ -163,12 +174,45 @@ fn obter_chave(pasta: &Path, cofre: Option<&dyn Cofre>, criar: bool) -> AppResul
 ///   define KANGEST_COFRE_MACOS); nas outras ficam no ficheiro, e o Porta-chaves só se lê se já lá houver uma chave.
 fn cofre_do_sistema() -> (Option<&'static dyn Cofre>, bool) {
     #[cfg(target_os = "windows")]
-    let r: (Option<&'static dyn Cofre>, bool) = (Some(&CofreSistema), true);
+    let r: (Option<&'static dyn Cofre>, bool) = (Some(&COFRE_EDICAO), true);
     #[cfg(target_os = "macos")]
-    let r: (Option<&'static dyn Cofre>, bool) = (Some(&CofreSistema), option_env!("KANGEST_COFRE_MACOS").is_some_and(|v| v == "1"));
+    let r: (Option<&'static dyn Cofre>, bool) = (Some(&COFRE_EDICAO), option_env!("KANGEST_COFRE_MACOS").is_some_and(|v| v == "1"));
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let r: (Option<&'static dyn Cofre>, bool) = (None, false);
     r
+}
+
+/// O cofre do sistema onde o KanGest oficial guarda a chave mestra (o serviço dele). Só se lê.
+fn cofre_oficial() -> Option<&'static dyn Cofre> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    let c: Option<&'static dyn Cofre> = Some(&COFRE_OFICIAL);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let c: Option<&'static dyn Cofre> = None;
+    c
+}
+
+/// A chave mestra de outra pasta de dados, **sem criar nem gravar nada**: nem no `kangest.chave` dela nem no cofre.
+/// Ao contrário de `obter_chave`, uma chave que falte é um erro (não se cria outra por cima).
+fn ler_chave(pasta: &Path, cofre: Option<&dyn Cofre>) -> AppResult<[u8; 32]> {
+    let f = pasta.join(FICHEIRO);
+    let b = std::fs::read(&f).map_err(|e| AppError::msg(format!("não foi possível ler {} ({e}).", f.display())))?;
+    if let Some(id) = std::str::from_utf8(&b).ok().and_then(|t| t.trim().strip_prefix(ID_PREFIXO)) {
+        let Some(c) = cofre else {
+            return Err(AppError::msg(format!("{} refere o cofre do sistema, que este computador não tem.", f.display())));
+        };
+        return match c.ler(id) {
+            Ok(Some(k)) => Ok(k),
+            Ok(None) => Err(AppError::msg("a chave não está no cofre do sistema deste utilizador.")),
+            Err(motivo) => Err(AppError::msg(format!("o cofre do sistema não deixou ler a chave ({motivo})."))),
+        };
+    }
+    b.try_into().map_err(|_| AppError::msg(format!("o ficheiro {} está danificado.", f.display())))
+}
+
+/// A chave mestra do KanGest oficial (a pasta de dados dele): os 32 bytes do `kangest.chave` dele ou, com
+/// «cofre1:<id>», o cofre do sistema com o serviço dele. Só se lê (services/oficial.rs).
+pub fn chave_mestra_oficial(pasta: &Path) -> AppResult<[u8; 32]> {
+    ler_chave(pasta, cofre_oficial())
 }
 
 /// Lê (ou cria, na primeira vez) a chave mestra desta pasta de dados.
@@ -193,22 +237,35 @@ pub fn chave_base() -> AppResult<String> {
              (ou autorize o KanGest) e abra o programa outra vez.",
         ));
     }
-    let k = CHAVE.get_or_init(aleatorio::<32>);
-    let mut dados = b"kangest-base-de-dados-v1".to_vec();
-    dados.extend_from_slice(k);
-    Ok(hex(ring::digest::digest(&ring::digest::SHA256, &dados).as_ref()))
+    Ok(chave_base_de(mestra()))
 }
 
-/// Sem `iniciar` (testes), usa uma chave só desta execução.
-fn chave() -> LessSafeKey {
-    let k = CHAVE.get_or_init(aleatorio::<32>);
+/// A chave da base (SQLCipher) que vem de uma chave mestra, em hexadecimal. A conta é a mesma no KanGest oficial
+/// (1.4.4): é com ela que se abre a base dele para trazer os dados (services/oficial.rs).
+pub fn chave_base_de(chave_mestra: &[u8; 32]) -> String {
+    let mut dados = b"kangest-base-de-dados-v1".to_vec();
+    dados.extend_from_slice(chave_mestra);
+    hex(ring::digest::digest(&ring::digest::SHA256, &dados).as_ref())
+}
+
+/// A chave mestra desta instalação. Sem `iniciar` (testes), uma chave só desta execução.
+fn mestra() -> &'static [u8; 32] {
+    CHAVE.get_or_init(aleatorio::<32>)
+}
+
+fn aead(k: &[u8; 32]) -> LessSafeKey {
     LessSafeKey::new(UnboundKey::new(&AES_256_GCM, k).expect("chave AES-256"))
 }
 
 pub fn cifrar(texto: &str) -> String {
+    cifrar_com(mestra(), texto)
+}
+
+/// Cifra com uma chave mestra dada (`cifrar` usa a desta instalação).
+pub fn cifrar_com(k: &[u8; 32], texto: &str) -> String {
     let nonce = aleatorio::<NONCE_LEN>();
     let mut dados = texto.as_bytes().to_vec();
-    chave()
+    aead(k)
         .seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(AAD), &mut dados)
         .expect("cifrar");
     let mut tudo = nonce.to_vec();
@@ -222,6 +279,11 @@ pub fn cifrado(valor: &str) -> bool {
 
 /// Decifra um valor guardado; um valor antigo (em texto) passa tal como está.
 pub fn decifrar(valor: &str) -> Result<String, String> {
+    decifrar_com(mestra(), valor)
+}
+
+/// Decifra com uma chave mestra dada (a do KanGest oficial, ao trazer os dados dele).
+pub fn decifrar_com(k: &[u8; 32], valor: &str) -> Result<String, String> {
     let Some(b64) = valor.strip_prefix(PREFIXO) else { return Ok(valor.to_string()) };
     let tudo = B64.decode(b64.trim()).map_err(|_| "valor cifrado ilegível".to_string())?;
     if tudo.len() < NONCE_LEN + 16 {
@@ -230,7 +292,7 @@ pub fn decifrar(valor: &str) -> Result<String, String> {
     let (n, c) = tudo.split_at(NONCE_LEN);
     let nonce = Nonce::try_assume_unique_for_key(n).map_err(|_| "valor cifrado ilegível".to_string())?;
     let mut dados = c.to_vec();
-    let texto = chave()
+    let texto = aead(k)
         .open_in_place(nonce, Aad::from(AAD), &mut dados)
         .map_err(|_| "foi cifrado noutra instalação (outra chave mestra)".to_string())?;
     String::from_utf8(texto.to_vec()).map_err(|_| "valor cifrado ilegível".to_string())
@@ -396,10 +458,10 @@ mod testes {
         let p = pasta("real");
         let antiga = aleatorio::<32>();
         std::fs::write(p.join(FICHEIRO), antiga).unwrap();
-        assert_eq!(obter_chave(&p, Some(&CofreSistema), true).unwrap(), Some(antiga));
+        assert_eq!(obter_chave(&p, Some(&COFRE_EDICAO), true).unwrap(), Some(antiga));
         let f = std::fs::read_to_string(p.join(FICHEIRO)).unwrap();
         let id = f.strip_prefix(ID_PREFIXO).expect("passou para o Porta-chaves").to_string();
-        assert_eq!(obter_chave(&p, Some(&CofreSistema), true).unwrap(), Some(antiga), "lida de volta do Porta-chaves");
+        assert_eq!(obter_chave(&p, Some(&COFRE_EDICAO), true).unwrap(), Some(antiga), "lida de volta do Porta-chaves");
         keyring::Entry::new(SERVICO, &id).unwrap().delete_credential().unwrap();
         let _ = std::fs::remove_dir_all(&p);
     }
@@ -424,6 +486,66 @@ mod testes {
         for x in [p, p2, p3] {
             let _ = std::fs::remove_dir_all(x);
         }
+    }
+
+    /// A chave da base é a mesma conta do KanGest oficial 1.4.4: SHA-256 do rótulo e da chave mestra (valores
+    /// calculados à parte). Se mudar, a base do oficial deixa de abrir aqui.
+    #[test]
+    fn chave_da_base_igual_a_do_oficial() {
+        assert_eq!(chave_base_de(&[0u8; 32]), "4a3e92ab67d18939786ea4044826790f5e83a32524849aaf8568f7d03850d420");
+        let k: [u8; 32] = std::array::from_fn(|i| i as u8);
+        assert_eq!(chave_base_de(&k), "f6e1c77d6e9dc597689b8a414d2b14593b95027be619acdbd6ec69ce5cdb33cb");
+        assert_eq!(chave_base().unwrap(), chave_base_de(mestra()), "a desta instalação faz a mesma conta");
+    }
+
+    /// A chave do oficial só se lê: nada se cria nem se grava no ficheiro nem no cofre dele, nem quando falta.
+    #[test]
+    fn chave_do_oficial_so_se_le() {
+        // os 32 bytes no ficheiro (o oficial no macOS sem certificado, ou um ficheiro antigo)
+        let p = pasta("oficial-ficheiro");
+        let k = aleatorio::<32>();
+        std::fs::write(p.join(FICHEIRO), k).unwrap();
+        assert_eq!(chave_mestra_oficial(&p).unwrap(), k);
+        assert_eq!(ler_chave(&p, Some(&Falso::default())).unwrap(), k);
+        assert_eq!(std::fs::read(p.join(FICHEIRO)).unwrap(), k, "o ficheiro não muda (não passa para o cofre)");
+        // «cofre1:<id>»: lê-se do cofre do oficial e não se grava nada
+        let c = Falso::default();
+        c.itens.borrow_mut().insert("abc123".into(), k);
+        std::fs::write(p.join(FICHEIRO), format!("{ID_PREFIXO}abc123")).unwrap();
+        assert_eq!(ler_chave(&p, Some(&c)).unwrap(), k);
+        assert_eq!(c.itens.borrow().len(), 1);
+        // a chave não está no cofre: erro, e não se cria outra (o obter_chave criava)
+        let vazio = Falso::default();
+        assert!(ler_chave(&p, Some(&vazio)).unwrap_err().to_string().contains("não está no cofre"));
+        assert!(vazio.itens.borrow().is_empty(), "nada gravado no cofre do oficial");
+        let recusa = Falso { falha_ler: true, ..Default::default() };
+        assert!(ler_chave(&p, Some(&recusa)).unwrap_err().to_string().contains("não deixou ler"));
+        assert!(ler_chave(&p, None).unwrap_err().to_string().contains("cofre do sistema"));
+        assert_eq!(std::fs::read_to_string(p.join(FICHEIRO)).unwrap(), format!("{ID_PREFIXO}abc123"), "o ficheiro não muda");
+        // sem ficheiro: erro, e o ficheiro não se cria
+        let sem = pasta("oficial-sem");
+        assert!(ler_chave(&sem, Some(&c)).is_err());
+        assert!(!sem.join(FICHEIRO).exists());
+        // danificado
+        std::fs::write(sem.join(FICHEIRO), b"curto").unwrap();
+        assert!(ler_chave(&sem, None).unwrap_err().to_string().contains("danificado"));
+        for x in [p, sem] {
+            let _ = std::fs::remove_dir_all(x);
+        }
+    }
+
+    /// Os segredos de outra instalação decifram-se com a chave dela e voltam a cifrar-se com a desta.
+    #[test]
+    fn segredo_de_outra_chave_recifrado() {
+        let outra = aleatorio::<32>();
+        let v = cifrar_com(&outra, "senha da FE");
+        assert!(cifrado(&v) && !v.contains("senha"));
+        assert!(decifrar(&v).unwrap_err().contains("outra chave"), "com a chave desta instalação não abre");
+        let texto = decifrar_com(&outra, &v).unwrap();
+        assert_eq!(texto, "senha da FE");
+        let nova = cifrar(&texto);
+        assert_eq!(decifrar(&nova).unwrap(), "senha da FE");
+        assert!(decifrar_com(&outra, &nova).is_err(), "e já não abre com a do oficial");
     }
 
     #[test]

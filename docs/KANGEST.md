@@ -240,10 +240,14 @@ Partiu do KanGest oficial 1.4.4 ([fernandotunas6-bot/KanGest](https://github.com
   oficial que venha numa configuração copiada (as releases do GitHub ou o kangest.pages.dev) passa a esta, por isso a
   versão genérica nunca se instala por cima. Enquanto não houver lá manifesto, «Verificar» dá erro e não instala nada
   (ver «Descarregar e actualizar», abaixo).
-- **Trazer os dados de um KanGest oficial:** no oficial, *Configurações → Sistema → Fazer cópia* (a cópia exportada,
-  portátil) ou uma cópia externa com senha; na edição, «Já tem uma cópia de segurança do KanGest?» no primeiro
-  arranque, ou *Configurações → Sistema → Cópias guardadas → Restaurar*. A pasta de dados copiada à mão não abre (a
-  base vai cifrada com a chave do cofre do oficial), e uma cópia de um oficial mais recente do que a edição é recusada
+- **Trazer os dados de um KanGest oficial:** com o oficial no mesmo computador, a edição encontra-o (a pasta
+  `ao.kigest.app`, ao lado da dela) e oferece trazer os dados dele no primeiro arranque, ou em *Configurações → Sistema
+  → Dados do KanGest oficial* enquanto ainda não tem dados: copia a base dele sem lhe tocar, passa-a para a sua chave e
+  confere-a tabela a tabela (desde a 1.4.5). À mão, noutro computador: no oficial, *Configurações → Sistema → Fazer
+  cópia* (a cópia exportada, portátil) ou uma cópia externa com senha; na edição, «Já tem uma cópia de segurança do
+  KanGest?» no primeiro arranque, ou *Configurações → Sistema → Cópias guardadas → Restaurar*. A pasta de dados copiada
+  à mão não abre (a base vai cifrada com a chave do cofre do oficial), e um oficial mais recente do que a edição é
+  recusado. Depois, o oficial não pode continuar a emitir nas mesmas séries
   ([COPIAS.md](../app/kangest-sistema/docs/COPIAS.md)).
 - **CI:** [`.github/workflows/kangest-livraria.yml`](../.github/workflows/kangest-livraria.yml) verifica a edição
   (tipos, clippy e testes) em cada PR que lhe mexa, e gera o instalador do Windows à mão. Os workflows de

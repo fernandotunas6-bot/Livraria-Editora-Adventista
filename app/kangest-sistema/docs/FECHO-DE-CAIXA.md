@@ -1,6 +1,6 @@
 # O fecho de caixa
 
-Como o KanGest Livraria fecha o caixa e o guarda (`services/caixa.rs`, `services/caixa_fechos.rs`, migração 0062).
+Como o KanGest Livraria fecha o caixa e o guarda (`services/caixa.rs`, `services/caixa_fechos.rs`, migração 0061).
 
 A regra é a de sempre: **tudo automático por omissão, e sempre com a opção manual ao lado**.
 
@@ -22,7 +22,7 @@ A regra é a de sempre: **tudo automático por omissão, e sempre com a opção 
 **Automático:**
 - **O Z fica arquivado** na mesma transacção que fecha o caixa (`caixa_fechos`). Fica o relatório completo, tal como
   estava nesse momento, com um selo SHA-256.
-- **O arquivo não se altera nem se apaga:** os gatilhos da 0062 recusam. Ver ou reimprimir um fecho lê o arquivo, por
+- **O arquivo não se altera nem se apaga:** os gatilhos da 0061 recusam. Ver ou reimprimir um fecho lê o arquivo, por
   isso um documento anulado depois já não muda um Z antigo. Se o selo deixar de conferir, o ecrã avisa.
 - **Os fechos de antes desta versão**, e os que vêm do KIGEST, arquivam-se ao abrir a base, com os valores desse dia,
   e ficam marcados como «reconstruídos».

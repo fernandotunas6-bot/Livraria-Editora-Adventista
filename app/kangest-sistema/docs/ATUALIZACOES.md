@@ -1,6 +1,26 @@
 # Publicar actualizações do KanGest
 
-O KanGest verifica actualizações em **Sistema → Sobre o KanGest → Actualizações**. A origem é um endereço (`https://…`) ou uma pasta partilhada na rede (`\\SERVIDOR\KanGest`). Cada posto actualiza-se a si próprio; antes de instalar é feita uma cópia de segurança da base em `copias/kangest-antes-de-<versão>.db`.
+O KanGest verifica actualizações em **Sistema → Sobre o KanGest → Actualizações**. A origem é um endereço (`https://…`)
+ou uma pasta partilhada na rede (`\\SERVIDOR\KanGest`). **Vazia, usa-se a origem oficial da edição,
+`https://livrariaadventista.ao/kangest/actualizacoes`.** Cada posto actualiza-se a si próprio.
+
+## O que o programa faz sozinho, e o que fica à mão
+
+- **Procura as versões novas sozinho** (`services/atualizacao.rs`, `iniciar`): no computador que guarda a base (o
+  servidor da loja ou o computador único), dois minutos depois de abrir e depois de 6 em 6 horas. Quando há versão nova
+  para o sistema, avisa no computador (uma vez por versão) e Sobre o KanGest mostra-a. Sem Internet, tenta na volta
+  seguinte. Desliga-se no mesmo cartão («Procurar sozinho as versões novas»); o «Verificar atualização» fica sempre.
+  Os postos em rede procuram à mão.
+- **Descarregar e instalar são sempre à mão**, por quem tem a permissão «Actualizações».
+- **A cópia de antes da actualização** (`copias/kangest-antes-de-<versão>.db`) faz-se ao descarregar e outra vez ao
+  instalar (com o que se vendeu entretanto), verificada como as automáticas (`PRAGMA integrity_check` e a marca
+  `.verificada`). Sem ela, o instalador não abre. A rotação das cópias automáticas não lhe toca: guardam-se as das
+  últimas 5 actualizações ([COPIAS.md](COPIAS.md)).
+- **Depois de instalada**, o primeiro arranque da versão nova nota a mudança de versão e verifica a base em segundo
+  plano (o ficheiro, as ligações entre tabelas, a cadeia da AGT, a auditoria, o stock e o caixa). Só avisa: com
+  problemas graves, oferece restaurar à mão a cópia de antes ([BASE-DE-DADOS.md](BASE-DE-DADOS.md#verificações)).
+- **Os ajustes de dados** que a versão nova traga correm uma vez no arranque, ficam registados e aparecem em Sobre o
+  KanGest ([BASE-DE-DADOS.md](BASE-DE-DADOS.md#ajustes-de-dados)).
 
 ## 1. Gerar os instaladores
 
@@ -27,12 +47,14 @@ ficheiro trocado entretanto não se instala.
 
 ## 3. Manifesto `kangest-atualizacao.json`
 
-**Na publicação pelo GitHub Actions o manifesto é gerado sozinho** (trabalho «manifesto das actualizações»: assina os
-três instaladores e anexa `kangest-atualizacao.json`, `SHA256SUMS.txt` e os `.sig` à release). Ao publicar o site
-(`site.yml`), o manifesto e os instaladores da versão do site são copiados para `kangest.pages.dev/actualizacoes`.
-A origem a indicar nos postos é **`https://kangest.pages.dev/actualizacoes`** (botão «Usar a origem oficial»):
-funciona também com o repositório privado. As instalações que tinham gravada a origem antiga
-(`https://github.com/fernandotunas6-bot/KanGest/releases/latest/download`) passam a ler a do site sozinhas.
+**Na edição, o manifesto é gerado pelo GitHub Actions** (`.github/workflows/kangest-livraria.yml` na raiz do
+repositório da livraria, «publicar no site», só a partir do `main`): assina o instalador com a chave das actualizações
+da edição, escreve `kangest-atualizacao.json` com as notas de `docs/versoes/v<versão>.md`, guarda tudo numa Release
+`kangest-livraria-v…` e publica o site outra vez. O deploy do site copia o instalador e o manifesto para
+**`https://livrariaadventista.ao/kangest/actualizacoes/`**, que é a origem oficial (`ORIGEM_OFICIAL`): já vem no
+programa, não é preciso escrevê-la. As origens do KanGest oficial (as releases do GitHub dele e o
+`kangest.pages.dev`), se vierem numa configuração antiga, lêem-se como a da edição: as versões do oficial nunca se
+instalam por cima da edição.
 
 Para uma pasta partilhada, copie para lá os instaladores com os `.sig` e gere o manifesto com
 `python3 scripts/manifesto-atualizacao.py <pasta> <versão> [docs/versoes/v<versão>.md]`, ou escreva-o à mão,

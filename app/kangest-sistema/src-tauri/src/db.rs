@@ -59,8 +59,8 @@ async fn contagens(c: &mut sqlx::SqliteConnection, esquema: &str) -> AppResult<V
 }
 
 /// Copia a base ligada em `c` (o esquema `main`) para `destino`, com a chave `chave_destino` (`None`: em claro), com
-/// o `sqlcipher_export`. Confere que a cópia tem as mesmas tabelas e linhas.
-async fn exportar(c: &mut sqlx::SqliteConnection, destino: &Path, chave_destino: Option<&str>) -> AppResult<()> {
+/// o `sqlcipher_export`. Confere que a cópia tem as mesmas tabelas e linhas, e devolve-as.
+async fn exportar(c: &mut sqlx::SqliteConnection, destino: &Path, chave_destino: Option<&str>) -> AppResult<Vec<(String, i64)>> {
     use crate::error::AppError;
     if destino.exists() {
         std::fs::remove_file(destino).map_err(|e| AppError::msg(format!("Não foi possível substituir {}: {e}", destino.display())))?;
@@ -77,7 +77,7 @@ async fn exportar(c: &mut sqlx::SqliteConnection, destino: &Path, chave_destino:
         if a != b {
             return Err(AppError::msg("A cópia da base não ficou igual ao original."));
         }
-        Ok(())
+        Ok(a)
     }
     .await;
     if r.is_err() {
@@ -94,7 +94,53 @@ async fn exportar(c: &mut sqlx::SqliteConnection, destino: &Path, chave_destino:
 /// poder restaurar noutro computador, onde a chave deste não existe. As cópias locais (`VACUUM INTO`) saem cifradas.
 pub async fn exportar_em_claro(pool: &SqlitePool, destino: &Path) -> AppResult<()> {
     let mut c = pool.acquire().await?;
-    exportar(&mut c, destino, None).await
+    exportar(&mut c, destino, None).await?;
+    Ok(())
+}
+
+/// Copia a base `origem` (cifrada com `chave_origem`, ou em claro) para `destino`, cifrada com `chave_destino`: o
+/// `sqlcipher_export` conferido tabela a tabela e, depois, o destino aberto outra vez, só com a chave nova, e contado
+/// de novo. A origem tem de ser uma cópia: abre-se para escrita (o ATTACH do destino precisa dela) e o que estiver no
+/// WAL dela entra antes na base. Devolve as tabelas e as linhas de cada uma.
+pub async fn recifrar(origem: &Path, chave_origem: Option<&str>, destino: &Path, chave_destino: &str) -> AppResult<Vec<(String, i64)>> {
+    use crate::error::AppError;
+    use sqlx::{ConnectOptions, Connection};
+    if !origem.is_file() {
+        return Err(AppError::msg(format!("Não encontro {}.", origem.display())));
+    }
+    // create_if_missing: sem ele o ATTACH não pode criar o ficheiro novo
+    let mut o = SqliteConnectOptions::new().filename(origem).create_if_missing(true);
+    if let Some(k) = chave_origem {
+        o = com_chave(o, k);
+    }
+    let mut c = o.connect().await?;
+    let r = exportar_copia(&mut c, destino, chave_destino).await;
+    c.close().await.ok();
+    if r.is_err() {
+        let _ = std::fs::remove_file(destino);
+    }
+    let antes = r?;
+    let depois = match com_chave(SqliteConnectOptions::new().filename(destino).read_only(true), chave_destino).connect().await {
+        Ok(mut d) => {
+            let n = contagens(&mut d, "main").await;
+            d.close().await.ok();
+            n.ok()
+        }
+        Err(_) => None,
+    };
+    if depois.as_ref() != Some(&antes) {
+        let _ = std::fs::remove_file(destino);
+        return Err(AppError::msg("A cópia da base, aberta com a chave nova, não ficou igual ao original."));
+    }
+    Ok(antes)
+}
+
+/// Na ligação à cópia: confere que abre (com a chave errada o SQLCipher responde «file is not a database», e aí não
+/// se cria destino nenhum), passa o WAL para a base e exporta.
+async fn exportar_copia(c: &mut sqlx::SqliteConnection, destino: &Path, chave_destino: &str) -> AppResult<Vec<(String, i64)>> {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sqlite_master").fetch_one(&mut *c).await?;
+    sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&mut *c).await?;
+    exportar(c, destino, Some(chave_destino)).await
 }
 
 /// Cifra uma base em claro no próprio sítio (versões anteriores, ou uma cópia em claro restaurada): exporta para um
@@ -161,7 +207,7 @@ pub async fn abrir(caminho: &Path) -> AppResult<SqlitePool> {
         .busy_timeout(std::time::Duration::from_secs(10));
     let pool = SqlitePoolOptions::new().max_connections(8).connect_with(opts).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
-    // os fechos de caixa de antes do arquivo (0062) ficam arquivados, reconstruídos com os valores de hoje
+    // os fechos de caixa de antes do arquivo (0061) ficam arquivados, reconstruídos com os valores de hoje
     if let Err(e) = crate::services::caixa_fechos::arquivar_antigos(&pool).await {
         eprintln!("Fechos de caixa: os antigos ficaram por arquivar ({e}).");
     }
@@ -184,6 +230,36 @@ pub async fn transacao(pool: &SqlitePool) -> AppResult<sqlx::Transaction<'static
 /// posterior e não abre aqui (o `migrate` recusa migrações aplicadas que não conhece).
 pub fn ultima_migracao() -> i64 {
     sqlx::migrate!("./migrations").migrations.iter().map(|m| m.version).max().unwrap_or(0)
+}
+
+/// O que, nas migrações de uma base, impede esta versão de a abrir: as aplicadas que ela não tem, as que tem com
+/// outro conteúdo (outro checksum: outro ramo do programa, como um KanGest oficial mais recente do que esta edição,
+/// com uma 0053 que não é a desta) e as que ficaram a meio. Vazio: a base abre aqui. Sem esta conferência, a troca de
+/// um restauro deixava a loja sem programa: o `migrate` de `abrir` recusa a base e o arranque pára.
+pub async fn migracoes_estranhas(c: &mut sqlx::SqliteConnection) -> AppResult<Vec<String>> {
+    let aplicadas: Vec<(i64, Vec<u8>, i64)> =
+        sqlx::query_as("SELECT version, checksum, success FROM _sqlx_migrations ORDER BY version").fetch_all(&mut *c).await?;
+    let conhecidas: Vec<(i64, Vec<u8>)> = sqlx::migrate!("./migrations")
+        .migrations
+        .iter()
+        .filter(|m| !m.migration_type.is_down_migration())
+        .map(|m| (m.version, m.checksum.to_vec()))
+        .collect();
+    Ok(estranhas(&aplicadas, &conhecidas))
+}
+
+/// As migrações aplicadas (versão, checksum, se terminou) comparadas com as conhecidas (versão, checksum).
+fn estranhas(aplicadas: &[(i64, Vec<u8>, i64)], conhecidas: &[(i64, Vec<u8>)]) -> Vec<String> {
+    let mut v = Vec::new();
+    for (versao, checksum, sucesso) in aplicadas {
+        match conhecidas.iter().find(|(k, _)| k == versao) {
+            None => v.push(format!("{versao:04} (que esta versão não tem)")),
+            Some((_, c)) if c != checksum => v.push(format!("{versao:04} (diferente da desta versão)")),
+            _ if *sucesso == 0 => v.push(format!("{versao:04} (ficou a meio)")),
+            _ => {}
+        }
+    }
+    v
 }
 
 /// Converte uma linha SQLite num objecto JSON (para leituras genéricas).
@@ -314,6 +390,72 @@ mod testes_cifra {
         let de_parte = partes.iter().find(|n| n.starts_with("kigest.db.ilegivel-")).expect("a base antiga ficou de parte");
         assert!(abre_com(&d.join(de_parte), &"ab".repeat(32)).await, "intacta: abre com a chave dela");
         assert!(abre_com(&f, &crate::segredos::chave_base().unwrap()).await, "a nova abre com a chave deste computador");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Uma base cifrada com uma chave (a do KanGest oficial) passa para outra (a desta edição): as mesmas tabelas e
+    /// linhas, também as que só estavam no WAL; a cópia só abre com a chave nova e a origem fica como estava.
+    #[tokio::test]
+    async fn recifrar_de_uma_chave_para_outra_com_as_mesmas_contagens() {
+        let d = pasta("recifrar");
+        let (a, b) = ("a1".repeat(32), "b2".repeat(32));
+        let origem = d.join("oficial.db");
+        let o = com_chave(SqliteConnectOptions::new(), &a).filename(&origem).create_if_missing(true).journal_mode(SqliteJournalMode::Wal);
+        let pool = SqlitePoolOptions::new().max_connections(1).connect_with(o).await.unwrap();
+        sqlx::query("CREATE TABLE clientes (nome TEXT)").execute(&pool).await.unwrap();
+        sqlx::query("CREATE TABLE \"vendas do dia\" (total INTEGER)").execute(&pool).await.unwrap();
+        for i in 0..120 {
+            sqlx::query("INSERT INTO clientes VALUES (?)").bind(format!("Cliente Exemplo {i}")).execute(&pool).await.unwrap();
+        }
+        sqlx::query("INSERT INTO \"vendas do dia\" VALUES (100), (250)").execute(&pool).await.unwrap();
+        sqlx::query("PRAGMA user_version = 52").execute(&pool).await.unwrap();
+        // o oficial aberto: o mais recente ainda está no WAL; copia-se a base e o WAL, como em services/oficial.rs
+        assert!(d.join("oficial.db-wal").exists());
+        let copia = d.join("copia.db");
+        for (de, para) in [("oficial.db", "copia.db"), ("oficial.db-wal", "copia.db-wal")] {
+            std::fs::copy(d.join(de), d.join(para)).unwrap();
+        }
+        let destino = d.join("edicao.db");
+        let n = recifrar(&copia, Some(a.as_str()), &destino, &b).await.unwrap();
+        assert_eq!(n, [("clientes".to_string(), 120), ("vendas do dia".to_string(), 2)]);
+        assert!(!em_claro(&destino) && !contem(&destino, "Cliente Exemplo"));
+        assert!(abre_com(&destino, &b).await, "abre com a chave nova");
+        assert!(!abre_com(&destino, &a).await, "e já não com a antiga");
+        let mut c = com_chave(SqliteConnectOptions::new().filename(&destino).read_only(true), &b).connect().await.unwrap();
+        assert_eq!(contagens(&mut c, "main").await.unwrap(), n);
+        let uv: i64 = sqlx::query_scalar("PRAGMA user_version").fetch_one(&mut c).await.unwrap();
+        assert_eq!(uv, 52);
+        c.close().await.ok();
+        // a origem não mudou: continua a abrir com a chave dela, com tudo
+        pool.close().await;
+        assert!(abre_com(&origem, &a).await);
+        // com a chave errada na origem não se copia nada
+        let e = d.join("errada.db");
+        assert!(recifrar(&copia, Some(b.as_str()), &e, &a).await.is_err());
+        assert!(!e.exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// As migrações que impedem a base de abrir: as que esta versão não tem, as diferentes e as que ficaram a meio.
+    #[test]
+    fn migracoes_estranhas_por_versao_e_checksum() {
+        let conhecidas = [(1, vec![1u8]), (2, vec![2u8]), (53, vec![53u8])];
+        assert!(estranhas(&[(1, vec![1], 1), (2, vec![2], 1)], &conhecidas).is_empty(), "uma base mais antiga abre");
+        assert!(estranhas(&[], &conhecidas).is_empty());
+        let e = estranhas(&[(1, vec![1], 1), (53, vec![99], 1), (60, vec![60], 1), (2, vec![2], 0)], &conhecidas);
+        assert_eq!(e, ["0053 (diferente da desta versão)", "0060 (que esta versão não tem)", "0002 (ficou a meio)"]);
+    }
+
+    #[tokio::test]
+    async fn as_migracoes_desta_versao_nao_sao_estranhas() {
+        let d = pasta("migracoes");
+        let pool = abrir(&d.join("kigest.db")).await.unwrap();
+        let mut c = pool.acquire().await.unwrap();
+        assert!(migracoes_estranhas(&mut c).await.unwrap().is_empty());
+        sqlx::query("UPDATE _sqlx_migrations SET checksum = x'00' WHERE version = 1").execute(&mut *c).await.unwrap();
+        assert_eq!(migracoes_estranhas(&mut c).await.unwrap(), ["0001 (diferente da desta versão)"]);
+        drop(c);
+        pool.close().await;
         let _ = std::fs::remove_dir_all(&d);
     }
 

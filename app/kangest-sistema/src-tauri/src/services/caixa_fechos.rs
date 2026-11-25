@@ -1,12 +1,12 @@
 // KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
-//! O fecho de caixa arquivado (migração 0062; docs/FECHO-DE-CAIXA.md).
+//! O fecho de caixa arquivado (migração 0061; docs/FECHO-DE-CAIXA.md).
 //!
 //! - **O instantâneo.** No fecho, o relatório Z inteiro (os pagamentos, a conferência, os artigos com as devoluções a
 //!   abater, os documentos da sessão e as vendas online) fica gravado em `caixa_fechos`, na mesma transacção que fecha
 //!   o caixa, com um selo SHA-256 do texto. Ver ou reimprimir um fecho lê o instantâneo: um documento anulado depois
-//!   já não muda um Z antigo. Os gatilhos da 0062 não o deixam alterar nem apagar.
+//!   já não muda um Z antigo. Os gatilhos da 0061 não o deixam alterar nem apagar.
 //! - **As vendas online**, à parte: os documentos emitidos pela API (sem caixa) e as encomendas pagas da cópia local
 //!   da Loja online ainda sem FR, entre a abertura e o fecho. Não contam para o numerário da gaveta. Cada uma fecha uma
 //!   só vez (`caixa_fecho_online`): o primeiro Z que a inclui fica com ela.
@@ -262,7 +262,7 @@ pub(super) async fn arquivar_reconstruido(pool: &SqlitePool, sid: i64) -> AppRes
     Ok(())
 }
 
-/// Os fechos sem arquivo (os de antes da 0062 e os importados do KIGEST): arquivados com os valores de agora e marcados
+/// Os fechos sem arquivo (os de antes da 0061 e os importados do KIGEST): arquivados com os valores de agora e marcados
 /// como reconstruídos, com uma linha na auditoria. Corre ao abrir a base (db.rs), a seguir às migrações; os que
 /// entrarem depois (a importação automática) arquivam-se ao abrir o fecho.
 pub(crate) async fn arquivar_antigos(pool: &SqlitePool) -> AppResult<usize> {

@@ -23,6 +23,10 @@ use crate::state::AppState;
 
 const MANTER_PADRAO: usize = 30;
 const INTERVALO_PADRAO: i64 = 4;
+/// As cópias de antes de cada actualização (`copias/kangest-antes-de-<versão>.db`). A rotação das cópias automáticas
+/// nunca as apaga: guardam-se à parte as das últimas `MANTER_ANTES` actualizações (`podar_antes`).
+pub const PREFIXO_ANTES: &str = "kangest-antes-de-";
+const MANTER_ANTES: usize = 5;
 const MAGIA_CIFRADA: &[u8] = b"KGCOPIA1";
 const MARCA_RESTAURO: &str = "restaurar.json";
 
@@ -188,11 +192,7 @@ pub async fn verificar_ficheiro(f: &Path) -> AppResult<()> {
     let tabelas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('documentos', 'config', 'empresa', '_sqlx_migrations')")
         .fetch_one(&mut c)
         .await?;
-    let migracao: Option<i64> = if tabelas == 4 {
-        sqlx::query_scalar("SELECT MAX(version) FROM _sqlx_migrations").fetch_one(&mut c).await.ok().flatten()
-    } else {
-        None
-    };
+    let estranhas = if tabelas == 4 { Some(crate::db::migracoes_estranhas(&mut c).await) } else { None };
     c.close().await.ok();
     if r != "ok" {
         return Err(AppError::msg(format!("A cópia está danificada ({r}).")));
@@ -200,9 +200,17 @@ pub async fn verificar_ficheiro(f: &Path) -> AppResult<()> {
     if tabelas < 4 {
         return Err(AppError::msg("O ficheiro não é uma cópia de segurança do KanGest."));
     }
-    // com migrações que esta versão não conhece, a base não voltaria a abrir depois do restauro
-    if migracao.unwrap_or(0) > crate::db::ultima_migracao() {
-        return Err(AppError::msg("A cópia é de uma versão mais recente do KanGest. Actualize este KanGest antes de a restaurar."));
+    // com migrações que esta versão não conhece (pela versão e pelo checksum), a base não voltaria a abrir depois do
+    // restauro e o programa não arrancava
+    let estranhas = estranhas.transpose()?.unwrap_or_default();
+    if !estranhas.is_empty() {
+        return Err(AppError::msg(format!(
+            "A cópia é de uma versão mais recente do KanGest, ou de outro ramo dele (por exemplo, um KanGest oficial mais \
+             recente do que esta edição): tem migrações que esta versão não conhece ({}; esta vai até à {:04}). Depois do \
+             restauro, a base não voltaria a abrir. Actualize este KanGest antes de a restaurar.",
+            estranhas.join(", "),
+            crate::db::ultima_migracao()
+        )));
     }
     Ok(())
 }
@@ -225,13 +233,53 @@ fn listar_db(dir: &Path, prefixo: &str) -> Vec<(std::time::SystemTime, PathBuf)>
     v
 }
 
+/// Uma cópia de antes de uma actualização (não entra na rotação das cópias automáticas).
+fn de_antes(f: &Path) -> bool {
+    f.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(PREFIXO_ANTES))
+}
+
+/// Apaga as cópias mais antigas com o `prefixo` até ficarem `manter`. As de antes das actualizações ficam sempre
+/// (têm a sua conta em `podar_antes`): são as que se oferecem se a verificação depois da actualização falhar.
 fn podar(dir: &Path, prefixo: &str, manter: usize) {
-    let mut v = listar_db(dir, prefixo);
+    let mut v: Vec<_> = listar_db(dir, prefixo).into_iter().filter(|(_, f)| !de_antes(f)).collect();
     while v.len() > manter {
         let f = v.remove(0).1;
         let _ = std::fs::remove_file(&f);
         let _ = std::fs::remove_file(f.with_extension("verificada"));
     }
+}
+
+/// Das cópias de antes das actualizações, ficam as das últimas `MANTER_ANTES` (cada uma é uma base inteira).
+pub fn podar_antes(dir: &Path) {
+    let mut v = listar_db(dir, PREFIXO_ANTES);
+    while v.len() > MANTER_ANTES {
+        let f = v.remove(0).1;
+        let _ = std::fs::remove_file(&f);
+        let _ = std::fs::remove_file(f.with_extension("verificada"));
+    }
+}
+
+/// O ficheiro da cópia de antes de instalar a versão `versao`: `copias/kangest-antes-de-<versão>.db`.
+pub fn copia_antes_de(pasta_dados: &Path, versao: &str) -> PathBuf {
+    let v: String = versao.trim().trim_start_matches('v').chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+')).collect();
+    pasta_copias(pasta_dados).join(format!("{PREFIXO_ANTES}{v}.db"))
+}
+
+/// Uma cópia verificada, como as automáticas: sai para um ficheiro ao lado, é conferida (`verificar_ficheiro`) e só
+/// depois toma o lugar de `destino`, com a marca `.verificada`. Uma cópia que falhe não estraga a que lá estava.
+pub async fn copia_verificada(pool: &SqlitePool, destino: &Path) -> AppResult<()> {
+    if let Some(dir) = destino.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| AppError::msg(format!("Não foi possível criar {}: {e}", dir.display())))?;
+    }
+    let provisoria = destino.with_extension("a-fazer");
+    copiar(pool, &provisoria).await?;
+    if let Err(e) = verificar_ficheiro(&provisoria).await {
+        let _ = std::fs::remove_file(&provisoria);
+        return Err(e);
+    }
+    std::fs::rename(&provisoria, destino).map_err(|e| AppError::msg(format!("Não foi possível gravar {}: {e}", destino.display())))?;
+    std::fs::write(destino.with_extension("verificada"), crate::db::agora()).ok();
+    Ok(())
 }
 
 /// Faz uma cópia agora: local, verificada e (se configurada) na pasta externa. Devolve o resumo.
@@ -469,9 +517,7 @@ async fn preparar_restauro(st: &AppState, r: &RestaurarIn, guardar_atual: bool) 
     if !origem.is_file() {
         return Err(AppError::msg(format!("Não encontro o ficheiro {}.", origem.display())));
     }
-    let dir = pasta_copias(&st.pasta_dados);
-    std::fs::create_dir_all(&dir).map_err(|e| AppError::msg(e.to_string()))?;
-    let pronto = dir.join("restauro-pendente.db");
+    let pronto = ficheiro_pendente(&st.pasta_dados)?;
     if e_cifrada(&origem) {
         let senha = match r.senha.as_deref().map(str::trim).filter(|x| !x.is_empty()) {
             Some(x) => x.to_string(),
@@ -486,19 +532,36 @@ async fn preparar_restauro(st: &AppState, r: &RestaurarIn, guardar_atual: bool) 
         let _ = std::fs::remove_file(&pronto);
         return Err(e);
     }
-    let seguranca = if guardar_atual {
-        let f = dir.join(format!("kangest-antes-do-restauro-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S")));
-        copiar(&st.pool, &f).await?;
-        Some(f.display().to_string())
-    } else {
-        None
-    };
-    std::fs::write(
-        st.pasta_dados.join(MARCA_RESTAURO),
-        json!({ "ficheiro": pronto.display().to_string(), "origem": origem.display().to_string(), "pedido_em": crate::db::agora() }).to_string(),
-    )
-    .map_err(|e| AppError::msg(e.to_string()))?;
+    let seguranca = marcar_restauro(st, &pronto, &origem.display().to_string(), guardar_atual.then_some("kangest-antes-do-restauro"), None).await?;
     Ok(json!({ "reiniciar": true, "copia_da_base_atual": seguranca }))
+}
+
+/// O ficheiro que a troca do arranque seguinte põe no lugar da base (`copias/restauro-pendente.db`).
+pub(crate) fn ficheiro_pendente(pasta_dados: &Path) -> AppResult<PathBuf> {
+    let dir = pasta_copias(pasta_dados);
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::msg(e.to_string()))?;
+    Ok(dir.join("restauro-pendente.db"))
+}
+
+/// Marca a troca da base por `pronto` (já conferido com `verificar_ficheiro`) no próximo arranque. Com
+/// `guardar_atual`, guarda antes a base actual em `copias/<nome>-AAAAMMDD-HHMMSS.db` e devolve onde. `posto`: o n.º
+/// do posto desta máquina depois da troca (o do KanGest oficial, services/oficial.rs), gravado no posto.json só
+/// quando a troca se faz.
+pub(crate) async fn marcar_restauro(st: &AppState, pronto: &Path, origem: &str, guardar_atual: Option<&str>, posto: Option<i64>) -> AppResult<Option<String>> {
+    let seguranca = match guardar_atual {
+        Some(nome) => {
+            let f = pasta_copias(&st.pasta_dados).join(format!("{nome}-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+            copiar(&st.pool, &f).await?;
+            Some(f.display().to_string())
+        }
+        None => None,
+    };
+    let mut marca = json!({ "ficheiro": pronto.display().to_string(), "origem": origem, "pedido_em": crate::db::agora() });
+    if let Some(p) = posto {
+        marca["posto_id"] = json!(p);
+    }
+    std::fs::write(st.pasta_dados.join(MARCA_RESTAURO), marca.to_string()).map_err(|e| AppError::msg(e.to_string()))?;
+    Ok(seguranca)
 }
 
 pub async fn restaurar(st: &AppState, r: RestaurarIn) -> AppResult<Value> {
@@ -542,6 +605,12 @@ pub fn aplicar_restauro_pendente(pasta_dados: &Path) -> AppResult<Option<String>
     std::fs::copy(&pronto, &novo).map_err(|e| AppError::msg(format!("Não foi possível restaurar a cópia: {e}")))?;
     std::fs::rename(&novo, &base).map_err(|e| AppError::msg(format!("Não foi possível restaurar a cópia: {e}")))?;
     let _ = std::fs::remove_file(&pronto);
+    // o posto que vinha com os dados (o do KanGest oficial): só depois de a base ter sido trocada
+    if let Some(posto) = v["posto_id"].as_i64() {
+        if let Err(e) = std::fs::write(pasta_dados.join("posto.json"), json!({ "posto_id": posto }).to_string()) {
+            eprintln!("Não foi possível gravar o posto {posto} desta máquina: {e}");
+        }
+    }
     Ok(v["origem"].as_str().map(String::from))
 }
 
@@ -699,6 +768,47 @@ pub async fn info(st: &AppState) -> AppResult<Value> {
 
 #[cfg(test)]
 mod testes {
+    /// A rotação das cópias automáticas nunca apaga as de antes das actualizações, mesmo sendo as mais antigas; essas
+    /// têm a sua própria conta (as das últimas 5 actualizações).
+    #[test]
+    fn podar_nao_apaga_as_copias_de_antes_das_actualizacoes() {
+        use std::time::{Duration, SystemTime};
+        let d = std::env::temp_dir().join(format!("kangest-podar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let criar = |nome: &str, dias: u64| {
+            let f = d.join(nome);
+            std::fs::write(&f, b"copia").unwrap();
+            std::fs::write(f.with_extension("verificada"), b"ok").unwrap();
+            let quando = SystemTime::now() - Duration::from_secs(dias * 24 * 3600);
+            std::fs::File::options().write(true).open(&f).unwrap().set_modified(quando).unwrap();
+        };
+        // a de antes da actualização é a mais antiga de todas: sem a protecção, era a primeira a sair
+        criar("kangest-antes-de-1.4.5.db", 40);
+        for i in 0..6 {
+            criar(&format!("kangest-2026110{i}-120000.db"), 10 - i);
+        }
+        super::podar(&d, "kangest-", 3);
+        let ficam: Vec<String> = super::listar_db(&d, "kangest-").iter().map(|(_, f)| f.file_name().unwrap().to_string_lossy().to_string()).collect();
+        assert!(ficam.contains(&"kangest-antes-de-1.4.5.db".to_string()), "{ficam:?}");
+        assert!(d.join("kangest-antes-de-1.4.5.verificada").exists());
+        assert_eq!(ficam.len(), 4, "3 automáticas e a de antes da actualização: {ficam:?}");
+        assert!(!ficam.contains(&"kangest-20261100-120000.db".to_string()), "as automáticas mais antigas saem: {ficam:?}");
+        // a conta à parte: ficam as das últimas 5 actualizações
+        for (i, v) in ["1.4.6", "1.4.7", "1.4.8", "1.4.9", "1.5.0"].iter().enumerate() {
+            criar(&format!("kangest-antes-de-{v}.db"), 30 - i as u64);
+        }
+        super::podar_antes(&d);
+        let antes: Vec<String> = super::listar_db(&d, super::PREFIXO_ANTES).iter().map(|(_, f)| f.file_name().unwrap().to_string_lossy().to_string()).collect();
+        assert_eq!(antes.len(), 5, "{antes:?}");
+        assert!(!antes.contains(&"kangest-antes-de-1.4.5.db".to_string()), "a mais antiga sai: {antes:?}");
+        assert!(!d.join("kangest-antes-de-1.4.5.verificada").exists());
+        // o nome da cópia vem da versão, limpo
+        assert_eq!(super::copia_antes_de(&d, "v1.4.6").file_name().unwrap(), "kangest-antes-de-1.4.6.db");
+        assert_eq!(super::copia_antes_de(&d, "1.4.6/../x").file_name().unwrap(), "kangest-antes-de-1.4.6..x.db");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
     #[test]
     fn guardar_como_aceita_so_caminhos_validos() {
         let d = std::env::temp_dir().join(format!("kangest-guardar-como-{}", std::process::id()));
