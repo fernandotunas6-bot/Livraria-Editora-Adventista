@@ -15,6 +15,9 @@ use crate::state::AppState;
 pub struct BinarioIn {
     nome: String,
     base64: String,
+    /// A subpasta (AppState::pasta_de): por omissão, «Relatórios e listas».
+    #[serde(default)]
+    pasta: Option<String>,
 }
 
 /// Nome limpo de separadores e caracteres especiais, para não sair da pasta de exportação.
@@ -40,7 +43,7 @@ pub async fn exportar_binario(st: &AppState, e: BinarioIn) -> AppResult<Value> {
     if bytes.is_empty() {
         return Err(AppError::msg("O ficheiro está vazio."));
     }
-    let caminho = st.pasta_exportacao.join(&nome);
+    let caminho = st.pasta_de(e.pasta.as_deref().unwrap_or("relatorios")).join(&nome);
     std::fs::write(&caminho, bytes).map_err(|err| AppError::msg(format!("Não foi possível gravar {}: {err}", caminho.display())))?;
     Ok(json!({ "ficheiro": caminho.display().to_string() }))
 }

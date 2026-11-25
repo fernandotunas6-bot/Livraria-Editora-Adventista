@@ -172,7 +172,7 @@ pub async fn acessos_listar(st: &AppState, f: RegistoIn) -> AppResult<Value> {
 
 // ============================== autenticação ==============================
 
-async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> Sessao {
+pub(crate) async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> Sessao {
     let perfil: String = row.get("perfil");
     let proprias: Option<String> = row.get("permissoes");
     let (nivel, permissoes) = permissoes_efectivas(&st.pool, &perfil, proprias.as_deref()).await;

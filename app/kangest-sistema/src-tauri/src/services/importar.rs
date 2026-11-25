@@ -85,6 +85,47 @@ fn i(r: &Registo, nomes: &[&str]) -> Option<i64> {
 fn b(r: &Registo, nomes: &[&str]) -> Option<bool> {
     campo(r, nomes).and_then(|v| v.bool())
 }
+
+/// O documento do KIGEST está anulado: `EstadoDocsTotal` ≠ 0 (o critério dos relatórios do KIGEST, que filtram
+/// «EstadoDocsTotal=0»). O `EstadoDocumento` não serve: há bases em que vale «A» em todos os documentos, anulados ou não.
+fn anulado_kigest(d: &Registo) -> bool {
+    match b(d, &["EstadoDocsTotal", "Anulado", "CanceladoStatus"]) {
+        Some(x) => x,
+        None => t(d, &["Estado", "Status", "StatusDocumento"])
+            .map(|s| {
+                let s = s.to_uppercase();
+                s == "A" || s.starts_with("ANUL")
+            })
+            .unwrap_or(false),
+    }
+}
+
+/// Dia a dia: quantos documentos não anulados e o total de cada dia, do lado do KIGEST (`origem`) e do que dele ficou
+/// no KanGest (`novo`). Devolve quantos dias se compararam, quantos batem certo e os dias diferentes (até 60, os mais
+/// recentes primeiro).
+pub(crate) fn diferencas_por_dia(origem: &[(String, i64)], novo: &[(String, i64, i64)]) -> (usize, usize, Vec<Value>) {
+    use std::collections::BTreeMap;
+    let mut dias: BTreeMap<String, [(i64, i64); 2]> = BTreeMap::new();
+    for (dia, total) in origem {
+        let e = dias.entry(dia.clone()).or_insert([(0, 0); 2]);
+        e[0].0 += 1;
+        e[0].1 += total;
+    }
+    for (dia, n, total) in novo {
+        let e = dias.entry(dia.clone()).or_insert([(0, 0); 2]);
+        e[1] = (*n, *total);
+    }
+    let comparados = dias.len();
+    let iguais = dias.values().filter(|[k, g]| k == g).count();
+    let diferentes: Vec<Value> = dias
+        .into_iter()
+        .rev()
+        .filter(|(_, [k, g])| k != g)
+        .take(60)
+        .map(|(dia, [k, g])| json!({ "dia": dia, "kigest": { "documentos": k.0, "total": k.1 }, "kangest": { "documentos": g.0, "total": g.1 } }))
+        .collect();
+    (comparados, iguais, diferentes)
+}
 /// Código de cliente ou fornecedor do KIGEST, tal como está: pode ser número ou texto (há bases com
 /// códigos como «Filial centro», «000001234», «0000000» e «0000000000», que são clientes diferentes).
 fn ent(r: &Registo, nomes: &[&str]) -> Option<String> {
@@ -851,6 +892,11 @@ pub async fn executar(st: &AppState, e: ExecutarIn) -> AppResult<Value> {
     let mut fonte = SqlServer::ligar(&e.conexao.com_senha_do_ini()?).await?;
     let origem = format!("{}/{}", e.conexao.servidor, e.conexao.base);
     importar_dados(st, &mut fonte, &e.opcoes, &origem).await
+}
+
+/// A importação automática (importar_auto.rs): a ligação e as opções guardadas, como as do ecrã.
+pub(crate) async fn executar_guardado(st: &AppState, conexao: Value, opcoes: Value) -> AppResult<Value> {
+    executar(st, ExecutarIn { conexao: serde_json::from_value(conexao)?, opcoes: serde_json::from_value(opcoes)? }).await
 }
 
 /// N.º do certificado no texto «Processado por programa validado nº.123/AGT/2020» → «123/AGT/2020».
@@ -1652,6 +1698,26 @@ async fn conferir(
     if op.rh && !x.funcionarios.is_empty() {
         v.push(item("Funcionários", "n", json!(x.funcionarios.len()), json!(escalar(tx, "SELECT COUNT(*) FROM funcionarios WHERE id_origem IS NOT NULL").await?)));
     }
+    // dia a dia: os documentos não anulados e o total de cada dia (as diferenças vão no relatório, em «por_dia»)
+    if op.documentos && !docs.is_empty() {
+        let origem: Vec<(String, i64)> = docs
+            .iter()
+            .filter(|d| !anulado_kigest(d))
+            .filter_map(|d| Some((data(d, &["DataEmissao", "Data"])?, kz(d, &["ValTotal", "Total", "ValTotal_Com_Imposto"]))))
+            .collect();
+        let novo: Vec<(String, i64, i64)> = sqlx::query_as(
+            "SELECT COALESCE(substr(data_emissao, 1, 10), ''), COUNT(*), COALESCE(SUM(total), 0) FROM documentos WHERE importado = 1 AND estado <> 'A' GROUP BY 1",
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        let (comparados, iguais, diferentes) = diferencas_por_dia(&origem, &novo);
+        let mut dias = item("Dias com as mesmas vendas", "n", json!(comparados), json!(iguais));
+        dias["por_dia"] = json!(diferentes);
+        v.push(dias);
+    }
+    if op.tesouraria && !x.caixa_fechos.is_empty() {
+        v.push(item("Fechos de caixa", "n", json!(x.caixa_fechos.len()), json!(escalar(tx, "SELECT COUNT(*) FROM caixa_sessoes WHERE id_origem IS NOT NULL").await?)));
+    }
     Ok(v)
 }
 
@@ -1735,15 +1801,7 @@ async fn n_docs(
                 (liquido + desc, desc)
             }
         };
-        // No KIGEST o documento anulado tem EstadoDocsTotal ≠ 0 (os relatórios filtram «EstadoDocsTotal=0»).
-        // O EstadoDocumento não serve: há bases em que vale «A» em todos os documentos, anulados ou não.
-        let anulado = match b(d, &["EstadoDocsTotal", "Anulado", "CanceladoStatus"]) {
-            Some(x) => x,
-            None => t(d, &["Estado", "Status", "StatusDocumento"]).map(|s| {
-                let s = s.to_uppercase();
-                s == "A" || s.starts_with("ANUL")
-            }).unwrap_or(false),
-        };
+        let anulado = anulado_kigest(d);
         let hash = t(d, &["Hash", "HashDocumento", "Assinatura"]).unwrap_or_default();
         let controlo = t(d, &["AssinaturaCurta", "HashControlo"]).unwrap_or_default();
         let pend = if conta_corrente == 1 && !anulado { pendente.get(&rf).copied().unwrap_or(0).max(0) } else { 0 };
@@ -3045,6 +3103,20 @@ pub(crate) fn tipo_inventario_pela_descricao(d: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 mod testes {
+    /// A conferência dia a dia: os dias que batem certo, e os diferentes, os mais recentes primeiro.
+    #[test]
+    fn conferencia_dia_a_dia() {
+        let origem = [("2026-11-01".to_string(), 1000), ("2026-11-01".to_string(), 500), ("2026-11-02".to_string(), 700), ("2026-11-03".to_string(), 50)];
+        let novo = [("2026-11-01".to_string(), 2, 1500), ("2026-11-02".to_string(), 1, 600), ("2026-11-04".to_string(), 1, 10)];
+        let (comparados, iguais, diferentes) = super::diferencas_por_dia(&origem, &novo);
+        assert_eq!((comparados, iguais), (4, 1));
+        let dias: Vec<&str> = diferentes.iter().map(|d| d["dia"].as_str().unwrap()).collect();
+        assert_eq!(dias, ["2026-11-04", "2026-11-03", "2026-11-02"]);
+        assert_eq!(diferentes[2]["kigest"]["total"], 700);
+        assert_eq!(diferentes[2]["kangest"]["total"], 600);
+        assert_eq!(diferentes[1]["kangest"]["documentos"], 0, "um dia que não entrou");
+    }
+
     use super::certificado_no_rodape;
 
     #[test]

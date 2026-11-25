@@ -66,7 +66,7 @@ pub async fn backup(st: &AppState, i: BackupIn) -> AppResult<Value> {
     st.exigir_perm("sistema.backup")?;
     let destino = match i.destino.as_deref().filter(|d| !d.trim().is_empty()) {
         Some(d) => destino_escolhido(d)?,
-        None => st.pasta_exportacao.join(format!("kangest-copia-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S"))),
+        None => st.pasta_de("copias").join(format!("kangest-copia-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S"))),
     };
     // portátil (em claro): é a que se leva para outro computador; a base em uso e as cópias locais vão cifradas
     crate::db::exportar_em_claro(&st.pool, &destino).await?;
@@ -549,6 +549,99 @@ pub fn aplicar_restauro_pendente(pasta_dados: &Path) -> AppResult<Option<String>
 pub struct ExportarIn {
     nome: String,
     conteudo: String,
+    /// A subpasta (AppState::pasta_de): por omissão, «Relatórios e listas».
+    #[serde(default)]
+    pasta: Option<String>,
+}
+
+// ---------------------------------------------------------------- a pasta dos documentos deste computador
+//
+// Tudo o que o KanGest grava para o utilizador (listas e relatórios em CSV e Excel, SAF-T, cópias portáteis) vai para
+// uma pasta visível e organizada: por omissão «Documentos/KanGest Livraria», criada sozinha, com uma subpasta por tipo.
+// Pode escolher-se outra à mão em Sobre o KanGest (fica em pastas.json, na pasta de dados deste computador).
+
+/// O nome da pasta, dentro dos Documentos do utilizador.
+pub const NOME_PASTA: &str = "KanGest Livraria";
+
+/// A pasta de omissão: «Documentos/KanGest Livraria», criada aqui; sem Documentos, as Transferências; sem nada, a pasta
+/// de dados.
+pub fn pasta_de_omissao(documentos: Option<std::path::PathBuf>, transferencias: Option<std::path::PathBuf>, dados: &std::path::Path) -> std::path::PathBuf {
+    if let Some(d) = documentos {
+        let p = d.join(NOME_PASTA);
+        if std::fs::create_dir_all(&p).is_ok() {
+            return p;
+        }
+    }
+    transferencias.unwrap_or_else(|| dados.to_path_buf())
+}
+
+fn ficheiro_pastas(dados: &std::path::Path) -> std::path::PathBuf {
+    dados.join("pastas.json")
+}
+
+/// A pasta escolhida à mão (se ainda existir).
+pub fn pasta_escolhida(dados: &std::path::Path) -> Option<std::path::PathBuf> {
+    let v: Value = serde_json::from_str(&std::fs::read_to_string(ficheiro_pastas(dados)).ok()?).ok()?;
+    let p = std::path::PathBuf::from(v["documentos"].as_str()?);
+    p.is_dir().then_some(p)
+}
+
+#[derive(Deserialize)]
+pub struct PastaIn {
+    /// A pasta nova; vazio ou ausente volta à de omissão.
+    #[serde(default)]
+    caminho: Option<String>,
+}
+
+/// Muda a pasta dos documentos deste computador (ou volta à de omissão). Corre no próprio computador, como as
+/// exportações («sistema.exportar…» é local numa rede de postos).
+pub async fn exportar_pasta(st: &AppState, i: PastaIn) -> AppResult<Value> {
+    st.sessao()?;
+    let nova = match i.caminho.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+        Some(c) => {
+            let p = std::path::PathBuf::from(c);
+            if !p.is_dir() {
+                return Err(AppError::msg(format!("A pasta {} não existe.", p.display())));
+            }
+            Some(p)
+        }
+        None => None,
+    };
+    let v = json!({ "documentos": nova.as_ref().map(|p| p.display().to_string()) });
+    std::fs::write(ficheiro_pastas(&st.pasta_dados), serde_json::to_string_pretty(&v)?)
+        .map_err(|e| AppError::msg(format!("Não foi possível guardar a pasta escolhida: {e}")))?;
+    *st.pasta_escolhida.write().unwrap() = nova;
+    Ok(json!({ "pasta": st.pasta_raiz().display().to_string(), "escolhida": st.pasta_escolhida.read().unwrap().is_some() }))
+}
+
+#[derive(Deserialize, Default)]
+pub struct AbrirIn {
+    /// Uma subpasta (AppState::pasta_de) ou um ficheiro acabado de gravar (abre a pasta dele).
+    #[serde(default)]
+    pasta: Option<String>,
+    #[serde(default)]
+    ficheiro: Option<String>,
+}
+
+/// Abre a pasta dos documentos (ou uma subpasta, ou a de um ficheiro exportado) no Explorador / Finder.
+pub async fn exportar_abrir(st: &AppState, i: AbrirIn) -> AppResult<Value> {
+    st.sessao()?;
+    let raiz = st.pasta_raiz();
+    let alvo = match (i.ficheiro.as_deref(), i.pasta.as_deref()) {
+        // só ficheiros dentro da pasta dos documentos
+        (Some(f), _) => std::path::Path::new(f).parent().filter(|p| p.starts_with(&raiz)).map(|p| p.to_path_buf()).unwrap_or_else(|| raiz.clone()),
+        (None, Some(t)) => st.pasta_de(t),
+        (None, None) => raiz.clone(),
+    };
+    let programa = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(programa).arg(&alvo).spawn().map_err(|e| AppError::msg(format!("Não foi possível abrir {}: {e}", alvo.display())))?;
+    Ok(json!({ "pasta": alvo.display().to_string() }))
 }
 
 /// Grava um ficheiro de texto (CSV, mapas) na pasta de exportação e devolve o caminho.
@@ -565,7 +658,7 @@ pub async fn exportar(st: &AppState, e: ExportarIn) -> AppResult<Value> {
     if nome.is_empty() || !nome.contains('.') {
         return Err(AppError::msg("Nome de ficheiro inválido."));
     }
-    let caminho = st.pasta_exportacao.join(&nome);
+    let caminho = st.pasta_de(e.pasta.as_deref().unwrap_or("relatorios")).join(&nome);
     // BOM UTF-8: o Excel abre os acentos correctamente
     let mut bytes = Vec::with_capacity(e.conteudo.len() + 3);
     if nome.to_lowercase().ends_with(".csv") {
@@ -591,7 +684,9 @@ pub async fn info(st: &AppState) -> AppResult<Value> {
         "sqlite": sqlite,
         "migracoes": migracoes,
         "pasta_dados": st.pasta_dados.display().to_string(),
-        "pasta_exportacao": st.pasta_exportacao.display().to_string(),
+        "pasta_exportacao": st.pasta_raiz().display().to_string(),
+        "pasta_omissao": st.pasta_exportacao.display().to_string(),
+        "pasta_escolhida": st.pasta_escolhida.read().unwrap().is_some(),
         "base_bytes": bytes,
         "ultima_copia": ultima_copia,
         "artigos": conta("SELECT COUNT(*) FROM artigos").await?,
@@ -619,3 +714,25 @@ mod testes {
     }
 }
 
+
+#[cfg(test)]
+mod testes_pasta_documentos {
+    /// A pasta dos documentos: «Documentos/KanGest Livraria», criada; sem Documentos, as Transferências; a escolhida à
+    /// mão só conta se existir.
+    #[test]
+    fn pasta_visivel_e_organizada() {
+        let base = std::env::temp_dir().join(format!("kangest-pasta-documentos-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("Documentos")).unwrap();
+        let p = super::pasta_de_omissao(Some(base.join("Documentos")), Some(base.join("Transferencias")), &base);
+        assert_eq!(p, base.join("Documentos").join(super::NOME_PASTA));
+        assert!(p.is_dir(), "a pasta é criada sozinha");
+        assert_eq!(super::pasta_de_omissao(None, Some(base.join("T")), &base), base.join("T"));
+        assert_eq!(super::pasta_de_omissao(None, None, &base), base);
+        std::fs::write(base.join("pastas.json"), r#"{"documentos": "/esta/pasta/nao/existe"}"#).unwrap();
+        assert!(super::pasta_escolhida(&base).is_none());
+        std::fs::write(base.join("pastas.json"), format!(r#"{{"documentos": {:?}}}"#, p.display().to_string())).unwrap();
+        assert_eq!(super::pasta_escolhida(&base), Some(p));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

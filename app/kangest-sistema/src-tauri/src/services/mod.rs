@@ -24,6 +24,7 @@ mod tv;
 pub mod fe;
 pub(crate) mod impressao;
 pub mod importar;
+pub mod importar_auto;
 mod importar_folha;
 mod importar_saft;
 mod integridade;
@@ -202,6 +203,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- importação do KIGEST (SQL Server) ----
         "importar.analisar" => importar::analisar(st, p(params)?).await,
         "importar.executar" => importar::executar(st, p(params)?).await,
+        "importar.automatico" => importar_auto::estado(st).await,
+        "importar.automaticoGuardar" => importar_auto::guardar(st, p(params)?).await,
+        "importar.automaticoAgora" => importar_auto::agora(st).await,
         "importar.analisarFicheiro" => importar::analisar_ficheiro(st, p(params)?).await,
         "importar.executarFicheiro" => importar::executar_ficheiro(st, p(params)?).await,
         "importar.ficheiros" => importar::ficheiros(st).await,
@@ -295,6 +299,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- impressão térmica (ESC/POS) e gaveta ----
         "impressao.estado" => impressao::estado(st).await,
         "impressao.talao" => impressao::talao(st, p(params)?).await,
+        // o registo das impressões fica na base (no servidor, numa rede de postos), por isso não é «impressao.»
+        "documentos.impressoes" => impressao::historico(st, p(params)?).await,
+        "documentos.impressao" => impressao::registar(st, p(params)?).await,
         "impressao.gaveta" => impressao::gaveta(st, p(params)?).await,
         "impressao.teste" => impressao::teste(st).await,
         "impressao.visor" => impressao::visor(st, p(params)?).await,
@@ -502,6 +509,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "atualizacao.descarregar" => atualizacao::descarregar(st).await,
         "atualizacao.instalar" => atualizacao::instalar(st, p(params)?).await,
         "sistema.exportar" => sistema::exportar(st, p(params)?).await,
+        // a pasta dos documentos deste computador (local numa rede de postos, como as exportações)
+        "sistema.exportarPasta" => sistema::exportar_pasta(st, p(params)?).await,
+        "sistema.exportarAbrir" => sistema::exportar_abrir(st, p(params)?).await,
 
         _ => Err(AppError::msg(format!("Método desconhecido: {metodo}"))),
     }

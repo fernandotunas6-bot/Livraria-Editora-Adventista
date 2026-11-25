@@ -45,11 +45,52 @@ function ajustarPagina() {
   document.head.appendChild(s);
 }
 
-/** Abre o diálogo de impressão do sistema para o conteúdo de #print-area. */
-export function imprimir() {
+/** Um nome de ficheiro limpo: sem os caracteres que os sistemas recusam («/» passa a «-»), curto. */
+export function nomeDeFicheiro(nome: string): string {
+  return nome
+    .replace(/[\\/]/g, "-")
+    .replace(/[:*?"<>|\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+const hoje = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * O nome com que o PDF fica gravado («Guardar como PDF» usa o título da janela, que era sempre «KanGest»):
+ * 1. o `data-ficheiro` do que se imprime (os documentos: «FR A2026-15 — Cliente»);
+ * 2. o primeiro título dentro da impressão, com a data («Lista de stock 2026-11-25»);
+ * 3. o título da página aberta, com a data.
+ */
+export function nomeDaImpressao(nome?: string): string {
+  if (nome?.trim()) return nomeDeFicheiro(nome);
+  const area = document.getElementById("print-area");
+  const marcado = area?.querySelector<HTMLElement>("[data-ficheiro]")?.dataset.ficheiro;
+  if (marcado?.trim()) return nomeDeFicheiro(marcado);
+  const titulo = area?.querySelector("h1, h2, h3")?.textContent || document.querySelector("main h1, h1")?.textContent || "";
+  return nomeDeFicheiro(`${titulo.trim() || "KanGest Livraria"} ${hoje()}`);
+}
+
+/**
+ * Abre o diálogo de impressão do sistema para o conteúdo de #print-area. `nome`: o nome do ficheiro ao guardar como PDF;
+ * sem ele, sai do que se imprime (nomeDaImpressao). O título da janela volta ao que era depois de imprimir.
+ * Aceita ser a acção de um botão (`onClick={imprimir}`): o evento do clique não é um nome e ignora-se.
+ */
+export function imprimir(nome?: unknown) {
+  const pedido = typeof nome === "string" ? nome : undefined;
   // pequeno atraso para o portal de impressão renderizar
   setTimeout(() => {
     ajustarPagina();
+    const antes = document.title;
+    document.title = nomeDaImpressao(pedido);
+    const repor = () => {
+      document.title = antes;
+      window.removeEventListener("afterprint", repor);
+    };
+    window.addEventListener("afterprint", repor);
+    // no Mac a impressão nativa não dá «afterprint»: repõe-se ao fim de uns segundos
+    setTimeout(repor, 15000);
     if (mac && "__TAURI_INTERNALS__" in window) {
       invoke("imprimir").catch(() => window.print());
     } else {

@@ -5,13 +5,59 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpen, Database, Download, Info, Keyboard, Mail, Phone, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BookOpen, Database, Download, FolderOpen, Info, Keyboard, Mail, Phone, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { call, MODO_WEB } from "@/lib/api";
 import { numero } from "@/lib/format";
 import { MENU } from "@/lib/menu";
 import { Button, Card, Field, Input, PageHeader, cn } from "@/components/ui";
 import { useSession } from "@/store/session";
 import { useLicenca } from "@/lib/licenca";
+import { escolherPasta } from "@/lib/dialogos";
+
+/**
+ * A pasta onde o KanGest grava o que exporta (listas, relatórios, SAF-T, cópias portáteis): por omissão
+ * «Documentos/KanGest Livraria», criada sozinha, com uma subpasta por tipo. Pode abrir-se, mudar-se ou repor-se.
+ */
+function PastaDocumentos({ info }: { info?: Info }) {
+  const qc = useQueryClient();
+  const mudar = async (caminho: string | null) => {
+    try {
+      await call("sistema.exportarPasta", { caminho });
+      qc.invalidateQueries({ queryKey: ["sistema-info"] });
+      toast.success(caminho ? "A pasta dos documentos mudou." : "A pasta dos documentos voltou a «Documentos/KanGest Livraria».");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="break-all font-mono text-[12px]">{info?.pasta_exportacao}</div>
+      <div className="text-[12px] text-ink-3">Com uma subpasta por tipo: Relatórios e listas, SAF-T, Cópias de segurança.</div>
+      {!MODO_WEB && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => call("sistema.exportarAbrir", {}).catch((e) => toast.error((e as Error).message))}>
+            <FolderOpen className="size-4" /> Abrir
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              const p = await escolherPasta("A pasta dos documentos do KanGest");
+              if (p) await mudar(p);
+            }}
+          >
+            Mudar…
+          </Button>
+          {info?.pasta_escolhida && (
+            <Button size="sm" variant="ghost" onClick={() => mudar(null)}>
+              Repor
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Info {
   versao: string;
@@ -20,6 +66,8 @@ interface Info {
   migracoes: number;
   pasta_dados: string;
   pasta_exportacao: string;
+  /** a pasta escolhida à mão (sistema.exportarPasta); sem ela, «Documentos/KanGest Livraria» */
+  pasta_escolhida?: boolean;
   base_bytes: number;
   ultima_copia: string | null;
   artigos: number;
@@ -120,8 +168,10 @@ export default function Sobre() {
             <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-y-2 text-[13.5px]">
               <dt className="text-ink-3">Pasta de dados</dt>
               <dd className="break-all font-mono text-[12px]">{info?.pasta_dados}</dd>
-              <dt className="text-ink-3">Exportações</dt>
-              <dd className="break-all font-mono text-[12px]">{info?.pasta_exportacao}</dd>
+              <dt className="text-ink-3">Pasta dos documentos</dt>
+              <dd>
+                <PastaDocumentos info={info} />
+              </dd>
               <dt className="text-ink-3">Tamanho da base</dt>
               <dd className="num">{info ? mb(info.base_bytes) : "…"}</dd>
               <dt className="text-ink-3">Última cópia</dt>

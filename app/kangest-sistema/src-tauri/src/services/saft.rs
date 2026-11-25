@@ -299,7 +299,7 @@ async fn preparar(st: &AppState, i: &SaftIn) -> AppResult<(sqlx::sqlite::SqliteR
 }
 
 fn gravar(st: &AppState, nome: &str, x: &str) -> AppResult<String> {
-    let caminho = st.pasta_exportacao.join(nome);
+    let caminho = st.pasta_de("saft").join(nome);
     std::fs::write(&caminho, x.as_bytes()).map_err(|e| AppError::msg(format!("Não foi possível gravar {}: {e}", caminho.display())))?;
     Ok(caminho.display().to_string())
 }
