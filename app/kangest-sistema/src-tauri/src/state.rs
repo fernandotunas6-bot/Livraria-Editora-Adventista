@@ -226,8 +226,11 @@ pub struct AppState {
     /// Serializa a emissão de documentos (numeração + cadeia de hash sem saltos).
     pub emissao: tokio::sync::Mutex<()>,
     pub posto: RwLock<PostoAtual>,
-    /// Pasta onde se gravam exportações (SAF-T, cópias de segurança manuais). Por omissão: Transferências.
+    /// Pasta onde se gravam exportações (SAF-T, cópias de segurança manuais, listas). Por omissão: «Documentos/KanGest
+    /// Livraria», criada no arranque (lib.rs), com uma subpasta por tipo (`pasta_de`).
     pub pasta_exportacao: PathBuf,
+    /// A pasta escolhida à mão em Sobre o KanGest (pastas.json na pasta de dados); sem ela, a `pasta_exportacao`.
+    pub pasta_escolhida: RwLock<Option<PathBuf>>,
     /// Pasta de dados da aplicação (base de dados, posto.json, cópias automáticas).
     pub pasta_dados: PathBuf,
     /// PIN de autorização (supervisor, regras de aprovação) errados seguidos, por quem pede: quantos e o último.
@@ -243,8 +246,31 @@ impl AppState {
             emissao: tokio::sync::Mutex::new(()),
             posto: RwLock::new(PostoAtual::default()),
             pasta_exportacao: std::env::temp_dir(),
+            pasta_escolhida: RwLock::new(None),
             pasta_dados: std::env::temp_dir(),
             falhas_autorizacao: Mutex::new(Default::default()),
+        }
+    }
+
+    /// A pasta dos documentos deste computador: a escolhida à mão ou a de omissão.
+    pub fn pasta_raiz(&self) -> PathBuf {
+        self.pasta_escolhida.read().unwrap().clone().unwrap_or_else(|| self.pasta_exportacao.clone())
+    }
+
+    /// A subpasta de um tipo de ficheiro, criada se faltar: «relatorios» (listas e relatórios exportados), «saft»,
+    /// «copias» (cópias de segurança portáteis) e «documentos». Sem poder criá-la, a pasta dos documentos.
+    pub fn pasta_de(&self, tipo: &str) -> PathBuf {
+        let raiz = self.pasta_raiz();
+        let nome = match tipo {
+            "saft" => "SAF-T",
+            "copias" => "Cópias de segurança",
+            "documentos" => "Documentos emitidos",
+            _ => "Relatórios e listas",
+        };
+        let p = raiz.join(nome);
+        match std::fs::create_dir_all(&p) {
+            Ok(()) => p,
+            Err(_) => raiz,
         }
     }
 

@@ -505,6 +505,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "atualizacao.descarregar" => atualizacao::descarregar(st).await,
         "atualizacao.instalar" => atualizacao::instalar(st, p(params)?).await,
         "sistema.exportar" => sistema::exportar(st, p(params)?).await,
+        // a pasta dos documentos deste computador (local numa rede de postos, como as exportações)
+        "sistema.exportarPasta" => sistema::exportar_pasta(st, p(params)?).await,
+        "sistema.exportarAbrir" => sistema::exportar_abrir(st, p(params)?).await,
 
         _ => Err(AppError::msg(format!("Método desconhecido: {metodo}"))),
     }

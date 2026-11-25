@@ -127,7 +127,9 @@ pub fn run() {
             }
             let mut estado = AppState::new(pool);
             estado.pasta_dados = dir.clone();
-            estado.pasta_exportacao = app.path().download_dir().unwrap_or_else(|_| dir.clone());
+            // a pasta dos documentos: «Documentos/KanGest Livraria», visível e criada aqui (ou as Transferências, sem ela)
+            estado.pasta_exportacao = services::sistema::pasta_de_omissao(app.path().document_dir().ok(), app.path().download_dir().ok(), &dir);
+            *estado.pasta_escolhida.write().unwrap() = services::sistema::pasta_escolhida(&dir);
             tauri::async_runtime::block_on(async {
                 estado.carregar_posto(posto_local(&dir)).await?;
                 // Cópia de segurança automática diária (não impede o arranque se falhar).

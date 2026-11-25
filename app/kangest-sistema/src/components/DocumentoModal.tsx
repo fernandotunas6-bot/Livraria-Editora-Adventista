@@ -12,7 +12,7 @@ import { useTabelas, useTalao58 } from "@/lib/hooks";
 import { imprimir, NOMES_VIAS } from "@/lib/print";
 import type { DocCompleto } from "@/lib/types";
 import { useSession } from "@/store/session";
-import { A4, NotaEntrega, PrintPortal, Ticket } from "./DocumentoPrint";
+import { A4, nomeDoDocumento, NotaEntrega, PrintPortal, Ticket } from "./DocumentoPrint";
 import { EstadoDocumento } from "./EstadoDocumento";
 import EnviarDocumento from "./EnviarDocumento";
 import { Badge, Button, Field, Input, Modal, Select, cn } from "./ui";
@@ -155,7 +155,7 @@ export default function DocumentoModal({
   async function imprimirDoc(quantas = vias) {
     setNotaEntrega(false);
     if (!termica) {
-      imprimir();
+      if (d) imprimir(nomeDoDocumento(d, segunda ? " (2.ª via)" : ""));
       return registar(nomesDasVias(quantas, segunda));
     }
     try {
@@ -169,7 +169,7 @@ export default function DocumentoModal({
   // «Para o cliente»: a cópia de impressão passa a ter só uma via e imprime-se depois de desenhada
   useEffect(() => {
     if (!soCliente) return;
-    imprimir();
+    if (d) imprimir(nomeDoDocumento(d, segunda ? " (2.ª via)" : ""));
     void registar(nomesDasVias(1, segunda));
     setSoCliente(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,7 +231,7 @@ export default function DocumentoModal({
                 title="Artigos e quantidades, sem preços, com assinaturas de entrega (no formato escolhido: A4 ou talão)"
                 onClick={() => {
                   setNotaEntrega(true);
-                  imprimir();
+                  imprimir(nomeDoDocumento(d, " — Nota de entrega"));
                 }}
               >
                 <Truck className="size-4" /> Nota de entrega

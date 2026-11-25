@@ -34,7 +34,10 @@ export function NotaEntrega({ d, talao }: { d: DocCompleto; talao: boolean }) {
   const consumidor = doc.entidade_nif === "999999999";
   if (talao) {
     return (
-      <div className={`print-ticket mx-auto bg-white font-mono text-black ${t58 ? "talao-58 w-[220px] p-2 text-[10px] leading-[1.3]" : "w-[300px] p-3 text-[11px] leading-[1.35]"}`}>
+      <div
+        className={`print-ticket mx-auto bg-white font-mono text-black ${t58 ? "talao-58 w-[220px] p-2 text-[10px] leading-[1.3]" : "w-[300px] p-3 text-[11px] leading-[1.35]"}`}
+        data-ficheiro={nomeDoDocumento(d, " — Nota de entrega")}
+      >
         <div className="text-center">
           <div className="text-[13px] font-bold">{e.designacao_comercial || e.nome}</div>
           <div>NIF: {e.nif}</div>
@@ -71,7 +74,7 @@ export function NotaEntrega({ d, talao }: { d: DocCompleto; talao: boolean }) {
     );
   }
   return (
-    <div className="mx-auto w-[190mm] bg-white p-2 text-[11.5px] leading-snug text-black">
+    <div className="mx-auto w-[190mm] bg-white p-2 text-[11.5px] leading-snug text-black" data-ficheiro={nomeDoDocumento(d, " — Nota de entrega")}>
       <div className="flex items-start justify-between gap-6">
         <div>
           {e.logo && <img src={e.logo} alt="" className="mb-1 max-h-16 max-w-[45mm] object-contain" />}
@@ -127,6 +130,14 @@ export function NotaEntrega({ d, talao }: { d: DocCompleto; talao: boolean }) {
 
 const ARIAL = { fontFamily: "Arial, Helvetica, sans-serif" };
 const hora = (dh?: string | null) => (dh && dh.length >= 16 ? dh.slice(11, 16) : "");
+
+/** O nome do ficheiro ao guardar o documento como PDF (lib/print.ts): «Factura-Recibo FR A2026-15 — Ana Silva». */
+export function nomeDoDocumento(d: DocCompleto, extra = ""): string {
+  const doc = d.documento;
+  const consumidor = !doc.entidade_nif || doc.entidade_nif === "999999999";
+  const cliente = !consumidor && doc.entidade_nome ? ` — ${doc.entidade_nome}` : "";
+  return `${doc.tipo_desc} ${doc.numero_doc}${cliente}${extra}`;
+}
 const nifTexto = (nif: string) => (nif === "999999999" ? "Consumidor Final" : nif);
 /** Linha de localização como no KIGEST: «Luanda - Angola». */
 const local = (e: DocCompleto["empresa"]) => `${e.localidade || e.provincia || "Luanda"} - Angola`;
@@ -157,7 +168,11 @@ export function Ticket({ d, via = "Original", reimpressao }: { d: DocCompleto; v
   const morada = [e.endereco, e.localidade || e.provincia].filter(Boolean).join(", ");
   const pago = pagamentosEntregues(d);
   return (
-    <div className={`print-ticket mx-auto bg-white text-black ${t58 ? "talao-58 w-[220px] p-2 text-[9.5px] leading-[1.25]" : "w-[300px] p-3 text-[11px] leading-[1.3]"}`} style={ARIAL}>
+    <div
+      className={`print-ticket mx-auto bg-white text-black ${t58 ? "talao-58 w-[220px] p-2 text-[9.5px] leading-[1.25]" : "w-[300px] p-3 text-[11px] leading-[1.3]"}`}
+      style={ARIAL}
+      data-ficheiro={nomeDoDocumento(d)}
+    >
       {/* a via no canto superior direito (Original, Duplicado… ou 2.ª via), como no A4 */}
       <div className="text-right font-bold">{via}</div>
       <div className="text-center">
@@ -377,6 +392,7 @@ export function A4({ d, via = "Original", reimpressao }: { d: DocCompleto; via?:
     <div
       className="mx-auto flex min-h-[272mm] w-[190mm] flex-col bg-white p-1 text-[10px] leading-snug text-black"
       style={{ ...ARIAL, ...(a5 ? { zoom: 134 / 190 } : {}) }}
+      data-ficheiro={nomeDoDocumento(d)}
     >
       {/* ---------- cabeçalho ---------- */}
       <div className="grid grid-cols-2 gap-8">

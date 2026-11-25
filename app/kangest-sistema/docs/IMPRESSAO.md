@@ -46,9 +46,39 @@ O programa sabe pela classe do tipo de documento:
 - **A factura e a factura/recibo** levam a assinatura da AGT (os 4 caracteres do hash) e o QR da Facturação
   Electrónica, quando a há.
 
+## O nome do PDF
+
+**Automático:** «Guardar como PDF» usava o título da janela, e todos os ficheiros saíam «kangest.pdf». Agora a impressão
+(`lib/print.ts`) dá-lhe o nome do que se imprime:
+- **um documento:** «Factura-Recibo FR A2026-15 — Ana Silva». O «/» do número passa a «-». Uma reimpressão acrescenta
+  «(2.ª via)», e a nota de entrega «— Nota de entrega»;
+- **uma lista ou um relatório** (o stock, as vendas…): o título que vai impresso e a data, ex.: «Lista de stock
+  2026-11-25».
+
+**Manual:** um ecrã pode dar o nome que quiser, com `imprimir("…")` ou o atributo `data-ficheiro`.
+
+## A pasta dos documentos
+
+**Automático:** tudo o que o KanGest grava sozinho para o utilizador vai para uma pasta visível e organizada,
+**«Documentos/KanGest Livraria»**, criada no arranque, com uma subpasta por tipo:
+- **Relatórios e listas:** os CSV e os Excel exportados dos ecrãs;
+- **SAF-T;**
+- **Cópias de segurança:** a cópia portátil, quando não se escolhe outro sítio.
+
+**Manual:** em *Sistema → Sobre o KanGest → Dados*:
+- **Abrir:** abre a pasta no Explorador ou no Finder;
+- **Mudar…:** escolhe outra pasta, que fica guardada em `pastas.json` na pasta de dados deste computador;
+- **Repor:** volta à de omissão.
+
+Numa rede de postos, cada computador tem a sua pasta, como sempre tiveram as exportações. Os ficheiros do KIGEST
+(`.kigest`) continuam a procurar-se também nas Transferências, no Ambiente de Trabalho e nas pens.
+
 ## Testes
 
 `services/tests.rs` (o teste da impressão térmica):
 - a primeira impressão com o Original e o Duplicado e quem emitiu;
 - a reimpressão da mesma venda sai sozinha como 2.ª via, com quem a imprimiu;
 - o registo das impressões (o diálogo também regista).
+
+`services/sistema.rs` (`pasta_visivel_e_organizada`): a pasta de omissão criada, as Transferências sem Documentos e a
+pasta escolhida só se existir.
