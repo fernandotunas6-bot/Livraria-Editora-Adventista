@@ -527,7 +527,7 @@ pub(super) fn html(v: &Value) -> String {
     if let Some(c) = s["contagem"].as_object().filter(|c| !c.is_empty()) {
         h.push_str("<h2>Contagem do numerário</h2><table>");
         let mut notas: Vec<(i64, i64)> = c.iter().map(|(k, q)| (k.parse().unwrap_or(0), q.as_i64().unwrap_or(0))).collect();
-        notas.sort_by(|x, y| y.0.cmp(&x.0));
+        notas.sort_by_key(|n| std::cmp::Reverse(n.0));
         for (face, q) in notas {
             h.push_str(&linha(&format!("{face} Kz × {q}"), &crate::agt::valor_pt(face * 100 * q), false));
         }
