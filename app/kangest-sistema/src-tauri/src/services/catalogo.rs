@@ -986,10 +986,9 @@ pub struct RecalcIn {
     aplicar: bool,
 }
 
-/// Compara as existências gravadas com a soma dos movimentos (stock e lotes) e, com `aplicar`, corrige-as
-/// e refaz o saldo acumulado de cada movimento.
-pub async fn stock_recalcular(st: &AppState, r: RecalcIn) -> AppResult<Value> {
-    let s = st.exigir_perm("stock.inventario")?;
+/// As existências e os lotes que não batem com a soma dos movimentos. Só lê: serve ao recálculo abaixo e à verificação
+/// depois das actualizações (services/verificacao.rs), que corre sem sessão.
+pub(crate) async fn stock_diferencas(pool: &sqlx::SqlitePool) -> AppResult<(Value, Value)> {
     let diferencas = db::rows_json(
         &sqlx::query(
             "WITH mov AS (SELECT artigo_id, armazem_id, SUM(quantidade) AS q FROM movimentos_stock GROUP BY artigo_id, armazem_id),
@@ -1004,7 +1003,7 @@ pub async fn stock_recalcular(st: &AppState, r: RecalcIn) -> AppResult<Value> {
              WHERE ABS(COALESCE(s.quantidade, 0) - COALESCE(m.q, 0)) > 0.000001
              ORDER BY a.descricao",
         )
-        .fetch_all(&st.pool)
+        .fetch_all(pool)
         .await?,
     );
     let lotes = db::rows_json(
@@ -1015,9 +1014,17 @@ pub async fn stock_recalcular(st: &AppState, r: RecalcIn) -> AppResult<Value> {
              GROUP BY l.id HAVING ABS(l.quantidade - l.saldo_inicial - COALESCE(SUM(lm.quantidade), 0)) > 0.000001
              ORDER BY a.descricao, l.lote",
         )
-        .fetch_all(&st.pool)
+        .fetch_all(pool)
         .await?,
     );
+    Ok((diferencas, lotes))
+}
+
+/// Compara as existências gravadas com a soma dos movimentos (stock e lotes) e, com `aplicar`, corrige-as
+/// e refaz o saldo acumulado de cada movimento.
+pub async fn stock_recalcular(st: &AppState, r: RecalcIn) -> AppResult<Value> {
+    let s = st.exigir_perm("stock.inventario")?;
+    let (diferencas, lotes) = stock_diferencas(&st.pool).await?;
     let mut saldos = 0u64;
     if r.aplicar {
         let mut tx = crate::db::transacao(&st.pool).await?;

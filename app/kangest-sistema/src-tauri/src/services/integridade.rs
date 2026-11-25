@@ -9,7 +9,7 @@
 
 use rsa::RsaPublicKey;
 use serde_json::{json, Value};
-use sqlx::Row;
+use sqlx::{Row, SqlitePool};
 
 use crate::agt;
 use crate::error::{AppError, AppResult};
@@ -121,7 +121,18 @@ pub async fn verificar(st: &AppState) -> AppResult<Value> {
     if !(s.tem("sistema.certificacao") || s.tem("sistema.auditoria")) {
         return Err(AppError::SemPermissao);
     }
-    let p = &st.pool;
+    let v = verificar_cadeia(&st.pool).await?;
+    sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (?, 'VERIFICAR_INTEGRIDADE', ?)")
+        .bind(s.id)
+        .bind(v["resumo"].as_str().unwrap_or_default())
+        .execute(&st.pool)
+        .await?;
+    Ok(v)
+}
+
+/// A verificação em si, só com a base: sem sessão e sem linha na auditoria. Serve ao botão acima e à verificação
+/// depois das actualizações, que corre sozinha em segundo plano (services/verificacao.rs).
+pub async fn verificar_cadeia(p: &SqlitePool) -> AppResult<Value> {
     let chaves = agt::chaves_publicas(p).await?;
     let series: Vec<(String, String, Option<i64>, Option<String>)> = sqlx::query_as(
         "SELECT x.tipo_codigo, x.serie, s.ultimo_numero, s.ultimo_hash
@@ -197,13 +208,8 @@ pub async fn verificar(st: &AppState) -> AppResult<Value> {
     } else {
         format!("{verificados} documentos verificados: {com_erro} série(s) com problemas; {} protecção(ões) em falta.", em_falta.len())
     };
-    sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (?, 'VERIFICAR_INTEGRIDADE', ?)")
-        .bind(s.id)
-        .bind(&resumo)
-        .execute(p)
-        .await?;
     Ok(json!({
-        "ok": ok, "resumo": resumo, "verificados": verificados, "series": lista,
+        "ok": ok, "resumo": resumo, "verificados": verificados, "series": lista, "series_com_erro": com_erro,
         "chaves": chaves.len(),
         "protecao": { "ativa": em_falta.is_empty(), "em_falta": em_falta },
         "data": crate::db::agora(),

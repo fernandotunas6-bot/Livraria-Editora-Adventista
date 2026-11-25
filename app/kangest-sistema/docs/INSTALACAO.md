@@ -47,7 +47,8 @@ shasum -a 256 KanGest_1.2.0_aarch64.dmg
 3. O KanGest usa o WebView2 do Windows (já vem no Windows 11 e no Windows 10 actualizado). Se faltar, o instalador
    descarrega-o: nesse caso é preciso Internet durante a instalação.
 
-Os dados ficam em `%APPDATA%\ao.kigest.app` (base `kigest.db`, cifrada, e cópias em `copias\`). Desinstalar (Definições →
+Os dados ficam em `%APPDATA%\ao.livrariaadventista.kangest` (base `kigest.db`, cifrada, e cópias em `copias\`); o KanGest
+oficial usa outra pasta (`ao.kigest.app`) e os dois não se misturam. Desinstalar (Definições →
 Aplicações) **não apaga os dados**, a não ser que marque a opção de apagar os dados da aplicação. Para passar para outro
 computador, use uma cópia externa ou exportada e **Restaurar**: a chave da base fica no cofre do Windows do computador
 antigo, por isso copiar a pasta não chega ([COPIAS.md](COPIAS.md)).
@@ -58,7 +59,8 @@ antigo, por isso copiar a pasta não chega ([COPIAS.md](COPIAS.md)).
 2. Sem assinatura da Apple, na primeira vez: botão direito no KanGest → **Abrir** → **Abrir** (ou Definições do Sistema →
    Privacidade e Segurança → «Abrir mesmo assim»).
 
-Os dados ficam em `~/Library/Application Support/ao.kigest.app`.
+Os dados ficam em `~/Library/Application Support/ao.livrariaadventista.kangest` (o KanGest oficial usa
+`ao.kigest.app`).
 
 ## 5. Primeiro arranque
 
@@ -102,9 +104,13 @@ precisam. Em **Configurações → Rede → Ligação à Internet**:
 
 ## 8. Actualizações
 
-Em Sistema → Sobre o KanGest → **Actualizações**, indique a origem `https://kangest.pages.dev/actualizacoes` (botão
-«Usar a origem oficial»), ou a pasta partilhada onde a empresa guarda os instaladores. O KanGest lê o manifesto `kangest-atualizacao.json`, descarrega o instalador do seu sistema, confere o
-SHA-256 e a assinatura, faz uma cópia de segurança da base e abre o instalador.
+Em Sistema → Sobre o KanGest → **Actualizações**. A origem já vem preenchida com a oficial da edição
+(`https://livrariaadventista.ao/kangest/actualizacoes`); só se escreve outra para usar uma pasta partilhada onde a
+empresa guarde os instaladores. No computador que guarda a base, o KanGest procura sozinho as versões novas de 6 em 6
+horas e avisa quando há uma (desliga-se no mesmo cartão). Descarregar e instalar são à mão: o KanGest lê o manifesto
+`kangest-atualizacao.json`, descarrega o instalador do seu sistema, confere o SHA-256 e a assinatura, faz e verifica uma
+cópia de segurança da base e abre o instalador. No primeiro arranque da versão nova, verifica a base em segundo plano e
+avisa se encontrar problemas ([ATUALIZACOES.md](ATUALIZACOES.md), [BASE-DE-DADOS.md](BASE-DE-DADOS.md#verificações)).
 
 ## 9. Problemas comuns
 

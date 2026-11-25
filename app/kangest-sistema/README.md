@@ -41,8 +41,11 @@ npm run tauri dev
 Na primeira execução aparece o assistente de configuração (empresa + administrador).
 A base de dados SQLite fica na pasta de dados da aplicação:
 
-- Windows: `%APPDATA%\ao.kigest.app\kigest.db`
-- macOS: `~/Library/Application Support/ao.kigest.app/kigest.db`
+- Windows: `%APPDATA%\ao.livrariaadventista.kangest\kigest.db`
+- macOS: `~/Library/Application Support/ao.livrariaadventista.kangest/kigest.db`
+
+(O KanGest oficial usa `ao.kigest.app`.) As actualizações da edição vêm de
+`https://livrariaadventista.ao/kangest/actualizacoes` ([docs/ATUALIZACOES.md](docs/ATUALIZACOES.md)).
 
 ## Gerar instaladores
 
