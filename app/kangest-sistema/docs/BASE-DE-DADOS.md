@@ -23,7 +23,9 @@ a base, por ordem; o SQLite guarda as aplicadas em `_sqlx_migrations`.
 - Uma migração já publicada **nunca se altera**: as correcções vão numa migração nova.
 - Antes de actualizar, o KanGest faz uma cópia da base (`copias/kangest-antes-de-<versão>.db`).
 - Uma cópia feita por uma versão mais recente (com migrações que esta não conhece) não se restaura: a base deixaria de
-  abrir.
+  abrir. Confere-se migração a migração, pelo número e pelo `checksum` (`db::migracoes_estranhas`), porque um KanGest
+  oficial mais recente do que esta edição pode ter uma `0053` com outro conteúdo. O mesmo vale ao trazer os dados do
+  oficial ([COPIAS.md](COPIAS.md)).
 
 ## Índices e desempenho
 
@@ -68,6 +70,6 @@ vendas, síntese, tesouraria, contas correntes, clientes, stock e caixa.
 ## Verificações
 
 - **Cadeia de assinaturas dos documentos**: Configurações → Certificação AGT → «Verificar agora».
-- **Cada cópia de segurança** é verificada logo depois de criada (`PRAGMA integrity_check`) e, ao restaurar, também a
-  versão das migrações.
+- **Cada cópia de segurança** é verificada logo depois de criada (`PRAGMA integrity_check`) e, ao restaurar, também as
+  migrações (o número e o conteúdo de cada uma).
 - Recálculo de stock (Gestão de Stock → Recálculo) compara as existências com os movimentos.

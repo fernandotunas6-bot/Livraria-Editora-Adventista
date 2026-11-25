@@ -54,6 +54,8 @@ pub mod fotos;
 mod inventario;
 mod ligacao;
 mod modos;
+// trazer os dados do KanGest oficial deste computador
+mod oficial;
 mod quadro;
 mod ramos;
 #[cfg(test)]
@@ -110,7 +112,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
     // Senha provisória por mudar ou sessão bloqueada: só se pode mudar a senha, retomar ou sair.
     let livre = matches!(
         metodo,
-        "setup.estado" | "setup.inicializar" | "setup.restaurar" | "auth.login" | "auth.loginPin" | "auth.logout" | "auth.sessao" | "auth.alterarSenha" | "auth.desbloquear" | "seguranca.politica"
+        "setup.estado" | "setup.inicializar" | "setup.restaurar" | "setup.importarOficial" | "auth.login" | "auth.loginPin" | "auth.logout" | "auth.sessao" | "auth.alterarSenha" | "auth.desbloquear" | "seguranca.politica"
             | "auth.recuperarVerificar" | "auth.recuperarConcluir"
     );
     if !livre {
@@ -160,6 +162,8 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "setup.estado" => setup::estado(st).await,
         "setup.inicializar" => setup::inicializar(st, p(params)?).await,
         "setup.restaurar" => sistema::restaurar_inicial(st, p(params)?).await,
+        // o KanGest oficial deste computador, no primeiro arranque (services/oficial.rs)
+        "setup.importarOficial" => Box::pin(oficial::importar_inicial(st)).await,
         "auth.login" => auth::login(st, p(params)?).await,
         "auth.logout" => auth::logout(st).await,
         "auth.loginPin" => auth::login_pin(st, p(params)?).await,
@@ -494,6 +498,8 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "sistema.copiasGuardar" => sistema::copias_guardar(st, p(params)?).await,
         "sistema.copiaAgora" => sistema::copia_agora(st).await,
         "sistema.restaurar" => sistema::restaurar(st, p(params)?).await,
+        "sistema.oficial" => oficial::estado(st).await,
+        "sistema.importarOficial" => Box::pin(oficial::importar_sistema(st)).await,
         "sistema.info" => sistema::info(st).await,
         "fe.estado" => fe::estado(st).await,
         "fe.guardar" => fe::guardar(st, p(params)?).await,

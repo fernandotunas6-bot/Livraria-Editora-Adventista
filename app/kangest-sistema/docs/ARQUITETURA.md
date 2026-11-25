@@ -24,6 +24,9 @@ e o servidor de licenças nunca é contactado. Para qualquer outro NIF, vale a l
 | Actualizações | kangest.pages.dev/actualizacoes | livrariaadventista.ao/kangest/actualizacoes |
 | CI | `.github/workflows/` do oficial | `.github/workflows/kangest-livraria.yml` da livraria |
 
+Com o oficial no mesmo computador, a edição só lê a pasta de dados e o cofre dele para trazer os dados
+(`services/oficial.rs`, [COPIAS.md](COPIAS.md) «Trazer os dados do KanGest oficial»): nunca grava lá.
+
 ## 1. Três camadas
 
 | Camada | O que guarda | Onde vive | Tecnologia |
