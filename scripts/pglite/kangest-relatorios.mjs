@@ -124,5 +124,26 @@ check('o gerente lê só as da loja dele', doGerente.length === 1 && doGerente[0
 check('e as linhas delas', (await como(gerente, `select count(*)::int n from public.kangest_documento_linhas`))[0].n === 1);
 check('um cliente não lê nada', (await como(cliente, `select count(*)::int n from public.kangest_documentos`))[0].n === 0);
 
+// --- os fechos de caixa dos postos (20261125180000) ---------------------------------------------------------------
+const fecho = (id, extra = {}) => ({ tipo: 'fecho', fecho: {
+  fecho_id: id, sessao_id: 10 + id, numero_z: id, posto: 'Caixa 1', aberta_em: '2026-11-25T08:00:00', fechada_em: '2026-11-25T18:00:00',
+  operador: 'Ana', fechado_por: 'Ana', total_vendido: 342000, numerario_esperado: 228000, valor_contado: 228000, online_total: 364000,
+  online_incluidas: true, reconstruido: false, selo: 'a'.repeat(64), selo_resumo: 'b'.repeat(64),
+  resumo: { sessao: { numero_z: id }, artigos: [{ descricao: 'O Desejado', quantidade: 2 }] }, encomendas: ['LIV-900'], ...extra } });
+const rf = await receber(posto, [fecho(1), { tipo: 'fecho', fecho: { resumo: {} } }]);
+check('fechos: recebido, e um sem número recusado', rf.fechos === 1 && rf.erros.length === 1 && rf.erros[0].tipo === 'fecho', rf);
+check('fechos: repetido não duplica', (await receber(posto, [fecho(1)])).repetidos === 1 && (await q(`select count(*)::int n from public.kangest_fechos`))[0].n === 1);
+const f1 = (await q(`select * from public.kangest_fechos where posto_id = $1 and fecho_id = 1`, [posto]))[0];
+check('fechos: da loja do posto, com o resumo', f1.store_id === loja.id && f1.numero_z === 1 && f1.resumo.artigos[0].quantidade === 2 && Number(f1.online_total) === 364000, f1);
+check('fechos: as encomendas que o Z fechou', (await q(`select order_number from public.kangest_fecho_encomendas where fecho = $1`, [f1.id])).map((r) => r.order_number).join() === 'LIV-900');
+await recusa('fechos: não se altera', () => q(`update public.kangest_fechos set valor_contado = 1 where id = $1`, [f1.id]), /não se altera/);
+await recusa('fechos: não se apaga', () => q(`delete from public.kangest_fechos where id = $1`, [f1.id]), /não se apagam/);
+await receber(antigo, [fecho(1)]);
+check('fechos: a direcção vê os de todas as lojas', (await como(direccao, `select count(*)::int n from public.kangest_fechos`))[0].n === 2);
+const fg = await como(gerente, `select distinct store_id from public.kangest_fechos`);
+check('fechos: o gerente vê só os da loja dele', fg.length === 1 && fg[0].store_id === outra.id, fg);
+check('fechos: um cliente não vê nenhum', (await como(cliente, `select count(*)::int n from public.kangest_fechos`))[0].n === 0);
+await recusa('fechos: a função de receber não se chama pela API', () => como(direccao, `select public.kangest_receber_fecho($1, null, '{}'::jsonb)`, [posto]), /permission denied/);
+
 console.log(`kangest-relatorios: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

@@ -63,7 +63,15 @@ Ficam na auditoria selada, com a ficha e o número:
 
 ## A cópia no site
 
-A cópia de cada fecho no painel do site vem num PR próprio, com a migração dela.
+**Automático:** com o posto ligado ao site, cada fecho arquivado entra numa fila (`sinc_fechos`, migração 0063). Segue
+no mesmo pedido que os documentos e o catálogo (`src/sinc/fechos.rs`).
+- **Sem dados pessoais:** os nomes dos clientes, da lista dos documentos e das vendas online, saem do resumo que vai
+  para o site.
+- **Leva o selo do arquivo,** e também o do resumo que seguiu.
+- **Ao ligar o posto,** os fechos de antes também seguem, uma vez só. Os que vieram do KIGEST não seguem.
+- **No site, ficam no painel:** *Sistema → Ligação ao KanGest → Fechos de caixa dos postos*. São uma cópia que não se
+  altera (`public.kangest_fechos`), e as encomendas que cada Z fechou ficam marcadas (`kangest_fecho_encomendas`).
+- **Quem os vê:** quem vê os relatórios, os de todas as lojas; o gerente da loja, só os da loja dele.
 
 ## Testes
 

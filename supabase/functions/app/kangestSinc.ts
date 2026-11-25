@@ -269,6 +269,8 @@ export function consumidorFinal(nif: unknown): boolean {
   return !n || /^9+$/.test(n) || /^0+$/.test(n);
 }
 
+/** O resumo de um fecho de caixa (o relatório Z sem dados pessoais) tem um tamanho razoável. */
+export const MAX_RESUMO_FECHO = 200_000;
 const inteiro = (v: unknown) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 0);
 const texto = (v: unknown, max: number) => String(v ?? "").slice(0, max);
 const numero = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -312,6 +314,38 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
           preco1_iva: inteiro(a.preco1_iva),
           ativo: a.ativo !== false && a.ativo !== 0,
           codigo_barras: texto(a.codigo_barras, 60),
+        },
+      });
+      continue;
+    }
+    // um fecho de caixa arquivado (o Z): o resumo vem sem os nomes dos clientes (sinc/fechos.rs) e com o selo do arquivo
+    if (item?.tipo === "fecho") {
+      const f = item.fecho || {};
+      const resumo = f.resumo && typeof f.resumo === "object" && !Array.isArray(f.resumo) ? f.resumo : {};
+      if (JSON.stringify(resumo).length > MAX_RESUMO_FECHO) throw new Error(`O resumo de um fecho tem no máximo ${MAX_RESUMO_FECHO} caracteres.`);
+      const encomendas = Array.isArray(f.encomendas) ? f.encomendas : [];
+      out.push({
+        tipo: "fecho",
+        fecho: {
+          fecho_id: inteiro(f.fecho_id),
+          sessao_id: inteiro(f.sessao_id),
+          numero_z: f.numero_z == null ? null : inteiro(f.numero_z),
+          posto: texto(f.posto, 120),
+          armazem_id: f.armazem_id == null ? null : inteiro(f.armazem_id),
+          aberta_em: texto(f.aberta_em, 19),
+          fechada_em: texto(f.fechada_em, 19),
+          operador: texto(f.operador, 120),
+          fechado_por: texto(f.fechado_por, 120),
+          total_vendido: inteiro(f.total_vendido),
+          numerario_esperado: inteiro(f.numerario_esperado),
+          valor_contado: inteiro(f.valor_contado),
+          online_total: inteiro(f.online_total),
+          online_incluidas: f.online_incluidas === true,
+          reconstruido: f.reconstruido === true,
+          selo: texto(f.selo, 64),
+          selo_resumo: texto(f.selo_resumo, 64),
+          resumo,
+          encomendas: encomendas.slice(0, MAX_LINHAS).map((n: unknown) => texto(n, 60)),
         },
       });
       continue;

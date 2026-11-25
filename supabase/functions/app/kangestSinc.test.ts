@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
-  consumidorFinal, deB64, decifrarCampo, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
+  consumidorFinal, deB64, decifrarCampo, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
 } from "./kangestSinc.ts";
 
@@ -170,6 +170,22 @@ describe("dados pessoais cifrados por coluna", () => {
 
     await expect(prepararLote({}, c)).rejects.toThrow(/lista/);
     await expect(prepararLote(Array.from({ length: 201 }, () => ({ tipo: "documento" })), c)).rejects.toThrow(/200/);
+  });
+
+  it("o fecho de caixa: só os campos conhecidos, o resumo com limite e as encomendas como texto", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const [f] = await prepararLote([{ tipo: "fecho", fecho: {
+      fecho_id: 3, sessao_id: 9, numero_z: 12, posto: "Caixa 1", aberta_em: "2026-11-25T08:00:00", fechada_em: "2026-11-25T18:00:00",
+      total_vendido: "342000", numerario_esperado: 228000, valor_contado: 228000, online_total: 364000, online_incluidas: true,
+      reconstruido: "sim", selo: "a".repeat(64), selo_resumo: "b".repeat(64), resumo: { sessao: { numero_z: 12 } }, encomendas: ["LIV-77", 5], extra: "fora",
+    } }], c);
+    expect(f.tipo).toBe("fecho");
+    expect(f.fecho).toMatchObject({ fecho_id: 3, numero_z: 12, total_vendido: 342000, online_incluidas: true, reconstruido: false, encomendas: ["LIV-77", "5"] });
+    expect(f.fecho.extra).toBeUndefined();
+    expect(f.fecho.resumo).toEqual({ sessao: { numero_z: 12 } });
+    const [lista] = await prepararLote([{ tipo: "fecho", fecho: { fecho_id: 1, resumo: [1, 2] } }], c);
+    expect(lista.fecho.resumo).toEqual({});
+    await expect(prepararLote([{ tipo: "fecho", fecho: { fecho_id: 1, resumo: { x: "y".repeat(MAX_RESUMO_FECHO) } } }], c)).rejects.toThrow(/resumo de um fecho/);
   });
 
   it("o stock e os artigos: o estado de cada armazém e o artigo, só com os campos conhecidos", async () => {

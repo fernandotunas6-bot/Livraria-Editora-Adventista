@@ -13,6 +13,7 @@ const ACCOES = { ne: 'Nota de encomenda', fr: 'Factura/Recibo', anular: 'Anulaç
 const KanGestConfigurador = lazy(() => import('./KanGestConfigurador'));
 const KanGestPostos = lazy(() => import('./KanGestPostos'));
 const KanGestDescarregar = lazy(() => import('./KanGestDescarregar'));
+const KanGestFechos = lazy(() => import('./KanGestFechos'));
 
 const FILA = [['pendente', 'Na fila', 'text-amber-600'], ['processando', 'A sair agora', 'text-sky-600'], ['feito', 'Feitos', 'text-emerald-600'], ['erro', 'Com erro', 'text-red-600'], ['ignorado', 'Não vão', 'text-muted-foreground']];
 const NIVEL = {
@@ -123,6 +124,7 @@ export default function KanGestTab() {
       <Suspense fallback={null}>
         <KanGestDescarregar />
         <KanGestPostos lojas={lojas} />
+        <KanGestFechos lojas={lojas} />
       </Suspense>
 
       {/*
