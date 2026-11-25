@@ -9,7 +9,8 @@ Em **Configurações → Sistema** (permissão *Cópia de segurança*).
 | Ao abrir o programa | Se a última cópia é de outro dia ou mais antiga do que a frequência escolhida |
 | De N em N horas, com o programa aberto | Por omissão de 4 em 4 horas (1, 2, 4, 8, 12 ou 24, ou só ao abrir) |
 | No fecho de caixa | Sempre |
-| Antes de uma actualização, de uma importação ou de um restauro | Sempre |
+| Antes de uma actualização, de uma importação ou de um restauro | Sempre. A de antes da actualização faz-se ao descarregar e outra vez ao instalar |
+| Antes dos ajustes de dados de uma versão nova | No arranque, se houver ajustes por aplicar ([BASE-DE-DADOS.md](BASE-DE-DADOS.md#ajustes-de-dados)) |
 | «Fazer cópia agora» | Manual |
 
 As cópias fazem-se na máquina que guarda a base de dados (modo *Sozinho* ou *Servidor*). Um posto em rede não faz cópias:
@@ -18,6 +19,11 @@ os dados estão no servidor.
 Cada cópia é feita com o programa em uso (`VACUUM INTO`) e **verificada** logo a seguir (`PRAGMA integrity_check` e as
 tabelas do KanGest). Guardam-se as últimas N (por omissão 30) em `copias/`, na pasta de dados. Como a base, vão
 **cifradas** com a chave deste computador: restauram-se aqui ([SEGURANCA.md](SEGURANCA.md) §5).
+
+As cópias de antes de cada actualização (`copias/kangest-antes-de-<versão>.db`, com a marca `.verificada`) ficam fora
+dessa conta: a rotação das automáticas nunca as apaga, e guardam-se as das últimas 5 actualizações. É a que Sobre o
+KanGest → Verificação da base oferece restaurar quando a verificação depois da actualização encontra problemas graves
+([BASE-DE-DADOS.md](BASE-DE-DADOS.md#depois-de-cada-actualização)).
 
 ## Fora deste computador
 

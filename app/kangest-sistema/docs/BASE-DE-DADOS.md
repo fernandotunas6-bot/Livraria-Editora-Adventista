@@ -21,7 +21,11 @@ As alterações ao esquema estão em `src-tauri/migrations/` (`0001_…sql`, `00
 a base, por ordem; o SQLite guarda as aplicadas em `_sqlx_migrations`.
 
 - Uma migração já publicada **nunca se altera**: as correcções vão numa migração nova.
-- Antes de actualizar, o KanGest faz uma cópia da base (`copias/kangest-antes-de-<versão>.db`).
+- Antes de actualizar, o KanGest faz uma cópia da base, verificada (`copias/kangest-antes-de-<versão>.db`), ao
+  descarregar e outra vez ao instalar. A rotação das cópias automáticas não a apaga: guardam-se as das últimas 5
+  actualizações.
+- O que precisa do programa e não só de SQL (preencher um valor novo, recalcular, recifrar) vai nos **ajustes de dados**
+  (em baixo), não numa migração.
 - Uma cópia feita por uma versão mais recente (com migrações que esta não conhece) não se restaura: a base deixaria de
   abrir.
 
@@ -71,3 +75,56 @@ vendas, síntese, tesouraria, contas correntes, clientes, stock e caixa.
 - **Cada cópia de segurança** é verificada logo depois de criada (`PRAGMA integrity_check`) e, ao restaurar, também a
   versão das migrações.
 - Recálculo de stock (Gestão de Stock → Recálculo) compara as existências com os movimentos.
+
+### Depois de cada actualização
+
+O KanGest guarda na configuração a versão do último arranque (`sistema.versao_arranque`). No arranque, depois das
+migrações, compara-a com a sua (`services/verificacao.rs`, `registar_arranque`, chamado em `lib.rs`): se mudou, fica
+marcada uma verificação por fazer (`verificacao.pendente`, com a versão de antes e a nova). Uma base nova, ainda sem
+empresa, só fica com a versão. Uma base de antes da 1.4.5 (sem a chave) conta como actualizada.
+
+Uns 45 segundos depois de o programa abrir, a verificação corre **em segundo plano e sem sessão**, só no computador que
+guarda a base. Nunca pára o arranque nem as vendas:
+
+| Verificação | O que confere | Com problemas |
+|---|---|---|
+| Ficheiro da base | `PRAGMA quick_check` | grave |
+| Ligações entre tabelas | `PRAGMA foreign_key_check` (registos ligados a um que não existe) | grave |
+| Cadeia de assinaturas da AGT | a mesma do «Verificar integridade» (`integridade::verificar_cadeia`): assinaturas, numeração, totais e os 9 gatilhos da 0018 | grave |
+| Registo de auditoria | a cadeia dos selos (`auditoria::verificar`) | grave |
+| Stock | as existências e os lotes face aos movimentos (`catalogo::stock_diferencas`, só leitura) | aviso |
+| Caixa | caixas abertos há mais de um dia, mais de um caixa aberto no mesmo posto, documentos ligados a um caixa que não existe | aviso |
+
+O resultado fica na tabela `verificacoes_base` (migração 0060; guardam-se as últimas 50) e na auditoria
+(`VERIFICACAO_BASE`). Com problemas, avisa no computador. **Só avisa**: nunca bloqueia a emissão, nunca corrige o stock
+e nunca restaura nada sozinho. Em **Sobre o KanGest → Verificação da base** vê-se o resultado de cada verificação, com o
+ecrã onde se corrige; «Verificar agora» corre-a à mão (permissão «Configurações»); e a verificação sozinha desliga-se
+(chave `verificacao.depois_de_actualizar`, ligada por omissão). Com problemas graves e a cópia de antes da actualização
+no disco, o ecrã oferece restaurá-la pelo restauro de sempre (fica marcado para o arranque seguinte; a base actual é
+guardada antes). Restaurar essa cópia na versão nova volta a correr as migrações desta versão: se o problema vier
+delas, fale primeiro com o suporte.
+
+## Ajustes de dados
+
+As migrações mudam o esquema e o que se faz em SQL. O que precisa do programa (preencher um valor novo, recalcular,
+recifrar) vai em `src-tauri/src/ajustes.rs`, numa lista por ordem (`AJUSTES`), e corre no arranque, logo depois das
+migrações (`lib.rs`):
+
+- cada ajuste corre **uma vez**, na sua transacção (`db::transacao`): o ajuste, a linha na tabela `ajustes_dados`
+  (migração 0060: nome, versão, aplicado_em, resultado, erro, tentativas) e a linha na auditoria (`AJUSTE_DADOS`)
+  entram juntos ou não entra nada;
+- antes do primeiro ajuste por fazer tira-se uma cópia de segurança (numa base com empresa);
+- um ajuste que falhe desfaz-se, fica com o erro e o número de tentativas (e `AJUSTE_DADOS_FALHOU` na auditoria) e volta
+  a tentar-se no arranque seguinte, ou com «Tentar outra vez» em Sobre o KanGest. **Não impede o programa de abrir.** Os
+  que vêm depois dele esperam por ele;
+- Sobre o KanGest → Verificação da base mostra a lista: aplicado (quando e o que fez), falhou (o erro) ou por aplicar.
+  Um ajuste que a base conhece e esta versão não (a base passou por uma versão mais recente) aparece como «de outra
+  versão».
+
+Para acrescentar um ajuste: vai para o fim da lista, com um nome que nunca muda (`<versão>-<o-que-faz>`); tem de servir
+a uma base nova e a uma antiga; e **nunca mexe em documentos assinados** (os gatilhos da 0018 recusam, e a AGT não se
+desliga).
+
+| Ajuste | Versão | O que faz |
+|---|---|---|
+| `1.4.5-verificacao-depois-de-actualizar` | 1.4.5 | Escreve ligada a opção nova «Verificar sozinho depois de cada actualização», se ninguém a escolheu. |

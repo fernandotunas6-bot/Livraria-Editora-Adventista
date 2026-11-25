@@ -6793,3 +6793,248 @@ async fn loja_online_conta_do_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// Uma verificação da base (services/verificacao.rs) pelo nome: `base`, `ligacoes`, `agt`, `auditoria`, `stock`, `caixa`.
+fn verificacao_de<'a>(v: &'a Value, id: &str) -> &'a Value {
+    v["detalhe"].as_array().and_then(|l| l.iter().find(|x| x["id"] == id)).unwrap_or_else(|| panic!("sem a verificação {id}: {v}"))
+}
+
+/// A versão do arranque: numa base por configurar só fica gravada; com a loja configurada, uma versão diferente marca a
+/// verificação da base, que corre sem sessão, grava o resultado, tira a marca e fica na auditoria. Desligada à mão, a
+/// verificação fica por fazer até ao «Verificar agora».
+#[tokio::test]
+async fn verificacao_depois_de_actualizar() {
+    use super::verificacao;
+    let pasta = std::env::temp_dir().join(format!("kigest-verificacao-arranque-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&pasta);
+    std::fs::create_dir_all(&pasta).unwrap();
+    let pool = db::abrir(&pasta.join("kigest.db")).await.expect("abrir base");
+    let mut st = AppState::new(pool);
+    st.pasta_dados = pasta.clone();
+    st.pasta_exportacao = pasta.clone();
+    st.carregar_posto(1).await.unwrap();
+    let versao = |st: &AppState| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, String>("SELECT valor FROM config WHERE chave = ?").bind(verificacao::CHAVE_VERSAO).fetch_optional(&pool).await.unwrap() }
+    };
+
+    // primeiro arranque, base nova: fica a versão e não há nada a verificar
+    assert!(!verificacao::registar_arranque(&st.pool, "1.4.5").await.unwrap());
+    assert_eq!(versao(&st).await.as_deref(), Some("1.4.5"));
+    assert!(!verificacao::registar_arranque(&st.pool, "1.4.5").await.unwrap(), "a mesma versão não conta");
+    assert!(verificacao::correr_pendente(&st.pool, &pasta).await.unwrap().is_none());
+
+    rpc(&st, "setup.inicializar", json!({ "empresa": { "nome": "Loja", "nif": "5000000003" }, "admin": { "nome": "Admin", "login": "admin", "senha": "1234" } })).await;
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let art = rpc(&st, "artigos.guardar", json!({ "descricao": "Bíblia", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": art, "quantidade": 10, "preco_unitario": 50000 }] })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": art, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+
+    // o programa foi actualizado: fica marcada a verificação, com a versão de antes
+    assert!(verificacao::registar_arranque(&st.pool, "1.4.6").await.unwrap());
+    assert_eq!(versao(&st).await.as_deref(), Some("1.4.6"));
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    assert_eq!(e["pendente"]["de"], "1.4.5", "{e}");
+    assert_eq!(e["pendente"]["para"], "1.4.6");
+    assert_eq!(e["automatica"], true, "ligada por omissão");
+    assert!(e["ultima"].is_null());
+
+    // a verificação corre sem sessão e, numa base sã, não encontra nada
+    let v = verificacao::correr_pendente(&st.pool, &pasta).await.unwrap().expect("havia uma verificação por fazer");
+    assert_eq!(v["ok"], true, "{v}");
+    assert_eq!(v["motivo"], "actualizacao");
+    assert_eq!(v["versao_anterior"], "1.4.5");
+    assert_eq!((v["graves"].as_i64(), v["avisos"].as_i64()), (Some(0), Some(0)));
+    let ids: Vec<&str> = v["detalhe"].as_array().unwrap().iter().map(|x| x["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["base", "ligacoes", "agt", "auditoria", "stock", "caixa"]);
+    assert!(v["detalhe"].as_array().unwrap().iter().all(|x| x["ok"] == true), "{v}");
+    assert!(verificacao_de(&v, "agt")["resumo"].as_str().unwrap().contains("conferido"), "{v}");
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    assert!(e["pendente"].is_null(), "a marca sai depois de verificar");
+    assert_eq!(e["ultima"]["id"], v["id"]);
+    assert_eq!(e["historico"].as_array().unwrap().len(), 1);
+    let aud: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auditoria WHERE acao = 'VERIFICACAO_BASE' AND detalhe LIKE 'Depois da actualização%'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(aud, 1);
+    assert!(verificacao::correr_pendente(&st.pool, &pasta).await.unwrap().is_none(), "corre uma vez por actualização");
+
+    // desligada à mão: a próxima actualização fica por verificar até alguém verificar
+    rpc(&st, "verificacao.automatica", json!({ "ligada": false })).await;
+    assert!(verificacao::registar_arranque(&st.pool, "1.4.7").await.unwrap());
+    assert!(verificacao::correr_pendente(&st.pool, &pasta).await.unwrap().is_none());
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    assert_eq!((e["automatica"].as_bool(), e["pendente"]["de"].as_str()), (Some(false), Some("1.4.6")));
+    let uid = st.sessao().unwrap().id;
+    let v = verificacao::verificar_base(&st.pool, &pasta, "manual", None, Some(uid)).await.unwrap();
+    assert_eq!((v["ok"].as_bool(), v["utilizador"].as_str()), (Some(true), Some("Admin")));
+    assert!(rpc(&st, "verificacao.estado", Value::Null).await["pendente"].is_null(), "a verificação à mão também a tira");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// A verificação apanha o stock diferente dos movimentos e o caixa esquecido (avisos) e a protecção da AGT em falta
+/// (grave); com problemas graves, oferece a cópia de antes da actualização, que se restaura pelo restauro de sempre.
+/// Nunca corrige nada sozinha.
+#[tokio::test]
+async fn verificacao_encontra_problemas_e_oferece_a_copia() {
+    use super::verificacao;
+    let (st, pasta) = base_com_admin("verificacao-problemas").await;
+    let uid = st.sessao().unwrap().id;
+    let art = rpc(&st, "artigos.guardar", json!({ "descricao": "Hinário", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": art, "quantidade": 10, "preco_unitario": 50000 }] })).await;
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": art, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+    // a cópia que o instalar da versão anterior deixou, verificada
+    let copia = super::sistema::copia_antes_de(&pasta, env!("CARGO_PKG_VERSION"));
+    super::sistema::copia_verificada(&st.pool, &copia).await.unwrap();
+    assert!(copia.with_extension("verificada").is_file());
+
+    let v = verificacao::verificar_base(&st.pool, &pasta, "manual", None, Some(uid)).await.unwrap();
+    assert_eq!(v["ok"], true, "{v}");
+
+    // o stock gravado deixa de bater com os movimentos e o caixa fica esquecido aberto: avisos, não graves
+    sqlx::query("UPDATE stock SET quantidade = 99 WHERE artigo_id = ?").bind(art).execute(&st.pool).await.unwrap();
+    sqlx::query("UPDATE caixa_sessoes SET aberta_em = '2020-01-06T08:00:00' WHERE estado = 'ABERTA'").execute(&st.pool).await.unwrap();
+    let v = verificacao::verificar_base(&st.pool, &pasta, "manual", None, Some(uid)).await.unwrap();
+    assert_eq!(v["ok"], false, "{v}");
+    assert_eq!((v["graves"].as_i64(), v["avisos"].as_i64()), (Some(0), Some(2)), "{v}");
+    let s = verificacao_de(&v, "stock");
+    assert_eq!(s["ok"], false);
+    assert_eq!(s["detalhe"]["existencias"][0]["gravado"], 99.0, "{s}");
+    assert_eq!(s["detalhe"]["existencias"][0]["calculado"], 9.0, "{s}");
+    let c = verificacao_de(&v, "caixa");
+    assert_eq!(c["ok"], false);
+    assert_eq!(c["detalhe"]["abertas_ha_mais_de_um_dia"].as_array().unwrap().len(), 1, "{c}");
+    assert!(verificacao_de(&v, "agt")["ok"] == true && verificacao_de(&v, "base")["ok"] == true);
+    // só avisa: o stock continua como estava
+    assert_eq!(stock(&st, art).await, 99.0);
+
+    // sem a protecção dos documentos assinados: grave, e a cópia de antes fica oferecida
+    sqlx::query("DROP TRIGGER trg_doc_assinado_upd").execute(&st.pool).await.unwrap();
+    let v = verificacao::verificar_base(&st.pool, &pasta, "manual", None, Some(uid)).await.unwrap();
+    assert_eq!(v["graves"], 1, "{v}");
+    let agt = verificacao_de(&v, "agt");
+    assert_eq!(agt["ok"], false);
+    assert_eq!(agt["detalhe"]["em_falta"][0], "trg_doc_assinado_upd", "{agt}");
+    assert_eq!(v["copia"], copia.display().to_string());
+    assert_eq!((v["copia_existe"].as_bool(), v["copia_verificada"].as_bool()), (Some(true), Some(true)));
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    assert_eq!(e["ultima"]["graves"], 1);
+    assert_eq!(e["historico"].as_array().unwrap().len(), 3);
+    assert_eq!(e["copia_antes"]["ficheiro"], copia.display().to_string());
+    assert_eq!(e["copia_antes"]["verificada"], true);
+
+    // restaurá-la é à mão, pelo restauro de sempre: no arranque seguinte, a base volta à de antes
+    let r = rpc(&st, "sistema.restaurar", json!({ "ficheiro": copia.display().to_string() })).await;
+    assert_eq!(r["reiniciar"], true);
+    fechar_de_vez(&st.pool).await;
+    assert!(super::sistema::aplicar_restauro_pendente(&pasta).unwrap().is_some());
+    let pool = db::abrir(&pasta.join("kigest.db")).await.unwrap();
+    let q: f64 = sqlx::query_scalar("SELECT quantidade FROM stock WHERE artigo_id = ?").bind(art).fetch_one(&pool).await.unwrap();
+    assert_eq!(q, 9.0);
+    let v = verificacao::verificar_base(&pool, &pasta, "manual", None, None).await.unwrap();
+    assert_eq!(verificacao_de(&v, "agt")["ok"], true, "{v}");
+    assert_eq!(verificacao_de(&v, "stock")["ok"], true, "{v}");
+    pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// Os ajustes de dados entre versões (src/ajustes.rs) correm uma vez, ficam registados (na tabela e na auditoria), com
+/// uma cópia antes, e aparecem em Sobre o KanGest. O ajuste da 1.4.5 respeita a escolha de quem já desligou a
+/// verificação.
+#[tokio::test]
+async fn ajustes_de_dados_correm_uma_vez() {
+    let (st, pasta) = base_com_admin("ajustes").await;
+    let n = crate::ajustes::AJUSTES.len();
+    let r = crate::ajustes::aplicar(&st.pool, Some(pasta.as_path())).await.unwrap();
+    assert_eq!(r["aplicados"], n, "{r}");
+    assert!(r["falhou"].is_null());
+    let valor: String = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(super::verificacao::CHAVE_AUTOMATICA).fetch_one(&st.pool).await.unwrap();
+    assert_eq!(valor, "1");
+    let conta = |acao: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM auditoria WHERE acao = ?").bind(acao).fetch_one(&pool).await.unwrap() }
+    };
+    assert_eq!(conta("AJUSTE_DADOS").await, n as i64);
+    let copias: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auditoria WHERE acao = 'COPIA_SEGURANCA' AND detalhe LIKE 'Cópia antes dos ajustes%'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(copias, 1, "uma cópia antes dos ajustes");
+
+    // no arranque seguinte não corre nada (nem se faz outra cópia)
+    let r = crate::ajustes::aplicar(&st.pool, Some(pasta.as_path())).await.unwrap();
+    assert_eq!((r["aplicados"].as_i64(), r["pendentes"].as_i64()), (Some(0), Some(0)));
+    assert_eq!(conta("AJUSTE_DADOS").await, n as i64);
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    let lista = e["ajustes"].as_array().unwrap();
+    assert_eq!(lista.len(), n);
+    assert!(lista.iter().all(|a| a["estado"] == "aplicado" && a["tentativas"] == 1 && a["erro"].is_null()), "{e}");
+    assert_eq!(lista[0]["nome"], "1.4.5-verificacao-depois-de-actualizar");
+    assert_eq!(lista[0]["resultado"], "Ligada, por omissão.");
+
+    // quem já tinha escolhido fica como estava (como se o ajuste viesse numa base com a escolha feita)
+    rpc(&st, "verificacao.automatica", json!({ "ligada": false })).await;
+    sqlx::query("DELETE FROM ajustes_dados").execute(&st.pool).await.unwrap();
+    let r = rpc(&st, "verificacao.ajustesAplicar", Value::Null).await;
+    assert_eq!(r["resultado"]["aplicados"], n, "{r}");
+    assert_eq!(r["ajustes"][0]["resultado"], "Já estava escolhida: ficou como estava.");
+    assert_eq!(rpc(&st, "verificacao.estado", Value::Null).await["automatica"], false);
+
+    // um ajuste que esta versão não conhece (a base passou por uma versão mais recente) aparece à parte
+    sqlx::query("INSERT INTO ajustes_dados (nome, versao, aplicado_em, resultado, tentativas) VALUES ('9.9.9-futuro', '9.9.9', '2027-01-01T00:00:00', 'feito', 1)")
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let e = rpc(&st, "verificacao.estado", Value::Null).await;
+    let futuro = e["ajustes"].as_array().unwrap().iter().find(|a| a["nome"] == "9.9.9-futuro").cloned().unwrap();
+    assert_eq!(futuro["estado"], "desconhecido");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// As actualizações procuram-se sozinhas: sem origem escrita usa-se a oficial; com versão nova avisa-se uma vez e o
+/// ecrã mostra-a; desligada à mão, não se procura. A cópia de antes de descarregar fica verificada e fora da rotação.
+#[tokio::test]
+async fn actualizacoes_procuram_se_sozinhas() {
+    use super::atualizacao;
+    let (st, pasta) = base_com_admin("actualizacao-sozinha").await;
+    let e = rpc(&st, "atualizacao.estado", Value::Null).await;
+    assert_eq!(e["fonte"], "");
+    assert_eq!(e["fonte_efectiva"], atualizacao::ORIGEM_OFICIAL, "sem origem escrita, a oficial");
+    assert_eq!(e["automatica"], true, "procura sozinha por omissão");
+    assert!(e["disponivel"].is_null());
+
+    let origem = pasta.join("origem");
+    std::fs::create_dir_all(&origem).unwrap();
+    let plat = e["plataforma"].as_str().unwrap().to_string();
+    let pacote = b"instalador de teste";
+    std::fs::write(origem.join("KanGest_9.9.9.bin"), pacote).unwrap();
+    let manifesto = json!({ "versao": "9.9.9", "pacotes": { plat: { "ficheiro": "KanGest_9.9.9.bin", "sha256": atualizacao::sha256_hex(pacote) } } });
+    std::fs::write(origem.join("kangest-atualizacao.json"), manifesto.to_string()).unwrap();
+    rpc(&st, "atualizacao.guardar", json!({ "fonte": origem.display().to_string() })).await;
+
+    // a primeira procura encontra a versão nova; a seguinte espera pelas 6 horas
+    assert_eq!(atualizacao::procurar_sozinho(&pasta).await.unwrap().as_deref(), Some("9.9.9"));
+    assert!(atualizacao::procurar_sozinho(&pasta).await.unwrap().is_none());
+    let e = rpc(&st, "atualizacao.estado", Value::Null).await;
+    assert_eq!(e["disponivel"], "9.9.9");
+    assert!(e["ultima_verificacao"].is_string());
+
+    // desligada à mão, não procura mesmo com o intervalo passado
+    rpc(&st, "atualizacao.automatica", json!({ "ligada": false })).await;
+    let cfg = pasta.join("atualizacao.json");
+    let mut c: Value = serde_json::from_str(&std::fs::read_to_string(&cfg).unwrap()).unwrap();
+    c["ultima_verificacao"] = Value::Null;
+    std::fs::write(&cfg, c.to_string()).unwrap();
+    assert!(atualizacao::procurar_sozinho(&pasta).await.unwrap().is_none());
+    assert_eq!(rpc(&st, "atualizacao.estado", Value::Null).await["automatica"], false);
+    // a procura à mão continua
+    assert_eq!(rpc(&st, "atualizacao.verificar", Value::Null).await["disponivel"], true);
+
+    // descarregar deixa a cópia de antes da actualização, verificada, que a rotação das automáticas não apaga
+    let d = rpc(&st, "atualizacao.descarregar", Value::Null).await;
+    let copia = std::path::PathBuf::from(d["copia"].as_str().expect("cópia de antes"));
+    assert_eq!(copia, super::sistema::copia_antes_de(&pasta, "9.9.9"));
+    assert!(copia.is_file() && copia.with_extension("verificada").is_file());
+    super::sistema::verificar_ficheiro(&copia).await.unwrap();
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

@@ -2,6 +2,7 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 mod agt;
+mod ajustes;
 pub mod api;
 mod auditoria;
 mod db;
@@ -125,6 +126,20 @@ pub fn run() {
             if let Err(e) = tauri::async_runtime::block_on(segredos::cifrar_existentes(&pool)) {
                 eprintln!("Não foi possível cifrar os segredos guardados: {e}");
             }
+            // a versão deste arranque: depois de uma actualização fica marcada a verificação da base, que corre mais
+            // tarde, em segundo plano (services/verificacao.rs)
+            match tauri::async_runtime::block_on(services::verificacao::registar_arranque(&pool, env!("CARGO_PKG_VERSION"))) {
+                Ok(true) => eprintln!("KanGest actualizado para a {}: a base vai ser verificada.", env!("CARGO_PKG_VERSION")),
+                Ok(false) => {}
+                Err(e) => eprintln!("Não foi possível registar a versão deste arranque: {e}"),
+            }
+            // os ajustes de dados entre versões, depois das migrações (src/ajustes.rs): um que falhe fica registado, volta
+            // a tentar-se no arranque seguinte e não impede o programa de abrir
+            match tauri::async_runtime::block_on(ajustes::aplicar(&pool, Some(dir.as_path()))) {
+                Ok(r) if r["falhou"].is_string() => eprintln!("Ajustes de dados: ficou um por aplicar ({r})."),
+                Ok(_) => {}
+                Err(e) => eprintln!("Ajustes de dados: {e}"),
+            }
             let mut estado = AppState::new(pool);
             estado.pasta_dados = dir.clone();
             // a pasta dos documentos: «Documentos/KanGest Livraria», visível e criada aqui (ou as Transferências, sem ela)
@@ -180,6 +195,10 @@ pub fn run() {
             services::resumo_email::iniciar(estado.clone());
             // Licença e equipa gerida no site: verificadas sozinhas, mesmo sem ninguém com sessão aberta.
             services::licenca::iniciar(estado.clone());
+            // a verificação da base depois de uma actualização (só se este arranque a marcou) e a procura de versões
+            // novas de 6 em 6 horas: as duas só avisam, nada se instala nem se restaura sozinho
+            services::verificacao::iniciar(estado.clone());
+            services::atualizacao::iniciar(estado.clone());
             app.manage(estado);
             Ok(())
         })

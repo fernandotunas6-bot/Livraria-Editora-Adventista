@@ -5,7 +5,7 @@ pub mod acesso_web;
 mod aparencia;
 mod auditoria;
 mod dois_passos;
-mod atualizacao;
+pub mod atualizacao;
 mod avencas;
 mod assistente;
 mod auth;
@@ -49,6 +49,8 @@ mod series;
 mod setup;
 pub mod sistema;
 mod suspensos;
+// a verificação da base depois de cada actualização e os ajustes de dados no ecrã (Sobre o KanGest)
+pub mod verificacao;
 mod ficheiros;
 pub mod fotos;
 mod inventario;
@@ -142,6 +144,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
     }
     if let Some(resto) = metodo.strip_prefix("tv.") {
         return Box::pin(tv::despachar(st, resto, params)).await;
+    }
+    if let Some(resto) = metodo.strip_prefix("verificacao.") {
+        return Box::pin(verificacao::despachar(st, resto, params)).await;
     }
     if let Some(resto) = metodo.strip_prefix("fotos.") {
         return Box::pin(async move {
@@ -506,6 +511,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "atualizacao.estado" => atualizacao::estado(st).await,
         "atualizacao.guardar" => atualizacao::guardar(st, p(params)?).await,
         "atualizacao.verificar" => atualizacao::verificar(st).await,
+        "atualizacao.automatica" => atualizacao::automatica(st, p(params)?).await,
         "atualizacao.descarregar" => atualizacao::descarregar(st).await,
         "atualizacao.instalar" => atualizacao::instalar(st, p(params)?).await,
         "sistema.exportar" => sistema::exportar(st, p(params)?).await,

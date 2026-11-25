@@ -14,9 +14,15 @@
 //!
 //! O pacote é sempre conferido pelo SHA-256 do manifesto. Com uma chave pública configurada
 //! (minisign, a mesma do `tauri signer`), a assinatura do pacote passa a ser obrigatória.
-//! Antes de instalar é feita uma cópia de segurança da base.
+//! Antes de instalar é feita uma cópia de segurança da base, verificada (`copias/kangest-antes-de-<versão>.db`): é a
+//! que se oferece se a verificação depois da actualização encontrar problemas (services/verificacao.rs).
+//!
+//! Sem origem escrita, usa-se a oficial da edição. As actualizações procuram-se sozinhas de 6 em 6 horas no computador
+//! que guarda a base (`iniciar`), e avisa-se no computador quando há versão nova; descarregar e instalar continuam à
+//! mão, em Sobre o KanGest. A procura sozinha desliga-se no mesmo ecrã.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -35,15 +41,19 @@ pub const ORIGEM_OFICIAL: &str = "https://livrariaadventista.ao/kangest/actualiz
 /// tenha gravadas passa a usar a da edição, para nunca instalar por cima a versão genérica.
 const ORIGENS_DO_OFICIAL: [&str; 2] = ["https://github.com/fernandotunas6-bot/KanGest/releases", "https://kangest.pages.dev"];
 
-/// A origem a usar de facto: a gravada, com as do KanGest oficial trocadas pela da edição.
+/// A origem a usar de facto: a gravada, com as do KanGest oficial trocadas pela da edição; sem origem gravada, a
+/// oficial da edição.
 pub fn fonte_efectiva(fonte: &str) -> String {
     let f = fonte.trim().trim_end_matches(['/', '\\']);
     let minusculas = f.to_ascii_lowercase();
-    if ORIGENS_DO_OFICIAL.iter().any(|o| minusculas.starts_with(&o.to_ascii_lowercase())) {
+    if f.is_empty() || ORIGENS_DO_OFICIAL.iter().any(|o| minusculas.starts_with(&o.to_ascii_lowercase())) {
         return ORIGEM_OFICIAL.to_string();
     }
     f.to_string()
 }
+
+/// De quantas em quantas horas se procuram actualizações sozinho.
+const INTERVALO_HORAS: i64 = 6;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -53,6 +63,21 @@ pub struct Config {
     pub chave_publica: String,
     #[serde(default)]
     pub ultima_verificacao: Option<String>,
+    /// Procurar actualizações sozinho (`None`: sim, por omissão; desliga-se em Sobre o KanGest).
+    #[serde(default)]
+    pub automatica: Option<bool>,
+    /// A versão nova encontrada na última procura (sozinha ou à mão), se houver.
+    #[serde(default)]
+    pub disponivel: Option<String>,
+    /// A última versão nova de que se avisou no computador (avisa-se uma vez por versão).
+    #[serde(default)]
+    pub avisada: Option<String>,
+}
+
+impl Config {
+    pub fn procura_sozinho(&self) -> bool {
+        self.automatica != Some(false)
+    }
 }
 
 fn ficheiro_cfg(dir: &Path) -> PathBuf {
@@ -130,9 +155,6 @@ struct Manifesto {
 }
 
 fn obter_manifesto(fonte: &str) -> AppResult<(Manifesto, String)> {
-    if fonte.trim().is_empty() {
-        return Err(AppError::msg("Indique primeiro a origem das actualizações (endereço ou pasta partilhada)."));
-    }
     let (url, base) = localizar(&fonte_efectiva(fonte));
     let m: Manifesto = serde_json::from_slice(&ler_origem(&url)?).map_err(|e| AppError::msg(format!("O ficheiro {MANIFESTO} é inválido: {e}")))?;
     Ok((m, base))
@@ -174,11 +196,15 @@ pub fn sha256_hex(dados: &[u8]) -> String {
     Sha256::digest(dados).iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Ficheiro com o SHA-256 conferido de um pacote descarregado.
-fn conferido(pacote: &Path) -> PathBuf {
+/// Ficheiro ao lado de um pacote descarregado (`.sha256`: o SHA-256 conferido; `.versao`: a versão que ele instala).
+fn ao_lado(pacote: &Path, extensao: &str) -> PathBuf {
     let mut n = pacote.as_os_str().to_owned();
-    n.push(".sha256");
+    n.push(extensao);
     PathBuf::from(n)
+}
+
+fn conferido(pacote: &Path) -> PathBuf {
+    ao_lado(pacote, ".sha256")
 }
 
 fn pasta(st: &AppState) -> PathBuf {
@@ -201,13 +227,32 @@ pub async fn estado(st: &AppState) -> AppResult<Value> {
         "versao_atual": env!("CARGO_PKG_VERSION"),
         "plataforma": plataforma(),
         "fonte": c.fonte,
-        // a que se usa de facto (a antiga do GitHub passa à oficial) e a oficial, para o botão «Usar a origem oficial»
-        "fonte_efectiva": (!c.fonte.trim().is_empty()).then(|| fonte_efectiva(&c.fonte)),
+        // a que se usa de facto (vazia ou a antiga do GitHub: a oficial) e a oficial, para «Usar a origem oficial»
+        "fonte_efectiva": fonte_efectiva(&c.fonte),
         "origem_oficial": ORIGEM_OFICIAL,
         "chave_publica": chave_efectiva(&c).is_some(),
         "chave_embutida": crate::produtor::chave_actualizacoes().is_some(),
         "ultima_verificacao": c.ultima_verificacao,
+        "automatica": c.procura_sozinho(),
+        // a versão nova que a última procura encontrou (deixa de contar depois de instalada)
+        "disponivel": c.disponivel.filter(|v| mais_recente(v, env!("CARGO_PKG_VERSION"))),
+        // a procura sozinha corre no computador que guarda a base, não nos postos em rede
+        "posto_cliente": crate::rede::config().cliente(),
     }))
+}
+
+#[derive(Deserialize)]
+pub struct AutomaticaIn {
+    ligada: bool,
+}
+
+/// Liga ou desliga a procura sozinha de actualizações neste computador (a manual fica sempre).
+pub async fn automatica(st: &AppState, a: AutomaticaIn) -> AppResult<Value> {
+    st.exigir_perm("sistema.atualizacoes")?;
+    let mut c = ler_cfg(&st.pasta_dados);
+    c.automatica = Some(a.ligada);
+    gravar_cfg(&st.pasta_dados, &c)?;
+    Ok(json!({ "automatica": c.procura_sozinho() }))
 }
 
 #[derive(Deserialize)]
@@ -243,10 +288,11 @@ pub async fn verificar(st: &AppState) -> AppResult<Value> {
     let mut c = ler_cfg(&st.pasta_dados);
     let fonte = c.fonte.clone();
     let (m, base) = tokio::task::spawn_blocking(move || obter_manifesto(&fonte)).await.map_err(|e| AppError::msg(e.to_string()))??;
-    c.ultima_verificacao = Some(crate::db::agora());
-    gravar_cfg(&st.pasta_dados, &c).ok();
     let plat = plataforma();
     let pacote = m.pacotes.get(&plat);
+    c.ultima_verificacao = Some(crate::db::agora());
+    c.disponivel = (mais_recente(&m.versao, env!("CARGO_PKG_VERSION")) && pacote.is_some()).then(|| m.versao.clone());
+    gravar_cfg(&st.pasta_dados, &c).ok();
     Ok(json!({
         "versao_atual": env!("CARGO_PKG_VERSION"),
         "versao": m.versao,
@@ -280,22 +326,33 @@ pub async fn descarregar(st: &AppState) -> AppResult<Value> {
         let nome = Path::new(&p.ficheiro).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "kangest-instalador".into());
         let destino = destino_dir.join(nome);
         std::fs::write(&destino, &dados).map_err(|e| AppError::msg(format!("Não foi possível gravar {}: {e}", destino.display())))?;
-        // o SHA-256 conferido fica ao lado: antes de abrir o instalador volta a conferir-se
+        // o SHA-256 conferido fica ao lado: antes de abrir o instalador volta a conferir-se; e a versão, para o nome da
+        // cópia de antes de instalar
         std::fs::write(conferido(&destino), sha256_hex(&dados)).map_err(|e| AppError::msg(e.to_string()))?;
+        std::fs::write(ao_lado(&destino, ".versao"), &m.versao).map_err(|e| AppError::msg(e.to_string()))?;
         Ok((destino, m.versao))
     })
     .await
     .map_err(|e| AppError::msg(e.to_string()))??;
-    // cópia de segurança antes de instalar (num posto cliente os dados estão no servidor)
-    let copia = if crate::rede::config().cliente() {
-        None
-    } else {
-        let c = st.pasta_dados.join("copias").join(format!("kangest-antes-de-{versao}.db"));
-        std::fs::create_dir_all(st.pasta_dados.join("copias")).ok();
-        super::sistema::copiar(&st.pool, &c).await?;
-        Some(c.display().to_string())
-    };
+    // cópia de segurança logo ao descarregar (e outra, mais recente, ao instalar)
+    let copia = copia_antes(st, &versao).await?;
     Ok(json!({ "ficheiro": ficheiro.display().to_string(), "versao": versao, "copia": copia }))
+}
+
+/// A cópia de antes da actualização, verificada como as automáticas, em `copias/kangest-antes-de-<versão>.db`. Num
+/// posto cliente não se faz: os dados estão no servidor.
+async fn copia_antes(st: &AppState, versao: &str) -> AppResult<Option<String>> {
+    if crate::rede::config().cliente() {
+        return Ok(None);
+    }
+    let f = super::sistema::copia_antes_de(&st.pasta_dados, versao);
+    super::sistema::copia_verificada(&st.pool, &f)
+        .await
+        .map_err(|e| AppError::msg(format!("Não foi possível fazer a cópia de segurança de antes da actualização: {e}")))?;
+    if let Some(dir) = f.parent() {
+        super::sistema::podar_antes(dir);
+    }
+    Ok(Some(f.display().to_string()))
 }
 
 #[derive(Deserialize)]
@@ -317,6 +374,13 @@ pub async fn instalar(st: &AppState, i: InstalarIn) -> AppResult<Value> {
     if sha256_hex(&dados) != esperado.trim() {
         return Err(AppError::msg("O instalador foi alterado depois de descarregado: actualização recusada. Descarregue-a de novo."));
     }
+    // a cópia de antes, já com o que se vendeu desde o descarregar; sem ela, o instalador não se abre
+    let versao = std::fs::read_to_string(ao_lado(&f, ".versao"))
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| f.file_stem().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "nova".into()));
+    let copia = copia_antes(st, &versao).await?;
     // o «start» passa pelo ShellExecute, que pede elevação (UAC) quando o instalador a exige;
     // sem o prefixo «\\?\» do canonicalize, que o cmd não aceita
     #[cfg(target_os = "windows")]
@@ -330,7 +394,60 @@ pub async fn instalar(st: &AppState, i: InstalarIn) -> AppResult<Value> {
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let r = std::process::Command::new("xdg-open").arg(&f).spawn();
     r.map_err(|e| AppError::msg(format!("Não foi possível abrir o instalador: {e}")))?;
-    Ok(Value::Null)
+    Ok(json!({ "versao": versao, "copia": copia }))
+}
+
+// ------------------------------------------------------------------ a procura sozinha
+
+/// Já passou o intervalo desde a última procura (ou nunca se procurou)?
+fn vencida(ultima: Option<&str>, agora: chrono::NaiveDateTime, horas: i64) -> bool {
+    match ultima.and_then(|u| chrono::NaiveDateTime::parse_from_str(u.trim(), "%Y-%m-%dT%H:%M:%S").ok()) {
+        Some(u) => agora - u >= chrono::Duration::hours(horas),
+        None => true,
+    }
+}
+
+/// Uma procura sozinha: com a procura ligada e o intervalo passado, lê o manifesto e, se há versão nova para este
+/// sistema, avisa no computador (uma vez por versão). Devolve a versão nova, se houver.
+pub(crate) async fn procurar_sozinho(dir: &Path) -> AppResult<Option<String>> {
+    let mut c = ler_cfg(dir);
+    if !c.procura_sozinho() || !vencida(c.ultima_verificacao.as_deref(), chrono::Local::now().naive_local(), INTERVALO_HORAS) {
+        return Ok(None);
+    }
+    let fonte = c.fonte.clone();
+    let (m, _) = tokio::task::spawn_blocking(move || obter_manifesto(&fonte)).await.map_err(|e| AppError::msg(e.to_string()))??;
+    c.ultima_verificacao = Some(crate::db::agora());
+    c.disponivel = (mais_recente(&m.versao, env!("CARGO_PKG_VERSION")) && m.pacotes.contains_key(&plataforma())).then(|| m.versao.clone());
+    let avisar = c.disponivel.is_some() && c.avisada != c.disponivel;
+    if avisar {
+        c.avisada = c.disponivel.clone();
+    }
+    gravar_cfg(dir, &c)?;
+    if avisar {
+        crate::nativo::notificar(
+            "actualizacao-nova",
+            "Há uma versão nova do KanGest Livraria",
+            &format!("A versão {} está publicada. Descarregue-a e instale-a em Sobre o KanGest → Actualizações.", m.versao),
+        );
+    }
+    Ok(c.disponivel)
+}
+
+/// Procura actualizações sozinho, de `INTERVALO_HORAS` em `INTERVALO_HORAS` horas, só no computador que guarda a base
+/// (num posto em rede, procura-se à mão). Uma falha (sem Internet) só fica no registo: tenta-se na volta seguinte.
+pub fn iniciar(st: Arc<AppState>) {
+    tauri::async_runtime::spawn(async move {
+        // deixa o arranque acabar primeiro
+        tokio::time::sleep(std::time::Duration::from_secs(2 * 60)).await;
+        loop {
+            if !crate::rede::config().cliente() {
+                if let Err(e) = procurar_sozinho(&st.pasta_dados).await {
+                    eprintln!("Procura de actualizações: {e}");
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(30 * 60)).await;
+        }
+    });
 }
 
 /// `\\?\C:\x` → `C:\x` e `\\?\UNC\srv\x` → `\\srv\x` (caminhos «verbatim» do canonicalize no Windows).
@@ -357,6 +474,22 @@ mod testes {
     }
 
     #[test]
+    fn procura_sozinha_de_6_em_6_horas() {
+        let agora = chrono::NaiveDateTime::parse_from_str("2026-11-25T18:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
+        assert!(vencida(None, agora, 6), "nunca se procurou");
+        assert!(vencida(Some("lixo"), agora, 6));
+        assert!(!vencida(Some("2026-11-25T13:00:00"), agora, 6), "há 5 horas");
+        assert!(vencida(Some("2026-11-25T12:00:00"), agora, 6), "há 6 horas");
+        // por omissão procura sozinha; desligada à mão, não
+        assert!(Config::default().procura_sozinho());
+        let c: Config = serde_json::from_str(r#"{"fonte": "", "automatica": false}"#).unwrap();
+        assert!(!c.procura_sozinho());
+        // a configuração das versões anteriores (sem os campos novos) continua a ler-se
+        let antiga: Config = serde_json::from_str(r#"{"fonte": "https://x.ao/k", "chave_publica": "", "ultima_verificacao": null}"#).unwrap();
+        assert!(antiga.procura_sozinho() && antiga.disponivel.is_none());
+    }
+
+    #[test]
     fn versoes_e_origens() {
         assert!(mais_recente("0.2.0", "0.1.9"));
         assert!(mais_recente("1.0", "0.9.9"));
@@ -372,6 +505,9 @@ mod testes {
         assert_eq!(fonte_efectiva("HTTPS://KANGEST.PAGES.DEV/actualizacoes/kangest-atualizacao.json"), ORIGEM_OFICIAL);
         assert_eq!(fonte_efectiva(r"\\SERVIDOR\KanGest\"), r"\\SERVIDOR\KanGest");
         assert_eq!(fonte_efectiva("https://x.ao/k"), "https://x.ao/k");
+        // sem origem escrita, a oficial da edição
+        assert_eq!(fonte_efectiva(""), ORIGEM_OFICIAL);
+        assert_eq!(fonte_efectiva("  "), ORIGEM_OFICIAL);
         assert_eq!(localizar(&fonte_efectiva(ORIGEM_OFICIAL)).0, "https://livrariaadventista.ao/kangest/actualizacoes/kangest-atualizacao.json");
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
