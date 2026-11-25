@@ -11,7 +11,7 @@ Abre sites da Internet em separadores, cada um numa janela própria. O painel da
   DuckDuckGo.
 - **Separadores abertos:** mostrar, fechar e guardar nos favoritos. As janelas que um site abre (`window.open`, por
   exemplo um pagamento ou um login) são outros separadores, com as mesmas regras.
-- **Favoritos.** Começa com a loja, o painel da livraria e o Painel de Gestão.
+- **Favoritos.** Começa com a loja, o painel da livraria e o Painel de Gestão (`livrariaadventista.ao/gestao`; o favorito antigo, num subdomínio que nunca existiu, corrige-se sozinho).
 - **Histórico:** as últimas 500 páginas, e a página mostra as 100 mais recentes. Pode limpar-se.
 - **Transferências:** para a pasta Transferências do utilizador, sem apagar um ficheiro com o mesmo nome
   («x (2).pdf»).

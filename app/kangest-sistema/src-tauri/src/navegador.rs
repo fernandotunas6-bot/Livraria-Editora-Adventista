@@ -73,12 +73,16 @@ impl Default for Dados {
     }
 }
 
+/// O Painel de Gestão da livraria: uma página do site. O subdomínio `gestao.` das primeiras versões nunca existiu.
+const PAINEL_DE_GESTAO: &str = "https://livrariaadventista.ao/gestao";
+const PAINEL_DE_GESTAO_ANTIGO: &str = "https://gestao.livrariaadventista.ao/";
+
 /// Os favoritos com que o navegador começa: a loja, o painel da livraria e o Painel de Gestão.
 fn favoritos_de_origem() -> Vec<Pagina> {
     [
         ("https://livrariaadventista.ao/", "Livraria Adventista"),
         ("https://livrariaadventista.ao/admin", "Painel da livraria"),
-        ("https://gestao.livrariaadventista.ao/", "Painel de Gestão"),
+        (PAINEL_DE_GESTAO, "Painel de Gestão"),
     ]
     .into_iter()
     .map(|(url, titulo)| Pagina { url: url.into(), titulo: titulo.into(), em: String::new() })
@@ -188,7 +192,16 @@ fn ficheiro(dir: &Path) -> PathBuf {
 }
 
 pub fn ler(dir: &Path) -> Dados {
-    std::fs::read_to_string(ficheiro(dir)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    let mut d: Dados = std::fs::read_to_string(ficheiro(dir)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    corrigir_favoritos(&mut d);
+    d
+}
+
+/// O favorito do Painel de Gestão gravado com o endereço antigo (que não abria) passa para o certo.
+fn corrigir_favoritos(d: &mut Dados) {
+    for f in d.favoritos.iter_mut().filter(|f| f.url == PAINEL_DE_GESTAO_ANTIGO) {
+        f.url = PAINEL_DE_GESTAO.into();
+    }
 }
 
 fn mudar(dir: &Path, f: impl FnOnce(&mut Dados)) -> AppResult<()> {
@@ -404,6 +417,18 @@ mod testes {
 
     fn u(s: &str) -> Url {
         Url::parse(s).unwrap()
+    }
+
+    /// O favorito antigo do Painel de Gestão (um subdomínio que nunca existiu) passa para a página do site; os outros
+    /// ficam como estão.
+    #[test]
+    fn o_favorito_antigo_do_painel_de_gestao_passa_para_a_pagina_do_site() {
+        let pagina = |url: &str| Pagina { url: url.into(), titulo: "x".into(), em: String::new() };
+        let mut d = Dados { favoritos: vec![pagina(PAINEL_DE_GESTAO_ANTIGO), pagina("https://livrariaadventista.ao/")], historico: Vec::new(), transferencias: Vec::new() };
+        corrigir_favoritos(&mut d);
+        assert_eq!(d.favoritos[0].url, PAINEL_DE_GESTAO);
+        assert_eq!(d.favoritos[1].url, "https://livrariaadventista.ao/");
+        assert!(favoritos_de_origem().iter().all(|f| f.url.starts_with("https://livrariaadventista.ao/")));
     }
 
     #[test]

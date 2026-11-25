@@ -16,7 +16,8 @@ import relatoriosImg from "@/assets/acesso/relatorios.jpg";
  * montra do KanGest (o programa e três novidades), à direita o formulário, e em baixo a faixa com as ligações de ajuda.
  */
 
-const SITE = "https://kangest.pages.dev";
+/** O site da livraria: é dela este KanGest (a ajuda e o contacto são os da livraria, não os do KanGest oficial). */
+const SITE = "https://livrariaadventista.ao";
 
 export type SeccaoAjuda = "entrar" | "aparelhos" | "seguranca";
 
@@ -70,7 +71,7 @@ export function RodapeAcesso({ onAjuda }: { onAjuda?: (s?: SeccaoAjuda) => void 
         ]
       : []),
     { rotulo: "Contacte-nos", acao: () => void abrirExterno(`${SITE}/contacto`) },
-    { rotulo: "Site do KanGest", acao: () => void abrirExterno(SITE) },
+    { rotulo: "Site da livraria", acao: () => void abrirExterno(SITE) },
   ];
   return (
     <footer className="flex shrink-0 flex-col items-center gap-1.5 bg-nav px-6 py-3 text-[13px] text-white/85">

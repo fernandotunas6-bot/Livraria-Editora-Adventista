@@ -12,8 +12,9 @@ use crate::error::{AppError, AppResult};
 use crate::internet::{self, Config};
 use crate::state::AppState;
 
-/// Site público do KanGest (para saber se há Internet, sem depender de nenhum serviço do programa).
-const SITE: &str = "https://kangest.pages.dev/";
+/// O site da livraria (para saber se há Internet e se o site responde).
+const SITE: &str = "https://livrariaadventista.ao/";
+const SITE_HOST: &str = "livrariaadventista.ao";
 
 fn descrever(p: &Option<internet::Proxy>) -> Value {
     match p {
@@ -28,7 +29,7 @@ pub async fn estado(st: &AppState) -> AppResult<Value> {
     Ok(json!({
         "proxy": c.proxy, "utilizador": c.utilizador, "tem_senha": !c.senha.is_empty(), "excepcoes": c.excepcoes, "do_sistema": c.do_sistema,
         // o que vale agora para a Internet (pode vir das variáveis ou do Windows)
-        "efectivo": descrever(&internet::proxy_para("kangest.pages.dev", true)),
+        "efectivo": descrever(&internet::proxy_para(SITE_HOST, true)),
         "origem_actualizacoes": super::atualizacao::ORIGEM_OFICIAL,
     }))
 }
@@ -109,10 +110,17 @@ fn testar_tcp(servico: &str, host: &str, porta: u16) -> Value {
 /// Testa, em paralelo, a Internet e cada serviço que o KanGest usa a partir desta máquina.
 pub async fn diagnostico(st: &AppState) -> AppResult<Value> {
     st.sessao()?;
-    let mut urls: Vec<(String, String, bool)> = vec![
-        ("Internet (site do KanGest)".into(), SITE.into(), false),
-        ("Servidor de licenças".into(), format!("{}/", super::licenca::servidor()), false),
-    ];
+    let mut urls: Vec<(String, String, bool)> = vec![("Internet (site da livraria)".into(), SITE.into(), false)];
+    // a ligação ao site (o centro, pela Edge Function), se este KanGest estiver emparelhado
+    let centro: Option<String> = sqlx::query_scalar("SELECT url FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_optional(&st.pool).await?;
+    if let Some(u) = centro {
+        urls.push(("Ligação ao site da livraria (o posto)".into(), format!("{}/", u.trim_end_matches('/')), false));
+    }
+    // o servidor de licenças só conta fora da livraria: a licença da edição não o contacta (licenca.rs)
+    let nif: Option<String> = sqlx::query_scalar("SELECT nif FROM empresa WHERE id = 1").fetch_optional(&st.pool).await?;
+    if !super::licenca::da_livraria(nif.as_deref()) {
+        urls.push(("Servidor de licenças".into(), format!("{}/", super::licenca::servidor()), false));
+    }
     let fonte = super::atualizacao::ler_cfg(&st.pasta_dados).fonte;
     let fonte = if fonte.trim().is_empty() { super::atualizacao::ORIGEM_OFICIAL.to_string() } else { super::atualizacao::fonte_efectiva(&fonte) };
     let pasta_actualizacoes = (!fonte.starts_with("http")).then(|| fonte.clone());
@@ -147,5 +155,5 @@ pub async fn diagnostico(st: &AppState) -> AppResult<Value> {
     // há Internet se algum endereço da Internet respondeu (um serviço bloqueado não quer dizer que não haja rede)
     let internet_ok = resultados.iter().any(|r| r["alcancado"] == true && r["endereco"].as_str().is_some_and(|e| e.starts_with("http")));
     let todos = resultados.iter().all(|r| r["ok"] == true);
-    Ok(json!({ "resultados": resultados, "internet": internet_ok, "todos": todos, "proxy": descrever(&internet::proxy_para("kangest.pages.dev", true)) }))
+    Ok(json!({ "resultados": resultados, "internet": internet_ok, "todos": todos, "proxy": descrever(&internet::proxy_para(SITE_HOST, true)) }))
 }

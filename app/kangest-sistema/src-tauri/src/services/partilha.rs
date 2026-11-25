@@ -430,8 +430,18 @@ pub struct AbrirIn {
 }
 
 /// Abre a ligação do WhatsApp no navegador ou na aplicação deste posto (método local).
+/// O que se pode abrir no navegador do sistema: o WhatsApp (enviar um documento) e o site da livraria (o contacto e
+/// o site, no ecrã de entrada). Só o endereço exacto do domínio: «https://livrariaadventista.ao.outro/» não serve.
+fn pode_abrir(url: &str) -> bool {
+    if url.chars().any(|c| c.is_whitespace() || c == '"' || c.is_control()) {
+        return false;
+    }
+    const SITE: &str = "https://livrariaadventista.ao";
+    url.starts_with("https://wa.me/") || url == SITE || url.strip_prefix(SITE).is_some_and(|r| r.starts_with('/'))
+}
+
 pub async fn abrir(i: AbrirIn) -> AppResult<Value> {
-    if !i.url.starts_with("https://wa.me/") || i.url.chars().any(|c| c.is_whitespace() || c == '"' || c.is_control()) {
+    if !pode_abrir(&i.url) {
         return Err(AppError::msg("Endereço não permitido."));
     }
     super::licenca::abrir_no_navegador(&i.url)?;
@@ -441,6 +451,16 @@ pub async fn abrir(i: AbrirIn) -> AppResult<Value> {
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn so_se_abre_o_whatsapp_e_o_site_da_livraria() {
+        for u in ["https://wa.me/244923456789?text=x", "https://livrariaadventista.ao", "https://livrariaadventista.ao/contacto"] {
+            assert!(pode_abrir(u), "{u}");
+        }
+        for u in ["https://livrariaadventista.ao.outro/", "https://livrariaadventista.aox", "http://livrariaadventista.ao/", "https://kangest.pages.dev/", "https://livrariaadventista.ao/ x"] {
+            assert!(!pode_abrir(u), "{u}");
+        }
+    }
 
     #[test]
     fn telefones_para_o_whatsapp() {
