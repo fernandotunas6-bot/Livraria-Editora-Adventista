@@ -75,13 +75,15 @@ export function nomeDaImpressao(nome?: string): string {
 /**
  * Abre o diálogo de impressão do sistema para o conteúdo de #print-area. `nome`: o nome do ficheiro ao guardar como PDF;
  * sem ele, sai do que se imprime (nomeDaImpressao). O título da janela volta ao que era depois de imprimir.
+ * Aceita ser a acção de um botão (`onClick={imprimir}`): o evento do clique não é um nome e ignora-se.
  */
-export function imprimir(nome?: string) {
+export function imprimir(nome?: unknown) {
+  const pedido = typeof nome === "string" ? nome : undefined;
   // pequeno atraso para o portal de impressão renderizar
   setTimeout(() => {
     ajustarPagina();
     const antes = document.title;
-    document.title = nomeDaImpressao(nome);
+    document.title = nomeDaImpressao(pedido);
     const repor = () => {
       document.title = antes;
       window.removeEventListener("afterprint", repor);
