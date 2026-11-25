@@ -154,8 +154,15 @@ pub async fn item_do_documento(pool: &SqlitePool, id: i64) -> AppResult<Option<V
                 d.entidade_nome, d.total_liquido, d.total_iva, d.total, d.estado, d.motivo_anulacao, d.referencia, d.hash,
                 d.hash_controlo, d.hash_versao, d.armazem_id,
                 COALESCE((SELECT a.hash FROM documentos a
-                           WHERE a.tipo_codigo = d.tipo_codigo AND a.serie = d.serie AND a.numero = d.numero - 1), '') AS hash_anterior
+                           WHERE a.tipo_codigo = d.tipo_codigo AND a.serie = d.serie AND a.numero = d.numero - 1), '') AS hash_anterior,
+                -- para os relatórios do site (1.4.5): de onde veio a venda, quem a fez, o vencimento, o que falta
+                -- pagar e o documento de origem (uma NC aponta para a factura)
+                CASE WHEN d.api_chave_id IS NOT NULL THEN 'api' ELSE 'balcao' END AS canal,
+                COALESCE(u.nome, '') AS operador, d.data_vencimento AS vencimento, d.valor_pendente,
+                COALESCE(o.numero_doc, '') AS doc_origem
            FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+           LEFT JOIN utilizadores u ON u.id = d.utilizador_id
+           LEFT JOIN documentos o ON o.id = d.doc_origem_id
           WHERE d.id = ?",
     )
     .bind(id)

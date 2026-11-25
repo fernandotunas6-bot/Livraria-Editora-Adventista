@@ -6534,6 +6534,9 @@ async fn sincronizacao_com_a_livraria() {
     assert_eq!(item["documento"]["hash_anterior"], a["documento"]["hash"]);
     assert_eq!(item["documento"]["total"], 1140000);
     assert_eq!(item["linhas"][0]["quantidade"].as_f64(), Some(2.0));
+    // e o que os relatórios do site precisam: o canal, o operador, o pendente e a origem
+    assert_eq!((item["documento"]["canal"].as_str(), item["documento"]["operador"].as_str()), (Some("balcao"), Some("Admin")));
+    assert_eq!((item["documento"]["valor_pendente"].as_i64(), item["documento"]["doc_origem"].as_str()), (Some(0), Some("")));
     let primeiro = crate::sinc::item_do_documento(&st.pool, a_id).await.unwrap().unwrap();
     assert_eq!(primeiro["documento"]["hash_anterior"], "", "a primeira da série não tem anterior");
 
@@ -6551,6 +6554,13 @@ async fn sincronizacao_com_a_livraria() {
     assert!(e["ligacao"]["ultimo_erro"].as_str().unwrap().contains("Sem ligação"), "{e}");
     assert!(e["ligacao"].get("chave_assinatura").is_none(), "a chave do posto nunca sai para o ecrã");
     assert_eq!(conta("SELECT COALESCE(MAX(tentativas), 0) FROM sinc_saida").await, 0);
+
+    // o pendente que muda (um recibo) põe o documento outra vez na fila, uma vez só enquanto espera (0062)
+    sqlx::query("UPDATE sinc_saida SET estado = 'feito'").execute(&st.pool).await.unwrap();
+    sqlx::query("UPDATE documentos SET valor_pendente = 1000 WHERE id = ?").bind(a_id).execute(&st.pool).await.unwrap();
+    sqlx::query("UPDATE documentos SET valor_pendente = 500 WHERE id = ?").bind(a_id).execute(&st.pool).await.unwrap();
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_saida WHERE operacao = 'pendente' AND estado = 'pendente'").await, 1);
+    assert_eq!(crate::sinc::item_do_documento(&st.pool, a_id).await.unwrap().unwrap()["documento"]["valor_pendente"], 500);
 
     // desligar: a chave sai e as vendas seguintes já não entram na fila
     rpc(&st, "sinc.desligar", Value::Null).await;
