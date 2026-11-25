@@ -70,6 +70,29 @@ O `Conexao.ini` do KIGEST guarda a senha do utilizador `sa` em texto simples.
 Depois da migração, recomenda-se mudar essa senha no SQL Server e, se a base antiga ficar só para consulta, criar um utilizador SQL só de leitura.
 
 
+## Importação automática (enquanto a loja ainda usa o KIGEST)
+
+**Automático:**
+- Em *Sistema → Importar dados*, com a ligação ao SQL Server do KIGEST analisada, **«Ligar»** a importação automática.
+  O KanGest passa a ir buscar sozinho o que entrou no KIGEST: os documentos, os pagamentos, os fechos de caixa, o
+  stock, os clientes e o resto das opções escolhidas.
+- Corre de N em N minutos (por omissão 60; de 15 minutos a 24 horas) e pouco depois de arrancar.
+- Corre só no computador servidor da loja, em nome de quem a ligou: as permissões e a auditoria são dele.
+- É a importação normal, que é repetível: o que já entrou não se duplica.
+- **A conferência dia a dia.** Cada volta compara, dia a dia, os documentos não anulados e o total do KIGEST com os que
+  entraram no KanGest. Mostra os dias diferentes e avisa no computador quando há diferenças ou um erro.
+- A senha do SQL Server fica cifrada com a chave mestra deste computador e nunca volta ao ecrã.
+
+**Manual:**
+- o intervalo, «Desligar» e «Importar agora»;
+- a importação de sempre, com o «Simular».
+
+Por omissão, a importação automática não mexe na empresa, nos utilizadores nem nos recursos humanos. Esses acertam-se
+uma vez, na importação à mão.
+
+**A conferência dia a dia também está na importação à mão:** a linha «Dias com as mesmas vendas» e a tabela «Dias com
+diferenças». A conferência compara também os fechos de caixa (`tbCaixaDiaria`).
+
 ## O que não é importado
 
 - Vendas suspensas no POS (`tbDocsCabessalhoSuspenso`) — são temporárias: feche-as no KIGEST antes da migração.

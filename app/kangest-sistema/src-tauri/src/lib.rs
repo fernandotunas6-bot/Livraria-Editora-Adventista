@@ -170,6 +170,8 @@ pub fn run() {
             sinc::iniciar(estado.clone());
             // e o tempo real da Loja online (o sinal «novidades» do site)
             sinc::tempo_real::iniciar(estado.clone());
+            // a importação automática do KIGEST (só faz alguma coisa se alguém a ligou em Importar dados)
+            services::importar_auto::iniciar(estado.clone());
             // Facturação electrónica da AGT: envia e consulta os documentos em segundo plano.
             services::fe::iniciar(estado.clone());
             // Cópias de segurança periódicas enquanto o programa está aberto.

@@ -60,6 +60,157 @@ interface Conferencia {
   unidade: "n" | "qtd" | "kz";
   kigest: number;
   kigest_novo: number;
+  /** «Dias com as mesmas vendas»: os dias que não batem certo (até 60, os mais recentes primeiro) */
+  por_dia?: DiaDiferente[];
+}
+
+interface DiaDiferente {
+  dia: string;
+  kigest: { documentos: number; total: number };
+  kangest: { documentos: number; total: number };
+}
+
+/** Os dias em que as vendas do KIGEST e do KanGest não batem certo (a conferência dia a dia). */
+function DiasDiferentes({ dias }: { dias: DiaDiferente[] }) {
+  if (!dias.length) return null;
+  return (
+    <div className="mt-4">
+      <div className="mb-2 font-medium">Dias com diferenças</div>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Dia</Th>
+            <Th className="text-right">Documentos no KIGEST</Th>
+            <Th className="text-right">No KanGest</Th>
+            <Th className="text-right">Total no KIGEST</Th>
+            <Th className="text-right">No KanGest</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {dias.map((d) => (
+            <tr key={d.dia}>
+              <Td className="whitespace-nowrap">{d.dia.split("-").reverse().join("/")}</Td>
+              <Td className="num text-right">{numero(d.kigest.documentos)}</Td>
+              <Td className={cn("num text-right", d.kigest.documentos !== d.kangest.documentos && "font-medium text-accent-ink")}>{numero(d.kangest.documentos)}</Td>
+              <Td className="num text-right">{kz(d.kigest.total)}</Td>
+              <Td className={cn("num text-right", d.kigest.total !== d.kangest.total && "font-medium text-accent-ink")}>{kz(d.kangest.total)}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
+interface EstadoAuto {
+  ativo: boolean;
+  intervalo_min: number;
+  servidor: string | null;
+  base: string | null;
+  com_senha: boolean;
+  utilizador: string | null;
+  ultima: string | null;
+  ultimo: { ok: boolean; em: string; erro?: string; resumo?: { contagens: { conjunto: string; registos: number }[]; dias_conferidos: number; dias_iguais: number; dias_diferentes: number; por_dia: DiaDiferente[] } } | null;
+  a_correr: boolean;
+  servidor_da_loja: boolean;
+}
+
+/**
+ * A importação automática do KIGEST (services/importar_auto.rs): enquanto a loja ainda usa o KIGEST, o KanGest vai
+ * buscar sozinho o que lá entrou, com a ligação e as opções escolhidas acima. Ligar, desligar, o intervalo e «Importar
+ * agora» são manuais.
+ */
+function ImportacaoAutomatica({ conexao, opcoes, analisada }: { conexao: Record<string, unknown> | null; opcoes: Record<string, boolean>; analisada: boolean }) {
+  const [e, setE] = useState<EstadoAuto | null>(null);
+  const [intervalo, setIntervalo] = useState(60);
+  const [busy, setBusy] = useState(false);
+  const carregar = () =>
+    call<EstadoAuto>("importar.automatico")
+      .then((v) => {
+        setE(v);
+        setIntervalo(v.intervalo_min);
+      })
+      .catch(() => setE(null));
+  useEffect(() => {
+    carregar();
+    const t = setInterval(carregar, 30000);
+    return () => clearInterval(t);
+  }, []);
+  if (!e) return null;
+  async function guardar(ativo: boolean) {
+    setBusy(true);
+    try {
+      // as opções de cima, menos as que só se acertam uma vez à mão (a empresa, os utilizadores, os recursos humanos)
+      const op = { ...opcoes, empresa: false, utilizadores: false, rh: false, simular: false };
+      setE(await call<EstadoAuto>("importar.automaticoGuardar", { ativo, conexao: analisada ? conexao : null, opcoes: op, intervalo_min: intervalo }));
+      toast.success(ativo ? "A importação automática do KIGEST está ligada." : "A importação automática do KIGEST está desligada.");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function agora() {
+    setBusy(true);
+    try {
+      const r = await call<{ estado: EstadoAuto }>("importar.automaticoAgora");
+      setE(r.estado);
+      toast.success("Importação do KIGEST feita.");
+    } catch (err) {
+      toast.error((err as Error).message);
+      carregar();
+    } finally {
+      setBusy(false);
+    }
+  }
+  const resumo = e.ultimo?.resumo;
+  return (
+    <Card className="p-5">
+      <div className="mb-1 flex items-center gap-2 font-semibold">
+        <RefreshCw className={cn("size-4 text-brand", e.a_correr && "animate-spin")} /> Importação automática
+        <Badge tone={e.ativo ? "ok" : "neutral"}>{e.ativo ? "Ligada" : "Desligada"}</Badge>
+      </div>
+      <p className="text-[13px] text-ink-2">
+        Enquanto a loja ainda usa o KIGEST, o KanGest vai buscar sozinho o que lá entrou (documentos, pagamentos, fechos de caixa, stock…) e confere
+        os totais dia a dia. Usa a ligação e as opções acima; a empresa, os utilizadores e os recursos humanos acertam-se à mão, uma vez.
+      </p>
+      {!e.servidor_da_loja && <p className="mt-2 text-[12px] text-accent-ink">Corre só no computador servidor da loja.</p>}
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <Field label="De quanto em quanto tempo (minutos)">
+          <Input type="number" min={15} max={1440} className="w-28" value={intervalo} onChange={(ev) => setIntervalo(Number(ev.target.value) || 60)} />
+        </Field>
+        <Button onClick={() => guardar(true)} loading={busy} disabled={!analisada && !e.servidor}>
+          {e.ativo ? "Guardar" : "Ligar"}
+        </Button>
+        {e.ativo && (
+          <Button variant="ghost" onClick={() => guardar(false)} disabled={busy}>
+            Desligar
+          </Button>
+        )}
+        {e.servidor && (
+          <Button variant="secondary" onClick={agora} disabled={busy || e.a_correr}>
+            Importar agora
+          </Button>
+        )}
+      </div>
+      <div className="mt-3 space-y-1 text-[12.5px] text-ink-3">
+        {e.servidor && (
+          <div>
+            Ligação: {e.servidor}/{e.base}
+            {e.utilizador ? ` · em nome de ${e.utilizador}` : ""}
+            {!analisada && " · para mudar, ligue e analise acima"}
+          </div>
+        )}
+        {e.ultimo && (
+          <div className={e.ultimo.ok ? "" : "text-danger"}>
+            Última volta: {dataHora(e.ultimo.em)} ·{" "}
+            {e.ultimo.ok ? `${numero(resumo?.dias_iguais ?? 0)} de ${numero(resumo?.dias_conferidos ?? 0)} dias iguais` : e.ultimo.erro}
+          </div>
+        )}
+      </div>
+      {resumo && <DiasDiferentes dias={resumo.por_dia || []} />}
+    </Card>
+  );
 }
 
 const valorConf = (c: Conferencia, v: number) => (c.unidade === "kz" ? kz(v) : c.unidade === "qtd" ? qtd(v) : numero(v));
@@ -598,6 +749,7 @@ export default function Importar() {
                       })}
                     </tbody>
                   </Table>
+                  <DiasDiferentes dias={relatorio.conferencia!.find((c) => c.por_dia)?.por_dia ?? []} />
                   <p className="mt-2 text-[12px] text-ink-3">
                     «No KanGest» conta só o que veio do KIGEST. Diferenças normais: artigos com a mesma referência juntam-se num só e os registos sem artigo,
                     conta ou documento conhecido ficam de fora (ver os avisos abaixo).
@@ -700,6 +852,7 @@ export default function Importar() {
             </div>
             <p className="mt-2 text-[12px] text-ink-3">Pode repetir a importação: artigos, entidades e documentos já importados não são duplicados.</p>
           </Card>
+          {fonte === "sqlserver" && <ImportacaoAutomatica conexao={analise ? conexao() : null} opcoes={opcoes} analisada={!!analise} />}
           <Card className="p-5">
             <div className="mb-2 flex items-center gap-2 font-semibold">
               <ShieldAlert className="size-4 text-accent-ink" /> Certificado AGT

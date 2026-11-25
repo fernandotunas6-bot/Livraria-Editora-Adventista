@@ -24,6 +24,7 @@ mod tv;
 pub mod fe;
 pub(crate) mod impressao;
 pub mod importar;
+pub mod importar_auto;
 mod importar_folha;
 mod importar_saft;
 mod integridade;
@@ -202,6 +203,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- importação do KIGEST (SQL Server) ----
         "importar.analisar" => importar::analisar(st, p(params)?).await,
         "importar.executar" => importar::executar(st, p(params)?).await,
+        "importar.automatico" => importar_auto::estado(st).await,
+        "importar.automaticoGuardar" => importar_auto::guardar(st, p(params)?).await,
+        "importar.automaticoAgora" => importar_auto::agora(st).await,
         "importar.analisarFicheiro" => importar::analisar_ficheiro(st, p(params)?).await,
         "importar.executarFicheiro" => importar::executar_ficheiro(st, p(params)?).await,
         "importar.ficheiros" => importar::ficheiros(st).await,
