@@ -1,7 +1,7 @@
 // KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
-//! O fecho de caixa arquivado (migração 0062; docs/UTILIZADORES.md §Fecho de caixa).
+//! O fecho de caixa arquivado (migração 0062; docs/FECHO-DE-CAIXA.md).
 //!
 //! - **O instantâneo.** No fecho, o relatório Z inteiro (os pagamentos, a conferência, os artigos com as devoluções a
 //!   abater, os documentos da sessão e as vendas online) fica gravado em `caixa_fechos`, na mesma transacção que fecha

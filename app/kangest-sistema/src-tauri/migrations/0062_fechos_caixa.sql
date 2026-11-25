@@ -1,8 +1,8 @@
 -- KanGest — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
 -- © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
--- O fecho de caixa arquivado, com as vendas online à parte (services/caixa_fechos.rs; docs/UTILIZADORES.md §Fecho de
--- caixa). A cópia no site vem numa migração própria.
+-- O fecho de caixa arquivado, com as vendas online à parte (services/caixa_fechos.rs; docs/FECHO-DE-CAIXA.md). A
+-- cópia no site vem numa migração própria.
 --
 -- caixa_fechos: o relatório Z como ficou no momento do fecho (o instantâneo em JSON), gravado na mesma transacção que
 -- fecha o caixa, com um selo SHA-256 do texto gravado. A reimpressão lê o instantâneo: um documento anulado depois do
