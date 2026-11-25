@@ -6823,12 +6823,14 @@ async fn fecho_arquivado_com_vendas_online_a_parte() {
     assert_eq!(aberto["online"]["quantidade"], 2, "no caixa aberto, o que o fecho incluiria: {}", aberto["online"]);
     assert_eq!(aberto["online"]["incluidas"], true, "a opção do posto vem ligada");
 
-    let z = rpc(&st, "caixa.fechar", json!({ "valor_contado": 342000 })).await;
+    let z = rpc(&st, "caixa.fechar", json!({ "valor_contado": 228000 })).await;
     assert!(agora.as_str() <= z["sessao"]["fechada_em"].as_str().unwrap());
     assert_eq!(z["arquivo"]["selo_confere"], true, "{}", z["arquivo"]);
     assert_eq!(z["arquivo"]["reconstruido"], false);
-    // o numerário: as duas FR do balcão (2 280 + 1 140); a venda online e a encomenda ficam à parte
-    assert_eq!(z["numerario_esperado"], 342000, "{z}");
+    // o numerário: as duas FR do balcão (2 280 + 1 140) menos a devolução em dinheiro (a saída que a NC faz, 1 140);
+    // a venda online e a encomenda ficam à parte
+    assert_eq!(z["numerario_esperado"], 228000, "{z}");
+    assert_eq!(z["total_vendido"], 342000);
     assert_eq!(z["online"]["total"], 114000 + 250000);
     assert_eq!(z["online"]["na_entrega"], 250000);
     let livro = z["artigos"].as_array().unwrap().iter().find(|l| l["descricao"] == "Livro A").cloned().unwrap();
@@ -6845,7 +6847,7 @@ async fn fecho_arquivado_com_vendas_online_a_parte() {
     // um documento anulado depois do fecho já não muda o Z
     rpc(&st, "documentos.anular", json!({ "id": fr3["documento"]["id"], "motivo": "erro de teste" })).await;
     let de_novo = rpc(&st, "caixa.obter", json!({ "id": sid })).await;
-    assert_eq!(de_novo["numerario_esperado"], 342000);
+    assert_eq!(de_novo["numerario_esperado"], 228000);
     assert_eq!(de_novo["total_vendido"], z["total_vendido"]);
 
     // a primeira impressão é a do fecho; a seguinte é 2.ª via; as duas na auditoria
