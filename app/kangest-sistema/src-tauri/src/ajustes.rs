@@ -111,7 +111,7 @@ async fn correr_um(pool: &SqlitePool, a: &Ajuste) -> AppResult<()> {
     if matches!(feito, Some(Some(_))) {
         return Ok(());
     }
-    let resultado = match (a.correr)(&mut *tx).await {
+    let resultado = match (a.correr)(&mut tx).await {
         Ok(r) => r,
         Err(e) => {
             tx.rollback().await.ok();
