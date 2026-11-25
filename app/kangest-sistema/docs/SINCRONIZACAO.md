@@ -28,6 +28,33 @@ livraria). Do lado do site, o protocolo, as tabelas e o painel estão em
 | O envio | `src/sinc/mod.rs` | Com documentos na fila, de 30 em 30 segundos; sem nada para enviar, só as novidades, de 2 em 2 minutos. Sempre no servidor da loja (num posto em rede, a base está no servidor), até 100 documentos num lote. Cada um leva o `hash` assinado, o `hash_anterior` (o do anterior da mesma série) e as linhas |
 | A cifra | `src/sinc/cifra.rs` | O pedido vai assinado com a chave Ed25519 deste posto e selado para o site (X25519 + HKDF-SHA256 + AES-256-GCM); a resposta vem selada para este pedido. Os vectores de teste são os mesmos da Edge Function |
 | A ligação | `sinc_ligacao` | O endereço, o posto, a semente cifrada e a chave pública do centro. Nunca sai para o ecrã |
+| O catálogo | `sinc_catalogo` (migração 0057), `src/sinc/catalogo.rs` | O stock de cada armazém e o preço de cada artigo, para o site. Ver abaixo |
+
+## Catálogo: o stock e os preços para o site
+
+O que a ligação antiga fazia com os avisos da API passa a ir pela ligação, no mesmo lote dos documentos.
+
+- **O que mudou.** Os gatilhos marcam o artigo em `sinc_catalogo`, na mesma transacção, quando muda:
+  - o stock (qualquer escrita na tabela `stock`: vendas, entradas, inventário, importações);
+  - o reservado (uma linha nova numa NE, ou uma NE facturada ou anulada);
+  - o artigo, no que o site usa: o nome, o preço, a taxa, o tipo, activo e o código de barras. O custo médio, que muda
+    a cada compra, fica de fora.
+
+  É um conjunto, não uma fila: dez vendas do mesmo livro dão uma linha.
+- **O que segue.** O **estado de agora**, montado como nos avisos da API (`webhooks::dados_evento`): a existência, o
+  reservado e o disponível de cada armazém, e o preço com IVA. O site grava o estado e não soma nada, por isso repetir
+  é seguro.
+- **Feito.** A linha só sai se não mudou enquanto o lote ia a caminho. Se mudou, segue na volta seguinte com o estado
+  novo.
+- **Ao emparelhar**, segue o catálogo activo todo, uma vez.
+- **O que o site faz com isto** decide-se no painel, em cada posto:
+  - «Conta para o stock à venda no site»: desligado, o posto só dá o «temos / não temos» da loja dele;
+  - «Manda no catálogo»: os preços e os produtos novos (ocultos, à espera de fotografia) vêm deste KanGest. Só um
+    posto o pode ter.
+
+  Os dois vêm desligados (docs/KANGEST-SINCRONIZACAO.md §10 na raiz da livraria).
+- No ecrã **Livraria → Ligação ao site**, «Stock e preços por enviar» mostra quantos artigos faltam. «Repetir os com
+  erro» também trata destes.
 
 **Quando algo falha:**
 - **Sem resposta** (sem Internet, o site em baixo): tenta-se na volta seguinte, sem contar tentativas. O ecrã diz «Sem

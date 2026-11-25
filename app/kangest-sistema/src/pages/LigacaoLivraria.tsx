@@ -29,6 +29,8 @@ interface EstadoSinc {
   com_erro: number;
   feitos: number;
   erros: ErroFila[];
+  /** O stock e os artigos que mudaram e ainda não seguiram para o site (sinc/catalogo.rs). */
+  catalogo?: { pendentes: number; com_erro: number };
   intervalo: number;
   aviso?: string;
 }
@@ -162,10 +164,11 @@ export default function LigacaoLivraria() {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-3 border-t border-line">
+            <div className="grid grid-cols-2 border-t border-line md:grid-cols-4">
               {[
-                ["Por enviar", e.pendentes, e.pendentes > 0 ? "text-accent-ink" : "text-ink"],
-                ["Com erro", e.com_erro, e.com_erro > 0 ? "text-danger" : "text-ink"],
+                ["Documentos por enviar", e.pendentes, e.pendentes > 0 ? "text-accent-ink" : "text-ink"],
+                ["Stock e preços por enviar", e.catalogo?.pendentes ?? 0, (e.catalogo?.com_erro ?? 0) > 0 ? "text-danger" : (e.catalogo?.pendentes ?? 0) > 0 ? "text-accent-ink" : "text-ink"],
+                ["Com erro", e.com_erro + (e.catalogo?.com_erro ?? 0), e.com_erro + (e.catalogo?.com_erro ?? 0) > 0 ? "text-danger" : "text-ink"],
                 ["Enviados (30 dias)", e.feitos, "text-ink"],
               ].map(([rotulo, n, cor]) => (
                 <div key={String(rotulo)} className="border-r border-line px-5 py-4 last:border-r-0">

@@ -202,3 +202,46 @@ Testes (`scripts/pglite/kangest-central.mjs`):
 - as encomendas gravam-se com o gatilho;
 - novo código e revogar apagam o tópico;
 - emparelhar outra vez dá um tópico novo.
+
+## 10. O stock, os preços e os artigos novos (o catálogo)
+
+Desde a migração `20261125140000`, o KanGest Livraria manda ao site, no mesmo lote dos documentos, o **estado** de cada
+artigo que mudou. É o que a ligação antiga fazia com os avisos da API, agora pelo posto, sem túnel.
+- **`stock`:** a existência, o reservado (NE por facturar) e o disponível de cada armazém.
+- **`artigo`:** o nome, o tipo, o preço com IVA, se está activo e o código de barras.
+
+O lado do KanGest está em `app/kangest-sistema/docs/SINCRONIZACAO.md` («Catálogo»).
+
+**No centro** (`kangest_receber`), com a lógica que o site já tinha:
+- o stock vai para `kangest_stock`, com a ligação `posto:<id>` e a loja do posto. Um armazém que deixou de vir sai;
+- `kangest_recalcular_stock_lote` actualiza o produto e o «temos / não temos» de cada loja (`store_stock`);
+- o artigo actualiza o preço (`stock_books.price`, de cêntimos para kwanzas) e, se o site não tem a referência, cria o
+  produto **oculto** com `kangest_artigo_novo` (§4.1 de KANGEST.md). Só os artigos de venda (tipo P), activos e com
+  nome.
+
+**Dois interruptores em cada posto** (painel, Sistema → Ligação ao KanGest → Postos), os dois desligados por omissão,
+para ligar as lojas uma a uma sem estragar o que o site tem:
+
+| Interruptor | Ligado | Desligado |
+|---|---|---|
+| Conta para o stock à venda no site (`stock_online`) | O disponível deste KanGest soma-se ao stock à venda (`stock_books.stock`) | Só o «temos / não temos» da loja do posto |
+| Manda no catálogo (`manda_catalogo`) | Os preços do site e os produtos novos vêm daqui. **Só um posto** | O artigo chega e é ignorado |
+
+- Um posto **sem loja** e sem «stock à venda» não mexe no stock: o item conta como «ignorado», não como erro, e o
+  KanGest não repete.
+- O recálculo deixou de zerar o stock à venda de uma referência que nenhum armazém «online» mandou. Antes, a primeira
+  loja ligada passava a ser o stock do site todo.
+- **Revogar** um posto tira o stock dele do site, desliga os interruptores e recalcula os produtos.
+- Rota: `POST /admin/kangest/postos/configurar` (`manage_settings`), com `{ id, stock_online?, manda_catalogo? }`.
+
+Testes (`scripts/pglite/kangest-central.mjs`):
+- o estado do armazém, sem dobrar;
+- o armazém que sai e a loja a «não temos»;
+- os postos que contam somam-se, e deixar de contar tira;
+- o posto sem loja é ignorado;
+- o preço e o produto novo oculto só do posto do catálogo, e um só posto do catálogo;
+- os serviços e os inactivos não entram;
+- o tipo desconhecido dá erro;
+- o revogar e as permissões.
+
+A limpeza do lote (`prepararLote`) está em `kangestSinc.test.ts`.

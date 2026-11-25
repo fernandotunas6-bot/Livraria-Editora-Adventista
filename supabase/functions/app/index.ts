@@ -3262,7 +3262,7 @@ const authParaPostos = () => {
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
-    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo")
     .order("criado_em", { ascending: true });
   if (error) throw new Error(error.message);
   const postos = [];
@@ -3311,6 +3311,19 @@ route("POST", "/admin/kangest/postos/revogar", permissao("manage_settings"), asy
   const { error } = await db.rpc("kangest_posto_revogar", { p_id: id });
   if (error) throw bad(error.message);
   return json({ ok: true });
+});
+
+// Os dois interruptores do posto (migração 20261125140000): o stock dele conta para o stock à venda no site, e os
+// preços e os artigos novos vêm dele (só um posto). Um campo que não venha fica como está.
+route("POST", "/admin/kangest/postos/configurar", permissao("manage_settings"), async ({ body }) => {
+  const id = String(body.id ?? "");
+  if (!uuidValido(id)) throw bad("Indique o posto.");
+  const opcao = (v: unknown) => (typeof v === "boolean" ? v : null);
+  const { data, error } = await db.rpc("kangest_posto_configurar", {
+    p_id: id, p_stock_online: opcao(body.stock_online), p_manda_catalogo: opcao(body.manda_catalogo),
+  });
+  if (error) throw bad(error.message);
+  return json(data);
 });
 
 route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso único (10 minutos, só o resumo na base), conferido no handler; limite de pedidos"), async ({ body, ip }) => {

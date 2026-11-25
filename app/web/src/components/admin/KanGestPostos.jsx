@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Copy, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { kangestPostoCodigo, kangestPostoCriar, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
+import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
 
 const ESTADOS = {
@@ -82,8 +82,26 @@ export default function KanGestPostos({ lojas = [] }) {
       toast.error(e?.message || 'Não foi possível pedir outro código.');
     }
   }
+  async function configurar(p, opcao, valor) {
+    const avisos = {
+      stock_online: valor
+        ? `O stock de «${p.nome}» passa a contar para o stock à venda no site (somado ao dos outros postos que contam).\n\nLigue-o só quando todas as lojas que vendem online estiverem ligadas, ou se este KanGest tiver o stock todo: os produtos que este KanGest não tem deixam de mudar, mas os que tem passam a valer o que ele diz.`
+        : `O stock de «${p.nome}» deixa de contar para o stock à venda no site. Continua a dar o «temos / não temos» da loja dele.`,
+      manda_catalogo: valor
+        ? `Os preços do site e os produtos novos (ocultos, à espera de fotografia) passam a vir de «${p.nome}».\n\nSó um posto manda no catálogo: se outro mandava, deixa de mandar.`
+        : `Os preços e os produtos novos deixam de vir de «${p.nome}».`,
+    };
+    if (!confirm(avisos[opcao])) return;
+    try {
+      await kangestPostoConfigurar(p.id, { [opcao]: valor });
+      toast.success('Posto actualizado.');
+      carregar();
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível mudar o posto.');
+    }
+  }
   async function revogar(p) {
-    if (!confirm(`Revogar «${p.nome}»?\n\nO KanGest desse posto deixa de poder enviar já. As facturas que já chegaram ficam.`)) return;
+    if (!confirm(`Revogar «${p.nome}»?\n\nO KanGest desse posto deixa de poder enviar já. As facturas que já chegaram ficam; o stock que ele mandou sai do site.`)) return;
     try {
       await kangestPostoRevogar(p.id);
       toast.success(`«${p.nome}» revogado.`);
@@ -141,6 +159,19 @@ export default function KanGestPostos({ lojas = [] }) {
                   {p.versao_programa ? ` · ${p.versao_programa}` : ''}
                 </p>
                 {p.ultimo_erro && <p className="w-full text-xs text-red-700 dark:text-red-400">{p.ultimo_erro}</p>}
+                {p.estado !== 'revogado' && (
+                  <div className="flex w-full flex-wrap gap-x-5 gap-y-1 text-xs">
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="checkbox" checked={!!p.stock_online} onChange={(e) => configurar(p, 'stock_online', e.target.checked)} />
+                      Conta para o stock à venda no site
+                    </label>
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="checkbox" checked={!!p.manda_catalogo} onChange={(e) => configurar(p, 'manda_catalogo', e.target.checked)} />
+                      Manda no catálogo (preços e produtos novos)
+                    </label>
+                    {!p.store_id && !p.stock_online && <span className="text-muted-foreground">Sem loja e sem contar para o site: o stock dele não é usado.</span>}
+                  </div>
+                )}
               </li>
             );
           })}
