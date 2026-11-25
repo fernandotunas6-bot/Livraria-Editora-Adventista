@@ -16,6 +16,18 @@ pub(crate) const VENDAS: &str = "d.tipo_codigo IN ('FR','FT','ND','NC') AND d.es
 const ENT: &str = "AND (?3 IS NULL OR d.entidade_id = ?3) AND (?4 IS NULL OR d.posto_id = ?4) AND (?5 IS NULL OR d.armazem_id = ?5)
      AND (?6 IS NULL OR (?6 = 'api') = (d.api_chave_id IS NOT NULL))";
 
+/// O cliente de um documento nas listas: uma factura a Consumidor Final que é de uma encomenda do site (a referência é
+/// o n.º da encomenda) mostra o nome do cliente da encomenda, da cópia local da Loja online, com «(loja online)». O
+/// documento fiscal não muda: é só a lista (a lei da AGT; o nome sem NIF não vai para a factura).
+pub(crate) const CLIENTE: &str = "COALESCE(CASE WHEN d.referencia <> '' AND COALESCE(d.entidade_id, 1) = 1
+       THEN (SELECT NULLIF(e.cliente, '') || ' (loja online)' FROM loja_encomendas e WHERE e.numero = d.referencia LIMIT 1) END,
+     d.entidade_nome)";
+/// Onde foi vendido: `loja online` (os documentos da chave da API, como as encomendas do site) ou `balcão`.
+pub(crate) const CANAL: &str = "CASE WHEN d.api_chave_id IS NOT NULL THEN 'loja online' ELSE 'balcão' END";
+/// Para as vistas que não usam os filtros ?3 a ?6 (o SQLite recusa parâmetros a mais).
+const SEM_FILTROS: &str = "AND (?3 IS NULL OR ?3 IS NOT NULL) AND (?4 IS NULL OR ?4 IS NOT NULL)
+     AND (?5 IS NULL OR ?5 IS NOT NULL) AND (?6 IS NULL OR ?6 IS NOT NULL)";
+
 /// Canal de venda: `api` (loja online e outras integrações) ou `balcao` (programa e POS).
 fn canal_valido(c: &Option<String>) -> AppResult<()> {
     match c.as_deref() {
@@ -199,7 +211,7 @@ pub struct VendasIn {
     de: String,
     ate: String,
     /// dia | mes | artigo | familia | operador | vendedor | posto | armazem | mes_posto | mes_armazem | pagamento | cliente |
-    /// artigo_operador | artigo_entidade | documento | iva | iva_dia | iva_familia | irt_c
+    /// artigo_operador | artigo_entidade | documento | loja_online | iva | iva_dia | iva_familia | irt_c
     agrupar: String,
     #[serde(default)]
     entidade_id: Option<i64>,
@@ -257,7 +269,7 @@ pub async fn vendas(st: &AppState, f: VendasIn) -> AppResult<Value> {
              WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY u.nome ORDER BY total DESC"
         ),
         "cliente" => format!(
-            "SELECT d.entidade_nome || ' (' || d.entidade_nif || ')' AS chave, COUNT(*) AS docs,
+            "SELECT {CLIENTE} || ' (' || d.entidade_nif || ')' AS chave, COUNT(*) AS docs,
                     SUM({SINAL}*d.total_liquido) AS liquido, SUM({SINAL}*d.total_iva) AS iva, SUM({SINAL}*d.total) AS total
              FROM documentos d WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT} GROUP BY 1 ORDER BY total DESC"
         ),
@@ -315,20 +327,34 @@ pub async fn vendas(st: &AppState, f: VendasIn) -> AppResult<Value> {
         ),
         // artigos por entidade: o que cada cliente comprou
         "artigo_entidade" => format!(
-            "SELECT d.entidade_nome || ' · ' || l.descricao AS chave, SUM({SINAL}*l.quantidade) AS quantidade,
+            "SELECT {CLIENTE} || ' · ' || l.descricao AS chave, SUM({SINAL}*l.quantidade) AS quantidade,
                     SUM({SINAL}*l.valor_liquido) AS liquido, SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
              FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
              WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
-             GROUP BY d.entidade_nome, l.descricao ORDER BY d.entidade_nome, total DESC"
+             GROUP BY 1 ORDER BY 1, total DESC"
         ),
         // detalhe documento a documento (quantidades, base, IVA e total de cada um)
         "documento" => format!(
-            "SELECT d.data_emissao || '  ' || d.numero_doc || ' · ' || d.entidade_nome || ' · ' || u.nome AS chave,
+            "SELECT d.data_emissao || '  ' || d.numero_doc || ' · ' || {CLIENTE} || ' · ' || {CANAL} || ' · ' || u.nome AS chave,
                     SUM({SINAL}*l.quantidade) AS quantidade, SUM({SINAL}*l.valor_liquido) AS liquido,
                     SUM({SINAL}*l.valor_iva) AS iva, SUM({SINAL}*l.total) AS total
              FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN utilizadores u ON u.id = d.utilizador_id
              WHERE {VENDAS} AND d.data_emissao BETWEEN ?1 AND ?2 {ENT}
              GROUP BY d.id ORDER BY d.data_emissao, d.id"
+        ),
+        // as encomendas do site pagas no período (a cópia local da Loja online): o cliente, onde se vendeu (o canal e a
+        // entrega ou o levantamento) e a FR, se já saiu. Os valores vêm do site em kwanzas; aqui, em cêntimos.
+        "loja_online" => format!(
+            "SELECT e.numero || ' · ' || COALESCE(NULLIF(e.cliente, ''), '(sem nome)')
+                    || ' · ' || COALESCE(NULLIF(json_extract(e.dados, '$.canal'), ''), 'site')
+                    || ' · ' || CASE WHEN e.levantamento = 1 THEN 'levantamento na loja' ELSE 'entrega' END
+                    || ' · ' || COALESCE((SELECT d.numero_doc FROM documentos d WHERE d.referencia = e.numero AND d.tipo_codigo = 'FR'
+                                            AND d.estado <> 'A' LIMIT 1), 'sem FR ainda') AS chave,
+                    1 AS docs, CAST(ROUND(e.total * 100) AS INTEGER) AS total
+             FROM loja_encomendas e
+             WHERE e.pagamento = 'paid' AND e.estado <> 'cancelled'
+               AND substr(COALESCE(NULLIF(json_extract(e.dados, '$.pago_em'), ''), e.criada_em), 1, 10) BETWEEN ?1 AND ?2 {SEM_FILTROS}
+             ORDER BY substr(COALESCE(NULLIF(json_extract(e.dados, '$.pago_em'), ''), e.criada_em), 1, 19), e.numero"
         ),
         "iva" => format!(
             "SELECT 'IVA ' || l.taxa_iva_pct || '%' || COALESCE(' — ' || l.motivo_isencao, '') AS chave,
@@ -715,6 +741,9 @@ pub struct TopIn {
     /// valor | quantidade (nos artigos e nas famílias, unidades; nos outros, documentos)
     #[serde(default)]
     ordem: Option<String>,
+    /// desc (os que mais venderam, por omissão) | asc (os que menos venderam, dos que venderam alguma coisa)
+    #[serde(default)]
+    sentido: Option<String>,
     #[serde(default)]
     n: Option<i64>,
 }
@@ -736,6 +765,26 @@ pub async fn top(st: &AppState, t: TopIn) -> AppResult<Value> {
     };
     let por_qtd = t.ordem.as_deref() == Some("quantidade");
     let n = t.n.unwrap_or(6).clamp(3, 20);
+    // os artigos com stock nesta loja que não venderam nada no período (o que está parado na prateleira)
+    if t.tipo.as_deref() == Some("sem_vendas") {
+        let armazem = st.loja().unwrap_or(st.posto().armazem_id);
+        let rows = sqlx::query(&format!(
+            "SELECT a.referencia AS chave, a.descricao AS nome, COALESCE(s.quantidade, 0) AS quantidade, 0 AS total
+             FROM artigos a JOIN stock s ON s.artigo_id = a.id AND s.armazem_id = ?3
+             WHERE a.ativo = 1 AND a.controla_stock = 1 AND s.quantidade > 0
+               AND NOT EXISTS (SELECT 1 FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+                                WHERE l.artigo_id = a.id AND {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao <= ?2{loja})
+             ORDER BY s.quantidade DESC, a.descricao LIMIT {n}"
+        ))
+        .bind(&desde)
+        .bind(&hoje)
+        .bind(armazem)
+        .fetch_all(&st.pool)
+        .await?;
+        return Ok(json!({ "desde": desde, "ate": hoje, "total_periodo": 0, "linhas": db::rows_json(&rows) }));
+    }
+    // os menos vendidos: do que vendeu menos para o que vendeu mais, só dos que venderam alguma coisa
+    let (sentido, so_vendidos) = if t.sentido.as_deref() == Some("asc") { ("ASC", " HAVING quantidade > 0") } else { ("DESC", "") };
     // (chave e nome do grupo, junções, quantidade)
     let (grupo, juntar, quantidade) = match t.tipo.as_deref().unwrap_or("artigos") {
         "artigos" => ("l.referencia AS chave, MAX(l.descricao) AS nome", "", format!("SUM({SINAL} * l.quantidade)")),
@@ -756,7 +805,7 @@ pub async fn top(st: &AppState, t: TopIn) -> AppResult<Value> {
             "COUNT(DISTINCT d.id)".to_string(),
         ),
         "operadores" => ("COALESCE(u.id, 0) AS chave, COALESCE(MAX(u.nome), '—') AS nome", " LEFT JOIN utilizadores u ON u.id = d.utilizador_id", "COUNT(DISTINCT d.id)".to_string()),
-        _ => return Err(AppError::msg("Tipo inválido: artigos, clientes, familias, vendedores ou operadores.")),
+        _ => return Err(AppError::msg("Tipo inválido: artigos, clientes, familias, vendedores, operadores ou sem_vendas.")),
     };
     // nos documentos (clientes, vendedores, operadores) o valor vem do total do documento; nos artigos e famílias, das linhas
     let por_documento = matches!(t.tipo.as_deref(), Some("clientes" | "vendedores" | "operadores"));
@@ -765,7 +814,7 @@ pub async fn top(st: &AppState, t: TopIn) -> AppResult<Value> {
             "SELECT {grupo}, {quantidade} AS quantidade, SUM({SINAL} * d.total) AS total
              FROM documentos d{juntar}
              WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao <= ?2{loja}
-             GROUP BY chave ORDER BY {} DESC LIMIT {n}",
+             GROUP BY chave{so_vendidos} ORDER BY {} {sentido} LIMIT {n}",
             if por_qtd { "quantidade" } else { "total" }
         )
     } else {
@@ -773,7 +822,7 @@ pub async fn top(st: &AppState, t: TopIn) -> AppResult<Value> {
             "SELECT {grupo}, {quantidade} AS quantidade, SUM({SINAL} * l.total) AS total
              FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id{juntar}
              WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao <= ?2{loja}
-             GROUP BY chave ORDER BY {} DESC LIMIT {n}",
+             GROUP BY chave{so_vendidos} ORDER BY {} {sentido} LIMIT {n}",
             if por_qtd { "quantidade" } else { "total" }
         )
     };
