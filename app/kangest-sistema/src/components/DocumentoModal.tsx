@@ -5,8 +5,9 @@ import { Fragment, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Ban, Printer, Receipt, FileText, Send, Truck, Undo2 } from "lucide-react";
+import { Ban, Printer, Receipt, FileText, Send, Truck, Undo2, UserRound } from "lucide-react";
 import { call } from "@/lib/api";
+import { dataHora } from "@/lib/format";
 import { useTabelas, useTalao58 } from "@/lib/hooks";
 import { imprimir, NOMES_VIAS } from "@/lib/print";
 import type { DocCompleto } from "@/lib/types";
@@ -24,29 +25,51 @@ export function useDocumento(id: number | null) {
 
 type Formato = "a4" | "ticket";
 
+/** A designação de cada via: Original, Duplicado… e, numa reimpressão, «2.ª Via — Original»… */
+export function nomesDasVias(vias: number, segundaVia?: boolean): string[] {
+  return Array.from({ length: Math.max(1, vias) }, (_, i) => {
+    const nome = NOMES_VIAS[i] ?? `Cópia ${i + 1}`;
+    return segundaVia ? `2.ª Via — ${nome}` : nome;
+  });
+}
+
+/** «2.ª via impressa por Ana em 25/11/2026 10:30» (vai no documento, junto de quem o emitiu). */
+export function textoReimpressao(quem: string | undefined, quando = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const em = `${p(quando.getDate())}/${p(quando.getMonth() + 1)}/${quando.getFullYear()} ${p(quando.getHours())}:${p(quando.getMinutes())}`;
+  return `2.ª via impressa por ${quem || "—"} em ${em}`;
+}
+
+/** Regista uma impressão (a base do «Original» e da 2.ª via automáticos). Não impede a impressão se falhar. */
+export async function registarImpressao(id: number, vias: string[], segundaVia: boolean, formato: string) {
+  try {
+    await call("documentos.impressao", { id, vias, segunda_via: segundaVia, formato });
+  } catch {
+    // sem registo, a impressão seguinte só sai como 2.ª via se alguém a marcar
+  }
+}
+
 /** N cópias do documento, cada uma com a sua designação (Original, Duplicado…). */
-export function Copias({ d, formato, vias, segundaVia }: { d: DocCompleto; formato: Formato; vias: number; segundaVia?: boolean }) {
+export function Copias({ d, formato, vias, segundaVia, reimpressao }: { d: DocCompleto; formato: Formato; vias: number; segundaVia?: boolean; reimpressao?: string }) {
+  const nomes = nomesDasVias(vias, segundaVia);
   return (
     <>
       {formato === "a4" && d.documento.formato === "A5" && <style>{"@media print { @page { size: A5; margin: 7mm; } }"}</style>}
-      {Array.from({ length: Math.max(1, vias) }, (_, i) => {
-        const nome = segundaVia ? `2.ª Via — ${NOMES_VIAS[i] ?? `Cópia ${i + 1}`}` : (NOMES_VIAS[i] ?? `Cópia ${i + 1}`);
-        return (
-          <Fragment key={i}>
-            {formato === "a4" ? (
-              <>
-                <A4 d={d} via={nome} />
-                {i < vias - 1 && <div className="break-after-page" />}
-              </>
-            ) : (
-              // cada via na sua página do tamanho do talão (lib/print.ts), e a impressora corta entre elas
-              <div className="via-talao">
-                <Ticket d={d} via={nome} />
-              </div>
-            )}
-          </Fragment>
-        );
-      })}
+      {nomes.map((nome, i) => (
+        <Fragment key={i}>
+          {formato === "a4" ? (
+            <>
+              <A4 d={d} via={nome} reimpressao={reimpressao} />
+              {i < nomes.length - 1 && <div className="break-after-page" />}
+            </>
+          ) : (
+            // cada via na sua página do tamanho do talão (lib/print.ts), e a impressora corta entre elas
+            <div className="via-talao">
+              <Ticket d={d} via={nome} reimpressao={reimpressao} />
+            </div>
+          )}
+        </Fragment>
+      ))}
     </>
   );
 }
@@ -57,9 +80,11 @@ export function ImpressaoAutomatica({ id, formato, vias, onDone }: { id: number;
   useEffect(() => {
     if (!d) return;
     imprimir();
+    // a primeira impressão, logo a seguir à emissão: o Original (e o Duplicado…); a seguinte já sai como 2.ª via
+    void registarImpressao(id, nomesDasVias(vias), false, formato === "ticket" ? "talao" : (d.documento.formato || "A4").toLowerCase());
     const t = setTimeout(onDone, 1500);
     return () => clearTimeout(t);
-  }, [d, onDone]);
+  }, [d, onDone, id, vias, formato]);
   if (!d) return null;
   return (
     <PrintPortal>
@@ -91,11 +116,29 @@ export default function DocumentoModal({
   const [formato, setFormato] = useState<Formato>(formatoInicial ?? opcoes?.formato ?? "a4");
   const [vias, setVias] = useState(1);
   const [segundaVia, setSegundaVia] = useState(false);
+  // «Para o cliente»: só a via do cliente (o Original; numa reimpressão, a 2.ª via)
+  const [soCliente, setSoCliente] = useState(false);
   const [anular, setAnular] = useState(false);
   const [enviar, setEnviar] = useState(false);
   const [motivo, setMotivo] = useState("");
   const tem = useSession((s) => s.tem);
+  const quem = useSession((s) => s.sessao?.nome);
   const qc = useQueryClient();
+  // as impressões já feitas: um documento já impresso sai sempre como 2.ª via (a AGT exige-o), sem ninguém a marcar
+  const historico = useQuery({
+    queryKey: ["impressoes", atual],
+    queryFn: () => call<{ total: number; ultima: { em: string; utilizador: string } | null }>("documentos.impressoes", { id: atual }),
+    enabled: !!atual,
+  });
+  const jaImpresso = (historico.data?.total ?? 0) > 0;
+  const segunda = jaImpresso || segundaVia;
+  const reimpressao = segunda ? textoReimpressao(quem) : undefined;
+  const formatoRegisto = formato === "ticket" ? "talao" : (d?.documento.formato || "A4").toLowerCase();
+  const registar = async (nomes: string[]) => {
+    if (!atual) return;
+    await registarImpressao(atual, nomes, segunda, formatoRegisto);
+    qc.invalidateQueries({ queryKey: ["impressoes", atual] });
+  };
   const nav = useNavigate();
   useEffect(() => {
     if (anularAoAbrir && d && d.documento.id === id && d.documento.estado === "N" && !d.documento.importado && tem("documentos.anular")) setAnular(true);
@@ -106,17 +149,35 @@ export default function DocumentoModal({
     if (d) setVias(formatoInicial === "ticket" ? (opcoes?.vias ?? 1) : d.documento.vias || 1);
   }, [d, formatoInicial, opcoes?.vias]);
 
-  // Com impressão térmica directa configurada, o talão vai em ESC/POS (corta o papel e abre a gaveta).
+  // Com impressão térmica directa configurada, o talão vai em ESC/POS (corta o papel e abre a gaveta). O talão térmico
+  // decide a 2.ª via e regista a impressão sozinho (impressao.rs).
   const termica = !!opcoes?.escpos?.ativo && formato === "ticket";
-  async function imprimirDoc() {
+  async function imprimirDoc(quantas = vias) {
     setNotaEntrega(false);
-    if (!termica) return imprimir();
+    if (!termica) {
+      imprimir();
+      return registar(nomesDasVias(quantas, segunda));
+    }
     try {
-      await call("impressao.talao", { id: atual, vias, segunda_via: segundaVia });
+      await call("impressao.talao", { id: atual, vias: quantas, segunda_via: segunda });
+      qc.invalidateQueries({ queryKey: ["impressoes", atual] });
       toast.success("Talão enviado à impressora térmica.");
     } catch (e) {
       toast.error((e as Error).message);
     }
+  }
+  // «Para o cliente»: a cópia de impressão passa a ter só uma via e imprime-se depois de desenhada
+  useEffect(() => {
+    if (!soCliente) return;
+    imprimir();
+    void registar(nomesDasVias(1, segunda));
+    setSoCliente(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soCliente]);
+  function paraCliente() {
+    setNotaEntrega(false);
+    if (termica) return imprimirDoc(1);
+    setSoCliente(true);
   }
 
   async function confirmarAnulacao() {
@@ -189,10 +250,17 @@ export default function DocumentoModal({
                 ))}
               </Select>
             </label>
-            <label className="mr-2 flex items-center gap-2 text-[13px] text-ink-2">
-              <input type="checkbox" checked={segundaVia} onChange={(e) => setSegundaVia(e.target.checked)} /> 2.ª via
+            <label
+              className="mr-2 flex items-center gap-2 text-[13px] text-ink-2"
+              title={jaImpresso ? "Este documento já foi impresso: a impressão seguinte sai como 2.ª via, como a AGT exige." : "Marcar à mão como 2.ª via"}
+            >
+              <input type="checkbox" checked={segunda} disabled={jaImpresso} onChange={(e) => setSegundaVia(e.target.checked)} />
+              {jaImpresso ? "2.ª via (automática)" : "2.ª via"}
             </label>
-            <Button onClick={imprimirDoc}>
+            <Button variant="secondary" onClick={paraCliente} title="Só a via do cliente: o Original e, numa reimpressão, a 2.ª via">
+              <UserRound className="size-4" /> Para o cliente
+            </Button>
+            <Button onClick={() => imprimirDoc()}>
               <Printer className="size-4" /> {termica ? "Imprimir na térmica" : "Imprimir"}
             </Button>
           </>
@@ -212,7 +280,7 @@ export default function DocumentoModal({
                   className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px]", formato === f ? "bg-surface font-medium shadow-sm" : "text-ink-2")}
                 >
                   {f === "a4" ? <FileText className="size-4" /> : <Receipt className="size-4" />}
-                  {f === "a4" ? "A4" : `Talão ${talao58 ? 58 : 80} mm`}
+                  {f === "a4" ? (d.documento.formato === "A5" ? "A5" : "A4") : `Talão ${talao58 ? 58 : 80} mm`}
                 </button>
               ))}
             </div>
@@ -220,15 +288,28 @@ export default function DocumentoModal({
             {d.documento.estado === "A" && <Badge tone="danger">Anulado: {d.documento.motivo_anulacao}</Badge>}
             {d.documento.hash_controlo && <Badge tone="brand">Assinado · {d.documento.hash_controlo}</Badge>}
             {d.documento.autorizado_por_nome && <Badge tone="accent">Autorizado por {d.documento.autorizado_por_nome}</Badge>}
+            {jaImpresso && historico.data?.ultima && (
+              <Badge tone="neutral">
+                Impresso {historico.data.total}× · a última por {historico.data.ultima.utilizador || "—"} em {dataHora(historico.data.ultima.em)}
+              </Badge>
+            )}
           </div>
           <EstadoDocumento d={d} onAbrir={setAtual} />
           <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-sunken p-6">
             <div className="mx-auto w-fit bg-white shadow-card">
-              {formato === "a4" ? <A4 d={d} via={segundaVia ? "2.ª Via" : "Original"} /> : <Ticket d={d} via={segundaVia ? "2.ª Via" : "Original"} />}
+              {formato === "a4" ? (
+                <A4 d={d} via={segunda ? "2.ª Via" : "Original"} reimpressao={reimpressao} />
+              ) : (
+                <Ticket d={d} via={segunda ? "2.ª Via" : "Original"} reimpressao={reimpressao} />
+              )}
             </div>
           </div>
           <PrintPortal>
-            {notaEntrega ? <NotaEntrega d={d} talao={formato === "ticket"} /> : <Copias d={d} formato={formato} vias={vias} segundaVia={segundaVia} />}
+            {notaEntrega ? (
+              <NotaEntrega d={d} talao={formato === "ticket"} />
+            ) : (
+              <Copias d={d} formato={formato} vias={soCliente ? 1 : vias} segundaVia={segunda} reimpressao={reimpressao} />
+            )}
           </PrintPortal>
           {enviar && <EnviarDocumento id={d.documento.id} numero={d.documento.numero_doc} onClose={() => setEnviar(false)} />}
 

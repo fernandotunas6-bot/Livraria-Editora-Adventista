@@ -295,6 +295,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- impressão térmica (ESC/POS) e gaveta ----
         "impressao.estado" => impressao::estado(st).await,
         "impressao.talao" => impressao::talao(st, p(params)?).await,
+        // o registo das impressões fica na base (no servidor, numa rede de postos), por isso não é «impressao.»
+        "documentos.impressoes" => impressao::historico(st, p(params)?).await,
+        "documentos.impressao" => impressao::registar(st, p(params)?).await,
         "impressao.gaveta" => impressao::gaveta(st, p(params)?).await,
         "impressao.teste" => impressao::teste(st).await,
         "impressao.visor" => impressao::visor(st, p(params)?).await,

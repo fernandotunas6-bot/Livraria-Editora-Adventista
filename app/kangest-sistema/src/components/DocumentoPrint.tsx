@@ -143,13 +143,12 @@ const naoServeFactura = (classe: string) => classe === "PROFORMA" || ehRecibo(cl
  * descrição e o total e, por baixo, quantidade × preço sem IVA, taxa e desconto; total sem IVA, desconto, IVA e TOTAL;
  * o que se pagou e o troco; o IVA por taxa só quando há mais de uma taxa ou isenções; o código de certificação.
  */
-export function Ticket({ d, via = "Original" }: { d: DocCompleto; via?: string }) {
+export function Ticket({ d, via = "Original", reimpressao }: { d: DocCompleto; via?: string; reimpressao?: string }) {
   const doc = d.documento;
   const e = d.empresa;
   const t58 = useTalao58();
   const recibo = ehRecibo(doc.classe);
   const segunda = via.startsWith("2.ª");
-  const outraVia = !segunda && via !== "Original";
   const consumidor = !doc.entidade_nif || doc.entidade_nif === "999999999";
   const resumo = d.resumo_iva;
   // uma só taxa, sem isenções: a linha do IVA diz a taxa e dispensa o quadro
@@ -159,6 +158,8 @@ export function Ticket({ d, via = "Original" }: { d: DocCompleto; via?: string }
   const pago = pagamentosEntregues(d);
   return (
     <div className={`print-ticket mx-auto bg-white text-black ${t58 ? "talao-58 w-[220px] p-2 text-[9.5px] leading-[1.25]" : "w-[300px] p-3 text-[11px] leading-[1.3]"}`} style={ARIAL}>
+      {/* a via no canto superior direito (Original, Duplicado… ou 2.ª via), como no A4 */}
+      <div className="text-right font-bold">{via}</div>
       <div className="text-center">
         {e.logo && <img src={e.logo} alt="" className="mx-auto mb-1 max-h-12 max-w-[160px] object-contain grayscale" />}
         <div className="text-[13px] font-bold leading-tight">{e.designacao_comercial || e.nome}</div>
@@ -176,11 +177,8 @@ export function Ticket({ d, via = "Original" }: { d: DocCompleto; via?: string }
           <span>{doc.tipo_desc}</span>
           <span className="text-[12px]">{doc.numero_doc}</span>
         </div>
-        <div className="flex justify-between gap-2">
-          <span>
-            {data(doc.data_emissao)} {hora(doc.data_hora)}
-          </span>
-          <span>{outraVia ? via : ""}</span>
+        <div>
+          {data(doc.data_emissao)} {hora(doc.data_hora)}
         </div>
         <div>Cliente: {consumidor ? "Consumidor final" : doc.entidade_nome}</div>
         {!consumidor && <div>NIF {doc.entidade_nif}</div>}
@@ -268,7 +266,11 @@ export function Ticket({ d, via = "Original" }: { d: DocCompleto; via?: string }
         {d.fe && <QrAgt d={d} tamanho="30mm" />}
         {rodapeAgt(d) && <div>{rodapeAgt(d)}</div>}
         {doc.classe === "VENDA" && <div>Bens/serviços colocados à disposição na data e local do documento.</div>}
-        <div>Operador: {doc.utilizador}</div>
+        <div>
+          Emitido por {doc.utilizador}
+          {doc.data_hora ? ` em ${data(doc.data_emissao)} ${hora(doc.data_hora)}` : ""}
+        </div>
+        {reimpressao && <div>{reimpressao}</div>}
         {doc.classe === "PROFORMA" &&
           e.bancos?.map((b) => (
             <div key={b.iban}>
@@ -328,7 +330,7 @@ function Seccao({ titulo, children }: { titulo: string; children: ReactNode }) {
  * de imposto, retenções e coordenadas bancárias à esquerda e os totais com o TOTAL DO DOCUMENTO à direita.
  * Com o formato A5 do tipo de documento, o mesmo desenho reduzido para meia folha.
  */
-export function A4({ d, via = "Original" }: { d: DocCompleto; via?: string }) {
+export function A4({ d, via = "Original", reimpressao }: { d: DocCompleto; via?: string; reimpressao?: string }) {
   const doc = d.documento;
   const e = d.empresa;
   const o = d.opcoes ?? OPCOES_PADRAO;
@@ -390,6 +392,12 @@ export function A4({ d, via = "Original" }: { d: DocCompleto; via?: string }) {
         </div>
         <div className="flex flex-col">
           <div className="text-right text-[12px] font-bold">{via}</div>
+          {/* quem emitiu e quando (o nome segue a opção «Mostrar o operador»); numa 2.ª via, quem a imprimiu e quando */}
+          <div className="text-right text-[8.5px]">
+            Emitido em {data(doc.data_emissao)} {hora(doc.data_hora)}
+            {o.mostrar_operador ? ` por ${doc.utilizador}` : ""}
+          </div>
+          {reimpressao && <div className="text-right text-[8.5px]">{reimpressao}</div>}
           <div className="mt-3 text-[11px] font-bold uppercase">{doc.tipo_desc}</div>
           <div className="text-[17px] font-bold leading-tight">{doc.numero_doc}</div>
           {naoServeFactura(doc.classe) && <div className="text-[9.5px]">Este documento não serve de factura</div>}

@@ -378,12 +378,28 @@ pub(super) fn rodape_agt(d: &Value) -> Option<String> {
 /// quantidade × preço sem IVA, taxa e desconto, com o total à direita; total sem IVA, desconto, IVA e TOTAL; o que se
 /// pagou e o troco; o IVA por taxa só com mais de uma taxa ou isenções; o código de certificação.
 fn render(cfg: &Config, d: &Value, via: &str) -> Vec<u8> {
+    render_com(cfg, d, via, None)
+}
+
+/// «25/11/2026 10:30» a partir de «2026-11-25T10:30:00».
+fn quando(iso: &str) -> String {
+    format!("{} {}", data_curta(iso), iso.get(11..16).unwrap_or(""))
+}
+
+/// O talão de um documento. `reimpressao`: numa 2.ª via, quem a imprimiu e quando (vai no fim, junto de quem emitiu).
+fn render_com(cfg: &Config, d: &Value, via: &str, reimpressao: Option<&str>) -> Vec<u8> {
     let doc = &d["documento"];
     let e = &d["empresa"];
     let mut t = Talao::novo(cfg);
     let classe = txt(doc, "classe");
     let recibo = classe == "RECIBO" || classe == "PAGAMENTO";
     let segunda = via.starts_with("2.");
+
+    // ---------- a via, no canto superior direito (Original, Duplicado… ou 2.ª via), como no A4 ----------
+    t.centrar(false);
+    t.negrito(true);
+    t.par("", via);
+    t.negrito(false);
 
     // ---------- empresa ----------
     if let Some(logo) = &cfg.logo {
@@ -418,8 +434,7 @@ fn render(cfg: &Config, d: &Value, via: &str) -> Vec<u8> {
     t.par(&txt(doc, "tipo_desc"), &txt(doc, "numero_doc"));
     t.negrito(false);
     let dh = txt(doc, "data_hora");
-    let outra = if !segunda && via != "Original" { via } else { "" };
-    t.par(&format!("{} {}", data_curta(&txt(doc, "data_emissao")), dh.get(11..16).unwrap_or("")), outra);
+    t.linha(&format!("{} {}", data_curta(&txt(doc, "data_emissao")), dh.get(11..16).unwrap_or("")));
     let nif = txt(doc, "entidade_nif");
     let consumidor = nif.is_empty() || nif == "999999999";
     t.linha(&format!("Cliente: {}", if consumidor { "Consumidor final".to_string() } else { txt(doc, "entidade_nome") }));
@@ -574,7 +589,12 @@ fn render(cfg: &Config, d: &Value, via: &str) -> Vec<u8> {
     if classe == "VENDA" {
         t.linha("Bens/serviços colocados à disposição na data e local do documento.");
     }
-    t.linha(&format!("Operador: {}", txt(doc, "utilizador")));
+    // quem emitiu e quando; numa 2.ª via, também quem a imprimiu e quando
+    let emitido = if dh.is_empty() { String::new() } else { format!(" em {}", quando(&dh)) };
+    t.linha(&format!("Emitido por {}{emitido}", txt(doc, "utilizador")));
+    if let Some(r) = reimpressao {
+        t.linha(r);
+    }
     if classe == "PROFORMA" {
         for b in lista(e, "bancos") {
             t.linha(&format!("{}: {}", txt(b, "banco"), txt(b, "iban")));
@@ -786,11 +806,16 @@ pub struct TalaoIn {
     pub gaveta: Option<bool>,
 }
 
-/// Imprime o talão de um documento na impressora térmica e, se configurado, abre a gaveta.
+/// Imprime o talão de um documento na impressora térmica e, se configurado, abre a gaveta. Um documento que já foi
+/// impresso sai sozinho como 2.ª via (a AGT exige-o), com quem a imprimiu e quando; a impressão fica registada.
 pub async fn talao(st: &AppState, i: TalaoIn) -> AppResult<Value> {
     let cfg = exigir_config(st)?;
     let d = crate::rede::chamar(st, "documentos.obter", json!({ "id": i.id })).await?;
     let vias = i.vias.unwrap_or(1).clamp(1, 4);
+    let antes = crate::rede::chamar(st, "documentos.impressoes", json!({ "id": i.id })).await?;
+    let segunda_via = i.segunda_via || antes["total"].as_i64().unwrap_or(0) > 0;
+    let quem = st.sessao_opcional().map(|s| s.nome).unwrap_or_default();
+    let reimpressao = segunda_via.then(|| format!("2.ª via impressa por {quem} em {}", quando(&crate::db::agora())));
     let numerario = lista(&d, "pagamentos").iter().any(|p| txt(p, "modo_codigo") == "NU");
     let abrir = i.gaveta.unwrap_or(match cfg.gaveta.as_str() {
         "sempre" => true,
@@ -799,13 +824,15 @@ pub async fn talao(st: &AppState, i: TalaoIn) -> AppResult<Value> {
     });
 
     let mut bytes = Vec::new();
+    let mut nomes = Vec::with_capacity(vias);
     for v in 0..vias {
-        let via = if i.segunda_via {
+        let via = if segunda_via {
             format!("2.ª via ({})", VIAS[v.min(3)])
         } else {
             VIAS[v.min(3)].to_string()
         };
-        bytes.extend_from_slice(&render(&cfg, &d, &via));
+        bytes.extend_from_slice(&render_com(&cfg, &d, &via, reimpressao.as_deref()));
+        nomes.push(via);
     }
     if abrir {
         let mut g = Talao::novo(&cfg);
@@ -813,7 +840,67 @@ pub async fn talao(st: &AppState, i: TalaoIn) -> AppResult<Value> {
         bytes.extend_from_slice(&g.b);
     }
     enviar(&cfg, &bytes)?;
-    Ok(json!({ "vias": vias, "gaveta": abrir }))
+    crate::rede::chamar(st, "documentos.impressao", json!({ "id": i.id, "vias": nomes, "segunda_via": segunda_via, "formato": "termica" })).await?;
+    Ok(json!({ "vias": vias, "gaveta": abrir, "segunda_via": segunda_via }))
+}
+
+// ============================== o registo das impressões (as vias automáticas) ==============================
+
+#[derive(Deserialize)]
+pub struct HistoricoIn {
+    pub id: i64,
+}
+
+/// Quantas vezes o documento foi impresso, e a primeira e a última impressão (quem e quando). Com `total` > 0, a
+/// impressão seguinte é uma 2.ª via.
+pub async fn historico(st: &AppState, i: HistoricoIn) -> AppResult<Value> {
+    st.sessao()?;
+    let linhas = crate::db::query_json_bind(
+        &st.pool,
+        "SELECT i.impresso_em AS em, COALESCE(u.nome, '') AS utilizador, i.segunda_via, i.formato, i.vias
+           FROM documento_impressoes i LEFT JOIN utilizadores u ON u.id = i.utilizador_id
+          WHERE i.documento_id = ? ORDER BY i.id",
+        i.id,
+    )
+    .await?;
+    let lista = linhas.as_array().cloned().unwrap_or_default();
+    Ok(json!({
+        "total": lista.len(),
+        "primeira": lista.first().cloned().unwrap_or(Value::Null),
+        "ultima": lista.last().cloned().unwrap_or(Value::Null),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct RegistarIn {
+    pub id: i64,
+    #[serde(default)]
+    pub vias: Vec<String>,
+    #[serde(default)]
+    pub segunda_via: bool,
+    #[serde(default)]
+    pub formato: String,
+}
+
+/// Regista uma impressão (o diálogo de impressão chama-o depois de imprimir; o talão térmico, sozinho).
+pub async fn registar(st: &AppState, i: RegistarIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    let existe: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documentos WHERE id = ?").bind(i.id).fetch_one(&st.pool).await?;
+    if existe == 0 {
+        return Err(AppError::msg("Documento desconhecido."));
+    }
+    let vias: Vec<String> = i.vias.into_iter().take(8).map(|v| v.chars().take(40).collect()).collect();
+    let formato: String = i.formato.chars().take(10).collect();
+    sqlx::query("INSERT INTO documento_impressoes (documento_id, vias, segunda_via, formato, utilizador_id, posto_id) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(i.id)
+        .bind(serde_json::to_string(&vias)?)
+        .bind(i.segunda_via)
+        .bind(formato)
+        .bind(s.id)
+        .bind(st.posto().id)
+        .execute(&st.pool)
+        .await?;
+    historico(st, HistoricoIn { id: i.id }).await
 }
 
 // ============================== visor de cliente ==============================

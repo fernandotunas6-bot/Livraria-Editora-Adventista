@@ -1285,6 +1285,23 @@ async fn talao_escpos() {
         assert!(visivel.chars().count() <= 48, "linha larga demais ({}): {l}", visivel.chars().count());
     }
 
+    // a via no canto superior direito de cada cópia, e quem emitiu e quando
+    assert!(texto.contains("Original") && texto.contains("Duplicado"), "sem a via de cada cópia: {texto}");
+    assert!(texto.contains("Emitido por"), "sem quem emitiu: {texto}");
+    assert!(!texto.contains("2.a via"), "a primeira impressão é o original: {texto}");
+    // a mesma venda outra vez: sai sozinha como 2.ª via (a AGT exige-o), com quem a imprimiu e quando
+    std::fs::remove_file(&saida).unwrap();
+    let r = rpc(&st, "impressao.talao", json!({ "id": id })).await;
+    assert_eq!(r["segunda_via"], true);
+    let outra = String::from_utf8_lossy(&std::fs::read(&saida).unwrap()).to_string();
+    assert!(outra.contains("2.a via") && outra.contains("impressa por"), "a reimpressão tem de sair como 2.ª via: {outra}");
+    let h = rpc(&st, "documentos.impressoes", json!({ "id": id })).await;
+    assert_eq!(h["total"], 2, "{h}");
+    assert_eq!((h["primeira"]["segunda_via"].as_i64(), h["ultima"]["segunda_via"].as_i64()), (Some(0), Some(1)), "{h}");
+    // o diálogo de impressão também regista (impressão pelo sistema, em A4)
+    let h = rpc(&st, "documentos.impressao", json!({ "id": id, "vias": ["2.ª Via — Original"], "segunda_via": true, "formato": "a4" })).await;
+    assert_eq!(h["total"], 3);
+
     // ---- venda em Multicaixa: talão sem gaveta ----
     std::fs::remove_file(&saida).unwrap();
     let mb = rpc(
