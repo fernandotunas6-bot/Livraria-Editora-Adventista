@@ -28,6 +28,9 @@ use crate::state::AppState;
 // O que faltava importar (categorias, permissões, vendas suspensas e prestações sociais; migração 0064).
 #[path = "importar_faltava.rs"]
 mod faltava;
+// As conciliações: documento a documento e a conta corrente fatura a fatura, na conferência.
+#[path = "importar_conciliar.rs"]
+mod conciliar;
 
 // ------------------------------------------------------------------ valores
 #[derive(Debug, Clone)]
@@ -835,6 +838,7 @@ const TABELAS: &[(&str, &[&str])] = &[
     ("proformas", &["vsDocsProformaCabessalho", "tbProformas"]),
     ("proforma_linhas", &["vsDocsProformaDetalhes", "vsProformaDetalhes"]),
     ("tes_contas", &["tbFluxoCaixaContas"]),
+    ("tes_contas_tipos", &["tbFluxoCaixaContasTipo"]),
     ("bancos", &["tbBancos"]),
     ("bancos_contas", &["tbBancosContas", "vsBancosContas"]),
     ("centros_custo", &["tbzconfigCentroCusto"]),
@@ -1120,6 +1124,7 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
     if op.tesouraria {
         for (canon, destino) in [
             ("tes_contas", &mut extras.tes_contas),
+            ("tes_contas_tipos", &mut extras.tes_contas_tipos),
             ("bancos", &mut extras.bancos),
             ("bancos_contas", &mut extras.bancos_contas),
             ("centros_custo", &mut extras.centros_custo),
@@ -1730,7 +1735,11 @@ async fn conferir(
         if !cc.is_empty() {
             let divida: i64 = cc.iter().map(|r| kz(r, &["ValorFalta", "Pendente", "Saldo"])).filter(|x| *x > 0).sum();
             v.push(item("Valores em dívida (conta corrente)", "kz", json!(divida), json!(escalar(tx, "SELECT SUM(valor_pendente) FROM documentos WHERE importado = 1").await?)));
+            // a conta corrente, fatura a fatura
+            v.push(conciliar::conta_corrente(tx, cc).await?);
         }
+        // documento a documento
+        v.push(conciliar::documento_a_documento(tx, docs).await?);
     }
     if op.tesouraria && !x.tes_movimentos.is_empty() {
         let saldo: i64 = x.tes_movimentos.iter().filter_map(movimento_tesouraria).map(|(tipo, valor)| if tipo == "ENTRADA" { valor } else { -valor }).sum();
@@ -1977,6 +1986,8 @@ struct Extras {
     proformas: Vec<Registo>,
     proforma_linhas: Vec<Registo>,
     tes_contas: Vec<Registo>,
+    /// os tipos das contas (tbFluxoCaixaContasTipo: 1 Caixa, 2 Banco…): o «Tipo» da conta é o número
+    tes_contas_tipos: Vec<Registo>,
     bancos: Vec<Registo>,
     bancos_contas: Vec<Registo>,
     centros_custo: Vec<Registo>,
@@ -2759,6 +2770,12 @@ fn codigo_moeda(r: &Registo) -> Option<&'static str> {
 }
 
 /// Entrada ou saída de um movimento do fluxo de caixa do KIGEST (crédito/débito ou valor com sinal).
+/// Uma conta do fluxo de caixa do KIGEST é de banco pelo tipo («Banco», «Conta bancária»…) ou por ter IBAN: entra na
+/// Conciliação bancária do KanGest (só as contas de banco), com os movimentos dela.
+fn conta_e_banco(tipo: &str, iban: Option<&str>) -> bool {
+    tipo.to_lowercase().contains("banc") || iban.is_some_and(|x| !x.trim().is_empty())
+}
+
 fn movimento_tesouraria(r: &Registo) -> Option<(&'static str, i64)> {
     let credito = kz(r, &["ValorCredito", "Credito", "Entrada"]);
     let debito = kz(r, &["ValorDebito", "Debito", "Saida"]);
@@ -2799,11 +2816,19 @@ async fn n_tesouraria(tx: &mut Transaction<'_, Sqlite>, rel: &mut Relatorio, map
     }
     // contas do fluxo de caixa e contas bancárias
     let mut contas: HashMap<i64, i64> = HashMap::new();
+    let tipos_conta: HashMap<i64, String> = x.tes_contas_tipos.iter().filter_map(|r| Some((i(r, &["ID", "Id"])?, t(r, &["Descricao", "Descritivo"])?))).collect();
     for r in &x.tes_contas {
         let (Some(k), Some(desc)) = (i(r, &["ID", "Id"]), t(r, &["Descricao"])) else { continue };
         let iban = t(r, &["Conta_Iban", "IBAN"]);
-        let banco = t(r, &["Tipo"]).map(|x| x.to_lowercase().contains("banc")).unwrap_or(false) || iban.is_some();
+        // o «Tipo» é o número do tipo (tbFluxoCaixaContasTipo) ou, em bases antigas, o texto
+        let tipo = i(r, &["Tipo"]).and_then(|n| tipos_conta.get(&n).cloned()).or_else(|| t(r, &["Tipo"])).unwrap_or_default();
+        let banco = conta_e_banco(&tipo, iban.as_deref());
         let id = conta_origem(tx, &format!("FC:{k}"), &desc, if banco { "BANCO" } else { "CAIXA" }, None, None, None, iban).await?;
+        // uma importação antiga lia mal o tipo (o número) e deixava a conta de banco como caixa: corrige-se, para ela
+        // entrar na Conciliação bancária
+        if banco {
+            sqlx::query("UPDATE contas SET tipo = 'BANCO' WHERE id = ? AND id_origem = ? AND tipo <> 'BANCO'").bind(id).bind(format!("FC:{k}")).execute(&mut **tx).await?;
+        }
         contas.insert(k, id);
     }
     let nomes_banco: HashMap<String, String> = x.bancos.iter().filter_map(|r| Some((t(r, &["Codigo", "CodBanco", "Id"])?, t(r, &["Nome", "Descricao"])?))).collect();
@@ -2844,7 +2869,7 @@ async fn n_tesouraria(tx: &mut Transaction<'_, Sqlite>, rel: &mut Relatorio, map
         .bind(valor)
         .bind(t(r, &["Desc_Geral", "Descricao", "Historico", "Observacao", "Desc_CCusto"]).unwrap_or_else(|| "Movimento importado do KIGEST".into()))
         .bind(i(r, &["Id_CentroCusto", "IdCentroCusto"]).and_then(|k| centros.get(&k).copied()))
-        .bind(t(r, &["RefDocumento", "Documento", "NumDocumento"]))
+        .bind(t(r, &["RefDocumento", "RefDocs", "Documento", "NumDocumento"]))
         .bind(i(r, &["IdUsuario"]).and_then(|u| mapas.utilizadores.get(&u).copied()).unwrap_or(utilizador))
         .bind(&origem)
         .execute(&mut **tx)

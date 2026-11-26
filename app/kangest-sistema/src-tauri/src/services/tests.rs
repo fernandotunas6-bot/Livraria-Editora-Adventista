@@ -626,6 +626,10 @@ async fn gc_paridade_e_importacao() {
     let conf = |nome: &str| r["conferencia"].as_array().unwrap().iter().find(|c| c["item"] == nome).cloned().unwrap_or_else(|| panic!("{nome}: {}", r["conferencia"]));
     assert_eq!((conf("Documentos")["kigest"].as_i64(), conf("Documentos")["kigest_novo"].as_i64()), (Some(3), Some(3)));
     assert_eq!((conf("Valores em dívida (conta corrente)")["kigest"].as_i64(), conf("Valores em dívida (conta corrente)")["kigest_novo"].as_i64()), (Some(57000), Some(57000)));
+    // as conciliações: a conta corrente fatura a fatura e os documentos um a um
+    let cc = conf("Facturas da conta corrente que batem certo");
+    assert_eq!((cc["kigest"].as_i64(), cc["kigest_novo"].as_i64()), (Some(1), Some(1)), "{cc}");
+    assert_eq!(conf("Documentos iguais, um a um")["kigest"].as_i64(), Some(3));
     let saldo = conf("Saldo das contas de tesouraria");
     assert_eq!((saldo["kigest"].as_i64(), saldo["kigest_novo"].as_i64()), (Some(7000500), Some(7000000)), "o movimento sem conta fica de fora e a diferença aparece");
     assert_eq!(conf("Funcionários")["kigest"], conf("Funcionários")["kigest_novo"]);
@@ -7544,6 +7548,79 @@ async fn kigest_o_que_faltava() {
     let ana2 = rpc(&st, "utilizadores.listar", Value::Null).await.as_array().unwrap().iter().find(|x| x["login"] == "ana").cloned().unwrap();
     assert_eq!(ana2["rever_permissoes"], false);
     assert_eq!(ana2["limite_desconto"], 5.0);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// As conciliações do KIGEST (services/importar_conciliar.rs): os documentos um a um e a conta corrente fatura a fatura,
+/// na conferência; e a bancária: uma conta de banco do KIGEST (o tipo pelo número, tbFluxoCaixaContasTipo) fica
+/// BANCO, e os movimentos dela, com o documento (RefDocs), entram no fluxo que a Conciliação bancária casa.
+#[tokio::test]
+async fn kigest_conciliacoes() {
+    let (st, pasta) = base_com_admin("kigest-conciliacoes").await;
+    let mut t: std::collections::HashMap<String, Vec<Registo>> = std::collections::HashMap::new();
+    t.insert("tbClientes".into(), vec![reg(&[("IdCliente", Val::I(2)), ("Nome", s("Escola Kianda")), ("NIF", s("5417000123"))])]);
+    t.insert(
+        "tbDocumentosCabessalho".into(),
+        vec![
+            reg(&[("RefDocumento", s("FT 2025/1")), ("DataEmissao", s("2025-06-01 00:00:00")), ("IdEntidade", Val::I(2)), ("ValTotal", Val::F(1000.0)), ("ValTaxa", Val::F(0.0))]),
+            reg(&[("RefDocumento", s("FR 2025/2")), ("DataEmissao", s("2025-06-02 00:00:00")), ("IdEntidade", Val::I(2)), ("ValTotal", Val::F(500.0)), ("ValTaxa", Val::F(0.0))]),
+            // um tipo que o KanGest não conhece: fica de fora, e a conciliação diz qual
+            reg(&[("RefDocumento", s("ZZ 2025/1")), ("DataEmissao", s("2025-06-03 00:00:00")), ("ValTotal", Val::F(10.0))]),
+        ],
+    );
+    t.insert(
+        "tbContasCorrente".into(),
+        vec![
+            reg(&[("Documento", s("FT 2025/1")), ("Entidade", s("2")), ("TipoMovimento", s("D")), ("Debito", Val::F(1000.0)), ("ValorFalta", Val::F(400.0))]),
+            reg(&[("Documento", s("FR 2025/2")), ("Entidade", s("2")), ("TipoMovimento", s("D")), ("Debito", Val::F(500.0)), ("ValorFalta", Val::F(0.0))]),
+            reg(&[("Documento", s("FR 2025/2")), ("Entidade", s("2")), ("TipoMovimento", s("C")), ("Credito", Val::F(500.0))]),
+            // uma factura da conta corrente sem o documento: aparece na conciliação
+            reg(&[("Documento", s("FT 2024/9")), ("Entidade", s("2")), ("TipoMovimento", s("D")), ("Debito", Val::F(300.0)), ("ValorFalta", Val::F(300.0))]),
+        ],
+    );
+    t.insert("tbFluxoCaixaContasTipo".into(), vec![reg(&[("ID", Val::I(1)), ("Descricao", s("Caixa"))]), reg(&[("ID", Val::I(2)), ("Descricao", s("Banco"))])]);
+    t.insert(
+        "tbFluxoCaixaContas".into(),
+        vec![reg(&[("ID", Val::I(1)), ("Descricao", s("Caixa de Venda(Geral)")), ("Tipo", Val::I(1))]), reg(&[("ID", Val::I(2)), ("Descricao", s("BFA Livraria")), ("Tipo", Val::I(2))])],
+    );
+    t.insert(
+        "tbFlulxoaixaCabessalho".into(),
+        vec![
+            reg(&[("Id", Val::I(1)), ("IdContaCaixa", Val::I(1)), ("Data", s("2025-06-02")), ("ValorCredito", Val::F(500.0)), ("RefDocs", s("FR 2025/2")), ("Desc_Geral", s("Venda"))]),
+            reg(&[("Id", Val::I(2)), ("IdContaCaixa", Val::I(2)), ("Data", s("2025-06-05")), ("ValorCredito", Val::F(600.0)), ("RefDocs", s("RC 2025/1")), ("Desc_Geral", s("Transferência da Escola"))]),
+        ],
+    );
+    let opcoes = Opcoes { empresa: false, artigos: false, stock: false, clientes: true, fornecedores: false, utilizadores: false, documentos: true, rh: false, lotes: false, oficina: false, tesouraria: true, simular: false };
+    let mut fonte = Memoria(t);
+    let r = importar_dados(&st, &mut fonte, &opcoes, "teste/conciliacoes").await.expect("importar");
+    let conf = |nome: &str| r["conferencia"].as_array().unwrap().iter().find(|c| c["item"] == nome).cloned().unwrap_or_else(|| panic!("{nome}: {}", r["conferencia"]));
+
+    // documento a documento: os dois que vieram batem certo; o de tipo desconhecido falta, e diz-se qual
+    let docs = conf("Documentos iguais, um a um");
+    assert_eq!((docs["kigest"].as_i64(), docs["kigest_novo"].as_i64()), (Some(3), Some(2)), "{docs}");
+    assert_eq!(docs["por_documento"].as_array().unwrap().len(), 1);
+    assert_eq!((docs["por_documento"][0]["documento"].as_str(), docs["por_documento"][0]["motivo"].as_str()), (Some("ZZ 2025/1"), Some("falta no KanGest")));
+
+    // a conta corrente fatura a fatura: a FT com 400 Kz em falta e a FR saldada batem certo; a FT de 2024 falta
+    let cc = conf("Facturas da conta corrente que batem certo");
+    assert_eq!((cc["kigest"].as_i64(), cc["kigest_novo"].as_i64()), (Some(3), Some(2)), "{cc}");
+    assert_eq!(cc["por_fatura"][0]["documento"], "FT 2024/9");
+    assert_eq!(cc["por_fatura"][0]["kigest"]["falta"], 30000);
+
+    // a bancária: a conta do tipo 2 é de banco (a do tipo 1, de caixa), e o movimento dela, com o documento, está no fluxo
+    let contas: Vec<(String, String)> = sqlx::query_as("SELECT descricao, tipo FROM contas WHERE descricao IN ('Caixa de Venda(Geral)', 'BFA Livraria') ORDER BY descricao")
+        .fetch_all(&st.pool)
+        .await
+        .unwrap();
+    assert_eq!(contas, vec![("BFA Livraria".to_string(), "BANCO".to_string()), ("Caixa de Venda(Geral)".to_string(), "CAIXA".to_string())]);
+    let fluxo: Vec<(Option<String>, i64)> = sqlx::query_as(
+        "SELECT f.documento, f.valor FROM vw_fluxo f JOIN contas c ON c.id = f.conta_id WHERE c.descricao = 'BFA Livraria' AND f.origem = 'TESOURARIA'",
+    )
+    .fetch_all(&st.pool)
+    .await
+    .unwrap();
+    assert_eq!(fluxo, vec![(Some("RC 2025/1".to_string()), 60000)]);
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
