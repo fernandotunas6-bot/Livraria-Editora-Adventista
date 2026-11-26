@@ -6,7 +6,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, Hand, Keyboard, KeyRound, LayoutDashboard, Lock, LogOut, Menu as IconeMenu, Monitor, MonitorSmartphone, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, ShieldCheck, ShoppingCart, Star, Sun, UserRound, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { call } from "@/lib/api";
+import { call, NA_APP } from "@/lib/api";
 import { MENU, type GrupoMenu, type ItemMenu } from "@/lib/menu";
 import { destinoActual, destinoPorEndereco, useNavegacao, type Destino } from "@/lib/navegacao";
 import { useAparencia, type Densidade, type Tema, type Toque } from "@/lib/aparencia";
@@ -53,6 +53,27 @@ const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator
 export default function AppShell() {
   const { sessao, setSessao, pode, tem } = useSession();
   const nav = useNavigate();
+  // as ligações kangest:// do painel do site (src-tauri/src/ligacoes.rs): o destino espera pela sessão e abre aqui
+  useEffect(() => {
+    if (!NA_APP) return;
+    const ir = async () => {
+      const d = await call<string | null>("ligacao.pendente").catch(() => null);
+      if (d) nav(d);
+    };
+    void ir();
+    let desligar: (() => void) | undefined;
+    let fechado = false;
+    void import("@tauri-apps/api/event").then(({ listen }) =>
+      listen("kangest-ligacao", () => void ir()).then((f) => {
+        if (fechado) f();
+        else desligar = f;
+      }),
+    );
+    return () => {
+      fechado = true;
+      desligar?.();
+    };
+  }, [nav]);
   const loc = useLocation();
   const qc = useQueryClient();
   const [senha, setSenha] = useState(false);

@@ -49,7 +49,10 @@ encoding_rs = "0.8"
 socket2 = "0.6"
 # Uma só cópia do KanGest aberta (a segunda traz a janela da primeira para a frente) e o arranque automático ao ligar o
 # computador (o servidor da loja). Série 2: o KanGest usa o Tauri 2.
-tauri-plugin-single-instance = "=2.5.5"
+# com «deep-link»: uma ligação kangest:// aberta com o KanGest já a correr vai para a janela aberta (src/ligacoes.rs)
+tauri-plugin-single-instance = { version = "=2.5.5", features = ["deep-link"] }
+# as ligações kangest:// do painel do site (src/ligacoes.rs)
+tauri-plugin-deep-link = "=2.6.3"
 tauri-plugin-autostart = "=2.7.0"
 # Notificações do sistema (centro de notificações do macOS, avisos do Windows): o que falha em segundo plano.
 tauri-plugin-notification = "=2.8.0"

@@ -233,6 +233,14 @@ export function CentroAjuda() {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [abrir, fechar]);
+  // ?ajuda=avisos (a ligação kangest://ajuda): abre o painel nesse separador
+  const nav = useNavigate();
+  useEffect(() => {
+    const pedido = new URLSearchParams(loc.search).get("ajuda");
+    if (!pedido) return;
+    abrir(["avisos", "assistente", "atalhos"].includes(pedido) ? (pedido as SeparadorAjuda) : "avisos");
+    nav(loc.pathname, { replace: true });
+  }, [loc.search, loc.pathname, abrir, nav]);
   const mostrarBotao = p.botao && (!ecraCheio || p.noPos);
   const lado = p.esquerda ? "left-4 sm:left-6" : "right-4 sm:right-6";
   return (

@@ -315,6 +315,8 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // o computador ao serviço: fechar para a bandeja e não adormecer, cada um à escolha (src/servico.rs)
         "servico.estado" => crate::servico::estado(st).await,
         "servico.guardar" => crate::servico::guardar(st, p(params)?).await,
+        // a ligação kangest:// que espera pelo ecrã, uma vez só (src/ligacoes.rs)
+        "ligacao.pendente" => Ok(serde_json::json!(crate::ligacoes::tirar_pendente())),
 
         // ---- impressão térmica (ESC/POS) e gaveta ----
         "impressao.estado" => impressao::estado(st).await,
