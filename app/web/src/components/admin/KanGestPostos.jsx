@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
 const ESTADOS = {
-  activo: ['Ligado', 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'],
-  por_emparelhar: ['À espera do código', 'bg-amber-500/10 text-amber-700 dark:text-amber-400'],
+  activo: ['Ligado', 'bg-estado-ok-fundo text-estado-ok'],
+  por_emparelhar: ['À espera do código', 'bg-estado-aviso-fundo text-estado-aviso'],
   revogado: ['Revogado', 'bg-muted text-muted-foreground'],
 };
 const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', dateStyle: 'short', timeStyle: 'short' }) : '—');
@@ -20,7 +20,7 @@ const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-PT', { timeZone: 'Af
 function CodigoNovo({ codigo, endereco, expira, onFechar }) {
   const copiar = (txt) => navigator.clipboard?.writeText(txt).then(() => toast.success('Copiado.'), () => toast.error('Não foi possível copiar.'));
   return (
-    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4 text-sm" role="status">
+    <div className="rounded-xl border border-estado-ok/40 bg-estado-ok-fundo p-4 text-sm" role="status">
       <p className="font-semibold">Escreva este código no KanGest Livraria, em Livraria → Ligação ao site</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <code className="rounded-lg bg-background px-3 py-2 font-mono text-2xl font-bold tracking-[0.2em]">{codigo}</code>
@@ -172,8 +172,8 @@ export default function KanGestPostos({ lojas = [] }) {
       </div>
       <LivroDoSite resumo={estado.livro_site} />
       {!estado.configurado && (
-        <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <p className="flex items-start gap-2 rounded-xl border border-estado-aviso/40 bg-estado-aviso-fundo p-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-estado-aviso" />
           Falta configurar as chaves da sincronização (KANGEST_SINC_CHAVES e KANGEST_DADOS_CHAVE). Gera-as o
           scripts/kangest/chaves-sinc.mjs; veja docs/KANGEST-SINCRONIZACAO.md.
         </p>
@@ -183,7 +183,7 @@ export default function KanGestPostos({ lojas = [] }) {
         // os computadores que precisam de atenção (o estado que cada KanGest manda: lib/kangestComputadores.js)
         const comProblemas = postos.filter((p) => p.estado === 'activo' && problemasDoComputador(p).some((x) => x.grave));
         return comProblemas.length > 0 ? (
-          <p className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+          <p className="flex items-center gap-2 rounded-lg border border-estado-erro/30 bg-estado-erro-fundo px-3 py-2 text-sm text-estado-erro">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             {comProblemas.length === 1 ? `O computador de «${comProblemas[0].nome}» precisa de atenção.` : `${comProblemas.length} computadores precisam de atenção.`}
           </p>
@@ -199,7 +199,7 @@ export default function KanGestPostos({ lojas = [] }) {
                 <span className="text-xs text-muted-foreground">{nomeLoja[p.store_id] || 'sem loja'}</span>
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', cor)}>{rotulo}</span>
                 {p.partidas > 0 && (
-                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-700 dark:text-red-400" title="Documentos cujo hash anterior não bate com o documento anterior da mesma série">
+                  <span className="rounded-full bg-estado-erro-fundo px-2 py-0.5 text-xs font-semibold text-estado-erro" title="Documentos cujo hash anterior não bate com o documento anterior da mesma série">
                     {p.partidas} elo(s) da cadeia AGT partidos
                   </span>
                 )}
@@ -214,11 +214,11 @@ export default function KanGestPostos({ lojas = [] }) {
                   )}
                 </span>
                 <p className="w-full text-xs text-muted-foreground">
-                  {p.estado === 'activo' ? <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="mr-1 inline h-3.5 w-3.5" />}
+                  {p.estado === 'activo' ? <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-estado-ok" /> : <Link2 className="mr-1 inline h-3.5 w-3.5" />}
                   {p.documentos} documento(s) recebido(s) · última sincronização {dataHora(p.ultima_sinc)}
                   {p.versao_programa ? ` · ${p.versao_programa}` : ''}
                 </p>
-                {p.ultimo_erro && <p className="w-full text-xs text-red-700 dark:text-red-400">{p.ultimo_erro}</p>}
+                {p.ultimo_erro && <p className="w-full text-xs text-estado-erro">{p.ultimo_erro}</p>}
                 {p.estado !== 'revogado' && <Computador p={p} />}
                 {p.estado !== 'revogado' && <SessoesDoPosto p={p} onTerminada={carregar} />}
                 {p.estado === 'activo' && <LivroDoPosto p={p} />}
@@ -312,7 +312,7 @@ function Computador({ p }) {
           {problemas.map((x) => (
             <span
               key={x.texto}
-              className={cn('rounded-full px-2 py-0.5 font-semibold', x.grave ? 'bg-red-500/10 text-red-700 dark:text-red-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400')}
+              className={cn('rounded-full px-2 py-0.5 font-semibold', x.grave ? 'bg-estado-erro-fundo text-estado-erro' : 'bg-estado-aviso-fundo text-estado-aviso')}
             >
               {x.texto}
             </span>
@@ -363,12 +363,12 @@ export function SessoesDoPosto({ p, onTerminada }) {
               <span className="font-semibold">{s.nome || s.login}</span>
               <span className="text-muted-foreground">{s.perfil}</span>
               {s.recurso && (
-                <span className="rounded-full bg-red-500/10 px-2 py-0.5 font-semibold text-red-700 dark:text-red-400" title="O perfil Administrador local, sem conta do site: cada entrada fica no registo de segurança">
+                <span className="rounded-full bg-estado-erro-fundo px-2 py-0.5 font-semibold text-estado-erro" title="O perfil Administrador local, sem conta do site: cada entrada fica no registo de segurança">
                   ADMIN de recurso
                 </span>
               )}
               {!s.recurso && !s.conta_site && (
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-400" title="Conta só do KanGest: tem de se ligar a uma conta do site">
+                <span className="rounded-full bg-estado-aviso-fundo px-2 py-0.5 font-semibold text-estado-aviso" title="Conta só do KanGest: tem de se ligar a uma conta do site">
                   conta local
                 </span>
               )}
@@ -437,10 +437,10 @@ export function LivroDoPosto({ p }) {
           <>
             <span>Livro de stock: {l.movimentos} movimento(s)</span>
             {l.divergencias === 0 ? (
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-400">bate certo com o posto</span>
+              <span className="rounded-full bg-estado-ok-fundo px-2 py-0.5 font-semibold text-estado-ok">bate certo com o posto</span>
             ) : (
               <>
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-400">
+                <span className="rounded-full bg-estado-aviso-fundo px-2 py-0.5 font-semibold text-estado-aviso">
                   {l.divergencias} diferença(s) com o posto
                 </span>
                 <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={ver} disabled={aVer}>

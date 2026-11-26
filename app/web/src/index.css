@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* os tokens partilhados com o KanGest (KANGEST ONE, fase G): os estados, os raios, o movimento */
+@import '../../../packages/marca/tokens.css';
 
 @plugin 'tailwindcss-animate';
 
