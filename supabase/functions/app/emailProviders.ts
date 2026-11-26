@@ -155,7 +155,10 @@ export function emailProviderReady(settings: Row | null, secrets: { brevo?: stri
     return secrets.cloudflareToken ? { ready: true, missing: "" } : { ready: false, missing: "token da API do Cloudflare" };
   }
   if (provider === "sendgrid") return secrets.sendgrid ? { ready: true, missing: "" } : { ready: false, missing: "chave SendGrid" };
-  if (!settings?.smtp_host) return { ready: false, missing: "servidor SMTP" };
+  // nada configurado ainda (o padrão é SMTP sem servidor): dizer o caminho recomendado, não só «servidor SMTP»
+  if (!settings?.smtp_host) {
+    return { ready: false, missing: "um fornecedor de email: a Brevo (grátis até 300 por dia, recomendada) ou um servidor SMTP pela porta 465" };
+  }
   const port = Number(settings?.smtp_port) || 465;
   if (smtpPortProblem(port)) return { ready: false, missing: `porta SMTP utilizável (a ${port} está bloqueada)` };
   return { ready: true, missing: "" };

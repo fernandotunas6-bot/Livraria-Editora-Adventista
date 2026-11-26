@@ -76,6 +76,8 @@ describe("configuração", () => {
     expect(emailProviderReady({ ...base, email_provider: "cloudflare" }, { cloudflareToken: "t" }).missing).toBe("ID da conta Cloudflare");
     expect(emailProviderReady({ ...base, email_provider: "cloudflare", cloudflare_account_id: "701800d0" }, { cloudflareToken: "t" }).ready).toBe(true);
     expect(emailProviderReady({ email_provider: "brevo" }, { brevo: "k" }).missing).toBe("email remetente");
+    // nada configurado (o padrão é SMTP sem servidor): aponta a Brevo, a recomendada
+    expect(emailProviderReady({ ...base, email_provider: "smtp" }, {}).missing).toContain("Brevo");
   });
 });
 
