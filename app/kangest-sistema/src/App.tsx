@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { call, EVENTO_DESLIGADO, ligacaoWeb, MODO_WEB } from "@/lib/api";
+import { call, EVENTO_DESLIGADO, ligacaoWeb, MODO_WEB, NA_APP } from "@/lib/api";
 import LigarWeb from "@/pages/LigarWeb";
 import { useSession } from "@/store/session";
 import type { Sessao } from "@/lib/types";
@@ -143,6 +143,8 @@ function Principal() {
         const s = await call<Sessao | null>("auth.sessao");
         if (!s) setSessao(null);
         else if (s.id !== sessao.id) setMudou(s);
+        // bloqueada fora deste ecrã (a janela foi para a bandeja: src-tauri/src/servico.rs)
+        else if (s.bloqueada && !sessao.bloqueada) setSessao(s);
       } catch {
         /* sem ligação: confere-se na próxima volta */
       }
@@ -150,9 +152,21 @@ function Principal() {
     const aoVoltar = () => document.visibilityState === "visible" && void conferir();
     document.addEventListener("visibilitychange", aoVoltar);
     const t = setInterval(conferir, 60_000);
+    // a janela foi para a bandeja: o programa bloqueou a sessão e avisa logo (src-tauri/src/servico.rs)
+    let desligar: (() => void) | undefined;
+    let fechado = false;
+    if (NA_APP)
+      void import("@tauri-apps/api/event").then(({ listen }) =>
+        listen("sessao-bloqueada", () => void conferir()).then((f) => {
+          if (fechado) f();
+          else desligar = f;
+        }),
+      );
     return () => {
       document.removeEventListener("visibilitychange", aoVoltar);
       clearInterval(t);
+      fechado = true;
+      desligar?.();
     };
   }, [sessao, setSessao]);
   const politica = usePolitica();

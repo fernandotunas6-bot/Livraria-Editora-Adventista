@@ -1890,6 +1890,92 @@ function ArranqueAutomatico() {
   );
 }
 
+type ModoServico = "automatico" | "sempre" | "nunca";
+interface EstadoServico {
+  bandeja: ModoServico;
+  acordado: ModoServico;
+  fecha_para_a_bandeja: boolean;
+  nao_adormece: boolean;
+  acordado_agora: boolean;
+  servidor: boolean;
+  acesso_web: boolean;
+}
+
+const MODOS_SERVICO: [ModoServico, string][] = [
+  ["automatico", "Automático"],
+  ["sempre", "Sempre"],
+  ["nunca", "Nunca"],
+];
+
+/** O computador ao serviço (src-tauri/src/servico.rs): cada opção à escolha de quem usa o computador, automática por
+ * omissão (quando é o servidor da rede ou tem o acesso pela Internet ligado). */
+function ServicoSempreLigado() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const { data: s } = useQuery({ queryKey: ["servico"], queryFn: () => call<EstadoServico>("servico.estado"), refetchInterval: 60_000 });
+  if (!s) return null;
+  async function mudar(chave: "bandeja" | "acordado", modo: ModoServico) {
+    setBusy(true);
+    try {
+      qc.setQueryData(["servico"], await call<EstadoServico>("servico.guardar", { [chave]: modo }));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const quem = s.servidor && s.acesso_web ? "o servidor dos postos e o acesso pela Internet" : s.servidor ? "o servidor dos postos" : s.acesso_web ? "o acesso pela Internet" : null;
+  const opcoes = [
+    {
+      chave: "bandeja" as const,
+      titulo: "Fechar a janela deixa o KanGest na bandeja",
+      texto: "O programa continua a trabalhar junto ao relógio (no Mac, na barra de menus): os postos, as cópias e a ligação ao site continuam. A sessão fica bloqueada; para sair, use o ícone.",
+      agora: s.fecha_para_a_bandeja ? "Agora: fechar a janela deixa-o na bandeja." : "Agora: fechar a janela termina o programa.",
+    },
+    {
+      chave: "acordado" as const,
+      titulo: "Não deixar o computador adormecer",
+      texto: "Enquanto o KanGest está aberto, o computador não entra em suspensão. O ecrã apaga-se como de costume.",
+      agora: s.nao_adormece ? (s.acordado_agora ? "Agora: o computador não adormece." : "Agora: ligado (este sistema não deixa mudar o sono).") : "Agora: o computador adormece como de costume.",
+    },
+  ];
+  return (
+    <Card className="p-5">
+      <div className="font-medium">Este computador ao serviço da loja</div>
+      <p className="mt-0.5 text-[13px] text-ink-3">
+        {quem
+          ? `No automático, estas opções estão ligadas: este computador é ${quem}, e há quem dependa dele.`
+          : "No automático, ficam ligadas quando este computador for o servidor dos postos ou tiver o acesso pela Internet."}
+      </p>
+      <div className="mt-4 space-y-4">
+        {opcoes.map((o) => (
+          <div key={o.chave}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13.5px] font-medium">{o.titulo}</span>
+              <div className="flex gap-1 rounded-lg bg-sunken p-1" role="radiogroup" aria-label={o.titulo}>
+                {MODOS_SERVICO.map(([id, nome]) => (
+                  <button
+                    key={id}
+                    role="radio"
+                    aria-checked={s[o.chave] === id}
+                    disabled={busy}
+                    onClick={() => mudar(o.chave, id)}
+                    className={cn("rounded-md px-3 py-1 text-[12.5px]", s[o.chave] === id ? "bg-surface font-medium shadow-sm" : "text-ink-2 hover:text-ink")}
+                  >
+                    {nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="mt-1 text-[12.5px] text-ink-3">{o.texto}</p>
+            <p className="mt-0.5 text-[12.5px] text-ink-2">{o.agora}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function Rede() {
   const [f, setF] = useState<Partial<EstadoRede> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -2030,6 +2116,7 @@ function Rede() {
       </Card>
 
       {NA_APP && <ArranqueAutomatico />}
+      {NA_APP && <ServicoSempreLigado />}
 
       {r.modo === "servidor" && r.servidor_activo && r.web && <AcessoBrowser r={r} />}
       {r.modo === "servidor" && r.web && <AcessoInternet />}

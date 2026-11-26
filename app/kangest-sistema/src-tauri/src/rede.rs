@@ -35,14 +35,16 @@ pub const PORTA_PADRAO: u16 = 7799;
 pub const CHAVE_MINIMA: usize = 10;
 /// Métodos que são sempre desta máquina, mesmo em modo cliente: configuração de rede,
 /// impressão (a impressora é local) e gravação de ficheiros exportados.
-const LOCAIS: [&str; 7] = ["rede.", "impressao.", "sistema.exportar", "atualizacao.", "licenca.abrirSite", "partilha.", "internet."];
+/// As escolhas do computador ao serviço (`servico.`: bandeja e sono) também são de cada máquina.
+const LOCAIS: [&str; 8] = ["rede.", "impressao.", "sistema.exportar", "atualizacao.", "licenca.abrirSite", "partilha.", "internet.", "servico."];
 
 /// Métodos que mexem na máquina onde correm (configuração de rede e de Internet, actualizações,
 /// ficheiros no disco, abrir o browser): o servidor recusa-os quando chegam pela rede. A impressão
 /// fica de fora de propósito: um posto no browser imprime pela impressora configurada no seu posto
 /// (de rede, por IP, ou ligada ao servidor).
-/// O acesso pela Internet (`web.`) liga um túnel nesta máquina: também só aqui.
-const SO_NA_MAQUINA: [&str; 7] = ["rede.", "sistema.exportar", "atualizacao.", "licenca.abrirSite", "partilha.", "internet.", "web."];
+/// O acesso pela Internet (`web.`) liga um túnel nesta máquina: também só aqui. E as escolhas da bandeja e do sono
+/// (`servico.`) são do computador onde o KanGest corre.
+const SO_NA_MAQUINA: [&str; 8] = ["rede.", "sistema.exportar", "atualizacao.", "licenca.abrirSite", "partilha.", "internet.", "web.", "servico."];
 
 // ============================== configuração ==============================
 

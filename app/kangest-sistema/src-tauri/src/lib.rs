@@ -16,6 +16,7 @@ mod produtor;
 mod recursos;
 mod rede;
 mod segredos;
+mod servico;
 pub mod selo;
 mod services;
 mod sinc;
@@ -126,6 +127,8 @@ pub fn run() {
             }
             // proxy desta máquina para a Internet (internet.json; sem ele, o do sistema)
             internet::carregar(&dir);
+            // as escolhas deste computador: fechar para a bandeja e não adormecer (servico.json)
+            servico::carregar(&dir);
             // restauro de uma cópia de segurança marcado antes de reiniciar
             match services::sistema::aplicar_restauro_pendente(&dir) {
                 Ok(Some(origem)) => eprintln!("Cópia de segurança restaurada: {origem}"),
@@ -216,9 +219,26 @@ pub fn run() {
             services::verificacao::iniciar(estado.clone());
             services::atualizacao::iniciar(estado.clone());
             app.manage(estado);
+            // o ícone na bandeja e a vigia do sono (src/servico.rs)
+            servico::iniciar(app.handle());
             Ok(())
         })
+        // com a escolha «bandeja», fechar a janela principal deixa o KanGest a trabalhar (src/servico.rs)
+        .on_window_event(|janela, evento| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = evento {
+                if servico::esconder_em_vez_de_fechar(janela) {
+                    api.prevent_close();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![rpc, imprimir, reiniciar, navegador::navegador])
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar o KanGest");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar o KanGest")
+        .run(|_app, _evento| {
+            // no Mac, clicar no ícone do Dock com a janela escondida traz a janela de volta
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _evento {
+                servico::mostrar(_app);
+            }
+        });
 }

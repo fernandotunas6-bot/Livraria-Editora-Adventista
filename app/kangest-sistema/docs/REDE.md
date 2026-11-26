@@ -47,6 +47,20 @@ Cada posto tem a **sua sessão**: quem entra num posto não entra nos outros, e 
 na série do posto que o emitiu (ex.: `FR P22026/15`). A numeração nunca salta porque a emissão
 continua a ser serializada num só lugar — o servidor.
 
+## O servidor sempre ligado
+
+Os postos dependem de o KanGest estar aberto no servidor. Em **Configurações → Rede → Este computador ao serviço da loja**
+há duas opções, cada uma à escolha de quem usa o computador (`src-tauri/src/servico.rs`):
+
+| Opção | O que faz | Automático (por omissão) |
+|---|---|---|
+| Fechar a janela deixa o KanGest na bandeja | Fechar a janela esconde-a: o programa continua junto ao relógio (no Mac, na barra de menus) a servir os postos, a fazer as cópias e a falar com o site. A sessão fica bloqueada (volta com a senha ou o PIN). Clicar no ícone abre a janela; «Sair do KanGest» pede confirmação enquanto há postos ou acesso pela Internet | ligada no servidor dos postos ou com o acesso pela Internet |
+| Não deixar o computador adormecer | Enquanto o KanGest está aberto, o computador não entra em suspensão (Windows: `SetThreadExecutionState`; Mac: asserção do IOKit). O ecrã apaga-se como de costume | a mesma regra |
+
+Cada opção tem **Automático**, **Sempre** e **Nunca**, e fica em `servico.json`, na pasta de dados (cada computador tem
+as suas; um posto não as muda no servidor). Com o arranque automático (a opção ao lado), o servidor volta sozinho depois
+de uma falha de luz.
+
 ## Segurança da ligação (KanGest 1.2)
 
 - O corpo de cada pedido e de cada resposta vai **cifrado e autenticado** (AES-256-GCM). A chave vem da chave de rede
