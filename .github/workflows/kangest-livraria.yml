@@ -97,11 +97,33 @@ jobs:
           openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out "$RUNNER_TEMP/produtor-teste.pem"
           KANGEST_AGT_CHAVE_FICHEIRO="$RUNNER_TEMP/produtor-teste.pem" KANGEST_AGT_CERTIFICADO=999 cargo test --locked
 
+  # Os instaladores: o do Windows (NSIS .exe) e os do Mac (.dmg), para os Mac com Apple Silicon (M1, M2…) e para os
+  # Mac com Intel, a partir do macOS 10.15 (tauri.conf.json, bundle.macOS.minimumSystemVersion). O GitHub já não tem
+  # runners Mac com Intel: compila-se de forma cruzada no Apple Silicon, como no KanGest oficial (build.yml).
   instalador:
-    name: Instalador do Windows
+    name: Instalador (${{ matrix.nome }})
     if: github.event_name == 'workflow_dispatch' && (inputs.instalador || inputs.publicar)
     needs: verificar
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: windows
+            plataforma: windows-latest
+            alvo: ""
+            args: "--bundles nsis"
+            ficheiros: app/kangest-sistema/src-tauri/target/release/bundle/nsis/*.exe
+          - nome: mac-apple-silicon
+            plataforma: macos-latest
+            alvo: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin --bundles app,dmg"
+            ficheiros: app/kangest-sistema/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          - nome: mac-intel
+            plataforma: macos-latest
+            alvo: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin --bundles app,dmg"
+            ficheiros: app/kangest-sistema/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+    runs-on: ${{ matrix.plataforma }}
     outputs:
       agt: ${{ steps.agt.outputs.agt }}
     steps:
@@ -114,15 +136,27 @@ jobs:
           cache-dependency-path: app/kangest-sistema/package-lock.json
 
       - name: Rust (stable)
-        run: rustup toolchain install stable --profile minimal; rustup default stable
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          if [ -n "${{ matrix.alvo }}" ]; then rustup target add "${{ matrix.alvo }}"; fi
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: app/kangest-sistema/src-tauri -> target
+          key: ${{ matrix.nome }}
 
       - run: npm ci
 
-      - name: Compilar (NSIS)
+      # Sem certificado da Apple: assinatura «ad-hoc» (evita o aviso «danificado» nos Mac com Apple Silicon; na primeira
+      # vez abre-se com o botão direito → Abrir, docs/INSTALACAO.md).
+      - name: Assinatura ad-hoc (Mac)
+        if: runner.os == 'macOS'
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+
+      - name: Compilar
+        shell: bash
         env:
           KANGEST_AGT_CHAVE: ${{ secrets.KANGEST_AGT_CHAVE }}
           KANGEST_AGT_CERTIFICADO: ${{ secrets.KANGEST_AGT_CERTIFICADO }}
@@ -136,7 +170,7 @@ jobs:
           KANGEST_EXIGIR_CERTIFICACAO: ${{ vars.KANGEST_EXIGIR_CERTIFICACAO }}
           KANGEST_SELO_PUBLICA: ${{ secrets.KANGEST_SELO_PUBLICA }}
           KANGEST_SELO_PRIVADA: ${{ secrets.KANGEST_SELO_PRIVADA }}
-        run: npm run tauri build -- --bundles nsis
+        run: npm run tauri build -- ${{ matrix.args }}
 
       # Diz ao «publicar» se este instalador leva a chave do produtor da AGT (o painel avisa quando não leva).
       - name: Certificação AGT
@@ -147,10 +181,17 @@ jobs:
         run: |
           if [ -n "$KANGEST_AGT_CHAVE" ]; then echo "agt=sim" >> "$GITHUB_OUTPUT"; else echo "agt=nao" >> "$GITHUB_OUTPUT"; fi
 
+      - name: Confirmar a assinatura (Mac)
+        if: runner.os == 'macOS'
+        run: |
+          for app in app/kangest-sistema/src-tauri/target/${{ matrix.alvo }}/release/bundle/macos/*.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: kangest-livraria-windows
-          path: app/kangest-sistema/src-tauri/target/release/bundle/nsis/*.exe
+          name: kangest-livraria-${{ matrix.nome }}
+          path: ${{ matrix.ficheiros }}
           if-no-files-found: error
 
   # O instalador no site: https://livrariaadventista.ao/kangest/actualizacoes/ (docs/KANGEST.md, «Descarregar e
@@ -177,10 +218,12 @@ jobs:
         with:
           node-version: 22
 
+      # os três: o do Windows e os dois do Mac
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: kangest-livraria-windows
+          pattern: kangest-livraria-*
           path: ${{ runner.temp }}/instalador
+          merge-multiple: true
 
       - name: Assinar, escrever o manifesto e guardar numa Release
         env:
@@ -201,44 +244,53 @@ jobs:
           cli="$(node -p "require('./app/kangest-sistema/package-lock.json').packages['node_modules/@tauri-apps/cli'].version")"
           P="$RUNNER_TEMP/publicar"
           mkdir -p "$P"
-          # Sem espaços no nome: vai tal e qual no manifesto e no endereço.
+          # Sem espaços no nome: vai tal e qual no manifesto e no endereço. O do Windows tem de estar; os do Mac também
+          # (um Mac sem o instalador dele ficava na versão de antes sem ninguém saber).
           exe="KanGest-Livraria_${versao}_x64-setup.exe"
+          mac_as="KanGest-Livraria_${versao}_aarch64.dmg"
+          mac_intel="KanGest-Livraria_${versao}_x64.dmg"
           cp "$(ls "$RUNNER_TEMP"/instalador/*_x64-setup.exe | head -1)" "$P/$exe"
-          tamanho=$(stat -c %s "$P/$exe")
-          # O Cloudflare Pages não serve ficheiros com mais de 25 MiB.
-          if [ "$tamanho" -gt 26214400 ]; then
-            echo "::error::O instalador tem $tamanho bytes e o site só serve ficheiros até 25 MiB."
-            exit 1
-          fi
-          npx --yes "@tauri-apps/cli@$cli" signer sign "$P/$exe"
-          # A assinatura tem de conferir com a chave que vai dentro do programa; senão, ninguém actualizava.
+          cp "$(ls "$RUNNER_TEMP"/instalador/*_aarch64.dmg | head -1)" "$P/$mac_as"
+          cp "$(ls "$RUNNER_TEMP"/instalador/*_x64.dmg | head -1)" "$P/$mac_intel"
           printf '%s' "$CHAVE_PUBLICA" > "$RUNNER_TEMP/chave.pub"
-          node scripts/kangest/verificar-assinatura.mjs "$RUNNER_TEMP/chave.pub" "$P/$exe.sig" "$P/$exe"
+          for f in "$exe" "$mac_as" "$mac_intel"; do
+            t=$(stat -c %s "$P/$f")
+            # O Cloudflare Pages não serve ficheiros com mais de 25 MiB.
+            if [ "$t" -gt 26214400 ]; then
+              echo "::error::$f tem $t bytes e o site só serve ficheiros até 25 MiB."
+              exit 1
+            fi
+            npx --yes "@tauri-apps/cli@$cli" signer sign "$P/$f"
+            # A assinatura tem de conferir com a chave que vai dentro do programa; senão, ninguém actualizava.
+            node scripts/kangest/verificar-assinatura.mjs "$RUNNER_TEMP/chave.pub" "$P/$f.sig" "$P/$f"
+          done
           # as notas da versão (o primeiro parágrafo) aparecem no programa ao oferecer a actualização
           python3 app/kangest-sistema/scripts/manifesto-atualizacao.py "$P" "$versao" "app/kangest-sistema/docs/versoes/v${versao}.md"
           agt=false
           [ "$AGT" = sim ] && agt=true
-          jq --argjson agt "$agt" --argjson tamanho "$tamanho" \
-            '.certificado_agt = $agt | .pacotes["windows-x86_64"].tamanho = $tamanho' \
+          jq --argjson agt "$agt" \
+            --argjson w "$(stat -c %s "$P/$exe")" --argjson a "$(stat -c %s "$P/$mac_as")" --argjson i "$(stat -c %s "$P/$mac_intel")" \
+            '.certificado_agt = $agt | .pacotes["windows-x86_64"].tamanho = $w | .pacotes["macos-aarch64"].tamanho = $a | .pacotes["macos-x86_64"].tamanho = $i' \
             "$P/kangest-atualizacao.json" > "$P/manifesto.json"
           mv "$P/manifesto.json" "$P/kangest-atualizacao.json"
           cat "$P/kangest-atualizacao.json"
           tag="kangest-livraria-v${versao}-b${GITHUB_RUN_NUMBER}"
           if [ "$agt" = true ]; then
             ensaio=""
-            notas="O KanGest Livraria ${versao} para Windows, com a certificação da AGT. Descarrega-se no painel do site (Sistema → Ligação ao KanGest)."
+            notas="O KanGest Livraria ${versao} para Windows e Mac, com a certificação da AGT. Descarrega-se no painel do site (Sistema → Ligação ao KanGest)."
           else
             # Uma versão de ensaio nunca passa à frente de uma certificada no site (deploy-cloudflare.yml).
             ensaio="--prerelease"
             notas="Versão de ENSAIO do KanGest Livraria ${versao}: sem a chave do produtor da AGT, as facturas saem com a chave de desenvolvimento e não valem para vender ao público."
           fi
-          gh release create "$tag" "$P/$exe" "$P/$exe.sig" "$P/kangest-atualizacao.json" "$P/SHA256SUMS.txt" \
+          gh release create "$tag" "$P/$exe" "$P/$exe.sig" "$P/$mac_as" "$P/$mac_as.sig" "$P/$mac_intel" "$P/$mac_intel.sig" \
+            "$P/kangest-atualizacao.json" "$P/SHA256SUMS.txt" \
             --target "$GITHUB_SHA" --latest=false $ensaio \
             --title "KanGest Livraria ${versao} (build ${GITHUB_RUN_NUMBER})" --notes "$notas"
           {
             echo "Instalador publicado em **${tag}** ($([ "$agt" = true ] && echo 'certificado pela AGT' || echo 'ensaio, sem a AGT'))."
             echo ""
-            echo "O site é publicado outra vez e passa a servi-lo em https://livrariaadventista.ao/kangest/actualizacoes/${exe}"
+            echo "O site é publicado outra vez e passa a servi-los em https://livrariaadventista.ao/kangest/actualizacoes/: ${exe}, ${mac_as} e ${mac_intel}"
             echo "(no painel: Sistema → Ligação ao KanGest → Descarregar)."
           } >> "$GITHUB_STEP_SUMMARY"
 

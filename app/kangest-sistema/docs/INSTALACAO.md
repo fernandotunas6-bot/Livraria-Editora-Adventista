@@ -16,13 +16,17 @@ Guia para quem instala o KanGest num computador da loja ou do escritório. Para 
 
 ## 2. Qual instalador
 
-Na página [Releases](https://github.com/fernandotunas6-bot/KanGest/releases) (ou no site):
+No painel do site da livraria, em *Sistema → Ligação ao KanGest → Descarregar* (servidos em
+`livrariaadventista.ao/kangest/actualizacoes/`):
 
 | Computador | Ficheiro |
 |---|---|
-| Windows 10 ou 11 | `KanGest_<versão>_x64-setup.exe` |
-| Mac com Apple Silicon (M1, M2, M3, M4) | `KanGest_<versão>_aarch64.dmg` |
-| Mac com processador Intel | `KanGest_<versão>_x64.dmg` |
+| Windows 10 ou 11 | `KanGest-Livraria_<versão>_x64-setup.exe` |
+| Mac com Apple Silicon (M1, M2, M3, M4) | `KanGest-Livraria_<versão>_aarch64.dmg` |
+| Mac com processador Intel | `KanGest-Livraria_<versão>_x64.dmg` |
+
+Os dois Mac são a partir do macOS 10.15 (Catalina), incluindo o macOS 12 Monterey (o CSS é verificado para o WebKit
+dele).
 
 No Mac, o tipo de processador está em  → Acerca deste Mac («Chip Apple…» ou «Processador Intel…»).
 
@@ -61,6 +65,9 @@ antigo, por isso copiar a pasta não chega ([COPIAS.md](COPIAS.md)).
 
 Os dados ficam em `~/Library/Application Support/ao.livrariaadventista.kangest` (o KanGest oficial usa
 `ao.kigest.app`).
+
+A impressora térmica, no Mac, é a fila do macOS (*Definições do Sistema → Impressoras*). O talão vai em RAW pelo CUPS
+(`lp -o raw`), sem partilhar a impressora: é o equivalente do spooler do Windows.
 
 ## 5. Primeiro arranque
 

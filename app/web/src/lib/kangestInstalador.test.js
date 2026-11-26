@@ -2,7 +2,9 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 import { describe, expect, it, vi } from 'vitest';
-import { instaladorDoManifesto, lerInstalador, MANIFESTO_INSTALADOR, tamanhoLegivel } from './kangestInstalador';
+import {
+  instaladorDoManifesto, instaladoresDoManifesto, lerInstalador, lerInstaladores, MANIFESTO_INSTALADOR, sistemaDoAparelho, tamanhoLegivel,
+} from './kangestInstalador';
 
 const SHA = 'a'.repeat(64);
 // o que o «publicar» do kangest-livraria.yml escreve (manifesto-atualizacao.py + certificado_agt e tamanho)
@@ -18,6 +20,9 @@ const manifesto = (extra = {}, pacote = {}) => ({
 describe('instalador do KanGest Livraria', () => {
   it('lê o manifesto publicado', () => {
     expect(instaladorDoManifesto(manifesto())).toEqual({
+      sistema: 'windows-x86_64',
+      rotulo: 'Windows',
+      detalhe: 'Windows 10 ou 11, 64 bits',
       versao: '1.4.4',
       data: '2026-11-24',
       notas: '',
@@ -49,6 +54,29 @@ describe('instalador do KanGest Livraria', () => {
     expect(instaladorDoManifesto(manifesto({}, { ficheiro: 'KanGest-Livraria_1.4.4_aarch64.dmg' }))).toBeNull();
   });
 
+  it('os instaladores do Mac, para Apple Silicon e para Intel, ao lado do do Windows', () => {
+    const m = manifesto({}, {});
+    m.pacotes['macos-aarch64'] = { ficheiro: 'KanGest-Livraria_1.4.6_aarch64.dmg', sha256: SHA, assinatura: 'x', tamanho: 9000000 };
+    m.pacotes['macos-x86_64'] = { ficheiro: 'KanGest-Livraria_1.4.6_x64.dmg', sha256: SHA, tamanho: 9500000 };
+    const lista = instaladoresDoManifesto(m);
+    expect(lista.map((i) => i.sistema)).toEqual(['windows-x86_64', 'macos-aarch64', 'macos-x86_64']);
+    expect(lista[1]).toMatchObject({ rotulo: 'Mac com Apple Silicon', endereco: '/kangest/actualizacoes/KanGest-Livraria_1.4.6_aarch64.dmg', assinado: true });
+    expect(lista[2].assinado).toBe(false);
+    // um .exe no lugar do Mac, ou um .dmg no do Windows, não serve
+    m.pacotes['macos-x86_64'].ficheiro = 'KanGest-Livraria_1.4.6_x64-setup.exe';
+    expect(instaladorDoManifesto(m, 'macos-x86_64')).toBeNull();
+    expect(instaladorDoManifesto(m, 'outro')).toBeNull();
+    // um manifesto só com o Windows (as versões de antes) dá só o Windows
+    expect(instaladoresDoManifesto(manifesto()).map((i) => i.sistema)).toEqual(['windows-x86_64']);
+    expect(instaladoresDoManifesto(null)).toEqual([]);
+  });
+
+  it('o sistema do aparelho, para destacar o instalador certo', () => {
+    expect(sistemaDoAparelho('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('windows');
+    expect(sistemaDoAparelho('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('mac');
+    expect(sistemaDoAparelho('Mozilla/5.0 (Linux; Android 14)')).toBe('');
+  });
+
   it('o tamanho em KB ou MB, e nada se não o houver', () => {
     expect(tamanhoLegivel(7864320)).toBe('7,5 MB');
     expect(tamanhoLegivel(300 * 1024)).toBe('300 KB');
@@ -64,5 +92,12 @@ describe('instalador do KanGest Livraria', () => {
     expect(await lerInstalador(async () => resposta(null, 'text/html; charset=utf-8'))).toBeNull();
     expect(await lerInstalador(async () => resposta(manifesto(), 'application/json', false))).toBeNull();
     expect(await lerInstalador(async () => ({ ok: true, headers: new Headers({ 'content-type': 'application/json' }), json: async () => { throw new Error('x'); } }))).toBeNull();
+  });
+
+  it('lê todos os instaladores; sem manifesto, ou sem nenhum, dá null', async () => {
+    const resposta = (corpo, tipo, ok = true) => ({ ok, headers: new Headers({ 'content-type': tipo }), json: async () => corpo });
+    expect((await lerInstaladores(async () => resposta(manifesto(), 'application/json'))).length).toBe(1);
+    expect(await lerInstaladores(async () => resposta(null, 'text/html'))).toBeNull();
+    expect(await lerInstaladores(async () => resposta({ versao: '1.4.6', pacotes: {} }, 'application/json'))).toBeNull();
   });
 });

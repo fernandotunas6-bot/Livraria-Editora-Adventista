@@ -95,7 +95,7 @@ jobs:
           fi
           d=dist/app/web/kangest/actualizacoes
           mkdir -p "$d"
-          gh release download "$tag" --pattern '*_x64-setup.exe' --pattern kangest-atualizacao.json --pattern SHA256SUMS.txt --dir "$d" --clobber
+          gh release download "$tag" --pattern '*_x64-setup.exe' --pattern '*_aarch64.dmg' --pattern '*_x64.dmg' --pattern kangest-atualizacao.json --pattern SHA256SUMS.txt --dir "$d" --clobber
           ls -la "$d"
           echo "KanGest Livraria de $tag em /kangest/actualizacoes/" >> "$GITHUB_STEP_SUMMARY"
 
