@@ -337,6 +337,8 @@ export const kangestPostoCriar = ({ nome, store_id }) => pb.send('/admin/kangest
 export const kangestPostoCodigo = (id) => pb.send('/admin/kangest/postos/codigo', { method: 'POST', body: { id } });
 /** O posto deixa de poder enviar; o que já chegou fica. */
 export const kangestPostoRevogar = (id) => pb.send('/admin/kangest/postos/revogar', { method: 'POST', body: { id } });
+/** Terminar uma sessão aberta num KanGest: a volta seguinte do posto leva o pedido (KANGEST ONE, A3). */
+export const kangestSessaoTerminar = (posto, sessao) => pb.send('/admin/kangest/sessoes/revogar', { method: 'POST', body: { posto, sessao } });
 /** Os interruptores do posto: `{ stock_online?, manda_catalogo? }` (só um posto manda no catálogo). */
 export const kangestPostoConfigurar = (id, opcoes) => pb.send('/admin/kangest/postos/configurar', { method: 'POST', body: { id, ...opcoes } });
 /** As dívidas por loja (o balcão dos postos e as encomendas do site), com os nomes dos clientes; só quem vê os relatórios. */
