@@ -26,6 +26,7 @@ import {
   CheckCheck,
   DatabaseBackup,
   ExternalLink,
+  Headset,
   Info,
   LifeBuoy,
   MessageCircle,
@@ -48,7 +49,7 @@ import { useSession } from "@/store/session";
 
 // ------------------------------------------------------------------ o estado do painel
 
-export type SeparadorAjuda = "avisos" | "assistente" | "atalhos";
+export type SeparadorAjuda = "avisos" | "atendimento" | "assistente" | "atalhos";
 
 interface EstadoAjuda {
   aberto: boolean;
@@ -238,7 +239,7 @@ export function CentroAjuda() {
   useEffect(() => {
     const pedido = new URLSearchParams(loc.search).get("ajuda");
     if (!pedido) return;
-    abrir(["avisos", "assistente", "atalhos"].includes(pedido) ? (pedido as SeparadorAjuda) : "avisos");
+    abrir(["avisos", "atendimento", "assistente", "atalhos"].includes(pedido) ? (pedido as SeparadorAjuda) : "avisos");
     nav(loc.pathname, { replace: true });
   }, [loc.search, loc.pathname, abrir, nav]);
   const mostrarBotao = p.botao && (!ecraCheio || p.noPos);
@@ -295,9 +296,13 @@ function Painel({
   }, [fechar]);
   const separadores: [SeparadorAjuda, string, LucideIcon][] = [
     ["avisos", "Avisos", Bell],
+    ["atendimento", "Clientes", Headset],
     ["assistente", "Assistente", Sparkles],
     ["atalhos", "Atalhos", Zap],
   ];
+  // as conversas dos clientes por ler (o separador «Clientes»)
+  const conversas = useQuery({ queryKey: ["ajuda-conversas"], queryFn: () => call<Conversas>("ajuda.conversas"), refetchInterval: 30_000, retry: false });
+  const conversasPorLer = (conversas.data?.conversas ?? []).filter((c) => c.por_ler).length;
   return (
     <section
       role="dialog"
@@ -329,7 +334,7 @@ function Painel({
         <Opcoes p={p} mudar={mudar} onFechar={() => setOpcoes(false)} />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-1 border-b border-line bg-surface p-2" role="tablist">
+          <div className="grid grid-cols-4 gap-1 border-b border-line bg-surface p-2" role="tablist">
             {separadores.map(([id, rotulo, Icone]) => (
               <button
                 key={id}
@@ -337,17 +342,19 @@ function Painel({
                 aria-selected={separador === id}
                 onClick={() => abrir(id)}
                 className={cn(
-                  "flex items-center justify-center gap-1.5 rounded-lg py-2 text-[13.5px] font-medium",
+                  "flex items-center justify-center gap-1 rounded-lg py-2 text-[12.5px] font-medium",
                   separador === id ? "bg-brand-50 text-brand" : "text-ink-3 hover:bg-sunken hover:text-ink",
                 )}
               >
                 <Icone className="size-4" /> {rotulo}
                 {id === "avisos" && porLer > 0 && <span className="rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white">{porLer}</span>}
+                {id === "atendimento" && conversasPorLer > 0 && <span className="rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white">{conversasPorLer}</span>}
               </button>
             ))}
           </div>
           <div className="min-h-0 flex-1">
             {separador === "avisos" && <ListaAvisos avisos={avisos} site={site} carregando={carregando} />}
+            {separador === "atendimento" && <Atendimento dados={conversas.data} carregando={conversas.isLoading} site={site?.site ?? ""} />}
             {separador === "assistente" && <Assistente />}
             {separador === "atalhos" && <Atalhos site={site?.site ?? ""} />}
           </div>
@@ -460,6 +467,211 @@ function ListaAvisos({ avisos, site, carregando }: { avisos: Aviso[]; site?: Avi
           </button>
         </p>
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ separador: atendimento (as conversas dos clientes)
+
+interface Conversa {
+  id: string;
+  subject: string | null;
+  status: "open" | "pending" | "closed" | "bot";
+  assigned_to: string | null;
+  last_message_at: string | null;
+  ticket_number: number | null;
+  priority: string | null;
+  order_id: string | null;
+  cliente: string;
+  encomenda: string | null;
+  por_ler: boolean;
+}
+
+interface Conversas {
+  ligado: boolean;
+  motivo?: string;
+  conversas: Conversa[];
+}
+
+interface MensagemSite {
+  id: number;
+  body: string;
+  created_at: string;
+  author_kind: "customer" | "staff" | "assistant" | "system" | "note";
+}
+
+/** As conversas dos clientes do site (src-tauri/src/sinc/atendimento.rs), com a conta do site e as regras de lá. */
+function Atendimento({ dados, carregando, site }: { dados?: Conversas; carregando: boolean; site: string }) {
+  const [aberta, setAberta] = useState<Conversa | null>(null);
+  const nav = useNavigate();
+  const fechar = useAjuda((s) => s.fechar);
+  if (aberta) return <ConversaAberta c={aberta} site={site} onVoltar={() => setAberta(null)} />;
+  if (carregando) return <p className="p-6 text-center text-[13px] text-ink-3">A pedir ao site…</p>;
+  if (!dados?.ligado)
+    return (
+      <div className="space-y-3 p-5 text-[13px] text-ink-2">
+        <p>As mensagens dos clientes vêm do site, com a sua conta de lá e a permissão «Gerir encomendas».</p>
+        {dados?.motivo && <p className="text-ink-3">{dados.motivo}</p>}
+        <button
+          onClick={() => {
+            nav("/loja-online");
+            fechar();
+          }}
+          className="font-medium text-brand hover:underline"
+        >
+          Entrar com a conta do site
+        </button>
+      </div>
+    );
+  if (dados.conversas.length === 0)
+    return (
+      <div className="flex flex-col items-center gap-2 p-8 text-center">
+        <span className="grid size-12 place-items-center rounded-full bg-ok-50 text-ok">
+          <Headset className="size-6" />
+        </span>
+        <span className="font-medium">Nenhuma conversa à espera</span>
+        <span className="text-[13px] text-ink-3">As mensagens dos clientes do site aparecem aqui.</span>
+      </div>
+    );
+  return (
+    <ul className="h-full space-y-2 overflow-y-auto p-3">
+      {dados.conversas.map((c) => (
+        <li key={c.id}>
+          <button onClick={() => setAberta(c)} className={cn("w-full rounded-xl border p-3 text-left hover:border-brand/50", c.por_ler ? "border-line-strong bg-bg" : "border-line bg-surface")}>
+            <div className="flex items-baseline gap-2">
+              <span className={cn("min-w-0 flex-1 truncate text-[13.5px]", c.por_ler ? "font-semibold" : "font-medium")}>{c.cliente}</span>
+              <span className="shrink-0 text-[11.5px] text-ink-3">{haQuanto(c.last_message_at)}</span>
+              {c.por_ler && <span className="size-2 shrink-0 rounded-full bg-brand" aria-label="por ler" />}
+            </div>
+            <div className="mt-0.5 truncate text-[12.5px] text-ink-2">{c.subject || "Sem assunto"}</div>
+            <div className="mt-1 flex gap-2 text-[11.5px] text-ink-3">
+              {c.ticket_number && <span>Pedido #{c.ticket_number}</span>}
+              {c.encomenda && <span className="font-mono">{c.encomenda}</span>}
+              {c.status === "pending" && <span className="text-accent-ink">em espera</span>}
+            </div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ConversaAberta({ c, site, onVoltar }: { c: Conversa; site: string; onVoltar: () => void }) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const fechar = useAjuda((s) => s.fechar);
+  const [texto, setTexto] = useState("");
+  const [aEnviar, setAEnviar] = useState(false);
+  const fim = useRef<HTMLDivElement>(null);
+  const mensagens = useQuery({ queryKey: ["ajuda-conversa", c.id], queryFn: () => call<MensagemSite[]>("ajuda.conversa", { id: c.id }), refetchInterval: 15_000 });
+  useEffect(() => fim.current?.scrollIntoView({ block: "end" }), [mensagens.data]);
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    if (!texto.trim() || aEnviar) return;
+    setAEnviar(true);
+    try {
+      await call("ajuda.responder", { id: c.id, texto });
+      setTexto("");
+      void qc.invalidateQueries({ queryKey: ["ajuda-conversa", c.id] });
+      void qc.invalidateQueries({ queryKey: ["ajuda-conversas"] });
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setAEnviar(false);
+    }
+  }
+  async function estado(novo: "pending" | "closed") {
+    try {
+      await call("ajuda.estadoConversa", { id: c.id, estado: novo, responsavel: c.assigned_to });
+      toast.success(novo === "closed" ? "Conversa resolvida." : "Conversa em espera do cliente.");
+      void qc.invalidateQueries({ queryKey: ["ajuda-conversas"] });
+      onVoltar();
+    } catch (x) {
+      toast.error((x as Error).message);
+    }
+  }
+  const estilo: Record<MensagemSite["author_kind"], string> = {
+    customer: "mr-auto rounded-tl-md border border-line bg-surface",
+    staff: "ml-auto rounded-tr-md bg-brand text-white",
+    note: "mx-auto border border-accent/40 bg-accent-50 text-accent-ink",
+    assistant: "mr-auto rounded-tl-md bg-sunken text-ink-2",
+    system: "mx-auto bg-transparent text-[12px] text-ink-3",
+  };
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <button onClick={onVoltar} className="rounded-md px-2 py-1 text-[13px] text-brand hover:bg-brand-50">
+          ← Conversas
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13.5px] font-semibold">{c.cliente}</div>
+          <div className="truncate text-[12px] text-ink-3">
+            {c.subject || "Sem assunto"}
+            {c.ticket_number ? ` · Pedido #${c.ticket_number}` : ""}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 border-b border-line px-3 py-2 text-[12.5px]">
+        {c.order_id && (
+          <button
+            onClick={() => {
+              nav(`/loja-online?encomenda=${encodeURIComponent(c.order_id ?? "")}`);
+              fechar();
+            }}
+            className="rounded-md border border-line px-2 py-1 hover:bg-sunken"
+          >
+            <ShoppingBag className="mr-1 inline size-3.5" />
+            {c.encomenda ?? "A encomenda"}
+          </button>
+        )}
+        {c.status !== "pending" && (
+          <button onClick={() => estado("pending")} className="rounded-md border border-line px-2 py-1 hover:bg-sunken">
+            Em espera do cliente
+          </button>
+        )}
+        <button onClick={() => estado("closed")} className="rounded-md border border-line px-2 py-1 text-ok hover:bg-ok-50">
+          <Check className="mr-1 inline size-3.5" />
+          Resolver
+        </button>
+        {site && (
+          <button onClick={() => abrirNoSite(`${site}/admin?tab=support`)} className="ml-auto rounded-md px-2 py-1 text-ink-3 hover:text-ink">
+            <ExternalLink className="inline size-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-bg p-3">
+        {mensagens.isLoading && <p className="text-center text-[13px] text-ink-3">A carregar…</p>}
+        {mensagens.isError && <p className="text-center text-[13px] text-danger">{(mensagens.error as Error).message}</p>}
+        {(mensagens.data ?? []).map((m) => (
+          <div key={m.id} className={cn("w-fit max-w-[85%] rounded-2xl px-3.5 py-2 text-[13.5px]", estilo[m.author_kind] ?? estilo.customer)}>
+            {m.author_kind === "note" && <span className="mb-0.5 block text-[11px] font-semibold uppercase">Nota interna</span>}
+            {m.author_kind === "assistant" && <span className="mb-0.5 block text-[11px] font-semibold">Assistente</span>}
+            <span className="whitespace-pre-wrap">{m.body}</span>
+            <span className={cn("mt-0.5 block text-[10.5px]", m.author_kind === "staff" ? "text-white/70" : "text-ink-3")}>{haQuanto(m.created_at)}</span>
+          </div>
+        ))}
+        <div ref={fim} />
+      </div>
+      <form onSubmit={enviar} className="flex items-end gap-2 border-t border-line bg-surface p-3">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void enviar(e as unknown as FormEvent);
+            }
+          }}
+          rows={2}
+          maxLength={4000}
+          placeholder="Responder ao cliente…"
+          aria-label="A resposta ao cliente"
+          className="min-h-[44px] min-w-0 flex-1 resize-none rounded-xl border-2 border-brand/40 bg-bg px-3 py-2 text-[14px] outline-none focus:border-brand"
+        />
+        <button type="submit" disabled={!texto.trim() || aEnviar} className="grid size-11 shrink-0 place-items-center rounded-full bg-brand text-white disabled:opacity-40" aria-label="Enviar">
+          <Send className="size-4" />
+        </button>
+      </form>
     </div>
   );
 }

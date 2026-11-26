@@ -311,6 +311,46 @@ pub async fn lido(st: &AppState, i: LidoIn) -> AppResult<Value> {
     Ok(json!({ "ok": true }))
 }
 
+// ------------------------------------------------------------------ o atendimento (sinc/atendimento.rs)
+
+/// As conversas activas dos clientes do site, com a conta do site da pessoa. Sem ela (ou sem «Gerir encomendas» no
+/// site), diz porquê em vez de falhar.
+pub async fn conversas(st: &AppState) -> AppResult<Value> {
+    let s = st.sessao()?;
+    match crate::sinc::atendimento::conversas(&st.pool, s.id).await {
+        Ok(v) => Ok(json!({ "ligado": true, "conversas": v })),
+        Err(motivo) => Ok(json!({ "ligado": false, "motivo": motivo, "conversas": [] })),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ConversaIn {
+    id: String,
+    #[serde(default)]
+    texto: String,
+    #[serde(default)]
+    estado: String,
+    #[serde(default)]
+    responsavel: Option<String>,
+}
+
+pub async fn conversa(st: &AppState, i: ConversaIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    crate::sinc::atendimento::mensagens(&st.pool, s.id, &i.id).await.map(|v| json!(v)).map_err(AppError::msg)
+}
+
+pub async fn responder(st: &AppState, i: ConversaIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    crate::sinc::atendimento::responder(&st.pool, s.id, &i.id, &i.texto).await.map_err(AppError::msg)?;
+    Ok(json!({ "ok": true }))
+}
+
+pub async fn estado_conversa(st: &AppState, i: ConversaIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    crate::sinc::atendimento::mudar_estado(&st.pool, s.id, &i.id, &i.estado, i.responsavel.as_deref()).await.map_err(AppError::msg)?;
+    Ok(json!({ "ok": true }))
+}
+
 // ------------------------------------------------------------------ o assistente
 
 #[derive(Deserialize)]

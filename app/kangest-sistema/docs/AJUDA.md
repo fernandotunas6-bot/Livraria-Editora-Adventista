@@ -29,6 +29,24 @@ que pode resolver (as permissões dela). O número dos por ler aparece no sino e
   parte (`ajuda.avisosSite`), para o painel não esperar pelo site. Marcá-los como lidos aqui é o mesmo que no sino do
   painel. Sem a conta do site, o rodapé diz porquê e leva à Loja online para entrar.
 
+## Clientes (o atendimento do site)
+
+As conversas dos clientes do site, para responder sem sair do KanGest (`src-tauri/src/sinc/atendimento.rs`). Usa a conta
+do site da pessoa e as mesmas tabelas e funções do painel, por isso valem as regras do site:
+
+- só quem tem «Gerir encomendas» no site vê as conversas;
+- cada resposta sai em nome de quem a escreve;
+- as notas internas da equipa aparecem marcadas e nunca chegam ao cliente.
+
+O que se vê e o que se faz:
+
+- **a lista:** as conversas abertas e em espera, as mais recentes primeiro, com o cliente, o assunto, o número do pedido
+  e a encomenda; as por ler ficam marcadas, e o número delas aparece no separador;
+- **a conversa:** as mensagens, actualizadas de 15 em 15 segundos. Abri-la marca-a como lida, como no painel. Responde-se
+  em baixo (Enter envia; Shift+Enter muda de linha; até 4000 caracteres);
+- **os botões:** «Em espera do cliente», «Resolver» e a encomenda, que abre na Loja online. Ao mudar o estado, quem tinha
+  a conversa continua a tê-la. A atribuição, a prioridade e as equipas fazem-se no painel (o ícone leva lá).
+
 ## Assistente
 
 Responde **neste computador**, com os dados da loja. Nada sai para fora.
