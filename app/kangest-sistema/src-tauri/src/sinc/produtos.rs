@@ -272,7 +272,6 @@ async fn guardar_coleccao(st: &AppState, i: GuardarIn) -> AppResult<Value> {
     Ok(json!({ "coleccao": c }))
 }
 
-/// Despachante dos métodos `loja.produto.*` e `loja.coleccao.*` (loja.rs).
 // --- KANGEST ONE, fase D: o artigo do KanGest no site, a partir da ficha do artigo ---------------------------------
 
 /// A referência para um filtro do PostgREST (`kigest_ref=eq.<ref>`): letras, algarismos e `-._~` passam; o resto vai
@@ -350,6 +349,7 @@ async fn publicar_artigo(st: &AppState, i: PublicarArtigoIn) -> AppResult<Value>
     Ok(json!({ "produto": novo }))
 }
 
+/// Despachante dos métodos `loja.produto.*` e `loja.coleccao.*` (loja.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
     match metodo {
         "produto.obter" => obter(st, serde_json::from_value(params)?).await,
