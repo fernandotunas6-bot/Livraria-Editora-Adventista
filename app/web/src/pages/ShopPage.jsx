@@ -249,7 +249,7 @@ const ShopPage = () => {
         </div>
       )}
       {availableFilters.genres?.length > 0 && (
-        <div className="border-b border-border bg-muted/20 sticky top-(--header-offset,0px) z-20 backdrop-blur-md bg-background/80">
+        <div className="border-b border-border sticky top-(--header-offset,0px) z-30 bg-background/95 backdrop-blur-md shadow-xs">
           <div className="container-custom py-3 flex gap-2 overflow-x-auto scrollbar-hide items-center">
             <span className="text-xs font-medium text-muted-foreground shrink-0 mr-1">Género:</span>
             <Button

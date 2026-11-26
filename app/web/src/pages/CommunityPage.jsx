@@ -85,7 +85,7 @@ export default function CommunityPage() {
           {/* No telemóvel uma coluna flexível (a grelha só no computador): numa célula de grelha a
               fila de temas não tinha espaço para ficar colada ao topo enquanto se desce o feed. */}
           <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)_18rem] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
-            <div className="sticky top-(--header-offset,0px) z-20 -mx-4 min-w-0 bg-editorial-tela/95 px-4 py-2 backdrop-blur-xs sm:-mx-6 sm:px-6 lg:top-24 lg:mx-0 lg:self-start lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <div className="sticky top-(--header-offset,0px) z-30 -mx-4 min-w-0 bg-editorial-tela/95 px-4 py-2 backdrop-blur-xs sm:-mx-6 sm:px-6 lg:top-24 lg:mx-0 lg:self-start lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
               <TopicNav topics={topics} active={filters.topic} counts={counts} onChange={(topic) => change({ topic })} />
             </div>
 
