@@ -135,6 +135,10 @@ avisa se encontrar problemas ([ATUALIZACOES.md](ATUALIZACOES.md), [BASE-DE-DADOS
 | O posto não encontra o servidor | Mesmo endereço e porta nos dois; firewall do servidor a aceitar a porta 7799 em redes privadas |
 | «Este KanGest foi alterado depois de publicado» | Reinstale a partir da página oficial ([SEGURANCA.md](SEGURANCA.md)) |
 | Restaurar diz «versão mais recente» | Actualize primeiro o KanGest deste computador |
+| Ao abrir, uma janela «O KanGest não conseguiu abrir» | Leia a mensagem: diz o que falhou e onde estão os dados. Se foi a actualização da base, ela já voltou ao que era antes desta versão ([BASE-DE-DADOS.md](BASE-DE-DADOS.md#migrações)); abra outra vez ou instale a versão anterior. Fica uma linha em `arranque.log`, na pasta dos dados, para o suporte |
+| Aviso «Disco quase cheio» / «Não há espaço no disco para a cópia de segurança» | Liberte espaço (lixo, transferências antigas). O KanGest já apagou as cópias automáticas mais antigas que podia (ficam sempre 3) ([COPIAS.md](COPIAS.md)) |
+| «O disco deste computador está cheio e a gravação não se fez» | Nada ficou a meio: liberte espaço e grave outra vez |
+| «O computador não conseguiu ler ou gravar a base de dados» | Um antivírus ou uma pasta sincronizada (OneDrive, Dropbox) a bloquear a pasta dos dados: exclua-a do antivírus e não a ponha numa pasta sincronizada |
 | A licença ou as actualizações dizem «Sem ligação» | Configurações → Rede → Ligação à Internet → **Testar ligação**: mostra o que falha e por onde |
 | «O proxy … pede utilizador e senha (407)» | Indique o utilizador e a senha do proxy no mesmo ecrã |
 | «O proxy … recusou a ligação a …» | O proxy ou a firewall da empresa bloqueia esse endereço: peça para o autorizar |

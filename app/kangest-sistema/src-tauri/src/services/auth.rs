@@ -157,7 +157,7 @@ pub async fn acessos_listar(st: &AppState, f: RegistoIn) -> AppResult<Value> {
     let rows = sqlx::query(
         "SELECT a.id, a.data_hora, a.evento, a.detalhe, COALESCE(u.nome, a.login) AS utilizador, a.login, p.descricao AS posto
          FROM acessos a LEFT JOIN utilizadores u ON u.id = a.utilizador_id LEFT JOIN postos p ON p.id = a.posto_id
-         WHERE substr(a.data_hora, 1, 10) BETWEEN ?1 AND ?2
+         WHERE a.data_hora >= ?1 AND a.data_hora < date(?2, '+1 day')
            AND (?3 IS NULL OR a.utilizador_id = ?3) AND (?4 IS NULL OR a.evento = ?4)
          ORDER BY a.id DESC LIMIT 2000",
     )

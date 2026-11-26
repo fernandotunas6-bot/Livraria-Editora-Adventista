@@ -35,42 +35,45 @@ pub struct SugestaoIn {
     armazem_id: Option<i64>,
 }
 
+/// A consulta da sugestão de encomendas (a reposição): o stock, as vendas do período, as encomendas em curso e a
+/// última compra de cada artigo.
+///
+/// As vendas e a última compra partem dos tipos de documento e da data (o índice tipo + data), com CROSS JOIN, que
+/// no SQLite fixa a ordem: com o JOIN normal, o SQLite preferia percorrer as linhas todas pela ordem do artigo e ir
+/// buscar o documento de cada uma (17,6 s com 450 mil linhas; assim, 0,6 s). Os planos estão num teste:
+/// `db::testes_cifra::os_planos_das_consultas_do_dia_a_dia`.
+pub(crate) const SQL_SUGESTAO: &str = "WITH vendido AS (
+         SELECT l.artigo_id, SUM(CASE WHEN t.credito = 1 THEN -l.quantidade ELSE l.quantidade END) AS q
+         FROM tipos_documento t CROSS JOIN documentos d ON d.tipo_codigo = t.codigo CROSS JOIN documento_linhas l ON l.documento_id = d.id
+         WHERE t.grupo = 'VENDAS' AND t.stock <> 0 AND d.estado <> 'A' AND d.data_emissao >= ?1
+           AND (?2 IS NULL OR d.armazem_id = ?2)
+         GROUP BY l.artigo_id),
+     encomendado AS (
+         SELECT l.artigo_id, SUM(l.quantidade) AS q FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
+         WHERE d.tipo_codigo = 'VNE' AND d.estado = 'N' AND (?2 IS NULL OR d.armazem_id = ?2) GROUP BY l.artigo_id),
+     existencias AS (
+         SELECT artigo_id, SUM(quantidade) AS q FROM stock WHERE (?2 IS NULL OR armazem_id = ?2) GROUP BY artigo_id),
+     ultima_compra AS (
+         SELECT l.artigo_id, d.entidade_id, d.entidade_nome, l.preco_unitario,
+                ROW_NUMBER() OVER (PARTITION BY l.artigo_id ORDER BY d.data_emissao DESC, d.id DESC) AS n
+         FROM tipos_documento t CROSS JOIN documentos d ON d.tipo_codigo = t.codigo CROSS JOIN documento_linhas l ON l.documento_id = d.id
+         WHERE t.grupo = 'COMPRAS' AND t.classe = 'COMPRA' AND t.credito = 0 AND d.estado <> 'A')
+     SELECT a.id, a.referencia, a.descricao, a.qtd_minima, a.qtd_maxima, a.custo,
+            COALESCE(e.q, 0.0) AS stock, COALESCE(v.q, 0.0) AS vendido, COALESCE(o.q, 0.0) AS encomendado,
+            u.entidade_id AS fornecedor_id, u.entidade_nome AS fornecedor, u.preco_unitario AS ultimo_custo
+     FROM artigos a
+     LEFT JOIN existencias e ON e.artigo_id = a.id
+     LEFT JOIN vendido v ON v.artigo_id = a.id
+     LEFT JOIN encomendado o ON o.artigo_id = a.id
+     LEFT JOIN ultima_compra u ON u.artigo_id = a.id AND u.n = 1
+     WHERE a.ativo = 1 AND a.controla_stock = 1 AND a.tipo = 'P' AND a.composto = 0";
+
 pub async fn sugestao(st: &AppState, i: SugestaoIn) -> AppResult<Value> {
     st.exigir_perm("compras.fatura")?;
     let dias = i.dias.unwrap_or(30).clamp(1, 365);
     let cobertura = i.cobertura.unwrap_or(15).clamp(1, 365);
     let desde = (chrono::Local::now().date_naive() - chrono::Duration::days(dias)).format("%Y-%m-%d").to_string();
-    let rows = sqlx::query(
-        "WITH vendido AS (
-             SELECT l.artigo_id, SUM(CASE WHEN t.credito = 1 THEN -l.quantidade ELSE l.quantidade END) AS q
-             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
-             WHERE t.grupo = 'VENDAS' AND t.stock <> 0 AND d.estado <> 'A' AND d.data_emissao >= ?1
-               AND (?2 IS NULL OR d.armazem_id = ?2)
-             GROUP BY l.artigo_id),
-         encomendado AS (
-             SELECT l.artigo_id, SUM(l.quantidade) AS q FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id
-             WHERE d.tipo_codigo = 'VNE' AND d.estado = 'N' AND (?2 IS NULL OR d.armazem_id = ?2) GROUP BY l.artigo_id),
-         existencias AS (
-             SELECT artigo_id, SUM(quantidade) AS q FROM stock WHERE (?2 IS NULL OR armazem_id = ?2) GROUP BY artigo_id),
-         ultima_compra AS (
-             SELECT l.artigo_id, d.entidade_id, d.entidade_nome, l.preco_unitario,
-                    ROW_NUMBER() OVER (PARTITION BY l.artigo_id ORDER BY d.data_emissao DESC, d.id DESC) AS n
-             FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
-             WHERE t.grupo = 'COMPRAS' AND t.classe = 'COMPRA' AND t.credito = 0 AND d.estado <> 'A')
-         SELECT a.id, a.referencia, a.descricao, a.qtd_minima, a.qtd_maxima, a.custo,
-                COALESCE(e.q, 0.0) AS stock, COALESCE(v.q, 0.0) AS vendido, COALESCE(o.q, 0.0) AS encomendado,
-                u.entidade_id AS fornecedor_id, u.entidade_nome AS fornecedor, u.preco_unitario AS ultimo_custo
-         FROM artigos a
-         LEFT JOIN existencias e ON e.artigo_id = a.id
-         LEFT JOIN vendido v ON v.artigo_id = a.id
-         LEFT JOIN encomendado o ON o.artigo_id = a.id
-         LEFT JOIN ultima_compra u ON u.artigo_id = a.id AND u.n = 1
-         WHERE a.ativo = 1 AND a.controla_stock = 1 AND a.tipo = 'P' AND a.composto = 0",
-    )
-    .bind(&desde)
-    .bind(i.armazem_id)
-    .fetch_all(&st.pool)
-    .await?;
+    let rows = sqlx::query(SQL_SUGESTAO).bind(&desde).bind(i.armazem_id).fetch_all(&st.pool).await?;
     let mut linhas = Vec::new();
     for r in rows {
         let (stock, vendido, encomendado): (f64, f64, f64) = (r.get("stock"), r.get("vendido"), r.get("encomendado"));

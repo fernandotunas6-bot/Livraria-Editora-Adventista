@@ -282,7 +282,13 @@ fn data_hora(s: &str) -> Option<NaiveDateTime> {
 async fn vestigios(p: &SqlitePool) -> AppResult<(Option<NaiveDate>, Option<NaiveDateTime>)> {
     let (a1, a2): (Option<String>, Option<String>) = sqlx::query_as("SELECT MIN(data_hora), MAX(data_hora) FROM auditoria").fetch_one(p).await?;
     let u1: Option<String> = sqlx::query_scalar("SELECT MIN(criado_em) FROM utilizadores").fetch_one(p).await?;
-    let (d1, d2): (Option<String>, Option<String>) = sqlx::query_as("SELECT MIN(data_hora), MAX(data_hora) FROM documentos WHERE importado = 0").fetch_one(p).await?;
+    // pelo índice da data, do princípio e do fim, até ao primeiro emitido aqui (o MIN/MAX com o filtro lia-os todos)
+    let (d1, d2): (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT (SELECT data_hora FROM documentos WHERE importado = 0 ORDER BY data_hora LIMIT 1),
+                (SELECT data_hora FROM documentos WHERE importado = 0 ORDER BY data_hora DESC LIMIT 1)",
+    )
+    .fetch_one(p)
+    .await?;
     let primeiro = [a1, u1, d1].into_iter().flatten().filter_map(|s| data(&s)).min();
     let ultimo = [a2, d2].into_iter().flatten().filter_map(|s| data_hora(&s)).max();
     Ok((primeiro, ultimo))

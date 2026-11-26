@@ -2293,6 +2293,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "keyring",
+ "libc",
  "libsqlite3-sys",
  "minisign-verify",
  "native-tls",

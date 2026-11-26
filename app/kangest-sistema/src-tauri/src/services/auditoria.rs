@@ -531,7 +531,7 @@ pub async fn listar(st: &AppState, f: ListarIn) -> AppResult<Value> {
             AND (?5 IS NULL OR a.entidade = ?5) AND (?6 IS NULL OR a.registo_id = ?6)
             AND (?7 IS NULL OR a.detalhe LIKE ?7 ESCAPE '\\' OR a.antes LIKE ?7 ESCAPE '\\' OR a.depois LIKE ?7 ESCAPE '\\' OR u.nome LIKE ?7 ESCAPE '\\')
             AND (?8 IS NULL OR a.origem = ?8)
-          ORDER BY a.id DESC LIMIT {LIMITE}"
+          ORDER BY a.data_hora DESC, a.id DESC LIMIT {LIMITE}"
     );
     let rows = sqlx::query(&sql)
         .bind(f.de.trim())

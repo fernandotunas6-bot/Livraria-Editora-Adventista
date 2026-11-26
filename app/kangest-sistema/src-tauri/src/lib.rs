@@ -13,6 +13,7 @@ mod navegador;
 pub mod http;
 pub mod internet;
 mod produtor;
+mod recursos;
 mod rede;
 mod segredos;
 pub mod selo;
@@ -110,10 +111,19 @@ pub fn run() {
                 selo::iniciar(std::path::PathBuf::new());
             }
             let dir = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&dir)?;
+            // sem a pasta dos dados, o cofre ou a base, o programa não arranca: diz porquê numa janela do sistema, em vez
+            // de fechar sem nada (nativo::falha_no_arranque)
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                let erro = if error::disco_cheio(&e) { "o disco está cheio".to_string() } else { e.to_string() };
+                nativo::falha_no_arranque(app.handle(), &dir, &format!("Não foi possível criar a pasta dos dados ({erro})."));
+                return Ok(());
+            }
             let caminho = dir.join("kigest.db");
             // chave mestra dos segredos da configuração (fora da base de dados)
-            segredos::iniciar(&dir)?;
+            if let Err(e) = segredos::iniciar(&dir) {
+                nativo::falha_no_arranque(app.handle(), &dir, &e.to_string());
+                return Ok(());
+            }
             // proxy desta máquina para a Internet (internet.json; sem ele, o do sistema)
             internet::carregar(&dir);
             // restauro de uma cópia de segurança marcado antes de reiniciar
@@ -122,7 +132,13 @@ pub fn run() {
                 Ok(None) => {}
                 Err(e) => eprintln!("O restauro da cópia de segurança falhou: {e}"),
             }
-            let pool = tauri::async_runtime::block_on(db::abrir(&caminho))?;
+            let pool = match tauri::async_runtime::block_on(db::abrir(&caminho)) {
+                Ok(p) => p,
+                Err(e) => {
+                    nativo::falha_no_arranque(app.handle(), &dir, &e.to_string());
+                    return Ok(());
+                }
+            };
             if let Err(e) = tauri::async_runtime::block_on(segredos::cifrar_existentes(&pool)) {
                 eprintln!("Não foi possível cifrar os segredos guardados: {e}");
             }
