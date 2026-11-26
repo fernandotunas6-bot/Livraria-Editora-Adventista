@@ -3513,7 +3513,10 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro,
+    // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
+    kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
+    site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
     posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });

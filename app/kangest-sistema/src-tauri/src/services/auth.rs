@@ -250,6 +250,11 @@ pub(crate) async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> S
             (Some(l), true)
         }
     };
+    // abaixo da versão mínima do site: só consultar e actualizar (sinc/versao.rs)
+    let desactualizado = crate::sinc::versao::desactualizado(&st.pool).await;
+    if desactualizado.is_some() {
+        permissoes.retain(|p| p == "relatorios.ver" || p == "sistema.atualizacoes");
+    }
     Sessao {
         id: row.get("id"),
         nome: row.get("nome"),
@@ -265,6 +270,7 @@ pub(crate) async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> S
         offline: false,
         ligar_ate,
         so_leitura,
+        desactualizado,
     }
 }
 
