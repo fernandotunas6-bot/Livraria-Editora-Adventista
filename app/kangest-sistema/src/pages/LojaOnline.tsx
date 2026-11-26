@@ -11,10 +11,11 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound, Users, Wallet } from "lucide-react";
+import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound, Users, Wallet, Church } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
 import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
+import { useSession } from "@/store/session";
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Table, Td, Th, cn } from "@/components/ui";
 
 type Tom = "neutral" | "brand" | "ok" | "danger" | "accent";
@@ -131,7 +132,7 @@ export default function LojaOnline() {
     };
   }, [qc]);
   const estado = useQuery({ queryKey: ["loja-estado"], queryFn: () => call<EstadoLoja>("loja.estado"), refetchInterval: 30000 });
-  const [aba, setAba] = useState<"encomendas" | "produtos" | "clientes" | "pagamentos">("encomendas");
+  const [aba, setAba] = useState<"encomendas" | "produtos" | "clientes" | "igrejas" | "pagamentos">("encomendas");
   const e = estado.data;
   const site = e?.ligacao?.site_url || "https://livrariaadventista.ao";
 
@@ -180,6 +181,7 @@ export default function LojaOnline() {
                   ["encomendas", "Encomendas", ShoppingBag],
                   ["produtos", "Produtos", Package],
                   ["clientes", "Clientes", Users],
+                  ["igrejas", "Igrejas", Church],
                   ["pagamentos", "Pagamentos", Wallet],
                 ] as const
               ).map(([id, rotulo, Icone]) => (
@@ -200,6 +202,7 @@ export default function LojaOnline() {
           {aba === "encomendas" && <Encomendas e={e} site={site} />}
           {aba === "produtos" && <Produtos e={e} site={site} />}
           {aba === "clientes" && <Clientes onVerEncomendas={() => setAba("encomendas")} />}
+          {aba === "igrejas" && <Igrejas />}
           {aba === "pagamentos" && <Pagamentos site={site} />}
           <p className="text-[12px] text-ink-3">
             Com a sua conta do site, as encomendas confirmam-se, preparam-se e entregam-se aqui, com as suas permissões, e o cliente é
@@ -1293,5 +1296,125 @@ function Pagamentos({ site }: { site: string }) {
         </>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ igrejas (o registo da Igreja do site)
+
+interface IgrejaLoja {
+  id: string;
+  cn: string;
+  nome: string;
+  tipo: string;
+  distrito: string;
+  campo: string;
+  provincia: string;
+  municipio: string;
+  morada: string;
+  delegado: string;
+  activa: number;
+  entidade_id: number | null;
+  cliente: string | null;
+}
+
+const TIPOS_IGREJA: Record<string, string> = { igreja: "Igreja", grupo: "Grupo", companhia: "Companhia" };
+
+/** As igrejas do registo da Igreja (vêm nas novidades dos postos: src-tauri/src/sinc/loja.rs), e «Criar cliente» para
+ * facturar à igreja: grava o cliente com o nome, a morada e o registo nas observações, e fica ligado a ela. */
+function Igrejas() {
+  const qc = useQueryClient();
+  const podeCriar = useSession((s) => s.tem("clientes"));
+  const [q, setQ] = useState("");
+  const [filtro, setFiltro] = useState<"activas" | "sem_cliente" | "todas">("activas");
+  const [aCriar, setACriar] = useState<string | null>(null);
+  const lista = useQuery({ queryKey: ["loja-igrejas", q, filtro], queryFn: () => call<IgrejaLoja[]>("loja.igrejas", { q, filtro }) });
+  async function criarCliente(g: IgrejaLoja) {
+    setACriar(g.id);
+    try {
+      const registo = [g.cn && `CN ${g.cn}`, g.distrito && `Distrito ${g.distrito}`, g.campo && `Campo ${g.campo}`, g.delegado && `Delegado ${g.delegado}`].filter(Boolean).join(" · ");
+      const r = await call<{ id: number }>("entidades.guardar", {
+        nome: g.nome,
+        endereco: g.morada || null,
+        localidade: g.municipio || null,
+        provincia: g.provincia || null,
+        observacoes: `Registo da Igreja (site): ${registo}`,
+      });
+      await call("loja.igrejaLigar", { id: g.id, entidade_id: r.id });
+      toast.success(`Cliente criado: ${g.nome}.`);
+      void qc.invalidateQueries({ queryKey: ["loja-igrejas"] });
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setACriar(null);
+    }
+  }
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center gap-2 p-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
+          <Input value={q} onChange={(x) => setQ(x.target.value)} placeholder="Nome, CN, distrito ou município" aria-label="Pesquisar igrejas" className="pl-9" />
+        </div>
+        <div className="flex gap-1 rounded-lg bg-sunken p-1">
+          {(
+            [
+              ["activas", "Activas"],
+              ["sem_cliente", "Sem cliente"],
+              ["todas", "Todas"],
+            ] as const
+          ).map(([id, nome]) => (
+            <button key={id} onClick={() => setFiltro(id)} className={cn("rounded-md px-3 py-1.5 text-[13px]", filtro === id ? "bg-surface font-medium shadow-sm" : "text-ink-3")}>
+              {nome}
+            </button>
+          ))}
+        </div>
+      </div>
+      {(lista.data ?? []).length === 0 ? (
+        <Empty
+          icon={<Church className="size-6" />}
+          title={q ? "Nenhuma igreja com essa pesquisa" : "Ainda sem igrejas"}
+          text="As igrejas do registo da Igreja chegam do site com a ligação dos postos."
+        />
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <Th>CN</Th>
+              <Th>Nome</Th>
+              <Th>Distrito · Campo</Th>
+              <Th>Município</Th>
+              <Th>Cliente no KanGest</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(lista.data ?? []).map((g) => (
+              <tr key={g.id} className={cn(!g.activa && "opacity-60")}>
+                <Td className="tabular-nums">{g.cn || "—"}</Td>
+                <Td>
+                  <span className="font-medium">{g.nome}</span>
+                  <span className="ml-1.5 text-[12px] text-ink-3">{TIPOS_IGREJA[g.tipo] ?? g.tipo}</span>
+                  {g.delegado && <span className="block text-[12px] text-ink-3">Delegado: {g.delegado}</span>}
+                </Td>
+                <Td className="text-[13px]">{[g.distrito, g.campo].filter(Boolean).join(" · ") || "—"}</Td>
+                <Td className="text-[13px]">{[g.municipio, g.provincia].filter(Boolean).join(", ") || "—"}</Td>
+                <Td>
+                  {g.entidade_id ? (
+                    <Link to={`/clientes?id=${g.entidade_id}`} className="text-[13px] font-medium text-brand hover:underline">
+                      {g.cliente ?? "Ver o cliente"}
+                    </Link>
+                  ) : podeCriar ? (
+                    <Button variant="secondary" disabled={aCriar === g.id} onClick={() => criarCliente(g)}>
+                      <Plus className="size-4" /> Criar cliente
+                    </Button>
+                  ) : (
+                    <span className="text-[12.5px] text-ink-3">—</span>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Card>
   );
 }
