@@ -67,7 +67,15 @@ Num KanGest **ligado ao site** (o posto emparelhado e activo), todas as pessoas 
 - **Depois da data,** essas contas só consultam: ficam apenas com «Ver relatórios», e a barra diz porquê. Nada se
   apaga: o histórico dos documentos continua a apontar para elas.
 - **Contas locais novas:** só a do ADMIN de recurso. As outras criam-se no painel do site (Utilizadores → Permissões).
-- **Ligar a conta:** a pessoa entra com o email da conta do site; o KanGest cria o utilizador ligado (`conta_site`).
+- **Ligar a conta, com o histórico.** Em *Sistema → Utilizadores* («Contas locais»), o administrador escreve o email da
+  conta do site de cada pessoa (`utilizadores.ligarContaSite`, migração 0072, `ligar_conta_site`).
+  - Na primeira vez que a pessoa entra com esse email, a conta local passa a ser a dela: o mesmo utilizador, com os
+    documentos e o histórico, e o perfil vem do site.
+  - Sem esse pedido, entrar com o email cria um utilizador novo, ligado à conta do site.
+  - A conta ADMIN de recurso não se liga.
+  - Cada pedido fica na auditoria (`LIGAR_CONTA_SITE`).
+  - Ainda não se manda o convite por email, porque a produção não tem envio de email; a pessoa recebe o aviso por outra
+    via.
 
 Num KanGest **isolado** (sem ligação ao site), nada disto muda.
 
