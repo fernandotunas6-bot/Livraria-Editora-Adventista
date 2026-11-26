@@ -62,11 +62,11 @@ Restrições de segurança, palavra por palavra:
 | Fase | O que faz | PR | Em produção |
 |---|---|---|---|
 | A1 | a sessão do site no KanGest só em memória: não há tabela `sessoes_site`, e nenhum token vai para o disco | #151 | KanGest 1.4.9 (por publicar) |
-| A2 | uma só identidade: num KanGest ligado, as contas locais têm data-limite e depois só lêem; contas locais novas, só o ADMIN; o modo sem Internet | #152 | KanGest 1.4.9 |
+| A2 | uma só identidade: num KanGest ligado, as contas locais têm data-limite (30 dias a contar da ligação ao site) e depois só lêem; contas locais novas, só o ADMIN; o modo sem Internet | #152, #167 | KanGest 1.4.9 |
 | A3 | as sessões abertas no painel do site, com «Terminar»; o ADMIN de recurso entra no registo de segurança com aviso; o ecrã de entrada mostra a ligação | #153 | sim (20261126180000); o KanGest na 1.4.9 |
 | F | o staging antes da produção no `deploy-supabase.yml` (passa à frente sem staging) | #154 | sim; o staging é do dono |
-| B1 | o livro de stock em sombra: as aberturas por época e os movimentos do KanGest | #155 | sim (20261126190000); o KanGest na 1.4.9 |
-| B2 | as encomendas do site no livro: reserva no checkout, libertação no cancelamento ou na FR do posto | #156 | sim (20261126200000) |
+| B1 | o livro de stock em sombra: as aberturas por época e os movimentos do KanGest (só dos artigos que o livro segue) | #155, #167 | sim (20261126190000); o KanGest na 1.4.9 |
+| B2 | as encomendas do site no livro: reserva no checkout, libertação no cancelamento ou na FR do posto; o resumo do painel conta só as encomendas em curso | #156, #167 | sim (20261126200000); 20261126230000 com o #167 |
 | B3 | o stock à venda passa a sair do livro | — | **por fazer:** espera pelo staging |
 | C1–C3 | a API v1 com as 17 famílias, o contrato OpenAPI, o `Idempotency-Key` e as leituras pelo RLS | #157, #158, #160 | sim (20261126210000) |
 | D | o artigo no site a partir da ficha do artigo, nunca a 0 Kz | #159 | KanGest 1.4.9 |
