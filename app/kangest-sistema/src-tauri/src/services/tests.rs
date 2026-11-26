@@ -7980,6 +7980,10 @@ async fn o_centro_de_integracoes_junta_as_ligacoes() {
     sqlx::query("INSERT INTO fe_envios (documento_id, estado) VALUES (?, 'INVALIDO') ON CONFLICT(documento_id) DO UPDATE SET estado = 'INVALIDO'").bind(fr["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
     let v = rpc(&st, "integracoes.resumo", Value::Null).await;
     assert_eq!((v[0]["id"].as_str(), v[0]["estado"].as_str()), (Some("fe"), Some("erro")), "{v}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// As igrejas do registo da Igreja chegam nas novidades, aparecem na Loja online e ligam-se ao cliente criado a partir
 /// delas; uma actualização que chegue depois não desfaz a ligação.
 #[tokio::test]
