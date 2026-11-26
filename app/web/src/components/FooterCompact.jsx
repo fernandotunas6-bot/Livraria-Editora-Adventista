@@ -5,6 +5,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { CreditCard, Facebook, Instagram, MapPin, MessageCircle, PackageSearch, ShieldCheck, Truck, Youtube } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { ligacaoKanguele } from '@/lib/kanguele';
 import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
 import { eAppNativa } from '@/lib/nativeApp';
@@ -116,8 +117,11 @@ export default function FooterCompact() {
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 border-t border-background/20 pt-3 text-center">
           <p className="w-full py-1 text-xs text-background/70">{copyright}</p>
-          {/* Crédito de quem desenvolveu: fixo, fora das definições do painel. */}
-          <p className="w-full pb-1 text-xs text-background/70"><a href="mailto:valentinocanguele@gmail.com" className="hover:underline">Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com</a></p>
+          {/* Crédito de quem desenvolveu: o texto é fixo; o endereço vem das Configurações (lib/kanguele.js). */}
+          <p className="w-full pb-1 text-xs text-background/70">
+            Desenvolvido pela{' '}
+            <a href={ligacaoKanguele(settings.kangest_url)} target="_blank" rel="noopener" className="underline underline-offset-2">Kanguele</a>
+          </p>
           <Link to="/privacidade" className={pe}>
             Política de privacidade
           </Link>

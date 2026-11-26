@@ -6,6 +6,7 @@ import { Loader2, Save, Mail, Bell, Sparkles, RotateCcw } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { applyOptionalColumns, hasColumn } from '@/lib/optionalColumns';
 import { ligacaoDaApp } from '@/lib/appDownload';
+import { KANGUELE_SITE, ligacaoKanguele } from '@/lib/kanguele';
 import { SORT_OPTIONS, normalizeSort } from '@/lib/productSort';
 import { embedOnlyVideoPlatform } from '@/lib/videoUrl';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +101,7 @@ const empty = {
   header_cta_link: '/shop',
   footer_tagline: '',
   footer_copyright: '',
+  kangest_url: '',
   footer_columns: null,
   show_stores_in_footer: true,
   shop_hero_title: 'Todos os Livros',
@@ -184,6 +186,8 @@ export default function SettingsTab() {
   const [hasYoutube, setHasYoutube] = useState(false);
   // As ligações para descarregar os apps (migração `ligacoes_dos_apps`, página /app do site).
   const [hasAppLinks, setHasAppLinks] = useState(false);
+  // O endereço do site da Kanguele, no crédito do rodapé (migração rodape_kanguele).
+  const [hasKangestUrl, setHasKangestUrl] = useState(false);
   const [hasAboutImages, setHasAboutImages] = useState(false);
   const [hasAboutTeam, setHasAboutTeam] = useState(false);
   // Colunas da migração 20261106050000: antes dela, enviá-las partia a gravação das definições.
@@ -210,6 +214,7 @@ export default function SettingsTab() {
         setRecordId(r.id);
         setHasYoutube(hasColumn(r, 'youtube'));
         setHasAppLinks(hasColumn(r, 'app_android_url'));
+        setHasKangestUrl(hasColumn(r, 'kangest_url'));
         setHasAboutImages(hasColumn(r, 'about_top_image_url'));
         setHasAboutTeam(hasColumn(r, 'about_team'));
         setHasNewRules(hasColumn(r, 'unpaid_cancel_days'));
@@ -257,6 +262,7 @@ export default function SettingsTab() {
           header_cta_link: r.header_cta_link || empty.header_cta_link,
           footer_tagline: r.footer_tagline || '',
           footer_copyright: r.footer_copyright || '',
+          kangest_url: r.kangest_url || '',
           footer_columns: r.footer_columns || null,
           show_stores_in_footer: r.show_stores_in_footer !== false,
           shop_hero_title: r.shop_hero_title || empty.shop_hero_title,
@@ -385,6 +391,12 @@ export default function SettingsTab() {
       toast({ variant: 'destructive', title: 'Ligação dos apps inválida', description: 'Em PWA / telemóvel, as ligações para descarregar têm de começar por https://' });
       return;
     }
+    // o endereço do site da Kanguele: um mal escrito não se grava (o rodapé voltava ao de omissão sem ninguém saber)
+    const kangest = String(form.kangest_url || '').trim();
+    if (hasKangestUrl && kangest && ligacaoKanguele(kangest) === KANGUELE_SITE && kangest.replace(/\/$/, '') !== KANGUELE_SITE.replace(/\/$/, '')) {
+      toast({ variant: 'destructive', title: 'Endereço da Kanguele inválido', description: 'No Rodapé, o endereço do site da Kanguele tem de começar por https://' });
+      return;
+    }
     setSaving(true);
     try {
       const data = {
@@ -460,6 +472,7 @@ export default function SettingsTab() {
             .filter((m) => m.name),
         }],
         [hasYoutube, { youtube: (form.youtube || '').trim() }],
+        [hasKangestUrl, { kangest_url: kangest ? ligacaoKanguele(kangest) : KANGUELE_SITE }],
         [hasAppLinks, {
           app_android_url: ligacaoDaApp(form.app_android_url),
           app_ios_url: ligacaoDaApp(form.app_ios_url),
@@ -1251,6 +1264,15 @@ export default function SettingsTab() {
             <Label htmlFor="config-footer-copyright">Texto de Copyright</Label>
             <Input id="config-footer-copyright" value={form.footer_copyright} onChange={(e) => set('footer_copyright', e.target.value)} placeholder="© 2026 Livraria Adventista. Todos os direitos reservados." />
           </div>
+          {hasKangestUrl && (
+            <div className="space-y-2">
+              <Label htmlFor="config-kangest-url">Site da Kanguele (o link de «Desenvolvido pela Kanguele»)</Label>
+              <Input id="config-kangest-url" type="url" value={form.kangest_url} onChange={(e) => set('kangest_url', e.target.value)} placeholder={KANGUELE_SITE} />
+              <p className="text-xs text-muted-foreground">
+                Se o domínio do site da Kanguele mudar, mude-o aqui: o link dos dois rodapés acompanha. Vazio: {KANGUELE_SITE}
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-3 p-3 rounded-lg border">
             <Switch checked={form.show_stores_in_footer} onCheckedChange={(v) => set('show_stores_in_footer', v)} aria-label="Mostrar lojas físicas no rodapé" />
             <Label>Mostrar lojas físicas no rodapé</Label>
