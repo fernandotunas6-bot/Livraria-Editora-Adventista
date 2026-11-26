@@ -6398,7 +6398,10 @@ route("GET", "/api/v1", publica("o índice da API v1: a versão e as famílias d
   data: {
     versao: API_V1_VERSAO,
     contrato: "docs/api/openapi.json",
-    familias: ["auth", "users", "permissions", "system", "integrations", "synchronization"],
+    familias: [
+      "auth", "users", "permissions", "system", "integrations", "synchronization",
+      "products", "categories", "pricing", "inventory", "stock-movements", "orders",
+    ],
   },
 }));
 
@@ -6459,6 +6462,132 @@ rotaV1("GET", "/api/v1/synchronization/postos", "GET /admin/kangest/postos");
 rotaV1("GET", "/api/v1/synchronization/postos/livro", "GET /admin/kangest/postos/livro");
 rotaV1("POST", "/api/v1/synchronization/sessoes/revogar", "POST /admin/kangest/sessoes/revogar");
 rotaV1("POST", "/api/v1/synchronization/sincronizar", "POST /admin/kangest/sincronizar");
+
+// --- C2: o catálogo, o stock e as encomendas, pela sessão da pessoa e pelo RLS de hoje -----------------------------
+// Estas leituras não passam pela service role: vão com a chave pública e o token de quem pede, e o RLS das tabelas
+// decide o que cada um vê (o público, os produtos à vista; o cliente, as encomendas dele; a equipa, conforme as
+// permissões). A porta da rota é só a primeira barreira.
+function dbDaPessoa(req: Request): SupabaseClient {
+  const apikey = (Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+  if (!apikey) throw new HttpError(503, "A API v1 ainda não tem a chave pública do projecto (SUPABASE_ANON_KEY).");
+  const token = req.headers.get("authorization") || "";
+  return createClient(SUPABASE_URL, apikey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: /^Bearer\s+\S+$/i.test(token) ? { Authorization: token } : {} },
+  });
+}
+
+const PRODUTO_V1 = "id, title, author, genre, collection_id, isbn, book_code, sku, kigest_ref, publisher, language, price, sale_price, sale_starts_at, sale_ends_at, stock, active, digital, featured, cover, cover_image, versions, updated";
+const ENCOMENDA_V1 = "id, order_number, created, updated, total, status, payment_status, delivery_status, payment_method_name, shipping_method, store_id, items";
+
+/** Uma página de uma consulta PostgREST, por ordem estável (o id), com o cursor seguinte. */
+async function paginaDaBase(url: URL, consulta: (de: number, ate: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) {
+  const { limit, offset } = paginaV1(url, 50, 200);
+  const { data, error } = await consulta(offset, offset + limit);
+  if (error) throw bad(error.message);
+  const linhas = data || [];
+  // pede-se uma a mais para saber se há página seguinte
+  const ha = linhas.length > limit;
+  return json({ data: linhas.slice(0, limit), next_cursor: ha ? cursorV1(offset + limit) : null });
+}
+
+route("GET", "/api/v1/products", publica("os produtos que o RLS deixa ver a quem pede (o público, só os activos)"), async ({ req, url }) => {
+  const q = cleanText(url.searchParams.get("q"), 100);
+  const genero = cleanText(url.searchParams.get("genre"), 80);
+  const ref = cleanText(url.searchParams.get("kigest_ref"), 60);
+  return paginaDaBase(url, (de, ate) => {
+    let c = dbDaPessoa(req).from("stock_books").select(PRODUTO_V1).order("id", { ascending: true }).range(de, ate);
+    if (q) c = c.ilike("title", `%${q.replace(/[%_\\]/g, (x) => `\\${x}`)}%`);
+    if (genero) c = c.eq("genre", genero);
+    if (ref) c = c.eq("kigest_ref", ref);
+    return c;
+  });
+});
+
+route("GET", "/api/v1/products/get", publica("um produto, se o RLS o deixar ver a quem pede"), async ({ req, url }) => {
+  const id = cleanText(url.searchParams.get("id"), 60);
+  if (!id) throw bad("Indique o produto (id).");
+  const { data, error } = await dbDaPessoa(req).from("stock_books").select(PRODUTO_V1).eq("id", id).maybeSingle();
+  if (error) throw bad(error.message);
+  if (!data) throw new HttpError(404, "Produto não encontrado.");
+  return json({ data });
+});
+
+route("GET", "/api/v1/categories", publica("os géneros dos produtos à vista e as colecções activas; só dados públicos"), async ({ req }) => {
+  const base = dbDaPessoa(req);
+  const [{ data: livros, error: e1 }, { data: colecoes, error: e2 }] = await Promise.all([
+    base.from("stock_books").select("genre").neq("genre", "").limit(5000),
+    base.from("book_collections").select("id, title, slug, description, sort_order, active, featured").order("sort_order", { ascending: true }),
+  ]);
+  if (e1 || e2) throw bad((e1 || e2)!.message);
+  const generos = new Map<string, number>();
+  for (const l of livros || []) generos.set(l.genre, (generos.get(l.genre) || 0) + 1);
+  return json({
+    data: {
+      generos: [...generos.entries()].sort((a, b) => a[0].localeCompare(b[0], "pt")).map(([nome, produtos]) => ({ nome, produtos })),
+      colecoes: colecoes || [],
+    },
+  });
+});
+
+route("GET", "/api/v1/pricing", publica("os preços e as promoções dos produtos à vista; o mesmo que a loja mostra"), async ({ req, url }) => {
+  const agora = Date.now();
+  const em = (v: unknown) => (v ? Date.parse(String(v)) : NaN);
+  const r = await paginaDaBase(url, (de, ate) =>
+    dbDaPessoa(req).from("stock_books").select("id, kigest_ref, price, sale_price, sale_starts_at, sale_ends_at, updated").order("id", { ascending: true }).range(de, ate));
+  const corpo = await r.json();
+  corpo.data = (corpo.data as Row[]).map((p) => {
+    const promo = p.sale_price != null && Number(p.sale_price) > 0 && Number(p.sale_price) < Number(p.price)
+      && !(em(p.sale_starts_at) > agora) && !(em(p.sale_ends_at) < agora);
+    return { ...p, preco_actual: promo ? Number(p.sale_price) : Number(p.price), em_promocao: promo };
+  });
+  return json(corpo);
+});
+
+route("GET", "/api/v1/inventory", publica("o stock à venda e o «temos / não temos» por loja que o RLS deixa ver"), async ({ req, url }) => {
+  const loja = cleanText(url.searchParams.get("store_id"), 60);
+  return paginaDaBase(url, (de, ate) => {
+    let c = dbDaPessoa(req).from("store_stock").select("store_id, book_id, available, updated").order("book_id", { ascending: true }).order("store_id", { ascending: true }).range(de, ate);
+    if (loja) c = c.eq("store_id", loja);
+    return c;
+  });
+});
+
+route("GET", "/api/v1/stock-movements", permissao("manage_catalog"), async ({ req, url }) => {
+  const ref = cleanText(url.searchParams.get("referencia"), 60);
+  const loja = cleanText(url.searchParams.get("store_id"), 60);
+  const posto = cleanText(url.searchParams.get("posto_id"), 40);
+  return paginaDaBase(url, (de, ate) => {
+    let c = dbDaPessoa(req).from("stock_movimentos")
+      .select("id, posto_id, store_id, armazem_id, referencia, book_id, tipo, quantidade, origem, documento, momento")
+      .order("id", { ascending: true }).range(de, ate);
+    if (ref) c = c.eq("referencia", ref);
+    if (loja) c = c.eq("store_id", loja);
+    if (uuidValido(posto)) c = c.eq("posto_id", posto);
+    return c;
+  });
+});
+
+route("GET", "/api/v1/orders", sessao(), async ({ req, url }) => {
+  const estado = cleanText(url.searchParams.get("status"), 30);
+  return paginaDaBase(url, (de, ate) => {
+    let c = dbDaPessoa(req).from("orders").select(ENCOMENDA_V1).order("created", { ascending: false }).order("id", { ascending: false }).range(de, ate);
+    if (estado) c = c.eq("status", estado);
+    return c;
+  });
+});
+
+route("GET", "/api/v1/orders/get", sessao(), async ({ req, url }) => {
+  const numero = cleanText(url.searchParams.get("order_number"), 60);
+  const id = cleanText(url.searchParams.get("id"), 60);
+  if (!numero && !id) throw bad("Indique a encomenda (id ou order_number).");
+  let c = dbDaPessoa(req).from("orders").select(ENCOMENDA_V1);
+  c = id ? c.eq("id", id) : c.eq("order_number", numero);
+  const { data, error } = await c.maybeSingle();
+  if (error) throw bad(error.message);
+  if (!data) throw new HttpError(404, "Encomenda não encontrada.");
+  return json({ data });
+});
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });

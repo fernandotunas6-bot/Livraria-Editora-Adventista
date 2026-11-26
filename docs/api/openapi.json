@@ -590,6 +590,484 @@
           }
         }
       }
+    },
+    "/api/v1/products": {
+      "get": {
+        "summary": "Os produtos, por páginas (o público vê os activos; quem gere o catálogo, todos).",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "genre",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "kigest_ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/products/get": {
+      "get": {
+        "summary": "Um produto.",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "summary": "Os géneros (com quantos produtos) e as colecções.",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": []
+      }
+    },
+    "/api/v1/pricing": {
+      "get": {
+        "summary": "Os preços e as promoções, com o preço de agora (preco_actual) e se está em promoção.",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ]
+      }
+    },
+    "/api/v1/inventory": {
+      "get": {
+        "summary": "O «temos / não temos» de cada produto por loja.",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/stock-movements": {
+      "get": {
+        "summary": "O livro único de stock (KANGEST ONE, B): cada movimento, por ordem.",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_catalog"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "referencia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "posto_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "summary": "As encomendas (o cliente vê as dele; quem gere as encomendas, todas), as mais recentes primeiro.",
+        "x-acesso": {
+          "tipo": "sessao"
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/get": {
+      "get": {
+        "summary": "Uma encomenda, pelo id ou pelo número.",
+        "x-acesso": {
+          "tipo": "sessao"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "description": "Lê pela sessão de quem pede (a chave pública e o token dela): o RLS da tabela decide o que cada um vê.",
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "order_number",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        ]
+      }
     }
   }
 }
