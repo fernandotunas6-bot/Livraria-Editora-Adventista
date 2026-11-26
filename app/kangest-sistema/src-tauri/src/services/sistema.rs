@@ -28,6 +28,12 @@ const INTERVALO_PADRAO: i64 = 4;
 pub const PREFIXO_ANTES: &str = "kangest-antes-de-";
 const MANTER_ANTES: usize = 5;
 const MAGIA_CIFRADA: &[u8] = b"KGCOPIA1";
+/// As cópias automáticas que ficam sempre, mesmo com o disco cheio (a rotação por espaço não passa daqui).
+const MINIMO_COPIAS: usize = 3;
+/// O espaço que fica livre no disco depois de uma cópia: o sistema e a própria base precisam dele para trabalhar.
+const FOLGA_DO_DISCO: u64 = 200 * 1024 * 1024;
+/// Uma cópia provisória (`.a-fazer`) com mais do que isto ficou de um fecho inesperado a meio de uma cópia.
+const PROVISORIA_ESQUECIDA: std::time::Duration = std::time::Duration::from_secs(3600);
 const MARCA_RESTAURO: &str = "restaurar.json";
 
 /// Cópia consistente da base (mesmo com a aplicação em uso) via `VACUUM INTO`.
@@ -282,6 +288,93 @@ pub async fn copia_verificada(pool: &SqlitePool, destino: &Path) -> AppResult<()
     Ok(())
 }
 
+/// O espaço que uma cópia da base precisa: o tamanho dela (com o WAL), mais um décimo e a folga do disco.
+fn espaco_para_copia(tamanho_base: u64) -> u64 {
+    tamanho_base.saturating_add(tamanho_base / 10).saturating_add(FOLGA_DO_DISCO)
+}
+
+/// Quantas das cópias mais antigas (os tamanhos, da mais antiga para a mais recente) é preciso apagar para haver
+/// `precisa` livres, deixando pelo menos `ficam`. `None`: nem apagando todas as que se podem apagar chega.
+fn quantas_apagar(livre: u64, precisa: u64, antigas: &[u64], ficam: usize) -> Option<usize> {
+    let podem = antigas.len().saturating_sub(ficam);
+    let mut l = livre;
+    for k in 0..=podem {
+        if l >= precisa {
+            return Some(k);
+        }
+        if let Some(t) = antigas.get(k).filter(|_| k < podem) {
+            l = l.saturating_add(*t);
+        }
+    }
+    None
+}
+
+/// Antes de uma cópia na pasta `dir`: há espaço para ela? Sem espaço, saem primeiro as cópias automáticas mais antigas,
+/// e ficam sempre as `MINIMO_COPIAS` mais recentes e as de antes das actualizações. Sem espaço mesmo assim, a cópia não
+/// se faz, com uma mensagem clara e um aviso do sistema (e nada se apaga, porque não chegaria).
+fn garantir_espaco(pasta_dados: &Path, dir: &Path) -> AppResult<()> {
+    use crate::recursos::tamanho_legivel;
+    let base = pasta_dados.join("kigest.db");
+    let tamanho: u64 = [base.clone(), base.with_extension("db-wal")].iter().filter_map(|f| std::fs::metadata(f).ok()).map(|m| m.len()).sum();
+    let precisa = espaco_para_copia(tamanho);
+    // o sistema não disse o espaço: tenta-se (se falhar, a cópia não fica partida: copia_verificada)
+    let Some(livre) = crate::recursos::espaco_livre(dir) else { return Ok(()) };
+    let antigas: Vec<(u64, PathBuf)> = listar_db(dir, "kangest-")
+        .into_iter()
+        .filter(|(_, f)| !de_antes(f))
+        .map(|(_, f)| (std::fs::metadata(&f).map(|m| m.len()).unwrap_or(0), f))
+        .collect();
+    let tamanhos: Vec<u64> = antigas.iter().map(|x| x.0).collect();
+    match quantas_apagar(livre, precisa, &tamanhos, MINIMO_COPIAS) {
+        Some(0) => Ok(()),
+        Some(k) => {
+            for (_, f) in &antigas[..k] {
+                let _ = std::fs::remove_file(f);
+                let _ = std::fs::remove_file(f.with_extension("verificada"));
+            }
+            eprintln!("Disco quase cheio: saíram as {k} cópias automáticas mais antigas para a nova caber.");
+            Ok(())
+        }
+        None => {
+            let msg = format!(
+                "Não há espaço no disco para a cópia de segurança: a base tem {}, no disco há {} livres e são precisos {}. \
+                 Liberte espaço (por exemplo, esvazie o lixo ou apague transferências antigas).",
+                tamanho_legivel(tamanho),
+                tamanho_legivel(livre),
+                tamanho_legivel(precisa)
+            );
+            crate::nativo::notificar("disco-cheio", "Disco quase cheio", &msg);
+            Err(AppError::msg(msg))
+        }
+    }
+}
+
+/// As cópias provisórias (`.a-fazer`) que ficaram de um fecho inesperado a meio de uma cópia: ocupavam o disco para
+/// sempre. Só as com mais de uma hora (uma cópia pode estar a decorrer agora).
+fn limpar_provisorias(dir: &Path) {
+    let Ok(it) = std::fs::read_dir(dir) else { return };
+    for e in it.filter_map(|e| e.ok()) {
+        let antiga = e.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d > PROVISORIA_ESQUECIDA);
+        if antiga && e.file_name().to_string_lossy().ends_with(".a-fazer") {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
+}
+
+/// Uma cópia verificada para `destino` (`copia_verificada`), depois de conferir o espaço no disco (`garantir_espaco`).
+/// Usam-na as cópias automáticas, a de antes de cada actualização e a de antes das migrações (db.rs).
+pub async fn copia_com_espaco(pool: &SqlitePool, pasta_dados: &Path, destino: &Path) -> AppResult<()> {
+    let dir = destino.parent().unwrap_or(pasta_dados);
+    std::fs::create_dir_all(dir).map_err(|e| AppError::msg(format!("Não foi possível criar {}: {e}", dir.display())))?;
+    limpar_provisorias(dir);
+    garantir_espaco(pasta_dados, dir)?;
+    copia_verificada(pool, destino).await?;
+    if de_antes(destino) {
+        podar_antes(dir);
+    }
+    Ok(())
+}
+
 /// Faz uma cópia agora: local, verificada e (se configurada) na pasta externa. Devolve o resumo.
 pub async fn fazer_copia(pool: &SqlitePool, pasta_dados: &Path, motivo: &str) -> AppResult<Value> {
     let c = ler_cfg(pool).await?;
@@ -289,9 +382,9 @@ pub async fn fazer_copia(pool: &SqlitePool, pasta_dados: &Path, motivo: &str) ->
     std::fs::create_dir_all(&dir).map_err(|e| AppError::msg(e.to_string()))?;
     let carimbo = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
     let destino = dir.join(format!("kangest-{carimbo}.db"));
-    copiar(pool, &destino).await?;
-    verificar_ficheiro(&destino).await?;
-    std::fs::write(destino.with_extension("verificada"), crate::db::agora()).ok();
+    // o espaço primeiro; a cópia sai para um ficheiro ao lado e só ganha o nome dela depois de verificada (antes, uma
+    // cópia que falhasse a meio, com o disco cheio, ficava como a mais recente e a rotação apagava uma boa)
+    copia_com_espaco(pool, pasta_dados, &destino).await?;
     podar(&dir, "kangest-", c.manter);
     cfg_gravar(pool, "copias.ultima", &crate::db::agora()).await?;
     // pasta externa (a pen pode não estar ligada: fica registado o erro, a cópia local já está feita)
@@ -757,6 +850,8 @@ pub async fn info(st: &AppState) -> AppResult<Value> {
         "pasta_omissao": st.pasta_exportacao.display().to_string(),
         "pasta_escolhida": st.pasta_escolhida.read().unwrap().is_some(),
         "base_bytes": bytes,
+        // o que o KanGest encontrou neste computador e como configurou a base (recursos.rs)
+        "computador": crate::recursos::resumo(&st.pasta_dados),
         "ultima_copia": ultima_copia,
         "artigos": conta("SELECT COUNT(*) FROM artigos").await?,
         "entidades": conta("SELECT COUNT(*) FROM entidades").await?,
@@ -768,6 +863,22 @@ pub async fn info(st: &AppState) -> AppResult<Value> {
 
 #[cfg(test)]
 mod testes {
+    /// Com o disco cheio, saem só as cópias automáticas mais antigas que forem precisas, e ficam sempre as 3 mais
+    /// recentes. Se nem assim chegar, não sai nenhuma (e a cópia não se faz, com a mensagem).
+    #[test]
+    fn com_o_disco_cheio_saem_so_as_copias_precisas() {
+        use super::{espaco_para_copia, quantas_apagar};
+        let cinco = [100, 100, 100, 100, 100];
+        assert_eq!(quantas_apagar(500, 400, &cinco, 3), Some(0), "há espaço: não sai nenhuma");
+        assert_eq!(quantas_apagar(250, 400, &cinco, 3), Some(2), "faltam 150: saem as duas mais antigas");
+        assert_eq!(quantas_apagar(100, 400, &cinco, 3), None, "só 2 podem sair e não chega: nenhuma");
+        assert_eq!(quantas_apagar(0, 1, &[100, 100], 3), None, "com 3 ou menos, nenhuma sai");
+        assert_eq!(quantas_apagar(10, 1, &[], 3), Some(0));
+        // uma base de 1000 MB precisa de 1100 MB e da folga de 200 MB
+        let mb = 1024 * 1024;
+        assert_eq!(espaco_para_copia(1000 * mb), 1300 * mb);
+    }
+
     /// A rotação das cópias automáticas nunca apaga as de antes das actualizações, mesmo sendo as mais antigas; essas
     /// têm a sua própria conta (as das últimas 5 actualizações).
     #[test]

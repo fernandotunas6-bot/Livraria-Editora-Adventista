@@ -93,6 +93,26 @@ pub async fn arranque_guardar(st: &AppState, i: ArranqueIn) -> AppResult<Value> 
     arranque(st).await
 }
 
+/// O arranque falhou: a base não abre, o cofre não deu a chave, ou uma migração não passou. Antes, o programa fechava
+/// sem dizer nada (no Windows, clicava-se no ícone e não acontecia nada). Agora a janela principal esconde-se e aparece
+/// uma janela do sistema com a explicação e o sítio dos dados; ao fechá-la, o programa termina. Fica também uma linha
+/// em `arranque.log`, na pasta dos dados, para o suporte.
+pub fn falha_no_arranque(app: &tauri::AppHandle, pasta: &std::path::Path, erro: &str) {
+    use std::io::Write;
+    use tauri::Manager;
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    eprintln!("O KanGest não arrancou: {erro}");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(pasta.join("arranque.log")) {
+        let _ = writeln!(f, "{} {} {erro}", crate::db::agora(), env!("CARGO_PKG_VERSION"));
+    }
+    if let Some(janela) = app.get_webview_window("main") {
+        let _ = janela.hide();
+    }
+    let texto = format!("{erro}\n\nOs dados deste computador estão em {}.", pasta.display());
+    let a = app.clone();
+    app.dialog().message(texto).title("O KanGest não conseguiu abrir").kind(MessageDialogKind::Error).show(move |_| a.exit(1));
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;

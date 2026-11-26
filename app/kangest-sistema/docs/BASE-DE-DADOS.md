@@ -14,6 +14,13 @@ conjunto de postos em rede, só o servidor tem a base; os postos falam com ele (
 | Escritas | transacções `BEGIN IMMEDIATE` (`db::transacao`): uma segunda gravação espera pela primeira (`busy_timeout` de 10 s) em vez de falhar com «database is locked» |
 | Segredos | cifrados (chave mestra fora da base, `kangest.chave`): ver [SEGURANCA.md](SEGURANCA.md) |
 | Cópias | automáticas, externas e cifradas, verificadas com `PRAGMA integrity_check`: ver [COPIAS.md](COPIAS.md) |
+| Ligações e cache | adaptadas ao computador (`src/recursos.rs`): o dobro dos núcleos em ligações (entre 4 e 12) e 1/64 da memória em cache (entre 16 e 256 MB no total). Com a base cifrada, uma página na cache não se decifra outra vez |
+| Temporários | as ordenações grandes em memória com 3 GB ou mais (no Windows, o antivírus examina cada ficheiro temporário) |
+| WAL | volta a 64 MB depois de cada checkpoint (`journal_size_limit`), em vez de ficar com o tamanho do maior pico |
+| Estatísticas | **nenhuma**: não se corre `ANALYZE` nem `PRAGMA optimize` (ver em baixo, «Índices e desempenho») |
+
+Em **Sobre o KanGest → Este computador** vê-se o que o programa encontrou (núcleos, memória, espaço livre no disco dos
+dados) e como configurou a base. Com pouco espaço para a próxima cópia, a linha fica a vermelho.
 
 ## Migrações
 
@@ -24,6 +31,16 @@ a base, por ordem; o SQLite guarda as aplicadas em `_sqlx_migrations`.
 - Antes de actualizar, o KanGest faz uma cópia da base, verificada (`copias/kangest-antes-de-<versão>.db`), ao
   descarregar e outra vez ao instalar. A rotação das cópias automáticas não a apaga: guardam-se as das últimas 5
   actualizações.
+- **Também quando o instalador novo se pôs à mão**, sem passar pela actualização do programa: no arranque, se há
+  migrações por aplicar numa base com dados, a cópia `kangest-antes-de-<versão>.db` faz-se antes de as aplicar, com o
+  estado desse momento (`db::copia_antes_de_migrar`).
+- **Uma migração que falha** desfaz-se (cada uma corre numa transacção) e a base **volta à cópia de antes**: a que
+  falhou fica ao lado (`kigest.db.migracao-falhou-<data>`, com o WAL dela) para o suporte, e a versão anterior do
+  KanGest abre outra vez a base sem perder nada (`db::voltar_a_copia`). Cada troca de nome desfaz-se se a seguinte
+  falhar: a pasta nunca fica sem a base.
+- **O arranque que falha diz porquê.** Uma migração que não passa, o cofre do sistema que não dá a chave ou uma pasta de
+  dados que não se cria abrem uma janela do sistema com a explicação e o sítio dos dados (`nativo::falha_no_arranque`),
+  e fica uma linha em `arranque.log`, na pasta dos dados. Antes, o programa fechava sem dizer nada.
 - O que precisa do programa e não só de SQL (preencher um valor novo, recalcular, recifrar) vai nos **ajustes de dados**
   (em baixo), não numa migração.
 - Uma cópia feita por uma versão mais recente (com migrações que esta não conhece) não se restaura: a base deixaria de
@@ -59,6 +76,34 @@ Regras que saíram desta medição, para as consultas novas:
   liam todos os movimentos uma vez por conta).
 - Uma junção a partir do conjunto pequeno (os documentos de uma sessão), não a partir da tabela grande (todos os
   pagamentos).
+
+### Segunda medição (migração 0066)
+
+Uma segunda volta, com 150 000 documentos, 450 000 linhas, 450 000 movimentos de stock, 200 000 linhas de auditoria,
+20 000 clientes e 15 000 artigos. As consultas saíram do próprio código (as 1009 literais) e o plano de cada uma foi
+pedido ao SQLite. Assinalaram-se as que liam uma tabela grande inteira, e mediram-se as do dia-a-dia:
+
+| Consulta | Antes | Depois |
+|---|---|---|
+| Sugestão de encomendas (reposição) | 17,6 s | 0,6 s |
+| Documentos do Consumidor final (quase todas as vendas) | 1,9 s | 22 ms |
+| Lista de clientes (saldo e crédito de cada um) | 1,3 s | 94 ms |
+| Auditoria de um período longo | 1,2 s | 25 ms |
+| Licença: primeiro e último documento emitidos aqui | 265 ms | 4,5 ms |
+| Gravar um cliente (o NIF já existe?) | toda a tabela | índice |
+
+Mais quatro regras:
+
+- **`CROSS JOIN` para fixar a ordem** quando o SQLite escolhe mal. Na reposição, preferia percorrer as linhas todas pela
+  ordem do artigo e ir buscar o documento de cada uma; partindo dos tipos e da data, lê só o período.
+- **Ordenar pela coluna do índice do filtro** (`ORDER BY data_hora DESC, id DESC` com o filtro pela data): sai já
+  ordenado e pára no `LIMIT`. Com `ORDER BY id`, o SQLite lia o período todo e ordenava-o.
+- **Nada de funções sobre a coluna do filtro** (`substr(data_hora, 1, 10) BETWEEN …`): com `data_hora >= ? AND
+  data_hora < date(?, '+1 day')` usa-se o índice.
+- **Sem `ANALYZE`.** Com as estatísticas do planeador, a lista de documentos que abre por omissão passava de 6 ms para
+  0,9 s (3,7 s a frio), e a pesquisa por número de 26 para 211 ms: o SQLite passava a escolher outra ordem. O teste
+  `db::testes_cifra::os_planos_das_consultas_do_dia_a_dia` confirma os planos destas consultas no motor do programa e
+  que não há estatísticas.
 
 ### Medir de novo
 

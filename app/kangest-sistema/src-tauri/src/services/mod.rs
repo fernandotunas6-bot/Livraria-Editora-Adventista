@@ -33,7 +33,7 @@ mod integridade;
 pub mod licenca;
 mod oficina;
 mod fidelizacao;
-mod gestao;
+pub(crate) mod gestao;
 mod inteligencia;
 mod parametros;
 mod partilha;

@@ -76,6 +76,15 @@ interface Info {
   documentos: number;
   importados: number;
   utilizadores: number;
+  /** o que o KanGest encontrou no computador da base e como a configurou (src-tauri/src/recursos.rs) */
+  computador?: {
+    nucleos: number;
+    memoria: number | null;
+    espaco_livre: number | null;
+    ligacoes: number;
+    cache_kib: number;
+    temporarios_em_memoria: boolean;
+  };
 }
 
 const ATALHOS_POS: [string, string][] = [
@@ -117,6 +126,31 @@ const MANUAL: { titulo: string; texto: string }[] = [
 ];
 
 const mb = (b: number) => (b < 1024 * 1024 ? `${numero(Math.max(1, Math.round(b / 1024)), 0)} KB` : `${numero(b / 1024 / 1024, 1)} MB`);
+const tamanho = (b: number) => (b >= 1024 ** 3 ? `${numero(b / 1024 ** 3, 1)} GB` : mb(b));
+
+/** O computador da base: núcleos, memória e espaço livre, e como a base se configurou. Com pouco espaço (menos do que
+ * uma cópia de segurança precisa: a base, mais um décimo, mais 200 MB), avisa. */
+function Computador({ info }: { info?: Info }) {
+  const c = info?.computador;
+  if (!info || !c) return <>…</>;
+  const precisa = info.base_bytes * 1.1 + 200 * 1024 * 1024;
+  const pouco = c.espaco_livre != null && c.espaco_livre < precisa;
+  return (
+    <>
+      {c.nucleos} núcleos{c.memoria ? ` · ${tamanho(c.memoria)} de memória` : ""}
+      {c.espaco_livre != null && (
+        <span className={cn(pouco && "font-medium text-danger")}>
+          {" "}
+          · {tamanho(c.espaco_livre)} livres no disco{pouco ? " (pouco: a próxima cópia de segurança pode não caber)" : ""}
+        </span>
+      )}
+      <div className="text-[12px] text-ink-3">
+        Base adaptada a este computador: {c.ligacoes} ligações, cache até {tamanho(c.ligacoes * c.cache_kib * 1024)}
+        {c.temporarios_em_memoria ? ", ordenações em memória" : ""}
+      </div>
+    </>
+  );
+}
 
 /** Sobre o KanGest, manual rápido e atalhos de teclado. */
 export default function Sobre() {
@@ -159,6 +193,10 @@ export default function Sobre() {
               <dt className="text-ink-3">Motor da base</dt>
               <dd>
                 SQLite {info?.sqlite} · {info?.migracoes} actualizações de estrutura aplicadas
+              </dd>
+              <dt className="text-ink-3">{MODO_WEB ? "Computador da base" : "Este computador"}</dt>
+              <dd>
+                <Computador info={info} />
               </dd>
             </dl>
           </Card>

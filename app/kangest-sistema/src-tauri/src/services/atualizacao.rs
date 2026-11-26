@@ -346,12 +346,10 @@ async fn copia_antes(st: &AppState, versao: &str) -> AppResult<Option<String>> {
         return Ok(None);
     }
     let f = super::sistema::copia_antes_de(&st.pasta_dados, versao);
-    super::sistema::copia_verificada(&st.pool, &f)
+    // com o espaço do disco conferido; ficam as das últimas actualizações (podar_antes)
+    super::sistema::copia_com_espaco(&st.pool, &st.pasta_dados, &f)
         .await
         .map_err(|e| AppError::msg(format!("Não foi possível fazer a cópia de segurança de antes da actualização: {e}")))?;
-    if let Some(dir) = f.parent() {
-        super::sistema::podar_antes(dir);
-    }
     Ok(Some(f.display().to_string()))
 }
 

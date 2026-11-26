@@ -20,6 +20,13 @@ Cada cópia é feita com o programa em uso (`VACUUM INTO`) e **verificada** logo
 tabelas do KanGest). Guardam-se as últimas N (por omissão 30) em `copias/`, na pasta de dados. Como a base, vão
 **cifradas** com a chave deste computador: restauram-se aqui ([SEGURANCA.md](SEGURANCA.md) §5).
 
+**Com o disco quase cheio:** antes de cada cópia confere-se o espaço livre (o tamanho da base, mais um décimo, mais 200 MB
+de folga para o sistema). Sem espaço, saem primeiro as cópias automáticas mais antigas, só as precisas, e ficam sempre as
+3 mais recentes e as de antes das actualizações. Se nem assim chegar, a cópia não se faz e aparece um aviso do sistema
+(«Disco quase cheio») com o que falta, em vez de o disco encher a meio da cópia. A cópia sai sempre para um ficheiro ao
+lado (`.a-fazer`) e só ganha o nome dela depois de verificada: uma cópia que falhe nunca fica como a mais recente. As
+provisórias que sobrem de um fecho inesperado apagam-se na cópia seguinte.
+
 As cópias de antes de cada actualização (`copias/kangest-antes-de-<versão>.db`, com a marca `.verificada`) ficam fora
 dessa conta: a rotação das automáticas nunca as apaga, e guardam-se as das últimas 5 actualizações. É a que Sobre o
 KanGest → Verificação da base oferece restaurar quando a verificação depois da actualização encontra problemas graves
