@@ -34,7 +34,7 @@ contra o código em cada PR:
 |---|---|---|
 | C1 | `auth`, `users`, `permissions`, `system`, `integrations`, `synchronization` | #157 |
 | C2 | `products`, `categories`, `pricing`, `inventory`, `stock-movements`, `orders` | só leitura, pelo RLS (ver abaixo) |
-| C3 | `sales`, `invoices`, `payments`, `customers`, `suppliers`, `documents`, `reports` | a seguir |
+| C3 | `sales`, `invoices`, `payments`, `customers`, `suppliers`, `documents`, `reports` | só leitura: o RLS e as funções dos relatórios |
 
 ## As leituras pelo RLS (C2)
 
