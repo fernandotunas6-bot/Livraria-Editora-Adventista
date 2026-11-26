@@ -23,6 +23,7 @@ pub mod catalogo;
 pub mod cifra;
 pub mod encomendas;
 pub mod entrada;
+pub mod estado;
 pub mod fechos;
 pub mod loja;
 pub mod pessoa;
@@ -271,7 +272,9 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     let (tarefas_feitas, tarefas_itens) = encomendas::resultados(pool).await?;
     lote.extend(tarefas_itens);
     let cursores = loja::ler_cursores(pool).await?;
-    match enviar(l, &json!({ "lote": lote, "cursores": &cursores })).await {
+    // o estado deste computador (espaço, cópias, AGT…), para o painel do site (estado.rs)
+    let estado_pc = estado::do_computador(st).await;
+    match enviar(l, &json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc })).await {
         Ok(r) => {
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
             fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;

@@ -69,6 +69,7 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
+  limparEstadoComputador,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados,
 } from "./kangestSinc.ts";
@@ -3266,7 +3267,7 @@ const authParaPostos = () => {
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
-    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, estado_computador, estado_em")
     .order("criado_em", { ascending: true });
   if (error) throw new Error(error.message);
   const postos = [];
@@ -3395,6 +3396,11 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     aberto = await abrirPedido(JSON.parse(raw), chaves, aadDoPedido(posto, hora, nonce));
   } catch (e) {
     throw bad(`Envelope inválido: ${(e as Error).message}`);
+  }
+  // o estado do computador (espaço, cópias, AGT…): só os campos da lista, para o painel (KanGestPostos.jsx)
+  const estadoComputador = limparEstadoComputador(aberto.dados?.estado);
+  if (estadoComputador) {
+    await db.from("kangest_postos").update({ estado_computador: estadoComputador, estado_em: new Date().toISOString() }).eq("id", posto);
   }
   let resultado = null;
   const tudo = Array.isArray(aberto.dados?.lote) ? aberto.dados.lote : [];

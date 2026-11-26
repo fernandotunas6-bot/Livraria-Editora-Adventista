@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  limparEstadoComputador,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -230,5 +231,30 @@ describe("dados pessoais cifrados por coluna", () => {
     ], c);
     expect([i0.artigo.ativo, i1.artigo.ativo]).toEqual([false, false]);
     await expect(prepararLote([{ tipo: "stock", referencia: "X", armazens: Array.from({ length: 101 }, (_, i) => ({ armazem_id: i })) }], c)).rejects.toThrow(/armazéns/);
+  });
+});
+
+describe("limparEstadoComputador", () => {
+  it("guarda só os campos da lista, com os tipos e os limites conferidos", () => {
+    const e = limparEstadoComputador({
+      versao: "1.4.7 Livraria", sistema: "macos aarch64", nucleos: 8, memoria: 17179869184, espaco_livre: 52_000_000_000,
+      base_bytes: 9_000_000, ultima_copia: "2026-11-26T08:00:00Z", copia_externa_erro: false, modo: "servidor",
+      fe_rejeitados: 0, por_enviar: 3, verificacao: "ok", bandeja: true, acordado: true,
+      // o que não está na lista não passa
+      cliente: "Ana Domingos", nif: "5417000001", caminho: "/Users/ana/Library",
+    });
+    expect(e).toEqual({
+      versao: "1.4.7 Livraria", sistema: "macos aarch64", nucleos: 8, memoria: 17179869184, espaco_livre: 52_000_000_000,
+      base_bytes: 9_000_000, ultima_copia: "2026-11-26T08:00:00.000Z", copia_externa_erro: false, modo: "servidor",
+      fe_rejeitados: 0, por_enviar: 3, verificacao: "ok", bandeja: true, acordado: true,
+    });
+  });
+
+  it("deita fora os valores com o tipo ou o limite errado", () => {
+    expect(limparEstadoComputador({ nucleos: -1, memoria: "muita", modo: "administrador", verificacao: "talvez", ultima_copia: "ontem", bandeja: "sim", versao: `x${"\u0007"}y` }))
+      .toEqual({ versao: "xy" });
+    expect(limparEstadoComputador(null)).toBeNull();
+    expect(limparEstadoComputador([1, 2])).toBeNull();
+    expect(limparEstadoComputador("estado")).toBeNull();
   });
 });
