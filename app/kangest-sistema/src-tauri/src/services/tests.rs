@@ -8027,6 +8027,9 @@ async fn a_identidade_unica_num_kangest_ligado_ao_site() {
     rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
     let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
     assert!(s["ligar_ate"].is_null() && s["so_leitura"] == false && s["offline"] == false, "{s}");
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!(e["ligacao"]["ligado"], false, "o ecrã de entrada de um KanGest isolado: {e}");
+    assert!(e["ligacao"]["versao"].is_string());
     // liga-se ao site
     sqlx::query(
         "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em)
@@ -8035,6 +8038,14 @@ async fn a_identidade_unica_num_kangest_ligado_ao_site() {
     .execute(&st.pool)
     .await
     .unwrap();
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!((e["ligacao"]["ligado"].as_bool(), e["ligacao"]["em_linha"].as_bool()), (Some(true), Some(false)), "ligado, ainda sem volta: {e}");
+    sqlx::query("UPDATE sinc_ligacao SET ultima_sinc = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime'), loja = 'Loja do Huambo' WHERE id = 1")
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!((e["ligacao"]["em_linha"].as_bool(), e["ligacao"]["loja"].as_str()), (Some(true), Some("Loja do Huambo")), "{e}");
     rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
     // contas locais novas: só ADMIN
     assert!(rpc_err(&st, "utilizadores.guardar", json!({ "nome": "Outra", "login": "caixa2", "perfil": "CAIXA", "senha": "caixa123" })).await.contains("conta da pessoa no painel do site"));
