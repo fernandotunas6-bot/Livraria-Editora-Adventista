@@ -131,6 +131,11 @@ describe("o registo das rotas no index.ts", () => {
     const publicas = rotas.filter((r) => r.tipo === "publica").map((r) => r.rota).sort();
     expect(publicas).toEqual([
       "GET /api/v1",
+      "GET /api/v1/categories",
+      "GET /api/v1/inventory",
+      "GET /api/v1/pricing",
+      "GET /api/v1/products",
+      "GET /api/v1/products/get",
       "GET /api/v1/system/info",
       "GET /book-collections",
       "GET /chat/config",
