@@ -47,6 +47,9 @@ das tabelas decide o que cada um vê:
 A porta da rota é só a primeira barreira. As escritas do catálogo (publicar um produto e o preço do KanGest) são a
 fase D.
 
+**A excepção são as contas:** `users` (C1) e `customers` (C3) usam a função do painel (`admin_users_list`) com a
+mesma porta (`manage_users`), tal como `GET /admin/users`.
+
 ## Variáveis
 
 `KANGEST_MIN_VERSION` (segredo da Edge Function, opcional) é a versão mínima do KanGest que o site aceita. Aparece em

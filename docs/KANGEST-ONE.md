@@ -98,7 +98,7 @@ Restrições de segurança, palavra por palavra:
 
 | Restrição | Como |
 |---|---|
-| a `service_role` nunca vai para o cliente | só existe nos segredos da Edge Function; o CI falha se o site ou o ecrã do KanGest compilados a levarem (teste 13); a API v1 da C2 e da C3 lê pela sessão de quem pede (`dbDaPessoa`), nunca pela service role |
+| a `service_role` nunca vai para o cliente | só existe nos segredos da Edge Function; o CI falha se o site ou o ecrã do KanGest compilados a levarem (teste 13); na API v1, as leituras do catálogo, do stock, das encomendas, das vendas, das facturas e dos relatórios vão pela sessão de quem pede (`dbDaPessoa`) e pelo RLS; `users` e `customers` usam a função e a porta das rotas do painel (`admin_users_list`, `manage_users`), como `/admin/users` |
 | nada destrutivo na produção sem autorização | as migrações destas fases só acrescentam (tabelas, funções, gatilhos que nunca impedem uma encomenda); um backup cifrado antes de cada migração (`deploy-supabase.yml`); o livro de stock não se altera nem se apaga |
 | as credenciais externas | cada variável está identificada em §7 e em [AMBIENTES.md](AMBIENTES.md); nenhuma é inventada |
 | nenhuma chave estática como autenticação no desktop | o posto autentica-se com uma chave Ed25519 própria, gerada no emparelhamento e revogável no painel; as pessoas, com a conta do site |
