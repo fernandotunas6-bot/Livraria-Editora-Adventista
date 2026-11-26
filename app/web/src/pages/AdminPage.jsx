@@ -50,6 +50,7 @@ import { downloadReceipt, receiptBrand, receiptFromOrder } from '@/lib/receipt';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 // Pequeno: os gráficos (a parte pesada) carregam lá dentro, só quando se abre a secção.
 import OrdersReportSection from '@/components/admin/OrdersReportSection';
+import SeccaoExpansivel from '@/components/admin/shell/SeccaoExpansivel';
 
 const CollectionsTab = lazy(() => import('@/components/admin/CollectionsTab'));
 const SlidesTab = lazy(() => import('@/components/admin/SlidesTab'));
@@ -108,8 +109,9 @@ const ORDER_LIST_FIELDS = [
  * definida lá dentro seria um componente novo a cada pintura, e o React desmontava e voltava a
  * montar o conteúdo (perdendo o que se estava a escrever) sempre que a página actualizasse.
  */
+// Cada secção pode expandir-se para o ecrã inteiro (components/admin/shell/SeccaoExpansivel.jsx).
 function AdminSection({ active, value, children }) {
-  return active === value ? children : null;
+  return active === value ? <SeccaoExpansivel key={value}>{children}</SeccaoExpansivel> : null;
 }
 
 const AdminPage = () => {
