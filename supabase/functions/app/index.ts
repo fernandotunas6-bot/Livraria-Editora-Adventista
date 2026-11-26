@@ -68,7 +68,7 @@ import {
   testarLigacao, tratarAviso, type Ligacao,
 } from "./kangest.ts";
 import {
-  aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, horaValida, lerChavesSinc, lerCifraDados,
+  aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados,
 } from "./kangestSinc.ts";
@@ -3313,6 +3313,15 @@ route("POST", "/admin/kangest/postos/revogar", permissao("manage_settings"), asy
   const { error } = await db.rpc("kangest_posto_revogar", { p_id: id });
   if (error) throw bad(error.message);
   return json({ ok: true });
+});
+
+// As dívidas por loja (migração 20261125170000): as facturas a crédito do balcão e as encomendas entregues ou pagas em
+// parte. Os nomes dos clientes do balcão chegam cifrados e só se decifram aqui, para quem vê os relatórios.
+route("GET", "/admin/relatorios/dividas", permissao("view_reports", "edit_reports"), async ({ url }) => {
+  const loja = (url.searchParams.get("loja") || "").trim();
+  const { data, error } = await db.rpc("dividas_por_loja", { p_loja: loja || null });
+  if (error) throw new Error(error.message);
+  return json({ dividas: await dividasParaOPainel(data || [], await cifraDadosKanGest()) });
 });
 
 // Os dois interruptores do posto (migração 20261125140000): o stock dele conta para o stock à venda no site, e os

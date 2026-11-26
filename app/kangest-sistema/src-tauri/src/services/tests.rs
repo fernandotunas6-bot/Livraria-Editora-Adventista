@@ -5874,6 +5874,52 @@ async fn tops_do_painel() {
     assert_eq!(top("operadores", "quantidade").await["linhas"][0]["quantidade"], 2);
     assert!(rpc_err(&st, "relatorios.top", json!({ "tipo": "x" })).await.contains("Tipo inválido"));
     assert!(rpc_err(&st, "relatorios.top", json!({ "periodo": "seculo" })).await.contains("Período inválido"));
+    // os menos vendidos: do que vendeu menos para o que vendeu mais
+    let menos = rpc(&st, "relatorios.top", json!({ "tipo": "artigos", "periodo": "mes", "ordem": "valor", "sentido": "asc" })).await;
+    assert_eq!(nomes(&menos), vec!["Água", "Mesa"]);
+    // os parados: com stock e sem vendas no período (as águas e a mesa são serviços, sem stock)
+    let livro = rpc(&st, "artigos.guardar", json!({ "descricao": "Livro parado", "taxa_iva_id": 1, "preco1": 250000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": livro, "quantidade": 5, "preco_unitario": 100000 }] })).await;
+    let parados = rpc(&st, "relatorios.top", json!({ "tipo": "sem_vendas", "periodo": "mes" })).await;
+    assert_eq!(nomes(&parados), vec!["Livro parado"]);
+    assert_eq!(parados["linhas"][0]["quantidade"].as_f64(), Some(5.0));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// As vendas do site nos relatórios do KanGest (parte I): a lista das encomendas pagas da loja online, com o cliente,
+/// o canal e a FR; e, nas listas de documentos e de clientes, a FR de uma encomenda (a Consumidor Final) mostra o nome
+/// do cliente da encomenda e «loja online», sem mexer no documento.
+#[tokio::test]
+async fn vendas_da_loja_online_nos_relatorios() {
+    let (st, pasta) = base_com_admin("relatorios-loja-online").await;
+    let livro = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "tipo": "S", "taxa_iva_id": 1, "preco1": 500000 })).await["id"].as_i64().unwrap();
+    let hoje = db::hoje();
+    sqlx::query("INSERT INTO loja_encomendas (id, numero, estado, pagamento, total, cliente, levantamento, dados) VALUES ('e-1', 'LIV-77', 'processing', 'paid', 5700, 'Rui Manuel', 1, ?)")
+        .bind(json!({ "pago_em": format!("{hoje}T10:00:00+01:00"), "canal": "whatsapp" }).to_string())
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let vendas = |agrupar: &str| rpc(&st, "relatorios.vendas", json!({ "de": hoje, "ate": hoje, "agrupar": agrupar }));
+    let online = vendas("loja_online").await;
+    assert_eq!(online.as_array().unwrap().len(), 1, "{online}");
+    let chave = online[0]["chave"].as_str().unwrap().to_string();
+    assert!(chave.contains("LIV-77") && chave.contains("Rui Manuel") && chave.contains("whatsapp") && chave.contains("levantamento na loja") && chave.contains("sem FR ainda"), "{chave}");
+    assert_eq!(online[0]["total"], 570000, "do site em kwanzas, aqui em cêntimos");
+
+    // a FR da encomenda, emitida pela loja online (a chave da API), a Consumidor Final
+    let fr = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "referencia": "LIV-77", "linhas": [{ "artigo_id": livro, "quantidade": 1 }], "pagamentos": [{ "modo": "TB", "valor": 570000 }] })).await;
+    sqlx::query("UPDATE documentos SET api_chave_id = 1 WHERE id = ?").bind(fr["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
+    let numero = fr["documento"]["numero_doc"].as_str().unwrap().to_string();
+    assert!(vendas("loja_online").await[0]["chave"].as_str().unwrap().contains(&numero), "a FR aparece na encomenda");
+    let docs = vendas("documento").await;
+    let linha = docs.as_array().unwrap().iter().find(|l| l["chave"].as_str().unwrap().contains(&numero)).cloned().unwrap();
+    assert!(linha["chave"].as_str().unwrap().contains("Rui Manuel (loja online)") && linha["chave"].as_str().unwrap().contains("· loja online ·"), "{linha}");
+    let clientes = vendas("cliente").await;
+    assert!(clientes.as_array().unwrap().iter().any(|l| l["chave"].as_str().unwrap().starts_with("Rui Manuel (loja online)")), "{clientes}");
+    // o documento fiscal continua a Consumidor Final
+    let nome: String = sqlx::query_scalar("SELECT entidade_nome FROM documentos WHERE id = ?").bind(fr["documento"]["id"].as_i64().unwrap()).fetch_one(&st.pool).await.unwrap();
+    assert_ne!(nome, "Rui Manuel");
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
