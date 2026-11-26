@@ -8017,3 +8017,63 @@ async fn as_igrejas_do_site_chegam_e_ligam_se_ao_cliente() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (fase A): num KanGest ligado ao site, uma conta local (não ADMIN) entra com um aviso até à data-limite e,
+/// depois dela, só consulta; contas locais novas só de administrador. Num KanGest isolado, nada muda.
+#[tokio::test]
+async fn a_identidade_unica_num_kangest_ligado_ao_site() {
+    let (st, pasta) = base_com_admin("identidade-unica").await;
+    // isolado: cria-se uma caixa local, e ela entra sem avisos
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert!(s["ligar_ate"].is_null() && s["so_leitura"] == false && s["offline"] == false, "{s}");
+    // liga-se ao site
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em)
+         VALUES (1, 'https://exemplo.ao', 'p', 'c', 'k', 'x', 1, '2026-11-26T10:00:00')",
+    )
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    // contas locais novas: só ADMIN
+    assert!(rpc_err(&st, "utilizadores.guardar", json!({ "nome": "Outra", "login": "caixa2", "perfil": "CAIXA", "senha": "caixa123" })).await.contains("conta da pessoa no painel do site"));
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Recurso", "login": "admin2", "perfil": "ADMIN", "senha": "Admin-2026!", "mudar_senha": false })).await;
+    // a data-limite (a migração pôs 30 dias à frente): a caixa entra, com o aviso
+    let limite = rpc(&st, "utilizadores.contasLocais", Value::Null).await;
+    assert_eq!((limite["ligado"].as_bool(), limite["por_ligar"].as_i64()), (Some(true), Some(1)), "{limite}");
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert!(s["ligar_ate"].is_string() && s["so_leitura"] == false, "{s}");
+    assert!(s["permissoes"].as_array().unwrap().iter().any(|p| p == "vendas.fatura_recibo"), "ainda vende: {s}");
+    // passou a data: só consulta
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    assert!(rpc_err(&st, "utilizadores.contasLocaisGuardar", json!({ "ate": "ontem" })).await.contains("data válida"));
+    rpc(&st, "utilizadores.contasLocaisGuardar", json!({ "ate": "2026-01-01" })).await;
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert_eq!(s["so_leitura"], true, "{s}");
+    let perms: Vec<&str> = s["permissoes"].as_array().unwrap().iter().filter_map(|p| p.as_str()).collect();
+    assert!(perms.iter().all(|p| *p == "relatorios.ver"), "só ver relatórios: {s}");
+    assert!(!s["permissoes"].as_array().unwrap().iter().any(|p| p == "vendas.fatura_recibo"));
+    // o ADMIN de recurso continua sem restrição
+    let a = rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    assert!(a["ligar_ate"].is_null() && a["so_leitura"] == false, "{a}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+#[test]
+fn a_regra_das_contas_locais() {
+    use crate::services::auth::{conta_local, ContaLocal};
+    let n = |c: ContaLocal| match c {
+        ContaLocal::Normal => "normal".to_string(),
+        ContaLocal::Avisar(d) => format!("avisar {d}"),
+        ContaLocal::SoLeitura(d) => format!("ler {d}"),
+    };
+    assert_eq!(n(conta_local(false, None, "CAIXA", Some("2026-01-01"), "2026-11-26")), "normal", "isolado");
+    assert_eq!(n(conta_local(true, None, "ADMIN", Some("2026-01-01"), "2026-11-26")), "normal", "ADMIN de recurso");
+    assert_eq!(n(conta_local(true, Some("a@b.ao"), "CAIXA", Some("2026-01-01"), "2026-11-26")), "normal", "já ligada");
+    assert_eq!(n(conta_local(true, Some(""), "CAIXA", Some("2026-12-26"), "2026-11-26")), "avisar 2026-12-26");
+    assert_eq!(n(conta_local(true, None, "GESTOR", Some("2026-11-26"), "2026-11-26")), "avisar 2026-11-26", "no próprio dia ainda entra");
+    assert_eq!(n(conta_local(true, None, "GESTOR", Some("2026-11-25"), "2026-11-26")), "ler 2026-11-25");
+    assert_eq!(n(conta_local(true, None, "CAIXA", None, "2026-11-26")), "avisar ");
+}

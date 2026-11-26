@@ -19,6 +19,12 @@ export interface Sessao {
   mudar_senha?: boolean;
   /** sessão bloqueada (inactividade ou pelo operador) */
   bloqueada?: boolean;
+  /** entrou sem Internet, com a cópia local da conta do site (o modo limitado) */
+  offline?: boolean;
+  /** conta local num KanGest ligado ao site: ligar-se à conta do site até esta data (AAAA-MM-DD) */
+  ligar_ate?: string | null;
+  /** passou a data: só lê */
+  so_leitura?: boolean;
 }
 
 /** Impressão térmica directa: ESC/POS em vez do diálogo do sistema (corta o papel e abre a gaveta). */
