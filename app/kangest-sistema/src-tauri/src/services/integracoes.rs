@@ -210,22 +210,6 @@ pub async fn resumo(st: &AppState) -> AppResult<Value> {
     Ok(json!(v.into_iter().map(|(_, c)| c).collect::<Vec<_>>()))
 }
 
-#[cfg(test)]
-mod testes {
-    use super::*;
-
-    #[test]
-    fn o_estado_do_site_pelas_filas() {
-        assert_eq!(estado_do_site(false, true, 9, 9, 9), Estado::Desligada, "desligado, nada mais conta");
-        assert_eq!(estado_do_site(true, true, 0, 0, 0), Estado::Erro);
-        assert_eq!(estado_do_site(true, false, 1, 0, 0), Estado::Erro);
-        assert_eq!(estado_do_site(true, false, 0, 51, 0), Estado::Atencao);
-        assert_eq!(estado_do_site(true, false, 0, 0, 1), Estado::Atencao);
-        assert_eq!(estado_do_site(true, false, 0, 10, 0), Estado::Ok);
-        assert!(Estado::Erro < Estado::Atencao && Estado::Atencao < Estado::Ok, "a ordem do pior para o melhor");
-    }
-}
-
 /// O ecossistema para o painel inicial (KANGEST ONE, fase G): a ligação ao servidor central, o que espera para ir para o
 /// site, as encomendas do site por tratar, o livro de stock e a versão mínima. Num KanGest isolado, `ligado: false`.
 pub async fn ecossistema(st: &AppState) -> AppResult<Value> {
@@ -265,4 +249,21 @@ pub async fn ecossistema(st: &AppState) -> AppResult<Value> {
         "desactualizado": crate::sinc::versao::desactualizado(p).await,
         "versao": crate::sinc::versao::ESTA,
     }))
+}
+
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn o_estado_do_site_pelas_filas() {
+        assert_eq!(estado_do_site(false, true, 9, 9, 9), Estado::Desligada, "desligado, nada mais conta");
+        assert_eq!(estado_do_site(true, true, 0, 0, 0), Estado::Erro);
+        assert_eq!(estado_do_site(true, false, 1, 0, 0), Estado::Erro);
+        assert_eq!(estado_do_site(true, false, 0, 51, 0), Estado::Atencao);
+        assert_eq!(estado_do_site(true, false, 0, 0, 1), Estado::Atencao);
+        assert_eq!(estado_do_site(true, false, 0, 10, 0), Estado::Ok);
+        assert!(Estado::Erro < Estado::Atencao && Estado::Atencao < Estado::Ok, "a ordem do pior para o melhor");
+    }
 }
