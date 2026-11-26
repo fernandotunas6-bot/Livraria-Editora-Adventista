@@ -351,3 +351,24 @@ Em **Configurações → KanGest → Postos**, cada posto mostra o seu computado
 
 No topo da lista aparece quantos computadores precisam de atenção. Um posto com um KanGest anterior à 1.4.8 ainda não
 manda o estado: o painel diz só isso.
+
+## 13. O ERP financeiro central (os movimentos da tesouraria)
+
+Cada movimento da tesouraria do KanGest segue para o site no mesmo lote assinado que os documentos e os fechos
+(`app/kangest-sistema/src-tauri/src/sinc/financeiro.rs`; fila `sinc_financeiro`, migração 0068). Gatilhos enchem a fila
+ao gravar um movimento e ao anulá-lo, só com o posto ligado. Ao ligar o posto, seguem também os dos últimos 400 dias.
+
+No site fica **uma cópia que não se altera** (`public.kangest_movimentos`, migração `20261126170000`):
+
+- um gatilho recusa qualquer alteração ou apagamento. A única coisa que muda é marcar como anulado, e isso não volta
+  atrás;
+- um movimento repetido não se grava em dobro;
+- uma anulação que chegue depois só o marca.
+
+**Sem dados pessoais:** a descrição livre e o cliente ou fornecedor do movimento ficam no KanGest. Seguem a conta, o
+tipo (entrada ou saída), o valor, a data, o centro de custo e o número do documento.
+
+No painel, em **Configurações → KanGest**, o quadro «Dinheiro das lojas» (`KanGestFinanceiro.jsx`,
+`public.kangest_financeiro`) mostra, por período, as entradas, as saídas e o saldo, por loja e por centro de custo, sem
+os anulados (que se contam à parte). Só o vê quem lê os pagamentos (`can_read_payments`), e o período tem no máximo 400
+dias.
