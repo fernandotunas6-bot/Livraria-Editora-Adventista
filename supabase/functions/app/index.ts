@@ -6328,7 +6328,7 @@ const MAX_BODY_BYTES = 1_000_000;
 // - As escritas levam `Idempotency-Key`: o mesmo pedido repetido devolve a primeira resposta (24 horas).
 // - As rotas antigas continuam como estão (o site e o KanGest usam-nas).
 const API_V1_VERSAO = "1";
-const IDEMPOTENCY_KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
+const CHAVE_IDEMPOTENCIA_V1 = /^[A-Za-z0-9_.:-]{8,100}$/;
 
 /** A resposta de uma rota antiga, em `{ data }`. */
 async function respostaV1(res: Response): Promise<Response> {
@@ -6360,7 +6360,7 @@ function paginaV1(url: URL, porOmissao = 50, maximo = 200): { limit: number; off
 /** As escritas: o mesmo `Idempotency-Key` da mesma pessoa na mesma rota devolve a primeira resposta (24 horas). */
 async function idempotenteV1(ctx: CtxComSessao, rota: string, fazer: () => Promise<Response>): Promise<Response> {
   const chave = (ctx.req.headers.get("idempotency-key") || "").trim();
-  if (!IDEMPOTENCY_KEY.test(chave)) {
+  if (!CHAVE_IDEMPOTENCIA_V1.test(chave)) {
     throw bad("As escritas da API v1 levam o cabeçalho Idempotency-Key (8 a 100 letras, algarismos ou _ . : -).");
   }
   const desde = new Date(Date.now() - 86_400_000).toISOString();
