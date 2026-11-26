@@ -150,6 +150,16 @@ pub async fn devidos(pool: &SqlitePool, agora: i64) -> AppResult<Devidos> {
         });
         return Ok(Devidos { aberturas: aberturas.iter().map(|a| (a.armazem_id, a.artigo_id)).collect(), movimentos: Vec::new(), dados });
     }
+    // os movimentos de artigos que o livro não segue (sem referência, sem controlo de stock ou compostos — os mesmos que a
+    // abertura deixa de fora) saem da fila: o site recusá-los-ia sempre, e o «Servidor central» ficava em atenção sem motivo
+    sqlx::query(
+        "DELETE FROM sinc_stock_livro WHERE mov_id IN (
+           SELECT m.id FROM movimentos_stock m JOIN artigos a ON a.id = m.artigo_id
+            WHERE m.id IN (SELECT mov_id FROM sinc_stock_livro)
+              AND (TRIM(COALESCE(a.referencia, '')) = '' OR a.controla_stock <> 1 OR a.composto <> 0))",
+    )
+    .execute(pool)
+    .await?;
     let movimentos: Vec<Movimento> = sqlx::query_as(
         "SELECT f.mov_id, f.tentativas, m.armazem_id, COALESCE(a.referencia, '') AS referencia, m.quantidade, m.data_hora,
                 d.tipo_codigo, t.classe, d.numero_doc

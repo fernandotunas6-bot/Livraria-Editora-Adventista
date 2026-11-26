@@ -8203,6 +8203,15 @@ async fn livro_de_stock_para_o_site() {
     livro::concluir(&st.pool, &d, &json!({ "aceites": [mov], "erros": [] }), 2801 + 3600).await.unwrap();
     assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0);
 
+    // um movimento de um artigo que o livro não segue (deixou de controlar stock) sai da fila sem seguir
+    let outro = rpc(&st, "artigos.guardar", json!({ "descricao": "Serviço", "referencia": "SRV-1", "taxa_iva_id": 1, "preco1": 100, "custo": 50 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": outro, "quantidade": 3, "preco_unitario": 50 }] })).await;
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 1, "a entrada do artigo novo entrou na fila");
+    sqlx::query("UPDATE artigos SET controla_stock = 0 WHERE id = ?").bind(outro).execute(&st.pool).await.unwrap();
+    let d = livro::devidos(&st.pool, 2801 + 3600).await.unwrap();
+    assert!(d.movimentos.is_empty() && d.dados.is_null(), "não segue: {}", d.dados);
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0, "e saiu da fila");
+
     // desligar e voltar a ligar: abre outra vez, com a existência de agora
     livro::apagar(&st.pool).await.unwrap();
     assert!(livro::abrir_se_preciso(&st.pool, "posto-a").await.unwrap());
@@ -8334,6 +8343,33 @@ async fn o_ecossistema_no_painel_inicial() {
     // com uma volta há pouco e sem erro: em linha
     sqlx::query("UPDATE sinc_ligacao SET ultima_sinc = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime') WHERE id = 1").execute(&st.pool).await.unwrap();
     assert_eq!(rpc(&st, "dashboard.ecossistema", Value::Null).await["em_linha"], true);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// KANGEST ONE (A2): o prazo das contas locais conta a partir da ligação ao site. Um prazo que já passou (ou que acaba
+/// antes de 30 dias) passa para daqui a 30 dias; uma data mais tarde escolhida pelo administrador fica.
+#[tokio::test]
+async fn o_prazo_das_contas_locais_conta_da_ligacao() {
+    use crate::services::auth::prazo_das_contas_locais_ao_ligar;
+    let (st, pasta) = base_com_admin("prazo-ao-ligar").await;
+    let ate = || {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, String>("SELECT valor FROM config WHERE chave = 'identidade.contas_locais_ate'").fetch_one(&pool).await.unwrap() }
+    };
+    let daqui_a_30: String = sqlx::query_scalar("SELECT date('now', 'localtime', '+30 days')").fetch_one(&st.pool).await.unwrap();
+    // a actualização foi há meses: o prazo já tinha passado
+    sqlx::query("UPDATE config SET valor = '2026-01-01' WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, daqui_a_30, "30 dias a partir da ligação");
+    // o administrador escolheu uma data mais tarde: fica
+    sqlx::query("UPDATE config SET valor = '2099-12-31' WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, "2099-12-31");
+    // sem prazo nenhum: fica a 30 dias
+    sqlx::query("DELETE FROM config WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, daqui_a_30);
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }

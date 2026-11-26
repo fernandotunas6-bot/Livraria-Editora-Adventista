@@ -237,6 +237,7 @@ Base: `https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app`
 O frontend usa uma API ao estilo `pb.collection(...)` (herdada do PocketBase), implementada sobre o Supabase em `app/web/src/lib/dataClient.js`.
 
 > Contactos e campanhas: [docs/CONTACTOS-E-CAMPANHAS.md](docs/CONTACTOS-E-CAMPANHAS.md)  
+> KANGEST ONE (o KanGest e o site como uma só plataforma): [docs/KANGEST-ONE.md](docs/KANGEST-ONE.md) · API v1: [docs/api/README.md](docs/api/README.md) · Ambientes (staging): [docs/AMBIENTES.md](docs/AMBIENTES.md)  
 > Guia de lançamento: [docs/LANCAMENTO.md](docs/LANCAMENTO.md) · Arquitectura: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · Passagem de trabalho: [docs/HANDOFF.md](docs/HANDOFF.md) · Produção, funcionários e finanças: [docs/PRODUCAO.md](docs/PRODUCAO.md) · Migração do repositório: [docs/MIGRACAO-REPOSITORIO.md](docs/MIGRACAO-REPOSITORIO.md)  
 > O login (email e Google) é do Supabase Auth. O Firebase fica só para as ferramentas do Google Workspace no painel.
 
@@ -282,6 +283,10 @@ Configuração no GitHub (Settings → Secrets and variables → Actions). Num r
 | Variável | `ANDROID_CERT_SHA256` | Impressões SHA-256 dos certificados do app Android: ligações do site no app |
 | Secret | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | Chave de envio do app Android para a Play Store |
 | Secret | `GOOGLE_SERVICES_JSON`, `PLAY_SERVICE_ACCOUNT_JSON` | Firebase (notificações do Android) e envio automático para a Play Store (opcional) |
+| Variável (ambiente `staging`) | `STAGING_SUPABASE_URL` | O projecto de staging: as migrações e a Edge Function vão lá antes da produção ([docs/AMBIENTES.md](docs/AMBIENTES.md)). Sem ela, a publicação segue sem ensaio |
+| Secret (ambiente `staging`) | `STAGING_DB_PASSWORD` | Palavra-passe da base de staging (e, opcional, `STAGING_SUPABASE_ACCESS_TOKEN`) |
+
+Na Edge Function (Supabase → Edge Functions → Secrets), além dos que já lá estão: `KANGEST_MIN_VERSION`, opcional. É a versão mínima do KanGest que o site aceita: abaixo dela, um KanGest ligado só consulta e pede para ser actualizado ([docs/KANGEST-ONE.md](docs/KANGEST-ONE.md)).
 
 O ficheiro `app/web/public/_redirects` encaminha todas as rotas para `index.html` (SPA).
 
