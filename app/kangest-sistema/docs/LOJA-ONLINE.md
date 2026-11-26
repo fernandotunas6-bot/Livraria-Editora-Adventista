@@ -146,3 +146,15 @@ Dois separadores novos na Loja online, ao lado das Encomendas e dos Produtos:
 
   **Só se lê:** confirmar um pagamento e reembolsar fazem-se no painel (o botão leva lá). Um pagamento só fica
   confirmado pelo gateway ou por quem tem «Confirmar pagamentos».
+
+## Igrejas
+
+As igrejas, os grupos e as companhias do registo da Igreja do site chegam nas novidades dos postos, como as encomendas
+e o catálogo (`loja_igrejas`, migração 0067; no site, `kangest_novidades`, migração `20261126160000`). Seguem o número
+(CN), o nome, o tipo, o distrito, o campo, a província, o município, a morada, o delegado e se está activa. Os
+pastores, os telefones e as notas ficam no site.
+
+Em **Livraria → Loja online → Igrejas** pesquisa-se pelo nome, pelo CN, pelo distrito ou pelo município, e filtra-se por
+activas, sem cliente ou todas. **«Criar cliente»** (com a permissão «Clientes») grava o cliente com o nome, a morada e,
+nas observações, o registo (CN, distrito, campo e delegado), e fica ligado à igreja para a loja lhe facturar. Uma
+actualização que chegue depois do site não desfaz a ligação.
