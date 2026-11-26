@@ -36,6 +36,8 @@ interface Utilizador {
   ultimo_acesso: string | null;
   bloqueado_ate: string | null;
   importado: boolean;
+  /** As permissões vieram do KIGEST (aproximadas) e ainda não foram confirmadas: guardar o utilizador confirma-as. */
+  rever_permissoes?: boolean;
 }
 
 interface Perfil {
@@ -143,6 +145,7 @@ function estado(u: Utilizador) {
   if (!u.ativo) return <Badge>Inactivo</Badge>;
   if (u.bloqueado_ate) return <Badge tone="danger">Bloqueado até {u.bloqueado_ate.slice(11, 16)}</Badge>;
   if (u.mudar_senha) return <Badge tone="accent">Senha provisória</Badge>;
+  if (u.rever_permissoes) return <Badge tone="accent">Rever permissões (KIGEST)</Badge>;
   return <Badge tone="ok">Activo</Badge>;
 }
 

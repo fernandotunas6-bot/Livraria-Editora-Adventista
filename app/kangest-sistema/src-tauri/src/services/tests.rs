@@ -7429,3 +7429,121 @@ async fn o_fecho_segue_para_o_site_sem_os_nomes_dos_clientes() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// O que faltava importar do KIGEST (migração 0064, services/importar_faltava.rs): as categorias como subfamília, as
+/// permissões aproximadas e «para rever» (sem as de administrador), as vendas suspensas prontas a retomar e as
+/// prestações sociais pagas. Uma segunda importação não duplica nada, nem traz de volta uma suspensa já retomada, nem
+/// mexe em permissões já revistas.
+#[tokio::test]
+async fn kigest_o_que_faltava() {
+    let (st, pasta) = base_com_admin("kigest-o-que-faltava").await;
+    let mut t: std::collections::HashMap<String, Vec<Registo>> = std::collections::HashMap::new();
+    t.insert("tbzconfigTaxasIva".into(), vec![reg(&[("Id", Val::I(1)), ("Taxa", Val::F(0.0)), ("Descricao", s("Isento"))])]);
+    t.insert("tbArtigosFamilia".into(), vec![reg(&[("IdFamilia", Val::I(1)), ("Descricao", s("Livros"))])]);
+    t.insert("tbArtigosSubFamilia".into(), vec![reg(&[("Id", Val::I(1)), ("IdFamilia", Val::I(1)), ("Descricao", s("Devocionais"))])]);
+    t.insert("tbArtigosCategoria".into(), vec![reg(&[("IdCategoria", Val::I(1)), ("Descricao", s("Produto"))]), reg(&[("IdCategoria", Val::I(2)), ("Descricao", s("Serviço"))])]);
+    t.insert(
+        "tbArtigos".into(),
+        vec![
+            reg(&[("IdArtigo", Val::I(77)), ("Referencia", s("00091")), ("Descricao", s("O Desejado")), ("IdFamilia", Val::I(1)), ("IdSubFamilia", Val::I(1)), ("IdCategoria", Val::I(1)), ("IdTaxa", Val::I(1)), ("Preco1", Val::F(28785.0))]),
+            reg(&[("IdArtigo", Val::I(78)), ("Referencia", s("00092")), ("Descricao", s("Caminho a Cristo")), ("IdFamilia", Val::I(1)), ("IdCategoria", Val::I(1)), ("IdTaxa", Val::I(1)), ("Preco1", Val::F(18135.0))]),
+        ],
+    );
+    t.insert("tbUsuarioPrivilegio".into(), vec![reg(&[("Id", Val::I(0)), ("Privilegio", s("Vendedor"))]), reg(&[("Id", Val::I(1)), ("Privilegio", s("Admin"))])]);
+    t.insert(
+        "tbUsuario".into(),
+        vec![
+            reg(&[("IdUsuario", Val::I(1)), ("Nome", s("Ana Caixa")), ("Usuario", s("ana")), ("Privilegio", Val::I(0)), ("PosDesconto", s("S")), ("PosQuantidade", s("S")),
+                  ("FrontFat_Recibo", s("S")), ("FluxoCaixa_Regularizacao", s("N")), ("posLimeteDesconto", Val::F(10.0))]),
+            reg(&[("IdUsuario", Val::I(3)), ("Nome", s("Rui Gestor")), ("Usuario", s("rui")), ("Privilegio", Val::I(1)), ("FrontAd_Stock", s("S")), ("ForntCad_User", s("S"))]),
+        ],
+    );
+    t.insert(
+        "tbDocsCabessalhoSuspenso".into(),
+        vec![
+            reg(&[("ID", Val::I(1)), ("RefDocumento", s("FR 2026/407")), ("SiglaDocumento", s("FR")), ("DataEmissao", s("2026-08-27 00:00:00")), ("IdUsuario", Val::I(3)), ("ValTotal", Val::F(47055.0))]),
+            reg(&[("ID", Val::I(2)), ("RefDocumento", s("16")), ("SiglaDocumento", s("PP")), ("IdUsuario", Val::I(1))]),
+        ],
+    );
+    t.insert(
+        "tbDocsDetalheSuspenso".into(),
+        vec![
+            reg(&[("RefDocumento", s("FR 2026/407")), ("IdArtigo", Val::I(77)), ("Qtd", Val::F(1.0)), ("ValorUnit", Val::F(28785.0)), ("ValorTotal", Val::F(28785.0))]),
+            reg(&[("RefDocumento", s("FR 2026/407")), ("IdArtigo", Val::I(78)), ("Qtd", Val::F(1.0)), ("ValorUnit", Val::F(18135.0)), ("ValorTotal", Val::F(18135.0))]),
+            reg(&[("RefDocumento", s("FR 2026/407")), ("IdArtigo", Val::I(999)), ("Qtd", Val::F(1.0)), ("ValorUnit", Val::F(1.0))]),
+            reg(&[("RefDocumento", s("16")), ("IdArtigo", Val::I(999)), ("Qtd", Val::F(1.0))]),
+        ],
+    );
+    t.insert("tbRhFuncionarios".into(), vec![reg(&[("Id", s("F001")), ("Nome", s("Maria Kiala")), ("Salario_Base", Val::F(150000.0))])]);
+    t.insert("tbzconfigTiposPrestacao".into(), vec![reg(&[("IdTipo", Val::I(1)), ("Descritivo", s("Subsídio de Licença-Maternidade")), ("TempoMensal", Val::I(4))])]);
+    t.insert(
+        "tbRhFuncSubsidioSocias".into(),
+        vec![
+            reg(&[("ID", Val::I(5)), ("IdTipoPrestacao", Val::I(1)), ("IDFuncionario", s("F001")), ("DataProcessamento", s("2026-03-31 00:00:00")), ("DataInicial", s("2026-03-01 00:00:00")),
+                  ("DataFinal", s("2026-06-30 00:00:00")), ("TotalLiquido", Val::F(300000.0))]),
+            reg(&[("ID", Val::I(6)), ("IDFuncionario", s("F999")), ("TotalLiquido", Val::F(1.0))]),
+        ],
+    );
+    t.insert(
+        "tbRhFuncSubsidioSociasDetalhes".into(),
+        vec![
+            reg(&[("IdSubsidiosSociais", Val::I(5)), ("MesReferencia", s("2026-03")), ("DataProcessamento", s("2026-03-31 00:00:00")), ("ValorLiquido", Val::F(150000.0))]),
+            reg(&[("IdSubsidiosSociais", Val::I(5)), ("MesReferencia", s("2026-04")), ("DataProcessamento", s("2026-04-30 00:00:00")), ("ValorLiquido", Val::F(150000.0))]),
+        ],
+    );
+    let opcoes = Opcoes { empresa: false, artigos: true, stock: false, clientes: false, fornecedores: false, utilizadores: true, documentos: true, rh: true, lotes: false, oficina: false, tesouraria: false, simular: false };
+    let mut fonte = Memoria(t);
+    let r = importar_dados(&st, &mut fonte, &opcoes, "teste/o-que-faltava").await.expect("importar");
+    let conta = |nome: &str| r["contagens"].as_array().unwrap().iter().find(|c| c["conjunto"] == nome).map(|c| c["registos"].as_i64().unwrap());
+    assert_eq!((conta("Vendas suspensas"), conta("Prestações sociais")), (Some(1), Some(1)), "{r}");
+    let avisos = r["avisos"].to_string();
+    assert!(avisos.contains("para rever") && avisos.contains("vendas suspensas") && avisos.contains("funcionário não veio"), "{avisos}");
+
+    // as categorias: o artigo sem subfamília fica na «Produto» da família dele; o outro mantém a sua
+    let sub: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT a.referencia, s.descricao FROM artigos a LEFT JOIN subfamilias s ON s.id = a.subfamilia_id WHERE a.referencia IN ('00091', '00092') ORDER BY a.referencia",
+    )
+    .fetch_all(&st.pool)
+    .await
+    .unwrap();
+    assert_eq!(sub, vec![("00091".to_string(), Some("Devocionais".to_string())), ("00092".to_string(), Some("Produto".to_string()))]);
+
+    // as permissões: aproximadas, «para rever», sem as de administrador, e o ADMIN nunca vem do KIGEST
+    let lista = rpc(&st, "utilizadores.listar", Value::Null).await;
+    let u = |login: &str| lista.as_array().unwrap().iter().find(|x| x["login"] == login).cloned().unwrap();
+    let (ana, rui) = (u("ana"), u("rui"));
+    assert_eq!((ana["perfil"].as_str(), rui["perfil"].as_str()), (Some("CAIXA"), Some("GESTOR")));
+    assert_eq!(ana["rever_permissoes"], true);
+    assert_eq!(ana["limite_desconto"], 10.0);
+    let perms = |v: &Value| v["permissoes"].as_array().unwrap().iter().map(|p| p.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(perms(&ana), vec!["pos.desconto", "pos.quantidade", "vendas.fatura_recibo"]);
+    assert_eq!(perms(&rui), vec!["stock.entrada"], "a gestão de utilizadores (só de administrador) não vem do KIGEST");
+
+    // a venda suspensa, pronta a retomar no POS, com os artigos de cá e sem a linha do artigo que não veio
+    let suspensas = rpc(&st, "suspensos.listar", Value::Null).await;
+    assert_eq!(suspensas.as_array().unwrap().len(), 1, "{suspensas}");
+    assert!(suspensas[0]["descricao"].as_str().unwrap().contains("FR 2026/407"));
+    assert_eq!(suspensas[0]["total"], 4692000);
+    let aberta = rpc(&st, "suspensos.abrir", json!({ "id": suspensas[0]["id"] })).await;
+    assert_eq!(aberta["dados"]["linhas"].as_array().unwrap().len(), 2);
+    assert_eq!(aberta["dados"]["linhas"][0]["preco"], 2878500);
+
+    // a prestação social, com os dois meses pagos
+    let (tipo, mensal, meses): (String, i64, i64) = sqlx::query_as("SELECT tipo, liquido_mensal, meses FROM rh_prestacoes WHERE id_origem = '5'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!((tipo.as_str(), mensal, meses), ("Subsídio de Licença-Maternidade", 15000000, 2));
+    let pagos: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rh_prestacao_pagamentos").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(pagos, 2);
+
+    // o administrador revê a Ana; uma segunda importação não duplica nada, não traz de volta a suspensa já retomada
+    // nem mexe nas permissões revistas
+    rpc(&st, "utilizadores.guardar", json!({ "id": ana["id"], "nome": "Ana Caixa", "login": "ana", "perfil": "CAIXA", "ativo": true, "permissoes": ["pos.desconto"], "limite_desconto": 5 })).await;
+    let r2 = importar_dados(&st, &mut fonte, &opcoes, "teste/o-que-faltava").await.expect("importar outra vez");
+    let conta2 = |nome: &str| r2["contagens"].as_array().unwrap().iter().find(|c| c["conjunto"] == nome).map(|c| c["registos"].as_i64().unwrap());
+    assert_eq!((conta2("Vendas suspensas"), conta2("Prestações sociais")), (Some(0), Some(0)));
+    assert!(rpc(&st, "suspensos.listar", Value::Null).await.as_array().unwrap().is_empty(), "a retomada não volta");
+    let ana2 = rpc(&st, "utilizadores.listar", Value::Null).await.as_array().unwrap().iter().find(|x| x["login"] == "ana").cloned().unwrap();
+    assert_eq!(ana2["rever_permissoes"], false);
+    assert_eq!(ana2["limite_desconto"], 5.0);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

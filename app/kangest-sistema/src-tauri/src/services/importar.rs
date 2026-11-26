@@ -25,6 +25,10 @@ use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
+// O que faltava importar (categorias, permissões, vendas suspensas e prestações sociais; migração 0064).
+#[path = "importar_faltava.rs"]
+mod faltava;
+
 // ------------------------------------------------------------------ valores
 #[derive(Debug, Clone)]
 pub enum Val {
@@ -793,6 +797,7 @@ const TABELAS: &[(&str, &[&str])] = &[
     ("unidades", &["tbArtigosUnidade"]),
     ("familias", &["tbArtigosFamilia"]),
     ("subfamilias", &["tbArtigosSubFamilia"]),
+    ("categorias", &["tbArtigosCategoria"]),
     ("armazens", &["tbzconfigArmazem"]),
     ("artigos", &["tbArtigos"]),
     ("tipos_inventario", &["tbArtigosTipoInventario"]),
@@ -800,6 +805,12 @@ const TABELAS: &[(&str, &[&str])] = &[
     ("clientes", &["tbClientes", "tbCliente", "vsClientes"]),
     ("fornecedores", &["tbFornecedores", "tbFornecedor", "vsFornecedores"]),
     ("utilizadores", &["tbUsuario", "tbUsuarios"]),
+    ("privilegios", &["tbUsuarioPrivilegio"]),
+    ("suspensos", &["tbDocsCabessalhoSuspenso"]),
+    ("suspenso_linhas", &["tbDocsDetalheSuspenso"]),
+    ("rh_prestacoes", &["tbRhFuncSubsidioSocias"]),
+    ("rh_prestacao_meses", &["tbRhFuncSubsidioSociasDetalhes"]),
+    ("rh_tipos_prestacao", &["tbzconfigTiposPrestacao"]),
     ("tipos", &["tbzconfigTiposDocumentos"]),
     ("documentos", &["tbDocumentosCabessalho"]),
     ("linhas", &["tbDocumentosDetalhe"]),
@@ -1056,6 +1067,7 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
     let unidades = if precisa_tabelas { ler_opt(fonte, &tabs, "unidades").await? } else { vec![] };
     let familias = if precisa_tabelas { ler_opt(fonte, &tabs, "familias").await? } else { vec![] };
     let subfamilias = if precisa_tabelas { ler_opt(fonte, &tabs, "subfamilias").await? } else { vec![] };
+    let categorias = if op.artigos { faltava::categorias(&ler_opt(fonte, &tabs, "categorias").await?) } else { HashMap::new() };
     let armazens = ler_opt(fonte, &tabs, "armazens").await?;
     let artigos = if op.artigos || op.documentos || op.lotes || op.oficina { ler_opt(fonte, &tabs, "artigos").await? } else { vec![] };
     let tipos_inventario = if op.artigos { ler_opt(fonte, &tabs, "tipos_inventario").await? } else { vec![] };
@@ -1063,6 +1075,14 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
     let clientes = if op.clientes || op.documentos || op.oficina { ler_opt(fonte, &tabs, "clientes").await? } else { vec![] };
     let fornecedores = if op.fornecedores || op.documentos { ler_opt(fonte, &tabs, "fornecedores").await? } else { vec![] };
     let utilizadores = if op.utilizadores { ler_opt(fonte, &tabs, "utilizadores").await? } else { vec![] };
+    let privilegios = if op.utilizadores { faltava::privilegios(&ler_opt(fonte, &tabs, "privilegios").await?) } else { HashMap::new() };
+    let (suspensos, suspenso_linhas) =
+        if op.documentos { (ler_opt(fonte, &tabs, "suspensos").await?, ler_opt(fonte, &tabs, "suspenso_linhas").await?) } else { (vec![], vec![]) };
+    let (prestacoes, prestacao_meses, tipos_prestacao) = if op.rh {
+        (ler_opt(fonte, &tabs, "rh_prestacoes").await?, ler_opt(fonte, &tabs, "rh_prestacao_meses").await?, ler_opt(fonte, &tabs, "rh_tipos_prestacao").await?)
+    } else {
+        (vec![], vec![], vec![])
+    };
     let (tipos, docs, linhas, pagamentos, cc) = if op.documentos {
         (
             ler_opt(fonte, &tabs, "tipos").await?,
@@ -1272,6 +1292,7 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
         })
         .collect();
     let mut n_art = 0;
+    let mut subfamilias_das_categorias: HashMap<(i64, String), i64> = HashMap::new();
     for r in &artigos {
         let id_k = i(r, &["IdArtigo", "Id"]);
         let referencia = t(r, &["Referencia", "Codigo"]).or_else(|| id_k.map(|x| format!("K{x}")));
@@ -1295,7 +1316,11 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
             t(r, &["DescricaoCurta"]),
             if servico { "S" } else { "P" },
             fam.map(|f| f.0),
-            i(r, &["IdSubFamilia"]).and_then(|s| mapas.subfamilias.get(&s).copied()),
+            match i(r, &["IdSubFamilia"]).and_then(|s| mapas.subfamilias.get(&s).copied()) {
+                Some(s) => Some(s),
+                // sem subfamília própria: a categoria do KIGEST, dentro da família do artigo
+                None => faltava::subfamilia_da_categoria(&mut tx, &mut subfamilias_das_categorias, &categorias, fam.map(|f| f.0), i(r, &["IdCategoria"])).await?,
+            },
             i(r, &["IdUnidadeVenda", "IdUnidade"]).and_then(|u| mapas.unidades.get(&u).copied()).or(Some(1)),
         );
         // No KIGEST as vendas abatem o stock mesmo com ControloStock = «N» (na base real, em 250 de 276 artigos
@@ -1319,6 +1344,10 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
                     .bind(id)
                     .execute(&mut *tx)
                     .await?;
+                // a subfamília (ou a categoria) só se o artigo ainda não tem nenhuma: não se desfaz o que se arrumou cá
+                if let Some(sub) = campos.4 {
+                    sqlx::query("UPDATE artigos SET subfamilia_id = ? WHERE id = ? AND subfamilia_id IS NULL").bind(sub).bind(id).execute(&mut *tx).await?;
+                }
                 id
             }
             None => sqlx::query(
@@ -1535,7 +1564,7 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
 
     // 7) utilizadores (senhas provisórias — as do KIGEST não são reaproveitáveis)
     if op.utilizadores {
-        let mut n_u = 0;
+        let (mut n_u, mut n_perm) = (0, 0);
         for r in &utilizadores {
             let Some(login) = t(r, &["Usuario", "Login", "NomeUsuario", "Utilizador"]) else { continue };
             let id_k = i(r, &["IdUsuario", "Id"]);
@@ -1568,12 +1597,21 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
             };
             if let Some(k) = id_k {
                 mapas.utilizadores.insert(k, id);
+                // as permissões que tinha no KIGEST, aproximadas e «para rever» (só se ninguém lhes mexeu cá)
+                if faltava::aplicar_permissoes(&mut tx, id, r, &privilegios).await? {
+                    n_perm += 1;
+                }
             }
         }
         if !utilizadores.is_empty() {
             rel.conta("Utilizadores", n_u);
             if n_u > 0 {
-                rel.avisos.push("Os utilizadores importados receberam senhas provisórias (listadas abaixo) e o perfil CAIXA. Reveja perfis e permissões.".into());
+                rel.avisos.push("Os utilizadores importados receberam senhas provisórias (listadas abaixo).".into());
+            }
+            if n_perm > 0 {
+                rel.avisos.push(format!(
+                    "{n_perm} utilizador(es) ficaram com as permissões do KIGEST, aproximadas às do KanGest e marcadas «para rever»: confirme-as em Sistema → Utilizadores. As só de administrador não vêm do KIGEST."
+                ));
             }
         }
     }
@@ -1589,8 +1627,12 @@ pub async fn importar_dados<F: Fonte>(st: &AppState, fonte: &mut F, op: &Opcoes,
         }
     }
 
+    // 8b) as vendas suspensas do POS do KIGEST (prontas a retomar)
+    faltava::vendas_suspensas(&mut tx, &mut rel, &mapas, &suspensos, &suspenso_linhas, sessao.id).await?;
+
     // 9) recursos humanos, lotes e oficina
     n_rh(&mut tx, &mut rel, &extras).await?;
+    faltava::prestacoes(&mut tx, &mut rel, &prestacoes, &prestacao_meses, &tipos_prestacao, sessao.id).await?;
     n_lotes(&mut tx, &mut rel, &mapas, &extras.lotes).await?;
     n_oficina(&mut tx, &mut rel, &mapas, &extras, sessao.id).await?;
     // 10) recibos, retenções e proformas (histórico), tesouraria e caixa, salários processados
