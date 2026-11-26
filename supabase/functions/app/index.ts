@@ -6318,6 +6318,148 @@ const UNEXPECTED_ERROR = "Ocorreu um erro inesperado. Tente novamente dentro de 
 // 1 MB: folga sobre a assinatura da confirmação de entrega (600 KB) e o checkout (200 KB).
 const MAX_BODY_BYTES = 1_000_000;
 
+// ===================================================================================================================
+// API v1 (KANGEST ONE, fase C; contrato em docs/api/openapi.json, conferido por apiV1.test.ts)
+// ===================================================================================================================
+// - Tudo debaixo de `/api/v1/`. As respostas vêm em `{ data }` (e `next_cursor`, nas listas); os erros em
+//   `{ error: { status, message }, ref }`.
+// - Cada rota reutiliza o que já existe: `rotaV1` usa uma rota antiga com o mesmo acesso e o mesmo handler; as outras
+//   chamam as mesmas funções da base, com o acesso das rotas antigas equivalentes (o teste confere).
+// - As escritas levam `Idempotency-Key`: o mesmo pedido repetido devolve a primeira resposta (24 horas).
+// - As rotas antigas continuam como estão (o site e o KanGest usam-nas).
+const API_V1_VERSAO = "1";
+const CHAVE_IDEMPOTENCIA_V1 = /^[A-Za-z0-9_.:-]{8,100}$/;
+
+/** A resposta de uma rota antiga, em `{ data }`. */
+async function respostaV1(res: Response): Promise<Response> {
+  const corpo = await res.json().catch(() => null);
+  if (res.status >= 400) {
+    throw new HttpError(res.status, (corpo as Row | null)?.message || "Pedido recusado.");
+  }
+  return json({ data: corpo }, res.status);
+}
+
+/** O cursor das listas: opaco para quem chama (é o deslocamento, em base64url). */
+const cursorV1 = (offset: number) => btoa(`o:${offset}`).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+function paginaV1(url: URL, porOmissao = 50, maximo = 200): { limit: number; offset: number } {
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || porOmissao, 1), maximo);
+  const c = url.searchParams.get("cursor") || "";
+  let offset = 0;
+  if (c) {
+    try {
+      const m = atob(c.replace(/-/g, "+").replace(/_/g, "/")).match(/^o:(\d{1,9})$/);
+      if (!m) throw new Error();
+      offset = Number(m[1]);
+    } catch {
+      throw bad("Cursor inválido.");
+    }
+  }
+  return { limit, offset };
+}
+
+/** As escritas: o mesmo `Idempotency-Key` da mesma pessoa na mesma rota devolve a primeira resposta (24 horas). */
+async function idempotenteV1(ctx: CtxComSessao, rota: string, fazer: () => Promise<Response>): Promise<Response> {
+  const chave = (ctx.req.headers.get("idempotency-key") || "").trim();
+  if (!CHAVE_IDEMPOTENCIA_V1.test(chave)) {
+    throw bad("As escritas da API v1 levam o cabeçalho Idempotency-Key (8 a 100 letras, algarismos ou _ . : -).");
+  }
+  const desde = new Date(Date.now() - 86_400_000).toISOString();
+  const { data: antes } = await db.from("api_idempotencia").select("estado, resposta")
+    .eq("utilizador", ctx.auth.id).eq("rota", rota).eq("chave", chave).gte("criado_em", desde).maybeSingle();
+  if (antes) return json(antes.resposta, antes.estado, { "Idempotent-Replayed": "true" });
+  const res = await fazer();
+  const corpo = await res.clone().json().catch(() => null);
+  if (corpo !== null && res.status < 500) {
+    const { error } = await db.from("api_idempotencia")
+      .upsert({ utilizador: ctx.auth.id, rota, chave, estado: res.status, resposta: corpo }, { onConflict: "utilizador,rota,chave", ignoreDuplicates: true });
+    if (error) console.error("API v1: idempotência por guardar", rota, error.message);
+  }
+  // de vez em quando, as de há mais de um dia saem
+  if (Math.random() < 0.02) await db.from("api_idempotencia").delete().lt("criado_em", desde);
+  return res;
+}
+
+/**
+ * Uma rota v1 sobre uma rota que já existe: o mesmo acesso e o mesmo handler, com a resposta em `{ data }`. As escritas
+ * passam pela idempotência.
+ */
+function rotaV1(method: "GET" | "POST", caminho: string, existente: string) {
+  const base = routes[existente];
+  if (!base) throw new Error(`API v1: a rota ${existente} não existe.`);
+  const registar = route as unknown as (m: string, p: string, a: Access, h: Handler) => void;
+  registar(method, caminho, base.access, async (ctx) => {
+    const fazer = async () => respostaV1(await base.handler(ctx));
+    return method === "POST" && ctx.auth ? idempotenteV1(ctx as CtxComSessao, caminho, fazer) : fazer();
+  });
+}
+
+// --- o índice e o sistema ------------------------------------------------------------------------------------------
+route("GET", "/api/v1", publica("o índice da API v1: a versão e as famílias de rotas, sem dados"), async () => json({
+  data: {
+    versao: API_V1_VERSAO,
+    contrato: "docs/api/openapi.json",
+    familias: ["auth", "users", "permissions", "system", "integrations", "synchronization"],
+  },
+}));
+
+route("GET", "/api/v1/system/info", publica("a versão da API e a versão mínima do KanGest; nenhum segredo"), async () => json({
+  data: {
+    api: API_V1_VERSAO,
+    kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
+    hora: new Date().toISOString(),
+  },
+}));
+
+// --- auth e permissions -------------------------------------------------------------------------------------------
+route("GET", "/api/v1/auth/me", sessao(), async ({ auth }) => json({
+  data: {
+    id: auth.id,
+    email: auth.email,
+    role: auth.role,
+    equipa: isStaff(auth),
+    permissoes: PERMISSION_KEYS.filter((k) => can(auth, k)),
+  },
+}));
+
+route("GET", "/api/v1/permissions", sessao(), async ({ auth }) => json({
+  data: PERMISSION_KEYS.map((chave) => ({ chave, minha: can(auth, chave) })),
+}));
+
+// --- users: a mesma função e a mesma permissão que GET /admin/users, com cursor ------------------------------------
+route("GET", "/api/v1/users", permissao("manage_users"), async ({ url }) => {
+  const { limit, offset } = paginaV1(url, 50, 100);
+  const scope = ["team", "customers", "all"].includes(url.searchParams.get("scope") || "") ? url.searchParams.get("scope") : "all";
+  const { data, error } = await db.rpc("admin_users_list", {
+    p_scope: scope,
+    p_search: cleanText(url.searchParams.get("q"), 100),
+    p_status: cleanText(url.searchParams.get("status"), 20) || "all",
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw bad(error.message);
+  const lista: unknown[] = Array.isArray((data as Row)?.items) ? (data as Row).items : [];
+  const total = Number((data as Row)?.total) || 0;
+  return json({ data: lista, total, next_cursor: offset + lista.length < total ? cursorV1(offset + lista.length) : null });
+});
+
+// --- integrations: o estado de cada ligação (nunca os segredos) ----------------------------------------------------
+route("GET", "/api/v1/integrations", permissao("manage_settings"), async (ctx) => {
+  const mensagens = await routes["GET /messaging/status"].handler(ctx).then((r) => r.json());
+  return json({
+    data: {
+      ...mensagens,
+      pagamentos: { gateway: gatewayProvider(), segredo: !!(Deno.env.get("PAYMENT_WEBHOOK_SECRET") || "").trim() },
+      kangest: { sincronizacao: await sincConfigurada() },
+    },
+  });
+});
+
+// --- synchronization: os postos do KanGest, o livro de stock e as sessões (as rotas do painel) ---------------------
+rotaV1("GET", "/api/v1/synchronization/postos", "GET /admin/kangest/postos");
+rotaV1("GET", "/api/v1/synchronization/postos/livro", "GET /admin/kangest/postos/livro");
+rotaV1("POST", "/api/v1/synchronization/sessoes/revogar", "POST /admin/kangest/sessoes/revogar");
+rotaV1("POST", "/api/v1/synchronization/sincronizar", "POST /admin/kangest/sincronizar");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   // Id de correlação: vai em todas as respostas e em cada registo de erro, por isso uma
@@ -6328,7 +6470,11 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/functions\/v1/, "").replace(/^\/app/, "").replace(/\/$/, "") || "/";
   const entry = routes[`${req.method} ${path}`];
-  if (!entry) return json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
+  // a API v1 tem um só formato de erro: { error: { status, message }, ref }
+  const v1 = path === "/api/v1" || path.startsWith("/api/v1/");
+  const erroV1 = (status: number, message: string, headers: Record<string, string> = {}) =>
+    json({ error: { status, message }, ref: requestId }, status, { ...headers, "X-Request-Id": requestId });
+  if (!entry) return v1 ? erroV1(404, "Rota não encontrada.") : json({ message: "Rota não encontrada." }, 404, { "X-Request-Id": requestId });
   let auth: Auth = null;
   try {
     let body: Row = {};
@@ -6361,6 +6507,7 @@ Deno.serve(async (req) => {
     return res;
   } catch (err) {
     if (err instanceof HttpError) {
+      if (v1) return erroV1(err.status, err.message, err.headers);
       return json({ message: err.message, status: err.status }, err.status, { ...err.headers, "X-Request-Id": requestId });
     }
     console.log(`Erro em ${req.method} ${path} [${requestId}]:`, err);
@@ -6372,6 +6519,7 @@ Deno.serve(async (req) => {
     // A referência curta vai na própria frase: é o que o cliente copia para o WhatsApp da
     // loja, e os primeiros 8 caracteres chegam para encontrar o pedido nos registos.
     const publicMessage = `${UNEXPECTED_ERROR} (ref. ${requestId.slice(0, 8)})`;
+    if (v1) return erroV1(500, isStaff(auth) ? detail : publicMessage);
     return json(
       { message: isStaff(auth) ? detail : publicMessage, ref: requestId, status: 500 },
       500,

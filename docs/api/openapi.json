@@ -1,0 +1,595 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "KanGest Core API (Livraria Editora Adventista)",
+    "version": "1",
+    "description": "A API v1 do ecossistema KANGEST ONE, na Edge Function `app` do Supabase. As respostas vêm em `{ data }` (e `next_cursor` nas listas); os erros em `{ error: { status, message }, ref }`. As escritas levam `Idempotency-Key`. Cada rota declara o acesso em `x-acesso` (conferido contra o código por supabase/functions/app/apiV1.test.ts); `x-reutiliza` diz a rota antiga de que é o mesmo handler e o mesmo acesso."
+  },
+  "servers": [
+    {
+      "url": "https://{projecto}.supabase.co/functions/v1/app",
+      "variables": {
+        "projecto": {
+          "default": "bggqkjjqbjhbjsckzopj"
+        }
+      }
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "sessao": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A sessão do Supabase Auth da pessoa (o mesmo token do site e do KanGest). A equipa precisa dos dois passos."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "8 a 100 letras, algarismos ou _ . : - ; o mesmo valor repetido nas 24 horas seguintes devolve a primeira resposta (com o cabeçalho Idempotent-Replayed).",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "description": "O next_cursor da página anterior.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Erro": {
+        "description": "Erro.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "error",
+                "ref"
+              ],
+              "properties": {
+                "error": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "message"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "integer"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "ref": {
+                  "type": "string",
+                  "description": "O id do pedido, para procurar nos registos."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "summary": "O índice da API: a versão e as famílias de rotas.",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/system/info": {
+      "get": {
+        "summary": "A versão da API e a versão mínima do KanGest (KANGEST_MIN_VERSION).",
+        "x-acesso": {
+          "tipo": "publica"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Quem está a pedir: o id, o email, o papel e as permissões efectivas.",
+        "x-acesso": {
+          "tipo": "sessao"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ]
+      }
+    },
+    "/api/v1/permissions": {
+      "get": {
+        "summary": "O catálogo das permissões, com as que a pessoa tem.",
+        "x-acesso": {
+          "tipo": "sessao"
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chave": {
+                            "type": "string"
+                          },
+                          "minha": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "summary": "As contas (a mesma função e a mesma permissão de GET /admin/users), por páginas.",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_users"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Uma página.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "team",
+                "customers",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/integrations": {
+      "get": {
+        "summary": "O estado de cada ligação (mensagens, pagamentos, KanGest), sem segredos.",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ]
+      }
+    },
+    "/api/v1/synchronization/postos": {
+      "get": {
+        "summary": "Os postos do KanGest: o estado, o computador, as sessões abertas e o livro de stock.",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "x-reutiliza": "GET /admin/kangest/postos"
+      }
+    },
+    "/api/v1/synchronization/postos/livro": {
+      "get": {
+        "summary": "Onde o livro de stock de um posto não bate certo com a fotografia (até 200).",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "x-reutiliza": "GET /admin/kangest/postos/livro",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/synchronization/sessoes/revogar": {
+      "post": {
+        "summary": "Termina uma sessão aberta num KanGest (na volta seguinte do posto).",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "x-reutiliza": "POST /admin/kangest/sessoes/revogar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/synchronization/sincronizar": {
+      "post": {
+        "summary": "Corre já uma volta da sincronização com o KiGest (a ligação antiga).",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "x-reutiliza": "POST /admin/kangest/sincronizar",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
