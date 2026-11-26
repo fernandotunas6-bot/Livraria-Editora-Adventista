@@ -11,7 +11,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound, Users, Wallet } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
 import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
@@ -131,7 +131,7 @@ export default function LojaOnline() {
     };
   }, [qc]);
   const estado = useQuery({ queryKey: ["loja-estado"], queryFn: () => call<EstadoLoja>("loja.estado"), refetchInterval: 30000 });
-  const [aba, setAba] = useState<"encomendas" | "produtos">("encomendas");
+  const [aba, setAba] = useState<"encomendas" | "produtos" | "clientes" | "pagamentos">("encomendas");
   const e = estado.data;
   const site = e?.ligacao?.site_url || "https://livrariaadventista.ao";
 
@@ -179,6 +179,8 @@ export default function LojaOnline() {
                 [
                   ["encomendas", "Encomendas", ShoppingBag],
                   ["produtos", "Produtos", Package],
+                  ["clientes", "Clientes", Users],
+                  ["pagamentos", "Pagamentos", Wallet],
                 ] as const
               ).map(([id, rotulo, Icone]) => (
                 <button
@@ -195,7 +197,10 @@ export default function LojaOnline() {
             </div>
           </div>
           <ContaSite />
-          {aba === "encomendas" ? <Encomendas e={e} site={site} /> : <Produtos e={e} site={site} />}
+          {aba === "encomendas" && <Encomendas e={e} site={site} />}
+          {aba === "produtos" && <Produtos e={e} site={site} />}
+          {aba === "clientes" && <Clientes onVerEncomendas={() => setAba("encomendas")} />}
+          {aba === "pagamentos" && <Pagamentos site={site} />}
           <p className="text-[12px] text-ink-3">
             Com a sua conta do site, as encomendas confirmam-se, preparam-se e entregam-se aqui, com as suas permissões, e o cliente é
             avisado como no painel. Sem Internet, a alteração fica na fila e segue quando a ligação voltar. Os produtos mudam-se no painel
@@ -216,9 +221,14 @@ function Encomendas({ e, site }: { e: EstadoLoja; site: string }) {
   useEffect(() => {
     const f = sp.get("filtro");
     const enc = sp.get("encomenda");
-    if (f === null && enc === null) return;
+    const pesquisa = sp.get("q");
+    if (f === null && enc === null && pesquisa === null) return;
     if (f !== null) setFiltro(f);
     if (enc) setAberta(enc);
+    if (pesquisa !== null) {
+      setQ(pesquisa);
+      setFiltro("");
+    }
     // o pedido já foi atendido: o endereço volta ao da Loja online (e Voltar não o repete)
     setSp({}, { replace: true });
   }, [sp, setSp]);
@@ -1085,5 +1095,203 @@ function FilaAlteracoes({ onFechar }: { onFechar: () => void }) {
         </Table>
       )}
     </Modal>
+  );
+}
+
+// ------------------------------------------------------------------ clientes (da cópia local das encomendas)
+
+interface ClienteLoja {
+  cliente: string;
+  telefone: string;
+  encomendas: number;
+  em_aberto: number;
+  total: number;
+  ultima: string;
+}
+
+/** Os clientes que encomendaram nesta loja pelo site (src-tauri/src/sinc/loja.rs, `clientes`): sem Internet e só desta loja. */
+function Clientes({ onVerEncomendas }: { onVerEncomendas: () => void }) {
+  const [q, setQ] = useState("");
+  const [, setSp] = useSearchParams();
+  const lista = useQuery({ queryKey: ["loja-clientes", q], queryFn: () => call<ClienteLoja[]>("loja.clientes", { q }) });
+  const ver = (c: ClienteLoja) => {
+    setSp({ q: c.telefone || c.cliente });
+    onVerEncomendas();
+  };
+  return (
+    <Card>
+      <div className="relative p-3">
+        <Search className="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
+        <Input value={q} onChange={(x) => setQ(x.target.value)} placeholder="Nome ou telefone" aria-label="Pesquisar clientes" className="pl-9" />
+      </div>
+      {(lista.data ?? []).length === 0 ? (
+        <Empty icon={<Users className="size-6" />} title={q ? "Nenhum cliente com essa pesquisa" : "Ainda sem clientes"} text="Os clientes aparecem com as encomendas do site para esta loja." />
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <Th>Cliente</Th>
+              <Th>Telefone</Th>
+              <Th className="text-right">Encomendas</Th>
+              <Th className="text-right">Em aberto</Th>
+              <Th className="text-right">Total</Th>
+              <Th>Última</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {(lista.data ?? []).map((c) => (
+              <tr key={`${c.cliente}-${c.telefone}`} className="cursor-pointer hover:bg-sunken" onClick={() => ver(c)} title="Ver as encomendas deste cliente">
+                <Td className="font-medium">{c.cliente}</Td>
+                <Td>{c.telefone || "—"}</Td>
+                <Td className="text-right tabular-nums">{c.encomendas}</Td>
+                <Td className="text-right tabular-nums">{c.em_aberto > 0 ? <Badge tone="accent">{c.em_aberto}</Badge> : 0}</Td>
+                <Td className="text-right tabular-nums">{emKz(c.total)}</Td>
+                <Td>{quando(c.ultima)}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Card>
+  );
+}
+
+// ------------------------------------------------------------------ pagamentos (o relatório do painel, com a conta do site)
+
+interface RelatorioPagamentos {
+  received: { payments: number; refunds: number; net: number; count: number; automatic: number; manual: number };
+  by_method: { method_code: string; method_name: string; received: number; refunded: number; count: number }[];
+  receivable: { amount: number; count: number };
+  to_confirm: { count: number; amount: number; items: { payment_id: string; order_id: string; order_number: string; customer_name: string; amount: number; method_name: string | null; created: string }[] };
+  delivered_unpaid: { count: number; amount: number };
+}
+
+const hojeISO = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Africa/Luanda" });
+const PERIODOS: [string, string, () => [string, string]][] = [
+  ["mes", "Este mês", () => [hojeISO().slice(0, 8) + "01", hojeISO()]],
+  [
+    "anterior",
+    "Mês passado",
+    () => {
+      const d = new Date(`${hojeISO().slice(0, 8)}01T12:00:00`);
+      d.setDate(0);
+      const fim = d.toLocaleDateString("sv-SE");
+      return [fim.slice(0, 8) + "01", fim];
+    },
+  ],
+  [
+    "30",
+    "Últimos 30 dias",
+    () => {
+      const d = new Date(`${hojeISO()}T12:00:00`);
+      d.setDate(d.getDate() - 29);
+      return [d.toLocaleDateString("sv-SE"), hojeISO()];
+    },
+  ],
+];
+
+/** Os pagamentos da loja online: o relatório «Pagamentos e caixa» do painel (src-tauri/src/sinc/pagamentos.rs). Só se lê:
+ * confirmar e reembolsar faz-se no painel. */
+function Pagamentos({ site }: { site: string }) {
+  const conta = useContaSite();
+  const [periodo, setPeriodo] = useState("mes");
+  const [de, ate] = (PERIODOS.find((p) => p[0] === periodo) ?? PERIODOS[0])[2]();
+  const r = useQuery({
+    queryKey: ["loja-pagamentos", de, ate],
+    queryFn: () => call<RelatorioPagamentos>("loja.pagamentos", { de, ate }),
+    enabled: !!conta.data?.entrou,
+    retry: false,
+  });
+  if (!conta.data?.entrou)
+    return (
+      <Card className="p-5 text-[13.5px] text-ink-2">
+        Os pagamentos vêm do site, com as suas permissões de lá: entre com a sua conta do site (em cima) para os ver aqui.
+      </Card>
+    );
+  const d = r.data;
+  const cartao = (rotulo: string, valor: string, detalhe?: string, tom?: string) => (
+    <div className="rounded-xl border border-line bg-surface px-4 py-3">
+      <p className="text-[12px] text-ink-3">{rotulo}</p>
+      <p className={cn("text-xl font-semibold tabular-nums", tom)}>{valor}</p>
+      {detalhe && <p className="text-[12px] text-ink-3">{detalhe}</p>}
+    </div>
+  );
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1 rounded-lg bg-sunken p-1">
+          {PERIODOS.map(([id, nome]) => (
+            <button key={id} onClick={() => setPeriodo(id)} className={cn("rounded-md px-3 py-1.5 text-[13px]", periodo === id ? "bg-surface font-medium shadow-sm" : "text-ink-3")}>
+              {nome}
+            </button>
+          ))}
+        </div>
+        <span className="text-[12.5px] text-ink-3">
+          {de.split("-").reverse().join("/")} a {ate.split("-").reverse().join("/")}
+        </span>
+        {site && (
+          <Button variant="ghost" className="ml-auto" onClick={() => abrirNoSite(`${site}/admin?tab=pagamentos-caixa`)}>
+            <ExternalLink className="size-4" /> Confirmar e reembolsar no painel
+          </Button>
+        )}
+      </div>
+      {r.isError && <Card className="p-4 text-[13.5px] text-danger">{(r.error as Error).message}</Card>}
+      {r.isLoading && <Card className="p-4 text-[13.5px] text-ink-3">A pedir ao site…</Card>}
+      {d && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {cartao("Recebido (líquido)", emKz(d.received.net), `${d.received.count} pagamento(s) · ${emKz(d.received.refunds)} reembolsado(s)`)}
+            {cartao("Por confirmar", emKz(d.to_confirm.amount), `${d.to_confirm.count} pagamento(s) indicados pelos clientes`, d.to_confirm.count > 0 ? "text-accent-ink" : undefined)}
+            {cartao("Por receber", emKz(d.receivable.amount), `${d.receivable.count} encomenda(s) em aberto`)}
+            {cartao("Entregue sem pagamento", emKz(d.delivered_unpaid.amount), `${d.delivered_unpaid.count} encomenda(s)`, d.delivered_unpaid.count > 0 ? "text-danger" : undefined)}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Card>
+              <p className="border-b border-line px-4 py-2.5 text-[13px] font-medium">Por método</p>
+              {d.by_method.length === 0 ? (
+                <p className="p-4 text-[13px] text-ink-3">Sem pagamentos no período.</p>
+              ) : (
+                <Table>
+                  <tbody>
+                    {d.by_method.map((m) => (
+                      <tr key={m.method_code || m.method_name}>
+                        <Td>{m.method_name || m.method_code}</Td>
+                        <Td className="text-right tabular-nums">{m.count}</Td>
+                        <Td className="text-right tabular-nums">{emKz(m.received - m.refunded)}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card>
+            <Card>
+              <p className="border-b border-line px-4 py-2.5 text-[13px] font-medium">Por confirmar</p>
+              {d.to_confirm.items.length === 0 ? (
+                <p className="p-4 text-[13px] text-ink-3">Nenhum pagamento à espera de confirmação.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {d.to_confirm.items.map((x) => (
+                    <li key={x.payment_id}>
+                      <Link to={`/loja-online?encomenda=${encodeURIComponent(x.order_id)}`} className="flex items-center gap-3 px-4 py-2.5 text-[13px] hover:bg-sunken">
+                        <span className="font-mono font-medium">{x.order_number}</span>
+                        <span className="min-w-0 flex-1 truncate text-ink-2">
+                          {x.customer_name}
+                          {x.method_name ? ` · ${x.method_name}` : ""}
+                        </span>
+                        <span className="tabular-nums font-medium">{emKz(x.amount)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+          <p className="text-[12px] text-ink-3">
+            O mesmo relatório do painel do site («Pagamentos e caixa»), com as suas permissões de lá. Os reembolsos são as devoluções em dinheiro. Confirmar um
+            pagamento e reembolsar fazem-se no painel.
+          </p>
+        </>
+      )}
+    </div>
   );
 }

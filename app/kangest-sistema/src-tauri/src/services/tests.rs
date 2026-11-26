@@ -7924,3 +7924,40 @@ async fn o_estado_do_computador_so_leva_numeros_e_marcas() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// Os clientes da loja online saem da cópia local das encomendas: a mesma pessoa (nome e telefone) junta-se, as
+/// canceladas não contam para o total, e as em aberto contam-se à parte.
+#[tokio::test]
+async fn os_clientes_da_loja_online_saem_das_encomendas() {
+    let (st, pasta) = base_com_admin("loja-clientes").await;
+    for (id, cliente, telefone, estado, total, quando) in [
+        ("e1", "Ana Domingos", "923000001", "delivered", 10000.0, "2026-11-20T10:00:00Z"),
+        ("e2", "ana domingos ", "923000001", "pending", 5000.0, "2026-11-25T10:00:00Z"),
+        ("e3", "Ana Domingos", "923000001", "cancelled", 9999.0, "2026-11-21T10:00:00Z"),
+        ("e4", "Bruno Kiala", "924000002", "confirmed", 2500.0, "2026-11-24T10:00:00Z"),
+    ] {
+        sqlx::query("INSERT INTO loja_encomendas (id, numero, criada_em, estado, total, cliente, telefone) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            .bind(id)
+            .bind(format!("ENC-{id}"))
+            .bind(quando)
+            .bind(estado)
+            .bind(total)
+            .bind(cliente)
+            .bind(telefone)
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    let v = rpc(&st, "loja.clientes", json!({})).await;
+    let v = v.as_array().unwrap();
+    assert_eq!(v.len(), 2, "{v:?}");
+    let ana = v.iter().find(|c| c["telefone"] == "923000001").unwrap();
+    assert_eq!((ana["encomendas"].as_i64(), ana["em_aberto"].as_i64(), ana["total"].as_f64()), (Some(3), Some(1), Some(15000.0)), "{ana}");
+    assert_eq!(v[0]["telefone"], "923000001", "a última encomenda primeiro");
+    assert_eq!(rpc(&st, "loja.clientes", json!({ "q": "Kiala" })).await.as_array().unwrap().len(), 1);
+    // sem a conta do site, os pagamentos dizem porquê (este KanGest nem está ligado)
+    let e = rpc_err(&st, "loja.pagamentos", json!({ "de": "2026-11-01", "ate": "2026-11-26" })).await;
+    assert!(e.contains("ligado ao site"), "{e}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

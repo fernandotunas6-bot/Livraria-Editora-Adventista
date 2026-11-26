@@ -244,6 +244,41 @@ async fn produtos(st: &AppState, f: Filtro) -> AppResult<Value> {
     Ok(Value::Array(linhas.iter().map(db::row_json).collect()))
 }
 
+/// Os clientes que encomendaram nesta loja pelo site, da cópia local das encomendas (sem Internet e só os desta loja):
+/// quantas encomendas, quantas em aberto, o total (sem as canceladas) e a última. A mesma pessoa pelo nome e o telefone.
+async fn clientes(st: &AppState, f: Filtro) -> AppResult<Value> {
+    permitir(st)?;
+    let q = f.q.trim().to_string();
+    let linhas = sqlx::query(
+        "SELECT MAX(cliente) AS cliente, telefone, COUNT(*) AS encomendas,
+                COALESCE(SUM(estado NOT IN ('delivered', 'cancelled')), 0) AS em_aberto,
+                COALESCE(SUM(CASE WHEN estado <> 'cancelled' THEN total ELSE 0 END), 0) AS total,
+                MAX(criada_em) AS ultima
+           FROM loja_encomendas
+          WHERE TRIM(cliente) <> '' AND (?1 = '' OR cliente LIKE ?2 OR telefone LIKE ?2)
+          GROUP BY LOWER(TRIM(cliente)), telefone
+          ORDER BY ultima DESC LIMIT 500",
+    )
+    .bind(&q)
+    .bind(format!("%{q}%"))
+    .fetch_all(&st.pool)
+    .await?;
+    Ok(Value::Array(linhas.iter().map(db::row_json).collect()))
+}
+
+#[derive(Deserialize)]
+struct PeriodoIn {
+    de: String,
+    ate: String,
+}
+
+/// Os pagamentos da loja online (o relatório do painel), com a conta do site da pessoa (pagamentos.rs).
+async fn pagamentos(st: &AppState, i: PeriodoIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    permitir(st)?;
+    super::pagamentos::relatorio(&st.pool, s.id, &i.de, &i.ate).await.map_err(AppError::msg)
+}
+
 /// Despachante dos métodos `loja.*` (services/mod.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
     // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs)
@@ -260,6 +295,8 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "encomendas" => encomendas(st, filtro()?).await,
         "encomenda" => encomenda(st, serde_json::from_value(params.clone())?).await,
         "produtos" => produtos(st, filtro()?).await,
+        "clientes" => clientes(st, filtro()?).await,
+        "pagamentos" => pagamentos(st, serde_json::from_value(params.clone())?).await,
         _ => Err(AppError::msg(format!("Método desconhecido: loja.{metodo}"))),
     }
 }
