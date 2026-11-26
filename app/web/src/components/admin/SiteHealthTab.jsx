@@ -6,6 +6,7 @@ import { Activity, Bug, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import { METRICS, errorWhere, formatMetric, pageName, rating, vitalsTable } from '@/lib/siteHealth';
+import SaudeEcossistema from '@/components/admin/SaudeEcossistema';
 
 const RATING_STYLE = {
   good: 'bg-emerald-50 text-emerald-800 ring-emerald-600/20',
@@ -83,6 +84,7 @@ export default function SiteHealthTab() {
 
   return (
     <div className="space-y-6">
+      <SaudeEcossistema />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl rounded-xl border border-border bg-card p-3 text-sm text-muted-foreground">
           <p className="flex items-start gap-2">
