@@ -35,6 +35,7 @@ pub mod licenca;
 mod oficina;
 mod fidelizacao;
 pub(crate) mod gestao;
+mod integracoes;
 mod inteligencia;
 mod parametros;
 mod partilha;
@@ -278,6 +279,8 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "posto.selecionar" => posto::selecionar(st, p(params)?).await,
 
         // ---- API de integração (chaves de acesso para outros sistemas) ----
+        // o Centro de Integrações: cada ligação numa só vista, só a ler a base (services/integracoes.rs)
+        "integracoes.resumo" => integracoes::resumo(st).await,
         "api.estado" => crate::api::estado(st).await,
         "api.guardar" => crate::api::guardar(st, p(params)?).await,
         "api.chaveCriar" => crate::api::chave_criar(st, p(params)?).await,

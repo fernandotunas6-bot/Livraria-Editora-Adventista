@@ -7962,6 +7962,28 @@ async fn os_clientes_da_loja_online_saem_das_encomendas() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// O Centro de Integrações junta as ligações, a pior primeiro, só a ler a base.
+#[tokio::test]
+async fn o_centro_de_integracoes_junta_as_ligacoes() {
+    let (st, pasta) = base_com_admin("centro-integracoes").await;
+    let v = rpc(&st, "integracoes.resumo", Value::Null).await;
+    let ids: Vec<&str> = v.as_array().unwrap().iter().map(|c| c["id"].as_str().unwrap()).collect();
+    for id in ["site", "api", "avisos", "fe", "kigest", "web"] {
+        assert!(ids.contains(&id), "falta {id}: {ids:?}");
+    }
+    let site = v.as_array().unwrap().iter().find(|c| c["id"] == "site").unwrap();
+    assert_eq!(site["estado"], "desligada", "{site}");
+    // uma rejeição da AGT põe a facturação electrónica com erro, e à frente das outras
+    let doc = rpc(&st, "artigos.guardar", json!({ "descricao": "Encadernação", "tipo": "S", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    let fr = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": doc, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+    sqlx::query("INSERT INTO fe_envios (documento_id, estado) VALUES (?, 'INVALIDO') ON CONFLICT(documento_id) DO UPDATE SET estado = 'INVALIDO'").bind(fr["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
+    let v = rpc(&st, "integracoes.resumo", Value::Null).await;
+    assert_eq!((v[0]["id"].as_str(), v[0]["estado"].as_str()), (Some("fe"), Some("erro")), "{v}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// As igrejas do registo da Igreja chegam nas novidades, aparecem na Loja online e ligam-se ao cliente criado a partir
 /// delas; uma actualização que chegue depois não desfaz a ligação.
 #[tokio::test]
