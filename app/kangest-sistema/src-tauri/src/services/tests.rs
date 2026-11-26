@@ -7812,6 +7812,9 @@ fn site_falso_para_produtos() -> (u16, PedidosRecebidos) {
             let resposta = match (metodo.as_str(), caminho.as_str()) {
                 ("GET", c) if c.starts_with("/rest/v1/stock_books?id=eq.p1") => json!([{ "id": "p1", "title": "O Desejado", "price": 5700, "stock": 3, "kigest_ref": "LIV-001", "active": true }]),
                 ("GET", c) if c.starts_with("/rest/v1/stock_books?id=eq.p2") => json!([{ "id": "p2", "title": "Livro livre", "price": 100, "kigest_ref": "", "active": true }]),
+                // a fase D: o produto ligado a um artigo, pela referência
+                ("GET", c) if c.starts_with("/rest/v1/stock_books?kigest_ref=eq.LIV-001&") => json!([{ "id": "p1", "title": "O Desejado", "price": 5700, "stock": 3, "active": false, "cover_image": "" }]),
+                ("GET", c) if c.starts_with("/rest/v1/stock_books?kigest_ref=eq.LIV-002&") => json!([{ "id": "p3", "title": "Sem preço", "price": 0, "stock": 0, "active": false }]),
                 ("PATCH", c) if c.starts_with("/rest/v1/stock_books?id=eq.") => {
                     let mut v = corpo.clone();
                     v["id"] = json!(c.rsplit('.').next().unwrap_or(""));
@@ -8212,6 +8215,54 @@ async fn livro_de_stock_para_o_site() {
     assert_eq!(livro::tipo_do_movimento(Some("TS"), Some("STOCK"), -3.0), "transferencia");
     assert_eq!(livro::tipo_do_movimento(Some("ES"), Some("STOCK"), 5.0), "ajuste");
     assert_eq!(livro::tipo_do_movimento(None, None, -1.0), "ajuste");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// KANGEST ONE (fase D): na ficha do artigo, o produto ligado no site (pela referência), e publicá-lo ou ocultá-lo com a
+/// conta do site da pessoa. Nunca a 0 Kz; sem referência ou ainda fora do site, diz o que fazer; fica na auditoria.
+#[tokio::test]
+async fn o_artigo_no_site_pela_ficha() {
+    let (st, pasta) = base_com_admin("artigo-no-site").await;
+    let livro = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "referencia": "LIV-001", "taxa_iva_id": 1, "preco1": 500000 })).await["id"].as_i64().unwrap();
+    let sem_preco = rpc(&st, "artigos.guardar", json!({ "descricao": "Sem preço", "referencia": "LIV-002", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
+    let fora = rpc(&st, "artigos.guardar", json!({ "descricao": "Ainda fora", "referencia": "LIV-003", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
+    let sem_ref = rpc(&st, "artigos.guardar", json!({ "descricao": "Sem referência", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
+    // o KanGest dá uma referência a quem não a tem: tira-se à mão, para o caso de um artigo antigo sem ela
+    sqlx::query("UPDATE artigos SET referencia = '' WHERE id = ?").bind(sem_ref).execute(&st.pool).await.unwrap();
+    // sem ligação ao site, a ficha não mostra nada
+    assert_eq!(rpc(&st, "loja.produto.doArtigo", json!({ "artigo_id": livro })).await["ligado"], false);
+
+    let (porta, recebidos) = site_falso_para_produtos();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let agora = chrono::Utc::now().timestamp();
+    let tokens = crate::sinc::pessoa::Tokens { access: "tok".into(), refresh: "r".into(), expira: agora + 3600 };
+    crate::sinc::pessoa::guardar(&st.pool, 1, "admin@x.ao", &tokens, "", agora).await.unwrap();
+
+    let d = rpc(&st, "loja.produto.doArtigo", json!({ "artigo_id": livro })).await;
+    assert_eq!((d["ligado"].as_bool(), d["produto"]["id"].as_str(), d["produto"]["active"].as_bool()), (Some(true), Some("p1"), Some(false)), "{d}");
+    // publica: o PATCH só leva o active, para o produto certo
+    let r = rpc(&st, "loja.produto.publicarArtigo", json!({ "artigo_id": livro, "activo": true })).await;
+    assert_eq!(r["produto"]["active"], true);
+    let ultimo = recebidos.lock().unwrap().iter().rev().find(|(p, _)| p.starts_with("PATCH")).cloned().unwrap();
+    assert_eq!((ultimo.0.as_str(), ultimo.1.clone()), ("PATCH /rest/v1/stock_books?id=eq.p1", json!({ "active": true })));
+    // nunca a 0 Kz; ocultar a 0 Kz pode
+    assert!(rpc_err(&st, "loja.produto.publicarArtigo", json!({ "artigo_id": sem_preco, "activo": true })).await.contains("0 Kz"));
+    rpc(&st, "loja.produto.publicarArtigo", json!({ "artigo_id": sem_preco, "activo": false })).await;
+    // ainda fora do site, e sem referência: diz o que fazer
+    assert_eq!(rpc(&st, "loja.produto.doArtigo", json!({ "artigo_id": fora })).await["produto"], Value::Null);
+    assert!(rpc_err(&st, "loja.produto.publicarArtigo", json!({ "artigo_id": fora, "activo": true })).await.contains("ainda não está no site"));
+    assert!(rpc_err(&st, "loja.produto.publicarArtigo", json!({ "artigo_id": sem_ref, "activo": true })).await.contains("referência"));
+    // fica na auditoria
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auditoria WHERE detalhe LIKE '%publicou no site o produto «O Desejado»%'").fetch_one(&st.pool).await.unwrap_or(0);
+    assert_eq!(n, 1, "a publicação na auditoria");
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
