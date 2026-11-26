@@ -8383,6 +8383,8 @@ async fn o_prazo_das_contas_locais_conta_da_ligacao() {
 #[tokio::test]
 async fn a_saude_do_servidor_central_no_kangest() {
     let (st, pasta) = base_com_admin("saude-servidor").await;
+    // a caixa local, antes de o KanGest estar ligado (depois, contas locais novas só a do ADMIN)
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
     let (porta, recebidos) = site_falso_para_produtos();
     sqlx::query(
         "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
@@ -8404,7 +8406,6 @@ async fn a_saude_do_servidor_central_no_kangest() {
     assert_eq!((r["saude"]["estado"].as_str(), r["saude"]["base"]["ms"].as_i64()), (Some("aviso"), Some(12)), "{r}");
     assert!(recebidos.lock().unwrap().iter().any(|(p, _)| p == "GET /functions/v1/app/api/v1/system/health"));
     // uma caixa não lhe chega (é do administrador cá)
-    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
     rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
     assert!(rpc_err(&st, "integracoes.servidor", Value::Null).await.to_lowercase().contains("permiss"));
     st.pool.close().await;
