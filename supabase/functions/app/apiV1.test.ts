@@ -89,7 +89,7 @@ describe("API v1: o contrato e o código", () => {
       const comSessao = tipo !== "publica";
       expect({ rota: k, security: (op.security ?? []).length > 0 }).toEqual({ rota: k, security: comSessao });
       if (comSessao) expect({ rota: k, r401: !!op.responses["401"] }).toEqual({ rota: k, r401: true });
-      if (tipo === "permissao") expect({ rota: k, r403: !!op.responses["403"] }).toEqual({ rota: k, r403: true });
+      if (tipo === "permissao" || tipo === "equipa") expect({ rota: k, r403: !!op.responses["403"] }).toEqual({ rota: k, r403: true });
     }
   });
 });
@@ -111,6 +111,10 @@ describe("API v1: a porta de cada rota (sem sessão, sem permissão, com permiss
         // com ela, passa; o administrador tem todas
         const gestorCom: Auth = { id: "4", email: "p@b.ao", role: "manager", permissions: { [d.chaves[0]]: true } };
         expect({ rota: k, r: recusa(a, gestorCom) }).toEqual({ rota: k, r: null });
+      } else if (d.tipo === "equipa") {
+        // só a equipa: um cliente não passa; um gestor passa mesmo sem permissões (o RLS e as funções decidem o resto)
+        expect({ rota: k, status: recusa(a, cliente)?.status }).toEqual({ rota: k, status: 403 });
+        expect({ rota: k, r: recusa(a, gestorSem) }).toEqual({ rota: k, r: null });
       } else {
         expect({ rota: k, r: recusa(a, cliente) }).toEqual({ rota: k, r: null });
       }
