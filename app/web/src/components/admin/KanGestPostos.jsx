@@ -3,9 +3,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, BookOpenCheck, Copy, Cpu, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Copy, Cpu, KeyRound, Link2, LogOut, Plus, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
+import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos, kangestSessaoTerminar } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
 import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
@@ -219,6 +219,7 @@ export default function KanGestPostos({ lojas = [] }) {
                 </p>
                 {p.ultimo_erro && <p className="w-full text-xs text-red-700 dark:text-red-400">{p.ultimo_erro}</p>}
                 {p.estado !== 'revogado' && <Computador p={p} />}
+                {p.estado !== 'revogado' && <SessoesDoPosto p={p} onTerminada={carregar} />}
                 {p.estado === 'activo' && <LivroDoPosto p={p} />}
                 {p.estado !== 'revogado' && (
                   <div className="flex w-full flex-wrap gap-x-5 gap-y-1 text-xs">
@@ -316,6 +317,89 @@ function Computador({ p }) {
             </span>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Quem está dentro do KanGest deste posto (KANGEST ONE, A3): as sessões abertas que ele mandou na última volta, sem
+ * tokens. «Terminar» pede o fim; a volta seguinte do posto leva o pedido, e a pessoa volta ao ecrã de entrada. O ADMIN
+ * local de recurso aparece marcado (cada entrada dele está no registo de segurança).
+ */
+export function SessoesDoPosto({ p, onTerminada }) {
+  const [aTerminar, setATerminar] = useState('');
+  const todas = p.sessoes || [];
+  const abertas = todas.filter((s) => !s.fim);
+  const terminadas = todas.filter((s) => s.fim);
+  if (!todas.length) return null;
+
+  async function terminar(s) {
+    const quem = s.nome || s.login;
+    if (!confirm(`Terminar a sessão de «${quem}» em «${p.nome}»?\n\nNa próxima sincronização do posto (em menos de um minuto, com Internet), a pessoa volta ao ecrã de entrada.`)) return;
+    setATerminar(s.sessao);
+    try {
+      await kangestSessaoTerminar(p.id, s.sessao);
+      toast.success('Pedido enviado: a sessão termina na próxima sincronização do posto.');
+      onTerminada?.();
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível terminar a sessão.');
+    } finally {
+      setATerminar('');
+    }
+  }
+
+  return (
+    <div className="w-full space-y-1.5 text-xs">
+      <p className="font-semibold text-muted-foreground">
+        <UserRound className="mr-1 inline h-3.5 w-3.5" />
+        {abertas.length === 0 ? 'Ninguém dentro do KanGest agora' : abertas.length === 1 ? '1 pessoa dentro do KanGest' : `${abertas.length} pessoas dentro do KanGest`}
+      </p>
+      {abertas.length > 0 && (
+        <ul className="space-y-1">
+          {abertas.map((s) => (
+            <li key={s.sessao} className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted/40 px-2 py-1.5">
+              <span className="font-semibold">{s.nome || s.login}</span>
+              <span className="text-muted-foreground">{s.perfil}</span>
+              {s.recurso && (
+                <span className="rounded-full bg-red-500/10 px-2 py-0.5 font-semibold text-red-700 dark:text-red-400" title="O perfil Administrador local, sem conta do site: cada entrada fica no registo de segurança">
+                  ADMIN de recurso
+                </span>
+              )}
+              {!s.recurso && !s.conta_site && (
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-400" title="Conta só do KanGest: tem de se ligar a uma conta do site">
+                  conta local
+                </span>
+              )}
+              {s.offline && <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">sem Internet</span>}
+              <span className="text-muted-foreground">
+                {[s.aparelho, s.local, s.inicio ? `desde ${dataHora(s.inicio)}` : null].filter(Boolean).join(' · ')}
+              </span>
+              <span className="ml-auto">
+                {s.revogar_em ? (
+                  <span className="text-muted-foreground">a terminar na próxima sincronização…</span>
+                ) : (
+                  <Button size="sm" variant="outline" className="h-6 px-2 text-xs" disabled={aTerminar === s.sessao} onClick={() => terminar(s)}>
+                    <LogOut className="mr-1 h-3 w-3" />{aTerminar === s.sessao ? 'A pedir…' : 'Terminar'}
+                  </Button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {terminadas.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">{terminadas.length} sessão(ões) terminada(s) nos últimos 7 dias</summary>
+          <ul className="mt-1 space-y-0.5 text-muted-foreground">
+            {terminadas.slice(0, 30).map((s) => (
+              <li key={s.sessao}>
+                {s.nome || s.login} ({s.perfil}{s.recurso ? ', ADMIN de recurso' : ''}) · {dataHora(s.inicio)} → {dataHora(s.fim)}
+                {s.motivo === 'revogada' ? ' · terminada no painel' : ''}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

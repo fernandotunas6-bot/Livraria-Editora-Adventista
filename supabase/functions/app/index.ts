@@ -69,7 +69,7 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador, limparLivroStock,
+  limparEstadoComputador, limparLivroStock, limparSessoesKanGest,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados,
 } from "./kangestSinc.ts";
@@ -3278,7 +3278,7 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
       const { count } = await q;
       return count ?? 0;
     };
-    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), livro: null as Row | null });
+    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), sessoes: [] as Row[], livro: null as Row | null });
   }
   // o livro único de stock (KANGEST ONE, B1): os movimentos e as diferenças com a fotografia, por posto
   const { data: livros, error: eLivros } = await db.rpc("stock_livro_resumo");
@@ -3287,6 +3287,16 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
     const p = postos.find((x) => x.id === l.posto_id);
     if (p) p.livro = { movimentos: Number(l.movimentos), aberto: !!l.aberto, divergencias: Number(l.divergencias) };
   }
+  // as sessões abertas em cada posto e as da última semana (KANGEST ONE, A3); sem a tabela, a lista fica vazia
+  const semana = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { data: sessoes, error: eSessoes } = await db.from("kangest_sessoes")
+    .select("posto_id, sessao, nome, login, perfil, conta_site, recurso, aparelho, local, pela_internet, offline, inicio, visto_em, fim, motivo, revogar_em")
+    .or(`fim.is.null,fim.gt.${semana}`)
+    .order("inicio", { ascending: false, nullsFirst: false })
+    .limit(500);
+  if (eSessoes) console.error("KanGest: sessões dos postos", eSessoes.message);
+  const porPosto = new Map(postos.map((p) => [p.id, p]));
+  for (const s of sessoes || []) porPosto.get(s.posto_id)?.sessoes.push(s);
   return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos });
 });
 
@@ -3297,6 +3307,16 @@ route("GET", "/admin/kangest/postos/livro", permissao("manage_settings"), async 
   const { data, error } = await db.rpc("stock_livro_conferir", { p_posto: id }).limit(200);
   if (error) throw new Error(error.message);
   return json({ diferencas: data || [] });
+});
+
+// Terminar uma sessão aberta num KanGest (KANGEST ONE, A3): a volta seguinte do posto leva o pedido, e ele termina-a.
+route("POST", "/admin/kangest/sessoes/revogar", permissao("manage_settings"), async ({ body, auth }) => {
+  const posto = String(body.posto ?? "");
+  const sessao = String(body.sessao ?? "");
+  if (!uuidValido(posto) || !/^[0-9a-f]{16}$/.test(sessao)) throw bad("Indique o posto e a sessão.");
+  const { data, error } = await db.rpc("kangest_sessao_revogar", { p_posto: posto, p_sessao: sessao, p_por: auth.id }).setHeader("x-actor-id", auth.id);
+  if (error) throw bad(error.message);
+  return json(data);
 });
 
 route("POST", "/admin/kangest/postos", permissao("manage_settings"), async ({ body, auth }) => {
@@ -3418,6 +3438,15 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   if (estadoComputador) {
     await db.from("kangest_postos").update({ estado_computador: estadoComputador, estado_em: new Date().toISOString() }).eq("id", posto);
   }
+  // as sessões abertas (KANGEST ONE, A3: quem, perfil, aparelho; nunca tokens): o painel vê-as e termina-as, e a
+  // resposta leva as que o painel pediu para terminar. Nunca impede a sincronização das facturas e do stock.
+  let sessoesRevogar: unknown = null;
+  const sessoes = limparSessoesKanGest(aberto.dados?.sessoes);
+  if (sessoes) {
+    const { data, error } = await db.rpc("kangest_sessoes_receber", { p_posto: posto, p_sessoes: sessoes });
+    if (error) console.error("KanGest: sessões do posto", posto, error.message);
+    else sessoesRevogar = data;
+  }
   // o livro único de stock, em sombra (KANGEST ONE, B1): as aberturas e os movimentos de stock do posto. Nunca impede a
   // sincronização das facturas e do stock de hoje: um erro volta na resposta e o posto tenta outra vez.
   let stockLivro: unknown = null;
@@ -3478,7 +3507,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, stock_livro: stockLivro, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
     posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });

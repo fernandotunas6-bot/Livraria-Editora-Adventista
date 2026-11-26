@@ -70,6 +70,15 @@ Num KanGest **ligado ao site** (o posto emparelhado e activo), todas as pessoas 
 
 Num KanGest **isolado** (sem ligação ao site), nada disto muda.
 
+**O ecrã de entrada** mostra, por baixo do formulário, a ligação ao servidor central (`setup.estado`, `ligacao`):
+- «Ligado ao servidor central», com a loja, se a última volta correu bem nos últimos 10 minutos;
+- senão, o aviso do modo limitado: com a conta do site vende-se e factura-se, mas a loja online e a confirmação de
+  pagamentos esperam pela Internet;
+- e sempre a versão do KanGest. Confere-se de 30 em 30 segundos.
+
+**O painel do site vê quem está dentro** de cada KanGest e pode terminar uma sessão; cada entrada do ADMIN de recurso
+avisa os administradores (docs/KANGEST-SINCRONIZACAO.md §14).
+
 ## Testes
 
 - `sinc/entrada.rs`:
