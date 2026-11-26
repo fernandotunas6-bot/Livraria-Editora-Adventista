@@ -61,3 +61,23 @@ errada (docs/KANGEST-ENSAIO.md). No fim, revoga-se o posto de ensaio.
 
 **Antes de integrar as fases A e B do KANGEST ONE,** o ensaio corre contra o staging. Para a B (o livro único de
 stock), confere-se também a transição numa cópia lógica da produção, só de leitura.
+
+## Os testes de aceitação do KANGEST ONE
+
+`scripts/aceitacao/kangest-one.mjs` corre as verificações de servidor contra um ambiente e escreve um relatório em
+Markdown. **Só faz leituras,** por isso também se pode correr contra a produção.
+
+```sh
+node scripts/aceitacao/kangest-one.mjs https://<ref>.supabase.co/functions/v1/app relatorio.md
+KANGEST_ONE_TOKEN=<token de uma conta da equipa com «Gerir configurações»> node scripts/aceitacao/kangest-one.mjs …
+```
+
+**Sem token,** confere:
+- o índice e a versão da API;
+- a recusa sem sessão (401 e 403, no formato único de erro);
+- o 404;
+- os produtos pelo RLS público.
+
+**Com token,** confere também quem sou, a saúde do ecossistema e o livro de stock. O token nunca vai para o relatório.
+
+Os outros testes de aceitação (2, 3, 5, 6, 8, 9 e 11 a 14) correm no CI: Rust, PGlite e vitest.
