@@ -350,6 +350,29 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
       });
       continue;
     }
+    // um movimento da tesouraria (o ERP central; sinc/financeiro.rs): sem a descrição livre nem o cliente
+    if (item?.tipo === "movimento") {
+      const m = item.movimento || {};
+      const data = texto(m.data, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error("Movimento sem data válida.");
+      const valor = inteiro(m.valor);
+      if (valor < 0) throw new Error("O valor de um movimento não pode ser negativo.");
+      out.push({
+        tipo: "movimento",
+        movimento: {
+          movimento_id: inteiro(m.movimento_id),
+          data,
+          data_hora: texto(m.data_hora, 19),
+          conta: texto(m.conta, 80),
+          tipo: m.tipo === "entrada" ? "entrada" : "saida",
+          valor,
+          categoria: texto(m.categoria, 80),
+          documento: texto(m.documento, 40),
+          anulado: m.anulado === true,
+        },
+      });
+      continue;
+    }
     if (item?.tipo !== "documento") {
       out.push({ tipo: texto(item?.tipo, 40) });
       continue;

@@ -185,6 +185,24 @@ await q(`select public.kangest_posto_revogar($1)`, [semLoja]);
 await recusa('um posto revogado não recebe novidades', () => novidades({}, 50, semLoja), /desconhecido ou revogado/);
 await recusa('novidades: as contas não executam', () => como('authenticated', admin, `select public.kangest_novidades('${posto}'::uuid, '{}'::jsonb, 5)`), /permission denied/);
 
+// --- o ERP financeiro central (20261126170000): os movimentos da tesouraria, que não se alteram ------------------
+const mov = (id, extra = {}) => ({ tipo: 'movimento', movimento: { movimento_id: id, data: '2026-11-26', data_hora: '2026-11-26T10:00:00', conta: 'Caixa', tipo: 'entrada', valor: 570000, categoria: 'Vendas', documento: 'FR 2026/7', anulado: false, ...extra } });
+const mv1 = await receber(posto, [mov(1), mov(2, { tipo: 'saida', valor: 120000, categoria: 'Despesas' })]);
+check('os movimentos entram', mv1.movimentos === 2 && mv1.erros.length === 0, mv1);
+const mv2 = await receber(posto, [mov(1)]);
+check('o mesmo movimento outra vez não se grava em dobro', mv2.movimentos === 0 && mv2.repetidos === 1, mv2);
+const mv3 = await receber(posto, [mov(1, { anulado: true })]);
+check('a anulação só marca o movimento', mv3.movimentos === 1 && (await q(`select anulado from public.kangest_movimentos where posto_id = $1 and movimento_id = 1`, [posto]))[0].anulado === true, mv3);
+check('a anulação repetida não muda nada', (await receber(posto, [mov(1, { anulado: true })])).repetidos === 1);
+await recusa('um movimento não se altera', () => q(`update public.kangest_movimentos set valor = 1 where posto_id = $1 and movimento_id = 2`, [posto]), /não se alteram/);
+await recusa('a anulação não volta atrás', () => q(`update public.kangest_movimentos set anulado = false where posto_id = $1 and movimento_id = 1`, [posto]), /não se alteram/);
+await recusa('um movimento não se apaga', () => q(`delete from public.kangest_movimentos where posto_id = $1`, [posto]), /não se apagam/);
+check('um movimento sem data válida vai para os erros', (await receber(posto, [mov(3, { data: 'ontem' })])).erros.length === 1);
+const resumoFin = (await como('authenticated', admin, `select public.kangest_financeiro('2026-11-01', '2026-11-30') r`))[0].r;
+check('o resumo financeiro: sem o anulado, por loja e por centro de custo', resumoFin.total.entradas === 0 && resumoFin.total.saidas === 120000 && resumoFin.anulados === 1
+  && resumoFin.lojas.length === 1 && resumoFin.categorias.some((c) => c.categoria === 'Despesas'), resumoFin);
+await recusa('o resumo financeiro: só quem lê os pagamentos', () => como('authenticated', '00000000-0000-4000-8000-0000000000ff', `select public.kangest_financeiro('2026-11-01', '2026-11-30')`), /Sem acesso/);
+
 // --- tempo real (20261125120000): o tópico secreto de cada posto e o sinal sem dados --------------------------------
 const topico = async (id) => (await q(`select topico from public.kangest_postos where id = $1`, [id]))[0].topico;
 const t1 = await topico(posto);

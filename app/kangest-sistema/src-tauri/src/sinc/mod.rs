@@ -26,6 +26,7 @@ pub mod encomendas;
 pub mod entrada;
 pub mod estado;
 pub mod fechos;
+pub mod financeiro;
 pub mod loja;
 pub mod pagamentos;
 pub mod pessoa;
@@ -270,6 +271,9 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     // os fechos de caixa arquivados, para a cópia no site (sem os nomes dos clientes)
     let (fechos_pendentes, fechos_itens) = fechos::devidos(pool, agora, fechos::LOTE).await?;
     lote.extend(fechos_itens);
+    // os movimentos da tesouraria, para o ERP central (sem a descrição nem o cliente)
+    let (fin_pendentes, fin_itens) = financeiro::devidos(pool, agora, financeiro::LOTE).await?;
+    lote.extend(fin_itens);
     // o que este KanGest fez com as tarefas da volta anterior (as encomendas online)
     let (tarefas_feitas, tarefas_itens) = encomendas::resultados(pool).await?;
     lote.extend(tarefas_itens);
@@ -280,6 +284,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
         Ok(r) => {
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
             fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;
+            financeiro::concluir(pool, &fin_pendentes, &financeiro::erros_do_resultado(&r["resultado"]), agora).await?;
             encomendas::marcar_enviados(pool, &tarefas_feitas).await?;
             // as tarefas novas emitem-se já; os resultados seguem na volta seguinte (logo a seguir, por causa do «continuar»)
             let por_seguir = encomendas::executar(st, &r["tarefas"]).await?;
@@ -341,6 +346,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 continuar: fila.len() as i64 == LOTE
                     || cat_pendentes.len() as i64 == catalogo::LOTE
                     || fechos_pendentes.len() as i64 == fechos::LOTE
+                    || fin_pendentes.len() as i64 == financeiro::LOTE
                     || por_seguir > 0
                     || mais,
             })
@@ -516,10 +522,13 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
         loja::apagar(&st.pool).await?;
         catalogo::apagar(&st.pool).await?;
         fechos::apagar(&st.pool).await?;
+        financeiro::apagar(&st.pool).await?;
     }
     enfileirar_tudo(&st.pool).await?;
     // os fechos de caixa arquivados também seguem (o site guarda uma cópia)
     fechos::enfileirar_tudo(&st.pool).await?;
+    // os movimentos da tesouraria (o ERP central: financeiro.rs), os do último ano
+    financeiro::enfileirar_tudo(&st.pool).await?;
     // o catálogo todo segue uma vez: o site fica com o stock e os preços de agora
     catalogo::enfileirar_tudo(&st.pool).await?;
     let mut e = estado(st).await?;
@@ -586,6 +595,7 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
     catalogo::apagar(&st.pool).await?;
     fechos::apagar(&st.pool).await?;
+    financeiro::apagar(&st.pool).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;

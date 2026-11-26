@@ -258,3 +258,19 @@ describe("limparEstadoComputador", () => {
     expect(limparEstadoComputador("estado")).toBeNull();
   });
 });
+
+describe("prepararLote: os movimentos da tesouraria (o ERP central)", () => {
+  it("passa só os campos da lista e recusa a data ou o valor errados", async () => {
+    const c = await lerCifraDados(paraB64(seq(32, 9)));
+    const [m] = await prepararLote([{
+      tipo: "movimento",
+      movimento: { movimento_id: 7, data: "2026-11-26", data_hora: "2026-11-26T10:00:00", conta: "Caixa", tipo: "entrada", valor: 570000, categoria: "Vendas", documento: "FR 2026/7", anulado: false, descricao: "Pago pela Ana Domingos", entidade: "Ana" },
+    }], c!);
+    expect(m).toEqual({
+      tipo: "movimento",
+      movimento: { movimento_id: 7, data: "2026-11-26", data_hora: "2026-11-26T10:00:00", conta: "Caixa", tipo: "entrada", valor: 570000, categoria: "Vendas", documento: "FR 2026/7", anulado: false },
+    });
+    await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 8, data: "26/11/2026", valor: 1 } }], c!)).rejects.toThrow(/data/);
+    await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 9, data: "2026-11-26", valor: -1 } }], c!)).rejects.toThrow(/negativo/);
+  });
+});
