@@ -90,6 +90,11 @@ fn p<T: DeserializeOwned>(v: Value) -> AppResult<T> {
     Ok(serde_json::from_value(v)?)
 }
 
+/// Bloqueia a sessão deste computador (a janela foi para a bandeja: src/servico.rs).
+pub async fn bloquear_sessao(st: &AppState) -> AppResult<Value> {
+    auth::bloquear(st).await
+}
+
 /// Entrada de todos os pedidos. Nos métodos que gravam fichas, regista na auditoria o antes e o depois
 /// (services/auditoria.rs); no fim, sela as linhas novas da auditoria (src/auditoria.rs).
 pub async fn dispatch(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
@@ -306,6 +311,9 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // arranque automático deste computador (método local: cada computador tem o seu; src/nativo.rs)
         "rede.arranque" => crate::nativo::arranque(st).await,
         "rede.arranqueGuardar" => crate::nativo::arranque_guardar(st, p(params)?).await,
+        // o computador ao serviço: fechar para a bandeja e não adormecer, cada um à escolha (src/servico.rs)
+        "servico.estado" => crate::servico::estado(st).await,
+        "servico.guardar" => crate::servico::guardar(st, p(params)?).await,
 
         // ---- impressão térmica (ESC/POS) e gaveta ----
         "impressao.estado" => impressao::estado(st).await,

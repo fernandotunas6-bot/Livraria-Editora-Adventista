@@ -150,6 +150,11 @@ pub fn parar() {
     }
 }
 
+/// O túnel do acesso pela Internet está a correr neste computador (há telemóveis e postos a chegar por ele)?
+pub fn a_correr() -> bool {
+    tunel().lock().map(|t| t.a_correr).unwrap_or(false)
+}
+
 fn estado_tunel() -> Value {
     resumo_tunel(&tunel().lock().unwrap())
 }
