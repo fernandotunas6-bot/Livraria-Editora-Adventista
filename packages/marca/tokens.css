@@ -1,0 +1,63 @@
+/* KanGest e Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
+   © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor. */
+
+/*
+ * KANGEST ONE, fase G: o sistema de desenho que o KanGest e o site partilham (decisão do dono de 26/11).
+ *
+ * Unifica-se o que não é marca: as cores de estado (ok, aviso, erro, informação), os raios, o movimento e a escala do
+ * texto. As cores da marca ficam de cada lado (o verde-azulado do KanGest; o petróleo e o ouro do site).
+ *
+ * Lido pelo Tailwind 4 dos dois lados (`@import` depois de `tailwindcss`): dá as classes `text-estado-ok`,
+ * `bg-estado-ok-fundo`, `border-estado-ok/40`, `rounded-cartao`, `duration-kg`… O contraste AA de cada par (o texto
+ * sobre o fundo do estado, e sobre a superfície) é conferido por packages/marca/contraste.test.mjs, em claro e em escuro.
+ */
+@theme {
+  /* estados: o texto (que também serve de ícone) e o fundo suave por baixo */
+  --color-estado-ok: #1d6b45;
+  --color-estado-ok-fundo: #e6f4ec;
+  --color-estado-aviso: #8a5508;
+  --color-estado-aviso-fundo: #fdf2dc;
+  --color-estado-erro: #b3261e;
+  --color-estado-erro-fundo: #fce9e7;
+  --color-estado-info: #1d58b8;
+  --color-estado-info-fundo: #e8f0fc;
+
+  /* raios */
+  --radius-campo: 0.5rem;
+  --radius-cartao: 0.875rem;
+  --radius-pilula: 9999px;
+
+  /* movimento (menos movimento: ver em baixo) */
+  --ease-kg: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duracao-kg-rapida: 120ms;
+  --duracao-kg: 200ms;
+
+  /* a escala do texto partilhada (o resto fica de cada lado) */
+  --text-legenda: 0.75rem;
+  --text-legenda--line-height: 1rem;
+  --text-corpo: 0.875rem;
+  --text-corpo--line-height: 1.375rem;
+  --text-titulo-cartao: 1rem;
+  --text-titulo-cartao--line-height: 1.5rem;
+}
+
+/* escuro: o KanGest usa [data-tema="escuro"], o site a classe .dark */
+:root[data-tema="escuro"],
+.dark {
+  --color-estado-ok: #5fd39b;
+  --color-estado-ok-fundo: #133024;
+  --color-estado-aviso: #f2b754;
+  --color-estado-aviso-fundo: #33260f;
+  --color-estado-erro: #ff8a7a;
+  --color-estado-erro-fundo: #3a1a16;
+  --color-estado-info: #8db8ff;
+  --color-estado-info-fundo: #16243d;
+}
+
+/* menos movimento, para quem o pede no sistema */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duracao-kg-rapida: 0ms;
+    --duracao-kg: 0ms;
+  }
+}

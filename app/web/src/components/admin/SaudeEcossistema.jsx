@@ -8,9 +8,9 @@ import { sistemaSaude } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
 
 const TONS = {
-  ok: ['Tudo bem', 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'],
-  aviso: ['Atenção', 'bg-amber-500/10 text-amber-700 dark:text-amber-400'],
-  grave: ['Problema', 'bg-red-500/10 text-red-700 dark:text-red-400'],
+  ok: ['Tudo bem', 'bg-estado-ok-fundo text-estado-ok'],
+  aviso: ['Atenção', 'bg-estado-aviso-fundo text-estado-aviso'],
+  grave: ['Problema', 'bg-estado-erro-fundo text-estado-erro'],
 };
 const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-PT', { timeZone: 'Africa/Luanda', dateStyle: 'short', timeStyle: 'short' }) : '—');
 
@@ -60,7 +60,7 @@ export default function SaudeEcossistema() {
           <RefreshCw className={cn('mr-1 h-3.5 w-3.5', aLer && 'animate-spin')} />Actualizar
         </Button>
       </div>
-      {erro && <p className="text-red-700 dark:text-red-400">{erro}</p>}
+      {erro && <p className="text-estado-erro">{erro}</p>}
       {s && (
         <div className="space-y-2">
           <ul className="flex flex-wrap gap-x-5 gap-y-1">
@@ -68,7 +68,7 @@ export default function SaudeEcossistema() {
               <li key={nome} className="flex items-center gap-1.5">
                 {nome} <Estado estado={p?.estado} />
                 {p?.ms != null && <span className="text-xs text-muted-foreground">{p.ms} ms</span>}
-                {p?.erro && <span className="text-xs text-red-700 dark:text-red-400">{p.erro}</span>}
+                {p?.erro && <span className="text-xs text-estado-erro">{p.erro}</span>}
               </li>
             ))}
             <li className="flex items-center gap-1.5">
