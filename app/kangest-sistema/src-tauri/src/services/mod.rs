@@ -479,6 +479,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
 
         // ---- relatórios / sistema ----
         "dashboard" => relatorios::dashboard(st).await,
+        "dashboard.ecossistema" => integracoes::ecossistema(st).await,
         // KanGest inteligente (calculado aqui, nada sai para fora): resumo de ontem, previsões e alertas
         "inteligencia.painel" => inteligencia::painel(st).await,
         // assistente de perguntas (Ctrl+K): «quanto vendi ontem?», «quem me deve mais?»

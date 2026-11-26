@@ -8266,3 +8266,28 @@ async fn o_artigo_no_site_pela_ficha() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (fase G): o ecossistema no painel inicial. Num KanGest isolado, nada; ligado, o servidor central, o que
+/// espera para ir para o site, as encomendas do site e o livro de stock.
+#[tokio::test]
+async fn o_ecossistema_no_painel_inicial() {
+    let (st, pasta) = base_com_admin("ecossistema").await;
+    assert_eq!(rpc(&st, "dashboard.ecossistema", Value::Null).await, json!({ "ligado": false }));
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em, posto_nome, loja)
+         VALUES (1, 'https://exemplo.ao', 'p', 'c', 'k', 'x', 1, '2026-11-26T10:00:00', 'Caixa 1', 'Livraria — Huambo')",
+    )
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let e = rpc(&st, "dashboard.ecossistema", Value::Null).await;
+    assert_eq!((e["ligado"].as_bool(), e["posto"].as_str(), e["em_linha"].as_bool()), (Some(true), Some("Caixa 1"), Some(false)), "ainda sem volta: {e}");
+    assert_eq!(e["encomendas"], json!({ "novas": 0, "por_entregar": 0, "levantamento": 0 }));
+    assert_eq!(e["livro"]["aberto"], false);
+    assert!(e["desactualizado"].is_null() && e["versao"].is_string(), "{e}");
+    // com uma volta há pouco e sem erro: em linha
+    sqlx::query("UPDATE sinc_ligacao SET ultima_sinc = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime') WHERE id = 1").execute(&st.pool).await.unwrap();
+    assert_eq!(rpc(&st, "dashboard.ecossistema", Value::Null).await["em_linha"], true);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
