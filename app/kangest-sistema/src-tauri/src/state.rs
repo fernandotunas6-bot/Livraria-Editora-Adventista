@@ -177,6 +177,10 @@ pub struct Sessao {
     /// Passou essa data: a conta local só lê (fica só com «ver relatórios»).
     #[serde(default)]
     pub so_leitura: bool,
+    /// Este KanGest está abaixo da versão mínima que o site aceita (a versão mínima): só lê e pode actualizar-se
+    /// (sinc/versao.rs).
+    #[serde(default)]
+    pub desactualizado: Option<String>,
 }
 
 impl Sessao {

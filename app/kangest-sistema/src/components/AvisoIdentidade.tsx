@@ -4,9 +4,11 @@
 /**
  * KANGEST ONE (fase A): os avisos da identidade, por cima de cada ecrã (src-tauri/src/services/auth.rs, `conta_local`).
  * - **sem Internet:** entrou com a cópia local da conta do site, no modo limitado;
- * - **conta local num KanGest ligado ao site:** tem de se ligar à conta do site até à data; depois dela, só lê.
+ * - **conta local num KanGest ligado ao site:** tem de se ligar à conta do site até à data; depois dela, só lê;
+ * - **abaixo da versão mínima do site** (fase E, sinc/versao.rs): só consulta e pode actualizar-se.
  */
-import { CloudOff, UserRoundCog } from "lucide-react";
+import { CloudOff, RefreshCw, UserRoundCog } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useSession } from "@/store/session";
 import { data } from "@/lib/format";
 
@@ -16,6 +18,18 @@ export function AvisoIdentidade() {
   const caixa = "mb-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-[13.5px]";
   return (
     <>
+      {s.desactualizado && (
+        <div className={`${caixa} border-danger/40 bg-danger-50 text-danger`} role="alert">
+          <RefreshCw className="mt-0.5 size-4 shrink-0" />
+          <span>
+            <strong>Este KanGest precisa de ser actualizado.</strong> O site da livraria pede a versão {s.desactualizado} ou mais recente: até lá, só se
+            pode consultar.{" "}
+            <Link to="/sobre" className="font-medium underline underline-offset-2">
+              Actualizar agora
+            </Link>
+          </span>
+        </div>
+      )}
       {s.offline && (
         <div className={`${caixa} border-accent/40 bg-accent-50 text-accent-ink`} role="status">
           <CloudOff className="mt-0.5 size-4 shrink-0" />

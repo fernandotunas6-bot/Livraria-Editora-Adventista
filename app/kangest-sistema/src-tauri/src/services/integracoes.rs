@@ -89,6 +89,39 @@ pub async fn resumo(st: &AppState) -> AppResult<Value> {
         }
         v.push(cartao("site", "Site da livraria", estado, resumo, d, "/ligacao-site"));
 
+        // o servidor central (KANGEST ONE): a versão mínima que o site aceita e o livro único de stock
+        if activa {
+            let minima: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'site.kangest_min_version'").fetch_optional(p).await?;
+            let abaixo = crate::sinc::versao::desactualizado(p).await;
+            let livro = crate::sinc::livro::contagem(p).await?;
+            let erros_livro = livro["com_erro"].as_i64().unwrap_or(0);
+            let estado = if abaixo.is_some() {
+                Estado::Erro
+            } else if erros_livro > 0 {
+                Estado::Atencao
+            } else {
+                Estado::Ok
+            };
+            let resumo = match &abaixo {
+                Some(m) => format!("Este KanGest ({}) está abaixo da versão mínima do site ({m}): só consulta até ser actualizado.", crate::sinc::versao::ESTA),
+                None => format!("KanGest {}{}", crate::sinc::versao::ESTA, minima.as_deref().map(|m| format!(" · o site pede {m} ou mais recente")).unwrap_or_default()),
+            };
+            let mut d = Vec::new();
+            if livro["aberto"].as_bool() != Some(true) {
+                d.push("Livro de stock: à espera da abertura (na volta seguinte)".to_string());
+            } else {
+                let abertura = livro["abertura"].as_i64().unwrap_or(0);
+                if abertura > 0 {
+                    d.push(format!("Livro de stock: {abertura} abertura(s) por enviar"));
+                }
+                d.push(format!("Livro de stock: {} movimento(s) na fila", livro["fila"].as_i64().unwrap_or(0)));
+            }
+            if erros_livro > 0 {
+                d.push(format!("{erros_livro} movimento(s) de stock recusado(s) pelo site"));
+            }
+            v.push(cartao("servidor", "Servidor central", estado, resumo, d, if abaixo.is_some() { "/sobre" } else { "/ligacao-site" }));
+        }
+
         // a API de integração
         let chaves: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_chaves WHERE ativa = 1 AND revogada_em IS NULL").fetch_one(p).await?;
         let (pedidos, falhados): (i64, i64) = sqlx::query_as(
