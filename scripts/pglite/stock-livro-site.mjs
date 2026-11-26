@@ -83,6 +83,11 @@ check('sem posto, a reserva fica (a venda não chega pelo livro do posto)', (awa
 // --- o resumo do painel ------------------------------------------------------------------------------------------------
 const [res] = await svc(`select * from public.stock_livro_site_resumo()`);
 check('uma reserva aberta, de uma unidade e uma encomenda', Number(res.reservas_abertas) === 1 && Number(res.unidades) === 1 && Number(res.encomendas) === 1, res);
+// entregue pelo próprio site (sem posto): a reserva fica no livro como a saída, mas deixa de estar «em curso»
+await q(`update public.orders set delivery_status = 'delivered' where order_number = $1`, [e3.order_number]);
+const [res2] = await svc(`select * from public.stock_livro_site_resumo()`);
+check('a entregue já não conta como reserva em curso', Number(res2.reservas_abertas) === 0 && Number(res2.encomendas) === 0, res2);
+check('e o livro guarda a saída dela', (await soma(e3.order_number)) === -1);
 
 // --- um erro no livro nunca impede uma encomenda ----------------------------------------------------------------------
 await q(`alter table public.stock_movimentos add constraint teste_falha check (referencia <> 'LIV-001') not valid`);

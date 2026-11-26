@@ -485,7 +485,9 @@ checkout e o cancelamento, com o número da encomenda. O livro recebe o mesmo, p
 - **As variantes** com stock próprio ainda não entram.
 - **Nada disto impede uma encomenda nem um cancelamento:** um erro fica num aviso, e o livro fica por acertar.
 
-O painel mostra as reservas do site por libertar (`stock_livro_site_resumo`, `LivroDoSite`).
+O painel mostra as reservas do site por libertar das encomendas ainda em curso (`stock_livro_site_resumo`, `LivroDoSite`;
+a migração `20261126230000` tira as entregues e as canceladas: numa encomenda que o site entrega sem posto, a reserva
+fica no livro como a saída).
 
 Testes:
 - `scripts/pglite/stock-livro-site.mjs`: reservar, cancelar, a FR do posto, a FR sem posto, o resumo, e um erro no livro
