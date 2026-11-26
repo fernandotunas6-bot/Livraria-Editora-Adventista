@@ -1092,6 +1092,7 @@ function ArtigoForm({
             <input type="checkbox" checked={a.ativo !== 0} onChange={(e) => set("ativo", e.target.checked ? 1 : 0)} /> Artigo activo
           </label>
         )}
+        {a.id && inicial.referencia && <NoSite artigoId={a.id} />}
       </AbasFicha>
     </Modal>
   );
@@ -1171,5 +1172,60 @@ function GerarVariantes({ artigo, ramo, onClose }: { artigo: Artigo; ramo: Ramo;
         </div>
       ))}
     </Modal>
+  );
+}
+
+type ProdutoNoSite = { id: string; title: string; active: boolean; price: number | null };
+
+/**
+ * O artigo no site (KANGEST ONE, fase D): o produto ligado pela referência, com o preço e se está à vista, e «Publicar no
+ * site» ou «Ocultar» com a conta do site da pessoa. Nunca a 0 Kz: o preço vem do posto que manda no catálogo. Num
+ * KanGest sem ligação ao site, não aparece.
+ */
+function NoSite({ artigoId }: { artigoId: number }) {
+  const tem = useSession((s) => s.tem);
+  const qc = useQueryClient();
+  const [ocupado, setOcupado] = useState(false);
+  const q = useQuery({
+    queryKey: ["artigo-no-site", artigoId],
+    queryFn: () => call<{ ligado: boolean; produto?: ProdutoNoSite | null }>("loja.produto.doArtigo", { artigo_id: artigoId }),
+    retry: false,
+  });
+  if (q.isLoading || (q.data && !q.data.ligado)) return null;
+  const p = q.data?.produto ?? null;
+  const preco = p?.price != null ? `${Number(p.price).toLocaleString("pt-PT")} Kz` : "sem preço";
+
+  async function mudar(activo: boolean) {
+    setOcupado(true);
+    try {
+      await call("loja.produto.publicarArtigo", { artigo_id: artigoId, activo });
+      toast.success(activo ? "Publicado no site." : "Oculto no site.");
+      await qc.invalidateQueries({ queryKey: ["artigo-no-site", artigoId] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-line p-3 text-[13px]" aria-label="O artigo no site">
+      <div className="mb-1 font-medium text-ink">No site da livraria</div>
+      {q.error ? (
+        <p className="text-ink-3">{(q.error as Error).message}</p>
+      ) : !p ? (
+        <p className="text-ink-3">Ainda não está no site. O posto que manda no catálogo cria-o, oculto, na volta seguinte da sincronização.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink-2">«{p.title}» · {preco}</span>
+          <Badge tone={p.active ? "ok" : "neutral"}>{p.active ? "À vista" : "Oculto"}</Badge>
+          {tem("artigos.editar") && (
+            <Button size="sm" variant="secondary" className="ml-auto" loading={ocupado} onClick={() => mudar(!p.active)}>
+              {p.active ? "Ocultar no site" : "Publicar no site"}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

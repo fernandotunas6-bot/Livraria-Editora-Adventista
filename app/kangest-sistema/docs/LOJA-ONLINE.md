@@ -76,6 +76,21 @@ e criar e editar as colecções (`src/sinc/produtos.rs`, métodos `loja.produto.
   `LOJA_COLECCAO`).
 - **As imagens:** a capa é o endereço de uma imagem. Carregar ficheiros continua a fazer-se no painel do site.
 
+### Na ficha do artigo (KANGEST ONE, fase D)
+
+Na ficha de um artigo com referência, num KanGest ligado ao site, o cartão **«No site da livraria»** mostra o produto
+ligado pela referência: o título, o preço e se está à vista ou oculto (`loja.produto.doArtigo`).
+
+**«Publicar no site» e «Ocultar no site»** (`loja.produto.publicarArtigo`) vão com a conta do site da pessoa: precisam de
+«Gerir Catálogo» lá e de `artigos.editar` cá, e ficam na auditoria.
+- **Nunca se publica a 0 Kz.** O preço vem do posto que manda no catálogo (`catalogo.rs`). Enquanto não chega ao site, a
+  publicação é recusada e diz-se porquê. Ocultar pode-se sempre.
+- **Um artigo que ainda não está no site** é criado, oculto, pelo posto que manda no catálogo na volta seguinte. A ficha
+  diz isso.
+- **Sem referência,** a ficha pede uma: é por ela que o site liga o produto ao artigo.
+
+Teste: `o_artigo_no_site_pela_ficha` (`services/tests.rs`, com o site falso).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
