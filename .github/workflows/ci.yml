@@ -42,6 +42,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # KANGEST ONE, teste de aceitação 13: o site compilado não leva nenhuma credencial privilegiada
+      - name: Segredos no site compilado
+        run: node scripts/verificar-segredos.mjs --pasta app/web/dist
+
       # Dependências do site com vulnerabilidade crítica conhecida param o PR. Só "critical":
       # as 4 "high" de hoje são do gRPC, que o Firebase usa no servidor e não entra no bundle
       # (ver docs/AUDITORIA.md), e um gate que fica sempre vermelho deixa de ser lido.

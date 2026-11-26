@@ -2,7 +2,10 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 import { describe, expect, it } from 'vitest';
-import { findSecrets } from './verificar-segredos.mjs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { findSecrets, segredosNaPasta } from './verificar-segredos.mjs';
 
 // Os valores de teste são montados aos bocados, para o próprio verificador não os encontrar
 // neste ficheiro quando corre sobre o repositório.
@@ -44,5 +47,28 @@ describe('findSecrets', () => {
       'task-1234567890abcdef1234567890abcdef',
     ];
     for (const value of publicos) expect(findSecrets(value), value).toEqual([]);
+  });
+});
+
+describe('segredosNaPasta (KANGEST ONE, teste 13: nada de privilegiado no cliente)', () => {
+  it('encontra a chave secreta e o JWT service_role no que se compila, e deixa a chave pública', () => {
+    const pasta = mkdtempSync(join(tmpdir(), 'cliente-'));
+    try {
+      mkdirSync(join(pasta, 'assets'));
+      const corpo = (role) => Buffer.from(JSON.stringify({ role, iss: 'supabase' })).toString('base64url');
+      const anon = `eyJhbGciOiJIUzI1NiJ9.${corpo('anon')}.assinaturaassinatura`;
+      writeFileSync(join(pasta, 'assets', 'index.js'), `const url="https://x.supabase.co";const k="${anon}";const p="sb_publishable_abcdefghijklmnopqrstuvwxyz";`);
+      expect(segredosNaPasta(pasta)).toEqual({ files: 1, problems: [] });
+      const service = `eyJhbGciOiJIUzI1NiJ9.${corpo('service_role')}.assinaturaassinatura`;
+      // montada por partes, para este ficheiro não ter uma chave por extenso
+      const secreta = ['sb', 'secret', 'abcdefghijklmnopqrstuvwxyz'].join('_');
+      writeFileSync(join(pasta, 'assets', 'mau.js'), `const s="${service}";const t="${secreta}";`);
+      const r = segredosNaPasta(pasta);
+      expect(r.files).toBe(2);
+      expect(r.problems.map((p) => p.rule).sort()).toEqual(['Chave secreta do Supabase', 'JWT service_role do Supabase']);
+      expect(JSON.stringify(r.problems)).not.toContain('abcdefghijklmnopqrstuvwxyz');
+    } finally {
+      rmSync(pasta, { recursive: true, force: true });
+    }
   });
 });

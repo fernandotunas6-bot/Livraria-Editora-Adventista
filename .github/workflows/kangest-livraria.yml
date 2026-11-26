@@ -82,6 +82,8 @@ jobs:
         run: |
           npx vite build
           node scripts/verificar-css.mjs
+          # KANGEST ONE, teste de aceitação 13: o ecrã compilado não leva nenhuma credencial privilegiada
+          node ../../scripts/verificar-segredos.mjs --pasta dist
 
       - name: Clippy
         working-directory: app/kangest-sistema/src-tauri
