@@ -93,14 +93,31 @@ uma vez, na importação à mão.
 **A conferência dia a dia também está na importação à mão:** a linha «Dias com as mesmas vendas» e a tabela «Dias com
 diferenças». A conferência compara também os fechos de caixa (`tbCaixaDiaria`).
 
+## O que faltava (migração 0064)
+
+`services/importar_faltava.rs`. Uma importação seguinte, também a automática, não duplica nada.
+
+- **As categorias dos artigos** (`tbArtigosCategoria`): passam a subfamília da família do artigo («Produto»,
+  «Serviço»…), só quando o artigo não tem subfamília própria. Um artigo já arrumado cá não muda.
+- **As permissões dos utilizadores** (as ~70 colunas `Front*`, `Pos*` e `FluxoCaixa_*` de `tbUsuario` e o privilégio
+  de `tbUsuarioPrivilegio`):
+  - **são aproximadas:** cada coluna com «S» dá a permissão do KanGest que lhe corresponde, e o limite de desconto
+    vem do `posLimeteDesconto`. As do restaurante (`Rest_*`) e as que não têm par ficam de fora;
+  - **ficam «para rever»:** o utilizador aparece com «Rever permissões (KIGEST)» em *Sistema → Utilizadores*, até o
+    administrador o guardar;
+  - **o lado seguro:** as permissões só de administrador (utilizadores, configurações, actualizações…) nunca vêm do
+    KIGEST, e o perfil ADMIN também não. Quem era administrador no KIGEST fica GESTOR;
+  - **o que já se mexeu cá fica:** um utilizador com permissões próprias ou já revisto não muda.
+- **As vendas suspensas** (`tbDocsCabessalhoSuspenso` e `tbDocsDetalheSuspenso`): ficam suspensas no POS do Posto#1,
+  prontas a retomar, com os artigos de cá. Uma linha de um artigo que não veio fica de fora, e o relatório avisa. Uma
+  suspensa já retomada no KanGest não volta na importação seguinte.
+- **As prestações sociais pagas** (`tbRhFuncSubsidioSocias`, os detalhes e `tbzconfigTiposPrestacao`): em *Recursos
+  Humanos → Prestações Sociais*, com o tipo e os meses pagos (`rh_prestacao_pagamentos`).
+
 ## O que não é importado
 
-- Vendas suspensas no POS (`tbDocsCabessalhoSuspenso`) — são temporárias: feche-as no KIGEST antes da migração.
-- Permissões dos utilizadores (`tbUsuarioPrivilegio`) — os códigos do KIGEST não correspondem às permissões novas; reveja-as em Sistema → Utilizadores e Permissões.
-- Categorias dos artigos (`tbArtigosCategoria`) — o KanGest usa família e subfamília. Os **tipos de inventário**
-  (`tbArtigosTipoInventario`: mercadorias, matérias-primas, produtos acabados, subprodutos, trabalhos em curso)
-  passam para a ficha de cada artigo e para o SAF-T de inventários.
-- Histórico de prestações sociais pagas (`tbRhFuncSubsidioSociasDetalhes`) — as prestações em curso registam-se em Recursos Humanos → Prestações Sociais.
+- Os tipos de inventário (`tbArtigosTipoInventario`: mercadorias, matérias-primas, produtos acabados, subprodutos,
+  trabalhos em curso) passam para a ficha de cada artigo e para o SAF-T de inventários.
 - Séries antigas, locais de entrega e configurações internas do KIGEST.
 
 A comparação completa, tabela a tabela, está em [COMPARACAO-KIGEST.md](COMPARACAO-KIGEST.md).

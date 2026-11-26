@@ -685,6 +685,8 @@ pub async fn listar(st: &AppState) -> AppResult<Value> {
             "bloqueado_ate": bloqueado,
             "tentativas": r.get::<i64, _>("tentativas"),
             "importado": r.get::<Option<String>, _>("id_origem").is_some(),
+            // as permissões vieram do KIGEST (aproximadas) e o administrador ainda não as confirmou (migração 0064)
+            "rever_permissoes": r.try_get::<Option<String>, _>("permissoes_kigest").ok().flatten().as_deref() == Some("rever"),
             "foto": r.try_get::<Option<String>, _>("foto").ok().flatten(),
         }));
     }
@@ -770,7 +772,10 @@ pub async fn guardar(st: &AppState, u: UtilizadorIn) -> AppResult<Value> {
     let mut tx = crate::db::transacao(&st.pool).await?;
     let id = match u.id {
         Some(id) => {
-            sqlx::query("UPDATE utilizadores SET nome = ?, login = ?, perfil = ?, ativo = ?, permissoes = ?, limite_desconto = ? WHERE id = ?")
+            sqlx::query(
+                "UPDATE utilizadores SET nome = ?, login = ?, perfil = ?, ativo = ?, permissoes = ?, limite_desconto = ?,
+                   permissoes_kigest = CASE WHEN permissoes_kigest IS NULL THEN NULL ELSE 'revisto' END WHERE id = ?",
+            )
                 .bind(u.nome.trim())
                 .bind(u.login.trim())
                 .bind(&u.perfil)
