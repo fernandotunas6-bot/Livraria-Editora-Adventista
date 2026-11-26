@@ -24,7 +24,27 @@ pub async fn estado(st: &AppState) -> AppResult<Value> {
         "base_de_parte": if inicializado { None } else { ultima_de_parte(&st.pasta_dados) },
         // o KanGest oficial neste computador: o ecrã inicial oferece trazer os dados dele (services/oficial.rs)
         "oficial": if empresa > 0 { Value::Null } else { super::oficial::encontrado(st) },
+        // o ecrã de entrada mostra a ligação ao servidor central e a versão (KANGEST ONE)
+        "ligacao": ligacao_para_entrada(&st.pool).await,
     }))
+}
+
+/// Para o ecrã de entrada (KANGEST ONE): se este KanGest está ligado ao servidor central e se a última volta correu bem
+/// nos últimos 10 minutos (sem isso, a conta do site entra no modo limitado). Da loja, só o nome (o que está na porta).
+async fn ligacao_para_entrada(pool: &sqlx::SqlitePool) -> Value {
+    let r: Option<(String, bool)> = sqlx::query_as(
+        "SELECT loja, (ultimo_erro = '' AND COALESCE(ultima_sinc, '') >= strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-10 minutes'))
+           FROM sinc_ligacao WHERE id = 1 AND ativa = 1",
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+    let versao = env!("CARGO_PKG_VERSION");
+    match r {
+        Some((loja, em_linha)) => json!({ "ligado": true, "loja": loja, "em_linha": em_linha, "versao": versao }),
+        None => json!({ "ligado": false, "versao": versao }),
+    }
 }
 
 /// A base posta de parte mais recente (`kigest.db.ilegivel-AAAAMMDD-HHMMSS`), sem o WAL e o índice que a acompanham.

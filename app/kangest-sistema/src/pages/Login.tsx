@@ -3,7 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, CloudOff, ShieldCheck } from "lucide-react";
 import { call } from "@/lib/api";
 import { useSession } from "@/store/session";
 import type { Sessao } from "@/lib/types";
@@ -230,8 +231,46 @@ export default function Login({ empresa }: { empresa: string | null }) {
         )}
 
         {erro && <p className="mt-4 rounded-lg bg-danger-50 px-3 py-2 text-[13px] text-danger">{erro}</p>}
+        <EstadoDaLigacao />
       </div>
     </Moldura>
+  );
+}
+
+type LigacaoEntrada = { ligado: boolean; loja?: string; em_linha?: boolean; versao?: string };
+
+/**
+ * Por baixo da entrada (KANGEST ONE): a ligação ao servidor central e a versão. Ligado e com a última volta certa:
+ * «Ligado ao servidor central». Ligado mas sem resposta: a conta do site entra no modo limitado, e diz-se o que isso
+ * quer dizer. Um KanGest isolado só mostra a versão. Confere-se de 30 em 30 segundos.
+ */
+function EstadoDaLigacao() {
+  const q = useQuery({
+    queryKey: ["entrada", "ligacao"],
+    queryFn: async () => (await call<{ ligacao?: LigacaoEntrada }>("setup.estado")).ligacao ?? null,
+    refetchInterval: 30_000,
+  });
+  const l = q.data;
+  if (!l) return null;
+  return (
+    <div className="mt-6 space-y-2 text-[12.5px] text-ink-3" role="status">
+      {l.ligado &&
+        (l.em_linha ? (
+          <p className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full bg-ok" aria-hidden />
+            Ligado ao servidor central{l.loja ? ` · ${l.loja}` : ""}
+          </p>
+        ) : (
+          <p className="flex gap-2 rounded-lg border border-accent/40 bg-accent-50 px-3 py-2 text-accent-ink">
+            <CloudOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Sem ligação ao servidor central. Com a conta do site entra no modo limitado: vende e factura, mas a loja online e a confirmação de
+              pagamentos esperam pela Internet.
+            </span>
+          </p>
+        ))}
+      {l.versao && <p>KanGest Livraria {l.versao}</p>}
+    </div>
   );
 }
 

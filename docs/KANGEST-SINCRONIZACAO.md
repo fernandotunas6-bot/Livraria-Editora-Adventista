@@ -114,6 +114,7 @@ A assinatura RSA de cada documento (`agt.rs`) não se confere aqui: fica para o 
 | `POST /admin/kangest/postos` | `manage_settings` | Cria um posto e devolve o código (uma vez) e o endereço |
 | `POST /admin/kangest/postos/codigo` | `manage_settings` | Outro código: computador novo, chave perdida ou rodar a chave |
 | `POST /admin/kangest/postos/revogar` | `manage_settings` | Revoga o posto |
+| `POST /admin/kangest/sessoes/revogar` | `manage_settings` | `{posto, sessao}`: pede o fim de uma sessão aberta no KanGest (§14) |
 | `POST /kangest/emparelhar` | o código de uso único (10 por minuto e por IP) | `{codigo, chave_publica, versao}` → o posto e a chave pública do centro |
 | `POST /kangest/sinc` | a assinatura Ed25519 do posto (240 por minuto e por IP) | O lote selado → a resposta selada |
 
@@ -372,3 +373,38 @@ No painel, em **Configurações → KanGest**, o quadro «Dinheiro das lojas» (
 `public.kangest_financeiro`) mostra, por período, as entradas, as saídas e o saldo, por loja e por centro de custo, sem
 os anulados (que se contam à parte). Só o vê quem lê os pagamentos (`can_read_payments`), e o período tem no máximo 400
 dias.
+
+## 14. As sessões abertas em cada KanGest (KANGEST ONE, fase A3)
+
+Em cada volta, o KanGest manda também **quem está dentro** (`dados.sessoes`, dentro do envelope assinado e cifrado;
+`app/kangest-sistema/src-tauri/src/sinc/sessoes.rs`):
+- a sessão deste computador e as dos postos e browsers em rede (num KanGest que é o servidor da loja);
+- de cada uma: o nome, o login, o perfil, se é uma conta do site, se é o ADMIN local de recurso, o aparelho, o local,
+  se entrou sem Internet e a hora de entrada.
+
+**Nunca seguem tokens nem senhas.** Cada sessão vai com uma chave de 16 letras, tirada do aparelho, da pessoa e da
+hora de entrada (uma entrada nova dá uma chave nova). O site ainda filtra por uma lista fechada de campos
+(`kangestSinc.ts`, `limparSessoesKanGest`; no máximo 100).
+
+Na base (`public.kangest_sessoes`, migração `20261126180000`; só o servidor lê e escreve):
+- **`kangest_sessoes_receber`** grava as que vieram e dá por terminadas as que deixaram de vir (`terminou`, ou
+  `revogada` se o painel o tinha pedido). Guarda um mês de histórico por posto. Um KanGest antigo, que não manda a
+  lista, não mexe em nada.
+- **Cada entrada do ADMIN de recurso** fica no registo de segurança (`private.audit_write`) e avisa os administradores
+  do site (`staff_notifications`, tipo `security`). Avisa uma vez por entrada, não a cada volta.
+- **`kangest_sessao_revogar`** marca o pedido de fim (quem pediu, no registo de segurança). A volta seguinte do posto
+  traz a chave em `sessoes_revogar`. O KanGest termina a sessão (este computador ou o posto em rede volta ao ecrã de
+  entrada, e a sessão do site dessa pessoa acaba) e regista-a em `acessos` (`SESSAO_REVOGADA`).
+
+No painel, em **Configurações → KanGest → Postos**, cada posto mostra quem está dentro, com «Terminar»
+(`KanGestPostos.jsx`, `SessoesDoPosto`):
+- o ADMIN de recurso a vermelho;
+- as contas locais a amarelo (têm de se ligar a uma conta do site);
+- as sessões sem Internet;
+- as terminadas nos últimos 7 dias.
+
+Testes:
+- `scripts/pglite/kangest-sessoes.mjs`: a volta, o registo e o aviso do ADMIN de recurso, o pedido de fim e o acesso
+  recusado de fora;
+- `kangestSinc.test.ts` (`limparSessoesKanGest`) e `KanGestPostos.test.jsx`;
+- Rust: `sessoes_para_o_painel_do_site`.

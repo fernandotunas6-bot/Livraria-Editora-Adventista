@@ -8027,6 +8027,9 @@ async fn a_identidade_unica_num_kangest_ligado_ao_site() {
     rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
     let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
     assert!(s["ligar_ate"].is_null() && s["so_leitura"] == false && s["offline"] == false, "{s}");
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!(e["ligacao"]["ligado"], false, "o ecrã de entrada de um KanGest isolado: {e}");
+    assert!(e["ligacao"]["versao"].is_string());
     // liga-se ao site
     sqlx::query(
         "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em)
@@ -8035,6 +8038,14 @@ async fn a_identidade_unica_num_kangest_ligado_ao_site() {
     .execute(&st.pool)
     .await
     .unwrap();
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!((e["ligacao"]["ligado"].as_bool(), e["ligacao"]["em_linha"].as_bool()), (Some(true), Some(false)), "ligado, ainda sem volta: {e}");
+    sqlx::query("UPDATE sinc_ligacao SET ultima_sinc = strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime'), loja = 'Loja do Huambo' WHERE id = 1")
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let e = rpc(&st, "setup.estado", Value::Null).await;
+    assert_eq!((e["ligacao"]["em_linha"].as_bool(), e["ligacao"]["loja"].as_str()), (Some(true), Some("Loja do Huambo")), "{e}");
     rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
     // contas locais novas: só ADMIN
     assert!(rpc_err(&st, "utilizadores.guardar", json!({ "nome": "Outra", "login": "caixa2", "perfil": "CAIXA", "senha": "caixa123" })).await.contains("conta da pessoa no painel do site"));
@@ -8076,4 +8087,49 @@ fn a_regra_das_contas_locais() {
     assert_eq!(n(conta_local(true, None, "GESTOR", Some("2026-11-26"), "2026-11-26")), "avisar 2026-11-26", "no próprio dia ainda entra");
     assert_eq!(n(conta_local(true, None, "GESTOR", Some("2026-11-25"), "2026-11-26")), "ler 2026-11-25");
     assert_eq!(n(conta_local(true, None, "CAIXA", None, "2026-11-26")), "avisar ");
+}
+
+/// KANGEST ONE (fase A3): as sessões abertas seguem para o painel do site (sem tokens), o ADMIN local de recurso vai
+/// marcado, e uma sessão terminada no painel acaba aqui, neste computador e num posto em rede.
+#[tokio::test]
+async fn sessoes_para_o_painel_do_site() {
+    use crate::rede::{id_ligacao, ligar_para_teste, sessoes_ligadas};
+    use crate::sinc::sessoes;
+    let (st, pasta) = base_com_admin("sessoes-painel").await;
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
+    let caixa_id: i64 = sqlx::query_scalar("SELECT id FROM utilizadores WHERE login = 'caixa1'").fetch_one(&st.pool).await.unwrap();
+    let mut caixa = st.sessao().unwrap();
+    caixa.id = caixa_id;
+    caixa.login = "caixa1".into();
+    caixa.nome = "Operador".into();
+    caixa.perfil = "CAIXA".into();
+    let token = format!("teste-sessoes-site-{}", std::process::id());
+    ligar_para_teste(&token, Some(caixa), None, "Caixa das sessões", "Rede da loja", false);
+    let deste = format!("Programa KanGest ({})", st.posto().descricao);
+    let l = sessoes::abertas(&st).await;
+    let admin = l.iter().find(|s| s["login"] == "admin" && s["aparelho"] == deste.as_str()).expect("a sessão deste computador").clone();
+    assert_eq!((admin["perfil"].as_str(), admin["recurso"].as_bool(), admin["conta_site"].as_bool()), (Some("ADMIN"), Some(true), Some(false)), "{admin}");
+    assert!(admin["id"].as_str().is_some_and(|c| c.len() == 16 && c.chars().all(|x| x.is_ascii_hexdigit())), "{admin}");
+    assert!(admin["inicio"].as_str().is_some_and(|i| i.len() > 19), "a hora de entrada com o fuso: {admin}");
+    let posto = l.iter().find(|s| s["aparelho"] == "Programa KanGest (Caixa das sessões)").expect("o posto em rede").clone();
+    assert_eq!((posto["login"].as_str(), posto["recurso"].as_bool()), (Some("caixa1"), Some(false)), "{posto}");
+    let texto = serde_json::to_string(&l).unwrap();
+    assert!(!texto.contains(&token) && !texto.contains(&id_ligacao(&token)), "nem o token nem o id da ligação");
+    // a mesma entrada dá sempre a mesma chave
+    let de_novo = sessoes::abertas(&st).await;
+    assert!(de_novo.iter().any(|s| s["id"] == admin["id"]));
+    // o painel termina a do posto: ela acaba; uma chave desconhecida não faz nada
+    assert_eq!(sessoes::revogar(&st, &json!([posto["id"], "0000000000000000"])).await, 1);
+    assert!(!sessoes_ligadas().iter().any(|x| x.id == id_ligacao(&token)), "o posto volta ao ecrã de entrada");
+    assert!(st.sessao().is_ok(), "este computador continua");
+    assert_eq!(sessoes::revogar(&st, &Value::Null).await, 0);
+    // e depois a deste computador
+    assert_eq!(sessoes::revogar(&st, &json!([admin["id"]])).await, 1);
+    assert!(st.sessao().is_err(), "este computador volta ao ecrã de entrada");
+    assert!(!sessoes::abertas(&st).await.iter().any(|s| s["id"] == admin["id"]));
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM acessos WHERE evento = 'SESSAO_REVOGADA'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(n, 2, "cada uma fica no registo de acessos");
+    crate::rede::terminar_ligacao(&id_ligacao(&token));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
 }

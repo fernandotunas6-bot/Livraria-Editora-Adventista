@@ -493,3 +493,43 @@ export function limparEstadoComputador(e: unknown): Record<string, unknown> | nu
   for (const k of Object.keys(limpo)) if (limpo[k] === null) delete limpo[k];
   return limpo;
 }
+
+// ------------------------------------------------------------------ as sessões abertas em cada posto (KANGEST ONE, A3)
+
+const CHAVE_DA_SESSAO = /^[0-9a-f]{16}$/;
+
+/**
+ * As sessões abertas que o KanGest manda em cada volta (sinc/sessoes.rs): quem entrou, o perfil, o aparelho e desde
+ * quando, nunca tokens. Só os campos da lista, com os tipos e os limites conferidos, e no máximo 100. Sem lista (um
+ * KanGest antigo) dá `null`, e a base não mexe nas sessões desse posto (public.kangest_sessoes_receber).
+ */
+export function limparSessoesKanGest(l: unknown): Record<string, unknown>[] | null {
+  if (!Array.isArray(l)) return null;
+  const texto = (x: unknown, max: number) => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").trim().slice(0, max) : "");
+  const marca = (x: unknown) => x === true;
+  const data = (x: unknown) => (typeof x === "string" && x.length <= 40 && !Number.isNaN(Date.parse(x)) ? new Date(x).toISOString() : null);
+  const vistas = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const s of l) {
+    if (out.length >= 100) break;
+    if (!s || typeof s !== "object" || Array.isArray(s)) continue;
+    const v = s as Record<string, unknown>;
+    const id = typeof v.id === "string" ? v.id : "";
+    if (!CHAVE_DA_SESSAO.test(id) || vistas.has(id)) continue;
+    vistas.add(id);
+    out.push({
+      id,
+      nome: texto(v.nome, 80),
+      login: texto(v.login, 120),
+      perfil: texto(v.perfil, 40),
+      conta_site: marca(v.conta_site),
+      recurso: marca(v.recurso),
+      aparelho: texto(v.aparelho, 80),
+      local: texto(v.local, 80),
+      pela_internet: marca(v.pela_internet),
+      offline: marca(v.offline),
+      inicio: data(v.inicio),
+    });
+  }
+  return out;
+}
