@@ -127,3 +127,22 @@ Cada encomenda ou produto alterado no site volta a vir e substitui o que havia (
 - desligar apaga a cópia.
 
 `sinc/loja.rs` testa os filtros fixos e a leitura do JSON.
+
+## Clientes e pagamentos
+
+Dois separadores novos na Loja online, ao lado das Encomendas e dos Produtos:
+
+- **Clientes** (`loja.clientes`): quem encomendou nesta loja pelo site. Sai da cópia local das encomendas, por isso
+  funciona sem Internet e só mostra os desta loja. A mesma pessoa junta-se pelo nome e o telefone. Para cada cliente
+  mostra quantas encomendas fez, quantas estão em aberto, o total (sem as canceladas) e a última. Clicar num cliente
+  mostra as encomendas dele.
+- **Pagamentos** (`loja.pagamentos`, `src-tauri/src/sinc/pagamentos.rs`): o mesmo relatório do painel do site
+  («Pagamentos e caixa», `public.payments_report`), pedido com a conta do site da pessoa. Por isso só o vê quem lá pode
+  ler os pagamentos. Por período (este mês, o mês passado, os últimos 30 dias) mostra:
+  - o recebido líquido, com os reembolsos (as devoluções em dinheiro);
+  - o que está por confirmar e o que há por receber;
+  - o entregue sem pagamento;
+  - o recebido por método, e a lista dos pagamentos por confirmar, cada um a abrir a encomenda no KanGest.
+
+  **Só se lê:** confirmar um pagamento e reembolsar fazem-se no painel (o botão leva lá). Um pagamento só fica
+  confirmado pelo gateway ou por quem tem «Confirmar pagamentos».
