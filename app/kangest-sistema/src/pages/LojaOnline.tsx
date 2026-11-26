@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { CheckCircle2, CloudOff, ExternalLink, KeyRound, Link2, Package, Search, ShoppingBag, Store, UserRound } from "lucide-react";
+import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
 import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
@@ -415,8 +415,28 @@ function DetalheEncomenda({ id, site, onFechar }: { id: string; site: string; on
 }
 
 function Produtos({ e, site }: { e: EstadoLoja; site: string }) {
+  const qc = useQueryClient();
   const [filtro, setFiltro] = useState("");
   const [q, setQ] = useState("");
+  // o editor: null fechado, "" um produto novo, ou o id do produto
+  const [editar, setEditar] = useState<string | null>(null);
+  const [eliminar, setEliminar] = useState<LinhaProduto | null>(null);
+  const [aFazer, setAFazer] = useState("");
+  const recarregar = () => {
+    for (const k of ["loja-produtos", "loja-estado"]) qc.invalidateQueries({ queryKey: [k] });
+  };
+  async function accao(chave: string, metodo: string, params: object, ok: string) {
+    setAFazer(chave);
+    try {
+      await call(metodo, params);
+      toast.success(ok);
+      recarregar();
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setAFazer("");
+    }
+  }
   const lista = useQuery({
     queryKey: ["loja-produtos", filtro, q],
     queryFn: () => call<LinhaProduto[]>("loja.produtos", { filtro, q }),
@@ -432,7 +452,10 @@ function Produtos({ e, site }: { e: EstadoLoja; site: string }) {
   ];
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => setEditar("")}>
+          <Plus className="size-4" /> Novo produto
+        </Button>
         {filtros.map(([id, rotulo, n]) => (
           <button
             key={id || "todos"}
@@ -477,7 +500,33 @@ function Produtos({ e, site }: { e: EstadoLoja; site: string }) {
                     {p.artigo_id ? p.stock_loja : <span className="text-[12px] text-ink-3">{p.referencia ? "não existe cá" : "—"}</span>}
                   </Td>
                   <Td>{p.activo === 1 ? <Badge tone="ok">À venda</Badge> : <Badge tone="neutral">Oculto</Badge>}</Td>
-                  <Td>
+                  <Td className="whitespace-nowrap">
+                    <Button variant="ghost" size="sm" title="Editar" aria-label={`Editar «${p.titulo}»`} onClick={() => setEditar(p.id)}>
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title={p.activo === 1 ? "Ocultar no site" : "Publicar no site"}
+                      aria-label={`${p.activo === 1 ? "Ocultar" : "Publicar"} «${p.titulo}»`}
+                      loading={aFazer === `pub-${p.id}`}
+                      onClick={() => accao(`pub-${p.id}`, "loja.produto.publicar", { id: p.id, activo: p.activo !== 1 }, p.activo === 1 ? "Ocultado no site." : "Publicado no site.")}
+                    >
+                      {p.activo === 1 ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Duplicar (a cópia fica oculta)"
+                      aria-label={`Duplicar «${p.titulo}»`}
+                      loading={aFazer === `dup-${p.id}`}
+                      onClick={() => accao(`dup-${p.id}`, "loja.produto.duplicar", { id: p.id }, "Duplicado: a cópia está oculta.")}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" title="Eliminar do site" aria-label={`Eliminar «${p.titulo}»`} onClick={() => setEliminar(p)}>
+                      <Trash2 className="size-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -494,7 +543,244 @@ function Produtos({ e, site }: { e: EstadoLoja; site: string }) {
           </Table>
         )}
       </Card>
+      <Coleccoes />
+      {editar !== null && <EditorProduto id={editar || null} onFechar={() => setEditar(null)} onGuardado={recarregar} />}
+      {eliminar && (
+        <Modal
+          open
+          onClose={() => setEliminar(null)}
+          title={`Eliminar «${eliminar.titulo}» do site?`}
+          width="max-w-md"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEliminar(null)}>Não</Button>
+              <Button
+                variant="danger"
+                loading={aFazer === "eliminar"}
+                onClick={async () => {
+                  await accao("eliminar", "loja.produto.eliminar", { id: eliminar.id, confirmar: true }, "Eliminado do site.");
+                  setEliminar(null);
+                }}
+              >
+                Eliminar
+              </Button>
+            </>
+          }
+        >
+          <p className="text-ink-2">O produto sai do site e não se recupera. Para o tirar só da venda, oculte-o. Fica na auditoria.</p>
+        </Modal>
+      )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// O editor dos produtos e das colecções do site (src-tauri/src/sinc/produtos.rs)
+// ---------------------------------------------------------------------------------------------------------------
+
+type CamposProduto = Record<string, string | number | boolean | null>;
+interface Coleccao {
+  id: string;
+  title: string;
+  description: string | null;
+  sort_order: number | null;
+  active: boolean;
+  featured: boolean;
+}
+
+/** O que o editor mostra, pela ordem: [campo, rótulo, tipo]. */
+const CAMPOS_EDITOR: [string, string, "texto" | "numero" | "longo"][] = [
+  ["title", "Título", "texto"],
+  ["author", "Autor", "texto"],
+  ["publisher", "Editora", "texto"],
+  ["isbn", "ISBN", "texto"],
+  ["book_code", "Código", "texto"],
+  ["kigest_ref", "Referência no KanGest", "texto"],
+  ["language", "Língua", "texto"],
+  ["pages", "Páginas", "numero"],
+  ["year", "Ano", "numero"],
+  ["price", "Preço (Kz)", "numero"],
+  ["sale_price", "Preço em promoção (Kz)", "numero"],
+  ["stock", "Stock no site", "numero"],
+  ["cover_image", "Capa (endereço da imagem)", "texto"],
+  ["description", "Descrição", "longo"],
+];
+
+/** Criar ou editar um produto do site. Num produto ligado a um artigo do KanGest, o preço e o stock vêm de cá. */
+function EditorProduto({ id, onFechar, onGuardado }: { id: string | null; onFechar: () => void; onGuardado: () => void }) {
+  const atual = useQuery({
+    queryKey: ["loja-produto", id],
+    queryFn: () => call<{ produto: CamposProduto; ligado: boolean; bloqueados: string[] }>("loja.produto.obter", { id }),
+    enabled: !!id,
+  });
+  const coleccoes = useQuery({ queryKey: ["loja-coleccoes"], queryFn: () => call<Coleccao[]>("loja.coleccao.listar") });
+  const [campos, setCampos] = useState<CamposProduto>({});
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (atual.data) setCampos(atual.data.produto);
+  }, [atual.data]);
+  const ligado = !!atual.data?.ligado;
+  const bloqueado = (k: string) => ligado && (atual.data?.bloqueados ?? []).includes(k);
+  const mudar = (k: string, v: string | number | boolean | null) => setCampos((c) => ({ ...c, [k]: v }));
+  async function guardar() {
+    setBusy(true);
+    try {
+      const envio: CamposProduto = {};
+      for (const [k] of CAMPOS_EDITOR) if (!bloqueado(k) && k in campos) envio[k] = campos[k];
+      for (const k of ["collection_id", "active", "featured"]) if (k in campos) envio[k] = campos[k];
+      await call("loja.produto.guardar", { id, campos: envio });
+      toast.success(id ? "Produto guardado no site." : "Produto criado no site (oculto, até o publicar).");
+      onGuardado();
+      onFechar();
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal
+      open
+      onClose={onFechar}
+      title={id ? "Editar o produto no site" : "Novo produto no site"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onFechar}>Cancelar</Button>
+          <Button loading={busy} disabled={!!id && !atual.data} onClick={guardar}>Guardar</Button>
+        </>
+      }
+    >
+      {id && atual.isLoading ? (
+        <p className="text-ink-3">A abrir o produto no site…</p>
+      ) : atual.error ? (
+        <p className="text-danger">{(atual.error as Error).message}</p>
+      ) : (
+        <div className="space-y-4">
+          {ligado && (
+            <p className="rounded-lg bg-sunken px-3 py-2 text-[13px] text-ink-2">
+              Este produto está ligado a um artigo do KanGest: o preço, a promoção e o stock vêm daqui, pela sincronização, e não se mudam no site.
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {CAMPOS_EDITOR.map(([k, rotulo, tipo]) =>
+              tipo === "longo" ? (
+                <Field key={k} label={rotulo} className="sm:col-span-2">
+                  <textarea
+                    className="kg-campo min-h-24 rounded-lg border border-line bg-surface px-3 py-2 text-[14px]"
+                    value={String(campos[k] ?? "")}
+                    onChange={(x) => mudar(k, x.target.value)}
+                  />
+                </Field>
+              ) : (
+                <Field key={k} label={rotulo} hint={bloqueado(k) ? "Vem do KanGest" : undefined}>
+                  <Input
+                    type={tipo === "numero" ? "number" : "text"}
+                    disabled={bloqueado(k)}
+                    value={campos[k] === null || campos[k] === undefined ? "" : String(campos[k])}
+                    onChange={(x) => mudar(k, tipo === "numero" ? (x.target.value === "" ? null : Number(x.target.value)) : x.target.value)}
+                  />
+                </Field>
+              ),
+            )}
+            <Field label="Colecção">
+              <Select value={String(campos.collection_id ?? "")} onChange={(x) => mudar("collection_id", x.target.value)}>
+                <option value="">Sem colecção</option>
+                {(coleccoes.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </Select>
+            </Field>
+            <div className="flex items-end gap-4 pb-2 text-[13px]">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!campos.active} onChange={(x) => mudar("active", x.target.checked)} /> À venda no site
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!campos.featured} onChange={(x) => mudar("featured", x.target.checked)} /> Em destaque
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** As colecções do site: a lista, criar e editar (título, descrição, ordem, visível, destaque). */
+function Coleccoes() {
+  const qc = useQueryClient();
+  const lista = useQuery({ queryKey: ["loja-coleccoes"], queryFn: () => call<Coleccao[]>("loja.coleccao.listar"), retry: false });
+  const [editar, setEditar] = useState<Partial<Coleccao> | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function guardar() {
+    if (!editar) return;
+    setBusy(true);
+    try {
+      const { id, ...campos } = editar;
+      await call("loja.coleccao.guardar", { id: id ?? null, campos });
+      toast.success("Colecção guardada no site.");
+      qc.invalidateQueries({ queryKey: ["loja-coleccoes"] });
+      setEditar(null);
+    } catch (x) {
+      toast.error((x as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="font-semibold">Colecções do site</div>
+        <Button size="sm" variant="secondary" onClick={() => setEditar({ title: "", active: false, featured: false })}>
+          <Plus className="size-4" /> Nova colecção
+        </Button>
+      </div>
+      {lista.error ? (
+        <p className="text-[13px] text-ink-3">{(lista.error as Error).message}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {(lista.data ?? []).map((c) => (
+            <button key={c.id} type="button" onClick={() => setEditar(c)} className="rounded-full border border-line px-3 py-1 text-[13px] hover:border-brand/60">
+              {c.title} {!c.active && <span className="text-ink-3">(oculta)</span>}
+            </button>
+          ))}
+          {lista.data && !lista.data.length && <span className="text-[13px] text-ink-3">Ainda não há colecções.</span>}
+        </div>
+      )}
+      {editar && (
+        <Modal
+          open
+          onClose={() => setEditar(null)}
+          title={editar.id ? "Editar a colecção" : "Nova colecção"}
+          width="max-w-md"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setEditar(null)}>Cancelar</Button>
+              <Button loading={busy} onClick={guardar}>Guardar</Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <Field label="Título">
+              <Input value={editar.title ?? ""} onChange={(x) => setEditar({ ...editar, title: x.target.value })} />
+            </Field>
+            <Field label="Descrição">
+              <Input value={editar.description ?? ""} onChange={(x) => setEditar({ ...editar, description: x.target.value })} />
+            </Field>
+            <Field label="Ordem">
+              <Input type="number" value={editar.sort_order ?? ""} onChange={(x) => setEditar({ ...editar, sort_order: x.target.value === "" ? null : Number(x.target.value) })} />
+            </Field>
+            <div className="flex gap-4 text-[13px]">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!editar.active} onChange={(x) => setEditar({ ...editar, active: x.target.checked })} /> Visível no site
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!editar.featured} onChange={(x) => setEditar({ ...editar, featured: x.target.checked })} /> Em destaque
+              </label>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </Card>
   );
 }
 

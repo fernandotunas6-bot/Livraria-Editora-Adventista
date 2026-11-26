@@ -7763,3 +7763,125 @@ async fn entrar_com_a_conta_do_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// Um site falso para o editor dos produtos: responde ao PostgREST e guarda (método, caminho, corpo) de cada pedido.
+fn site_falso_para_produtos() -> (u16, PedidosRecebidos) {
+    use std::io::{Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let porta = l.local_addr().unwrap().port();
+    let recebidos: PedidosRecebidos = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let r = recebidos.clone();
+    std::thread::spawn(move || {
+        for f in l.incoming().flatten() {
+            let mut f = f;
+            let mut dados = Vec::new();
+            let mut b = [0u8; 8192];
+            loop {
+                let n = f.read(&mut b).unwrap_or(0);
+                dados.extend_from_slice(&b[..n]);
+                let texto = String::from_utf8_lossy(&dados).to_string();
+                if let Some((cab, corpo)) = texto.split_once("\r\n\r\n") {
+                    let tam: usize = cab.lines().find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0))).unwrap_or(0);
+                    if corpo.len() >= tam || n == 0 {
+                        break;
+                    }
+                }
+                if n == 0 {
+                    break;
+                }
+            }
+            let texto = String::from_utf8_lossy(&dados).to_string();
+            let mut partes = texto.split_whitespace();
+            let metodo = partes.next().unwrap_or("").to_string();
+            let caminho = partes.next().unwrap_or("").to_string();
+            let corpo: Value = serde_json::from_str(texto.split_once("\r\n\r\n").map(|x| x.1).unwrap_or("")).unwrap_or(Value::Null);
+            r.lock().unwrap().push((format!("{metodo} {caminho}"), corpo.clone()));
+            let resposta = match (metodo.as_str(), caminho.as_str()) {
+                ("GET", c) if c.starts_with("/rest/v1/stock_books?id=eq.p1") => json!([{ "id": "p1", "title": "O Desejado", "price": 5700, "stock": 3, "kigest_ref": "LIV-001", "active": true }]),
+                ("GET", c) if c.starts_with("/rest/v1/stock_books?id=eq.p2") => json!([{ "id": "p2", "title": "Livro livre", "price": 100, "kigest_ref": "", "active": true }]),
+                ("PATCH", c) if c.starts_with("/rest/v1/stock_books?id=eq.") => {
+                    let mut v = corpo.clone();
+                    v["id"] = json!(c.rsplit('.').next().unwrap_or(""));
+                    json!([v])
+                }
+                ("POST", "/rest/v1/stock_books") | ("POST", "/rest/v1/book_collections") => {
+                    let mut v = corpo.clone();
+                    v["id"] = json!("novo");
+                    json!([v])
+                }
+                ("DELETE", c) if c.starts_with("/rest/v1/stock_books?id=eq.p2") => json!([{ "id": "p2", "title": "Livro livre" }]),
+                ("GET", c) if c.starts_with("/rest/v1/book_collections") => json!([{ "id": "c1", "title": "Devocionais", "active": true }]),
+                _ => json!([]),
+            }
+            .to_string();
+            let _ = f.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{resposta}", resposta.len()).as_bytes());
+        }
+    });
+    (porta, recebidos)
+}
+
+/// O editor dos produtos e das colecções do site (src/sinc/produtos.rs; parte C): tudo vai com a sessão do site da
+/// pessoa; num produto ligado a um artigo do KanGest, o preço, a promoção, o stock e a ligação não seguem; um produto
+/// novo entra oculto e, se se liga a um artigo de cá, o preço e o stock dele seguem pela sincronização; a cópia fica
+/// oculta, sem ligação e sem stock; eliminar pede confirmação e fica na auditoria.
+#[tokio::test]
+async fn editor_dos_produtos_do_site() {
+    let (st, pasta) = base_com_admin("editor-produtos").await;
+    let (porta, recebidos) = site_falso_para_produtos();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "referencia": "LIV-001", "taxa_iva_id": 1, "preco1": 500000 })).await["id"].as_i64().unwrap();
+    // a sessão do site da pessoa (como depois de entrar em Livraria → Loja online)
+    let agora = chrono::Utc::now().timestamp();
+    let tokens = crate::sinc::pessoa::Tokens { access: "tok".into(), refresh: "r".into(), expira: agora + 3600 };
+    crate::sinc::pessoa::guardar(&st.pool, 1, "admin@x.ao", &tokens, "", agora).await.unwrap();
+    let corpo = |pedido: &str| recebidos.lock().unwrap().iter().rev().find(|(p, _)| p.starts_with(pedido)).map(|x| x.1.clone()).unwrap_or(Value::Null);
+
+    // ligado a um artigo de cá: o preço e o stock vêm do KanGest
+    let p = rpc(&st, "loja.produto.obter", json!({ "id": "p1" })).await;
+    assert_eq!(p["ligado"], true);
+    let g = rpc(&st, "loja.produto.guardar", json!({ "id": "p1", "campos": { "title": "O Desejado (edição nova)", "price": 1, "stock": 99, "kigest_ref": "" } })).await;
+    assert_eq!(corpo("PATCH /rest/v1/stock_books?id=eq.p1"), json!({ "title": "O Desejado (edição nova)" }), "o preço, o stock e a ligação não seguem");
+    assert_eq!(g["bloqueados"].as_array().unwrap().len(), 3);
+
+    // um produto novo que se liga a um artigo de cá: oculto, sem preço nem stock, e o artigo volta à fila do catálogo
+    rpc(&st, "loja.produto.guardar", json!({ "campos": { "title": "O Desejado (capa dura)", "kigest_ref": "LIV-001", "price": 10, "stock": 5 } })).await;
+    assert_eq!(corpo("POST /rest/v1/stock_books"), json!({ "title": "O Desejado (capa dura)", "kigest_ref": "LIV-001", "active": false }));
+    let fila: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sinc_catalogo WHERE artigo_id = ?").bind(artigo).fetch_one(&st.pool).await.unwrap();
+    assert_eq!(fila, 2);
+    // um produto novo sem ligação: com o preço, oculto
+    rpc(&st, "loja.produto.guardar", json!({ "campos": { "title": "Caderno", "price": 250 } })).await;
+    assert_eq!(corpo("POST /rest/v1/stock_books"), json!({ "title": "Caderno", "price": 250, "active": false }));
+    assert!(rpc_err(&st, "loja.produto.guardar", json!({ "campos": { "price": 10 } })).await.contains("título"));
+    assert!(rpc_err(&st, "loja.produto.guardar", json!({ "id": "p2", "campos": { "price": -5 } })).await.contains("maior que zero"));
+
+    // duplicar: a cópia fica oculta, sem ligação e sem stock
+    rpc(&st, "loja.produto.duplicar", json!({ "id": "p1" })).await;
+    let c = corpo("POST /rest/v1/stock_books");
+    assert_eq!((c["title"].as_str(), c["active"].clone(), c["kigest_ref"].as_str(), c["stock"].clone()), (Some("O Desejado (cópia)"), json!(false), Some(""), json!(0)), "{c}");
+
+    // publicar e ocultar
+    rpc(&st, "loja.produto.publicar", json!({ "id": "p2", "activo": false })).await;
+    assert_eq!(corpo("PATCH /rest/v1/stock_books?id=eq.p2"), json!({ "active": false }));
+
+    // eliminar: pede confirmação e fica na auditoria
+    assert!(rpc_err(&st, "loja.produto.eliminar", json!({ "id": "p2" })).await.contains("Confirme"));
+    rpc(&st, "loja.produto.eliminar", json!({ "id": "p2", "confirmar": true })).await;
+    let auditoria: String = sqlx::query_scalar("SELECT detalhe FROM auditoria WHERE acao = 'LOJA_PRODUTO_ELIMINADO'").fetch_one(&st.pool).await.unwrap();
+    assert!(auditoria.contains("Livro livre"), "{auditoria}");
+    // um id que não pode ir num endereço não sai daqui
+    assert!(rpc_err(&st, "loja.produto.eliminar", json!({ "id": "p2&id=neq.x", "confirmar": true })).await.contains("desconhecido"));
+
+    // as colecções
+    assert_eq!(rpc(&st, "loja.coleccao.listar", Value::Null).await.as_array().unwrap().len(), 1);
+    rpc(&st, "loja.coleccao.guardar", json!({ "campos": { "title": "Novidades", "active": true, "outro": "fora" } })).await;
+    assert_eq!(corpo("POST /rest/v1/book_collections"), json!({ "title": "Novidades", "active": true }));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

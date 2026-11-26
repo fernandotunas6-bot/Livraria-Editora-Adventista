@@ -4,9 +4,8 @@
 //! A Loja online no KanGest (Livraria → Loja online; docs/LOJA-ONLINE.md): a cópia local das encomendas desta loja e
 //! do catálogo do site, que chega com cada sincronização (`kangest_novidades` no site). Lê-se também sem Internet.
 //!
-//! Só se lê aqui. As alterações (confirmar, preparar, entregar, publicar, mudar preços) fazem-se no painel do site,
-//! aberto no navegador do KanGest (navegador.rs), com o login e o MFA de cada pessoa: assim o KanGest não guarda
-//! sessões de pessoas e as regras do painel valem como sempre.
+//! Aqui só se lê a cópia. As alterações vão com a sessão do site de cada pessoa, com as regras do painel: as das
+//! encomendas em pessoa.rs, as dos produtos e das colecções em produtos.rs.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -250,6 +249,10 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
     // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs)
     if let Some(resto) = metodo.strip_prefix("conta.") {
         return super::pessoa::despachar(st, resto, params).await;
+    }
+    // o editor dos produtos e das colecções do site (produtos.rs)
+    if metodo.starts_with("produto.") || metodo.starts_with("coleccao.") {
+        return super::produtos::despachar(st, metodo, params).await;
     }
     let filtro = || -> AppResult<Filtro> { if params.is_null() { Ok(Filtro::default()) } else { Ok(serde_json::from_value(params.clone())?) } };
     match metodo {

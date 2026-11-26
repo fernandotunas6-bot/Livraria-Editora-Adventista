@@ -25,6 +25,7 @@ pub mod entrada;
 pub mod fechos;
 pub mod loja;
 pub mod pessoa;
+pub mod produtos;
 pub mod tempo_real;
 
 use std::collections::HashMap;

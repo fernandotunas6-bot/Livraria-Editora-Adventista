@@ -209,13 +209,13 @@ async fn sessao_de(pool: &SqlitePool, utilizador: i64) -> AppResult<Option<Sessa
     Ok(Some(Sessao { email, tokens, factor_id, entrou_em }))
 }
 
-async fn apagar_sessao(pool: &SqlitePool, utilizador: i64) -> AppResult<()> {
+pub(super) async fn apagar_sessao(pool: &SqlitePool, utilizador: i64) -> AppResult<()> {
     sqlx::query("DELETE FROM sessoes_site WHERE utilizador_id = ?").bind(utilizador).execute(pool).await?;
     Ok(())
 }
 
 /// Um token válido da pessoa: renova-o se faltar menos de um minuto; ao fim do turno, a sessão acaba.
-async fn token_valido(pool: &SqlitePool, a: &Auth, utilizador: i64) -> Result<String, Erro> {
+pub(super) async fn token_valido(pool: &SqlitePool, a: &Auth, utilizador: i64) -> Result<String, Erro> {
     let Some(s) = sessao_de(pool, utilizador).await? else {
         return Err(Erro::SemSessao("Entre com a sua conta do site para alterar encomendas (Livraria → Loja online).".into()));
     };
