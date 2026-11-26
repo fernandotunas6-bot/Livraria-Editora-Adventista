@@ -350,13 +350,15 @@ async fn pagamentos(st: &AppState, i: PeriodoIn) -> AppResult<Value> {
 
 /// Despachante dos métodos `loja.*` (services/mod.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
-    // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs)
+    // a conta do site de cada pessoa e as alterações às encomendas (pessoa.rs); sem Internet, a mensagem diz porquê
     if let Some(resto) = metodo.strip_prefix("conta.") {
-        return super::pessoa::despachar(st, resto, params).await;
+        let r = super::pessoa::despachar(st, resto, params).await;
+        return if resto == "entrar" { r } else { super::explicar_sem_internet(st, r) };
     }
     // o editor dos produtos e das colecções do site (produtos.rs)
     if metodo.starts_with("produto.") || metodo.starts_with("coleccao.") {
-        return super::produtos::despachar(st, metodo, params).await;
+        let r = super::produtos::despachar(st, metodo, params).await;
+        return super::explicar_sem_internet(st, r);
     }
     let filtro = || -> AppResult<Filtro> { if params.is_null() { Ok(Filtro::default()) } else { Ok(serde_json::from_value(params.clone())?) } };
     match metodo {
@@ -367,7 +369,7 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "clientes" => clientes(st, filtro()?).await,
         "igrejas" => igrejas(st, filtro()?).await,
         "igrejaLigar" => igreja_ligar(st, serde_json::from_value(params.clone())?).await,
-        "pagamentos" => pagamentos(st, serde_json::from_value(params.clone())?).await,
+        "pagamentos" => super::explicar_sem_internet(st, pagamentos(st, serde_json::from_value(params.clone())?).await),
         _ => Err(AppError::msg(format!("Método desconhecido: loja.{metodo}"))),
     }
 }

@@ -102,6 +102,14 @@ check('só a diferença: −4 no armazém 1 e +1 no 2', dif.length === 2 && Numb
 check('agora bate tudo certo', (await conferir(posto)).length === 0, await conferir(posto));
 check('a mesma abertura outra vez não conta', (await receber(posto, [{ armazem_id: 1, referencia: 'LIV-001', quantidade: 7 }], [], '20261127T080000')).aberturas === 0);
 
+// --- o stock negativo: uma venda sem Internet deixa o livro abaixo de zero; entra, e fica à vista para acerto ---
+await receber(posto, [], [{ mov_id: 201, armazem_id: 1, referencia: 'LIV-001', quantidade: -9, tipo: 'venda', documento: 'FR A/40' }]);
+const neg = await servidor(`select * from public.stock_livro_negativos($1)`, [posto]);
+check('o artigo com o livro abaixo de zero', neg.length === 1 && neg[0].referencia === 'LIV-001' && Number(neg[0].livro) === -2, neg);
+const rneg = (await servidor(`select * from public.stock_livro_resumo()`)).find((x) => x.posto_id === posto);
+check('o resumo conta-o', Number(rneg.negativos) === 1, rneg);
+await recusa('ninguém de fora lê os negativos', () => como(null, `select * from public.stock_livro_negativos($1)`, [posto], 'anon'), /permission denied/);
+
 // --- quem lê e quem escreve --------------------------------------------------------------------------------------------
 const catalogo = await pessoa('catalogo@x.ao', 'manager', { manage_catalog: true });
 const cliente = await pessoa('cliente@x.ao');

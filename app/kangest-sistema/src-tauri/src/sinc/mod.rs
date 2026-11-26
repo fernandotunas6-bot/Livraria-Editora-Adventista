@@ -91,6 +91,18 @@ pub fn proxima_tentativa(tentativas: i64, agora: i64) -> i64 {
     agora + minutos * 60
 }
 
+/// O modo sem Internet (KANGEST ONE, fase A): quem entrou com a cópia local da conta do site não tem a sessão do site.
+/// Quando um pedido que precisa do site falha nessa sessão, a mensagem diz porquê e o que fazer. Nada é bloqueado de
+/// antemão: a Internet pode ter voltado entretanto.
+pub fn explicar_sem_internet(st: &AppState, r: AppResult<Value>) -> AppResult<Value> {
+    match r {
+        Err(e) if st.sessao_opcional().is_some_and(|s| s.offline) => Err(AppError::msg(format!(
+            "Está no modo sem Internet (entrou com a cópia local da sua conta do site). {e} Quando houver Internet, saia e entre outra vez no KanGest."
+        ))),
+        r => r,
+    }
+}
+
 /// O endereço que o painel do site mostra («https://<projecto>.supabase.co/functions/v1/app»), sem a barra do fim.
 pub fn normalizar_url(url: &str) -> AppResult<String> {
     let u = url.trim().trim_end_matches('/');

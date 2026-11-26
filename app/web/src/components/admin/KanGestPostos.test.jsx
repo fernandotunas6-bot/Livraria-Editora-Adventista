@@ -128,3 +128,16 @@ describe('LivroDoSite (KANGEST ONE, B2)', () => {
     expect(host.textContent).toBe('');
   });
 });
+
+describe('LivroDoPosto: o stock negativo (o que faltava, 26/11)', () => {
+  it('avisa e, com «Ver», diz quais', async () => {
+    livro.mockResolvedValue({ diferencas: [], negativos: [{ armazem_id: 1, referencia: 'LIV-001', livro: '-2' }] });
+    await mount(<LivroDoPosto p={{ id: ID, livro: { movimentos: 9, aberto: true, divergencias: 0, negativos: 1 } }} />);
+    expect(host.textContent).toContain('1 artigo(s) com stock negativo');
+    expect(host.textContent).not.toContain('bate certo');
+    const botao = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Ver');
+    await act(async () => botao.click());
+    await flush();
+    expect(host.textContent).toContain('LIV-001 (armazém 1: -2)');
+  });
+});

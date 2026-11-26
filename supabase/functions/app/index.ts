@@ -3286,7 +3286,7 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
   if (eLivros) console.error("KanGest: resumo do livro de stock", eLivros.message);
   for (const l of livros || []) {
     const p = postos.find((x) => x.id === l.posto_id);
-    if (p) p.livro = { movimentos: Number(l.movimentos), aberto: !!l.aberto, divergencias: Number(l.divergencias) };
+    if (p) p.livro = { movimentos: Number(l.movimentos), aberto: !!l.aberto, divergencias: Number(l.divergencias), negativos: Number(l.negativos ?? 0) };
   }
   // as sessões abertas em cada posto e as da última semana (KANGEST ONE, A3); sem a tabela, a lista fica vazia
   const semana = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -3312,7 +3312,10 @@ route("GET", "/admin/kangest/postos/livro", permissao("manage_settings"), async 
   if (!uuidValido(id)) throw bad("Indique o posto.");
   const { data, error } = await db.rpc("stock_livro_conferir", { p_posto: id }).limit(200);
   if (error) throw new Error(error.message);
-  return json({ diferencas: data || [] });
+  // os artigos com o livro abaixo de zero (uma venda sem Internet que deixou o posto em falta): para acerto
+  const { data: negativos, error: eNeg } = await db.rpc("stock_livro_negativos", { p_posto: id }).limit(200);
+  if (eNeg) console.error("KanGest: stock negativo no livro", eNeg.message);
+  return json({ diferencas: data || [], negativos: negativos || [] });
 });
 
 // Terminar uma sessão aberta num KanGest (KANGEST ONE, A3): a volta seguinte do posto leva o pedido, e ele termina-a.
