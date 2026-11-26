@@ -8203,6 +8203,15 @@ async fn livro_de_stock_para_o_site() {
     livro::concluir(&st.pool, &d, &json!({ "aceites": [mov], "erros": [] }), 2801 + 3600).await.unwrap();
     assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0);
 
+    // um movimento de um artigo que o livro não segue (deixou de controlar stock) sai da fila sem seguir
+    let outro = rpc(&st, "artigos.guardar", json!({ "descricao": "Serviço", "referencia": "SRV-1", "taxa_iva_id": 1, "preco1": 100, "custo": 50 })).await["id"].as_i64().unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": outro, "quantidade": 3, "preco_unitario": 50 }] })).await;
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 1, "a entrada do artigo novo entrou na fila");
+    sqlx::query("UPDATE artigos SET controla_stock = 0 WHERE id = ?").bind(outro).execute(&st.pool).await.unwrap();
+    let d = livro::devidos(&st.pool, 2801 + 3600).await.unwrap();
+    assert!(d.movimentos.is_empty() && d.dados.is_null(), "não segue: {}", d.dados);
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0, "e saiu da fila");
+
     // desligar e voltar a ligar: abre outra vez, com a existência de agora
     livro::apagar(&st.pool).await.unwrap();
     assert!(livro::abrir_se_preciso(&st.pool, "posto-a").await.unwrap());
