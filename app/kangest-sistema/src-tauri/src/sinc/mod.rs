@@ -18,6 +18,7 @@
 //! - As facturas são emitidas e assinadas aqui (AGT); o centro guarda uma cópia que não se altera.
 //! - Só o servidor da loja corre o ciclo: num posto em rede, a base e a fila estão no servidor.
 
+pub mod atendimento;
 pub mod avisos;
 pub mod catalogo;
 pub mod cifra;
