@@ -688,7 +688,11 @@ function Seguranca() {
  * conta do site; depois, só consultam. O administrador muda a data aqui (src-tauri/src/services/auth.rs). */
 function ContasLocais() {
   const qc = useQueryClient();
-  const r = useQuery({ queryKey: ["contas-locais"], queryFn: () => call<{ ligado: boolean; ate: string | null; por_ligar: number }>("utilizadores.contasLocais") });
+  const r = useQuery({
+    queryKey: ["contas-locais"],
+    queryFn: () =>
+      call<{ ligado: boolean; ate: string | null; por_ligar: number; contas?: ContaPorLigar[] }>("utilizadores.contasLocais"),
+  });
   const [ate, setAte] = useState<string | null>(null);
   if (!r.data?.ligado) return null;
   const valor = ate ?? r.data.ate ?? "";
@@ -719,6 +723,63 @@ function ContasLocais() {
           Guardar
         </Button>
       </div>
+      {(r.data.contas ?? []).length > 0 && (
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="mb-2 text-[13px] text-ink-3">
+            Ligar a uma conta do site: escreva o email da conta do site da pessoa. Na primeira vez que ela entrar com esse email, esta conta passa a
+            ser a dela, com o histórico.
+          </div>
+          <ul className="space-y-2">
+            {(r.data.contas ?? []).map((c) => (
+              <LigarConta key={`${c.id}-${c.ligar_conta_site ?? ""}`} conta={c} />
+            ))}
+          </ul>
+        </div>
+      )}
     </Card>
+  );
+}
+
+type ContaPorLigar = { id: number; nome: string; login: string; perfil: string; ligar_conta_site: string | null };
+
+/** Uma conta local por ligar: o email da conta do site da pessoa (KANGEST ONE; services/auth.rs, ligar_conta_site). */
+function LigarConta({ conta }: { conta: ContaPorLigar }) {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState(conta.ligar_conta_site ?? "");
+  const [ocupado, setOcupado] = useState(false);
+  async function ligar(valor: string | null) {
+    setOcupado(true);
+    try {
+      qc.setQueryData(["contas-locais"], await call("utilizadores.ligarContaSite", { id: conta.id, email: valor }));
+      toast.success(valor ? `Na próxima entrada com ${valor}, a conta de ${conta.nome} fica ligada.` : "Pedido de ligação desfeito.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  return (
+    <li className="flex flex-wrap items-center gap-2 text-[13px]">
+      <span className="min-w-40 font-medium">{conta.nome}</span>
+      <span className="text-ink-3">
+        {conta.login} · {conta.perfil}
+      </span>
+      <Input
+        className="ml-auto w-64"
+        type="email"
+        placeholder="email da conta do site"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        aria-label={`Email da conta do site de ${conta.nome}`}
+      />
+      <Button variant="secondary" loading={ocupado} disabled={!email.trim() || email.trim().toLowerCase() === conta.ligar_conta_site} onClick={() => ligar(email.trim())}>
+        Ligar
+      </Button>
+      {conta.ligar_conta_site && (
+        <Button variant="ghost" disabled={ocupado} onClick={() => ligar(null)}>
+          Desfazer
+        </Button>
+      )}
+    </li>
   );
 }

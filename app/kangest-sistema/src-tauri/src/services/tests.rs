@@ -8373,3 +8373,45 @@ async fn o_prazo_das_contas_locais_conta_da_ligacao() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (fase A, o que faltava): «Ligar a uma conta do site». O administrador indica o email da conta do site da
+/// pessoa; na primeira entrada com esse email, a conta local passa a ser a dela (o mesmo id, com o histórico), e não se
+/// cria um utilizador novo. A conta ADMIN de recurso não se liga, e o email tem de ser um email.
+#[tokio::test]
+async fn ligar_uma_conta_local_a_conta_do_site() {
+    let (st, pasta) = base_com_admin("ligar-conta").await;
+    // a conta local criada antes de o KanGest estar ligado ao site
+    let caixa = rpc(&st, "utilizadores.guardar", json!({ "nome": "Operadora", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await["id"]
+        .as_i64()
+        .unwrap();
+    let porta = site_falso_para_entrar();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    // o pedido de ligação: o email da conta do site, em minúsculas; a lista mostra-o
+    assert!(rpc_err(&st, "utilizadores.ligarContaSite", json!({ "id": caixa, "email": "não é email" })).await.contains("email"));
+    assert!(rpc_err(&st, "utilizadores.ligarContaSite", json!({ "id": 1, "email": "admin@x.ao" })).await.contains("ADMIN"));
+    let r = rpc(&st, "utilizadores.ligarContaSite", json!({ "id": caixa, "email": "Caixa@X.ao" })).await;
+    let item = r["contas"].as_array().unwrap().iter().find(|c| c["id"] == caixa).cloned().unwrap();
+    assert_eq!(item["ligar_conta_site"], "caixa@x.ao", "{r}");
+    // a primeira entrada com a conta do site: a conta local fica a ser a da pessoa
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa@x.ao", "senha": "certa" })).await;
+    assert_eq!((s["id"].as_i64(), s["perfil"].as_str(), s["login"].as_str()), (Some(caixa), Some("CAIXA"), Some("caixa@x.ao")), "o mesmo utilizador: {s}");
+    let (conta, pendente): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT conta_site, ligar_conta_site FROM utilizadores WHERE id = ?").bind(caixa).fetch_one(&st.pool).await.unwrap();
+    assert_eq!((conta.as_deref(), pendente), (Some("u-caixa"), None));
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM utilizadores WHERE conta_site = 'u-caixa'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(n, 1, "nenhum utilizador novo");
+    // e já não é uma conta local por ligar
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let r = rpc(&st, "utilizadores.contasLocais", Value::Null).await;
+    assert!(!r["contas"].as_array().unwrap().iter().any(|c| c["id"] == caixa), "{r}");
+    assert!(rpc_err(&st, "utilizadores.ligarContaSite", json!({ "id": caixa, "email": "outra@x.ao" })).await.contains("já é de uma conta do site"));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

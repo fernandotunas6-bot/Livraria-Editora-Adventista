@@ -205,7 +205,13 @@ pub async fn contas_locais(st: &AppState) -> AppResult<Value> {
     let por_ligar: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM utilizadores WHERE ativo = 1 AND perfil <> 'ADMIN' AND conta_site IS NULL")
         .fetch_one(&st.pool)
         .await?;
-    Ok(json!({ "ligado": ligado_ao_site(&st.pool).await, "ate": ate, "por_ligar": por_ligar }))
+    let lista = db::query_json(
+        &st.pool,
+        "SELECT id, nome, login, perfil, ligar_conta_site FROM utilizadores
+          WHERE ativo = 1 AND perfil <> 'ADMIN' AND conta_site IS NULL ORDER BY nome",
+    )
+    .await?;
+    Ok(json!({ "ligado": ligado_ao_site(&st.pool).await, "ate": ate, "por_ligar": por_ligar, "contas": lista }))
 }
 
 #[derive(Deserialize)]
@@ -239,6 +245,55 @@ pub(crate) async fn prazo_das_contas_locais_ao_ligar(pool: &sqlx::SqlitePool) ->
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// A conta local que o administrador mandou ligar a este email (ainda sem conta do site): (id, perfil).
+async fn pendente_de_ligar(pool: &sqlx::SqlitePool, email: &str) -> AppResult<Option<(i64, String)>> {
+    Ok(sqlx::query_as("SELECT id, perfil FROM utilizadores WHERE ligar_conta_site = ? AND conta_site IS NULL")
+        .bind(email.trim().to_lowercase())
+        .fetch_optional(pool)
+        .await?)
+}
+
+#[derive(Deserialize)]
+pub struct LigarContaIn {
+    id: i64,
+    /// o email da conta do site da pessoa; vazio ou nulo desfaz o pedido
+    email: Option<String>,
+}
+
+/// O administrador manda ligar uma conta local à conta do site da pessoa (KANGEST ONE, fase A): na primeira entrada com
+/// esse email, a conta local fica a ser a da pessoa, com o histórico. Fica na auditoria.
+pub async fn ligar_conta_site(st: &AppState, i: LigarContaIn) -> AppResult<Value> {
+    let s = st.exigir_perm("sistema.utilizadores")?;
+    let row: Option<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT login, perfil, conta_site FROM utilizadores WHERE id = ?").bind(i.id).fetch_optional(&st.pool).await?;
+    let Some((login, perfil, conta_site)) = row else { return Err(AppError::msg("Esse utilizador não existe.")) };
+    if perfil == "ADMIN" {
+        return Err(AppError::msg("A conta ADMIN de recurso fica local: não se liga a uma conta do site."));
+    }
+    if conta_site.is_some_and(|c| !c.is_empty()) {
+        return Err(AppError::msg("Esta conta já é de uma conta do site."));
+    }
+    let email = i.email.map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty());
+    if let Some(e) = &email {
+        let valido = e.len() <= 200 && e.split_once('@').is_some_and(|(a, d)| !a.is_empty() && d.contains('.') && !d.starts_with('.') && !d.ends_with('.'));
+        if !valido || e.contains(char::is_whitespace) {
+            return Err(AppError::msg("Escreva o email da conta do site da pessoa."));
+        }
+    }
+    sqlx::query("UPDATE utilizadores SET ligar_conta_site = ? WHERE id = ?")
+        .bind(&email)
+        .bind(i.id)
+        .execute(&st.pool)
+        .await
+        .map_err(|e| if e.to_string().contains("UNIQUE") { AppError::msg("Esse email já está pedido para outra conta local.") } else { e.into() })?;
+    let detalhe = match &email {
+        Some(e) => format!("{login}: ligar à conta do site {e} na primeira entrada"),
+        None => format!("{login}: pedido de ligação desfeito"),
+    };
+    registar(st, Some(s.id), &s.login, "LIGAR_CONTA_SITE", Some(detalhe)).await;
+    contas_locais(st).await
 }
 
 /// Este KanGest está ligado ao site (o posto emparelhado e activo)?
@@ -475,8 +530,10 @@ async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> 
                 }
             };
             let existente: Option<(i64, String)> = sqlx::query_as("SELECT id, perfil FROM utilizadores WHERE conta_site = ?").bind(&pessoa.id).fetch_optional(&st.pool).await?;
-            let id = match existente {
-                Some((id, perfil_antes)) => {
+            // uma conta local que o administrador mandou ligar a este email (só se ainda não há conta ligada a esta pessoa)
+            let pendente = if existente.is_none() { pendente_de_ligar(&st.pool, email).await? } else { None };
+            let id = match (existente, pendente) {
+                (Some((id, perfil_antes)), _) => {
                     // o perfil manda o site; se mudou, as permissões próprias de cá deixam de valer (nunca ficam a mais)
                     sqlx::query(
                         "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = ?, perfil = ?, conta_site_validada_em = ?, mudar_senha = 0,
@@ -495,7 +552,28 @@ async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> 
                     .map_err(unico)?;
                     id
                 }
-                None => {
+                // uma conta local que o administrador mandou ligar a este email: passa a ser a da pessoa, com o histórico
+                (None, Some((id, perfil_antes))) => {
+                    sqlx::query(
+                        "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = ?, perfil = ?, conta_site = ?, conta_site_validada_em = ?,
+                           mudar_senha = 0, ligar_conta_site = NULL, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
+                    )
+                    .bind(&pessoa.nome)
+                    .bind(email)
+                    .bind(&pessoa.email)
+                    .bind(&resumo)
+                    .bind(perfil)
+                    .bind(&pessoa.id)
+                    .bind(&agora)
+                    .bind(perfil_antes != perfil)
+                    .bind(id)
+                    .execute(&st.pool)
+                    .await
+                    .map_err(unico)?;
+                    registar(st, Some(id), email, "CONTA_SITE", Some(format!("conta local ligada à conta do site, como {perfil}"))).await;
+                    id
+                }
+                (None, None) => {
                     let id = sqlx::query(
                         "INSERT INTO utilizadores (nome, login, email, senha_hash, perfil, ativo, mudar_senha, conta_site, conta_site_validada_em)
                          VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)",
