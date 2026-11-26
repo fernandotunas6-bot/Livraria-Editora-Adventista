@@ -220,6 +220,8 @@ function ListaUtilizadores() {
   const perfilEscolhido = perfis.data?.find((p) => p.codigo === u?.perfil);
 
   return (
+    <>
+    <ContasLocais />
     <Card>
       <div className="flex items-center justify-between p-4">
         <span className="text-[13px] text-ink-2">
@@ -389,6 +391,7 @@ function ListaUtilizadores() {
         </Modal>
       )}
     </Card>
+    </>
   );
 }
 
@@ -676,6 +679,45 @@ function Seguranca() {
       </label>
       <div className="mt-6 flex justify-end">
         <Button onClick={guardar}>Guardar</Button>
+      </div>
+    </Card>
+  );
+}
+
+/** KANGEST ONE (fase A): num KanGest ligado ao site, as contas locais (não ADMIN) têm até uma data para se ligarem à
+ * conta do site; depois, só consultam. O administrador muda a data aqui (src-tauri/src/services/auth.rs). */
+function ContasLocais() {
+  const qc = useQueryClient();
+  const r = useQuery({ queryKey: ["contas-locais"], queryFn: () => call<{ ligado: boolean; ate: string | null; por_ligar: number }>("utilizadores.contasLocais") });
+  const [ate, setAte] = useState<string | null>(null);
+  if (!r.data?.ligado) return null;
+  const valor = ate ?? r.data.ate ?? "";
+  async function guardar() {
+    try {
+      qc.setQueryData(["contas-locais"], await call("utilizadores.contasLocaisGuardar", { ate: valor }));
+      setAte(null);
+      toast.success("Data-limite das contas locais guardada.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+  return (
+    <Card className="mb-4 p-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1 text-[13.5px]">
+          <div className="font-medium">Este KanGest está ligado ao site: as pessoas entram com a conta do site</div>
+          <div className="text-ink-3">
+            {r.data.por_ligar > 0
+              ? `${r.data.por_ligar} conta(s) local(is) ainda por ligar. Até à data-limite continuam a trabalhar, com um aviso; depois, só consultam. O ADMIN fica como recurso.`
+              : "Todas as contas activas já entram com a conta do site (o ADMIN fica como recurso)."}
+          </div>
+        </div>
+        <Field label="Data-limite das contas locais">
+          <InputData value={valor} onChange={(e) => setAte(e.target.value)} />
+        </Field>
+        <Button onClick={guardar} disabled={!valor || valor === r.data.ate}>
+          Guardar
+        </Button>
       </div>
     </Card>
   );

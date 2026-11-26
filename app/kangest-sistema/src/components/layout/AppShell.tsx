@@ -15,6 +15,7 @@ import { Button, Field, Input, MenuItem, Modal, Popover, Segmentado, cn } from "
 import { Logo } from "@/components/Logo";
 import { bloquearSessao } from "@/components/Sessao";
 import { AvisoLicenca } from "@/components/AvisoLicenca";
+import { AvisoIdentidade } from "@/components/AvisoIdentidade";
 import { EstadoLivraria } from "@/components/EstadoLivraria";
 import { PaletaComandos } from "@/components/Comandos";
 import DocumentoModal from "@/components/DocumentoModal";
@@ -295,6 +296,7 @@ export default function AppShell() {
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-5 lg:px-8 lg:py-6">
             {loc.pathname !== "/licenca" && <AvisoLicenca />}
+            <AvisoIdentidade />
             <Outlet />
           </div>
         </main>

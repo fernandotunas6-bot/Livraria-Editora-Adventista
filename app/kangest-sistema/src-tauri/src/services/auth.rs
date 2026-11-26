@@ -172,11 +172,84 @@ pub async fn acessos_listar(st: &AppState, f: RegistoIn) -> AppResult<Value> {
 
 // ============================== autenticação ==============================
 
+/// KANGEST ONE (fase A): o estado de uma conta local num KanGest ligado ao site.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ContaLocal {
+    /// Sem restrição: conta do site, o ADMIN de recurso, ou um KanGest que não está ligado ao site.
+    Normal,
+    /// Uma conta local: tem de se ligar à conta do site até esta data (vazia: sem data marcada).
+    Avisar(String),
+    /// Passou a data: só lê.
+    SoLeitura(String),
+}
+
+/// Num KanGest ligado ao site, a identidade é a conta do site. Uma conta local que não é ADMIN (o ADMIN fica como
+/// recurso) recebe um aviso até à data-limite (`identidade.contas_locais_ate`) e, depois dela, só lê. Um KanGest isolado,
+/// sem posto, continua com as suas contas locais.
+pub fn conta_local(ligado: bool, conta_site: Option<&str>, perfil: &str, limite: Option<&str>, hoje: &str) -> ContaLocal {
+    if !ligado || conta_site.is_some_and(|c| !c.is_empty()) || perfil == "ADMIN" {
+        return ContaLocal::Normal;
+    }
+    match limite.filter(|l| l.len() == 10) {
+        Some(l) if hoje > l => ContaLocal::SoLeitura(l.to_string()),
+        Some(l) => ContaLocal::Avisar(l.to_string()),
+        None => ContaLocal::Avisar(String::new()),
+    }
+}
+
+/// A data-limite das contas locais e se este KanGest está ligado ao site (Utilizadores).
+pub async fn contas_locais(st: &AppState) -> AppResult<Value> {
+    st.exigir_perm("sistema.utilizadores")?;
+    let ate: Option<String> =
+        sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'identidade.contas_locais_ate'").fetch_optional(&st.pool).await?;
+    let por_ligar: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM utilizadores WHERE ativo = 1 AND perfil <> 'ADMIN' AND conta_site IS NULL")
+        .fetch_one(&st.pool)
+        .await?;
+    Ok(json!({ "ligado": ligado_ao_site(&st.pool).await, "ate": ate, "por_ligar": por_ligar }))
+}
+
+#[derive(Deserialize)]
+pub struct ContasLocaisIn {
+    ate: String,
+}
+
+/// O administrador muda a data-limite das contas locais (fica na auditoria).
+pub async fn contas_locais_guardar(st: &AppState, i: ContasLocaisIn) -> AppResult<Value> {
+    let s = st.exigir_perm("sistema.utilizadores")?;
+    let ate = i.ate.trim();
+    if chrono::NaiveDate::parse_from_str(ate, "%Y-%m-%d").is_err() {
+        return Err(AppError::msg("Escolha uma data válida."));
+    }
+    sqlx::query("INSERT INTO config (chave, valor) VALUES ('identidade.contas_locais_ate', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
+        .bind(ate)
+        .execute(&st.pool)
+        .await?;
+    registar(st, Some(s.id), &s.login, "CONTAS_LOCAIS", Some(format!("data-limite das contas locais: {ate}"))).await;
+    contas_locais(st).await
+}
+
+/// Este KanGest está ligado ao site (o posto emparelhado e activo)?
+async fn ligado_ao_site(pool: &sqlx::SqlitePool) -> bool {
+    sqlx::query_scalar::<_, i64>("SELECT 1 FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_optional(pool).await.ok().flatten().is_some()
+}
+
 pub(crate) async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> Sessao {
     let perfil: String = row.get("perfil");
     let proprias: Option<String> = row.get("permissoes");
-    let (nivel, permissoes) = permissoes_efectivas(&st.pool, &perfil, proprias.as_deref()).await;
+    let (nivel, mut permissoes) = permissoes_efectivas(&st.pool, &perfil, proprias.as_deref()).await;
     let perfil_descricao = sqlx::query_scalar("SELECT descricao FROM perfis WHERE codigo = ?").bind(&perfil).fetch_optional(&st.pool).await.ok().flatten();
+    let limite: Option<String> =
+        sqlx::query_scalar("SELECT valor FROM config WHERE chave = 'identidade.contas_locais_ate'").fetch_optional(&st.pool).await.ok().flatten();
+    let conta_site: Option<String> = row.try_get("conta_site").ok().flatten();
+    let estado = conta_local(ligado_ao_site(&st.pool).await, conta_site.as_deref(), &perfil, limite.as_deref(), &db::hoje());
+    let (ligar_ate, so_leitura) = match estado {
+        ContaLocal::Normal => (None, false),
+        ContaLocal::Avisar(l) => (Some(l), false),
+        ContaLocal::SoLeitura(l) => {
+            permissoes.retain(|p| p == "relatorios.ver");
+            (Some(l), true)
+        }
+    };
     Sessao {
         id: row.get("id"),
         nome: row.get("nome"),
@@ -189,6 +262,9 @@ pub(crate) async fn sessao_de(st: &AppState, row: &sqlx::sqlite::SqliteRow) -> S
         bloqueada: false,
         perfil_descricao,
         armazem_id: row.try_get::<Option<i64>, _>("armazem_id").ok().flatten(),
+        offline: false,
+        ligar_ate,
+        so_leitura,
     }
 }
 
@@ -241,7 +317,9 @@ async fn entrar(st: &AppState, row: &sqlx::sqlite::SqliteRow, como: &str) -> App
         .bind(id)
         .execute(&st.pool)
         .await?;
-    let s = sessao_de(st, row).await;
+    let mut s = sessao_de(st, row).await;
+    // a cópia local da conta do site, sem Internet: o modo limitado
+    s.offline = como.contains("sem Internet");
     sqlx::query("INSERT INTO auditoria (utilizador_id, acao) VALUES (?, 'LOGIN')").bind(id).execute(&st.pool).await?;
     registar(st, Some(id), &login, "LOGIN", Some(como.into())).await;
     st.definir_sessao(Some(s.clone()));
@@ -871,6 +949,13 @@ pub async fn guardar(st: &AppState, u: UtilizadorIn) -> AppResult<Value> {
     }
     if u.nome.trim().is_empty() || u.login.trim().is_empty() {
         return Err(AppError::msg("Nome e utilizador são obrigatórios."));
+    }
+    // KANGEST ONE (fase A): num KanGest ligado ao site, as pessoas entram com a conta do site; contas locais novas só
+    // de administrador (o recurso)
+    if u.id.is_none() && u.perfil != "ADMIN" && ligado_ao_site(&st.pool).await {
+        return Err(AppError::msg(
+            "Este KanGest está ligado ao site: crie a conta da pessoa no painel do site (com a permissão «KanGest: caixa» ou «gestor») e ela entra aqui com o email e a senha do site.",
+        ));
     }
     // o último administrador activo não pode perder o acesso
     if let Some(id) = u.id {
