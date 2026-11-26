@@ -512,6 +512,10 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
         return Err(AppError::msg("A chave do centro que o site mandou não é válida."));
     }
     let anterior: Option<String> = sqlx::query_scalar("SELECT posto_id FROM sinc_ligacao WHERE id = 1").fetch_optional(&st.pool).await?;
+    if anterior.is_none() {
+        // KANGEST ONE (A2): o prazo das contas locais conta a partir da ligação ao site
+        crate::services::auth::prazo_das_contas_locais_ao_ligar(&st.pool).await?;
+    }
     sqlx::query(
         "INSERT INTO sinc_ligacao (id, url, posto_id, posto_nome, loja, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em, ultimo_erro)
          VALUES (1, ?, ?, ?, ?, ?, ?, ?, 1, ?, '')

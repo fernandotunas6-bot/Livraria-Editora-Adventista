@@ -8346,3 +8346,30 @@ async fn o_ecossistema_no_painel_inicial() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (A2): o prazo das contas locais conta a partir da ligação ao site. Um prazo que já passou (ou que acaba
+/// antes de 30 dias) passa para daqui a 30 dias; uma data mais tarde escolhida pelo administrador fica.
+#[tokio::test]
+async fn o_prazo_das_contas_locais_conta_da_ligacao() {
+    use crate::services::auth::prazo_das_contas_locais_ao_ligar;
+    let (st, pasta) = base_com_admin("prazo-ao-ligar").await;
+    let ate = || {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, String>("SELECT valor FROM config WHERE chave = 'identidade.contas_locais_ate'").fetch_one(&pool).await.unwrap() }
+    };
+    let daqui_a_30: String = sqlx::query_scalar("SELECT date('now', 'localtime', '+30 days')").fetch_one(&st.pool).await.unwrap();
+    // a actualização foi há meses: o prazo já tinha passado
+    sqlx::query("UPDATE config SET valor = '2026-01-01' WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, daqui_a_30, "30 dias a partir da ligação");
+    // o administrador escolheu uma data mais tarde: fica
+    sqlx::query("UPDATE config SET valor = '2099-12-31' WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, "2099-12-31");
+    // sem prazo nenhum: fica a 30 dias
+    sqlx::query("DELETE FROM config WHERE chave = 'identidade.contas_locais_ate'").execute(&st.pool).await.unwrap();
+    prazo_das_contas_locais_ao_ligar(&st.pool).await.unwrap();
+    assert_eq!(ate().await, daqui_a_30);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

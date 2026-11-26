@@ -228,6 +228,19 @@ pub async fn contas_locais_guardar(st: &AppState, i: ContasLocaisIn) -> AppResul
     contas_locais(st).await
 }
 
+/// Ao ligar ao site (o primeiro emparelhamento, ou outra vez depois de desligar): o prazo das contas locais conta a partir
+/// daqui, não da actualização do programa (a migração 0070 pôs 30 dias na altura da actualização, que pode ter sido há
+/// meses). Fica a 30 dias de hoje, a menos que o administrador já tenha escolhido uma data mais tarde.
+pub(crate) async fn prazo_das_contas_locais_ao_ligar(pool: &sqlx::SqlitePool) -> AppResult<()> {
+    sqlx::query(
+        "INSERT INTO config (chave, valor) VALUES ('identidade.contas_locais_ate', date('now', 'localtime', '+30 days'))
+         ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor WHERE config.valor < excluded.valor",
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Este KanGest está ligado ao site (o posto emparelhado e activo)?
 async fn ligado_ao_site(pool: &sqlx::SqlitePool) -> bool {
     sqlx::query_scalar::<_, i64>("SELECT 1 FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_optional(pool).await.ok().flatten().is_some()

@@ -61,7 +61,8 @@ Em *Sistema → Utilizadores*, as contas do site aparecem com «Conta do site».
 
 Num KanGest **ligado ao site** (o posto emparelhado e activo), todas as pessoas entram com a conta do site:
 - **As contas locais que já existem** (sem `conta_site`, não ADMIN) continuam a entrar até à data-limite, com um aviso
-  na barra para se ligarem à conta do site. A migração 0070 põe a data a 30 dias; o administrador muda-a em
+  na barra para se ligarem à conta do site. O prazo é de 30 dias a contar da ligação ao site (o primeiro emparelhamento,
+  ou outra vez depois de desligar), a menos que o administrador já tenha escolhido uma data mais tarde; muda-se em
   *Sistema → Utilizadores* («Contas locais»), e a mudança fica na auditoria (`CONTAS_LOCAIS`).
 - **Depois da data,** essas contas só consultam: ficam apenas com «Ver relatórios», e a barra diz porquê. Nada se
   apaga: o histórico dos documentos continua a apontar para elas.

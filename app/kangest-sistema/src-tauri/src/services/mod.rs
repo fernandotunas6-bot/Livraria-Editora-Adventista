@@ -9,7 +9,7 @@ pub mod atualizacao;
 mod avencas;
 mod ajuda;
 mod assistente;
-mod auth;
+pub(crate) mod auth;
 // motor central de dados (construtor de relatórios, BI, qualidade dos dados)
 mod dados;
 mod caixa;
