@@ -90,7 +90,7 @@ function main() {
   if (i > 0) {
     const pasta = process.argv[i + 1];
     if (!pasta) {
-      console.error('Indique a pasta: --pasta app/web/dist');
+      console.error('Indique a pasta: --pasta dist/app/web');
       process.exit(2);
     }
     let r;
