@@ -130,6 +130,8 @@ describe("o registo das rotas no index.ts", () => {
   it("as rotas abertas são estas e só estas", () => {
     const publicas = rotas.filter((r) => r.tipo === "publica").map((r) => r.rota).sort();
     expect(publicas).toEqual([
+      "GET /api/v1",
+      "GET /api/v1/system/info",
       "GET /book-collections",
       "GET /chat/config",
       "GET /geo/localities",
