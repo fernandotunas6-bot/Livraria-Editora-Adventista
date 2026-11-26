@@ -11,7 +11,7 @@
 // Um JWT só é segredo se o papel for `service_role`, por isso esse é descodificado e lido.
 //
 // Uso: node scripts/verificar-segredos.mjs        (sai com 1 se encontrar algo)
-//      node scripts/verificar-segredos.mjs --pasta app/web/dist
+//      node scripts/verificar-segredos.mjs --pasta dist/app/web
 //        (KANGEST ONE, teste de aceitação 13: o que vai para o cliente — o site compilado, o ecrã do KanGest — não leva
 //        nenhuma credencial privilegiada: nem a service_role, nem sb_secret_, nem chaves privadas)
 import { execFileSync } from 'node:child_process';
