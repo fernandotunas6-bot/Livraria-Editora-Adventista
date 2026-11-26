@@ -62,3 +62,23 @@ Na engrenagem do painel (ficam neste computador, por pessoa):
 
 A Loja online aceita `?filtro=` (`por_confirmar`, `levantamentos`, `em_curso`, …) e `?encomenda=<id>` no endereço: é assim
 que os avisos e o assistente a abrem no sítio certo.
+
+## Abrir no KanGest a partir do site
+
+No painel do site, na encomenda, o bloco «KanGest» tem **«Abrir no KanGest»**. Aparece para os administradores e para
+quem tem «KanGest: caixa» ou «KanGest: gestor». Abre a encomenda na Loja online do KanGest deste computador, com a
+ligação `kangest://loja-online/encomenda/<id>` (`src-tauri/src/ligacoes.rs`).
+
+- **O instalador regista o esquema `kangest://`** (no Windows; no Mac vem no pacote da aplicação). Com o KanGest já
+  aberto, a ligação vai para a janela aberta, sem abrir outra cópia.
+- **Uma ligação só leva a um ecrã, nunca faz nada sozinha.** Qualquer página da Internet pode abrir uma ligação
+  `kangest://`, por isso só valem os destinos da lista, com os ids conferidos; o resto só traz a janela para a frente:
+
+  | Ligação | Ecrã |
+  |---|---|
+  | `kangest://loja-online/encomenda/<id>` | a encomenda na Loja online |
+  | `kangest://loja-online?filtro=por_confirmar` | a Loja online, filtrada (`por_confirmar`, `em_curso`, `levantamentos`, `concluidas`, `canceladas`) |
+  | `kangest://loja-online` | a Loja online |
+  | `kangest://ajuda` | o centro de ajuda, nos avisos |
+- **Sem sessão aberta,** o destino fica guardado e abre-se depois de entrar.
+- **Num posto em rede,** a ligação é desse computador (`ligacao.` está nos métodos locais), nunca vai ao servidor.

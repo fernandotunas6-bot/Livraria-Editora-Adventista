@@ -12,6 +12,7 @@ mod nativo;
 mod navegador;
 pub mod http;
 pub mod internet;
+mod ligacoes;
 mod produtor;
 mod recursos;
 mod rede;
@@ -97,6 +98,8 @@ pub fn run() {
                 let _ = janela.set_focus();
             }
         }))
+        // as ligações kangest:// do painel do site (src/ligacoes.rs): só levam a um ecrã
+        .plugin(tauri_plugin_deep_link::init())
         // abrir ao ligar o computador (Configurações → Rede): chave «Run» no Windows, LaunchAgent no macOS
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         // notificações do sistema: o que falha em segundo plano (src/nativo.rs, notificar)
@@ -105,6 +108,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             nativo::definir(app.handle().clone());
+            // as ligações kangest:// (src/ligacoes.rs): com o programa aberto, e a que o abriu
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                // no Windows, o registo do esquema confirma-se a cada arranque (o instalador já o fez; no Mac vem no pacote)
+                #[cfg(any(windows, target_os = "linux"))]
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("As ligações kangest:// não ficaram registadas: {e}");
+                }
+                let h = app.handle().clone();
+                app.deep_link().on_open_url(move |e| ligacoes::abrir(&h, &e.urls()));
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    ligacoes::abrir(app.handle(), &urls);
+                }
+            }
             // selo de integridade do executável (só nas compilações oficiais; corre numa thread à parte)
             if let Ok(recursos) = app.path().resource_dir() {
                 selo::iniciar(recursos);

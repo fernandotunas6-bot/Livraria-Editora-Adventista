@@ -1372,7 +1372,7 @@ const AdminPage = () => {
                               onChanged={loadAll}
                             />
                             {/* Os documentos do KanGest desta encomenda: NE, FR, anulação e nota de crédito (docs/KANGEST.md). */}
-                            <Suspense fallback={null}><OrderKanGest orderId={o.id} podeRepetir={isAdmin || hasPermission('manage_settings')} /></Suspense>
+                            <Suspense fallback={null}><OrderKanGest orderId={o.id} podeRepetir={isAdmin || hasPermission('manage_settings')} podeAbrir={isAdmin || hasPermission('kangest_caixa') || hasPermission('kangest_gestor')} /></Suspense>
                             {/* Entrega ao domicílio: o colportor mais próximo (migração entregas_por_colportor). */}
                             {['delivery', 'express'].includes(o.shipping_method) && (
                               <OrderColporteurDelivery order={o} onChanged={loadAll} />
