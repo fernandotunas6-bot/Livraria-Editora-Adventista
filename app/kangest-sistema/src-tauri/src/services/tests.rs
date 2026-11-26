@@ -8133,3 +8133,85 @@ async fn sessoes_para_o_painel_do_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (fase B1): o livro único de stock. A abertura com a existência de agora, os movimentos de depois dela (com
+/// o tipo e o documento) só depois das aberturas, a fila que só se enche depois da abertura deste posto, a resposta do
+/// site (aceite, recusado, ou um site ainda sem o livro) e o voltar a ligar.
+#[tokio::test]
+async fn livro_de_stock_para_o_site() {
+    use crate::sinc::livro;
+    let (st, pasta) = base_com_admin("livro-stock").await;
+    let contar = |sql: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+    let art = rpc(&st, "artigos.guardar", json!({ "descricao": "O Desejado", "referencia": "LIV-001", "taxa_iva_id": 1, "preco1": 570000, "custo": 300000 })).await["id"]
+        .as_i64()
+        .unwrap();
+    rpc(&st, "documentos.emitir", json!({ "tipo": "ES", "linhas": [{ "artigo_id": art, "quantidade": 10, "preco_unitario": 300000 }] })).await;
+    // sem ligação ao site, nada entra na fila nem abre
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0);
+    assert!(livro::devidos(&st.pool, 0).await.unwrap().dados.is_null());
+
+    // liga-se: a abertura, uma vez só
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em)
+         VALUES (1, 'https://exemplo.ao', 'posto-a', 'c', 'k', 'x', 1, '2026-11-26T10:00:00')",
+    )
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    assert!(livro::abrir_se_preciso(&st.pool, "posto-a").await.unwrap());
+    assert!(!livro::abrir_se_preciso(&st.pool, "posto-a").await.unwrap(), "só uma vez");
+    let d = livro::devidos(&st.pool, 0).await.unwrap();
+    assert_eq!(d.aberturas, vec![(1, art)]);
+    assert_eq!((d.dados["aberturas"][0]["referencia"].as_str(), d.dados["aberturas"][0]["quantidade"].as_f64()), (Some("LIV-001"), Some(10.0)), "{}", d.dados);
+    assert!(d.dados["epoca"].as_str().is_some_and(|e| e.len() == 15), "{}", d.dados);
+
+    // a venda depois da abertura entra na fila, mas só segue depois das aberturas
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    let fr = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": art, "quantidade": 2 }], "pagamentos": [{ "modo": "NU", "valor": 2000000 }] })).await;
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 1);
+    assert!(livro::devidos(&st.pool, 0).await.unwrap().movimentos.is_empty(), "primeiro as aberturas");
+
+    // um site ainda sem o livro: tudo espera meia hora
+    livro::concluir(&st.pool, &d, &Value::Null, 1000).await.unwrap();
+    assert!(livro::devidos(&st.pool, 1000).await.unwrap().dados.is_null());
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_abertura").await, 1, "a abertura fica");
+    // o site aceita a abertura
+    let d = livro::devidos(&st.pool, 2801).await.unwrap();
+    assert_eq!(d.aberturas.len(), 1);
+    livro::concluir(&st.pool, &d, &json!({ "aberturas": 1, "aceites": [], "repetidos": 0, "erros": [] }), 2801).await.unwrap();
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_abertura").await, 0);
+
+    // agora o movimento da venda, com o tipo e o documento
+    let d = livro::devidos(&st.pool, 2801).await.unwrap();
+    let m = &d.dados["movimentos"][0];
+    assert_eq!((m["tipo"].as_str(), m["quantidade"].as_f64(), m["documento"].as_str()), (Some("venda"), Some(-2.0), fr["documento"]["numero_doc"].as_str()), "{m}");
+    assert!(m["momento"].as_str().is_some_and(|x| x.len() > 19), "a hora com o fuso: {m}");
+    // recusado: fica com o erro e espera
+    let mov = d.movimentos[0].0;
+    livro::concluir(&st.pool, &d, &json!({ "aceites": [], "erros": [{ "mov_id": mov, "erro": "Movimento incompleto" }] }), 2801).await.unwrap();
+    assert!(livro::devidos(&st.pool, 2801).await.unwrap().movimentos.is_empty(), "espera pela tentativa seguinte");
+    assert_eq!(livro::contagem(&st.pool).await.unwrap()["com_erro"], 1);
+    // aceite: sai da fila
+    let d = livro::devidos(&st.pool, 2801 + 3600).await.unwrap();
+    assert_eq!(d.movimentos.iter().map(|m| m.0).collect::<Vec<_>>(), vec![mov]);
+    livro::concluir(&st.pool, &d, &json!({ "aceites": [mov], "erros": [] }), 2801 + 3600).await.unwrap();
+    assert_eq!(contar("SELECT COUNT(*) FROM sinc_stock_livro").await, 0);
+
+    // desligar e voltar a ligar: abre outra vez, com a existência de agora
+    livro::apagar(&st.pool).await.unwrap();
+    assert!(livro::abrir_se_preciso(&st.pool, "posto-a").await.unwrap());
+    assert_eq!(livro::devidos(&st.pool, 0).await.unwrap().dados["aberturas"][0]["quantidade"].as_f64(), Some(8.0));
+
+    // o tipo de cada movimento
+    assert_eq!(livro::tipo_do_movimento(Some("NC"), Some("VENDA"), 1.0), "devolucao");
+    assert_eq!(livro::tipo_do_movimento(Some("FR"), Some("VENDA"), 1.0), "ajuste", "a anulação de uma venda");
+    assert_eq!(livro::tipo_do_movimento(Some("FC"), Some("COMPRA"), 3.0), "compra");
+    assert_eq!(livro::tipo_do_movimento(Some("TS"), Some("STOCK"), -3.0), "transferencia");
+    assert_eq!(livro::tipo_do_movimento(Some("ES"), Some("STOCK"), 5.0), "ajuste");
+    assert_eq!(livro::tipo_do_movimento(None, None, -1.0), "ajuste");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

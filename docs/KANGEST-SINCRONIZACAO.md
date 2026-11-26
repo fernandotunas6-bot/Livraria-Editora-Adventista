@@ -115,6 +115,7 @@ A assinatura RSA de cada documento (`agt.rs`) não se confere aqui: fica para o 
 | `POST /admin/kangest/postos/codigo` | `manage_settings` | Outro código: computador novo, chave perdida ou rodar a chave |
 | `POST /admin/kangest/postos/revogar` | `manage_settings` | Revoga o posto |
 | `POST /admin/kangest/sessoes/revogar` | `manage_settings` | `{posto, sessao}`: pede o fim de uma sessão aberta no KanGest (§14) |
+| `GET /admin/kangest/postos/livro?id=` | `manage_settings` | Onde o livro de stock do posto não bate certo com a fotografia (§15) |
 | `POST /kangest/emparelhar` | o código de uso único (10 por minuto e por IP) | `{codigo, chave_publica, versao}` → o posto e a chave pública do centro |
 | `POST /kangest/sinc` | a assinatura Ed25519 do posto (240 por minuto e por IP) | O lote selado → a resposta selada |
 
@@ -408,3 +409,62 @@ Testes:
   recusado de fora;
 - `kangestSinc.test.ts` (`limparSessoesKanGest`) e `KanGestPostos.test.jsx`;
 - Rust: `sessoes_para_o_painel_do_site`.
+
+## 15. O livro único de stock, em sombra (KANGEST ONE, fase B1)
+
+O plano do KANGEST ONE pede um só livro de stock no Postgres central. A fase B1 põe-no a correr ao lado do que já
+existe:
+- cada entrada e saída de stock do KanGest passa a ter uma linha no livro central (`public.stock_movimentos`,
+  migração `20261126190000`), com a chave de idempotência;
+- o stock à venda no site **continua a sair das fotografias** de cada posto (`kangest_stock`, §10) até à fase B3,
+  quando o livro bater certo no staging e na produção.
+
+**No KanGest** (`app/kangest-sistema/src-tauri/src/sinc/livro.rs`, migração 0071):
+- **A abertura.** Na primeira volta com o livro, ao ligar a outro posto e depois de desligar, a existência de cada
+  artigo em cada armazém fica por enviar (`sinc_stock_abertura`), com uma época (`stock_livro.epoca`). Faz-se numa
+  transacção que começa por escrever, e nenhum movimento se mete a meio.
+- **Os movimentos.** Depois da abertura deste posto, cada linha nova de `movimentos_stock` entra na fila
+  `sinc_stock_livro` (um gatilho). Segue só depois das aberturas todas, até 500 por volta.
+- **O que segue de cada movimento:** o armazém, a referência, a quantidade com sinal, o número do documento e a hora.
+  O tipo sai do documento:
+
+  | Tipo | Quando |
+  |---|---|
+  | `venda` | a saída de uma venda |
+  | `devolucao` | a entrada de uma nota de crédito |
+  | `compra` | a entrada de uma compra |
+  | `transferencia` | uma transferência de stock |
+  | `ajuste` | os acertos, o inventário e as anulações |
+
+  **Nunca seguem** o cliente, o custo nem a descrição.
+- **A resposta** (`stock_livro`):
+  - o que foi aceite sai da fila;
+  - o recusado fica com o erro e tenta outra vez mais tarde;
+  - um site ainda sem o livro faz tudo esperar meia hora.
+
+**No site:**
+- **`stock_livro_receber(posto, época, aberturas, movimentos)`** trata um posto de cada vez (`pg_advisory_xact_lock`).
+  - A abertura grava a **diferença** para o livro: a existência toda na primeira vez, e só o que faltava ao voltar a
+    ligar.
+  - Um movimento repetido não conta outra vez, mas volta como aceite.
+  - Um tipo desconhecido volta como erro.
+- **O livro não se altera nem se apaga:** corrige-se com um movimento inverso. Só as ligações ao posto, à loja e ao
+  produto ficam vazias quando o que apontam sai.
+- **Quem lê e escreve:** lê quem gere o catálogo (`manage_catalog`), e só o servidor escreve.
+- **`stock_livro_conferir(posto)`** mostra onde a soma do livro difere da fotografia do posto, por armazém e
+  referência. `stock_livro_resumo()` dá, por posto, os movimentos, se já abriu e quantas diferenças há.
+
+**No painel,** em Configurações → KanGest → Postos, cada posto mostra o seu livro (`LivroDoPosto`):
+- «à espera da abertura»;
+- «bate certo com o posto»;
+- ou as diferenças, com «Ver».
+
+**Testes:**
+- `scripts/pglite/stock-livro.mjs`: a abertura, os movimentos, o repetido, a recusa, o não alterar, a conferência, o
+  voltar a ligar e o acesso;
+- `kangestSinc.test.ts` (`limparLivroStock`) e `KanGestPostos.test.jsx`;
+- Rust: `livro_de_stock_para_o_site`.
+
+**A seguir:**
+- **B2:** as reservas, as libertações e as devoluções do site entram no livro;
+- **B3:** o stock à venda passa a sair do livro, depois de conferido no staging e numa cópia da produção.

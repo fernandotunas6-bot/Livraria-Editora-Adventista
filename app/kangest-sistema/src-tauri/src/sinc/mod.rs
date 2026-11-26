@@ -27,6 +27,7 @@ pub mod entrada;
 pub mod estado;
 pub mod fechos;
 pub mod financeiro;
+pub mod livro;
 pub mod loja;
 pub mod pagamentos;
 pub mod pessoa;
@@ -283,13 +284,21 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     let estado_pc = estado::do_computador(st).await;
     // as sessões abertas (quem, perfil, aparelho; nunca tokens), para o painel do site as ver e terminar (sessoes.rs)
     let sessoes_abertas = sessoes::abertas(st).await;
-    match enviar(l, &json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas })).await {
+    // o livro único de stock (livro.rs): a abertura, na primeira volta deste posto, e depois os movimentos de stock.
+    // Nunca impede o resto da volta.
+    if let Err(e) = livro::abrir_se_preciso(pool, &l.posto_id).await {
+        eprintln!("Livro de stock: a abertura fica para a volta seguinte ({e}).");
+    }
+    let livro_devidos = livro::devidos(pool, agora).await.unwrap_or_default();
+    let dados = json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas, "stock_livro": &livro_devidos.dados });
+    match enviar(l, &dados).await {
         Ok(r) => {
             // o painel pediu o fim de alguma: termina-se primeiro, antes de tudo o resto
             let revogadas = sessoes::revogar(st, &r["sessoes_revogar"]).await;
             if revogadas > 0 {
                 eprintln!("Sincronização: {revogadas} sessão(ões) terminada(s) a pedido do painel do site.");
             }
+            livro::concluir(pool, &livro_devidos, &r["stock_livro"], agora).await?;
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
             fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;
             financeiro::concluir(pool, &fin_pendentes, &financeiro::erros_do_resultado(&r["resultado"]), agora).await?;
@@ -356,6 +365,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                     || fechos_pendentes.len() as i64 == fechos::LOTE
                     || fin_pendentes.len() as i64 == financeiro::LOTE
                     || por_seguir > 0
+                    || livro_devidos.cheio()
                     || mais,
             })
         }
@@ -531,6 +541,7 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
         catalogo::apagar(&st.pool).await?;
         fechos::apagar(&st.pool).await?;
         financeiro::apagar(&st.pool).await?;
+        livro::apagar(&st.pool).await?;
     }
     enfileirar_tudo(&st.pool).await?;
     // os fechos de caixa arquivados também seguem (o site guarda uma cópia)
@@ -572,6 +583,7 @@ async fn estado(st: &AppState) -> AppResult<Value> {
         "feitos": conta("feito"),
         "erros": erros,
         "catalogo": catalogo::contagem(&st.pool).await?,
+        "livro": livro::contagem(&st.pool).await?,
         "intervalo": INTERVALO,
     }))
 }
@@ -604,6 +616,8 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     catalogo::apagar(&st.pool).await?;
     fechos::apagar(&st.pool).await?;
     financeiro::apagar(&st.pool).await?;
+    // o livro de stock abre outra vez na ligação seguinte (só o que faltar entra no livro do site)
+    livro::apagar(&st.pool).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;
