@@ -171,7 +171,7 @@ export default function Relatorios() {
   // Uma loja (armazém) e um canal: «balcao» = programa e POS; «api» = loja online e outras integrações
   const armazens = useTabelas().data?.armazens ?? [];
   const [armazemId, setArmazemId] = useState(0);
-  const [canal, setCanal] = useState<"" | "api" | "balcao">("");
+  const [canal, setCanal] = useState<"" | "api" | "balcao" | "kigest">("");
   const filtros = { armazem_id: armazemId || null, canal: canal || null };
   const sintese = vista === "sintese";
   const [ano, setAno] = useState(new Date().getFullYear());
@@ -245,7 +245,7 @@ export default function Relatorios() {
 
   const descricaoFiltros =
     (armazemId ? ` — ${armazens.find((a) => a.id === armazemId)?.nome ?? "loja"}` : "") +
-    (canal === "api" ? " — loja online e API" : canal === "balcao" ? " — balcão" : "");
+    (canal === "api" ? " — loja online e API" : canal === "balcao" ? " — balcão" : canal === "kigest" ? " — histórico do KIGEST" : "");
   const primeiraColuna = vista === "dia" ? "Dia" : vista === "mes" ? "Mês" : titulo.replace("Por ", "").replace(/^\w/, (c) => c.toUpperCase());
 
   /** O mapa à vista, com as mesmas colunas, num livro Excel (números e datas como tal). */
@@ -455,10 +455,11 @@ export default function Relatorios() {
             ))}
           </Select>
         )}
-        <Select className="w-52" value={canal} onChange={(e) => setCanal(e.target.value as "" | "api" | "balcao")} aria-label="Canal de venda">
+        <Select className="w-52" value={canal} onChange={(e) => setCanal(e.target.value as "" | "api" | "balcao" | "kigest")} aria-label="Canal de venda">
           <option value="">Todos os canais</option>
           <option value="balcao">Balcão (programa e POS)</option>
           <option value="api">Loja online e API</option>
+          <option value="kigest">Histórico do KIGEST</option>
         </Select>
       </div>
       {vista === "irt_c" && <TaxaGrupoC />}
