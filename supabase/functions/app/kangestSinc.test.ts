@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
-  consumidorFinal, deB64, decifrarCampo, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
+  consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
 } from "./kangestSinc.ts";
 
@@ -170,6 +170,22 @@ describe("dados pessoais cifrados por coluna", () => {
 
     await expect(prepararLote({}, c)).rejects.toThrow(/lista/);
     await expect(prepararLote(Array.from({ length: 201 }, () => ({ tipo: "documento" })), c)).rejects.toThrow(/200/);
+  });
+
+  it("as dívidas para o painel: o nome do balcão decifrado; o que não abre fica «(cifrado)»", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const nome = await cifrarCampo(c, "Ana Silva");
+    const outra = (await lerCifraDados(paraB64(seq(32, 8))))!;
+    const r = await dividasParaOPainel([
+      { store_id: "l1", origem: "balcao", numero: "FT A/1", data: "2026-11-25", vencimento: "2026-12-25", total: "114.00", pendente: "57.00", cliente: "", cliente_cifrado: nome },
+      { store_id: "l1", origem: "site", numero: "LIV-9", total: 90, pendente: 90, cliente: "Rui", cliente_cifrado: "" },
+      { store_id: "l1", origem: "balcao", numero: "FT A/2", total: 1, pendente: 1, cliente: "", cliente_cifrado: await cifrarCampo(outra, "Outro") },
+    ], c);
+    expect(r[0]).toEqual({ store_id: "l1", origem: "balcao", numero: "FT A/1", data: "2026-11-25", vencimento: "2026-12-25", total: 114, pendente: 57, cliente: "Ana Silva" });
+    expect(r[1].cliente).toBe("Rui");
+    expect(r[2].cliente).toBe("(cifrado)");
+    expect((await dividasParaOPainel([{ origem: "balcao", cliente_cifrado: nome, pendente: 1 }], null))[0].cliente).toBe("(cifrado)");
+    expect(JSON.stringify(r)).not.toContain("cliente_cifrado");
   });
 
   it("o stock e os artigos: o estado de cada armazém e o artigo, só com os campos conhecidos", async () => {
