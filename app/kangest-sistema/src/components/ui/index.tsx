@@ -3,7 +3,7 @@
 
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ChevronRight, ChevronsUpDown, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ChevronRight, ChevronsUpDown, Maximize2, Minimize2, X, type LucideIcon } from "lucide-react";
 import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TdHTMLAttributes } from "react";
 import { numero } from "@/lib/format";
 
@@ -284,10 +284,47 @@ export function Atalho({ tecla }: { tecla: string }) {
 }
 
 // ---------------- Table ----------------
-export function Table({ children, className }: { children: ReactNode; className?: string }) {
+/**
+ * Uma tabela. Qualquer lista pode **expandir-se para o ecrã inteiro** (o botão no canto, que aparece ao passar o rato,
+ * ou Esc para voltar), para ver mais linhas e colunas e trabalhar nela com mais espaço: é a mesma tabela, com os
+ * filtros, a ordenação e os botões das linhas a funcionar. `expandir={false}` tira o botão (listas pequenas).
+ */
+export function Table({ children, className, expandir = true, titulo }: { children: ReactNode; className?: string; expandir?: boolean; titulo?: string }) {
+  const [aberta, setAberta] = useState(false);
+  useEffect(() => {
+    if (!aberta) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setAberta(false);
+      }
+    };
+    window.addEventListener("keydown", tecla, true);
+    return () => window.removeEventListener("keydown", tecla, true);
+  }, [aberta]);
   return (
-    <div className={cn("overflow-auto", className)}>
-      <table className="w-full border-collapse text-left">{children}</table>
+    <div className={cn("group/tabela relative", aberta && "fixed inset-0 z-40 flex flex-col bg-bg p-3 sm:p-5")} role={aberta ? "dialog" : undefined} aria-label={aberta ? (titulo ?? "Lista expandida") : undefined}>
+      {aberta && (
+        <div className="mb-3 flex items-center gap-3">
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{titulo ?? "Lista"}</span>
+          <button onClick={() => setAberta(false)} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] hover:bg-sunken">
+            <Minimize2 className="size-4" /> Voltar <kbd className="ml-1">Esc</kbd>
+          </button>
+        </div>
+      )}
+      {expandir && !aberta && (
+        <button
+          onClick={() => setAberta(true)}
+          className="absolute right-1.5 top-1.5 z-[2] grid size-7 place-items-center rounded-md border border-line bg-surface/95 text-ink-3 opacity-0 shadow-xs transition hover:text-ink focus-visible:opacity-100 group-hover/tabela:opacity-100"
+          aria-label="Expandir a lista para o ecrã inteiro"
+          title="Expandir a lista (ecrã inteiro)"
+        >
+          <Maximize2 className="size-3.5" />
+        </button>
+      )}
+      <div className={cn("overflow-auto", aberta ? "min-h-0 flex-1 rounded-xl border border-line bg-surface" : className)}>
+        <table className="w-full border-collapse text-left">{children}</table>
+      </div>
     </div>
   );
 }
