@@ -1,11 +1,9 @@
 # O KanGest e o site
 
-> **A ligação descrita nas secções 1 a 7 está desligada desde 24/11/2026.** É a ligação antiga: o site chamava a API
-> de cada KanGest por um túnel de entrada em cada loja, e nunca chegou a funcionar em produção. O agendador saiu na
-> migração `20261125130000`, e o código fica inerte. O caminho actual é o do **KanGest Livraria**, ligado pelos
-> postos: é ele que chama o site, sem túnel ([KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md) e
-> [A edição da livraria](#a-edição-da-livraria-o-código-neste-repositório)). O stock, os preços, os artigos novos e
-> a NE e a FR das encomendas ainda não passaram para os postos ([ECOSSISTEMA.md](ECOSSISTEMA.md) §12).
+> **As várias lojas e o caminho actual estão nas secções 1 e 2.** As secções 3 a 7 descrevem a ligação antiga (o
+> site chamava a API de cada KanGest por um túnel de entrada em cada loja), desligada desde 24/11/2026 e mantida só
+> como referência. O agendador dela saiu na migração `20261125130000`, e o código fica inerte. Hoje é o **KanGest
+> Livraria** que chama o site, pelos postos, sem túnel ([KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md)).
 
 O **KanGest** é o programa de facturação das livrarias (o sucessor do KiGest). A ligação ao site substitui a
 exportação manual do KiGest ([catalogo/KIGEST.md](catalogo/KIGEST.md)) e trabalha em três sentidos (a edição do
@@ -21,32 +19,62 @@ Os gatilhos da base só põem os documentos numa fila (`kangest_fila`); quem fal
 5 em 5 minutos, com novas tentativas. **Uma loja sem Internet nunca impede uma compra no site**: os documentos
 saem quando ela voltar.
 
-## 1. Lojas: um KanGest central ou um por loja
+## 1. Várias lojas: um KanGest por loja, ligado ao site pelos postos
 
-As duas formas funcionam, e podem misturar-se:
+A Livraria e Editora Adventista tem várias lojas (hoje Catumbela, Huambo e Lubango). O sistema funciona assim:
 
-- **Servidor central** — um só KanGest para a empresa; cada livraria é um **armazém** (com os seus postos e séries).
-  Uma ligação, com `lojas` a dizer o armazém de cada loja do site.
-- **Um KanGest por loja** — cada livraria tem o seu computador servidor. Uma ligação por loja, cada uma com a sua
-  loja em `lojas`. As encomendas sem loja vão para a ligação `padrao`.
+- **Cada loja tem o seu KanGest Livraria**, num computador servidor da loja. É lá que se vende ao balcão: as facturas
+  são assinadas na loja (a AGT exige-o) e a loja continua a vender sem Internet. As outras caixas da mesma loja
+  ligam-se a esse servidor pela rede local.
+- **Cada KanGest liga-se ao site como um posto da sua loja** (*Sistema → Ligação ao KanGest → Postos*). É sempre o
+  KanGest que chama o site; a loja não precisa de abrir nada na Internet.
+- **O site é o centro:** a base de dados reúne as lojas todas, e o painel mostra-as em conjunto ou uma a uma.
 
-A loja de uma encomenda é a de `orders.store_id` (a do levantamento, ou a que serve a província da entrega —
-[LOJAS.md](LOJAS.md)). A NE reserva o stock no armazém dessa loja, e a FR sai desse mesmo stock.
+### Os dados em tempo real
 
-## 2. No KanGest
+Com Internet, cada posto fala com o site de 30 em 30 segundos quando há o que mandar, e de 2 em 2 minutos quando não
+há. A ligação é assinada e cifrada ([KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md)).
 
-1. **Sistema → API e Integrações**: ligar a API «só desta máquina» e publicá-la com HTTPS pelo túnel da Cloudflare
-   (docs do KanGest: `API.md` §3). O endereço fica `https://<nome>/api/v1`.
-2. Um utilizador e um posto próprios para o site (prefixo de série `W`: as vendas do site saem como `FR W2026/15`).
-3. **Chave de acesso** com: `api.artigos`, `api.stock`, `api.documentos`, `vendas.proforma` (NE),
-   `vendas.fatura_recibo` (FR), `vendas.nota_credito` (NC dos reembolsos), `documentos.anular`, `clientes`,
-   `relatorios.ver` e `pos.alterar_preco` (o site cobra o preço dele, com as promoções).
-4. Dois artigos de serviço: **portes** (ex.: referência `PORTES`) e, para as edições digitais e produtos que não
-   existam no KanGest, um **genérico** (ex.: `DIGITAL`; a linha leva o título do produto).
-5. **Avisos automáticos → Novo aviso**: endereço
-   `https://<projecto>.supabase.co/functions/v1/app/webhooks/kangest?ligacao=<id>`, eventos `stock.alterado`,
-   `artigo.alterado`, `documento.emitido` e `documento.anulado` (estes dois trazem as vendas do balcão ao vivo para o
-   Painel de Gestão — [PAINEL-GESTAO.md](PAINEL-GESTAO.md)). Guarde o segredo (`whsec_…`).
+| De onde → para onde | O quê |
+|---|---|
+| Loja → site | Cada factura, nota de crédito e recibo, logo depois de emitido; o stock e os preços quando mudam; o fecho de caixa (o Z) |
+| Site → loja | As encomendas online dessa loja (a NE, que reserva o stock, e a FR quando estão pagas) e o catálogo |
+| No painel | As vendas ao vivo de cada loja (Painel de Gestão), os relatórios, os mais e os menos vendidos, as dívidas e os fechos |
+
+**Sem Internet,** a loja continua a vender. O que fica por mandar espera numa fila no próprio KanGest, e segue
+sozinho quando a ligação volta: não se perde nada.
+
+**O stock à venda no site** é o disponível (a existência menos o reservado) dos postos com «Stock online». Por isso,
+um artigo esgotado nas lojas aparece «Esgotado» no site e não se pode comprar.
+
+### Quem trabalha onde
+
+| Quem | No site | No KanGest |
+|---|---|---|
+| **Administrador** (a direcção) | Tudo, de qualquer lugar: o Painel de Gestão com as lojas todas, os relatórios, as encomendas, os postos, os produtos e a equipa | Entra como Gestor com a conta do site. Para administrar o programa (séries, certificação, utilizadores), usa a conta ADMIN local de cada loja |
+| **Gerente de loja** («Painel da sua loja», ficha na loja) | O Painel de Gestão e os relatórios só da sua loja | Gestor (com «KanGest: gestor»), em qualquer loja |
+| **Caixa** («KanGest: caixa», ficha na loja) | — | O POS, só nos postos da loja da sua ficha |
+
+Todos entram no KanGest com a sua conta do site (o email, a senha e os dois passos). Sem Internet, a cópia local vale
+7 dias ([ENTRADA-COM-A-CONTA-DO-SITE.md](../app/kangest-sistema/docs/ENTRADA-COM-A-CONTA-DO-SITE.md)).
+
+## 2. Pôr uma loja a funcionar
+
+1. **Instalar o KanGest Livraria** no computador servidor da loja. Os instaladores para Windows e para Mac estão no
+   painel, em *Sistema → Ligação ao KanGest → Descarregar*.
+2. **Trazer os dados:** do KanGest oficial, pela cópia de segurança; ou do KIGEST, pela importação, que pode ficar
+   automática enquanto a loja ainda o usa.
+3. **Criar o posto da loja** no painel, em *Sistema → Ligação ao KanGest → Postos*. O código vale 10 minutos:
+   escreve-se no KanGest, em *Livraria → Ligação ao site*.
+4. **Escolher o que o posto faz:**
+   - «Stock online»: o stock dele conta para o site;
+   - «Manda no catálogo»: os preços e os artigos novos vêm dele. Só um posto, em geral o da sede ou o da loja que
+     gere o catálogo.
+5. **A equipa da loja:**
+   - uma ficha de funcionário por pessoa, com a loja (*Funcionários*);
+   - a permissão «KanGest: caixa» ou «KanGest: gestor», ou um cargo que a leve (*Utilizadores → Permissões*).
+6. **Ligar os produtos:** cada produto do site com a referência do artigo do KanGest (`kigest_ref`). Sem ela, o stock
+   e o preço desse produto não vêm da loja.
 
 ## 3. No site
 
