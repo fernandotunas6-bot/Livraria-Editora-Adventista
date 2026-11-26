@@ -7974,7 +7974,7 @@ async fn o_centro_de_integracoes_junta_as_ligacoes() {
     let site = v.as_array().unwrap().iter().find(|c| c["id"] == "site").unwrap();
     assert_eq!(site["estado"], "desligada", "{site}");
     // uma rejeição da AGT põe a facturação electrónica com erro, e à frente das outras
-    let doc = rpc(&st, "artigos.guardar", json!({ "descricao": "Livro", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    let doc = rpc(&st, "artigos.guardar", json!({ "descricao": "Encadernação", "tipo": "S", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
     rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
     let fr = rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "linhas": [{ "artigo_id": doc, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
     sqlx::query("INSERT INTO fe_envios (documento_id, estado) VALUES (?, 'INVALIDO') ON CONFLICT(documento_id) DO UPDATE SET estado = 'INVALIDO'").bind(fr["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
