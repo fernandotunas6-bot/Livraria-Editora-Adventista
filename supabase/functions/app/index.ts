@@ -74,6 +74,7 @@ import {
   type CifraDados,
 } from "./kangestSinc.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
+import { type Estado, compararVersoes, estadoDoPosto, estadoDosEmails, pior, redact } from "./saude.ts";
 import { deadlineFrom, jwtClaims, mfaPending } from "./mfa.ts";
 import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
@@ -6688,6 +6689,59 @@ route("GET", "/api/v1/reports/financeiro", equipa(), async ({ req, url }) => {
 });
 
 rotaV1("GET", "/api/v1/reports/dividas", "GET /admin/relatorios/dividas");
+
+// --- E: a saúde do ecossistema ------------------------------------------------------------------------------------
+// A base, o Auth, o Storage, a fila de emails, os postos do KanGest (o último contacto e o que têm por enviar), a última
+// migração e a versão mínima do KanGest. Cada peça com o estado (ok, aviso, grave) e o geral, o pior. Os erros passam
+// por redact(): nem tokens, nem chaves, nem emails, nem telefones.
+async function medirV1(fn: () => Promise<unknown>): Promise<{ estado: Estado; ms: number; erro?: string }> {
+  const t = performance.now();
+  try {
+    await fn();
+    return { estado: "ok", ms: Math.round(performance.now() - t) };
+  } catch (e) {
+    return { estado: "grave", ms: Math.round(performance.now() - t), erro: redact((e as Error)?.message || String(e)).slice(0, 200) };
+  }
+}
+
+route("GET", "/api/v1/system/health", permissao("manage_settings"), async () => {
+  const agora = Date.now();
+  const falhou = (r: { error: unknown }) => {
+    if (r.error) throw r.error;
+  };
+  const [base, autenticacao, ficheiros] = await Promise.all([
+    medirV1(async () => falhou(await db.from("site_settings").select("id").limit(1))),
+    medirV1(async () => falhou(await db.auth.admin.listUsers({ page: 1, perPage: 1 }))),
+    medirV1(async () => falhou(await db.storage.listBuckets())),
+  ]);
+  const conta = async (estado: string) => (await db.from("email_queue").select("id", { count: "exact", head: true }).eq("status", estado)).count ?? 0;
+  const [pendentes, falhados] = await Promise.all([conta("pending"), conta("failed")]);
+  const { data: agendador } = await db.rpc("email_queue_scheduler_status");
+  // o agendador (pg_cron): sem ele a fila só anda com o botão do painel; sem resposta, não se sabe (null)
+  const activo = (agendador as Row | null)?.available ? !!(agendador as Row).scheduled : null;
+  const emails = { ...estadoDosEmails(pendentes, falhados, activo), pendentes, falhados };
+  const minima = (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null;
+  const { data: ps } = await db.from("kangest_postos").select("id, nome, ultima_sinc, estado_computador, versao_programa").eq("estado", "activo");
+  const postos = (ps || []).map((p: Row) => {
+    const versao = (p.estado_computador?.versao as string) || p.versao_programa || "";
+    const e = estadoDoPosto(p, agora);
+    const antigo = !!(minima && versao && compararVersoes(versao, minima) < 0);
+    return {
+      id: p.id, nome: p.nome, versao, ultima_sinc: p.ultima_sinc, por_enviar: p.estado_computador?.por_enviar ?? null,
+      estado: antigo ? pior(e.estado, "aviso") : e.estado,
+      motivo: antigo ? `KanGest ${versao} abaixo da versão mínima ${minima}` : e.motivo,
+    };
+  });
+  const { data: migracao } = await db.rpc("sistema_ultima_migracao");
+  const estado = pior(base.estado, autenticacao.estado, ficheiros.estado, emails.estado, ...postos.map((p) => p.estado as Estado));
+  if (estado !== "ok") console.warn("Saúde do ecossistema:", estado, JSON.stringify({ base, autenticacao, ficheiros, emails: emails.estado }));
+  return json({
+    data: {
+      estado, hora: new Date(agora).toISOString(), api: API_V1_VERSAO, kangest_min_version: minima,
+      base, auth: autenticacao, storage: ficheiros, emails, postos, ultima_migracao: migracao ?? null,
+    },
+  });
+});
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });

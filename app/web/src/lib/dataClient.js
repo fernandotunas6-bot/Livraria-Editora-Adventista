@@ -784,7 +784,8 @@ async function send(path, options = {}) {
     body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
   });
   const out = await res.json().catch(() => ({}));
-  if (!res.ok) throw new DataError(out.message || `Erro ${res.status}`, res.status, out);
+  // a API v1 manda os erros em { error: { status, message } }; as rotas antigas, em { message }
+  if (!res.ok) throw new DataError(out.message || out.error?.message || `Erro ${res.status}`, res.status, out);
   return out;
 }
 
