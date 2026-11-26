@@ -8228,6 +8228,8 @@ async fn o_artigo_no_site_pela_ficha() {
     let sem_preco = rpc(&st, "artigos.guardar", json!({ "descricao": "Sem preço", "referencia": "LIV-002", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
     let fora = rpc(&st, "artigos.guardar", json!({ "descricao": "Ainda fora", "referencia": "LIV-003", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
     let sem_ref = rpc(&st, "artigos.guardar", json!({ "descricao": "Sem referência", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
+    // o KanGest dá uma referência a quem não a tem: tira-se à mão, para o caso de um artigo antigo sem ela
+    sqlx::query("UPDATE artigos SET referencia = '' WHERE id = ?").bind(sem_ref).execute(&st.pool).await.unwrap();
     // sem ligação ao site, a ficha não mostra nada
     assert_eq!(rpc(&st, "loja.produto.doArtigo", json!({ "artigo_id": livro })).await["ligado"], false);
 
