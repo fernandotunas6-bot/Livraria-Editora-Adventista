@@ -201,6 +201,9 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* o ecossistema (KANGEST ONE): o servidor central, o que espera para ir para o site, as encomendas e o livro de stock */}
+      <Ecossistema />
+
       {/* KanGest inteligente: resumo de ontem, previsões e alertas, calculados neste computador */}
       <Inteligencia />
 
@@ -497,5 +500,90 @@ function TopPainel() {
         <Esqueleto />
       )}
     </Card>
+  );
+}
+
+type EstadoEcossistema = {
+  ligado: boolean;
+  posto?: string;
+  loja?: string;
+  ultima_sinc?: string | null;
+  em_linha?: boolean;
+  erro?: string;
+  por_enviar?: number;
+  encomendas?: { novas: number; por_entregar: number; levantamento: number };
+  livro?: { aberto: boolean; abertura: number; fila: number; com_erro: number };
+  desactualizado?: string | null;
+  versao?: string;
+};
+
+/**
+ * O ecossistema no painel inicial (KANGEST ONE, fase G): só num KanGest ligado ao site. Quatro cartões com os estados
+ * partilhados com o site (packages/marca/tokens.css): o servidor central, o que espera para ir para o site, as
+ * encomendas do site por tratar e o livro de stock.
+ */
+function Ecossistema() {
+  const nav = useNavigate();
+  const { data: e } = useQuery({
+    queryKey: ["dashboard", "ecossistema"],
+    queryFn: () => call<EstadoEcossistema>("dashboard.ecossistema"),
+    refetchInterval: 60_000,
+  });
+  if (!e?.ligado) return null;
+  const tom = (t: "ok" | "aviso" | "erro") =>
+    t === "ok" ? "bg-estado-ok-fundo text-estado-ok" : t === "aviso" ? "bg-estado-aviso-fundo text-estado-aviso" : "bg-estado-erro-fundo text-estado-erro";
+  const servidor: "ok" | "aviso" | "erro" = e.desactualizado ? "erro" : e.em_linha ? "ok" : "aviso";
+  const fila = e.por_enviar ?? 0;
+  const enc = e.encomendas ?? { novas: 0, por_entregar: 0, levantamento: 0 };
+  const livro = e.livro;
+  const cartoes: { titulo: string; estado: "ok" | "aviso" | "erro"; valor: string; texto: string; ir?: string }[] = [
+    {
+      titulo: "Servidor central",
+      estado: servidor,
+      valor: e.desactualizado ? "Actualizar" : e.em_linha ? "Ligado" : "Sem ligação",
+      texto: e.desactualizado
+        ? `O site pede o KanGest ${e.desactualizado} ou mais recente`
+        : `${e.posto ?? ""}${e.loja ? ` · ${e.loja}` : ""} · ${e.ultima_sinc ? `última volta ${dataHora(e.ultima_sinc)}` : "ainda sem volta"}`,
+      ir: e.desactualizado ? "/sobre" : "/ligacao-site",
+    },
+    {
+      titulo: "Por enviar ao site",
+      estado: fila > 50 ? "aviso" : "ok",
+      valor: qtd(fila),
+      texto: fila ? "documentos, catálogo, fechos e movimentos à espera da volta seguinte" : "tudo enviado",
+    },
+    {
+      titulo: "Encomendas do site",
+      estado: enc.novas > 0 ? "aviso" : "ok",
+      valor: qtd(enc.novas),
+      texto: `novas · ${qtd(enc.por_entregar)} por entregar${enc.levantamento ? ` · ${qtd(enc.levantamento)} para levantar` : ""}`,
+      ir: "/loja-online",
+    },
+    {
+      titulo: "Livro de stock",
+      estado: livro?.com_erro ? "erro" : livro?.aberto ? "ok" : "aviso",
+      valor: !livro?.aberto ? "À espera" : livro.com_erro ? `${qtd(livro.com_erro)} recusado(s)` : "Em dia",
+      texto: !livro?.aberto ? "a abertura segue na volta seguinte" : `${qtd(livro.fila)} movimento(s) na fila${livro.abertura ? ` · ${qtd(livro.abertura)} abertura(s) por enviar` : ""}`,
+    },
+  ];
+  return (
+    <section aria-label="O ecossistema" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {cartoes.map((c) => (
+        <button
+          key={c.titulo}
+          type="button"
+          disabled={!c.ir}
+          onClick={c.ir ? () => nav(c.ir!) : undefined}
+          className="rounded-cartao border border-line bg-surface p-4 text-left shadow-card transition-colors duration-200 enabled:hover:border-line-strong disabled:cursor-default"
+        >
+          <div className="flex items-center justify-between gap-2 text-[12.5px] text-ink-3">
+            <span>{c.titulo}</span>
+            <span className={cn("size-2 rounded-pilula", c.estado === "ok" ? "bg-estado-ok" : c.estado === "aviso" ? "bg-estado-aviso" : "bg-estado-erro")} aria-hidden />
+          </div>
+          <div className={cn("mt-1 inline-flex rounded-campo px-1.5 text-[17px] font-semibold", tom(c.estado))}>{c.valor}</div>
+          <p className="mt-1 text-legenda text-ink-3">{c.texto}</p>
+        </button>
+      ))}
+    </section>
   );
 }

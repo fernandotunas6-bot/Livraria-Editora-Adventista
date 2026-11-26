@@ -210,6 +210,48 @@ pub async fn resumo(st: &AppState) -> AppResult<Value> {
     Ok(json!(v.into_iter().map(|(_, c)| c).collect::<Vec<_>>()))
 }
 
+/// O ecossistema para o painel inicial (KANGEST ONE, fase G): a ligação ao servidor central, o que espera para ir para o
+/// site, as encomendas do site por tratar, o livro de stock e a versão mínima. Num KanGest isolado, `ligado: false`.
+pub async fn ecossistema(st: &AppState) -> AppResult<Value> {
+    st.sessao()?;
+    let p = &st.pool;
+    let lig: Option<(String, String, Option<String>, String, bool)> = sqlx::query_as(
+        "SELECT posto_nome, loja, ultima_sinc, ultimo_erro,
+                (ultimo_erro = '' AND COALESCE(ultima_sinc, '') >= strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-10 minutes'))
+           FROM sinc_ligacao WHERE id = 1 AND ativa = 1",
+    )
+    .fetch_optional(p)
+    .await?;
+    let Some((posto, loja, ultima_sinc, erro, em_linha)) = lig else { return Ok(json!({ "ligado": false })) };
+    let conta = |sql: &'static str| async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(p).await.unwrap_or(0) };
+    let por_enviar = conta("SELECT COUNT(*) FROM sinc_saida WHERE estado IN ('pendente', 'erro')").await
+        + conta("SELECT COUNT(*) FROM sinc_catalogo").await
+        + conta("SELECT COUNT(*) FROM sinc_fechos WHERE feito_em IS NULL").await
+        + conta("SELECT COUNT(*) FROM sinc_financeiro WHERE estado = 'pendente'").await
+        + conta("SELECT COUNT(*) FROM sinc_stock_livro").await;
+    let (novas, por_entregar, levantamento): (i64, i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(estado = 'pending'), 0), COALESCE(SUM(estado IN ('confirmed', 'shipped')), 0),
+                COALESCE(SUM(levantamento = 1 AND estado NOT IN ('delivered', 'cancelled')), 0)
+           FROM loja_encomendas",
+    )
+    .fetch_one(p)
+    .await?;
+    Ok(json!({
+        "ligado": true,
+        "posto": posto,
+        "loja": loja,
+        "ultima_sinc": ultima_sinc,
+        "em_linha": em_linha,
+        "erro": erro.chars().take(200).collect::<String>(),
+        "por_enviar": por_enviar,
+        "encomendas": { "novas": novas, "por_entregar": por_entregar, "levantamento": levantamento },
+        "livro": crate::sinc::livro::contagem(p).await?,
+        "desactualizado": crate::sinc::versao::desactualizado(p).await,
+        "versao": crate::sinc::versao::ESTA,
+    }))
+}
+
+
 #[cfg(test)]
 mod testes {
     use super::*;
