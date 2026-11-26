@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador,
+  limparEstadoComputador, limparLivroStock,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -272,5 +272,41 @@ describe("prepararLote: os movimentos da tesouraria (o ERP central)", () => {
     });
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 8, data: "26/11/2026", valor: 1 } }], c!)).rejects.toThrow(/data/);
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 9, data: "2026-11-26", valor: -1 } }], c!)).rejects.toThrow(/negativo/);
+  });
+});
+
+describe("limparLivroStock (KANGEST ONE, B1)", () => {
+  it("passa só os campos da lista e deixa de fora o que não se pode marcar", () => {
+    const l = limparLivroStock({
+      aberturas: [
+        { armazem_id: 1, referencia: " LIV-001 ", quantidade: 12.00049, momento: "2026-11-26T10:00:00+01:00", custo: 999 },
+        { armazem_id: 1, referencia: "", quantidade: 1 },
+        { armazem_id: -1, referencia: "X", quantidade: 1 },
+        { armazem_id: 2, referencia: "X", quantidade: "3" },
+      ],
+      movimentos: [
+        { mov_id: 7, armazem_id: 1, referencia: "LIV-001", quantidade: -2, tipo: "venda", documento: "FR A/12", momento: "ontem", cliente: "Ana" },
+        { mov_id: 8, armazem_id: 1, referencia: "LIV-001", quantidade: 1, tipo: "outra" },
+        { mov_id: 0, armazem_id: 1, referencia: "LIV-001", quantidade: 1, tipo: "venda" },
+        { armazem_id: 1, referencia: "LIV-001", quantidade: 1, tipo: "venda" },
+      ],
+      segredo: "x",
+    });
+    expect(l).toEqual({
+      aberturas: [{ armazem_id: 1, referencia: "LIV-001", quantidade: 12, momento: "2026-11-26T09:00:00.000Z" }],
+      movimentos: [
+        { mov_id: 7, armazem_id: 1, referencia: "LIV-001", quantidade: -2, tipo: "venda", documento: "FR A/12", momento: null },
+        { mov_id: 8, armazem_id: 1, referencia: "LIV-001", quantidade: 1, tipo: "outra", documento: "", momento: null },
+      ],
+    });
+    expect(JSON.stringify(l)).not.toContain("Ana");
+  });
+
+  it("sem nada dá null; no máximo 2000 de cada", () => {
+    expect(limparLivroStock(undefined)).toBeNull();
+    expect(limparLivroStock([1])).toBeNull();
+    expect(limparLivroStock({})).toEqual({ aberturas: [], movimentos: [] });
+    const muitos = Array.from({ length: 2100 }, (_, i) => ({ mov_id: i + 1, armazem_id: 1, referencia: "R", quantidade: 1, tipo: "venda" }));
+    expect(limparLivroStock({ movimentos: muitos })!.movimentos).toHaveLength(2000);
   });
 });

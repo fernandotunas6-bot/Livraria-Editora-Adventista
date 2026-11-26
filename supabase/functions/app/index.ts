@@ -69,7 +69,7 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador,
+  limparEstadoComputador, limparLivroStock,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados,
 } from "./kangestSinc.ts";
@@ -3278,9 +3278,25 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
       const { count } = await q;
       return count ?? 0;
     };
-    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true) });
+    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), livro: null as Row | null });
+  }
+  // o livro único de stock (KANGEST ONE, B1): os movimentos e as diferenças com a fotografia, por posto
+  const { data: livros, error: eLivros } = await db.rpc("stock_livro_resumo");
+  if (eLivros) console.error("KanGest: resumo do livro de stock", eLivros.message);
+  for (const l of livros || []) {
+    const p = postos.find((x) => x.id === l.posto_id);
+    if (p) p.livro = { movimentos: Number(l.movimentos), aberto: !!l.aberto, divergencias: Number(l.divergencias) };
   }
   return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos });
+});
+
+// Onde o livro de stock de um posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1): até 200 linhas.
+route("GET", "/admin/kangest/postos/livro", permissao("manage_settings"), async ({ url }) => {
+  const id = url.searchParams.get("id") || "";
+  if (!uuidValido(id)) throw bad("Indique o posto.");
+  const { data, error } = await db.rpc("stock_livro_conferir", { p_posto: id }).limit(200);
+  if (error) throw new Error(error.message);
+  return json({ diferencas: data || [] });
 });
 
 route("POST", "/admin/kangest/postos", permissao("manage_settings"), async ({ body, auth }) => {
@@ -3402,6 +3418,17 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   if (estadoComputador) {
     await db.from("kangest_postos").update({ estado_computador: estadoComputador, estado_em: new Date().toISOString() }).eq("id", posto);
   }
+  // o livro único de stock, em sombra (KANGEST ONE, B1): as aberturas e os movimentos de stock do posto. Nunca impede a
+  // sincronização das facturas e do stock de hoje: um erro volta na resposta e o posto tenta outra vez.
+  let stockLivro: unknown = null;
+  const livro = limparLivroStock(aberto.dados?.stock_livro);
+  if (livro && (livro.aberturas.length || livro.movimentos.length)) {
+    const { data, error } = await db.rpc("stock_livro_receber", { p_posto: posto, p_aberturas: livro.aberturas, p_movimentos: livro.movimentos });
+    if (error) {
+      console.error("KanGest: livro de stock do posto", posto, error.message);
+      stockLivro = { erro: error.message.slice(0, 300) };
+    } else stockLivro = data;
+  }
   let resultado = null;
   const tudo = Array.isArray(aberto.dados?.lote) ? aberto.dados.lote : [];
   // o que o KanGest fez com as tarefas da volta anterior (os documentos das encomendas online, §11): primeiro, para a
@@ -3449,7 +3476,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, stock_livro: stockLivro, site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
     posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
   }));
 });

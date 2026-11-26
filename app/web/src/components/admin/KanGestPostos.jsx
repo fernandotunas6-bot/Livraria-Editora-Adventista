@@ -3,9 +3,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Copy, Cpu, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Copy, Cpu, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
+import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
 import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
@@ -219,6 +219,7 @@ export default function KanGestPostos({ lojas = [] }) {
                 </p>
                 {p.ultimo_erro && <p className="w-full text-xs text-red-700 dark:text-red-400">{p.ultimo_erro}</p>}
                 {p.estado !== 'revogado' && <Computador p={p} />}
+                {p.estado === 'activo' && <LivroDoPosto p={p} />}
                 {p.estado !== 'revogado' && (
                   <div className="flex w-full flex-wrap gap-x-5 gap-y-1 text-xs">
                     <label className="inline-flex items-center gap-1.5">
@@ -315,6 +316,69 @@ function Computador({ p }) {
             </span>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O livro único de stock do posto, em sombra (KANGEST ONE, B1): quantos movimentos tem e se a soma bate certo com a
+ * fotografia que o posto manda. «Ver» mostra as diferenças (até 200), por armazém e referência.
+ */
+export function LivroDoPosto({ p }) {
+  const [diferencas, setDiferencas] = useState(null);
+  const [aVer, setAVer] = useState(false);
+  const l = p.livro;
+  if (!l) return null;
+
+  async function ver() {
+    setAVer(true);
+    try {
+      setDiferencas((await kangestPostoLivro(p.id)).diferencas || []);
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível ler o livro de stock.');
+    } finally {
+      setAVer(false);
+    }
+  }
+
+  return (
+    <div className="w-full space-y-1 text-xs">
+      <p className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+        <BookOpenCheck className="h-3.5 w-3.5" />
+        {!l.aberto ? (
+          <span>Livro de stock: à espera da abertura (o KanGest 1.4.9 ou mais recente manda-a na primeira volta).</span>
+        ) : (
+          <>
+            <span>Livro de stock: {l.movimentos} movimento(s)</span>
+            {l.divergencias === 0 ? (
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-400">bate certo com o posto</span>
+            ) : (
+              <>
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-400">
+                  {l.divergencias} diferença(s) com o posto
+                </span>
+                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={ver} disabled={aVer}>
+                  {aVer ? 'A ler…' : 'Ver'}
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </p>
+      {diferencas && diferencas.length > 0 && (
+        <table className="w-full max-w-md text-left">
+          <thead className="text-muted-foreground">
+            <tr><th className="font-medium">Referência</th><th className="font-medium">Armazém</th><th className="text-right font-medium">Livro</th><th className="text-right font-medium">Posto</th></tr>
+          </thead>
+          <tbody>
+            {diferencas.map((d) => (
+              <tr key={`${d.armazem_id}-${d.referencia}`}>
+                <td>{d.referencia}</td><td>{d.armazem_id}</td><td className="text-right">{Number(d.livro)}</td><td className="text-right">{Number(d.fotografia)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

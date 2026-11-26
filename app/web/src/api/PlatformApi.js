@@ -331,6 +331,8 @@ export const kangestTestar = () => pb.send('/admin/kangest/testar', { method: 'P
 
 /** Postos do KanGest Livraria (docs/KANGEST-SINCRONIZACAO.md): a lista, se as chaves estão configuradas e o endereço. */
 export const kangestPostos = () => pb.send('/admin/kangest/postos', { method: 'GET' });
+/** Onde o livro de stock do posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1). */
+export const kangestPostoLivro = (id) => pb.send(`/admin/kangest/postos/livro?id=${encodeURIComponent(id)}`, { method: 'GET' });
 /** Cria um posto e devolve o código de emparelhamento (uso único, 10 minutos). */
 export const kangestPostoCriar = ({ nome, store_id }) => pb.send('/admin/kangest/postos', { method: 'POST', body: { nome, store_id } });
 /** Outro código para o posto (computador novo, chave perdida ou rodar a chave): a chave actual deixa de valer. */

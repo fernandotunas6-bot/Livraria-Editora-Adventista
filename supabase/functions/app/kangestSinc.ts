@@ -493,3 +493,47 @@ export function limparEstadoComputador(e: unknown): Record<string, unknown> | nu
   for (const k of Object.keys(limpo)) if (limpo[k] === null) delete limpo[k];
   return limpo;
 }
+
+// ------------------------------------------------------------------ o livro único de stock (KANGEST ONE, B1)
+
+const MAX_LIVRO = 2000;
+
+/**
+ * O que o KanGest manda para o livro de stock (sinc/livro.rs): as aberturas (a existência de cada artigo em cada
+ * armazém, na primeira volta) e os movimentos novos (`movimentos_stock`, com o id local, o tipo e o documento). Só os
+ * campos da lista, com os tipos e os limites conferidos, e no máximo 2000 de cada. Um movimento sem id não se pode
+ * marcar no posto e fica de fora; um de tipo desconhecido segue, para a base o devolver como erro
+ * (public.stock_livro_receber). Sem nada (um KanGest antigo), `null`.
+ */
+export function limparLivroStock(x: unknown): { aberturas: Record<string, unknown>[]; movimentos: Record<string, unknown>[] } | null {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return null;
+  const v = x as Record<string, unknown>;
+  const texto = (t: unknown, max: number) => (typeof t === "string" ? t.replace(/[\u0000-\u001f]/g, "").trim().slice(0, max) : "");
+  const id = (n: unknown) => (typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : null);
+  const armazem = (n: unknown) => (typeof n === "number" && Number.isSafeInteger(n) && n >= 0 ? n : null);
+  const qtd = (n: unknown) => (typeof n === "number" && Number.isFinite(n) && Math.abs(n) < 1e9 ? Math.round(n * 1000) / 1000 : null);
+  const data = (t: unknown) => (typeof t === "string" && t.length <= 40 && !Number.isNaN(Date.parse(t)) ? new Date(t).toISOString() : null);
+  const lista = (l: unknown) => (Array.isArray(l) ? l.filter((i) => i && typeof i === "object" && !Array.isArray(i)).slice(0, MAX_LIVRO) : []);
+  const aberturas = [];
+  for (const a of lista(v.aberturas) as Record<string, unknown>[]) {
+    const r = { armazem_id: armazem(a.armazem_id), referencia: texto(a.referencia, 60), quantidade: qtd(a.quantidade), momento: data(a.momento) };
+    if (r.armazem_id !== null && r.referencia && r.quantidade !== null) aberturas.push(r);
+  }
+  const movimentos = [];
+  for (const m of lista(v.movimentos) as Record<string, unknown>[]) {
+    const mov_id = id(m.mov_id);
+    if (mov_id === null) continue;
+    const tipo = texto(m.tipo, 20);
+    movimentos.push({
+      mov_id,
+      armazem_id: armazem(m.armazem_id),
+      referencia: texto(m.referencia, 60),
+      quantidade: qtd(m.quantidade),
+      // um tipo fora da lista segue como veio: a base devolve-o como erro, e o posto vê-o
+      tipo: tipo || "desconhecido",
+      documento: texto(m.documento, 60),
+      momento: data(m.momento),
+    });
+  }
+  return { aberturas, movimentos };
+}
