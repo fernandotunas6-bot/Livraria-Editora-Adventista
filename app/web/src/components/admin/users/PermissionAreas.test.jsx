@@ -26,6 +26,8 @@ describe('permissões por área', () => {
   it('cada permissão diz o que abre, calculado do registo das secções', () => {
     expect(opensText('manage_colporteurs')).toBe('Colportagem, Registo da Igreja (só leitura)');
     expect(opensText('manage_settings')).not.toContain('Integrações');
+    // as do KanGest não abrem nada no painel
+    expect(opensText('kangest_caixa')).toBe('');
   });
 
   it('os interruptores mudam só a permissão tocada', async () => {

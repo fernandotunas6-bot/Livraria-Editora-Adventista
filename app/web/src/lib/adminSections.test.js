@@ -223,11 +223,12 @@ describe('vistas (sub-secções)', () => {
 });
 
 describe('permissões arrumadas pelas áreas do painel', () => {
-  it('cada permissão mora numa área do painel e abre pelo menos uma secção', () => {
+  it('cada permissão mora numa área do painel e abre pelo menos uma secção (as do KanGest valem no programa)', () => {
     const areas = ADMIN_GROUPS.map((g) => g.id);
     for (const [key, p] of Object.entries(PERMISSIONS)) {
       expect(areas, key).toContain(p.area);
-      expect(sectionsOpenedBy(key).length, key).toBeGreaterThan(0);
+      if (p.foraDoPainel) expect(sectionsOpenedBy(key), key).toEqual([]);
+      else expect(sectionsOpenedBy(key).length, key).toBeGreaterThan(0);
     }
   });
 

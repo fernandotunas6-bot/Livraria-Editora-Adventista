@@ -54,6 +54,10 @@ export const PERMISSION_KEYS = [
   // O Painel de Gestão só das lojas da ficha de funcionário (migração painel_gestao): o gerente de uma loja
   // acompanha as vendas e a meta dela sem ver as outras nem a facturação toda.
   "view_store_dashboard",
+  // Entrar no KanGest Livraria com a conta do site, como Caixa ou como Gestor (migração kangest_entrada_com_a_conta).
+  // Não abrem nada no painel nem na Edge Function: o KanGest lê-as pela public.kangest_eu.
+  "kangest_caixa",
+  "kangest_gestor",
 ];
 
 /** Faz parte da equipa — distinto de ter uma permissão concreta. */

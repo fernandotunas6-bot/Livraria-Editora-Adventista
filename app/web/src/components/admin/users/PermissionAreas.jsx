@@ -61,6 +61,7 @@ export function PermissionSwitches({ value = {}, onChange, disabled = false }) {
                   <span id={`perm-${key}-desc`} className="block text-xs text-muted-foreground">
                     {p.description}
                     {opens && <span className="mt-0.5 block text-foreground/70">Abre: {opens}</span>}
+                    {p.foraDoPainel && <span className="mt-0.5 block text-foreground/70">{p.foraDoPainel}</span>}
                   </span>
                 </span>
               </label>

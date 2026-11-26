@@ -247,6 +247,24 @@ Cada fecho de caixa arquivado num posto (o relatório Z) chega ao site no tipo `
   os pagamentos, os artigos e as vendas online à parte.
 - **Quem os vê:** quem vê os relatórios, todas as lojas; o gerente da loja, a sua.
 
+## 5.4 Entrar no KanGest com a conta do site
+
+Cada pessoa da equipa vai entrar no KanGest Livraria com a sua conta do site: o email, a senha e o código dos dois
+passos. O lado do programa vem num PR seguinte. No site (migração `20261126100000`):
+- **Duas permissões novas**, em *Utilizadores → Permissões* e nos cargos, na área *Sistema*:
+  - **KanGest: caixa** dá o perfil Caixa (o POS);
+  - **KanGest: gestor** dá o perfil Gestor (vendas, compras, stock e relatórios, sem a administração do programa).
+
+  Não abrem nada no painel.
+- **O administrador do site entra como Gestor.** O perfil Administrador do KanGest nunca vem do site: fica sempre a
+  conta ADMIN local de recurso.
+- **`public.kangest_eu()`:** o KanGest pergunta com a sessão da própria pessoa, e só fica a saber dela:
+  - o nome, o email e o cargo;
+  - o perfil: `GESTOR`, `CAIXA` ou `null` (sem acesso);
+  - as lojas da ficha de funcionário.
+
+  Como no painel, uma conta com os dois passos precisa da sessão com o código.
+
 ## 6. Rotas da Edge Function
 
 | Rota | Quem | O quê |

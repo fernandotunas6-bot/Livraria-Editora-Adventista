@@ -25,6 +25,10 @@ export const PERMISSIONS = {
   manage_church_registry: { area: 'igreja', label: 'Registo da Igreja', description: 'Campos, distritos, igrejas e pastores' },
   manage_colporteurs: { area: 'igreja', label: 'Colportagem', description: 'Colportores, relatórios, stock entregue, percentagens e acertos' },
   manage_settings: { area: 'sistema', label: 'Configurações', description: 'Marca, portes, contactos, aparência, lojas físicas e a faixa de aviso' },
+  // As do KanGest Livraria: não abrem nada no painel; dizem com que perfil a pessoa entra no programa com a conta do
+  // site (migração kangest_entrada_com_a_conta). O perfil Administrador do KanGest nunca vem daqui.
+  kangest_caixa: { area: 'sistema', label: 'KanGest: caixa', description: 'Entrar no KanGest Livraria com esta conta, no ponto de venda (o perfil Caixa)', foraDoPainel: 'No KanGest Livraria: o perfil Caixa' },
+  kangest_gestor: { area: 'sistema', label: 'KanGest: gestor', description: 'Entrar no KanGest Livraria com esta conta, com o perfil Gestor (vendas, compras, stock e relatórios; sem a administração do programa)', foraDoPainel: 'No KanGest Livraria: o perfil Gestor' },
 };
 
 export const ROLES = {
@@ -50,6 +54,8 @@ export const DEFAULT_PERMISSIONS = {
   manage_marketing: false,
   manage_church_registry: false,
   manage_colporteurs: false,
+  kangest_caixa: false,
+  kangest_gestor: false,
 };
 
 export const MANAGER_PERMISSIONS = {
@@ -69,6 +75,8 @@ export const MANAGER_PERMISSIONS = {
   manage_marketing: true,
   manage_church_registry: false,
   manage_colporteurs: false,
+  kangest_caixa: false,
+  kangest_gestor: false,
 };
 
 /** Só os gestores usam permissões granulares; clientes não têm nenhuma e administradores têm todas. */
