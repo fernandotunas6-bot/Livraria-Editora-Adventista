@@ -159,6 +159,10 @@ pub async fn contas_guardar(st: &AppState, v: BTreeMap<String, String>) -> AppRe
 pub struct LancamentosIn {
     de: String,
     ate: String,
+    /// Incluir o histórico importado do KIGEST (desligado por omissão: o contabilista já o recebeu do KIGEST, e
+    /// entrava em dobro). Quando se inclui, vai no diário «Vendas (KIGEST)» / «Compras (KIGEST)».
+    #[serde(default)]
+    incluir_kigest: bool,
 }
 
 /// Diário do período: uma linha por conta movimentada em cada documento.
@@ -170,17 +174,18 @@ pub async fn lancamentos(st: &AppState, i: LancamentosIn) -> AppResult<Value> {
     }
     let c = contas(st).await?;
     let docs = sqlx::query(
-        "SELECT d.id, d.numero_doc, d.data_emissao, d.tipo_codigo, d.entidade_nome, d.entidade_nif, d.total, d.total_liquido, d.total_iva,
+        "SELECT d.id, d.numero_doc, d.data_emissao, d.tipo_codigo, d.entidade_nome, d.entidade_nif, d.importado, d.total, d.total_liquido, d.total_iva,
                 d.total_retencao, t.grupo, t.classe, t.credito, t.pago_no_acto,
                 COALESCE((SELECT SUM(l.valor_liquido) FROM documento_linhas l JOIN artigos a ON a.id = l.artigo_id
                           WHERE l.documento_id = d.id AND a.tipo = 'S'), 0) AS servicos
          FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
-         WHERE d.data_emissao BETWEEN ?1 AND ?2 AND d.estado <> 'A' AND d.importado = 0
+         WHERE d.data_emissao BETWEEN ?1 AND ?2 AND d.estado <> 'A' AND (d.importado = 0 OR ?3 = 1)
            AND t.classe IN ('VENDA', 'RECIBO', 'COMPRA', 'PAGAMENTO')
          ORDER BY d.data_emissao, d.id",
     )
     .bind(&i.de)
     .bind(&i.ate)
+    .bind(i.incluir_kigest as i64)
     .fetch_all(&st.pool)
     .await?;
     let mut linhas: Vec<Value> = Vec::new();
@@ -192,6 +197,7 @@ pub async fn lancamentos(st: &AppState, i: LancamentosIn) -> AppResult<Value> {
         let data: String = d.get("data_emissao");
         let nome: String = d.get("entidade_nome");
         let nif: String = d.get("entidade_nif");
+        let do_kigest = d.get::<i64, _>("importado") == 1;
         let (grupo, classe): (String, String) = (d.get("grupo"), d.get("classe"));
         let credito = d.get::<i64, _>("credito") == 1;
         let pago = d.get::<i64, _>("pago_no_acto") == 1;
@@ -270,7 +276,13 @@ pub async fn lancamentos(st: &AppState, i: LancamentosIn) -> AppResult<Value> {
             e.0 += deb;
             e.1 += cred;
             linhas.push(json!({
-                "data": data, "documento": numero, "diario": if grupo == "VENDAS" { "Vendas" } else { "Compras" },
+                "data": data, "documento": numero,
+                "diario": match (grupo == "VENDAS", do_kigest) {
+                    (true, false) => "Vendas",
+                    (true, true) => "Vendas (KIGEST)",
+                    (false, false) => "Compras",
+                    (false, true) => "Compras (KIGEST)",
+                },
                 "conta": conta, "descricao": desc, "nif": nif, "debito": deb, "credito": cred,
             }));
         }

@@ -12,9 +12,11 @@ use crate::state::AppState;
 pub(crate) const SINAL: &str = "CASE WHEN d.tipo_codigo = 'NC' THEN -1 ELSE 1 END";
 pub(crate) const VENDAS: &str = "d.tipo_codigo IN ('FR','FT','ND','NC') AND d.estado <> 'A'";
 // Filtros opcionais do relatório de vendas: ?3 entidade (cliente), ?4 posto, ?5 armazém (a loja, num servidor
-// central) e ?6 canal ('api' = documentos emitidos por uma chave da API, como a loja online; 'balcao' = os outros).
+// central) e ?6 canal ('api' = documentos emitidos por uma chave da API, como a loja online; 'balcao' = os emitidos
+// no programa e no POS; 'kigest' = o histórico importado do KIGEST, só de leitura).
 const ENT: &str = "AND (?3 IS NULL OR d.entidade_id = ?3) AND (?4 IS NULL OR d.posto_id = ?4) AND (?5 IS NULL OR d.armazem_id = ?5)
-     AND (?6 IS NULL OR (?6 = 'api') = (d.api_chave_id IS NOT NULL))";
+     AND (?6 IS NULL OR (?6 = 'api' AND d.api_chave_id IS NOT NULL) OR (?6 = 'balcao' AND d.api_chave_id IS NULL AND d.importado = 0)
+          OR (?6 = 'kigest' AND d.importado = 1))";
 
 /// O cliente de um documento nas listas: uma factura a Consumidor Final que é de uma encomenda do site (a referência é
 /// o n.º da encomenda) mostra o nome do cliente da encomenda, da cópia local da Loja online, com «(loja online)». O
@@ -22,17 +24,19 @@ const ENT: &str = "AND (?3 IS NULL OR d.entidade_id = ?3) AND (?4 IS NULL OR d.p
 pub(crate) const CLIENTE: &str = "COALESCE(CASE WHEN d.referencia <> '' AND COALESCE(d.entidade_id, 1) = 1
        THEN (SELECT NULLIF(e.cliente, '') || ' (loja online)' FROM loja_encomendas e WHERE e.numero = d.referencia LIMIT 1) END,
      d.entidade_nome)";
-/// Onde foi vendido: `loja online` (os documentos da chave da API, como as encomendas do site) ou `balcão`.
-pub(crate) const CANAL: &str = "CASE WHEN d.api_chave_id IS NOT NULL THEN 'loja online' ELSE 'balcão' END";
+/// Onde foi vendido: `KIGEST` (o histórico importado, só de leitura), `loja online` (os documentos da chave da API,
+/// como as encomendas do site) ou `balcão`.
+pub(crate) const CANAL: &str = "CASE WHEN d.importado = 1 THEN 'KIGEST' WHEN d.api_chave_id IS NOT NULL THEN 'loja online' ELSE 'balcão' END";
 /// Para as vistas que não usam os filtros ?3 a ?6 (o SQLite recusa parâmetros a mais).
 const SEM_FILTROS: &str = "AND (?3 IS NULL OR ?3 IS NOT NULL) AND (?4 IS NULL OR ?4 IS NOT NULL)
      AND (?5 IS NULL OR ?5 IS NOT NULL) AND (?6 IS NULL OR ?6 IS NOT NULL)";
 
-/// Canal de venda: `api` (loja online e outras integrações) ou `balcao` (programa e POS).
+/// Canal de venda: `api` (loja online e outras integrações), `balcao` (programa e POS) ou `kigest` (o histórico do
+/// KIGEST).
 fn canal_valido(c: &Option<String>) -> AppResult<()> {
     match c.as_deref() {
-        None | Some("api") | Some("balcao") => Ok(()),
-        Some(_) => Err(AppError::msg("Canal inválido: use «api» ou «balcao».")),
+        None | Some("api") | Some("balcao") | Some("kigest") => Ok(()),
+        Some(_) => Err(AppError::msg("Canal inválido: use «api», «balcao» ou «kigest».")),
     }
 }
 
@@ -219,7 +223,7 @@ pub struct VendasIn {
     posto_id: Option<i64>,
     #[serde(default)]
     armazem_id: Option<i64>,
-    /// api | balcao
+    /// api | balcao | kigest
     #[serde(default)]
     canal: Option<String>,
 }
@@ -399,7 +403,7 @@ pub async fn vendas(st: &AppState, f: VendasIn) -> AppResult<Value> {
 #[derive(Deserialize)]
 pub struct SinteseIn {
     ano: i32,
-    /// Só um posto / um armazém (uma loja) / um canal (api | balcao), como no relatório de vendas.
+    /// Só um posto / um armazém (uma loja) / um canal (api | balcao | kigest), como no relatório de vendas.
     #[serde(default)]
     posto_id: Option<i64>,
     #[serde(default)]
@@ -422,7 +426,8 @@ pub async fn sintese(st: &AppState, s: SinteseIn) -> AppResult<Value> {
                 COALESCE(SUM(CASE WHEN d.importado = 1 THEN {SINAL}*d.total ELSE 0 END), 0)
          FROM documentos d WHERE {VENDAS} AND d.data_emissao >= ?1 AND d.data_emissao < ?2
            AND (?3 IS NULL OR d.posto_id = ?3) AND (?4 IS NULL OR d.armazem_id = ?4)
-           AND (?5 IS NULL OR (?5 = 'api') = (d.api_chave_id IS NOT NULL))
+           AND (?5 IS NULL OR (?5 = 'api' AND d.api_chave_id IS NOT NULL) OR (?5 = 'balcao' AND d.api_chave_id IS NULL AND d.importado = 0)
+                OR (?5 = 'kigest' AND d.importado = 1))
          GROUP BY 1, 2"
     ))
     .bind(format!("{}-01-01", s.ano - 1))

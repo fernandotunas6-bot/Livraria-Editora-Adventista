@@ -652,6 +652,18 @@ async fn gc_paridade_e_importacao() {
     assert_eq!(x["saldo"], 57000, "o valor em dívida do KIGEST passa para a conta corrente");
     let hist = rpc(&st, "documentos.listar", json!({ "q": "FT 2025/7" })).await[0].clone();
     assert_eq!(hist["hash_controlo"], "HSIO");
+    // o histórico do KIGEST nos relatórios: marcado «KIGEST», com o filtro próprio, fora do «balcão»; e nos lançamentos
+    // para a contabilidade só a pedido
+    let rel = |canal: Value| rpc(&st, "relatorios.vendas", json!({ "de": "2025-01-01", "ate": "2025-12-31", "agrupar": "documento", "canal": canal }));
+    let kigest = rel(json!("kigest")).await;
+    assert!(kigest.as_array().unwrap().iter().any(|l| l["chave"].as_str().unwrap().contains("FT 2025/7") && l["chave"].as_str().unwrap().contains("· KIGEST ·")), "{kigest}");
+    assert!(rel(json!("balcao")).await.as_array().unwrap().iter().all(|l| !l["chave"].as_str().unwrap().contains("FT 2025/7")));
+    assert!(rpc_err(&st, "relatorios.vendas", json!({ "de": "2025-01-01", "ate": "2025-12-31", "agrupar": "dia", "canal": "outro" })).await.contains("kigest"));
+    let sem = rpc(&st, "contabilidade.lancamentos", json!({ "de": "2025-01-01", "ate": "2025-12-31" })).await;
+    assert!(sem["linhas"].as_array().unwrap().iter().all(|l| l["documento"] != "FT 2025/7"), "por omissão, o KIGEST fica de fora");
+    let com = rpc(&st, "contabilidade.lancamentos", json!({ "de": "2025-01-01", "ate": "2025-12-31", "incluir_kigest": true })).await;
+    assert!(com["linhas"].as_array().unwrap().iter().any(|l| l["documento"] == "FT 2025/7" && l["diario"] == "Vendas (KIGEST)"), "{com}");
+    assert_eq!(com["equilibrado"], true);
     // recibo no sistema novo sobre a factura antiga
     let rc = rpc(&st, "documentos.emitir", json!({ "tipo": "RC", "entidade_id": x["id"], "liquidar": [{ "documento_id": hist["id"], "valor": 57000 }], "pagamentos": [{ "modo": "NU", "valor": 57000 }] })).await;
     assert!(rc["documento"]["numero_doc"].as_str().unwrap().starts_with(&format!("RC N{ano}/")), "séries novas com prefixo N");

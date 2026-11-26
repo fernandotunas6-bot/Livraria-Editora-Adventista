@@ -41,7 +41,12 @@ export default function Contabilidade() {
   const [de, setDe] = useState(inicioMesISO());
   const [ate, setAte] = useState(hojeISO());
   const [contas, setContas] = useState(false);
-  const { data: l, isFetching, refetch } = useQuery({ queryKey: ["lancamentos", de, ate], queryFn: () => call<Lancamentos>("contabilidade.lancamentos", { de, ate }) });
+  // o histórico do KIGEST fica de fora por omissão: o contabilista já o recebeu do KIGEST
+  const [incluirKigest, setIncluirKigest] = useState(false);
+  const { data: l, isFetching, refetch } = useQuery({
+    queryKey: ["lancamentos", de, ate, incluirKigest],
+    queryFn: () => call<Lancamentos>("contabilidade.lancamentos", { de, ate, incluir_kigest: incluirKigest }),
+  });
   function exportar() {
     if (!l) return;
     exportarExcel(
@@ -79,6 +84,10 @@ export default function Contabilidade() {
         <Field label="Até">
           <InputData className="w-40" value={ate} onChange={(e) => setAte(e.target.value)} />
         </Field>
+        <label className="flex items-center gap-2 pb-2 text-[13px]" title="Desligado por omissão: o contabilista já recebeu estes documentos do KIGEST">
+          <input type="checkbox" checked={incluirKigest} onChange={(e) => setIncluirKigest(e.target.checked)} />
+          Incluir o histórico do KIGEST
+        </label>
         {l && (
           <div className="ml-auto flex items-center gap-3 text-[13px]">
             <span>
