@@ -70,6 +70,7 @@ export default function CentroIntegracoes() {
                   ))}
                 </ul>
               )}
+              {l.id === "servidor" && <SaudeDoSite />}
               <div className="mt-auto pt-4">
                 <Button variant="ghost" onClick={() => nav(l.destino)}>
                   {l.estado === "desligada" ? "Configurar" : "Abrir"} <ArrowRight className="size-4" />
@@ -81,5 +82,58 @@ export default function CentroIntegracoes() {
       </div>
       {lista.length === 0 && !r.isLoading && <Card className="p-5 text-[13.5px] text-ink-3">Não tem permissões para ver as ligações deste KanGest.</Card>}
     </>
+  );
+}
+
+type SaudeSite = {
+  estado: "ok" | "aviso" | "grave";
+  base?: { estado: string; ms?: number };
+  auth?: { estado: string; ms?: number };
+  storage?: { estado: string; ms?: number };
+  emails?: { estado: string; motivo?: string };
+  postos?: { nome: string; estado: string; motivo?: string }[];
+  ultima_migracao?: string | null;
+};
+
+/**
+ * A saúde do servidor central, como o site a vê (KANGEST ONE, fase E; GET /api/v1/system/health), pedida com a conta do
+ * site da pessoa (`integracoes.servidor`). Sem essa conta nesta sessão, ou sem «Gerir configurações» no site, diz porquê.
+ */
+function SaudeDoSite() {
+  const q = useQuery({
+    queryKey: ["integracoes-servidor"],
+    queryFn: () => call<{ saude?: SaudeSite; motivo?: string }>("integracoes.servidor"),
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  if (q.isLoading) return <p className="mt-3 text-[12.5px] text-ink-3">A perguntar ao site pela saúde do servidor…</p>;
+  const s = q.data?.saude;
+  if (!s) return <p className="mt-3 text-[12.5px] text-ink-3">{q.data?.motivo ?? (q.error as Error | null)?.message ?? "Sem resposta do site."}</p>;
+  const tom = (e?: string) => (e === "ok" ? "text-estado-ok" : e === "grave" ? "text-estado-erro" : "text-estado-aviso");
+  const pecas: [string, { estado: string; ms?: number } | undefined][] = [["Base", s.base], ["Contas", s.auth], ["Ficheiros", s.storage]];
+  return (
+    <div className="mt-3 space-y-1 rounded-campo bg-sunken px-3 py-2 text-[12.5px] text-ink-2" aria-label="A saúde do servidor central">
+      <div className="font-medium text-ink">
+        No site: <span className={tom(s.estado)}>{s.estado === "ok" ? "tudo bem" : s.estado === "grave" ? "problema" : "atenção"}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-3">
+        {pecas.map(([n, p]) => (
+          <span key={n}>
+            {n} <span className={tom(p?.estado)}>{p?.estado ?? "—"}</span>
+            {p?.ms != null ? ` · ${p.ms} ms` : ""}
+          </span>
+        ))}
+        <span>
+          Emails <span className={tom(s.emails?.estado)}>{s.emails?.estado ?? "—"}</span>
+          {s.emails?.motivo ? ` · ${s.emails.motivo}` : ""}
+        </span>
+      </div>
+      {(s.postos ?? []).filter((p) => p.estado !== "ok").map((p) => (
+        <div key={p.nome} className={tom(p.estado)}>
+          {p.nome}: {p.motivo}
+        </div>
+      ))}
+      {s.ultima_migracao && <div className="text-ink-3">Base na migração {s.ultima_migracao}</div>}
+    </div>
   );
 }

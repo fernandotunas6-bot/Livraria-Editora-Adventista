@@ -32,6 +32,7 @@ pub mod loja;
 pub mod pagamentos;
 pub mod pessoa;
 pub mod produtos;
+pub mod saude;
 pub mod sessoes;
 pub mod tempo_real;
 pub mod versao;
