@@ -155,8 +155,8 @@ jobs:
         if: runner.os == 'macOS'
         run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
 
+      # no shell de cada sistema (no Windows, o PowerShell: o OpenSSL não se compila com o Perl do Git Bash)
       - name: Compilar
-        shell: bash
         env:
           KANGEST_AGT_CHAVE: ${{ secrets.KANGEST_AGT_CHAVE }}
           KANGEST_AGT_CERTIFICADO: ${{ secrets.KANGEST_AGT_CERTIFICADO }}
@@ -184,7 +184,8 @@ jobs:
       - name: Confirmar a assinatura (Mac)
         if: runner.os == 'macOS'
         run: |
-          for app in app/kangest-sistema/src-tauri/target/${{ matrix.alvo }}/release/bundle/macos/*.app; do
+          # a pasta de trabalho é app/kangest-sistema (defaults.run)
+          for app in src-tauri/target/${{ matrix.alvo }}/release/bundle/macos/*.app; do
             codesign --verify --deep --strict --verbose=2 "$app"
           done
 
