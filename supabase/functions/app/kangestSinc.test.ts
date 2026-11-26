@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador,
+  limparEstadoComputador, limparSessoesKanGest,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -272,5 +272,41 @@ describe("prepararLote: os movimentos da tesouraria (o ERP central)", () => {
     });
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 8, data: "26/11/2026", valor: 1 } }], c!)).rejects.toThrow(/data/);
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 9, data: "2026-11-26", valor: -1 } }], c!)).rejects.toThrow(/negativo/);
+  });
+});
+
+describe("limparSessoesKanGest (KANGEST ONE, A3)", () => {
+  it("passa só os campos da lista, sem tokens, e recusa as chaves inválidas ou repetidas", () => {
+    const l = limparSessoesKanGest([
+      {
+        id: "0123456789abcdef", nome: "Admin\u0007", login: "admin", perfil: "ADMIN", conta_site: false, recurso: true,
+        aparelho: "Programa KanGest (Posto#1)", local: "", pela_internet: false, offline: false,
+        inicio: "2026-11-26T10:00:00+01:00", token: "segredo", refresh_token: "segredo",
+      },
+      { id: "0123456789abcdef", nome: "Repetida" },
+      { id: "XYZ", nome: "Chave inválida" },
+      { id: "fedcba9876543210", nome: "x".repeat(200), recurso: "sim", inicio: "ontem" },
+      "texto",
+      null,
+    ]);
+    expect(l).toEqual([
+      {
+        id: "0123456789abcdef", nome: "Admin", login: "admin", perfil: "ADMIN", conta_site: false, recurso: true,
+        aparelho: "Programa KanGest (Posto#1)", local: "", pela_internet: false, offline: false, inicio: "2026-11-26T09:00:00.000Z",
+      },
+      {
+        id: "fedcba9876543210", nome: "x".repeat(80), login: "", perfil: "", conta_site: false, recurso: false,
+        aparelho: "", local: "", pela_internet: false, offline: false, inicio: null,
+      },
+    ]);
+    expect(JSON.stringify(l)).not.toContain("segredo");
+  });
+
+  it("sem lista dá null (um KanGest antigo); no máximo 100", () => {
+    expect(limparSessoesKanGest(undefined)).toBeNull();
+    expect(limparSessoesKanGest({ id: "0123456789abcdef" })).toBeNull();
+    expect(limparSessoesKanGest([])).toEqual([]);
+    const muitas = Array.from({ length: 130 }, (_, i) => ({ id: i.toString(16).padStart(16, "0") }));
+    expect(limparSessoesKanGest(muitas)).toHaveLength(100);
   });
 });

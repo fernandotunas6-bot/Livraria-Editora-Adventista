@@ -166,6 +166,17 @@ pub struct Sessao {
     /// relatórios e o painel dela. `None` = todas as lojas.
     #[serde(default)]
     pub armazem_id: Option<i64>,
+    /// Entrou sem Internet, com a cópia local da conta do site: o modo limitado (KANGEST ONE, fase A). Vende-se e
+    /// factura-se, mas a loja online e o atendimento pedem a entrada com Internet.
+    #[serde(default)]
+    pub offline: bool,
+    /// Uma conta local (não ADMIN) num KanGest ligado ao site: a data (AAAA-MM-DD) até à qual se tem de ligar à conta do
+    /// site (services/auth.rs, `conta_local`).
+    #[serde(default)]
+    pub ligar_ate: Option<String>,
+    /// Passou essa data: a conta local só lê (fica só com «ver relatórios»).
+    #[serde(default)]
+    pub so_leitura: bool,
 }
 
 impl Sessao {

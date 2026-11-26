@@ -33,13 +33,16 @@ No ecrã de entrada, escreve-se o email no campo do utilizador (`src/sinc/entrad
 - O site diz o perfil. O utilizador local fica criado ou actualizado, ligado à conta do site (`conta_site`, migração
   0065), com o nome, o email e o perfil de lá.
 - **Se o perfil mudou no site,** as permissões próprias de cá deixam de valer: nunca ficam permissões a mais.
-- A sessão do site fica guardada para a *Loja online*, que já não pede a conta outra vez.
+- A sessão do site fica **só em memória** para a *Loja online* (KANGEST ONE, migração 0069): nunca vai para o disco,
+  e ao fechar o programa perde-se. A cada abertura entra-se outra vez.
 
 **Sem Internet** (ou sem resposta do site):
 - **A cópia local vale 7 dias** desde a última entrada com Internet, com a mesma senha. A senha fica só como resumo,
   como a dos utilizadores locais.
 - **Um relógio atrasado** em relação a essa entrada não conta a favor: a cópia deixa de valer.
 - **Uma conta que nunca entrou neste KanGest** precisa da Internet na primeira vez.
+- **O modo limitado:** a sessão fica marcada `offline` e a barra mostra «Modo sem Internet». Vende-se e factura-se,
+  mas a Loja online, a confirmação de pagamentos e o atendimento precisam da Internet (não há tokens).
 
 **O que continua como sempre:**
 - o bloqueio por tentativas falhadas, a conta desactivada (o administrador pode desactivá-la só neste KanGest) e a
@@ -53,6 +56,28 @@ No ecrã de entrada, escreve-se o email no campo do utilizador (`src/sinc/entrad
   deixa logo de valer.
 
 Em *Sistema → Utilizadores*, as contas do site aparecem com «Conta do site».
+
+## Uma só identidade (KANGEST ONE, decisão do dono de 26/11)
+
+Num KanGest **ligado ao site** (o posto emparelhado e activo), todas as pessoas entram com a conta do site:
+- **As contas locais que já existem** (sem `conta_site`, não ADMIN) continuam a entrar até à data-limite, com um aviso
+  na barra para se ligarem à conta do site. A migração 0070 põe a data a 30 dias; o administrador muda-a em
+  *Sistema → Utilizadores* («Contas locais»), e a mudança fica na auditoria (`CONTAS_LOCAIS`).
+- **Depois da data,** essas contas só consultam: ficam apenas com «Ver relatórios», e a barra diz porquê. Nada se
+  apaga: o histórico dos documentos continua a apontar para elas.
+- **Contas locais novas:** só a do ADMIN de recurso. As outras criam-se no painel do site (Utilizadores → Permissões).
+- **Ligar a conta:** a pessoa entra com o email da conta do site; o KanGest cria o utilizador ligado (`conta_site`).
+
+Num KanGest **isolado** (sem ligação ao site), nada disto muda.
+
+**O ecrã de entrada** mostra, por baixo do formulário, a ligação ao servidor central (`setup.estado`, `ligacao`):
+- «Ligado ao servidor central», com a loja, se a última volta correu bem nos últimos 10 minutos;
+- senão, o aviso do modo limitado: com a conta do site vende-se e factura-se, mas a loja online e a confirmação de
+  pagamentos esperam pela Internet;
+- e sempre a versão do KanGest. Confere-se de 30 em 30 segundos.
+
+**O painel do site vê quem está dentro** de cada KanGest e pode terminar uma sessão; cada entrada do ADMIN de recurso
+avisa os administradores (docs/KANGEST-SINCRONIZACAO.md §14).
 
 ## Testes
 
@@ -68,3 +93,7 @@ Em *Sistema → Utilizadores*, as contas do site aparecem com «Conta do site».
   - a mudança de senha recusada;
   - sem Internet, a cópia, a senha errada, a conta que nunca entrou e a cópia vencida;
   - a conta ADMIN local.
+- `services/tests.rs` (`a_regra_das_contas_locais` e `a_identidade_unica_num_kangest_ligado_ao_site`):
+  - isolado, a conta local entra sem avisos;
+  - ligado, a conta local entra com o aviso até à data e só consulta depois dela;
+  - a conta local nova recusada, o ADMIN de recurso aceite e sem restrições.

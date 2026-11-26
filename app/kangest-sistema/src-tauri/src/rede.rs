@@ -716,6 +716,9 @@ pub struct SessaoLigada {
     pub entrada: Option<String>,
     pub ultimo: String,
     pub pela_internet: bool,
+    /// Entrou sem Internet (a cópia local da conta do site): segue para o painel do site (sinc/sessoes.rs).
+    #[serde(skip_serializing)]
+    pub offline: bool,
 }
 
 /// Os postos e browsers com sessão iniciada neste servidor (os que só se ligaram, sem entrar, não contam).
@@ -736,6 +739,7 @@ pub fn sessoes_ligadas() -> Vec<SessaoLigada> {
                 entrada: e.entrada.clone(),
                 ultimo: e.ultimo.clone(),
                 pela_internet: e.pela_internet,
+                offline: s.offline,
             })
         })
         .collect()
