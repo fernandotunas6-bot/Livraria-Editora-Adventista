@@ -7980,6 +7980,34 @@ async fn o_centro_de_integracoes_junta_as_ligacoes() {
     sqlx::query("INSERT INTO fe_envios (documento_id, estado) VALUES (?, 'INVALIDO') ON CONFLICT(documento_id) DO UPDATE SET estado = 'INVALIDO'").bind(fr["documento"]["id"].as_i64().unwrap()).execute(&st.pool).await.unwrap();
     let v = rpc(&st, "integracoes.resumo", Value::Null).await;
     assert_eq!((v[0]["id"].as_str(), v[0]["estado"].as_str()), (Some("fe"), Some("erro")), "{v}");
+/// As igrejas do registo da Igreja chegam nas novidades, aparecem na Loja online e ligam-se ao cliente criado a partir
+/// delas; uma actualização que chegue depois não desfaz a ligação.
+#[tokio::test]
+async fn as_igrejas_do_site_chegam_e_ligam_se_ao_cliente() {
+    let (st, pasta) = base_com_admin("loja-igrejas").await;
+    let igreja = |activa: bool, morada: &str| {
+        json!({ "id": "c0ffee00-0000-4000-8000-000000000001", "cn": "101", "nome": "Igreja Central de Exemplo", "tipo": "igreja",
+                "distrito": "Distrito Exemplo", "campo": "Campo Exemplo", "provincia": "Huambo", "municipio": "Huambo",
+                "morada": morada, "delegado": "Delegado Exemplo", "activa": activa, "actualizada_em": "2026-11-26T10:00:00Z" })
+    };
+    let novidades = json!({ "igrejas": [igreja(true, "Rua Exemplo")], "cursores": { "igrejas": { "em": "2026-11-26T10:00:00Z", "id": "c0ffee00-0000-4000-8000-000000000001" } } });
+    crate::sinc::loja::aplicar(&st.pool, &novidades).await.unwrap();
+    let v = rpc(&st, "loja.igrejas", json!({ "q": "Central" })).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["distrito"], "Distrito Exemplo");
+    assert!(v[0]["entidade_id"].is_null());
+    // o cursor fica guardado para o pedido seguinte
+    let c = crate::sinc::loja::ler_cursores(&st.pool).await.unwrap();
+    assert_eq!(c["igrejas"]["id"], "c0ffee00-0000-4000-8000-000000000001");
+    // «Criar cliente»: grava-se o cliente e liga-se
+    let cliente = rpc(&st, "entidades.guardar", json!({ "nome": "Igreja Central de Exemplo", "endereco": "Rua Exemplo" })).await["id"].as_i64().unwrap();
+    rpc(&st, "loja.igrejaLigar", json!({ "id": "c0ffee00-0000-4000-8000-000000000001", "entidade_id": cliente })).await;
+    assert!(rpc_err(&st, "loja.igrejaLigar", json!({ "id": "c0ffee00-0000-4000-8000-000000000001", "entidade_id": 999999 })).await.contains("não existe"));
+    // uma actualização do site (mudou a morada, ficou inactiva) não desfaz a ligação
+    crate::sinc::loja::aplicar(&st.pool, &json!({ "igrejas": [igreja(false, "Rua Nova")] })).await.unwrap();
+    let todas = rpc(&st, "loja.igrejas", json!({ "filtro": "todas" })).await;
+    assert_eq!((todas[0]["entidade_id"].as_i64(), todas[0]["morada"].as_str(), todas[0]["activa"].as_i64()), (Some(cliente), Some("Rua Nova"), Some(0)), "{todas}");
+    assert_eq!(rpc(&st, "loja.igrejas", json!({})).await.as_array().unwrap().len(), 0, "inactiva: fora das activas");
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }

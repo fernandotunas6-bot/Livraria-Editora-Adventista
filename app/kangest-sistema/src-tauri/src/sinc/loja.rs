@@ -86,7 +86,32 @@ pub async fn aplicar(pool: &SqlitePool, novidades: &Value) -> AppResult<(usize, 
         .await?;
         produtos += 1;
     }
-    for nome in ["encomendas", "produtos"] {
+    // as igrejas do registo da Igreja (o cliente criado a partir de uma fica ligado: entidade_id não se toca)
+    for g in novidades["igrejas"].as_array().into_iter().flatten() {
+        let Some(id) = g["id"].as_str() else { continue };
+        sqlx::query(
+            "INSERT INTO loja_igrejas (id, cn, nome, tipo, distrito, campo, provincia, municipio, morada, delegado, activa, actualizada_em)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET cn = excluded.cn, nome = excluded.nome, tipo = excluded.tipo, distrito = excluded.distrito,
+               campo = excluded.campo, provincia = excluded.provincia, municipio = excluded.municipio, morada = excluded.morada,
+               delegado = excluded.delegado, activa = excluded.activa, actualizada_em = excluded.actualizada_em",
+        )
+        .bind(id)
+        .bind(texto(g, "cn"))
+        .bind(texto(g, "nome"))
+        .bind(texto(g, "tipo"))
+        .bind(texto(g, "distrito"))
+        .bind(texto(g, "campo"))
+        .bind(texto(g, "provincia"))
+        .bind(texto(g, "municipio"))
+        .bind(texto(g, "morada"))
+        .bind(texto(g, "delegado"))
+        .bind(g["activa"].as_bool().unwrap_or(true))
+        .bind(texto(g, "actualizada_em"))
+        .execute(&mut *tx)
+        .await?;
+    }
+    for nome in ["encomendas", "produtos", "igrejas"] {
         let cursor = &novidades["cursores"][nome];
         if cursor.is_object() {
             sqlx::query("INSERT INTO sinc_cursores (nome, valor) VALUES (?, ?) ON CONFLICT(nome) DO UPDATE SET valor = excluded.valor")
@@ -116,7 +141,7 @@ pub async fn encomendas_novas(pool: &SqlitePool, novidades: &Value) -> AppResult
 /// Os cursores para o próximo pedido: `{"encomendas": {...}, "produtos": {...}}` (vazios na primeira vez).
 pub async fn ler_cursores(pool: &SqlitePool) -> AppResult<Value> {
     let linhas: Vec<(String, String)> = sqlx::query_as("SELECT nome, valor FROM sinc_cursores").fetch_all(pool).await?;
-    let mut c = json!({ "encomendas": {}, "produtos": {} });
+    let mut c = json!({ "encomendas": {}, "produtos": {}, "igrejas": {} });
     for (nome, valor) in linhas {
         c[nome] = serde_json::from_str(&valor).unwrap_or(json!({}));
     }
@@ -126,7 +151,7 @@ pub async fn ler_cursores(pool: &SqlitePool) -> AppResult<Value> {
 /// Apaga a cópia (ao desligar, ou ao ligar a outro posto: os dados eram de outra loja).
 pub async fn apagar(pool: &SqlitePool) -> AppResult<()> {
     let mut tx = pool.begin().await?;
-    for t in ["loja_encomendas", "loja_produtos", "sinc_cursores"] {
+    for t in ["loja_encomendas", "loja_produtos", "loja_igrejas", "sinc_cursores"] {
         sqlx::query(&format!("DELETE FROM {t}")).execute(&mut *tx).await?;
     }
     tx.commit().await?;
@@ -266,6 +291,50 @@ async fn clientes(st: &AppState, f: Filtro) -> AppResult<Value> {
     Ok(Value::Array(linhas.iter().map(db::row_json).collect()))
 }
 
+/// As igrejas do registo da Igreja (a cópia local), com o cliente do KanGest ligado a cada uma. `filtro`: «activas»
+/// (por omissão), «todas» ou «sem_cliente».
+async fn igrejas(st: &AppState, f: Filtro) -> AppResult<Value> {
+    permitir(st)?;
+    let q = f.q.trim().to_string();
+    let onde = match f.filtro.as_str() {
+        "todas" => "1 = 1",
+        "sem_cliente" => "g.activa = 1 AND g.entidade_id IS NULL",
+        _ => "g.activa = 1",
+    };
+    let sql = format!(
+        "SELECT g.id, g.cn, g.nome, g.tipo, g.distrito, g.campo, g.provincia, g.municipio, g.morada, g.delegado, g.activa,
+                g.entidade_id, e.nome AS cliente
+           FROM loja_igrejas g LEFT JOIN entidades e ON e.id = g.entidade_id
+          WHERE ({onde}) AND (?1 = '' OR g.nome LIKE ?2 OR g.cn LIKE ?2 OR g.distrito LIKE ?2 OR g.municipio LIKE ?2)
+          ORDER BY g.nome COLLATE NOCASE LIMIT 500"
+    );
+    let linhas = sqlx::query(&sql).bind(&q).bind(format!("%{q}%")).fetch_all(&st.pool).await?;
+    Ok(Value::Array(linhas.iter().map(db::row_json).collect()))
+}
+
+#[derive(Deserialize)]
+struct IgrejaLigarIn {
+    id: String,
+    entidade_id: Option<i64>,
+}
+
+/// Liga (ou desliga, sem `entidade_id`) uma igreja a um cliente do KanGest: o que «Criar cliente» faz depois de o gravar.
+async fn igreja_ligar(st: &AppState, i: IgrejaLigarIn) -> AppResult<Value> {
+    st.exigir_perm("clientes")?;
+    permitir(st)?;
+    if let Some(e) = i.entidade_id {
+        let existe: Option<i64> = sqlx::query_scalar("SELECT id FROM entidades WHERE id = ?").bind(e).fetch_optional(&st.pool).await?;
+        if existe.is_none() {
+            return Err(AppError::msg("Esse cliente não existe."));
+        }
+    }
+    let r = sqlx::query("UPDATE loja_igrejas SET entidade_id = ? WHERE id = ?").bind(i.entidade_id).bind(&i.id).execute(&st.pool).await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::NaoEncontrado);
+    }
+    Ok(json!({ "ok": true }))
+}
+
 #[derive(Deserialize)]
 struct PeriodoIn {
     de: String,
@@ -296,6 +365,8 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "encomenda" => encomenda(st, serde_json::from_value(params.clone())?).await,
         "produtos" => produtos(st, filtro()?).await,
         "clientes" => clientes(st, filtro()?).await,
+        "igrejas" => igrejas(st, filtro()?).await,
+        "igrejaLigar" => igreja_ligar(st, serde_json::from_value(params.clone())?).await,
         "pagamentos" => pagamentos(st, serde_json::from_value(params.clone())?).await,
         _ => Err(AppError::msg(format!("Método desconhecido: loja.{metodo}"))),
     }

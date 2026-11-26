@@ -164,6 +164,10 @@ Testes: as novidades estão em `scripts/pglite/kangest-central.mjs`:
 - o posto sem loja e o revogado;
 - as permissões.
 
+**As igrejas** (migração `20261126160000`): as novidades trazem também as igrejas do registo da Igreja (`igrejas`,
+com o cursor e o `mais` delas), para a loja criar o cliente e facturar à igreja (Loja online → Igrejas). Seguem só o
+que é preciso para facturar; os pastores, os telefones e as notas ficam no site.
+
 ## 8. As pessoas no KanGest com a conta do site
 
 Para alterar encomendas a partir do KanGest (Livraria → Loja online), cada pessoa entra lá com a **sua** conta do site:

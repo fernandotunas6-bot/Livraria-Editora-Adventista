@@ -331,7 +331,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             sqlx::query("DELETE FROM sinc_saida WHERE estado = 'feito' AND feito_em < strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime', '-30 days')")
                 .execute(pool)
                 .await?;
-            let mais = r["novidades"]["mais"]["encomendas"].as_bool() == Some(true) || r["novidades"]["mais"]["produtos"].as_bool() == Some(true);
+            let mais = ["encomendas", "produtos", "igrejas"].iter().any(|k| r["novidades"]["mais"][k].as_bool() == Some(true));
             Ok(Volta::Feita {
                 enviados: ids.len(),
                 catalogo: cat_pendentes.len(),

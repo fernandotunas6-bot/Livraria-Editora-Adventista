@@ -165,6 +165,19 @@ check('a encomenda alterada volta a vir, com o estado novo', n4.encomendas.lengt
 const totalProdutos = (await q(`select count(*)::int n from public.stock_books`))[0].n;
 const cat = await novidades({}, 500);
 check('o catálogo vem todo, com os ocultos', cat.produtos.length === Math.min(totalProdutos, 500) && cat.produtos.some((x) => x.activo === false), { vieram: cat.produtos.length, totalProdutos });
+// as igrejas do registo da Igreja (20261126160000): todas, paginadas, e a alterada volta a vir
+for (const [cn, nome] of [['101', 'Igreja Central de Exemplo'], ['102', 'Grupo do Bairro Exemplo'], ['103', 'Companhia da Vila Exemplo']]) {
+  await q(`insert into public.churches (cn, name, address, delegate_name) values ($1, $2, 'Rua Exemplo', 'Delegado Exemplo')`, [cn, nome]);
+}
+const i1 = await novidades({}, 2);
+check('igrejas: a primeira página traz duas, e há mais', i1.igrejas.length === 2 && i1.mais.igrejas === true, i1.mais);
+const i2 = await novidades(i1.cursores, 2);
+check('igrejas: a segunda traz a que faltava, sem repetir', i2.igrejas.length === 1 && !i1.igrejas.some((x) => x.id === i2.igrejas[0].id), i2.igrejas);
+check('a igreja leva o que a loja precisa para facturar', i1.igrejas[0].nome && i1.igrejas[0].cn && i1.igrejas[0].morada === 'Rua Exemplo' && i1.igrejas[0].activa === true
+  && !('notes' in i1.igrejas[0]) && !('delegate_pastor_id' in i1.igrejas[0]), i1.igrejas[0]);
+await q(`update public.churches set active = false, updated = now() + interval '1 second' where cn = '101'`);
+const i3 = await novidades(i2.cursores, 2);
+check('a igreja alterada volta a vir', i3.igrejas.length === 1 && i3.igrejas[0].cn === '101' && i3.igrejas[0].activa === false, i3.igrejas);
 const semLoja = (await q(`select public.kangest_posto_criar('Sem loja', null, 'resumo-9', null) id`))[0].id;
 await q(`select public.kangest_emparelhar('resumo-9', $1, '1.4.4')`, [Buffer.alloc(32, 5).toString('base64')]);
 check('um posto sem loja não recebe encomendas', (await novidades({}, 50, semLoja)).encomendas.length === 0);
