@@ -11,8 +11,12 @@
 // Um JWT só é segredo se o papel for `service_role`, por isso esse é descodificado e lido.
 //
 // Uso: node scripts/verificar-segredos.mjs        (sai com 1 se encontrar algo)
+//      node scripts/verificar-segredos.mjs --pasta dist/app/web
+//        (KANGEST ONE, teste de aceitação 13: o que vai para o cliente — o site compilado, o ecrã do KanGest — não leva
+//        nenhuma credencial privilegiada: nem a service_role, nem sb_secret_, nem chaves privadas)
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const RULES = [
@@ -57,7 +61,58 @@ export function findSecrets(text) {
 const BINARY = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|woff2?|ttf|otf|mp4|webm|mp3)$/i;
 const MAX_BYTES = 2_000_000;
 
+/** Todos os ficheiros de uma pasta (o que se compila: JS, CSS, HTML, mapas e o resto). */
+function ficheirosDe(pasta) {
+  const out = [];
+  for (const e of readdirSync(pasta, { withFileTypes: true })) {
+    const f = join(pasta, e.name);
+    if (e.isDirectory()) out.push(...ficheirosDe(f));
+    else if (e.isFile()) out.push(f);
+  }
+  return out;
+}
+
+/** O que vai para o cliente: cada ficheiro da pasta, lido como texto (latin1, para os binários não falharem). */
+export function segredosNaPasta(pasta) {
+  const problems = [];
+  const files = ficheirosDe(pasta);
+  for (const file of files) {
+    let size = 0;
+    try { size = statSync(file).size; } catch { continue; }
+    if (size > 50_000_000) continue;
+    for (const hit of findSecrets(readFileSync(file, 'latin1'))) problems.push({ file, ...hit });
+  }
+  return { files: files.length, problems };
+}
+
 function main() {
+  const i = process.argv.indexOf('--pasta');
+  if (i > 0) {
+    const pasta = process.argv[i + 1];
+    if (!pasta) {
+      console.error('Indique a pasta: --pasta dist/app/web');
+      process.exit(2);
+    }
+    let r;
+    try {
+      r = segredosNaPasta(pasta);
+    } catch {
+      r = { files: 0, problems: [] };
+    }
+    const { files: n, problems: achados } = r;
+    if (!n) {
+      console.error(`A pasta ${pasta} está vazia ou não existe: compile primeiro.`);
+      process.exit(2);
+    }
+    if (!achados.length) {
+      console.log(`Segredos no cliente: nada em ${n} ficheiros de ${pasta}.`);
+      return;
+    }
+    console.error(`Credenciais privilegiadas no que vai para o cliente (${pasta}):`);
+    for (const p of achados) console.error(`  ${p.file}:${p.line}  ${p.rule}  ${p.preview}`);
+    console.error('\nNada disto pode ir no site compilado nem no instalador: só no servidor (os segredos da Edge Function).');
+    process.exit(1);
+  }
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
   const problems = [];
   for (const file of files) {
