@@ -36,21 +36,48 @@ fn com_fuso(local: &str) -> Option<String> {
     n.and_local_timezone(chrono::Local).earliest().map(|d| d.to_rfc3339())
 }
 
+/// Uma sessão antes de se ler a pessoa na base.
+struct Bruta {
+    ligacao: Option<String>,
+    utilizador: i64,
+    entrada: String,
+    aparelho: String,
+    local: String,
+    pela_internet: bool,
+    offline: bool,
+}
+
 async fn abertas_todas(st: &AppState) -> Vec<Aberta> {
-    let mut l: Vec<(Option<String>, i64, String, String, String, bool, bool)> = Vec::new();
+    let mut l: Vec<Bruta> = Vec::new();
     // este computador (a sessão do processo, nunca a de um pedido em rede)
-    let local: Option<Sessao> = st.sessao.lock().map(|s| s.clone()).unwrap_or(None);
+    let local: Option<Sessao> = st.sessao.lock().ok().and_then(|s| s.clone());
     if let Some(s) = local {
-        let entrada = st.entrada_local.lock().map(|e| e.clone()).unwrap_or(None).unwrap_or_default();
+        let entrada = st.entrada_local.lock().ok().and_then(|e| e.clone()).unwrap_or_default();
         let posto = st.posto.read().map(|p| p.descricao.clone()).unwrap_or_default();
-        l.push((None, s.id, entrada, format!("Programa KanGest ({posto})"), String::new(), false, s.offline));
+        l.push(Bruta {
+            ligacao: None,
+            utilizador: s.id,
+            entrada,
+            aparelho: format!("Programa KanGest ({posto})"),
+            local: String::new(),
+            pela_internet: false,
+            offline: s.offline,
+        });
     }
     // os postos e browsers em rede com sessão iniciada (num KanGest que é o servidor da loja)
     for x in crate::rede::sessoes_ligadas() {
-        l.push((Some(x.id), x.utilizador_id, x.entrada.unwrap_or_default(), x.aparelho, x.local, x.pela_internet, x.offline));
+        l.push(Bruta {
+            ligacao: Some(x.id),
+            utilizador: x.utilizador_id,
+            entrada: x.entrada.unwrap_or_default(),
+            aparelho: x.aparelho,
+            local: x.local,
+            pela_internet: x.pela_internet,
+            offline: x.offline,
+        });
     }
     let mut out = Vec::with_capacity(l.len());
-    for (ligacao, utilizador, entrada, aparelho, local, pela_internet, offline) in l {
+    for Bruta { ligacao, utilizador, entrada, aparelho, local, pela_internet, offline } in l {
         let row: Option<(String, String, String, Option<String>)> =
             sqlx::query_as("SELECT nome, login, perfil, conta_site FROM utilizadores WHERE id = ?").bind(utilizador).fetch_optional(&st.pool).await.ok().flatten();
         let Some((nome, login, perfil, conta_site)) = row else { continue };
