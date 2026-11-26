@@ -197,6 +197,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // KANGEST ONE (fase A): a data-limite das contas locais num KanGest ligado ao site
         "utilizadores.contasLocais" => auth::contas_locais(st).await,
         "utilizadores.contasLocaisGuardar" => auth::contas_locais_guardar(st, p(params)?).await,
+        "utilizadores.ligarContaSite" => auth::ligar_conta_site(st, p(params)?).await,
         "utilizadores.redefinirSenha" => auth::redefinir_senha(st, p(params)?).await,
         "utilizadores.desbloquear" => auth::desbloquear_conta(st, p(params)?).await,
         "perfis.listar" => auth::perfis_listar(st).await,
