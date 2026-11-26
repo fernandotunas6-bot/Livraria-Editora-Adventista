@@ -505,7 +505,7 @@ const MAX_LIVRO = 2000;
  * marcar no posto e fica de fora; um de tipo desconhecido segue, para a base o devolver como erro
  * (public.stock_livro_receber). Sem nada (um KanGest antigo), `null`.
  */
-export function limparLivroStock(x: unknown): { aberturas: Record<string, unknown>[]; movimentos: Record<string, unknown>[] } | null {
+export function limparLivroStock(x: unknown): { epoca: string; aberturas: Record<string, unknown>[]; movimentos: Record<string, unknown>[] } | null {
   if (!x || typeof x !== "object" || Array.isArray(x)) return null;
   const v = x as Record<string, unknown>;
   const texto = (t: unknown, max: number) => (typeof t === "string" ? t.replace(/[\u0000-\u001f]/g, "").trim().slice(0, max) : "");
@@ -535,5 +535,7 @@ export function limparLivroStock(x: unknown): { aberturas: Record<string, unknow
       momento: data(m.momento),
     });
   }
-  return { aberturas, movimentos };
+  // a época da abertura (a mesma em todas as aberturas dela): letras, algarismos e pouco mais
+  const epoca = typeof v.epoca === "string" && /^[0-9A-Za-z:.+_-]{1,40}$/.test(v.epoca) ? v.epoca : "";
+  return { epoca, aberturas, movimentos };
 }

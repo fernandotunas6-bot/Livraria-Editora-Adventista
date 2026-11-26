@@ -3423,7 +3423,9 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   let stockLivro: unknown = null;
   const livro = limparLivroStock(aberto.dados?.stock_livro);
   if (livro && (livro.aberturas.length || livro.movimentos.length)) {
-    const { data, error } = await db.rpc("stock_livro_receber", { p_posto: posto, p_aberturas: livro.aberturas, p_movimentos: livro.movimentos });
+    const { data, error } = await db.rpc("stock_livro_receber", {
+      p_posto: posto, p_epoca: livro.epoca, p_aberturas: livro.aberturas, p_movimentos: livro.movimentos,
+    });
     if (error) {
       console.error("KanGest: livro de stock do posto", posto, error.message);
       stockLivro = { erro: error.message.slice(0, 300) };

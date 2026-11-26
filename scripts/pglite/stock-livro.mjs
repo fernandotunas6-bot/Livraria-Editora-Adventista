@@ -38,8 +38,8 @@ const pessoa = async (email, role = 'member', permissions = null) => {
   await q(`update public.profiles set role = $2, permissions = coalesce($3::jsonb, permissions) where id = $1`, [u.id, role, permissions ? JSON.stringify(permissions) : null]);
   return u.id;
 };
-const receber = async (posto, aberturas, movimentos) =>
-  (await servidor(`select public.stock_livro_receber($1, $2::jsonb, $3::jsonb) r`, [posto, JSON.stringify(aberturas), JSON.stringify(movimentos)]))[0].r;
+const receber = async (posto, aberturas, movimentos, epoca = '20261126T090000') =>
+  (await servidor(`select public.stock_livro_receber($1, $2, $3::jsonb, $4::jsonb) r`, [posto, epoca, JSON.stringify(aberturas), JSON.stringify(movimentos)]))[0].r;
 const conferir = async (posto) => servidor(`select * from public.stock_livro_conferir($1)`, [posto]);
 
 const [loja] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Huambo', 'Huambo', 'Huambo', true) returning id`);
@@ -77,6 +77,7 @@ await recusa('mudar a quantidade', () => q(`update public.stock_movimentos set q
 await recusa('apagar', () => q(`delete from public.stock_movimentos where chave like '%:mov:101'`), /não se apaga/);
 await q(`delete from public.stock_books where id = $1`, [livro.id]);
 const depois = await q(`select count(*) n, count(book_id) com_produto from public.stock_movimentos where posto_id = $1`, [posto]);
+await recusa('uma abertura sem época', () => receber(posto, [{ armazem_id: 1, referencia: 'LIV-009', quantidade: 1 }], [], ''), /sem época/);
 check('o produto sai e o livro fica inteiro (só sem a ligação ao produto)', Number(depois[0].n) === 6 && Number(depois[0].com_produto) === 0, depois);
 
 // --- a conferência com a fotografia ----------------------------------------------------------------------------------
@@ -88,13 +89,26 @@ check('o armazém 2 não bate certo (livro 0, fotografia 1); o 1 e a abertura a 
 const resumo = (await servidor(`select * from public.stock_livro_resumo()`)).find((x) => x.posto_id === posto);
 check('o resumo para o painel', resumo && Number(resumo.movimentos) === 6 && resumo.aberto === true && Number(resumo.divergencias) === 1, resumo);
 
+// --- voltar a ligar: a abertura nova só grava o que faltava ----------------------------------------------------------
+// (entretanto, com o posto desligado, saíram 4 livros do armazém 1 e entraram 2 no 2, e a fotografia diz 7 e 1)
+await q(`update public.kangest_stock set quantidade = 7 where ligacao = 'posto:' || $1 and armazem_id = 1`, [posto]);
+const r4 = await receber(posto, [
+  { armazem_id: 1, referencia: 'LIV-001', quantidade: 7 },
+  { armazem_id: 2, referencia: 'LIV-001', quantidade: 1 },
+], [], '20261127T080000');
+check('duas aberturas novas', r4.aberturas === 2, r4);
+const dif = await q(`select armazem_id, quantidade from public.stock_movimentos where tipo = 'abertura' and documento = 'abertura 20261127T080000' order by armazem_id`);
+check('só a diferença: −4 no armazém 1 e +1 no 2', dif.length === 2 && Number(dif[0].quantidade) === -4 && Number(dif[1].quantidade) === 1, dif);
+check('agora bate tudo certo', (await conferir(posto)).length === 0, await conferir(posto));
+check('a mesma abertura outra vez não conta', (await receber(posto, [{ armazem_id: 1, referencia: 'LIV-001', quantidade: 7 }], [], '20261127T080000')).aberturas === 0);
+
 // --- quem lê e quem escreve --------------------------------------------------------------------------------------------
 const catalogo = await pessoa('catalogo@x.ao', 'manager', { manage_catalog: true });
 const cliente = await pessoa('cliente@x.ao');
 check('quem gere o catálogo lê o livro', (await como(catalogo, `select count(*) n from public.stock_movimentos`))[0].n > 0);
 check('um cliente não vê nada', Number((await como(cliente, `select count(*) n from public.stock_movimentos`))[0].n) === 0);
 await recusa('ninguém de fora escreve', () => como(catalogo, `insert into public.stock_movimentos (referencia, tipo, quantidade, origem, chave, momento) values ('X', 'ajuste', 1, 'x', 'x', now())`), /permission denied/);
-await recusa('ninguém de fora chama o receber', () => como(catalogo, `select public.stock_livro_receber($1, '[]'::jsonb, '[]'::jsonb)`, [posto]), /permission denied/);
+await recusa('ninguém de fora chama o receber', () => como(catalogo, `select public.stock_livro_receber($1, 'x', '[]'::jsonb, '[]'::jsonb)`, [posto]), /permission denied/);
 await recusa('nem a conferência', () => como(catalogo, `select * from public.stock_livro_conferir($1)`, [posto]), /permission denied/);
 
 console.log(`stock-livro: ${ok} ok, ${fail} falhas`);

@@ -1,9 +1,12 @@
 -- KANGEST ONE, fase B1: o livro único de stock, em sombra.
 --
 -- Cada entrada e saída de stock do KanGest (movimentos_stock, com o documento) passa a ter uma linha num livro central
--- que não se altera (`stock_movimentos`). Na primeira volta com o livro, o posto manda a **abertura**: a existência de
--- cada artigo em cada armazém até ao último movimento dessa hora. Depois, cada movimento novo, com a chave de
--- idempotência `kangest:<posto>:mov:<id>` (um movimento repetido não conta duas vezes).
+-- que não se altera (`stock_movimentos`).
+-- - **A abertura:** na primeira volta com o livro (e sempre que o posto volta a ligar-se), o KanGest manda a existência
+--   de cada artigo em cada armazém até ao último movimento dessa hora, com uma época. A base grava a diferença entre essa
+--   existência e a soma do livro: na primeira vez é a existência toda; ao voltar a ligar, só o que faltava.
+-- - **Os movimentos:** depois das aberturas todas, cada movimento novo, com a chave de idempotência
+--   `kangest:<posto>:mov:<id>` (um movimento repetido não conta duas vezes).
 --
 -- **Em sombra:** o stock à venda no site continua a sair das fotografias de cada posto (`kangest_stock`,
 -- `kangest_recalcular_stock`). O livro corre ao lado, e `stock_livro_conferir` mostra onde a soma do livro difere da
@@ -69,11 +72,13 @@ create trigger stock_movimentos_imutavel before update or delete on public.stock
   for each row execute function private.stock_movimentos_imutavel();
 
 -- O que o posto mandou nesta volta: as aberturas e os movimentos (a Edge Function já limpou os campos;
--- kangestSinc.ts, limparLivroStock). Devolve as aceites e as recusadas, para o posto marcar a fila.
+-- kangestSinc.ts, limparLivroStock). Devolve as aceites e as recusadas, para o posto marcar a fila. Um posto de cada
+-- vez (pg_advisory_xact_lock), para a diferença da abertura sair certa.
+--   p_epoca: a abertura deste posto («20261126T115500»), a mesma em todas as aberturas dela
 --   p_aberturas: [{"armazem_id": 1, "referencia": "LIV-001", "quantidade": 12, "momento": "…"}]
 --   p_movimentos: [{"mov_id": 3457, "armazem_id": 1, "referencia": "LIV-001", "quantidade": -1, "tipo": "venda",
 --                   "documento": "FR A/12", "momento": "…"}]
-create or replace function public.stock_livro_receber(p_posto uuid, p_aberturas jsonb, p_movimentos jsonb)
+create or replace function public.stock_livro_receber(p_posto uuid, p_epoca text, p_aberturas jsonb, p_movimentos jsonb)
 returns jsonb
 language plpgsql
 security definer
@@ -85,6 +90,7 @@ declare
   v_chave text;
   v_book text;
   v_n integer;
+  v_soma numeric;
   v_aberturas integer := 0;
   v_aceites bigint[] := '{}';
   v_repetidos integer := 0;
@@ -94,6 +100,11 @@ begin
   if v_posto.id is null or v_posto.estado <> 'activo' then
     raise exception 'Posto desconhecido ou revogado.' using errcode = '42501';
   end if;
+  perform pg_advisory_xact_lock(hashtext('stock_livro:' || p_posto::text));
+  if jsonb_typeof(p_aberturas) = 'array' and jsonb_array_length(p_aberturas) > 0
+     and coalesce(p_epoca, '') !~ '^[0-9A-Za-z:.+_-]{1,40}$' then
+    raise exception 'A abertura do livro de stock vem sem época.' using errcode = '22023';
+  end if;
 
   for r in
     select x.* from jsonb_to_recordset(case when jsonb_typeof(p_aberturas) = 'array' then p_aberturas else '[]'::jsonb end)
@@ -101,11 +112,15 @@ begin
     limit 2000
   loop
     continue when r.armazem_id is null or coalesce(btrim(r.referencia), '') = '' or r.quantidade is null;
-    v_chave := 'kangest:' || p_posto::text || ':abertura:' || r.armazem_id::text || ':' || btrim(r.referencia);
+    v_chave := 'kangest:' || p_posto::text || ':abertura:' || p_epoca || ':' || r.armazem_id::text || ':' || btrim(r.referencia);
+    continue when exists (select 1 from public.stock_movimentos m where m.chave = v_chave);
+    -- a diferença para o livro: a existência toda na primeira abertura, só o que faltava ao voltar a ligar
+    select coalesce(sum(m.quantidade), 0) into v_soma from public.stock_movimentos m
+     where m.posto_id = p_posto and m.armazem_id = r.armazem_id and m.referencia = btrim(r.referencia);
     select b.id into v_book from public.stock_books b where b.kigest_ref = btrim(r.referencia) order by b.id limit 1;
-    insert into public.stock_movimentos (posto_id, store_id, armazem_id, referencia, book_id, tipo, quantidade, origem, chave, momento)
-    values (p_posto, v_posto.store_id, r.armazem_id, left(btrim(r.referencia), 60), v_book, 'abertura', r.quantidade,
-            'kangest:' || p_posto::text, v_chave, coalesce(r.momento, now()))
+    insert into public.stock_movimentos (posto_id, store_id, armazem_id, referencia, book_id, tipo, quantidade, origem, documento, chave, momento)
+    values (p_posto, v_posto.store_id, r.armazem_id, left(btrim(r.referencia), 60), v_book, 'abertura', r.quantidade - v_soma,
+            'kangest:' || p_posto::text, 'abertura ' || p_epoca, v_chave, coalesce(r.momento, now()))
     on conflict (chave) do nothing;
     get diagnostics v_n = row_count;
     v_aberturas := v_aberturas + v_n;
@@ -138,8 +153,8 @@ begin
   return jsonb_build_object('aberturas', v_aberturas, 'aceites', to_jsonb(v_aceites), 'repetidos', v_repetidos, 'erros', v_erros);
 end;
 $$;
-revoke all on function public.stock_livro_receber(uuid, jsonb, jsonb) from public, anon, authenticated;
-grant execute on function public.stock_livro_receber(uuid, jsonb, jsonb) to service_role;
+revoke all on function public.stock_livro_receber(uuid, text, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.stock_livro_receber(uuid, text, jsonb, jsonb) to service_role;
 
 -- Onde o livro e a fotografia do posto não batem certo (por armazém e referência). Uma linha só com o livro ou só com a
 -- fotografia também conta. Vazio = o livro está certo.
