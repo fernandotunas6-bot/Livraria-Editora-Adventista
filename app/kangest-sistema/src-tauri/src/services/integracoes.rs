@@ -210,6 +210,16 @@ pub async fn resumo(st: &AppState) -> AppResult<Value> {
     Ok(json!(v.into_iter().map(|(_, c)| c).collect::<Vec<_>>()))
 }
 
+/// A saúde do servidor central, com a conta do site da pessoa (sinc/saude.rs): para o cartão «Servidor central» do
+/// Centro de Integrações. `{ saude }` ou `{ motivo }`; só a quem gere o sistema cá.
+pub async fn servidor(st: &AppState) -> AppResult<Value> {
+    st.exigir_perm("sistema.api")?;
+    Ok(match crate::sinc::saude::do_servidor(st).await {
+        Ok(v) => json!({ "saude": v }),
+        Err(m) => json!({ "motivo": m }),
+    })
+}
+
 /// O ecossistema para o painel inicial (KANGEST ONE, fase G): a ligação ao servidor central, o que espera para ir para o
 /// site, as encomendas do site por tratar, o livro de stock e a versão mínima. Num KanGest isolado, `ligado: false`.
 pub async fn ecossistema(st: &AppState) -> AppResult<Value> {

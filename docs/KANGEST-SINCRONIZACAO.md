@@ -516,6 +516,11 @@ sincronização leva-o em `kangest_min_version`. O KanGest guarda-o em `config` 
 
 **No painel do site,** a saúde do ecossistema (`/api/v1/system/health`) marca em aviso os postos abaixo da versão mínima.
 
+**No KanGest, o cartão «Servidor central»** do Centro de Integrações mostra também a saúde do site (a mesma rota),
+pedida com a conta do site da pessoa (`integracoes.servidor`, `sinc/saude.rs`). Mostra a base, as contas, os ficheiros,
+os emails, os postos em aviso e a última migração. Sem a conta do site nesta sessão, ou sem «Gerir configurações» no
+site, diz porquê. Teste: `a_saude_do_servidor_central_no_kangest`.
+
 Num KanGest isolado, a versão mínima não vale.
 
 Testes:

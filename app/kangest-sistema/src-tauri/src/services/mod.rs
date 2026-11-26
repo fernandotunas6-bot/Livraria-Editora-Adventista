@@ -285,6 +285,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // ---- API de integração (chaves de acesso para outros sistemas) ----
         // o Centro de Integrações: cada ligação numa só vista, só a ler a base (services/integracoes.rs)
         "integracoes.resumo" => integracoes::resumo(st).await,
+        "integracoes.servidor" => integracoes::servidor(st).await,
         "api.estado" => crate::api::estado(st).await,
         "api.guardar" => crate::api::guardar(st, p(params)?).await,
         "api.chaveCriar" => crate::api::chave_criar(st, p(params)?).await,

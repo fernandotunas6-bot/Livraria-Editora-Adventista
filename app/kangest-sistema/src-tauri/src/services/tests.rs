@@ -7827,6 +7827,10 @@ fn site_falso_para_produtos() -> (u16, PedidosRecebidos) {
                 }
                 ("DELETE", c) if c.starts_with("/rest/v1/stock_books?id=eq.p2") => json!([{ "id": "p2", "title": "Livro livre" }]),
                 ("GET", c) if c.starts_with("/rest/v1/book_collections") => json!([{ "id": "c1", "title": "Devocionais", "active": true }]),
+                // a saúde do servidor central (KANGEST ONE, fase E)
+                ("GET", c) if c.starts_with("/functions/v1/app/api/v1/system/health") => {
+                    json!({ "data": { "estado": "aviso", "base": { "estado": "ok", "ms": 12 }, "emails": { "estado": "aviso", "motivo": "2 email(s) falhado(s)" }, "postos": [] } })
+                }
                 _ => json!([]),
             }
             .to_string();
@@ -8412,6 +8416,40 @@ async fn ligar_uma_conta_local_a_conta_do_site() {
     let r = rpc(&st, "utilizadores.contasLocais", Value::Null).await;
     assert!(!r["contas"].as_array().unwrap().iter().any(|c| c["id"] == caixa), "{r}");
     assert!(rpc_err(&st, "utilizadores.ligarContaSite", json!({ "id": caixa, "email": "outra@x.ao" })).await.contains("já é de uma conta do site"));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
+/// KANGEST ONE (fase E, o que faltava): o «Servidor central» do Centro de Integrações com a saúde do site, pedida com a
+/// conta do site da pessoa; sem ela, diz-se porquê; só a quem gere o sistema cá.
+#[tokio::test]
+async fn a_saude_do_servidor_central_no_kangest() {
+    let (st, pasta) = base_com_admin("saude-servidor").await;
+    // a caixa local, antes de o KanGest estar ligado (depois, contas locais novas só a do ADMIN)
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
+    let (porta, recebidos) = site_falso_para_produtos();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, ?, '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}/functions/v1/app"))
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    // sem a conta do site nesta sessão: diz porquê
+    let r = rpc(&st, "integracoes.servidor", Value::Null).await;
+    assert!(r["motivo"].as_str().is_some_and(|m| m.contains("conta do site")), "{r}");
+    // com ela: a saúde que o site mandou, pedida com o token da pessoa
+    let agora = chrono::Utc::now().timestamp();
+    let tokens = crate::sinc::pessoa::Tokens { access: "tok".into(), refresh: "r".into(), expira: agora + 3600 };
+    crate::sinc::pessoa::guardar(&st.pool, 1, "admin@x.ao", &tokens, "", agora).await.unwrap();
+    let r = rpc(&st, "integracoes.servidor", Value::Null).await;
+    assert_eq!((r["saude"]["estado"].as_str(), r["saude"]["base"]["ms"].as_i64()), (Some("aviso"), Some(12)), "{r}");
+    assert!(recebidos.lock().unwrap().iter().any(|(p, _)| p == "GET /functions/v1/app/api/v1/system/health"));
+    // uma caixa não lhe chega (é do administrador cá)
+    rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert!(rpc_err(&st, "integracoes.servidor", Value::Null).await.to_lowercase().contains("permiss"));
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
