@@ -56,6 +56,24 @@ KanGest.
 
 Contas que só entram com o Google não têm senha: para entrar no KanGest, a pessoa define uma senha na conta do site.
 
+## Os produtos e as colecções
+
+No separador *Produtos* faz-se tudo como no painel: criar, duplicar, editar, publicar ou ocultar e eliminar produtos,
+e criar e editar as colecções (`src/sinc/produtos.rs`, métodos `loja.produto.*` e `loja.coleccao.*`).
+
+- **Com a sessão do site da pessoa,** como nas encomendas: as regras do painel valem, e só passa com «Gerir Catálogo»
+  no site. No KanGest, pede-se a permissão `artigos.editar`.
+- **Precisa de Internet:** sem ela, os produtos não mudam, e não há fila como nas encomendas.
+- **Um produto ligado a um artigo do KanGest** (a referência é a de um artigo daqui) tem bloqueados o preço, a
+  promoção, o stock e a própria ligação. Vêm do KanGest, pela sincronização do catálogo. O ecrã desliga esses campos,
+  e o servidor tira-os do que envia, se chegarem.
+- **Um produto novo entra oculto,** até se publicar (no site, o padrão é visível). Se se liga a um artigo daqui, não
+  leva preço nem stock: o artigo volta à fila do catálogo, e o preço e o stock seguem na sincronização seguinte.
+- **A cópia de um produto** fica oculta, sem a ligação ao KanGest e sem stock, para não contar duas vezes.
+- **Eliminar** pede confirmação. Tudo fica na auditoria do KanGest (`LOJA_PRODUTO`, `LOJA_PRODUTO_ELIMINADO`,
+  `LOJA_COLECCAO`).
+- **As imagens:** a capa é o endereço de uma imagem. Carregar ficheiros continua a fazer-se no painel do site.
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
