@@ -122,6 +122,7 @@ export default function DocumentoModal({
   const [enviar, setEnviar] = useState(false);
   const [motivo, setMotivo] = useState("");
   const tem = useSession((s) => s.tem);
+  const pode = useSession((s) => s.pode);
   const quem = useSession((s) => s.sessao?.nome);
   const qc = useQueryClient();
   // as impressões já feitas: um documento já impresso sai sempre como 2.ª via (a AGT exige-o), sem ninguém a marcar
@@ -140,9 +141,16 @@ export default function DocumentoModal({
     qc.invalidateQueries({ queryKey: ["impressoes", atual] });
   };
   const nav = useNavigate();
+  // facturas, notas de crédito e de débito e recibos: só o administrador anula (como o servidor)
+  const podeAnular =
+    !!d &&
+    tem("documentos.anular") &&
+    d.documento.estado === "N" &&
+    !d.documento.importado &&
+    (pode("ADMIN") || !(d.documento.grupo === "VENDAS" && ["VENDA", "RECIBO"].includes(d.documento.classe)));
   useEffect(() => {
-    if (anularAoAbrir && d && d.documento.id === id && d.documento.estado === "N" && !d.documento.importado && tem("documentos.anular")) setAnular(true);
-  }, [anularAoAbrir, d, id, tem]);
+    if (anularAoAbrir && d && d.documento.id === id && podeAnular) setAnular(true);
+  }, [anularAoAbrir, d, id, podeAnular]);
 
   // n.º de vias: o do posto (POS) ou o do tipo de documento
   useEffect(() => {
@@ -200,7 +208,7 @@ export default function DocumentoModal({
       footer={
         d && (
           <>
-            {tem("documentos.anular") && d.documento.estado === "N" && !d.documento.importado && (
+            {podeAnular && (
               <Button variant="ghost" className="mr-auto text-danger" onClick={() => setAnular(true)}>
                 <Ban className="size-4" /> Anular
               </Button>

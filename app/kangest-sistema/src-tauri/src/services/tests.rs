@@ -7672,6 +7672,8 @@ fn site_falso_para_entrar() -> u16 {
                     ("caixa@x.ao", "certa") => (200, { let mut t = tokens("tok-caixa"); t["user"] = json!({ "factors": [] }); t }),
                     ("gestor@x.ao", "certa") => (200, { let mut t = tokens("tok-gestor-aal1"); t["user"] = json!({ "factors": [{ "id": "f1", "status": "verified", "factor_type": "totp" }] }); t }),
                     ("semacesso@x.ao", "certa") => (200, tokens("tok-sem")),
+                    ("semmfa@x.ao", "certa") => (200, tokens("tok-semmfa")),
+                    ("outraloja@x.ao", "certa") => (200, tokens("tok-outraloja")),
                     _ => (400, json!({ "error": "invalid_grant", "error_description": "Invalid login credentials" })),
                 },
                 "/auth/v1/factors/f1/challenge" => (200, json!({ "id": "d1" })),
@@ -7685,7 +7687,12 @@ fn site_falso_para_entrar() -> u16 {
                 "/rest/v1/rpc/kangest_eu" => match token.as_str() {
                     "tok-caixa" => (200, json!({ "id": "u-caixa", "nome": "Ana Caixa", "email": "caixa@x.ao", "perfil": "CAIXA", "lojas": [] })),
                     "tok-gestor-aal2" => (200, json!({ "id": "u-gestor", "nome": "Rui Gestor", "email": "gestor@x.ao", "perfil": "GESTOR", "lojas": [] })),
-                    "tok-sem" => (200, json!({ "id": "u-sem", "nome": "Sem Acesso", "email": "semacesso@x.ao", "perfil": null, "lojas": [] })),
+                    "tok-sem" => (200, json!({ "id": "u-sem", "nome": "Sem Acesso", "email": "semacesso@x.ao", "perfil": null, "lojas": [], "mfa": true })),
+                    "tok-semmfa" => (200, json!({ "id": "u-semmfa", "nome": "Sem Código", "email": "semmfa@x.ao", "perfil": null, "lojas": [], "mfa": false })),
+                    // a kangest_eu recebe o posto deste KanGest e diz que não é da loja da ficha
+                    "tok-outraloja" if corpo["p_posto"] == "00000000-0000-4000-8000-000000000001" => {
+                        (200, json!({ "id": "u-outra", "nome": "Caixa do Lubango", "email": "outraloja@x.ao", "perfil": "CAIXA", "lojas": ["l2"], "mfa": true, "posto_na_ficha": false }))
+                    }
                     _ => (401, json!({ "message": "JWT inválido" })),
                 },
                 _ => (404, json!({ "message": "não há" })),
@@ -7739,6 +7746,10 @@ async fn entrar_com_a_conta_do_site() {
 
     // sem a permissão do KanGest no site: não entra
     assert!(erro("semacesso@x.ao", "certa").await.contains("não tem acesso ao KanGest"));
+    // sem os dois passos: diz para os activar no site
+    assert!(erro("semmfa@x.ao", "certa").await.contains("dois passos"));
+    // como Caixa, num posto que não é da loja da ficha: não entra (o KanGest manda o posto dele à kangest_eu)
+    assert!(erro("outraloja@x.ao", "certa").await.contains("outra loja"));
 
     // sem Internet: a cópia local, com a mesma senha
     sqlx::query("UPDATE sinc_ligacao SET auth_url = 'http://127.0.0.1:9'").execute(&st.pool).await.unwrap();

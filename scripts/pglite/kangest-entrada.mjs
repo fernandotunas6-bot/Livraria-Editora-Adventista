@@ -68,6 +68,16 @@ await como(admin, `select public.staff_role_assign($1, $2)`, [atendimento, cargo
 const r = await eu(atendimento);
 check('com o cargo, entra como Caixa', r.perfil === 'CAIXA' && r.cargo === 'Caixa da loja', r);
 
+// --- o posto e a loja da ficha (20261126120000) ---------------------------------------------------------------------
+const [outra] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Lubango', 'Huíla', 'Lubango', true) returning id`);
+const postoDaLoja = (await q(`select public.kangest_posto_criar('Caixa do Huambo', $1, 'r-ent-1', null) id`, [loja.id]))[0].id;
+const postoDeOutra = (await q(`select public.kangest_posto_criar('Caixa do Lubango', $1, 'r-ent-2', null) id`, [outra.id]))[0].id;
+const euNo = async (sub, posto) => (await como(sub, `select public.kangest_eu($1) e`, [posto]))[0].e;
+check('a caixa no posto da loja da ficha: sim', (await euNo(caixa, postoDaLoja)).posto_na_ficha === true);
+check('a caixa no posto de outra loja: não', (await euNo(caixa, postoDeOutra)).posto_na_ficha === false);
+check('sem ficha com loja: não se sabe (null)', (await euNo(gestor, postoDeOutra)).posto_na_ficha === null);
+check('sem posto: null, e os dois passos cumpridos', (await eu(caixa)).posto_na_ficha === null && (await eu(caixa)).mfa === true);
+
 // --- ninguém sem sessão ----------------------------------------------------------------------------------------------
 await recusa('o público não pergunta', () => como(null, `select public.kangest_eu()`, [], 'anon'), /permission denied/);
 await recusa('sem sessão, nada', () => como(null, `select public.kangest_eu()`), /Entre com a sua conta/);

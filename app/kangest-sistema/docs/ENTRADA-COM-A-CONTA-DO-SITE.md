@@ -13,7 +13,14 @@ Decide-se no site, em *Utilizadores → Permissões* ou nos cargos, área *Siste
   com o nome de acesso e a senha de cá, como antes.
 
 Sem nenhuma das duas permissões, a conta do site não entra («A sua conta do site não tem acesso ao KanGest»). O site
-responde pela `public.kangest_eu()` (migração `20261126100000`, docs/KANGEST.md §5.4).
+responde pela `public.kangest_eu(p_posto)` (migrações `20261126100000` e `20261126120000`, docs/KANGEST.md §5.4).
+
+- **Os dois passos:** uma conta da equipa sem os dois passos, depois do prazo do site, não tem perfil. A entrada diz
+  para os activar: entra-se no painel do site, que os pede, e volta-se a entrar aqui com o código.
+- **A loja da ficha:** o KanGest manda à `kangest_eu` o id do seu posto.
+  - Com o perfil Caixa, só se entra nos postos da loja da ficha de funcionário («A sua ficha de funcionário é de
+    outra loja»).
+  - Um Gestor entra em qualquer loja, e quem não tem ficha com loja também.
 
 ## Como funciona
 

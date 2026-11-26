@@ -26,9 +26,13 @@ pub struct PessoaSite {
     pub id: String,
     pub nome: String,
     pub email: String,
-    /// GESTOR, CAIXA ou nenhum (sem acesso ao KanGest). As lojas da ficha, que a kangest_eu também dá, ainda não
-    /// limitam o posto onde a pessoa entra (vale a loja da conta local, como antes).
+    /// GESTOR, CAIXA ou nenhum (sem acesso ao KanGest, ou faltam os dois passos)
     pub perfil: Option<String>,
+    /// Os dois passos estão cumpridos (falso: a conta tem de os activar no site; o perfil vem então vazio)
+    pub mfa: bool,
+    /// Este posto é da loja da ficha de funcionário? `None` sem ficha com loja (decisão do dono, 2026-11-26: como
+    /// Caixa, só se entra nos postos da loja da ficha)
+    pub posto_na_ficha: Option<bool>,
 }
 
 /// O que o site disse.
@@ -133,7 +137,9 @@ pub async fn validar(pool: &SqlitePool, email: &str, senha: &str, codigo: Option
             None => return Ok(Validacao::Recusada(pessoa::mensagem(&v, estado))),
         }
     }
-    let (estado, eu) = match pedir("POST", format!("{}/rest/v1/rpc/kangest_eu", a.url), &a.apikey, Some(&tokens.access), json!({})).await {
+    // o posto deste KanGest, para o site dizer se é da loja da ficha da pessoa
+    let posto: Option<String> = sqlx::query_scalar("SELECT posto_id FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_optional(pool).await?;
+    let (estado, eu) = match pedir("POST", format!("{}/rest/v1/rpc/kangest_eu", a.url), &a.apikey, Some(&tokens.access), json!({ "p_posto": posto })).await {
         Ok(r) => r,
         Err(x) => return Ok(x.into()),
     };
@@ -148,6 +154,8 @@ pub async fn validar(pool: &SqlitePool, email: &str, senha: &str, codigo: Option
         nome: eu["nome"].as_str().filter(|n| !n.trim().is_empty()).unwrap_or(email).trim().to_string(),
         email: eu["email"].as_str().unwrap_or(email).trim().to_lowercase(),
         perfil: eu["perfil"].as_str().map(str::to_string),
+        mfa: eu["mfa"].as_bool().unwrap_or(true),
+        posto_na_ficha: eu["posto_na_ficha"].as_bool(),
     };
     Ok(Validacao::Confirmada { pessoa, tokens })
 }
