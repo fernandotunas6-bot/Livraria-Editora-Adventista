@@ -92,6 +92,14 @@ open(f"{OUT}/logo.svg", "w").write(svg(d_full, wf, hf, NAVY, TITLE))
 open(f"{OUT}/logo-light.svg", "w").write(svg(d_full, wf, hf, "#ffffff", TITLE))
 open(f"{OUT}/logo-icon.svg", "w").write(svg(d_emb, we, he, NAVY, TITLE))
 open(f"{OUT}/logo-icon-light.svg", "w").write(svg(d_emb, we, he, "#ffffff", TITLE))
+# o favicon segue o tema do navegador: azul-marinho na barra clara, branco na escura (no Chrome escuro o azul quase
+# preto mal se via); um branco só desapareceria na barra clara
+open(f"{OUT}/favicon.svg", "w").write(
+    svg(d_emb, we, he, NAVY, TITLE).replace(
+        f"<title>{TITLE}</title>",
+        f"<title>{TITLE}</title>\n<style>path{{fill:{NAVY}}}@media (prefers-color-scheme:dark){{path{{fill:#ffffff}}}}</style>",
+    )
+)
 
 # ícones PWA maskable: emblema sobre branco com zona segura
 pad = int(round(max(we, he) * 0.22))
