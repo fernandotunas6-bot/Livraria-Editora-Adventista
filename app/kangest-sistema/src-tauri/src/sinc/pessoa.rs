@@ -9,10 +9,14 @@
 //! - confirmar, pelo PostgREST (com a RLS);
 //! - os passos da entrega, o «entregue» com o pagamento recebido e o cancelamento, por `POST /delivery-event`.
 //!
-//! A sessão é de cada utilizador deste KanGest, cifrada com a chave mestra (segredos.rs). Renova-se sozinha e acaba ao
-//! fim de 12 horas (um turno), ao sair ou ao desligar a ligação. Sem Internet, a alteração fica em `loja_comandos`, em
+//! A sessão é de cada utilizador deste KanGest e **vive só em memória** (KANGEST ONE, fase A): nenhum token do site se
+//! grava no disco. Morre quando o programa fecha, também à força, e ao abrir outra vez é preciso entrar de novo. Renova-se
+//! sozinha e acaba ao fim de 12 horas (um turno), ao sair ou ao desligar a ligação. Sem Internet, a alteração fica em `loja_comandos`, em
 //! nome de quem a fez, e sai quando a ligação voltar (o ciclo de mod.rs chama `enviar_comandos`).
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -169,23 +173,7 @@ pub(super) fn cabecalhos(apikey: &str, token: Option<&str>) -> Vec<(&'static str
 // A sessão de cada pessoa
 // ---------------------------------------------------------------------------------------------------------------
 
-pub(crate) async fn guardar(pool: &SqlitePool, utilizador: i64, email: &str, t: &Tokens, factor_id: &str, entrou_em: i64) -> AppResult<()> {
-    sqlx::query(
-        "INSERT INTO sessoes_site (utilizador_id, email, sessao, factor_id, entrou_em, actualizada_em) VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(utilizador_id) DO UPDATE SET email = excluded.email, sessao = excluded.sessao, factor_id = excluded.factor_id,
-           entrou_em = excluded.entrou_em, actualizada_em = excluded.actualizada_em",
-    )
-    .bind(utilizador)
-    .bind(email)
-    .bind(crate::segredos::cifrar(&serde_json::to_string(t)?))
-    .bind(factor_id)
-    .bind(entrou_em)
-    .bind(agora_s())
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
+#[derive(Clone)]
 struct Sessao {
     email: String,
     tokens: Tokens,
@@ -193,25 +181,47 @@ struct Sessao {
     entrou_em: i64,
 }
 
+/// A chave de uma sessão em memória: o ficheiro da base e o utilizador. Num programa há uma só base; nos testes, que
+/// correm juntos no mesmo processo com bases diferentes, os ids dos utilizadores repetem-se.
+type ChaveSessao = (PathBuf, i64);
+
+/// As sessões do site, **só em memória**: nada disto toca no disco (KANGEST ONE, fase A).
+fn sessoes() -> MutexGuard<'static, HashMap<ChaveSessao, Sessao>> {
+    static S: OnceLock<Mutex<HashMap<ChaveSessao, Sessao>>> = OnceLock::new();
+    S.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn base_de(pool: &SqlitePool) -> PathBuf {
+    pool.connect_options().get_filename().to_path_buf()
+}
+
+pub(crate) async fn guardar(pool: &SqlitePool, utilizador: i64, email: &str, t: &Tokens, factor_id: &str, entrou_em: i64) -> AppResult<()> {
+    let s = Sessao { email: email.to_string(), tokens: t.clone(), factor_id: factor_id.to_string(), entrou_em };
+    sessoes().insert((base_de(pool), utilizador), s);
+    Ok(())
+}
+
 async fn sessao_de(pool: &SqlitePool, utilizador: i64) -> AppResult<Option<Sessao>> {
-    let Some((email, cifrada, factor_id, entrou_em)) =
-        sqlx::query_as::<_, (String, String, String, i64)>("SELECT email, sessao, factor_id, entrou_em FROM sessoes_site WHERE utilizador_id = ?")
-            .bind(utilizador)
-            .fetch_optional(pool)
-            .await?
-    else {
-        return Ok(None);
-    };
-    let Some(tokens) = crate::segredos::decifrar(&cifrada).ok().and_then(|s| serde_json::from_str::<Tokens>(&s).ok()) else {
-        apagar_sessao(pool, utilizador).await?;
-        return Ok(None);
-    };
-    Ok(Some(Sessao { email, tokens, factor_id, entrou_em }))
+    Ok(sessoes().get(&(base_de(pool), utilizador)).cloned())
 }
 
 pub(super) async fn apagar_sessao(pool: &SqlitePool, utilizador: i64) -> AppResult<()> {
-    sqlx::query("DELETE FROM sessoes_site WHERE utilizador_id = ?").bind(utilizador).execute(pool).await?;
+    sessoes().remove(&(base_de(pool), utilizador));
     Ok(())
+}
+
+/// Há sessão do site deste utilizador (para os testes).
+#[cfg(test)]
+pub(crate) fn tem_sessao(pool: &SqlitePool, utilizador: i64) -> bool {
+    sessoes().contains_key(&(base_de(pool), utilizador))
+}
+
+/// Para os testes: a sessão entrou há mais `segundos` (o fim do turno sem esperar 12 horas).
+#[cfg(test)]
+pub(crate) fn envelhecer_sessao(pool: &SqlitePool, utilizador: i64, segundos: i64) {
+    if let Some(s) = sessoes().get_mut(&(base_de(pool), utilizador)) {
+        s.entrou_em -= segundos;
+    }
 }
 
 /// Um token válido da pessoa: renova-o se faltar menos de um minuto; ao fim do turno, a sessão acaba.
@@ -333,7 +343,8 @@ pub async fn ha_comandos(pool: &SqlitePool) -> AppResult<bool> {
 
 /// Ao desligar a ligação: as sessões e as alterações por enviar saem.
 pub async fn apagar_tudo(pool: &SqlitePool) -> AppResult<()> {
-    sqlx::query("DELETE FROM sessoes_site").execute(pool).await?;
+    let base = base_de(pool);
+    sessoes().retain(|(b, _), _| *b != base);
     sqlx::query("DELETE FROM loja_comandos WHERE estado <> 'feito'").execute(pool).await?;
     Ok(())
 }
