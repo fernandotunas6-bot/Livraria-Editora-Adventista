@@ -309,3 +309,41 @@ Sem isso, as tarefas voltam ao site com o erro «ainda não tem quem emita», e 
   - a NE pela API, sem dobrar;
   - a FR a partir da NE e a anulação;
   - o pedido recusado e desligar.
+
+## 12. O estado dos computadores no painel
+
+Em cada volta, o KanGest manda também o **estado do computador** (`dados.estado`, dentro do envelope assinado e
+cifrado; `app/kangest-sistema/src-tauri/src/sinc/estado.rs`). A Edge Function guarda-o em
+`kangest_postos.estado_computador` (com a hora, `estado_em`), só com os campos de uma lista fechada
+(`kangestSinc.ts`, `limparEstadoComputador`; migração `20261126150000`):
+
+| Campo | O quê |
+|---|---|
+| `versao`, `sistema`, `nucleos`, `memoria` | o programa e o computador |
+| `espaco_livre`, `base_bytes` | o espaço livre no disco dos dados e o tamanho da base |
+| `ultima_copia`, `copia_externa_erro` | a última cópia de segurança e se a externa falhou |
+| `modo` | `sozinho`, `servidor` (dos postos em rede) ou `cliente` |
+| `fe_rejeitados`, `por_enviar` | os documentos rejeitados pela AGT e os que esperam para seguir para o site |
+| `verificacao` | a última verificação da base: `ok`, `avisos` ou `graves` |
+| `bandeja`, `acordado` | as opções do servidor sempre ligado |
+
+**Nunca seguem** nomes, NIF, caminhos de pastas nem dados da loja: o KanGest não os põe, e o site deita fora tudo o que
+não estiver na lista ou tiver o tipo errado.
+
+Em **Configurações → KanGest → Postos**, cada posto mostra o seu computador, com o que precisa de atenção
+(`app/web/src/lib/kangestComputadores.js`, `problemasDoComputador`):
+
+- **graves, a vermelho:**
+  - disco quase cheio (não cabe a próxima cópia: a base, mais um décimo, mais 200 MB);
+  - verificação da base com problemas graves;
+  - documentos rejeitados pela AGT;
+  - sem contacto há mais de um dia;
+- **avisos, a amarelo:**
+  - sem cópia há mais de 2 dias, ou nenhuma;
+  - cópia externa falhou;
+  - verificação com avisos;
+  - mais de 20 documentos por enviar;
+  - sem contacto há mais de 30 minutos.
+
+No topo da lista aparece quantos computadores precisam de atenção. Um posto com um KanGest anterior à 1.4.8 ainda não
+manda o estado: o painel diz só isso.

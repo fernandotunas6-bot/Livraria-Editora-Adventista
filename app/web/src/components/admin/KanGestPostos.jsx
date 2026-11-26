@@ -3,10 +3,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Copy, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
+import { AlertTriangle, Copy, Cpu, KeyRound, Link2, Plus, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoRevogar, kangestPostos } from '@/api/PlatformApi';
 import { cn } from '@/lib/utils';
+import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
 const ESTADOS = {
   activo: ['Ligado', 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'],
@@ -177,6 +178,16 @@ export default function KanGestPostos({ lojas = [] }) {
         </p>
       )}
       {codigo && <CodigoNovo codigo={codigo.codigo} endereco={codigo.endereco} expira={codigo.expira_em} onFechar={() => setCodigo(null)} />}
+      {(() => {
+        // os computadores que precisam de atenção (o estado que cada KanGest manda: lib/kangestComputadores.js)
+        const comProblemas = postos.filter((p) => p.estado === 'activo' && problemasDoComputador(p).some((x) => x.grave));
+        return comProblemas.length > 0 ? (
+          <p className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {comProblemas.length === 1 ? `O computador de «${comProblemas[0].nome}» precisa de atenção.` : `${comProblemas.length} computadores precisam de atenção.`}
+          </p>
+        ) : null;
+      })()}
       {postos.length > 0 && (
         <ul className="divide-y rounded-xl border">
           {postos.map((p) => {
@@ -207,6 +218,7 @@ export default function KanGestPostos({ lojas = [] }) {
                   {p.versao_programa ? ` · ${p.versao_programa}` : ''}
                 </p>
                 {p.ultimo_erro && <p className="w-full text-xs text-red-700 dark:text-red-400">{p.ultimo_erro}</p>}
+                {p.estado !== 'revogado' && <Computador p={p} />}
                 {p.estado !== 'revogado' && (
                   <div className="flex w-full flex-wrap gap-x-5 gap-y-1 text-xs">
                     <label className="inline-flex items-center gap-1.5">
@@ -260,5 +272,50 @@ export default function KanGestPostos({ lojas = [] }) {
         </Button>
       </form>
     </section>
+  );
+}
+
+/** O computador do posto: o que o KanGest mandou na última volta (sinc/estado.rs) e o que precisa de atenção. */
+function Computador({ p }) {
+  const e = p.estado_computador || {};
+  if (!Object.keys(e).length) {
+    return p.estado === 'activo' ? (
+      <p className="w-full text-xs text-muted-foreground">
+        <Cpu className="mr-1 inline h-3.5 w-3.5" />O estado do computador aparece quando este posto tiver o KanGest 1.4.8 ou mais recente.
+      </p>
+    ) : null;
+  }
+  const problemas = problemasDoComputador(p);
+  const partes = [
+    e.sistema,
+    e.nucleos ? `${e.nucleos} núcleos` : null,
+    e.memoria ? `${tamanho(e.memoria)} de memória` : null,
+    e.espaco_livre != null ? `${tamanho(e.espaco_livre)} livres` : null,
+    e.base_bytes != null ? `base de ${tamanho(e.base_bytes)}` : null,
+    e.ultima_copia ? `última cópia ${dataHora(e.ultima_copia)}` : null,
+    e.modo === 'servidor' ? 'servidor dos postos em rede' : null,
+    e.bandeja ? 'fica na bandeja ao fechar' : null,
+    e.acordado ? 'não adormece' : null,
+  ].filter(Boolean);
+  return (
+    <div className="w-full space-y-1 text-xs">
+      <p className="text-muted-foreground">
+        <Cpu className="mr-1 inline h-3.5 w-3.5" />
+        {partes.join(' · ')}
+        {p.estado_em ? ` · estado de ${dataHora(p.estado_em)}` : ''}
+      </p>
+      {problemas.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {problemas.map((x) => (
+            <span
+              key={x.texto}
+              className={cn('rounded-full px-2 py-0.5 font-semibold', x.grave ? 'bg-red-500/10 text-red-700 dark:text-red-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400')}
+            >
+              {x.texto}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -432,3 +432,41 @@ export async function dividasParaOPainel(linhas: Row[], cifra: CifraDados | null
   }
   return out;
 }
+
+// ------------------------------------------------------------------ o estado do computador de cada posto
+
+const MODOS_DO_POSTO = ["sozinho", "servidor", "cliente"] as const;
+const VERIFICACOES = ["ok", "avisos", "graves"] as const;
+
+/**
+ * O estado do computador que o KanGest manda em cada volta (dentro do envelope assinado e cifrado), para o painel o
+ * mostrar por posto (KanGestPostos.jsx). Só uma lista fechada de campos, com os tipos e os limites conferidos: números e
+ * marcas do computador, nunca dados pessoais nem da loja. O que não for um objecto dá `null` (não se grava nada).
+ */
+export function limparEstadoComputador(e: unknown): Record<string, unknown> | null {
+  if (!e || typeof e !== "object" || Array.isArray(e)) return null;
+  const v = e as Record<string, unknown>;
+  const inteiro = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= max ? Math.floor(x) : null);
+  const texto = (x: unknown, max: number) => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").trim().slice(0, max) : null);
+  const umDe = <T extends string>(x: unknown, lista: readonly T[]) => (typeof x === "string" && (lista as readonly string[]).includes(x) ? x : null);
+  const data = (x: unknown) => (typeof x === "string" && x.length <= 40 && !Number.isNaN(Date.parse(x)) ? new Date(x).toISOString() : null);
+  const marca = (x: unknown) => (typeof x === "boolean" ? x : null);
+  const limpo: Record<string, unknown> = {
+    versao: texto(v.versao, 40),
+    sistema: texto(v.sistema, 40),
+    nucleos: inteiro(v.nucleos, 1024),
+    memoria: inteiro(v.memoria, 1e15),
+    espaco_livre: inteiro(v.espaco_livre, 1e16),
+    base_bytes: inteiro(v.base_bytes, 1e15),
+    ultima_copia: data(v.ultima_copia),
+    copia_externa_erro: marca(v.copia_externa_erro),
+    modo: umDe(v.modo, MODOS_DO_POSTO),
+    fe_rejeitados: inteiro(v.fe_rejeitados, 1e6),
+    por_enviar: inteiro(v.por_enviar, 1e7),
+    verificacao: umDe(v.verificacao, VERIFICACOES),
+    bandeja: marca(v.bandeja),
+    acordado: marca(v.acordado),
+  };
+  for (const k of Object.keys(limpo)) if (limpo[k] === null) delete limpo[k];
+  return limpo;
+}

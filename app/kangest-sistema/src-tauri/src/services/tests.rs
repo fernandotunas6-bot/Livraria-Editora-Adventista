@@ -7896,3 +7896,31 @@ async fn editor_dos_produtos_do_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// O estado do computador que segue para o painel do site (sinc/estado.rs): só os campos da lista, sem nomes, NIF nem
+/// caminhos de pastas, e com os números deste computador.
+#[tokio::test]
+async fn o_estado_do_computador_so_leva_numeros_e_marcas() {
+    let (st, pasta) = base_com_admin("estado-pc").await;
+    rpc(&st, "entidades.guardar", json!({ "nome": "Cliente Exemplo Privado", "nif": "5417000099" })).await;
+    let e = crate::sinc::estado::do_computador(&st).await;
+    let chaves: Vec<&str> = e.as_object().unwrap().keys().map(String::as_str).collect();
+    for k in &chaves {
+        assert!(
+            [
+                "versao", "sistema", "nucleos", "memoria", "espaco_livre", "base_bytes", "ultima_copia", "copia_externa_erro", "modo",
+                "fe_rejeitados", "por_enviar", "verificacao", "bandeja", "acordado",
+            ]
+            .contains(k),
+            "campo fora da lista: {k}"
+        );
+    }
+    assert!(e["versao"].as_str().unwrap().ends_with("Livraria"));
+    assert!(e["nucleos"].as_u64().unwrap() >= 1);
+    assert!(e["base_bytes"].as_u64().unwrap() > 0, "{e}");
+    assert_eq!(e["fe_rejeitados"], 0);
+    let texto = e.to_string();
+    assert!(!texto.contains("Cliente Exemplo") && !texto.contains("5417000099") && !texto.contains(pasta.to_str().unwrap()), "{texto}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
