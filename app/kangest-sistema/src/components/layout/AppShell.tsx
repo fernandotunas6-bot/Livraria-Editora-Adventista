@@ -25,6 +25,7 @@ import { useMeuPerfil } from "@/lib/perfil";
 import { useTabelas } from "@/lib/hooks";
 import { modoPorId } from "@/lib/modos";
 import type { Sessao } from "@/lib/types";
+import { CentroAjuda, SinoAvisos } from "@/components/Ajuda";
 
 const CHAVE_ABERTO = "kangest.menu.aberto";
 const CHAVE_RECOLHIDO = "kangest.menu.recolhido";
@@ -260,6 +261,8 @@ export default function AppShell() {
             <kbd>K</kbd>
           </button>
 
+          {/* os avisos e a ajuda (também a tecla F1): components/Ajuda.tsx */}
+          <SinoAvisos />
           <EstadoLivraria />
           <MenuNovo visivel={(to) => !!destinoPorEndereco(to) && visivel(destinoPorEndereco(to)!)} />
           <span className="hidden sm:contents">
@@ -289,6 +292,7 @@ export default function AppShell() {
       {doisPassos && <DoisPassos onClose={() => setDoisPassos(false)} />}
       {aparelhos && <AparelhosSessao onClose={() => setAparelhos(false)} />}
       {meuPerfil && <MeuPerfil onClose={() => setMeuPerfil(false)} />}
+      <CentroAjuda />
     </div>
   );
 }

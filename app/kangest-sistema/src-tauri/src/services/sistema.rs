@@ -309,13 +309,25 @@ fn quantas_apagar(livre: u64, precisa: u64, antigas: &[u64], ficam: usize) -> Op
     None
 }
 
+/// O tamanho da base, com o WAL.
+fn tamanho_da_base(pasta_dados: &Path) -> u64 {
+    let base = pasta_dados.join("kigest.db");
+    [base.clone(), base.with_extension("db-wal")].iter().filter_map(|f| std::fs::metadata(f).ok()).map(|m| m.len()).sum()
+}
+
+/// Para o centro de ajuda (services/ajuda.rs): quando foi a última cópia automática, o espaço livre no disco dos dados
+/// e o que a próxima cópia precisa.
+pub(crate) fn estado_das_copias(pasta_dados: &Path) -> (Option<std::time::SystemTime>, Option<u64>, u64) {
+    let ultima = listar_db(&pasta_copias(pasta_dados), "kangest-").into_iter().rev().find(|(_, f)| !de_antes(f)).map(|x| x.0);
+    (ultima, crate::recursos::espaco_livre(pasta_dados), espaco_para_copia(tamanho_da_base(pasta_dados)))
+}
+
 /// Antes de uma cópia na pasta `dir`: há espaço para ela? Sem espaço, saem primeiro as cópias automáticas mais antigas,
 /// e ficam sempre as `MINIMO_COPIAS` mais recentes e as de antes das actualizações. Sem espaço mesmo assim, a cópia não
 /// se faz, com uma mensagem clara e um aviso do sistema (e nada se apaga, porque não chegaria).
 fn garantir_espaco(pasta_dados: &Path, dir: &Path) -> AppResult<()> {
     use crate::recursos::tamanho_legivel;
-    let base = pasta_dados.join("kigest.db");
-    let tamanho: u64 = [base.clone(), base.with_extension("db-wal")].iter().filter_map(|f| std::fs::metadata(f).ok()).map(|m| m.len()).sum();
+    let tamanho = tamanho_da_base(pasta_dados);
     let precisa = espaco_para_copia(tamanho);
     // o sistema não disse o espaço: tenta-se (se falhar, a cópia não fica partida: copia_verificada)
     let Some(livre) = crate::recursos::espaco_livre(dir) else { return Ok(()) };

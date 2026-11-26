@@ -7,7 +7,7 @@
  * no navegador do KanGest, com o login de cada pessoa.
  */
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
@@ -208,9 +208,20 @@ export default function LojaOnline() {
 }
 
 function Encomendas({ e, site }: { e: EstadoLoja; site: string }) {
-  const [filtro, setFiltro] = useState("");
+  // ?filtro=por_confirmar e ?encomenda=<id>: os avisos e o assistente da ajuda abrem aqui (components/Ajuda.tsx)
+  const [sp, setSp] = useSearchParams();
+  const [filtro, setFiltro] = useState(sp.get("filtro") ?? "");
   const [q, setQ] = useState("");
-  const [aberta, setAberta] = useState<string | null>(null);
+  const [aberta, setAberta] = useState<string | null>(sp.get("encomenda"));
+  useEffect(() => {
+    const f = sp.get("filtro");
+    const enc = sp.get("encomenda");
+    if (f === null && enc === null) return;
+    if (f !== null) setFiltro(f);
+    if (enc) setAberta(enc);
+    // o pedido já foi atendido: o endereço volta ao da Loja online (e Voltar não o repete)
+    setSp({}, { replace: true });
+  }, [sp, setSp]);
   const lista = useQuery({
     queryKey: ["loja-encomendas", filtro, q],
     queryFn: () => call<LinhaEncomenda[]>("loja.encomendas", { filtro, q }),

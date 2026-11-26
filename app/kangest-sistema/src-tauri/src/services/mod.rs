@@ -7,6 +7,7 @@ mod auditoria;
 mod dois_passos;
 pub mod atualizacao;
 mod avencas;
+mod ajuda;
 mod assistente;
 mod auth;
 // motor central de dados (construtor de relatórios, BI, qualidade dos dados)
@@ -474,6 +475,11 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "inteligencia.painel" => inteligencia::painel(st).await,
         // assistente de perguntas (Ctrl+K): «quanto vendi ontem?», «quem me deve mais?»
         "inteligencia.perguntar" => assistente::perguntar(st, p(params)?).await,
+        // o centro de ajuda (o botão «Ajuda», o sino e o F1): os avisos e o assistente (services/ajuda.rs)
+        "ajuda.avisos" => ajuda::avisos(st).await,
+        "ajuda.avisosSite" => ajuda::avisos_site(st).await,
+        "ajuda.lido" => ajuda::lido(st, p(params)?).await,
+        "ajuda.perguntar" => ajuda::perguntar(st, p(params)?).await,
         // resumo diário ao dono por email (opcional), pelo servidor de email da empresa
         "inteligencia.resumoConfig" => resumo_email::config_obter(st).await,
         "inteligencia.resumoGuardar" => resumo_email::config_guardar(st, p(params)?).await,

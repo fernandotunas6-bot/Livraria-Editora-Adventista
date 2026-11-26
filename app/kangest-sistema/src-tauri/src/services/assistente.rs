@@ -25,7 +25,7 @@ use crate::state::AppState;
 
 #[derive(Deserialize)]
 pub struct PerguntaIn {
-    texto: String,
+    pub(crate) texto: String,
 }
 
 // ------------------------------------------------------------------ interpretar
