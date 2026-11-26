@@ -493,3 +493,24 @@ Testes:
 - os cenários do checkout, do KanGest, dos pagamentos e das lojas continuam certos.
 
 **A seguir:** a **B3**, o stock à venda a sair do livro, depois de ele bater certo no staging e numa cópia da produção.
+
+## 16. A versão mínima do KanGest (KANGEST ONE, fase E)
+
+**Quando o site a pede:** com o segredo `KANGEST_MIN_VERSION` na Edge Function (por exemplo `1.4.9`), cada volta da
+sincronização leva-o em `kangest_min_version`. O KanGest guarda-o em `config` (`site.kangest_min_version`;
+`sinc/versao.rs`). Sem o segredo, a versão mínima apaga-se, e o mesmo acontece ao desligar o posto.
+
+**Um KanGest ligado e abaixo dela:**
+- **cada sessão só consulta:** fica com «Ver relatórios» e «Atualizações» (`services/auth.rs`, `sessao_de`);
+- **por cima de cada ecrã** aparece «Este KanGest precisa de ser actualizado», com o caminho para «Sobre o KanGest»;
+- **no Centro de Integrações,** o cartão «Servidor central» fica em erro.
+  - Com a versão cumprida, o cartão mostra a versão e o estado do livro de stock (a abertura, a fila e os recusados).
+
+**No painel do site,** a saúde do ecossistema (`/api/v1/system/health`) marca em aviso os postos abaixo da versão mínima.
+
+Num KanGest isolado, a versão mínima não vale.
+
+Testes:
+- `abaixo_da_versao_minima_do_site` (Rust);
+- `comparar_versoes` (Rust);
+- `saude.test.ts` (`compararVersoes`).

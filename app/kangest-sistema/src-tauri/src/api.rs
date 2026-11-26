@@ -848,6 +848,7 @@ async fn chave_da_linha(st: &AppState, row: &sqlx::sqlite::SqliteRow, ip: Option
         offline: false,
         ligar_ate: None,
         so_leitura: false,
+        desactualizado: None,
     };
     Ok(Chave { id, nome: row.get("nome"), prefixo: row.get("prefixo"), permissoes, limite_minuto: row.get("limite_minuto"), sessao, posto })
 }
