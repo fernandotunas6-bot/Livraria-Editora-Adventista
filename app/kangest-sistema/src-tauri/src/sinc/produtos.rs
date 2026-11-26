@@ -273,12 +273,91 @@ async fn guardar_coleccao(st: &AppState, i: GuardarIn) -> AppResult<Value> {
 }
 
 /// Despachante dos métodos `loja.produto.*` e `loja.coleccao.*` (loja.rs).
+// --- KANGEST ONE, fase D: o artigo do KanGest no site, a partir da ficha do artigo ---------------------------------
+
+/// A referência para um filtro do PostgREST (`kigest_ref=eq.<ref>`): letras, algarismos e `-._~` passam; o resto vai
+/// codificado.
+pub fn ref_para_url(r: &str) -> String {
+    r.trim()
+        .bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || b"-._~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
+}
+
+#[derive(Deserialize)]
+struct ArtigoIn {
+    artigo_id: i64,
+}
+
+#[derive(Deserialize)]
+struct PublicarArtigoIn {
+    artigo_id: i64,
+    activo: bool,
+}
+
+/// O produto do site ligado ao artigo (pela referência): `None` se o artigo não tem referência ou não está no site.
+async fn produto_do_artigo(st: &AppState, utilizador: i64, artigo_id: i64) -> AppResult<(String, Option<Value>)> {
+    let referencia: Option<String> = sqlx::query_scalar("SELECT TRIM(COALESCE(referencia, '')) FROM artigos WHERE id = ?").bind(artigo_id).fetch_optional(&st.pool).await?;
+    let Some(referencia) = referencia.filter(|r| !r.is_empty()) else { return Ok((String::new(), None)) };
+    let l = rest(
+        &st.pool,
+        utilizador,
+        "GET",
+        &format!("stock_books?kigest_ref=eq.{}&select=id,title,active,price,sale_price,stock,cover_image,cover&order=id.asc&limit=1", ref_para_url(&referencia)),
+        None,
+    )
+    .await?;
+    Ok((referencia, l.as_array().and_then(|l| l.first().cloned())))
+}
+
+/// Para a ficha do artigo: está no site? Com que preço, e à vista ou oculto? Sem ligação ao site, `ligado: false`.
+async fn do_artigo(st: &AppState, i: ArtigoIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    let ligado: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_one(&st.pool).await?;
+    if !ligado {
+        return Ok(json!({ "ligado": false }));
+    }
+    let (referencia, produto) = produto_do_artigo(st, s.id, i.artigo_id).await?;
+    Ok(json!({ "ligado": true, "referencia": referencia, "produto": produto }))
+}
+
+/// Publica ou oculta no site o produto ligado ao artigo, com a conta do site da pessoa («Gerir Catálogo» lá, «artigos.editar»
+/// cá). Nunca se publica a 0 Kz: o preço vem do posto que manda no catálogo, e tem de ter chegado ao site.
+async fn publicar_artigo(st: &AppState, i: PublicarArtigoIn) -> AppResult<Value> {
+    let u = permitir(st)?;
+    let (referencia, produto) = produto_do_artigo(st, u, i.artigo_id).await?;
+    if referencia.is_empty() {
+        return Err(AppError::msg("Dê uma referência ao artigo: é por ela que o site o liga ao produto."));
+    }
+    let Some(p) = produto else {
+        return Err(AppError::msg(
+            "Este artigo ainda não está no site. O posto que manda no catálogo cria-o, oculto, na volta seguinte da sincronização; depois publique-o aqui.",
+        ));
+    };
+    if i.activo && p["price"].as_f64().unwrap_or(0.0) <= 0.0 {
+        return Err(AppError::msg(
+            "O preço ainda não chegou ao site, e um produto não se publica a 0 Kz. O posto que manda no catálogo envia-o na volta seguinte.",
+        ));
+    }
+    let id = p["id"].as_str().unwrap_or_default().to_string();
+    let novo = primeira(rest(&st.pool, u, "PATCH", &format!("stock_books?id=eq.{}", id_de(&id)?), Some(json!({ "active": i.activo }))).await?)?;
+    auditar(
+        &st.pool,
+        u,
+        format!("{} no site o produto «{}» ({}) do artigo {}", if i.activo { "publicou" } else { "ocultou" }, p["title"].as_str().unwrap_or(""), id, referencia),
+    )
+    .await?;
+    Ok(json!({ "produto": novo }))
+}
+
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
     match metodo {
         "produto.obter" => obter(st, serde_json::from_value(params)?).await,
         "produto.guardar" => guardar(st, serde_json::from_value(params)?).await,
         "produto.duplicar" => duplicar(st, serde_json::from_value(params)?).await,
         "produto.publicar" => publicar(st, serde_json::from_value(params)?).await,
+        "produto.doArtigo" => do_artigo(st, serde_json::from_value(params)?).await,
+        "produto.publicarArtigo" => publicar_artigo(st, serde_json::from_value(params)?).await,
         "produto.eliminar" => eliminar(st, serde_json::from_value(params)?).await,
         "coleccao.listar" => coleccoes(st).await,
         "coleccao.guardar" => guardar_coleccao(st, serde_json::from_value(params)?).await,
@@ -311,6 +390,13 @@ mod testes {
         assert!(validar(&m(json!({ "title": "Livro", "price": -1 })), false).is_err());
         assert!(validar(&m(json!({ "title": "Livro", "stock": "muito" })), false).is_err());
         assert!(validar(&m(json!({ "title": "Livro", "sale_price": null })), false).is_ok());
+    }
+
+    #[test]
+    fn a_referencia_no_filtro_do_site() {
+        assert_eq!(ref_para_url(" LIV-001 "), "LIV-001");
+        assert_eq!(ref_para_url("A B/1&x=2"), "A%20B%2F1%26x%3D2");
+        assert_eq!(ref_para_url("Ação"), "A%C3%A7%C3%A3o");
     }
 
     #[test]
