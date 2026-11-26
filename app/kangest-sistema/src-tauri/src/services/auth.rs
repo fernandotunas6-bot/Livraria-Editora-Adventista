@@ -343,14 +343,31 @@ async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> 
             (row, false)
         }
         Validacao::Confirmada { pessoa, tokens } => {
-            let Some(perfil) = entrada::perfil_do_site(pessoa.perfil.as_deref()) else {
-                // sem acesso no site: a cópia local deixa de valer já
+            let perfil = entrada::perfil_do_site(pessoa.perfil.as_deref());
+            // sem acesso, ou como Caixa num posto que não é da loja da ficha: não entra, e a cópia local deixa de valer
+            let recusa = match perfil {
+                None if !pessoa.mfa => Some((
+                    "conta do site sem os dois passos",
+                    "A sua conta do site precisa dos dois passos: entre no painel do site, active-os (o painel pede-os) e volte a entrar aqui com o código.",
+                )),
+                None => Some((
+                    "conta do site sem acesso ao KanGest",
+                    "A sua conta do site não tem acesso ao KanGest: peça a permissão «KanGest: caixa» ou «KanGest: gestor» no site.",
+                )),
+                Some("CAIXA") if pessoa.posto_na_ficha == Some(false) => Some((
+                    "conta do site: caixa de outra loja",
+                    "A sua ficha de funcionário é de outra loja: como Caixa, entra só nos postos da sua loja.",
+                )),
+                _ => None,
+            };
+            if let Some((motivo, mensagem)) = recusa {
                 if let Some(row) = &guardada {
                     sqlx::query("UPDATE utilizadores SET conta_site_validada_em = NULL WHERE id = ?").bind(row.get::<i64, _>("id")).execute(&st.pool).await?;
                 }
-                registar(st, None, email, "FALHA", Some("conta do site sem acesso ao KanGest".into())).await;
-                return Err(AppError::msg("A sua conta do site não tem acesso ao KanGest: peça a permissão «KanGest: caixa» ou «KanGest: gestor» no site."));
-            };
+                registar(st, None, email, "FALHA", Some(motivo.into())).await;
+                return Err(AppError::msg(mensagem));
+            }
+            let Some(perfil) = perfil else { return Err(AppError::msg("A sua conta do site não tem acesso ao KanGest.")) };
             let agora = db::agora();
             let resumo = hash_senha(&i.senha)?;
             let unico = |e: sqlx::Error| -> AppError {

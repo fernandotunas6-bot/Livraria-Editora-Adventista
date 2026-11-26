@@ -263,7 +263,10 @@ passos. O lado do programa vem num PR seguinte. No site (migração `20261126100
   - o perfil: `GESTOR`, `CAIXA` ou `null` (sem acesso);
   - as lojas da ficha de funcionário.
 
-  Como no painel, uma conta com os dois passos precisa da sessão com o código.
+  Como no painel, uma conta com os dois passos precisa da sessão com o código (sem eles, `mfa` vem falso).
+- **A loja da ficha** (migração `20261126120000`): o KanGest manda o id do posto, e a `kangest_eu` diz se ele é de uma
+  loja da ficha de funcionário (`posto_na_ficha`). Com o perfil Caixa, só se entra nos postos da loja da ficha. Um
+  Gestor, ou quem não tem ficha com loja, entra em qualquer loja.
 
 ## 6. Rotas da Edge Function
 
