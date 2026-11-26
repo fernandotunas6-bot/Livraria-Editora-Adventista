@@ -62,6 +62,25 @@ interface Conferencia {
   kigest_novo: number;
   /** «Dias com as mesmas vendas»: os dias que não batem certo (até 60, os mais recentes primeiro) */
   por_dia?: DiaDiferente[];
+  /** «Documentos iguais, um a um»: os documentos que não batem certo (até 200) */
+  por_documento?: DocumentoDiferente[];
+  /** «Facturas da conta corrente que batem certo»: as que não batem (até 200) */
+  por_fatura?: FacturaDiferente[];
+}
+
+interface DocumentoDiferente {
+  documento: string;
+  motivo: string;
+  kigest: { total: number; anulado: boolean } | null;
+  kangest: { total: number; anulado: boolean } | null;
+}
+
+interface FacturaDiferente {
+  documento: string;
+  entidade: string;
+  motivo: string;
+  kigest: { debito: number; credito: number; falta: number };
+  kangest: { pendente: number } | null;
 }
 
 interface DiaDiferente {
@@ -94,6 +113,68 @@ function DiasDiferentes({ dias }: { dias: DiaDiferente[] }) {
               <Td className={cn("num text-right", d.kigest.documentos !== d.kangest.documentos && "font-medium text-accent-ink")}>{numero(d.kangest.documentos)}</Td>
               <Td className="num text-right">{kz(d.kigest.total)}</Td>
               <Td className={cn("num text-right", d.kigest.total !== d.kangest.total && "font-medium text-accent-ink")}>{kz(d.kangest.total)}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
+/** Documento a documento: os que faltam, os com outro total e os anulados só de um lado. */
+function DocumentosDiferentes({ docs }: { docs: DocumentoDiferente[] }) {
+  if (!docs.length) return null;
+  return (
+    <div className="mt-4">
+      <div className="mb-2 font-medium">Documentos com diferenças</div>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Documento</Th>
+            <Th>Diferença</Th>
+            <Th className="text-right">Total no KIGEST</Th>
+            <Th className="text-right">No KanGest</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {docs.map((d) => (
+            <tr key={`${d.documento}-${d.motivo}`}>
+              <Td className="whitespace-nowrap">{d.documento}</Td>
+              <Td className="font-medium text-accent-ink">{d.motivo}</Td>
+              <Td className="num text-right">{d.kigest ? kz(d.kigest.total) : "—"}</Td>
+              <Td className="num text-right">{d.kangest ? kz(d.kangest.total) : "—"}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
+/** A conta corrente fatura a fatura: o que falta pagar no KIGEST ao lado do pendente no KanGest. */
+function FacturasDiferentes({ facturas }: { facturas: FacturaDiferente[] }) {
+  if (!facturas.length) return null;
+  return (
+    <div className="mt-4">
+      <div className="mb-2 font-medium">Conta corrente: facturas com diferenças</div>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Factura</Th>
+            <Th>Entidade</Th>
+            <Th>Diferença</Th>
+            <Th className="text-right">Em falta no KIGEST</Th>
+            <Th className="text-right">Pendente no KanGest</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {facturas.map((f) => (
+            <tr key={f.documento}>
+              <Td className="whitespace-nowrap">{f.documento}</Td>
+              <Td>{f.entidade || "—"}</Td>
+              <Td className="font-medium text-accent-ink">{f.motivo}</Td>
+              <Td className="num text-right">{kz(f.kigest.falta)}</Td>
+              <Td className="num text-right">{f.kangest ? kz(f.kangest.pendente) : "—"}</Td>
             </tr>
           ))}
         </tbody>
@@ -750,6 +831,8 @@ export default function Importar() {
                     </tbody>
                   </Table>
                   <DiasDiferentes dias={relatorio.conferencia!.find((c) => c.por_dia)?.por_dia ?? []} />
+                  <DocumentosDiferentes docs={relatorio.conferencia!.find((c) => c.por_documento)?.por_documento ?? []} />
+                  <FacturasDiferentes facturas={relatorio.conferencia!.find((c) => c.por_fatura)?.por_fatura ?? []} />
                   <p className="mt-2 text-[12px] text-ink-3">
                     «No KanGest» conta só o que veio do KIGEST. Diferenças normais: artigos com a mesma referência juntam-se num só e os registos sem artigo,
                     conta ou documento conhecido ficam de fora (ver os avisos abaixo).

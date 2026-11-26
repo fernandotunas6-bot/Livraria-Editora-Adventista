@@ -114,6 +114,29 @@ diferenças». A conferência compara também os fechos de caixa (`tbCaixaDiaria
 - **As prestações sociais pagas** (`tbRhFuncSubsidioSocias`, os detalhes e `tbzconfigTiposPrestacao`): em *Recursos
   Humanos → Prestações Sociais*, com o tipo e os meses pagos (`rh_prestacao_pagamentos`).
 
+## As conciliações
+
+Em cada importação, manual ou automática, a conferência compara o KIGEST com o que dele ficou no KanGest
+(`services/importar_conciliar.rs`). Cada comparação mostra quantos batem certo e lista os que não batem (até 200):
+
+- **Documento a documento** («Documentos iguais, um a um»): cada documento do KIGEST ao lado do mesmo no KanGest. A
+  lista diz porquê:
+  - «falta no KanGest», por exemplo um tipo de documento que o KanGest não conhece;
+  - «total diferente»;
+  - «anulado só no KIGEST» ou «anulado só no KanGest»;
+  - «só no KanGest», um importado que já não está no KIGEST.
+- **A conta corrente, fatura a fatura** («Facturas da conta corrente que batem certo», `tbContasCorrente`): para cada
+  factura, o que falta pagar no KIGEST ao lado do pendente dela no KanGest. O que falta é o `ValorFalta` do KIGEST;
+  sem ele, os débitos menos os créditos dessa factura.
+- **A bancária:** as contas de banco do KIGEST entram na tesouraria do KanGest como contas de banco, com os
+  movimentos e o documento de cada um (`RefDocs`). A partir daí, casam-se com o extracto em *Tesouraria → Conciliação
+  bancária*, como as outras.
+  - O tipo de cada conta vem de `tbFluxoCaixaContasTipo` (1 Caixa, 2 Banco). As importações anteriores liam mal esse
+    número e deixavam as contas de banco como caixa; a importação seguinte corrige-as.
+
+O resumo da importação automática leva também quantos documentos e quantas facturas se conferiram e quantos batem
+certo.
+
 ## O que não é importado
 
 - Os tipos de inventário (`tbArtigosTipoInventario`: mercadorias, matérias-primas, produtos acabados, subprodutos,

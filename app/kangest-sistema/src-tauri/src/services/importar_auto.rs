@@ -156,7 +156,13 @@ pub fn resumo(relatorio: &Value) -> Value {
     let dias = conferencia.iter().find(|c| c["item"] == "Dias com as mesmas vendas");
     let comparados = dias.and_then(|d| d["kigest"].as_i64()).unwrap_or(0);
     let iguais = dias.and_then(|d| d["kigest_novo"].as_i64()).unwrap_or(0);
+    // as conciliações (importar_conciliar.rs): quantos se compararam e quantos batem certo
+    let par = |nome: &str| {
+        conferencia.iter().find(|c| c["item"] == nome).map(|c| json!({ "conferidos": c["kigest"], "iguais": c["kigest_novo"] })).unwrap_or(Value::Null)
+    };
     json!({
+        "documentos": par("Documentos iguais, um a um"),
+        "facturas": par("Facturas da conta corrente que batem certo"),
         "contagens": relatorio["contagens"].as_array().map(|c| c.iter().take(30).cloned().collect::<Vec<_>>()).unwrap_or_default(),
         "avisos": relatorio["avisos"].as_array().map(|a| a.iter().take(20).cloned().collect::<Vec<_>>()).unwrap_or_default(),
         "dias_conferidos": comparados,
@@ -297,11 +303,14 @@ mod testes {
             "contagens": [{ "conjunto": "Documentos", "registos": 12 }],
             "conferencia": [
                 { "item": "Dias com as mesmas vendas", "kigest": 30, "kigest_novo": 29, "por_dia": [{ "dia": "2026-11-24" }] },
+                { "item": "Documentos iguais, um a um", "kigest": 1058, "kigest_novo": 1057, "por_documento": [] },
             ],
         });
         let s = resumo(&rel);
         assert_eq!((s["dias_conferidos"].as_i64(), s["dias_iguais"].as_i64(), s["dias_diferentes"].as_i64()), (Some(30), Some(29), Some(1)));
         assert_eq!(s["por_dia"][0]["dia"], "2026-11-24");
+        assert_eq!((s["documentos"]["conferidos"].as_i64(), s["documentos"]["iguais"].as_i64()), (Some(1058), Some(1057)));
+        assert!(s["facturas"].is_null(), "sem conta corrente, sem a conciliação dela");
         assert_eq!(s["contagens"][0]["registos"], 12);
     }
 }
