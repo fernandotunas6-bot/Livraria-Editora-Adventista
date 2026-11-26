@@ -16,7 +16,7 @@ vi.mock('@/api/PlatformApi', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { LivroDoPosto, SessoesDoPosto } = await import('./KanGestPostos');
+const { LivroDoPosto, LivroDoSite, SessoesDoPosto } = await import('./KanGestPostos');
 
 let root;
 let host;
@@ -109,6 +109,22 @@ describe('LivroDoPosto (KANGEST ONE, B1)', () => {
 
   it('sem livro (um site sem a migração), nada', async () => {
     await mount(<LivroDoPosto p={{ id: ID, livro: null }} />);
+    expect(host.textContent).toBe('');
+  });
+});
+
+describe('LivroDoSite (KANGEST ONE, B2)', () => {
+  it('as reservas por libertar', async () => {
+    await mount(<LivroDoSite resumo={{ reservas_abertas: 3, unidades: 5, encomendas: 2 }} />);
+    expect(host.textContent).toContain('5 unidade(s) reservada(s) em 2 encomenda(s)');
+  });
+
+  it('nenhuma, ou sem a migração', async () => {
+    await mount(<LivroDoSite resumo={{ reservas_abertas: 0, unidades: 0, encomendas: 0 }} />);
+    expect(host.textContent).toContain('nenhuma reserva por libertar');
+    act(() => root.unmount());
+    host.remove();
+    await mount(<LivroDoSite resumo={null} />);
     expect(host.textContent).toBe('');
   });
 });

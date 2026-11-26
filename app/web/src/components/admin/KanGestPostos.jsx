@@ -170,6 +170,7 @@ export default function KanGestPostos({ lojas = [] }) {
         <h3 id="kangest-postos" className="font-semibold">Postos do KanGest Livraria</h3>
         <span className="text-xs text-muted-foreground">as facturas da loja, já assinadas, chegam à base central cifradas e assinadas</span>
       </div>
+      <LivroDoSite resumo={estado.livro_site} />
       {!estado.configurado && (
         <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
@@ -465,5 +466,21 @@ export function LivroDoPosto({ p }) {
         </table>
       )}
     </div>
+  );
+}
+
+/**
+ * As reservas das encomendas do site no livro de stock (KANGEST ONE, B2): o checkout reserva, e o cancelamento ou a FR
+ * do posto libertam. Em sombra: o stock à venda ainda não sai do livro.
+ */
+export function LivroDoSite({ resumo }) {
+  if (!resumo) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <BookOpenCheck className="h-3.5 w-3.5" />
+      {resumo.reservas_abertas === 0
+        ? 'Livro de stock do site: nenhuma reserva por libertar.'
+        : `Livro de stock do site: ${resumo.unidades} unidade(s) reservada(s) em ${resumo.encomendas} encomenda(s), à espera da factura do posto ou do cancelamento.`}
+    </p>
   );
 }

@@ -465,6 +465,31 @@ existe:
 - `kangestSinc.test.ts` (`limparLivroStock`) e `KanGestPostos.test.jsx`;
 - Rust: `livro_de_stock_para_o_site`.
 
-**A seguir:**
-- **B2:** as reservas, as libertações e as devoluções do site entram no livro;
-- **B3:** o stock à venda passa a sair do livro, depois de conferido no staging e numa cópia da produção.
+### As encomendas do site no livro (fase B2)
+
+Migração `20261126200000`, também em sombra. O site já regista no histórico de stock (`stock_movements`) a venda do
+checkout e o cancelamento, com o número da encomenda. O livro recebe o mesmo, por gatilhos:
+
+| No site | No livro |
+|---|---|
+| o checkout desconta o stock | uma `reserva` por linha, na loja da encomenda (depois de a encomenda estar gravada) |
+| a encomenda é cancelada | `libertacao` das reservas dela que ainda estão por libertar |
+| o posto emite a FR da encomenda (`kangest_fila`, «fr» feito, com o posto) | `libertacao`: a saída passa a ser a venda do posto, que chega pelo livro dele (B1) |
+
+- **Cada reserva liberta-se uma vez só.** Depois de uma FR, a anulação chega pelo livro do posto, e o cancelamento no
+  site não liberta outra vez.
+- **Uma FR sem posto** (a ligação antiga ao KiGest) não liberta: essa venda não chega pelo livro.
+- **As devoluções físicas** fazem-se no KanGest (a nota de crédito) e chegam pelo livro do posto. O reembolso do site só
+  mexe no dinheiro.
+- **Sem referência do KanGest,** o produto entra com `livro:<id>`.
+- **As variantes** com stock próprio ainda não entram.
+- **Nada disto impede uma encomenda nem um cancelamento:** um erro fica num aviso, e o livro fica por acertar.
+
+O painel mostra as reservas do site por libertar (`stock_livro_site_resumo`, `LivroDoSite`).
+
+Testes:
+- `scripts/pglite/stock-livro-site.mjs`: reservar, cancelar, a FR do posto, a FR sem posto, o resumo, e um erro no livro
+  que não impede a encomenda;
+- os cenários do checkout, do KanGest, dos pagamentos e das lojas continuam certos.
+
+**A seguir:** a **B3**, o stock à venda a sair do livro, depois de ele bater certo no staging e numa cópia da produção.

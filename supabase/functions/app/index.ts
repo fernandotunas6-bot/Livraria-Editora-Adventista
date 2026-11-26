@@ -3297,7 +3297,12 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
   if (eSessoes) console.error("KanGest: sessões dos postos", eSessoes.message);
   const porPosto = new Map(postos.map((p) => [p.id, p]));
   for (const s of sessoes || []) porPosto.get(s.posto_id)?.sessoes.push(s);
-  return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos });
+  // as reservas das encomendas do site no livro de stock (KANGEST ONE, B2)
+  const { data: site, error: eSite } = await db.rpc("stock_livro_site_resumo");
+  if (eSite) console.error("KanGest: reservas do site no livro de stock", eSite.message);
+  const r = (site || [])[0];
+  const livroSite = r ? { reservas_abertas: Number(r.reservas_abertas), unidades: Number(r.unidades), encomendas: Number(r.encomendas) } : null;
+  return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos, livro_site: livroSite });
 });
 
 // Onde o livro de stock de um posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1): até 200 linhas.
