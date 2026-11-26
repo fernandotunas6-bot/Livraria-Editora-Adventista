@@ -388,12 +388,14 @@ function ListaBarras({ linhas, total, vazio }: { linhas: { nome: string; valor: 
   );
 }
 
-type TipoTop = "artigos" | "clientes" | "familias" | "vendedores" | "operadores";
+type TipoTop = "artigos" | "clientes" | "familias" | "vendedores" | "operadores" | "sem_vendas";
 type PeriodoTop = "hoje" | "semana" | "mes" | "30dias" | "ano";
 interface PrefTop {
   tipo: TipoTop;
   periodo: PeriodoTop;
   ordem: "valor" | "quantidade";
+  /** os que mais venderam (por omissão) ou os que menos venderam */
+  sentido?: "desc" | "asc";
 }
 const TIPOS_TOP: Record<TipoTop, { titulo: string; unidade: string }> = {
   artigos: { titulo: "Artigos mais vendidos", unidade: "unid." },
@@ -401,6 +403,7 @@ const TIPOS_TOP: Record<TipoTop, { titulo: string; unidade: string }> = {
   familias: { titulo: "Famílias que mais vendem", unidade: "unid." },
   vendedores: { titulo: "Vendedores", unidade: "documentos" },
   operadores: { titulo: "Quem mais vendeu", unidade: "documentos" },
+  sem_vendas: { titulo: "Com stock e sem vendas", unidade: "em stock" },
 };
 const PERIODOS_TOP: Record<PeriodoTop, string> = { hoje: "hoje", semana: "7 dias", mes: "este mês", "30dias": "30 dias", ano: "este ano" };
 const CHAVE_TOP = "kangest.painel.top";
@@ -431,7 +434,10 @@ function TopPainel() {
     placeholderData: (x) => x,
   });
   const linhas = q.data?.linhas ?? [];
-  const maior = Math.max(1, ...linhas.map((l) => (pref.ordem === "quantidade" ? l.quantidade : l.total)));
+  // os artigos parados: o que conta é o stock (não há valor vendido)
+  const parados = pref.tipo === "sem_vendas";
+  const pelaQuantidade = parados || pref.ordem === "quantidade";
+  const maior = Math.max(1, ...linhas.map((l) => (pelaQuantidade ? l.quantidade : l.total)));
   const sel = "rounded-md border border-line bg-surface px-1.5 py-0.5 text-[12.5px] font-normal text-ink-2 outline-none hover:border-line-strong focus:border-brand";
   return (
     <Card className={cn("p-5 transition-opacity", q.isFetching && "opacity-80")}>
@@ -450,15 +456,23 @@ function TopPainel() {
             </option>
           ))}
         </select>
-        <select aria-label="Ordenar por" className={sel} value={pref.ordem} onChange={(e) => mudar({ ordem: e.target.value as PrefTop["ordem"] })}>
-          <option value="valor">por valor</option>
-          <option value="quantidade">por {TIPOS_TOP[pref.tipo].unidade === "unid." ? "quantidade" : "n.º de documentos"}</option>
-        </select>
+        {!parados && (
+          <>
+            <select aria-label="Os que mais ou os que menos venderam" className={sel} value={pref.sentido ?? "desc"} onChange={(e) => mudar({ sentido: e.target.value as PrefTop["sentido"] })}>
+              <option value="desc">os que mais venderam</option>
+              <option value="asc">os que menos venderam</option>
+            </select>
+            <select aria-label="Ordenar por" className={sel} value={pref.ordem} onChange={(e) => mudar({ ordem: e.target.value as PrefTop["ordem"] })}>
+              <option value="valor">por valor</option>
+              <option value="quantidade">por {TIPOS_TOP[pref.tipo].unidade === "unid." ? "quantidade" : "n.º de documentos"}</option>
+            </select>
+          </>
+        )}
       </div>
       {linhas.length ? (
         <ol className="space-y-2.5">
           {linhas.map((a, i) => {
-            const v = pref.ordem === "quantidade" ? a.quantidade : a.total;
+            const v = pelaQuantidade ? a.quantidade : a.total;
             return (
               <li key={`${a.chave}-${i}`} className="flex items-center gap-3">
                 <span className="num grid size-6 shrink-0 place-items-center rounded-md bg-sunken text-[12px] text-ink-2">{i + 1}</span>
@@ -469,16 +483,16 @@ function TopPainel() {
                   </div>
                   <div className="mt-0.5 text-[12px] text-ink-3">
                     {qtd(a.quantidade)} {TIPOS_TOP[pref.tipo].unidade === "documentos" && a.quantidade === 1 ? "documento" : TIPOS_TOP[pref.tipo].unidade}
-                    {q.data && q.data.total_periodo > 0 && ` · ${Math.round((a.total / q.data.total_periodo) * 100)}% das vendas`}
+                    {!parados && q.data && q.data.total_periodo > 0 && ` · ${Math.round((a.total / q.data.total_periodo) * 100)}% das vendas`}
                   </div>
                 </div>
-                <span className="num text-[13.5px] font-medium">{kz(a.total)}</span>
+                {!parados && <span className="num text-[13.5px] font-medium">{kz(a.total)}</span>}
               </li>
             );
           })}
         </ol>
       ) : q.data ? (
-        <p className="py-8 text-center text-ink-3">Sem vendas {PERIODOS_TOP[pref.periodo]}.</p>
+        <p className="py-8 text-center text-ink-3">{parados ? `Todos os artigos com stock venderam ${PERIODOS_TOP[pref.periodo]}.` : `Sem vendas ${PERIODOS_TOP[pref.periodo]}.`}</p>
       ) : (
         <Esqueleto />
       )}

@@ -35,6 +35,7 @@ const VISTAS = [
   { id: "artigo_operador", label: "Artigos por operador" },
   { id: "artigo_entidade", label: "Artigos por entidade" },
   { id: "documento", label: "Detalhe de documentos" },
+  { id: "loja_online", label: "Vendas da loja online" },
   { id: "iva", label: "Mapa de IVA" },
   { id: "iva_dia", label: "Mapa de imposto por dia" },
   { id: "iva_familia", label: "Mapa de imposto por família" },
@@ -43,11 +44,11 @@ const VISTAS = [
 
 type Vista = (typeof VISTAS)[number]["id"];
 
-/** Os 19 mapas arrumados por assunto (como os grupos de mapas do Primavera e o menu de relatórios do Odoo). */
+/** Os 20 mapas arrumados por assunto (como os grupos de mapas do Primavera e o menu de relatórios do Odoo). */
 const CATEGORIAS: { id: string; label: string; vistas: Vista[] }[] = [
   { id: "vendas", label: "Vendas", vistas: ["sintese", "dia", "mes", "artigo", "familia", "cliente"] },
   { id: "equipa", label: "Operadores, postos e lojas", vistas: ["operador", "vendedor", "posto", "armazem", "mes_armazem", "artigo_operador"] },
-  { id: "documentos", label: "Pagamentos e documentos", vistas: ["pagamento", "artigo_entidade", "documento"] },
+  { id: "documentos", label: "Pagamentos e documentos", vistas: ["pagamento", "artigo_entidade", "documento", "loja_online"] },
   { id: "impostos", label: "Impostos", vistas: ["iva", "iva_dia", "iva_familia", "irt_c"] },
 ];
 
