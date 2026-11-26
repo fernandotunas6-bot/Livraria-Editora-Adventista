@@ -13,7 +13,73 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # O ensaio (KANGEST ONE, fase F; docs/AMBIENTES.md): as migrações e a Edge Function vão primeiro para o projecto de
+  # staging. Se falharem lá, a produção não é tocada. Sem o staging configurado (o ambiente «staging» do GitHub, com
+  # STAGING_SUPABASE_URL e STAGING_DB_PASSWORD), passa à frente com um aviso e a produção segue como até aqui.
+  staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+      STAGING_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      PROJECT_REF_PRODUCAO: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: O staging está configurado?
+        id: cfg
+        run: |
+          ref=$(printf '%s' "$STAGING_URL" | sed -nE 's#^https://([a-z0-9]{20})\.supabase\.co/?$#\1#p')
+          if [ -z "$STAGING_URL" ]; then
+            echo "::notice::Sem staging (falta STAGING_SUPABASE_URL no ambiente «staging» do GitHub): a produção segue sem ensaio. Ver docs/AMBIENTES.md."
+            echo "ref=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$ref" ]; then
+            echo "::error::STAGING_SUPABASE_URL tem de ser https://<ref de 20 letras>.supabase.co"
+            exit 1
+          fi
+          if [ "$ref" = "$PROJECT_REF_PRODUCAO" ]; then
+            echo "::error::O staging aponta para o projecto de produção: corrija STAGING_SUPABASE_URL."
+            exit 1
+          fi
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Faltam no ambiente «staging»:${missing/SUPABASE_DB_PASSWORD/STAGING_DB_PASSWORD}"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.cfg.outputs.ref != ''
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v1 (v1.7.3)
+        if: steps.cfg.outputs.ref != ''
+        with:
+          version: 2.121.0
+
+      - name: Ligar ao staging
+        if: steps.cfg.outputs.ref != ''
+        run: |
+          supabase link --project-ref "${{ steps.cfg.outputs.ref }}" || {
+            echo "::error::O staging não responde (pausado por inactividade?). Restaure-o no painel do Supabase, ou apague STAGING_SUPABASE_URL do ambiente «staging» para publicar sem ensaio."
+            exit 1
+          }
+
+      - name: Aplicar as migrações no staging
+        if: steps.cfg.outputs.ref != ''
+        run: supabase db push --include-all
+
+      - name: Publicar a Edge Function "app" no staging
+        if: steps.cfg.outputs.ref != ''
+        run: supabase functions deploy app --project-ref "${{ steps.cfg.outputs.ref }}" --no-verify-jwt
+
   deploy:
+    # só depois do ensaio no staging (ou sem staging configurado)
+    needs: staging
     runs-on: ubuntu-latest
     # O token do GitHub só precisa de ler o código: as credenciais de produção vêm dos segredos.
     permissions:
