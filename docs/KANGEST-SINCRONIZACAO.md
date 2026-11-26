@@ -454,6 +454,12 @@ existe:
 - **`stock_livro_conferir(posto)`** mostra onde a soma do livro difere da fotografia do posto, por armazém e
   referência. `stock_livro_resumo()` dá, por posto, os movimentos, se já abriu e quantas diferenças há.
 
+**O stock negativo** (migração `20261126240000`): uma venda sem Internet que deixe o livro de um posto abaixo de zero
+entra assim mesmo, porque a venda foi real e a factura está assinada. Mas fica à vista para acerto:
+- `stock_livro_resumo` conta os artigos com o livro abaixo de zero;
+- `stock_livro_negativos(posto)` diz quais;
+- o painel mostra-os a vermelho.
+
 **No painel,** em Configurações → KanGest → Postos, cada posto mostra o seu livro (`LivroDoPosto`):
 - «à espera da abertura»;
 - «bate certo com o posto»;

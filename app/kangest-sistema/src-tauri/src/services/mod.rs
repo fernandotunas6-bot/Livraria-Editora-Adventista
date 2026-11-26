@@ -490,10 +490,10 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "ajuda.lido" => ajuda::lido(st, p(params)?).await,
         "ajuda.perguntar" => ajuda::perguntar(st, p(params)?).await,
         // o atendimento dos clientes do site, com a conta do site da pessoa (sinc/atendimento.rs)
-        "ajuda.conversas" => ajuda::conversas(st).await,
-        "ajuda.conversa" => ajuda::conversa(st, p(params)?).await,
-        "ajuda.responder" => ajuda::responder(st, p(params)?).await,
-        "ajuda.estadoConversa" => ajuda::estado_conversa(st, p(params)?).await,
+        "ajuda.conversas" => crate::sinc::explicar_sem_internet(st, ajuda::conversas(st).await),
+        "ajuda.conversa" => crate::sinc::explicar_sem_internet(st, ajuda::conversa(st, p(params)?).await),
+        "ajuda.responder" => crate::sinc::explicar_sem_internet(st, ajuda::responder(st, p(params)?).await),
+        "ajuda.estadoConversa" => crate::sinc::explicar_sem_internet(st, ajuda::estado_conversa(st, p(params)?).await),
         // resumo diário ao dono por email (opcional), pelo servidor de email da empresa
         "inteligencia.resumoConfig" => resumo_email::config_obter(st).await,
         "inteligencia.resumoGuardar" => resumo_email::config_guardar(st, p(params)?).await,

@@ -412,6 +412,7 @@ export function SessoesDoPosto({ p, onTerminada }) {
  */
 export function LivroDoPosto({ p }) {
   const [diferencas, setDiferencas] = useState(null);
+  const [negativos, setNegativos] = useState([]);
   const [aVer, setAVer] = useState(false);
   const l = p.livro;
   if (!l) return null;
@@ -419,7 +420,9 @@ export function LivroDoPosto({ p }) {
   async function ver() {
     setAVer(true);
     try {
-      setDiferencas((await kangestPostoLivro(p.id)).diferencas || []);
+      const r = await kangestPostoLivro(p.id);
+      setDiferencas(r.diferencas || []);
+      setNegativos(r.negativos || []);
     } catch (e) {
       toast.error(e?.message || 'Não foi possível ler o livro de stock.');
     } finally {
@@ -436,13 +439,20 @@ export function LivroDoPosto({ p }) {
         ) : (
           <>
             <span>Livro de stock: {l.movimentos} movimento(s)</span>
-            {l.divergencias === 0 ? (
+            {l.negativos > 0 && (
+              <span className="rounded-full bg-estado-erro-fundo px-2 py-0.5 font-semibold text-estado-erro" title="Uma venda sem Internet deixou o livro abaixo de zero: acerte o stock no KanGest">
+                {l.negativos} artigo(s) com stock negativo
+              </span>
+            )}
+            {l.divergencias === 0 && !l.negativos ? (
               <span className="rounded-full bg-estado-ok-fundo px-2 py-0.5 font-semibold text-estado-ok">bate certo com o posto</span>
             ) : (
               <>
-                <span className="rounded-full bg-estado-aviso-fundo px-2 py-0.5 font-semibold text-estado-aviso">
-                  {l.divergencias} diferença(s) com o posto
-                </span>
+                {l.divergencias > 0 && (
+                  <span className="rounded-full bg-estado-aviso-fundo px-2 py-0.5 font-semibold text-estado-aviso">
+                    {l.divergencias} diferença(s) com o posto
+                  </span>
+                )}
                 <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={ver} disabled={aVer}>
                   {aVer ? 'A ler…' : 'Ver'}
                 </button>
@@ -451,6 +461,11 @@ export function LivroDoPosto({ p }) {
           </>
         )}
       </p>
+      {negativos.length > 0 && (
+        <p className="text-estado-erro">
+          Stock negativo no livro: {negativos.map((n) => `${n.referencia} (armazém ${n.armazem_id}: ${Number(n.livro)})`).join(' · ')}
+        </p>
+      )}
       {diferencas && diferencas.length > 0 && (
         <table className="w-full max-w-md text-left">
           <thead className="text-muted-foreground">
