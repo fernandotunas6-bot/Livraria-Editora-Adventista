@@ -1685,6 +1685,65 @@
         ],
         "x-reutiliza": "GET /admin/relatorios/dividas"
       }
+    },
+    "/api/v1/system/health": {
+      "get": {
+        "summary": "A saúde do ecossistema: a base, o Auth, o Storage, a fila de emails, os postos do KanGest, a última migração e a versão mínima do KanGest.",
+        "description": "Cada peça traz o estado (ok, aviso, grave) e o geral é o pior. Os erros vêm sem segredos nem dados pessoais (redact).",
+        "x-acesso": {
+          "tipo": "permissao",
+          "chaves": [
+            "manage_settings"
+          ]
+        },
+        "security": [
+          {
+            "sessao": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Certo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "estado"
+                      ],
+                      "properties": {
+                        "estado": {
+                          "type": "string",
+                          "enum": [
+                            "ok",
+                            "aviso",
+                            "grave"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro"
+          },
+          "default": {
+            "$ref": "#/components/responses/Erro"
+          }
+        }
+      }
     }
   }
 }

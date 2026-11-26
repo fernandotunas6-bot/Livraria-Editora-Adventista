@@ -9,6 +9,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const rpc = vi.fn();
 vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: (...a) => rpc(...a) } }));
+vi.mock('@/components/admin/SaudeEcossistema', () => ({ default: () => null }));
 
 const { default: SiteHealthTab } = await import('./SiteHealthTab');
 
