@@ -21,6 +21,7 @@
 pub mod catalogo;
 pub mod cifra;
 pub mod encomendas;
+pub mod entrada;
 pub mod fechos;
 pub mod loja;
 pub mod pessoa;

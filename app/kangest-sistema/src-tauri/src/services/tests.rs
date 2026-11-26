@@ -7636,3 +7636,130 @@ async fn kigest_conciliacoes() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// Um site falso que responde como o Supabase à entrada com a conta do site: a senha (as contas «certa»), o código dos
+/// dois passos («123456», na conta do gestor) e a kangest_eu, pelo token.
+fn site_falso_para_entrar() -> u16 {
+    use std::io::{Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let porta = l.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for f in l.incoming().flatten() {
+            let mut f = f;
+            let mut dados = Vec::new();
+            let mut b = [0u8; 8192];
+            loop {
+                let n = f.read(&mut b).unwrap_or(0);
+                dados.extend_from_slice(&b[..n]);
+                let texto = String::from_utf8_lossy(&dados).to_string();
+                if let Some((cab, corpo)) = texto.split_once("\r\n\r\n") {
+                    let tam: usize = cab.lines().find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0))).unwrap_or(0);
+                    if corpo.len() >= tam || n == 0 {
+                        break;
+                    }
+                }
+                if n == 0 {
+                    break;
+                }
+            }
+            let texto = String::from_utf8_lossy(&dados).to_string();
+            let caminho = texto.split_whitespace().nth(1).unwrap_or("").to_string();
+            let token = texto.lines().find_map(|l| l.strip_prefix("Authorization: Bearer ").or_else(|| l.strip_prefix("authorization: Bearer "))).unwrap_or("").trim().to_string();
+            let corpo: Value = serde_json::from_str(texto.split_once("\r\n\r\n").map(|x| x.1).unwrap_or("")).unwrap_or(Value::Null);
+            let tokens = |t: &str| json!({ "access_token": t, "refresh_token": format!("r-{t}"), "expires_in": 3600 });
+            let (estado, resposta) = match caminho.as_str() {
+                "/auth/v1/token?grant_type=password" => match (corpo["email"].as_str().unwrap_or(""), corpo["password"].as_str().unwrap_or("")) {
+                    ("caixa@x.ao", "certa") => (200, { let mut t = tokens("tok-caixa"); t["user"] = json!({ "factors": [] }); t }),
+                    ("gestor@x.ao", "certa") => (200, { let mut t = tokens("tok-gestor-aal1"); t["user"] = json!({ "factors": [{ "id": "f1", "status": "verified", "factor_type": "totp" }] }); t }),
+                    ("semacesso@x.ao", "certa") => (200, tokens("tok-sem")),
+                    _ => (400, json!({ "error": "invalid_grant", "error_description": "Invalid login credentials" })),
+                },
+                "/auth/v1/factors/f1/challenge" => (200, json!({ "id": "d1" })),
+                "/auth/v1/factors/f1/verify" => {
+                    if corpo["code"] == "123456" {
+                        (200, tokens("tok-gestor-aal2"))
+                    } else {
+                        (422, json!({ "msg": "Invalid TOTP code entered" }))
+                    }
+                }
+                "/rest/v1/rpc/kangest_eu" => match token.as_str() {
+                    "tok-caixa" => (200, json!({ "id": "u-caixa", "nome": "Ana Caixa", "email": "caixa@x.ao", "perfil": "CAIXA", "lojas": [] })),
+                    "tok-gestor-aal2" => (200, json!({ "id": "u-gestor", "nome": "Rui Gestor", "email": "gestor@x.ao", "perfil": "GESTOR", "lojas": [] })),
+                    "tok-sem" => (200, json!({ "id": "u-sem", "nome": "Sem Acesso", "email": "semacesso@x.ao", "perfil": null, "lojas": [] })),
+                    _ => (401, json!({ "message": "JWT inválido" })),
+                },
+                _ => (404, json!({ "message": "não há" })),
+            };
+            let resposta = resposta.to_string();
+            let _ = f.write_all(
+                format!("HTTP/1.1 {estado} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{resposta}", resposta.len()).as_bytes(),
+            );
+        }
+    });
+    porta
+}
+
+/// Entrar com a conta do site (parte J; src/sinc/entrada.rs, migração 0065): o site confirma a senha e o código dos
+/// dois passos e diz o perfil (Caixa ou Gestor, nunca Administrador); a sessão do site fica para a Loja online; sem
+/// Internet vale a cópia local até 7 dias, com a mesma senha; a conta ADMIN local entra sempre.
+#[tokio::test]
+async fn entrar_com_a_conta_do_site() {
+    let (st, pasta) = base_com_admin("entrada-site").await;
+    let porta = site_falso_para_entrar();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let login = |l: &str, s: &str, codigo: Option<&str>| rpc(&st, "auth.login", json!({ "login": l, "senha": s, "codigo": codigo }));
+    let erro = |l: &str, s: &str| rpc_err(&st, "auth.login", json!({ "login": l, "senha": s }));
+
+    // a senha errada: o que o site diz
+    assert!(erro("caixa@x.ao", "errada").await.contains("Email ou senha errados"));
+    // a caixa: entra como Caixa, ligada à conta do site, e a sessão do site fica para a Loja online
+    let s = login("caixa@x.ao", "certa", None).await;
+    assert_eq!((s["perfil"].as_str(), s["login"].as_str(), s["nome"].as_str()), (Some("CAIXA"), Some("caixa@x.ao"), Some("Ana Caixa")), "{s}");
+    let (conta, sessoes): (Option<String>, i64) = sqlx::query_as(
+        "SELECT u.conta_site, (SELECT COUNT(*) FROM sessoes_site x WHERE x.utilizador_id = u.id) FROM utilizadores u WHERE u.login = 'caixa@x.ao'",
+    )
+    .fetch_one(&st.pool)
+    .await
+    .unwrap();
+    assert_eq!((conta.as_deref(), sessoes), (Some("u-caixa"), 1));
+    // a senha é a do site: não se muda aqui
+    assert!(rpc_err(&st, "auth.alterarSenha", json!({ "atual": "certa", "nova": "Outra-senha-2026" })).await.contains("senha do site"));
+
+    // o gestor tem os dois passos: primeiro pede o código; com ele, entra como Gestor
+    assert_eq!(login("gestor@x.ao", "certa", None).await["dois_passos"], true);
+    assert!(rpc_err(&st, "auth.login", json!({ "login": "gestor@x.ao", "senha": "certa", "codigo": "000000" })).await.contains("Código errado"));
+    assert_eq!(login("gestor@x.ao", "certa", Some("123456")).await["perfil"], "GESTOR");
+
+    // sem a permissão do KanGest no site: não entra
+    assert!(erro("semacesso@x.ao", "certa").await.contains("não tem acesso ao KanGest"));
+
+    // sem Internet: a cópia local, com a mesma senha
+    sqlx::query("UPDATE sinc_ligacao SET auth_url = 'http://127.0.0.1:9'").execute(&st.pool).await.unwrap();
+    assert_eq!(login("caixa@x.ao", "certa", None).await["perfil"], "CAIXA");
+    assert!(erro("caixa@x.ao", "errada").await.contains("incorrectos"), "a cópia confere a senha");
+    assert!(erro("nunca@x.ao", "certa").await.contains("ainda não entrou neste KanGest"));
+    // passados 7 dias desde a última entrada com Internet, a cópia já não vale
+    sqlx::query("UPDATE utilizadores SET conta_site_validada_em = '2026-01-01T00:00:00' WHERE login = 'caixa@x.ao'").execute(&st.pool).await.unwrap();
+    assert!(erro("caixa@x.ao", "certa").await.contains("já não vale"));
+
+    // a conta ADMIN local entra sempre; o perfil Administrador nunca veio do site
+    assert_eq!(login("admin", "1234", None).await["perfil"], "ADMIN");
+    let lista = rpc(&st, "utilizadores.listar", Value::Null).await;
+    let do_site: Vec<(String, String)> = lista
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|u| u["conta_site"] == true)
+        .map(|u| (u["login"].as_str().unwrap().to_string(), u["perfil"].as_str().unwrap().to_string()))
+        .collect();
+    assert_eq!(do_site, vec![("caixa@x.ao".to_string(), "CAIXA".to_string()), ("gestor@x.ao".to_string(), "GESTOR".to_string())]);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

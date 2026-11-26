@@ -92,7 +92,7 @@ pub struct Tokens {
     pub expira: i64,
 }
 
-fn tokens_da_resposta(v: &Value) -> Option<Tokens> {
+pub(super) fn tokens_da_resposta(v: &Value) -> Option<Tokens> {
     Some(Tokens {
         access: v["access_token"].as_str()?.to_string(),
         refresh: v["refresh_token"].as_str()?.to_string(),
@@ -118,7 +118,7 @@ impl From<AppError> for Erro {
 }
 
 impl Erro {
-    fn texto(&self) -> String {
+    pub(super) fn texto(&self) -> String {
         match self {
             Erro::SemLigacao(m) => format!("Sem ligação ao site: {m}"),
             Erro::SemSessao(m) | Erro::Recusado(m) => m.clone(),
@@ -126,13 +126,13 @@ impl Erro {
     }
 }
 
-struct Auth {
-    url: String,
-    apikey: String,
+pub(super) struct Auth {
+    pub(super) url: String,
+    pub(super) apikey: String,
     funcoes: String,
 }
 
-async fn auth(pool: &SqlitePool) -> AppResult<Auth> {
+pub(super) async fn auth(pool: &SqlitePool) -> AppResult<Auth> {
     let Some((funcoes, url, apikey)) =
         sqlx::query_as::<_, (String, String, String)>("SELECT url, auth_url, auth_apikey FROM sinc_ligacao WHERE id = 1 AND ativa = 1")
             .fetch_optional(pool)
@@ -148,7 +148,7 @@ async fn auth(pool: &SqlitePool) -> AppResult<Auth> {
     Ok(Auth { url: url.trim_end_matches('/').to_string(), apikey, funcoes })
 }
 
-async fn pedido(metodo: &'static str, url: String, cabecalhos: Vec<(&'static str, String)>, corpo: Option<Value>) -> Result<(u16, Value), Erro> {
+pub(super) async fn pedido(metodo: &'static str, url: String, cabecalhos: Vec<(&'static str, String)>, corpo: Option<Value>) -> Result<(u16, Value), Erro> {
     let corpo = corpo.map(|c| c.to_string().into_bytes());
     let r = tokio::task::spawn_blocking(move || crate::http::pedido(metodo, &url, &cabecalhos, corpo.as_deref(), Duration::from_secs(30)))
         .await
@@ -157,7 +157,7 @@ async fn pedido(metodo: &'static str, url: String, cabecalhos: Vec<(&'static str
     Ok((r.estado, serde_json::from_slice(&r.corpo).unwrap_or(Value::Null)))
 }
 
-fn cabecalhos(apikey: &str, token: Option<&str>) -> Vec<(&'static str, String)> {
+pub(super) fn cabecalhos(apikey: &str, token: Option<&str>) -> Vec<(&'static str, String)> {
     let mut c = vec![("apikey", apikey.to_string()), ("Content-Type", "application/json".to_string()), ("Accept", "application/json".to_string())];
     if let Some(t) = token {
         c.push(("Authorization", format!("Bearer {t}")));

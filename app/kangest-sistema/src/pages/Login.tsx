@@ -202,7 +202,7 @@ export default function Login({ empresa }: { empresa: string | null }) {
           <TecladoPin valor={pin} onChange={setPin} ocupado={busy} onConfirmar={() => entrar("auth.loginPin", { pin })} />
         ) : (
           <form noValidate onSubmit={submeter} className="space-y-5">
-            <CampoAcesso label="Utilizador" erro={tocado && !login.trim() && OBRIGATORIO}>
+            <CampoAcesso label="Utilizador ou email da conta do site" erro={tocado && !login.trim() && OBRIGATORIO}>
               <InputAcesso
                 autoFocus
                 autoComplete="username"
