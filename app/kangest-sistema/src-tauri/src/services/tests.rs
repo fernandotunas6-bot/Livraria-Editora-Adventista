@@ -8215,3 +8215,49 @@ async fn livro_de_stock_para_o_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// KANGEST ONE (fase E): a versão mínima do KanGest que o site aceita. Abaixo dela (num KanGest ligado), cada sessão só
+/// consulta e pode actualizar-se, e o Centro de Integrações mostra o «Servidor central» em erro; sem ela, nada muda.
+#[tokio::test]
+async fn abaixo_da_versao_minima_do_site() {
+    use crate::sinc::versao;
+    let (st, pasta) = base_com_admin("versao-minima").await;
+    rpc(&st, "utilizadores.guardar", json!({ "nome": "Operador", "login": "caixa1", "perfil": "CAIXA", "senha": "caixa123", "mudar_senha": false })).await;
+    // isolado: a versão mínima não vale
+    versao::guardar(&st.pool, Some("99.0.0")).await.unwrap();
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert!(s["desactualizado"].is_null(), "num KanGest isolado nada muda: {s}");
+    // ligado ao site
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, ativa, emparelhado_em)
+         VALUES (1, 'https://exemplo.ao', 'p', 'c', 'k', 'x', 1, '2026-11-26T10:00:00')",
+    )
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert_eq!(s["desactualizado"], "99.0.0", "{s}");
+    let perms: Vec<&str> = s["permissoes"].as_array().unwrap().iter().filter_map(|p| p.as_str()).collect();
+    assert!(perms.iter().all(|p| *p == "relatorios.ver" || *p == "sistema.atualizacoes"), "só consultar e actualizar: {perms:?}");
+    // o administrador vê o servidor central em erro, e o caminho para actualizar
+    let a = rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    assert!(a["permissoes"].as_array().unwrap().iter().any(|p| p == "sistema.atualizacoes"), "pode actualizar-se");
+    assert!(!a["permissoes"].as_array().unwrap().iter().any(|p| p == "vendas.fatura_recibo"));
+    // o site deixa de pedir (ou pede uma versão já cumprida): tudo volta
+    versao::guardar(&st.pool, Some("0.0.1")).await.unwrap();
+    let s = rpc(&st, "auth.login", json!({ "login": "caixa1", "senha": "caixa123" })).await;
+    assert!(s["desactualizado"].is_null() && s["permissoes"].as_array().unwrap().iter().any(|p| p == "vendas.fatura_recibo"), "{s}");
+    versao::guardar(&st.pool, None).await.unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM config WHERE chave = 'site.kangest_min_version'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(n, 0);
+    // o cartão do servidor central, com a versão cumprida
+    versao::guardar(&st.pool, Some("0.0.1")).await.unwrap();
+    rpc(&st, "auth.login", json!({ "login": "admin", "senha": "1234" })).await;
+    let r = rpc(&st, "integracoes.resumo", Value::Null).await;
+    let cartoes = r.get("cartoes").or_else(|| r.get("integracoes")).cloned().unwrap_or(r.clone());
+    let c = cartoes.as_array().unwrap().iter().find(|c| c["id"] == "servidor").cloned().expect("o cartão do servidor central");
+    assert_eq!(c["estado"], "ok", "{c}");
+    assert!(c["resumo"].as_str().unwrap().contains("o site pede 0.0.1"), "{c}");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

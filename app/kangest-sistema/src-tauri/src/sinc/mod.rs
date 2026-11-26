@@ -34,6 +34,7 @@ pub mod pessoa;
 pub mod produtos;
 pub mod sessoes;
 pub mod tempo_real;
+pub mod versao;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -299,6 +300,8 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 eprintln!("Sincronização: {revogadas} sessão(ões) terminada(s) a pedido do painel do site.");
             }
             livro::concluir(pool, &livro_devidos, &r["stock_livro"], agora).await?;
+            // a versão mínima do KanGest que o site aceita (versao.rs)
+            versao::guardar(pool, r["kangest_min_version"].as_str()).await?;
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
             fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;
             financeiro::concluir(pool, &fin_pendentes, &financeiro::erros_do_resultado(&r["resultado"]), agora).await?;
@@ -618,6 +621,8 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     financeiro::apagar(&st.pool).await?;
     // o livro de stock abre outra vez na ligação seguinte (só o que faltar entra no livro do site)
     livro::apagar(&st.pool).await?;
+    // sem ligação, a versão mínima do site deixa de valer
+    versao::guardar(&st.pool, None).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;

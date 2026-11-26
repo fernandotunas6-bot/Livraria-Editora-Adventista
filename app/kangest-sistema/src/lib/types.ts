@@ -25,6 +25,8 @@ export interface Sessao {
   ligar_ate?: string | null;
   /** passou a data: só lê */
   so_leitura?: boolean;
+  /** Abaixo da versão mínima que o site aceita (a versão): só consulta e pode actualizar-se. */
+  desactualizado?: string | null;
 }
 
 /** Impressão térmica directa: ESC/POS em vez do diálogo do sistema (corta o papel e abre a gaveta). */
