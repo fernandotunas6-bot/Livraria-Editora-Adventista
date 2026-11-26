@@ -7003,13 +7003,18 @@ async fn loja_online_conta_do_site() {
     assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "preparar" })).await.contains("Entre com a sua conta do site"));
     assert_eq!(rpc(&st, "loja.conta.estado", Value::Null).await["entrou"], false);
 
-    // a sessão que o «entrar» guarda (aqui sem o site): fica cifrada
+    // a sessão que o «entrar» guarda (aqui sem o site): só em memória, nenhum token vai para o disco (KANGEST ONE, fase A)
     let uid = st.sessao().unwrap().id;
     let agora = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64;
     let tokens = crate::sinc::pessoa::Tokens { access: "token-de-acesso-secreto".into(), refresh: "renovacao-secreta".into(), expira: agora + 3600 };
     crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
-    let cifrada: String = sqlx::query_scalar("SELECT sessao FROM sessoes_site").fetch_one(&st.pool).await.unwrap();
-    assert!(!cifrada.contains("token-de-acesso-secreto") && !cifrada.contains("renovacao-secreta"), "a sessão do site fica cifrada");
+    let tabela: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'sessoes_site'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(tabela, 0, "já não há tabela de sessões na base");
+    let claro = pasta.join("sem-tokens.db");
+    crate::db::exportar_em_claro(&st.pool, &claro).await.unwrap();
+    let bytes = std::fs::read(&claro).unwrap();
+    let tem = |t: &str| bytes.windows(t.len()).any(|w| w == t.as_bytes());
+    assert!(!tem("token-de-acesso-secreto") && !tem("renovacao-secreta"), "nenhum token na base, nem decifrada");
     let conta = rpc(&st, "loja.conta.estado", Value::Null).await;
     assert_eq!((conta["entrou"].as_bool(), conta["email"].as_str()), (Some(true), Some("ana@livraria.ao")));
 
@@ -7035,20 +7040,20 @@ async fn loja_online_conta_do_site() {
     assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM loja_comandos WHERE estado = 'pendente'").fetch_one(&st.pool).await.unwrap(), 2);
 
     // o turno acaba ao fim de 12 horas
-    sqlx::query("UPDATE sessoes_site SET entrou_em = entrou_em - 13 * 3600").execute(&st.pool).await.unwrap();
+    crate::sinc::pessoa::envelhecer_sessao(&st.pool, uid, 13 * 3600);
     assert_eq!(rpc(&st, "loja.conta.estado", Value::Null).await["entrou"], false);
     assert!(rpc_err(&st, "loja.conta.accao", json!({ "id": "o1", "accao": "preparar" })).await.contains("12 horas"));
-    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+    assert!(!crate::sinc::pessoa::tem_sessao(&st.pool, uid));
 
     // sair (sem Internet, sai na mesma)
     crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
     assert_eq!(rpc(&st, "loja.conta.sair", Value::Null).await["entrou"], false);
-    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+    assert!(!crate::sinc::pessoa::tem_sessao(&st.pool, uid));
 
     // desligar apaga as sessões e as alterações por enviar
     crate::sinc::pessoa::guardar(&st.pool, uid, "ana@livraria.ao", &tokens, "", agora).await.unwrap();
     rpc(&st, "sinc.desligar", Value::Null).await;
-    assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessoes_site").fetch_one(&st.pool).await.unwrap(), 0);
+    assert!(!crate::sinc::pessoa::tem_sessao(&st.pool, uid));
     assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM loja_comandos").fetch_one(&st.pool).await.unwrap(), 0);
 
     st.pool.close().await;
@@ -7729,13 +7734,10 @@ async fn entrar_com_a_conta_do_site() {
     // a caixa: entra como Caixa, ligada à conta do site, e a sessão do site fica para a Loja online
     let s = login("caixa@x.ao", "certa", None).await;
     assert_eq!((s["perfil"].as_str(), s["login"].as_str(), s["nome"].as_str()), (Some("CAIXA"), Some("caixa@x.ao"), Some("Ana Caixa")), "{s}");
-    let (conta, sessoes): (Option<String>, i64) = sqlx::query_as(
-        "SELECT u.conta_site, (SELECT COUNT(*) FROM sessoes_site x WHERE x.utilizador_id = u.id) FROM utilizadores u WHERE u.login = 'caixa@x.ao'",
-    )
-    .fetch_one(&st.pool)
-    .await
-    .unwrap();
-    assert_eq!((conta.as_deref(), sessoes), (Some("u-caixa"), 1));
+    let (uid_caixa, conta): (i64, Option<String>) =
+        sqlx::query_as("SELECT id, conta_site FROM utilizadores WHERE login = 'caixa@x.ao'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(conta.as_deref(), Some("u-caixa"));
+    assert!(crate::sinc::pessoa::tem_sessao(&st.pool, uid_caixa), "a sessão do site fica em memória");
     // a senha é a do site: não se muda aqui
     assert!(rpc_err(&st, "auth.alterarSenha", json!({ "atual": "certa", "nova": "Outra-senha-2026" })).await.contains("senha do site"));
 

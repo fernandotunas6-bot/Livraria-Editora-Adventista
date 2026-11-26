@@ -42,7 +42,9 @@ painel:
 painel. A senha não fica guardada.
 
 **A sessão:**
-- fica cifrada com a chave mestra (`sessoes_site`), só para aquele utilizador do KanGest;
+- **vive só em memória** (KANGEST ONE, fase A; migração 0069): nenhum token do site vai para o disco. Ao fechar o
+  programa, também à força, a sessão morre, e ao abrir outra vez é preciso entrar de novo;
+- é só daquele utilizador do KanGest;
 - renova-se sozinha;
 - acaba ao fim de **12 horas** (um turno), ao sair ou ao desligar a ligação.
 
@@ -110,7 +112,7 @@ Cada encomenda ou produto alterado no site volta a vir e substitui o que havia (
 
 `services/tests.rs` (`loja_online_conta_do_site`):
 - sem sessão do site não se altera nada;
-- a sessão fica cifrada;
+- a sessão fica só em memória: a base não tem tabela de sessões, e nem a cópia decifrada da base tem os tokens;
 - sem Internet, as alterações ficam na fila em nome de quem as fez, com o pagamento;
 - só as alterações conhecidas e ids que podem ir num endereço;
 - a volta sem Internet não as perde;
