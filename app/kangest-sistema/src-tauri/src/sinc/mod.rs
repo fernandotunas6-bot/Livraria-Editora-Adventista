@@ -21,6 +21,7 @@
 pub mod catalogo;
 pub mod cifra;
 pub mod encomendas;
+pub mod fechos;
 pub mod loja;
 pub mod pessoa;
 pub mod tempo_real;
@@ -260,6 +261,9 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     // o catálogo que mudou (stock, preço, artigos), no mesmo pedido
     let (cat_pendentes, cat_itens) = catalogo::devidos(pool, agora, catalogo::LOTE).await?;
     lote.extend(cat_itens);
+    // os fechos de caixa arquivados, para a cópia no site (sem os nomes dos clientes)
+    let (fechos_pendentes, fechos_itens) = fechos::devidos(pool, agora, fechos::LOTE).await?;
+    lote.extend(fechos_itens);
     // o que este KanGest fez com as tarefas da volta anterior (as encomendas online)
     let (tarefas_feitas, tarefas_itens) = encomendas::resultados(pool).await?;
     lote.extend(tarefas_itens);
@@ -267,6 +271,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     match enviar(l, &json!({ "lote": lote, "cursores": &cursores })).await {
         Ok(r) => {
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
+            fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;
             encomendas::marcar_enviados(pool, &tarefas_feitas).await?;
             // as tarefas novas emitem-se já; os resultados seguem na volta seguinte (logo a seguir, por causa do «continuar»)
             let por_seguir = encomendas::executar(st, &r["tarefas"]).await?;
@@ -325,7 +330,11 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 encomendas,
                 produtos,
                 resultado: r["resultado"].clone(),
-                continuar: fila.len() as i64 == LOTE || cat_pendentes.len() as i64 == catalogo::LOTE || por_seguir > 0 || mais,
+                continuar: fila.len() as i64 == LOTE
+                    || cat_pendentes.len() as i64 == catalogo::LOTE
+                    || fechos_pendentes.len() as i64 == fechos::LOTE
+                    || por_seguir > 0
+                    || mais,
             })
         }
         Err(Falha::SemLigacao(m)) => {
@@ -498,8 +507,11 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
         sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
         loja::apagar(&st.pool).await?;
         catalogo::apagar(&st.pool).await?;
+        fechos::apagar(&st.pool).await?;
     }
     enfileirar_tudo(&st.pool).await?;
+    // os fechos de caixa arquivados também seguem (o site guarda uma cópia)
+    fechos::enfileirar_tudo(&st.pool).await?;
     // o catálogo todo segue uma vez: o site fica com o stock e os preços de agora
     catalogo::enfileirar_tudo(&st.pool).await?;
     let mut e = estado(st).await?;
@@ -565,6 +577,7 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     // mesmo posto não grava nada em dobro, e outro posto fica com tudo, como ao ligar a outro posto sem desligar
     sqlx::query("DELETE FROM sinc_saida").execute(&st.pool).await?;
     catalogo::apagar(&st.pool).await?;
+    fechos::apagar(&st.pool).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam
     loja::apagar(&st.pool).await?;
     pessoa::apagar_tudo(&st.pool).await?;

@@ -7377,3 +7377,55 @@ async fn fechos_antigos_arquivados_ao_abrir_reconstruidos() {
     assert_eq!((v["arquivo"]["reconstruido"].as_bool(), v["online"]["incluidas"].as_bool()), (Some(true), Some(false)));
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// A cópia do fecho de caixa no site (migração 0063, src/sinc/fechos.rs): com a ligação activa, cada fecho arquivado
+/// entra na fila e segue sem os nomes dos clientes, com o selo do arquivo; sem ligação, não entra; desligar esvazia.
+#[tokio::test]
+async fn o_fecho_segue_para_o_site_sem_os_nomes_dos_clientes() {
+    let (st, pasta) = base_com_admin("fecho-para-o-site").await;
+    let a = rpc(&st, "artigos.guardar", json!({ "descricao": "Livro A", "tipo": "S", "taxa_iva_id": 1, "preco1": 100000 })).await["id"].as_i64().unwrap();
+    let cli = rpc(&st, "entidades.guardar", json!({ "nome": "Ana Silva", "nif": "5417000123" })).await["id"].as_i64().unwrap();
+    // sem ligação: o fecho não entra na fila
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    rpc(&st, "caixa.fechar", json!({ "valor_contado": 0 })).await;
+    let conta = |sql: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_fechos").await, 0);
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    // com ligação: a venda a um cliente com nome e o fecho, que entra na fila na mesma transacção
+    rpc(&st, "caixa.abrir", json!({ "valor_inicial": 0 })).await;
+    rpc(&st, "documentos.emitir", json!({ "tipo": "FR", "entidade_id": cli, "linhas": [{ "artigo_id": a, "quantidade": 1 }], "pagamentos": [{ "modo": "NU", "valor": 114000 }] })).await;
+    let z = rpc(&st, "caixa.fechar", json!({ "valor_contado": 114000 })).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_fechos WHERE estado = 'pendente'").await, 1);
+    // os de antes da ligação entram ao enfileirar tudo (como ao emparelhar), uma vez só
+    assert_eq!(crate::sinc::fechos::enfileirar_tudo(&st.pool).await.unwrap(), 1);
+    assert_eq!(crate::sinc::fechos::enfileirar_tudo(&st.pool).await.unwrap(), 0);
+    let (pendentes, itens) = crate::sinc::fechos::devidos(&st.pool, i64::MAX, 20).await.unwrap();
+    assert_eq!((pendentes.len(), itens.len()), (2, 2));
+    let item = itens.iter().find(|i| i["fecho"]["numero_z"] == z["sessao"]["numero_z"]).unwrap();
+    assert_eq!(item["tipo"], "fecho");
+    assert_eq!(item["fecho"]["selo"], z["arquivo"]["selo"]);
+    assert_eq!(item["fecho"]["valor_contado"], 114000);
+    let texto = item.to_string();
+    assert!(!texto.contains("Ana Silva"), "o nome do cliente não vai para o site: {texto}");
+    assert!(item["fecho"]["resumo"]["documentos_lista"][0]["numero_doc"].is_string());
+    // o centro recebeu: ficam feitos (e não voltam a entrar)
+    crate::sinc::fechos::concluir(&st.pool, &pendentes, &Default::default(), 0).await.unwrap();
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_fechos WHERE estado = 'feito'").await, 2);
+    assert_eq!(crate::sinc::fechos::enfileirar_tudo(&st.pool).await.unwrap(), 0);
+    // desligar esvazia a fila
+    rpc(&st, "sinc.desligar", Value::Null).await;
+    assert_eq!(conta("SELECT COUNT(*) FROM sinc_fechos").await, 0);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

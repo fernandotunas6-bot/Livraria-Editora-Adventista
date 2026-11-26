@@ -236,6 +236,17 @@ Quem vê:
 - quem vê os relatórios (`view_reports`, `edit_reports`): todas as lojas e as dívidas;
 - o gerente de loja: os produtos da loja dele.
 
+## 5.3 Os fechos de caixa dos postos
+
+Cada fecho de caixa arquivado num posto (o relatório Z) chega ao site no tipo `fecho` da fila dos postos (migração
+`20261125180000`):
+- **Fica em `public.kangest_fechos`**, uma cópia que não se altera nem se apaga, sem os nomes dos clientes. O KanGest
+  tira-os do resumo.
+- **As encomendas que esse Z fechou** ficam em `public.kangest_fecho_encomendas`.
+- **No painel,** em *Sistema → Ligação ao KanGest*, aparecem os «Fechos de caixa dos postos», com o detalhe de cada Z:
+  os pagamentos, os artigos e as vendas online à parte.
+- **Quem os vê:** quem vê os relatórios, todas as lojas; o gerente da loja, a sua.
+
 ## 6. Rotas da Edge Function
 
 | Rota | Quem | O quê |
