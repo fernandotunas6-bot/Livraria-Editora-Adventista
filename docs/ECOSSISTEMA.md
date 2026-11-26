@@ -1,5 +1,8 @@
 # KanGest Livraria e o site — como vai funcionar (estudo)
 
+> **O estado actual do ecossistema** (as decisões do dono de 26/11, o que está feito e como se prova) está em
+> [KANGEST-ONE.md](KANGEST-ONE.md). Este documento é o estudo que lhe deu origem.
+
 Estudo de 24/11/2026, pedido pelo dono antes de se mexer na base de dados. Responde a quatro perguntas: como vai
 funcionar, como se liga ao site, que ligações há e como fica tudo cifrado. Diz também o que já existe, o que falta e
 por que ordem se faz.
@@ -120,7 +123,7 @@ nunca toca numa factura emitida: a factura é uma cópia fechada do momento.
 | **Emparelhar um posto** | No painel (`manage_settings`) cria-se um código de uso único, válido 10 minutos e guardado só como resumo SHA-256. O posto gera o seu par **Ed25519** e só a chave pública sobe | HTTPS | Código roubado: prazo curto, uso único, limite de pedidos |
 | **Posto → centro** (vendas, stock, caixa) | A conta do posto no Supabase Auth, mais a **assinatura Ed25519** de cada lote (posto, nonce, hora, SHA-256 do corpo) | TLS 1.3 e, por cima, o corpo **selado** (X25519 + HKDF-SHA256 + AES-256-GCM, à maneira do HPKE) com a chave pública do centro | Intercepção em proxies e registos; repetição (nonce e ±5 min); um JWT roubado não chega para escrever |
 | **Centro → posto** (encomendas, conteúdo, pagamentos) | O mesmo posto. A RLS só lhe mostra a loja dele | HTTPS ao puxar e WSS no Realtime | Ver dados de outras lojas |
-| **Pessoa → gestão da loja online** | A conta da pessoa no site, com **MFA obrigatório**. O refresh token fica no cofre (AES-256-GCM) | HTTPS para o PostgREST (com RLS) e para as rotas `/admin/...` | Um posto sem pessoa não muda o site |
+| **Pessoa → gestão da loja online** | A conta da pessoa no site, com **MFA obrigatório**. O refresh token fica **só em memória** (KANGEST ONE, fase A; a migração 0069 apagou o cofre `sessoes_site`): ao fechar o programa perde-se, e entra-se outra vez | HTTPS para o PostgREST (com RLS) e para as rotas `/admin/...` | Um posto sem pessoa não muda o site |
 | **Navegador → Internet** | Nenhuma identidade do KanGest | HTTPS; separadores **sem acesso ao programa** e perfil isolado | Um site a chegar aos ficheiros, às chaves ou à API local |
 | **Site → KanGest** (a actual) | Chave `kg_…` e avisos HMAC | Túnel da Cloudflare | Fica até o caminho novo estar provado |
 

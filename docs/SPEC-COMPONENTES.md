@@ -72,6 +72,36 @@ Só avisa; nunca bloqueia nem altera dados. Os textos são fixos e curtos, em fr
 
 As duas vêm de Configurações → cor principal (`applyShopTheme` em `app/web/src/lib/shopTheme.js`). Não se escreve `#0ea5c9` (nem outra cor da marca) à mão: deixava o painel sem efeito nesses sítios. Cores escolhidas pelos utilizadores (grupos de contactos) e as dos gráficos ficam como valores.
 
+## 7a. Estados partilhados com o KanGest (KANGEST ONE, fase G)
+
+As cores de estado, os raios, o movimento e a escala de texto vêm de um ficheiro que o site e o KanGest partilham:
+[`packages/marca/tokens.css`](../packages/marca/tokens.css), lido pelo Tailwind 4 dos dois lados. As cores da marca
+não estão lá: o site mantém o petróleo e o ouro, e o KanGest o verde-azulado.
+
+| Estado | Texto ou ícone | Fundo suave | Quando |
+|---|---|---|---|
+| Certo | `text-estado-ok` | `bg-estado-ok-fundo` | bate certo, ligado, tudo enviado |
+| Aviso | `text-estado-aviso` | `bg-estado-aviso-fundo` | precisa de atenção, mas nada parou |
+| Erro | `text-estado-erro` | `bg-estado-erro-fundo` | parou, foi recusado, ou é um risco de segurança (o ADMIN de recurso) |
+| Informação | `text-estado-info` | `bg-estado-info-fundo` | uma nota neutra |
+
+| Propriedade | Classes |
+|---|---|
+| Raios | `rounded-campo` (campos), `rounded-cartao` (cartões), `rounded-pilula` (etiquetas e pontos de estado) |
+| Movimento | `ease-kg`. As durações (`--duracao-kg`, `--duracao-kg-rapida`) vão a zero com `prefers-reduced-motion` |
+| Texto | `text-legenda`, `text-corpo`, `text-titulo-cartao` |
+
+Regras:
+- **Um estado novo usa estas classes,** não verdes, âmbares ou vermelhos soltos (`emerald-*`, `amber-*`, `red-*`).
+  - Já as usam: os postos do KanGest, as sessões, o livro de stock e a saúde do ecossistema, no painel do site; e os
+    cartões do ecossistema no painel inicial do KanGest.
+- **O modo escuro já vem nos tokens:** `.dark` no site, `[data-tema="escuro"]` no KanGest. Não se acrescenta `dark:` a
+  estas classes.
+- **Cada par texto e fundo passa o contraste AA** (4,5:1), também sobre as superfícies dos dois lados, em claro e em
+  escuro. Prova-o `packages/marca/contraste.test.mjs`. Mudar uma cor obriga a passar esse teste.
+- **Os elementos antigos** (o `CodeChip`, a `Pill`) passam para os estados quando forem tocados, no mesmo commit que
+  muda esta secção.
+
 ## 8. Ficha de produto
 
 Ordem, de cima para baixo, no telemóvel e no computador:
@@ -155,4 +185,5 @@ Sem as migrações aplicadas, o site mostra "A comunidade abre em breve".
 ## 10. Verificação
 
 - Teste unitário de regras: `app/web/src/lib/personDataChecks.test.js`.
+- O contraste AA dos estados partilhados: `packages/marca/contraste.test.mjs` (corre com o vitest do `app/web`).
 - Antes de fechar uma alteração de elemento: `npm run lint` em `app/web`, `npx vitest run`, e uma olhada na ficha e na lista com tema claro e escuro, e em telemóvel (16px de margem, sem scroll horizontal).
