@@ -845,6 +845,9 @@ async fn chave_da_linha(st: &AppState, row: &sqlx::sqlite::SqliteRow, ip: Option
         perfil_descricao: None,
         // as chaves da API agem pelo posto delas (a loja da chave), não pela loja do utilizador
         armazem_id: None,
+        offline: false,
+        ligar_ate: None,
+        so_leitura: false,
     };
     Ok(Chave { id, nome: row.get("nome"), prefixo: row.get("prefixo"), permissoes, limite_minuto: row.get("limite_minuto"), sessao, posto })
 }
