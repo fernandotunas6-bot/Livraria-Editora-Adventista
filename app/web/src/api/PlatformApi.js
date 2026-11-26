@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS = {
   header_cta_link: '/shop',
   footer_tagline: '',
   footer_copyright: '',
+  // o site da Kanguele, no crédito do rodapé (vazio: o de omissão, lib/kanguele.js)
+  kangest_url: '',
   footer_columns: null,
   show_stores_in_footer: true,
   ui_glass_enabled: true,

@@ -1680,6 +1680,8 @@ route("GET", "/settings", publica("configurações públicas do site; os segredo
     header_cta_link: rec.header_cta_link || "/shop",
     footer_tagline: rec.footer_tagline || "",
     footer_copyright: rec.footer_copyright || "",
+    // o site da Kanguele, no crédito do rodapé (só https://; o site volta ao de omissão sem ele)
+    kangest_url: /^https:\/\/[^\s"'<>]{4,200}$/.test(String(rec.kangest_url || "")) ? String(rec.kangest_url) : "",
     footer_columns: rec.footer_columns || null,
     show_stores_in_footer: orTrue(rec.show_stores_in_footer),
     shop_hero_title: rec.shop_hero_title || "Todos os Livros",

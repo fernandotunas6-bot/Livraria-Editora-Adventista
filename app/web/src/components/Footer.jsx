@@ -14,6 +14,7 @@ import { getPhysicalStores, getPaymentMethods } from '@/api/PlatformApi';
 import BrandLogo from '@/components/BrandLogo';
 import { BRAND } from '@/lib/brand';
 import { safeLinkUrl } from '@/lib/safeLink';
+import { ligacaoKanguele } from '@/lib/kanguele';
 import { fotoDaLoja, lojaSrcSet, mapsUrl } from '@/lib/stores';
 import SafeLink from '@/components/SafeLink.jsx';
 import { m as motion, AnimatePresence } from 'framer-motion';
@@ -491,8 +492,12 @@ const Footer = () => {
 
         <div className="flex flex-col items-center gap-2 border-t border-background/20 pt-8 text-center sm:flex-row sm:justify-center sm:gap-4">
           <p className="text-sm text-background/70">{copyright}</p>
-          {/* Crédito de quem desenvolveu: fixo, fora das definições do painel. */}
-          <p className="text-sm text-background/70"><a href="mailto:valentinocanguele@gmail.com" className="hover:underline">Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com</a></p>
+          {/* Crédito de quem desenvolveu: o texto é fixo, fora das definições do painel; o endereço do site da Kanguele
+              vem das Configurações (Rodapé), e um inválido volta ao de omissão (lib/kanguele.js). */}
+          <p className="text-sm text-background/70">
+            Desenvolvido pela{' '}
+            <a href={ligacaoKanguele(settings.kangest_url)} target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#22d3ee]">Kanguele</a>
+          </p>
           {/* Fora das colunas, que o painel pode mudar: as páginas legais ficam sempre ligadas. */}
           <Link to="/privacidade" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Política de privacidade</Link>
           <Link to="/termos" className="text-sm text-background/70 underline underline-offset-2 hover:text-[#22d3ee]">Termos e condições</Link>
