@@ -2,6 +2,7 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Loader2, Monitor, RotateCw, Send, Smartphone } from 'lucide-react';
 import pb from '@/lib/dataClient';
 import { Button } from '@/components/ui/button';
@@ -188,6 +189,10 @@ export default function EmailTemplatesPanel() {
             <ul className="mt-1 list-disc pl-4 space-y-0.5">
               {blockers.map((b) => <li key={b}>{b}</li>)}
             </ul>
+            {/* o sítio onde se resolve: Configurações › Email, push e chat (o fornecedor, a chave e o remetente) */}
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <Link to="/admin?tab=settings&vista=messaging">Configurar o envio de emails</Link>
+            </Button>
           </div>
         </div>
       ) : (
