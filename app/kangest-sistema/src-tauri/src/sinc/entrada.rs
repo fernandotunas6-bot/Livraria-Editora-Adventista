@@ -26,9 +26,9 @@ pub struct PessoaSite {
     pub id: String,
     pub nome: String,
     pub email: String,
-    /// GESTOR, CAIXA ou nenhum (sem acesso ao KanGest)
+    /// GESTOR, CAIXA ou nenhum (sem acesso ao KanGest). As lojas da ficha, que a kangest_eu também dá, ainda não
+    /// limitam o posto onde a pessoa entra (vale a loja da conta local, como antes).
     pub perfil: Option<String>,
-    pub lojas: Vec<String>,
 }
 
 /// O que o site disse.
@@ -148,7 +148,6 @@ pub async fn validar(pool: &SqlitePool, email: &str, senha: &str, codigo: Option
         nome: eu["nome"].as_str().filter(|n| !n.trim().is_empty()).unwrap_or(email).trim().to_string(),
         email: eu["email"].as_str().unwrap_or(email).trim().to_lowercase(),
         perfil: eu["perfil"].as_str().map(str::to_string),
-        lojas: eu["lojas"].as_array().into_iter().flatten().filter_map(|l| l.as_str().map(str::to_string)).collect(),
     };
     Ok(Validacao::Confirmada { pessoa, tokens })
 }
