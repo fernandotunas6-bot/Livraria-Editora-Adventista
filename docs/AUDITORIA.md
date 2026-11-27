@@ -2065,7 +2065,7 @@ fixo), a Edge Function, o site num navegador (telemóvel e computador) e os cabe
 
 | # | Achado | Gravidade | Feito |
 |---|---|---|---|
-| 1 | Verificação em dois passos opcional, também para os administradores (nenhum a tinha a 14/11) | Alta | Obrigatória para admin e gestor depois de 7 dias (`dois_passos_obrigatorio_equipa`, `mfa.ts`, `StaffMfaGate`); reposição pelos administradores (`/admin/users/mfa-reset`); cenários em `scripts/pglite/dois-passos.mjs` |
+| 1 | Verificação em dois passos opcional, também para os administradores (nenhum a tinha a 14/11) | Alta | Obrigatória para admin e gestor depois de 7 dias (`dois_passos_obrigatorio_equipa`, `mfa.ts`, `StaffMfaGate`). **A 27/11, o dono decidiu torná-la opcional** (`20261127150000_dois_passos_opcionais`), com um interruptor no painel para a voltar a ligar; o risco volta a ser o da palavra-passe roubada para quem não a activar; reposição pelos administradores (`/admin/users/mfa-reset`); cenários em `scripts/pglite/dois-passos.mjs` |
 | 2 | `livraria-adventista.pages.dev` continua no ar, ligado à produção | Média-alta | Por fazer pelo dono: o projecto está na conta Cloudflare antiga |
 | 3 | Checkout sem CAPTCHA; encomendas na entrega reservavam stock sem prazo | Média | Turnstile (`turnstile.ts`, `TurnstileWidget`) ligado pelos segredos; regra `unconfirmed_cancel_days` (0 = nunca) |
 | 4 | Webhook do gateway: aviso sem `status` contava como pago | Média | `status` obrigatório (`gateway_estado_obrigatorio`) |

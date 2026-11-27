@@ -50,7 +50,7 @@ Restrições de segurança, palavra por palavra:
 |---|---|---|
 | Dados | um só projecto Supabase (`bggqkjjqbjhbjsckzopj`): Postgres com RLS, migrações em `supabase/migrations` | [ARQUITETURA.md](ARQUITETURA.md) |
 | Core API | Edge Function `app`: as rotas antigas e a API v1 (`/api/v1/*`), cada rota com o acesso declarado (`access.ts`) | [api/README.md](api/README.md), [api/openapi.json](api/openapi.json) |
-| Identidade | Supabase Auth com os dois passos para a equipa; no KanGest, a conta do site (`sinc/entrada.rs`, `services/auth.rs`) | [ENTRADA-COM-A-CONTA-DO-SITE](../app/kangest-sistema/docs/ENTRADA-COM-A-CONTA-DO-SITE.md) |
+| Identidade | Supabase Auth, com os dois passos opcionais desde 27/11 (decisão do dono; obrigatórios só com o interruptor do painel); no KanGest, a conta do site (`sinc/entrada.rs`, `services/auth.rs`) | [ENTRADA-COM-A-CONTA-DO-SITE](../app/kangest-sistema/docs/ENTRADA-COM-A-CONTA-DO-SITE.md) |
 | Sincronização | cada KanGest é um posto Ed25519, com uma volta assinada e cifrada (`/kangest/sinc`) | [KANGEST-SINCRONIZACAO.md](KANGEST-SINCRONIZACAO.md) |
 | Livro de stock | `public.stock_movimentos`: o KanGest (`sinc/livro.rs`) e as encomendas do site | §15 de KANGEST-SINCRONIZACAO |
 | Saúde | `GET /api/v1/system/health`, o cartão «Ecossistema» no painel, o «Servidor central» e o painel inicial no KanGest | §16 de KANGEST-SINCRONIZACAO |

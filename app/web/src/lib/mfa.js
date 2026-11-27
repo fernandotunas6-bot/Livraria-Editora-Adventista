@@ -65,7 +65,24 @@ export async function startTotpEnrollment() {
     factorType: 'totp',
     friendlyName: `Autenticador ${new Date().toISOString().slice(0, 10)}`,
   }));
-  return { factorId: data.id, qrCode: data.totp?.qr_code || '', secret: data.totp?.secret || '' };
+  // `uri` (otpauth://totp/…): num telemóvel, abre a aplicação autenticadora já com a conta, sem ler o QR
+  return { factorId: data.id, qrCode: data.totp?.qr_code || '', secret: data.totp?.secret || '', uri: data.totp?.uri || '' };
+}
+
+/** A situação dos dois passos da própria conta e a política da equipa (`public.staff_mfa_status`). `null` sem ela. */
+export async function getStaffMfaStatus() {
+  const { data, error } = await supabase.rpc('staff_mfa_status');
+  return error ? null : data;
+}
+
+/**
+ * Liga (com `dias` de prazo) ou desliga a obrigação dos dois passos para a equipa. Só um administrador
+ * (`public.staff_mfa_politica_definir`); fica no registo de segurança.
+ */
+export async function setStaffMfaPolicy(obrigatoria, dias = 7) {
+  const { data, error } = await supabase.rpc('staff_mfa_politica_definir', { p_obrigatoria: obrigatoria, p_dias: dias });
+  if (error) throw error;
+  return data;
 }
 
 /** Termina a activação com o primeiro código gerado pela aplicação. */

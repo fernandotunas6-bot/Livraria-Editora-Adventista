@@ -45,6 +45,9 @@ describe('staffMfaView', () => {
     expect(staffMfaView({ staff: true, has_factor: true, enforced: true })).toBe('none');
     expect(staffMfaView({ staff: true, has_factor: false, enforced: false })).toBe('notice');
     expect(staffMfaView({ staff: true, has_factor: false, enforced: true })).toBe('gate');
+    // opcional para a equipa (decisão do dono a 27/11): nem ecrã nem aviso
+    expect(staffMfaView({ staff: true, has_factor: false, obrigatoria: false, enforced: false })).toBe('none');
+    expect(staffMfaView({ staff: true, has_factor: false, obrigatoria: true, enforced: true })).toBe('gate');
   });
 
   it('papéis da equipa', () => {

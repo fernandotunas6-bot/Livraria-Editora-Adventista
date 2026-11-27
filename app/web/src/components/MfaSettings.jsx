@@ -8,9 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
-  confirmTotpEnrollment, getMfaState, isTotpCode, mfaErrorMessage, normalizeTotpCode,
+  confirmTotpEnrollment, getMfaState, getStaffMfaStatus, isTotpCode, mfaErrorMessage, normalizeTotpCode,
   removeTotpFactor, startTotpEnrollment,
 } from '@/lib/mfa';
+import { AppsAutenticadoras, PassosAutenticador } from '@/components/AutenticadorGuia';
+
+/**
+ * O texto de cima, conforme quem é e a política da equipa (`staff_mfa_status().obrigatoria`; decisão do dono a 27/11:
+ * opcional para todos, com a obrigação para a equipa a ligar no painel).
+ */
+export function textoDosDoisPassos(isStaff, obrigatoria) {
+  if (isStaff && obrigatoria) return 'Obrigatória para a equipa: mesmo com a palavra-passe, ninguém entra no painel sem o código do seu telemóvel.';
+  if (isStaff) return 'Opcional, mas recomendada para a equipa: mesmo com a palavra-passe, ninguém entra no painel sem o código do seu telemóvel.';
+  return 'Opcional: além da palavra-passe, a entrada pede um código da aplicação autenticadora do telemóvel.';
+}
 
 /**
  * Activar ou retirar a verificação em dois passos (aplicação autenticadora: Google
@@ -26,6 +37,17 @@ export default function MfaSettings({ isStaff = false, onEnabled }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // a política da equipa (para o texto e o aviso ao retirar); sem resposta, conta como obrigatória
+  const [obrigatoria, setObrigatoria] = useState(true);
+
+  useEffect(() => {
+    if (!isStaff) return undefined;
+    let vivo = true;
+    getStaffMfaStatus().then((st) => {
+      if (vivo && st) setObrigatoria(st.obrigatoria !== false);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [isStaff]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -96,16 +118,12 @@ export default function MfaSettings({ isStaff = false, onEnabled }) {
   };
 
   return (
-    <div className="bg-card border rounded-xl p-6 max-w-lg mt-6">
+    <div className="bg-card border rounded-xl p-6 max-w-2xl mt-6">
       <h3 className="font-bold text-lg mb-1 flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
         Verificação em dois passos
       </h3>
-      <p className="text-sm text-muted-foreground mb-4">
-        {isStaff
-          ? 'Obrigatória para a equipa: mesmo com a palavra-passe, ninguém entra no painel sem o código do seu telemóvel.'
-          : 'Opcional: além da palavra-passe, a entrada pede um código da aplicação autenticadora do telemóvel.'}
-      </p>
+      <p className="text-sm text-muted-foreground mb-4">{textoDosDoisPassos(isStaff, obrigatoria)}</p>
 
       {loading ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />A verificar…</p>
@@ -117,7 +135,11 @@ export default function MfaSettings({ isStaff = false, onEnabled }) {
           </p>
           {confirmRemove ? (
             <div className="rounded-lg border border-destructive/40 p-3 space-y-3">
-              <p className="text-sm">Sem o segundo passo, basta a palavra-passe para entrar na conta. Retirar?</p>
+              <p className="text-sm">
+                {isStaff && obrigatoria
+                  ? 'Para a equipa é obrigatória: sem ela, o painel fecha até a activar outra vez. Retirar?'
+                  : 'Sem o segundo passo, basta a palavra-passe para entrar na conta. Retirar?'}
+              </p>
               <div className="flex gap-2">
                 <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={remove}>
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
@@ -135,10 +157,7 @@ export default function MfaSettings({ isStaff = false, onEnabled }) {
         </div>
       ) : enrolling ? (
         <form onSubmit={confirm} className="space-y-4" noValidate>
-          <ol className="text-sm space-y-1 list-decimal pl-5 text-muted-foreground">
-            <li>Na aplicação autenticadora, escolha adicionar conta e leia o código QR.</li>
-            <li>Introduza abaixo o código de 6 algarismos que a aplicação mostrar.</li>
-          </ol>
+          <PassosAutenticador uri={enrolling.uri} />
           {enrolling.qrCode && (
             <img src={enrolling.qrCode} alt="Código QR para a aplicação autenticadora" className="mx-auto h-44 w-44 rounded-lg border bg-white p-2" />
           )}
@@ -167,10 +186,16 @@ export default function MfaSettings({ isStaff = false, onEnabled }) {
           </div>
         </form>
       ) : (
-        <Button type="button" variant="outline" disabled={busy} onClick={start}>
-          {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-          Activar com aplicação autenticadora
-        </Button>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Precisa de uma aplicação autenticadora no telemóvel. A mais simples é o Google Authenticator, grátis:
+          </p>
+          <AppsAutenticadoras />
+          <Button type="button" disabled={busy} onClick={start}>
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            Activar com aplicação autenticadora
+          </Button>
+        </div>
       )}
 
       {error && <p role="alert" className="text-sm text-destructive mt-3">{error}</p>}

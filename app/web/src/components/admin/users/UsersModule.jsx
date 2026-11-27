@@ -22,6 +22,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { listUsers, listAllUsers, setUserSuspended, sendAccessLink, deleteUser, endUserSessions, resetUserMfa } from '@/lib/usersApi';
+import PoliticaDoisPassos from '@/components/admin/users/PoliticaDoisPassos';
 import UserFormDialog from './UserFormDialog';
 import UserDetailSheet from './UserDetailSheet';
 import { CodeChip, PersonAvatar, Pill, ROLE_BADGE, accountState, formatDate, formatKz } from './userFormat';
@@ -390,6 +391,9 @@ export default function UsersModule() {
           <Button onClick={() => openCreate(null)}><Plus className="h-4 w-4 mr-1" />Nova conta</Button>
         </div>
       </div>
+
+      {/* a verificação em dois passos da equipa: opcional ou obrigatória (só administradores) */}
+      {isAdmin && <PoliticaDoisPassos />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard icon={Users} label="Clientes com conta" value={s.customers} tone="bg-slate-500/10 text-slate-700 dark:text-slate-300" />

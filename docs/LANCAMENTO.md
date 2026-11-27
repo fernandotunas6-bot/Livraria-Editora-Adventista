@@ -227,10 +227,20 @@ confirmar que não é um robô» — basta recarregar.
 
 ### Verificação em dois passos da equipa
 
-Desde a migração `dois_passos_obrigatorio_equipa`, admin e gestor só têm o painel com o código da
-aplicação autenticadora, sete dias depois de a migração chegar à produção. Cada pessoa da equipa
-activa-o em Perfil → Segurança (ou no aviso do painel). Quem perder o telemóvel: outro
-administrador repõe-lho em Utilizadores → a conta → «Repor a verificação em dois passos».
+**Opcional desde 27/11, por decisão do dono** (migração `20261127150000_dois_passos_opcionais`). Cada pessoa activa-a
+ou retira-a em Perfil → Segurança. A activação mostra:
+- as ligações para o Google Authenticator (iPhone e Android);
+- os quatro passos com desenhos;
+- no telemóvel, o botão que abre a aplicação já com a conta.
+
+Quem a activou continua a precisar do código para ter os poderes da equipa.
+
+**Para voltar a ser obrigatória** para admin e gestor, um administrador usa o interruptor em Utilizadores →
+«Verificação em dois passos da equipa», com um prazo em dias para a equipa a activar. Antes de 27/11 era obrigatória,
+desde a migração `dois_passos_obrigatorio_equipa`. Cada mudança fica no registo de segurança, com alerta.
+
+**Quem perder o telemóvel:** outro administrador repõe-lho em Utilizadores → a conta → «Repor a verificação em dois
+passos».
 
 ## Suporte técnico
 
