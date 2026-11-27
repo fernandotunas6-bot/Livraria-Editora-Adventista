@@ -39,12 +39,50 @@ def sha256(f: pathlib.Path) -> str:
 
 
 def resumo_notas(texto: str, limite: int = 600) -> str:
-    """O primeiro parágrafo das notas da versão (sem títulos nem marcação), para mostrar no programa."""
+    r"""O primeiro parágrafo das notas da versão (sem títulos nem marcação), para mostrar no programa.
+
+    Uma lista no parágrafo fica numa frase, com os pontos separados por «;». Se não couber tudo, ficam os pontos que
+    cabem inteiros e «…», em vez de um ponto cortado a meio.
+
+    >>> resumo_notas("# T\n\nO KanGest:\n- as capas;\n- as fichas\n  do site;\n- o Google.\n\n## Mais")
+    'O KanGest: as capas; as fichas do site; o Google.'
+    >>> resumo_notas("Novidades:\n- um ponto comprido;\n- outro ponto comprido;\n- o terceiro.", limite=45)
+    'Novidades: um ponto comprido…'
+    >>> resumo_notas("Só uma frase, sem lista.")
+    'Só uma frase, sem lista.'
+    """
     for paragrafo in re.split(r"\n\s*\n", texto.strip()):
         p = paragrafo.strip()
-        if p and not p.startswith("#"):
-            p = re.sub(r"\*\*|__|`", "", " ".join(l.strip() for l in p.splitlines()))
-            return p if len(p) <= limite else p[: limite - 1].rstrip() + "…"
+        if not p or p.startswith("#"):
+            continue
+        limpo = lambda t: re.sub(r"\*\*|__|`", "", " ".join(t.split()))
+        abertura: list[str] = []
+        pontos: list[str] = []
+        for linha in p.splitlines():
+            l = linha.strip()
+            if re.match(r"^[-*] ", l):
+                pontos.append(l[2:])
+            elif pontos:
+                # a continuação de um ponto (a linha seguinte, indentada)
+                pontos[-1] += " " + l
+            else:
+                abertura.append(l)
+        inicio = limpo(" ".join(abertura))
+        if not pontos:
+            return inicio if len(inicio) <= limite else inicio[: limite - 1].rstrip() + "…"
+        itens = [limpo(x).rstrip(";,. ") for x in pontos]
+        frase = (inicio + " " if inicio else "") + "; ".join(itens) + "."
+        if len(frase) <= limite:
+            return frase
+        cabem: list[str] = []
+        for item in itens:
+            tentativa = (inicio + " " if inicio else "") + "; ".join(cabem + [item]) + "…"
+            if len(tentativa) > limite:
+                break
+            cabem.append(item)
+        if not cabem:
+            return frase[: limite - 1].rstrip() + "…"
+        return (inicio + " " if inicio else "") + "; ".join(cabem) + "…"
     return ""
 
 
