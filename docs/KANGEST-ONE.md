@@ -74,17 +74,24 @@ Restrições de segurança, palavra por palavra:
 | E2 | a versão mínima do KanGest (`KANGEST_MIN_VERSION`) e o cartão «Servidor central» | #162 | KanGest 1.4.9; o segredo é do dono |
 | G1 | os tokens partilhados com o contraste AA conferido | #163 | sim (o site) e KanGest 1.4.9 |
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
-| Google | entrar no KanGest com o Google: PKCE pelo navegador do sistema, os dois passos e a mesma conta do site; só no programa instalado | o PR do Google | a página de retorno, a partir do merge; KanGest 1.4.10 |
-| G3 | a revisão do estilo do site: as cinco escolhas do dono (as acções com os cantos dos campos, um só filtro em pílula, os rótulos, o botão do chat e a faixa da Loja), com as capturas antes e depois | o PR do estilo | sim, a partir do merge |
-| §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10 |
-| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
-| Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | #177 | KanGest 1.4.10 |
-| Dados dos livros | o autor, a editora, o idioma, o ano, as páginas e o ISBN (como código de barras) do site nas fichas dos artigos que não os têm | #178 | sim (20261127100000, a partir do merge); KanGest 1.4.10 |
-| Dados para o site | o sentido contrário: o que a ficha tem e o produto do site não, só do posto que manda no catálogo e só nos campos vazios | #179 | sim (20261127110000, a partir do merge); KanGest 1.4.10 |
-| Promoções | as promoções dos artigos no site, com a regra do preço (o posto que manda no catálogo), sem nunca mexer numa promoção do painel | #180 | sim (20261127120000, a partir do merge); KanGest 1.4.10 |
-| Categorias | as famílias do KanGest ligadas aos géneros do site (pelo nome ou à mão): o artigo na «Geral» recebe a família do género, e o produto em «Catálogo Geral», o género da família | o PR das famílias | sim (20261127130000, a partir do merge); KanGest 1.4.10 |
+| Google | entrar no KanGest com o Google: PKCE pelo navegador do sistema, os dois passos e a mesma conta do site; só no programa instalado | #183 | sim (a página de retorno); KanGest 1.4.10, publicada |
+| G3 | a revisão do estilo do site: as cinco escolhas do dono (as acções com os cantos dos campos, um só filtro em pílula, os rótulos, o botão do chat e a faixa da Loja), com as capturas antes e depois | #182 | sim |
+| §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10, publicada |
+| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10, publicada |
+| Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | #177 | sim (a Edge Function); KanGest 1.4.10, publicada |
+| Dados dos livros | o autor, a editora, o idioma, o ano, as páginas e o ISBN (como código de barras) do site nas fichas dos artigos que não os têm | #178 | sim (20261127100000); KanGest 1.4.10, publicada |
+| Dados para o site | o sentido contrário: o que a ficha tem e o produto do site não, só do posto que manda no catálogo e só nos campos vazios | #179 | sim (20261127110000); KanGest 1.4.10, publicada |
+| Promoções | as promoções dos artigos no site, com a regra do preço (o posto que manda no catálogo), sem nunca mexer numa promoção do painel | #180 | sim (20261127120000); KanGest 1.4.10, publicada |
+| Categorias | as famílias do KanGest ligadas aos géneros do site (pelo nome ou à mão): o artigo na «Geral» recebe a família do género, e o produto em «Catálogo Geral», o género da família | #181 | sim (20261127130000); KanGest 1.4.10, publicada |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
 | Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente; a volta dos postos sem assinatura recusada (27/11) | #166 | corrido contra a produção: 8 de 8 (27/11) |
+
+**A versão 1.4.10 do KanGest foi publicada a 27/11** (ordem do dono, «sim continua e publica»): a Release
+`kangest-livraria-v1.4.10-b197`, com os três instaladores (Windows, Mac Apple Silicon e Mac Intel) e o manifesto em
+livrariaadventista.ao/kangest/actualizacoes. Conferido:
+- o SHA-256 de cada instalador contra o manifesto, o `SHA256SUMS.txt` e a Release;
+- as duas assinaturas minisign de cada um, com a chave 6AD84654812A61BE;
+- o `.dmg` de Intel por dentro: a versão 1.4.10, o macOS 10.15 ou mais recente, o x86_64 e o esquema `kangest://`.
 
 ## 5. Os 14 testes de aceitação e a prova de cada um
 
@@ -132,6 +139,6 @@ Restrições de segurança, palavra por palavra:
 | 4 | E | ✅ (#170) **O «Servidor central» do KanGest com a saúde do site** (`/api/v1/system/health`), com a conta do site da pessoa. Hoje mostra o estado do lado do KanGest | — |
 | 5 | A | ✅ (ligação com o histórico; o convite por email espera pelo envio de email) **«Ligar a uma conta do site»** no ecrã Utilizadores: o convite por email e, à primeira entrada com essa conta, a conta local fica ligada (com o histórico) | — |
 | 6 | B3 | **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
-| 7 | G | ✅ no site (G3, a revisão de 27/11; SPEC-COMPONENTES §7b). **No KanGest,** as capturas na 1.4.10 instalada. **Os componentes de todos os dias com a mesma linguagem nos dois lados,** e as capturas antes e depois | a 1.4.10 |
-| 8 | A | ✅ (o PR do Google; KanGest 1.4.10) **O Google Login no KanGest:** PKCE pelo navegador do sistema, com o retorno pela página `/kangest/entrar/` do site e a ligação `kangest://auth` | — (o Google já está ligado no Supabase Auth) |
+| 7 | G | ✅ no site (G3, a revisão de 27/11; SPEC-COMPONENTES §7b). **No KanGest,** as capturas com a 1.4.10 instalada (publicada a 27/11). **Os componentes de todos os dias com a mesma linguagem nos dois lados,** e as capturas antes e depois | a 1.4.10 |
+| 8 | A | ✅ (#183; KanGest 1.4.10) **O Google Login no KanGest:** PKCE pelo navegador do sistema, com o retorno pela página `/kangest/entrar/` do site e a ligação `kangest://auth` | — (o Google já está ligado no Supabase Auth) |
 | 9 | F | **A aceitação contra o staging** (com token) | o staging |
