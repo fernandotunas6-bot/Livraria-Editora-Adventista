@@ -548,7 +548,7 @@ export interface FotoKanGest {
   versao: string;
   tipo: "image/jpeg" | "image/png" | "image/webp";
   extensao: "jpg" | "png" | "webp";
-  bytes: Uint8Array;
+  bytes: Bytes;
 }
 
 /** O tipo de uma imagem pelos primeiros bytes (JPEG, PNG ou WebP), ou `null`. */
@@ -583,7 +583,7 @@ export function limparFotosKanGest(x: unknown): { fotos: FotoKanGest[]; recusada
     if (!referencia) { recusar("O artigo não tem referência."); continue; }
     if (!m) { recusar("A fotografia não é uma imagem JPEG, PNG ou WebP."); continue; }
     if (m[2].length > Math.ceil((MAX_FOTO_BYTES * 4) / 3) + 4) { recusar("A fotografia é grande demais para o site."); continue; }
-    let bytes: Uint8Array;
+    let bytes: Bytes;
     try {
       bytes = deB64(m[2]);
     } catch {
