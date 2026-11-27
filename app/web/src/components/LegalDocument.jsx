@@ -68,7 +68,7 @@ export default function LegalDocument({ title, description, updated, sections })
             <nav aria-label="Nesta página" className="px-1 pb-2"><SectionIndex sections={sections} /></nav>
           </details>
           <nav aria-label="Nesta página" className="hidden min-w-0 lg:sticky lg:top-24 lg:block lg:self-start">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nesta página</p>
+            <p className="rotulo mb-2 text-muted-foreground">Nesta página</p>
             <SectionIndex sections={sections} />
           </nav>
 

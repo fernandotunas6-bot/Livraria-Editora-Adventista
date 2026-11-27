@@ -8,6 +8,7 @@ import { MessageCircle, X, Send, Sparkles, Bell, RotateCcw, Headset, Loader2, Ar
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPosition } from '@/hooks/useChatPosition';
+import { useRecolherAoDescer } from '@/hooks/useRecolherAoDescer';
 import {
   escalateChat, fetchChatConfig, loadChatSession, sendChatFeedback, sendChatMessage, startNewChat,
 } from '@/lib/assistantApi';
@@ -111,6 +112,9 @@ export default function LivrariaAssistant() {
   const { user, isAuthed, isAdmin, hasPermission } = useAuth();
   const { settings } = useSiteSettings();
   const { fixedStyle } = useChatPosition();
+  // Revisão do estilo (27/11, escolha 7): enquanto se desce a página, o botão sai da frente do conteúdo, e volta
+  // logo que se pára ou se sobe.
+  const recolhido = useRecolherAoDescer();
   const now = useNow();
 
   const canUseStaffInbox = isAdmin || hasPermission('manage_orders');
@@ -405,13 +409,18 @@ export default function LivrariaAssistant() {
           <motion.button
             type="button"
             initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={recolhido ? { opacity: 0, scale: 0.85, y: 12 } : { opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            style={recolhido ? { pointerEvents: 'none' } : undefined}
+            aria-hidden={recolhido || undefined}
+            tabIndex={recolhido ? -1 : undefined}
             onClick={() => setOpen(true)}
             title="Ajuda"
             // Cor da marca com um aro branco: o azul-escuro de antes perdia-se no carrossel e no
             // rodapé, ambos escuros. O aro separa o botão de qualquer fundo, claro ou escuro.
-            className="pointer-events-auto relative flex h-12 items-center gap-2 rounded-full bg-primary px-3.5 text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,0.28)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-hidden focus-visible:ring-4 focus-visible:ring-white 2xl:pr-4"
+            // Mais pequeno (revisão do estilo de 27/11): 44 px no telemóvel, o mínimo para o dedo, e 40 px no computador.
+            className="pointer-events-auto relative flex h-11 items-center gap-2 rounded-full bg-primary px-3 text-primary-foreground shadow-[0_4px_16px_rgba(0,0,0,0.25)] ring-2 ring-white/90 transition-colors hover:bg-primary/90 focus:outline-hidden focus-visible:ring-4 focus-visible:ring-white sm:h-10 sm:px-2.5 2xl:pr-3.5"
             aria-label={`${showSupportTab ? 'Ajuda, mensagens e atendimento' : 'Assistente da livraria'}${unread ? ` — ${unread} resposta(s) da equipa por ler` : ''}`}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.92 }}

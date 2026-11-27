@@ -212,7 +212,7 @@ export default function CollectionsPage() {
               <aside className="w-full lg:w-64 shrink-0">
                 {/* Desktop Sidebar Panel */}
                 <div className="hidden lg:block bg-card border rounded-2xl p-5 shadow-xs space-y-4">
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Filtrar Categoria</h3>
+                  <h3 className="rotulo text-foreground">Filtrar categoria</h3>
                   <div className="space-y-1">
                     {[
                       { id: 'all', label: 'Todos os Livros', count: books.length },
@@ -360,7 +360,7 @@ export default function CollectionsPage() {
                   <div className="text-center py-20 bg-card border rounded-2xl">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/60 mb-3" />
                     <p className="text-muted-foreground font-medium">Nenhum livro encontrado nesta categoria.</p>
-                    <Button onClick={() => setSelectedCategory('all')} size="sm" variant="outline" className="mt-4 rounded-full">
+                    <Button onClick={() => setSelectedCategory('all')} size="sm" variant="outline" className="mt-4 rounded-md">
                       Limpar Filtros
                     </Button>
                   </div>

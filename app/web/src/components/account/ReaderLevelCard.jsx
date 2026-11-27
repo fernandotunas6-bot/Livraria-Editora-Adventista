@@ -55,7 +55,7 @@ export default function ReaderLevelCard({ status, className = '' }) {
           </p>
         </div>
         {!member && (
-          <Link to="/shop" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
+          <Link to="/shop" className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
             <BookOpen className="h-4 w-4" aria-hidden="true" /> Ver livros
           </Link>
         )}

@@ -170,6 +170,18 @@
   @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
 }
 
+/* Os rótulos pequenos (revisão do estilo de 27/11, escolha 6): os grupos dos filtros, dos menus e das listas. A letra
+   dos títulos fica só nos títulos; os rótulos usam a letra do texto, a 13 px e em meio-negrito, sem maiúsculas nem
+   espaçamento. É um utilitário para ganhar à regra de base dos h3 (a letra dos títulos). */
+@utility rotulo {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 @utility input-focus {
   @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
 }

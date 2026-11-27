@@ -17,6 +17,7 @@ import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import ShopHeroBackground from '@/components/ShopHeroBackground';
+import { FilterChip } from '@/components/ui/filter-chip';
 import QuickViewModal from '@/components/QuickViewModal';
 import { getProduct } from '@/api/EcommerceApi';
 import { pageTitle } from '@/lib/brand';
@@ -224,7 +225,8 @@ const ShopPage = () => {
               <span className="text-white">Loja</span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-1 sm:mb-3 tracking-tight">{heroTitle}</h1>
-            <p className="text-white/85 max-w-2xl text-sm line-clamp-1 sm:line-clamp-none sm:text-base mb-1 sm:mb-4 md:text-lg md:mb-8">{heroSubtitle}</p>
+            {/* Mais estreito do que a faixa: os livros ficam à direita, longe do texto (revisão do estilo de 27/11). */}
+            <p className="text-white/85 max-w-xl text-sm line-clamp-1 sm:line-clamp-none sm:text-base mb-1 sm:mb-4 md:text-lg md:mb-8">{heroSubtitle}</p>
           </motion.div>
       </ShopHeroBackground>
 
@@ -251,28 +253,20 @@ const ShopPage = () => {
       {availableFilters.genres?.length > 0 && (
         <div className="border-b border-border sticky top-(--header-offset,0px) z-30 bg-background/95 backdrop-blur-md shadow-xs">
           <div className="container-custom py-3 flex gap-2 overflow-x-auto scrollbar-hide items-center">
-            <span className="text-xs font-medium text-muted-foreground shrink-0 mr-1">Género:</span>
-            <Button
-              size="sm"
-              variant={activeFilters.categories.length === 0 && !activeFilters.collection ? 'default' : 'outline'}
-              className={`rounded-full shrink-0 h-10 sm:h-8 ${activeFilters.categories.length === 0 && !activeFilters.collection ? 'btn-primary' : ''}`}
+            <span className="rotulo shrink-0 mr-1 text-muted-foreground">Género:</span>
+            <FilterChip
+              active={activeFilters.categories.length === 0 && !activeFilters.collection}
               onClick={() => { updateFilter('categories', []); updateFilter('collection', ''); }}
             >
               Todos ({catalogStats.total})
-            </Button>
+            </FilterChip>
             {availableFilters.genres.map((g) => {
               const count = allProducts.filter((p) => p.type?.value === g).length;
               const active = activeFilters.categories.includes(g);
               return (
-                <Button
-                  key={g}
-                  size="sm"
-                  variant={active ? 'default' : 'outline'}
-                  className={`rounded-full shrink-0 h-10 sm:h-8 ${active ? 'btn-primary' : ''}`}
-                  onClick={() => updateFilter('categories', active ? [] : [g])}
-                >
+                <FilterChip key={g} active={active} onClick={() => updateFilter('categories', active ? [] : [g])}>
                   {g} ({count})
-                </Button>
+                </FilterChip>
               );
             })}
           </div>

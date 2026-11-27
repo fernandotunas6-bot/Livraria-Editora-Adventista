@@ -435,7 +435,7 @@ const Footer = () => {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.entries(storesByProvince).map(([province, list]) => (
                 <div key={province}>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#22d3ee] mb-3">{province}</p>
+                  <p className="rotulo text-[#22d3ee] mb-3">{province}</p>
                   <div className="space-y-4">
                     {list.map((store) => (
                       <div key={store.id} className="rounded-xl overflow-hidden bg-background/5 border border-background/10">

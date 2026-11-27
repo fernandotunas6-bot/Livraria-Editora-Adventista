@@ -60,7 +60,7 @@ const FilterPanel = ({
 
       {/* Disponibilidade */}
       <div>
-        <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
+        <h3 className="rotulo mb-3 text-foreground flex items-center gap-1.5">
           <Package className="h-3.5 w-3.5 text-(--brand-primary)" /> Disponibilidade
         </h3>
         <div className="space-y-2">
@@ -86,7 +86,7 @@ const FilterPanel = ({
       {/* Coleções */}
       {bookCollections.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
+          <h3 className="rotulo mb-3 text-foreground flex items-center gap-1.5">
             <Layers className="h-3.5 w-3.5 text-(--brand-primary)" /> Coleção
           </h3>
           <Select
@@ -107,7 +107,7 @@ const FilterPanel = ({
       {/* Géneros */}
       {genres.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-foreground flex items-center gap-1.5">
+          <h3 className="rotulo mb-3 text-foreground flex items-center gap-1.5">
             <BookOpen className="h-3.5 w-3.5 text-(--brand-primary)" /> Género
           </h3>
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -130,7 +130,7 @@ const FilterPanel = ({
       {/* Tipo de produto */}
       {(availableFilters.productTypes?.length > 1) && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-foreground">Tipo de produto</h3>
+          <h3 className="rotulo mb-3 text-foreground">Tipo de produto</h3>
           <Select
             value={activeFilters.productType || '_all'}
             onValueChange={(v) => updateFilter('productType', v === '_all' ? '' : v)}
@@ -149,7 +149,7 @@ const FilterPanel = ({
       {/* Idioma */}
       {(availableFilters.languages?.length > 0) && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-foreground">Idioma</h3>
+          <h3 className="rotulo mb-3 text-foreground">Idioma</h3>
           <Select
             value={activeFilters.language || '_all'}
             onValueChange={(v) => updateFilter('language', v === '_all' ? '' : v)}
@@ -168,7 +168,7 @@ const FilterPanel = ({
       {/* Preço */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-foreground">Preço (Kz)</h3>
+          <h3 className="rotulo text-foreground">Preço (Kz)</h3>
           <span className="text-xs text-muted-foreground font-medium">
             {displayMinPrice.toLocaleString('pt-AO')} – {displayMaxPrice.toLocaleString('pt-AO')} Kz
           </span>
@@ -214,7 +214,7 @@ const FilterPanel = ({
         if (!values?.length) return null;
         return (
           <div key={optionName}>
-            <h3 className="text-sm font-medium mb-3 text-foreground">{optionName}</h3>
+            <h3 className="rotulo mb-3 text-foreground">{optionName}</h3>
             <div className="space-y-2">
               {values.map((val) => {
                 const isChecked = (activeFilters.options[optionName] || []).includes(val);

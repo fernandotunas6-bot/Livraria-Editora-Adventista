@@ -165,7 +165,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-slow"
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 justify-center">
-                    <span className="text-sm font-semibold bg-primary text-white px-4 py-2 rounded-full">Ver detalhes</span>
+                    <span className="text-sm font-semibold bg-primary text-white px-4 py-2 rounded-md">Ver detalhes</span>
                   </div>
                 </button>
               </div>

@@ -35,7 +35,7 @@ export default function CatalogInfiniteTail({ sentinelRef, hasMore, loadMore, sh
             <div className="h-full rounded-full bg-primary transition-[width] duration-base" style={{ width: `${Math.round((shown / total) * 100)}%` }} />
           </div>
         </div>
-        <Button variant="outline" size="sm" className="h-11 rounded-full px-6" onClick={loadMore}>
+        <Button variant="outline" size="sm" className="h-11 rounded-md px-6" onClick={loadMore}>
           Mostrar mais livros
         </Button>
       </div>
@@ -50,9 +50,9 @@ export default function CatalogInfiniteTail({ sentinelRef, hasMore, loadMore, sh
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {onClearFilters && (
-          <Button variant="outline" size="sm" className="h-10 rounded-full" onClick={onClearFilters}>Ver todos os livros</Button>
+          <Button variant="outline" size="sm" className="h-10 rounded-md" onClick={onClearFilters}>Ver todos os livros</Button>
         )}
-        <Button asChild variant="outline" size="sm" className="h-10 rounded-full">
+        <Button asChild variant="outline" size="sm" className="h-10 rounded-md">
           <Link to="/colecoes">Explorar coleções</Link>
         </Button>
         <Button

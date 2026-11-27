@@ -104,7 +104,7 @@ function SlideContent({ slide }) {
   // `SafeLink`: o endereço de cada slide é escrito no painel (ver components/SafeLink.jsx).
   const ctaButton = safeLinkUrl(slide.cta_link) ? (
     <SafeLink to={slide.cta_link}>
-      <Button size="lg" className="btn-primary text-base md:text-lg px-6 md:px-8 py-5 md:py-6 rounded-full mt-6">
+      <Button size="lg" className="btn-primary text-base md:text-lg px-6 md:px-8 py-5 md:py-6 rounded-md mt-6">
         {slide.cta_text || 'Explorar'}
         <ArrowRight className="ml-2 h-5 w-5" />
       </Button>
