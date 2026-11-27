@@ -122,7 +122,7 @@ Restrições de segurança, palavra por palavra:
 | 3 | B | ✅ (#169) **O alerta de «stock negativo»:** o livro de um posto que fica abaixo de zero tem de aparecer no painel para acerto, e nunca ser uma perda silenciosa | — |
 | 4 | E | ✅ (#170) **O «Servidor central» do KanGest com a saúde do site** (`/api/v1/system/health`), com a conta do site da pessoa. Hoje mostra o estado do lado do KanGest | — |
 | 5 | A | ✅ (ligação com o histórico; o convite por email espera pelo envio de email) **«Ligar a uma conta do site»** no ecrã Utilizadores: o convite por email e, à primeira entrada com essa conta, a conta local fica ligada (com o histórico) | — |
-| 6 | B3 | **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
+| 6 | B3 | (rascunho, desligado: o PR da B3) **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
 | 7 | G | **Os componentes de todos os dias com a mesma linguagem nos dois lados,** e as capturas antes e depois | a revisão do dono |
 | 8 | A | **O Google Login no KanGest** | o Google ligado no Supabase Auth |
 | 9 | F | **A aceitação contra o staging** (com token) | o staging |
