@@ -77,7 +77,7 @@ pub fn copia_vale(validada_em: Option<&str>, agora: &str) -> bool {
 }
 
 /// O factor TOTP verificado da conta, se o tem.
-fn factor_totp(v: &Value) -> Option<String> {
+pub(super) fn factor_totp(v: &Value) -> Option<String> {
     v["user"]["factors"]
         .as_array()
         .into_iter()

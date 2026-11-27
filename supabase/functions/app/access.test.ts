@@ -144,6 +144,8 @@ describe("o registo das rotas no index.ts", () => {
       "GET /geo/provinces",
       "GET /health",
       "GET /integrations",
+      // o endereço e a chave pública do Auth, para a ligação automática do KanGest (pedido do dono a 27/11)
+      "GET /kangest/auth",
       "GET /messaging/status",
       "GET /payment-methods",
       "GET /push/config",

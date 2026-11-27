@@ -116,6 +116,8 @@ A assinatura RSA de cada documento (`agt.rs`) não se confere aqui: fica para o 
 | `POST /admin/kangest/postos/revogar` | `manage_settings` | Revoga o posto |
 | `POST /admin/kangest/sessoes/revogar` | `manage_settings` | `{posto, sessao}`: pede o fim de uma sessão aberta no KanGest (§14) |
 | `GET /admin/kangest/postos/livro?id=` | `manage_settings` | Onde o livro de stock do posto não bate certo com a fotografia (§15) |
+| `GET /kangest/auth` | pública | O endereço e a chave pública do Auth do site, para a ligação automática de um KanGest por ligar |
+| `POST /kangest/ligar-com-a-conta` | `manage_settings` (a sessão da pessoa) | Cria o posto e emparelha-o no mesmo pedido, com a chave pública do KanGest: a ligação automática (1.4.11) |
 | `POST /kangest/emparelhar` | o código de uso único (10 por minuto e por IP) | `{codigo, chave_publica, versao}` → o posto e a chave pública do centro |
 | `POST /kangest/sinc` | a assinatura Ed25519 do posto (240 por minuto e por IP) | O lote selado → a resposta selada |
 

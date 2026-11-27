@@ -144,6 +144,103 @@ function EncomendasOnline() {
   );
 }
 
+type Loja = { id: string; name: string; province?: string | null };
+
+/**
+ * A ligação automática (pedido do dono a 27/11): quem tem «Gerir configurações» no site liga este KanGest com a sua conta,
+ * sem ir ao painel nem copiar códigos. O site cria o posto e emparelha-o no mesmo pedido (src-tauri/src/sinc/mod.rs,
+ * `ligar_com_a_conta`); a sessão só serve para isso e não se guarda.
+ */
+function LigacaoAutomatica({ onLigado }: { onLigado: (r: EstadoSinc) => void }) {
+  const inicio = useQuery({ queryKey: ["sinc", "inicio"], queryFn: () => call<{ url: string; lojas: Loja[] }>("sinc.ligar_inicio"), retry: false });
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [pedirCodigo, setPedirCodigo] = useState(false);
+  const [loja, setLoja] = useState("");
+  const [aLigar, setALigar] = useState(false);
+  const lojas = inicio.data?.lojas ?? [];
+
+  async function ligar(ev: FormEvent) {
+    ev.preventDefault();
+    setALigar(true);
+    try {
+      const r = await call<EstadoSinc | { dois_passos: true }>("sinc.ligar_com_a_conta", {
+        email,
+        senha,
+        store_id: loja,
+        ...(pedirCodigo ? { codigo } : {}),
+      });
+      if ("dois_passos" in r) {
+        setPedirCodigo(true);
+        return;
+      }
+      setSenha("");
+      setCodigo("");
+      onLigado(r);
+      toast.success(`Ligado à livraria como «${r.ligacao?.posto_nome || "posto"}». As facturas começam a seguir.`);
+      if (r.aviso) toast.warning(r.aviso);
+    } catch (x) {
+      toast.error((x as Error).message);
+      setCodigo("");
+    } finally {
+      setALigar(false);
+    }
+  }
+
+  if (inicio.isError) return null;
+  return (
+    <form onSubmit={ligar} className="space-y-4 p-5">
+      <div className="flex items-start gap-3">
+        <Link2 className="mt-0.5 size-5 shrink-0 text-brand" />
+        <div>
+          <p className="font-medium text-ink">Ligar com a conta do site (automático)</p>
+          <p className="text-ink-2">
+            Entre com a conta do site de quem tem «Gerir configurações». O posto desta loja é criado e ligado sozinho, sem
+            ir ao painel nem copiar códigos.
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Email da conta do site">
+          <Input id="sinc-email" type="email" autoComplete="username" value={email} onChange={(x) => setEmail(x.target.value)} />
+        </Field>
+        <Field label="Senha">
+          <Input id="sinc-senha" type="password" autoComplete="current-password" value={senha} onChange={(x) => setSenha(x.target.value)} />
+        </Field>
+      </div>
+      <Field label="A loja deste computador">
+        <Select id="sinc-loja" value={loja} onChange={(x) => setLoja(x.target.value)}>
+          <option value="">{inicio.isLoading ? "A carregar as lojas…" : "Sem loja (só facturas e stock)"}</option>
+          {lojas.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+              {l.province ? ` — ${l.province}` : ""}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      {pedirCodigo && (
+        <Field label="Código dos dois passos (a aplicação autenticadora)">
+          <Input
+            id="sinc-2fa"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            value={codigo}
+            onChange={(x) => setCodigo(x.target.value.replace(/\D/g, "").slice(0, 6))}
+            className="font-mono tracking-[0.3em]"
+            placeholder="000000"
+          />
+        </Field>
+      )}
+      <Button type="submit" loading={aLigar} disabled={!email.includes("@") || !senha || (pedirCodigo && codigo.length !== 6)}>
+        <KeyRound className="size-4" /> Ligar automaticamente
+      </Button>
+    </form>
+  );
+}
+
 export default function LigacaoLivraria() {
   const qc = useQueryClient();
   const estado = useQuery({ queryKey: ["sinc"], queryFn: () => call<EstadoSinc>("sinc.estado"), refetchInterval: 15000 });
@@ -200,11 +297,12 @@ export default function LigacaoLivraria() {
         </Card>
       ) : !e.ligada || !e.ligacao ? (
         <Card className="max-w-3xl">
-          <form onSubmit={ligar} className="space-y-4 p-5">
+          <LigacaoAutomatica onLigado={pronto} />
+          <form onSubmit={ligar} className="space-y-4 border-t border-line p-5">
             <div className="flex items-start gap-3">
               <Link2 className="mt-0.5 size-5 shrink-0 text-brand" />
               <p className="text-ink-2">
-                No painel do site, em <b>Sistema → Ligação ao KanGest → Postos do KanGest Livraria</b>, crie o posto desta loja.
+                <b>Ou com um código do painel:</b> no painel do site, em <b>Sistema → Ligação ao KanGest → Postos do KanGest Livraria</b>, crie o posto desta loja.
                 O painel mostra o endereço e um código de 8 letras, que serve uma vez durante 10 minutos.
               </p>
             </div>

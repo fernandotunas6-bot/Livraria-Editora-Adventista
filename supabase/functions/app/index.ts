@@ -3415,6 +3415,44 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
   });
 });
 
+// A ligação automática (pedido do dono a 27/11, «quero que a ligação seja automática»): em vez de criar o posto no
+// painel e copiar o código, quem tem «Gerir configurações» liga o KanGest com a sua conta do site. O KanGest pergunta
+// aqui o Auth (o endereço e a chave pública, que não são segredo), entra com a pessoa (e os dois passos, se os tem) e
+// manda a sua chave pública; o posto nasce e fica emparelhado no mesmo pedido. A sessão da pessoa só serve para isto.
+route("GET", "/kangest/auth", publica("o endereço e a chave pública do Auth do site, que já vão no próprio site; para o KanGest por ligar"), async () => {
+  const auth = authParaPostos();
+  if (!auth || !chavesSinc().length) return json({ message: "Rota não encontrada." }, 404);
+  return json({ auth });
+});
+
+route("POST", "/kangest/ligar-com-a-conta", permissao("manage_settings"), async ({ body, auth, ip }) => {
+  if (!await sincConfigurada()) throw new HttpError(503, SINC_POR_CONFIGURAR);
+  if (!await checkRateLimit("kangest-ligar-conta", ip, 10)) throw tooMany("Demasiadas tentativas. Espere um minuto.");
+  const chaves = chavesSinc();
+  const loja = String(body.store_id ?? "").trim();
+  let nomeLoja = "";
+  if (loja) {
+    const { data: s } = await db.from("physical_stores").select("id, name").eq("id", loja).maybeSingle();
+    if (!s) throw bad("Essa loja não existe.");
+    nomeLoja = String(s.name ?? "");
+  }
+  const nome = (String(body.nome ?? "").trim() || (nomeLoja ? `KanGest — ${nomeLoja}` : "KanGest")).slice(0, 80);
+  const resumo = await resumoSinc(normalizarCodigo(codigoEmparelhamento()));
+  const { error: eCriar } = await db.rpc("kangest_posto_criar", {
+    p_nome: nome, p_store_id: loja || null, p_codigo_resumo: resumo, p_criado_por: auth.id,
+  });
+  if (eCriar) throw new Error(eCriar.message);
+  const { data, error } = await db.rpc("kangest_emparelhar", {
+    p_codigo_resumo: resumo, p_chave_publica: String(body.chave_publica ?? ""), p_versao: String(body.versao ?? ""),
+  });
+  if (error) throw bad(error.message);
+  console.log("KanGest: posto ligado com a conta de", auth.id, "—", nome);
+  return json({
+    posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(),
+    tempo_real: { topico: (data as Row)?.topico ?? null }, hora: Math.floor(Date.now() / 1000),
+  });
+});
+
 /**
  * As fotografias dos artigos do KanGest como capas dos produtos do site que não têm nenhuma (KANGEST ONE, integração
  * total; app/kangest-sistema/src-tauri/src/sinc/capas.rs, `para_o_site`):
