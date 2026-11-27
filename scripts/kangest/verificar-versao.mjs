@@ -1,29 +1,31 @@
 // Livraria Editora Adventista — Desenvolvido por Valentino Canguele · 926 445 277 · valentinocanguele@gmail.com
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
-
-// Confere uma versão publicada do KanGest: para cada instalador do manifesto do site, o tamanho, o SHA-256 (contra o
-// manifesto e o SHA256SUMS.txt) e as duas assinaturas minisign (a do ficheiro e a global), com a chave pública guardada
-// em ~/.kangest-livraria/actualizacoes.key.pub. Sem o minisign instalado: o Ed25519 e o BLAKE2b do próprio Node.
-// Uso (Node 22), depois de o deploy do site que a publicação lança acabar:
+//
+// Confere uma versão do KanGest já publicada no site, de ponta a ponta: o manifesto anuncia a versão esperada e, para
+// cada instalador dele, o tamanho, o SHA-256 (contra o manifesto e o SHA256SUMS.txt) e a assinatura minisign com a
+// chave pública das actualizações (a mesma verificação do verificar-assinatura.mjs, que o «publicar» corre antes).
+//
+// Uso (Node 22), depois de acabar o deploy do site que a publicação lança (deploy-cloudflare.yml):
 //   node scripts/kangest/verificar-versao.mjs <versão esperada> [pasta onde guardar o .dmg de Intel]
-// Usou-se na 1.4.9 e na 1.4.10 (docs/KANGEST-ONE.md).
-import { createHash, createPublicKey, verify } from 'node:crypto';
+// A chave pública vem de ~/.kangest-livraria/actualizacoes.key.pub (ou de KANGEST_CHAVE_PUB). Usou-se na 1.4.9 e na
+// 1.4.10 (docs/KANGEST-ONE.md).
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { verificarAssinatura } from './verificar-assinatura.mjs';
 
 const [, , esperada, guardar] = process.argv;
+if (!esperada) {
+  console.error('Uso: node scripts/kangest/verificar-versao.mjs <versão esperada> [pasta onde guardar o .dmg de Intel]');
+  process.exit(2);
+}
 const BASE = 'https://livrariaadventista.ao/kangest/actualizacoes/';
-
-// a chave pública: o ficheiro do minisign, em base64 numa só linha
-const pubTexto = Buffer.from(readFileSync(join(homedir(), '.kangest-livraria/actualizacoes.key.pub'), 'utf8').trim(), 'base64').toString();
-const pub = Buffer.from(pubTexto.trim().split('\n')[1], 'base64');
-const idChave = Buffer.from(pub.subarray(2, 10)).reverse().toString('hex').toUpperCase();
-const chave = createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), pub.subarray(10, 42)]), format: 'der', type: 'spki' });
+const chavePublica = readFileSync(process.env.KANGEST_CHAVE_PUB || join(homedir(), '.kangest-livraria/actualizacoes.key.pub'), 'utf8');
 
 const m = await (await fetch(BASE + 'kangest-atualizacao.json', { cache: 'no-store' })).json();
 const somas = await (await fetch(BASE + 'SHA256SUMS.txt', { cache: 'no-store' })).text();
-console.log(`manifesto: versão ${m.versao} (${m.data}); esperada ${esperada}; chave ${idChave}`);
+console.log(`manifesto: versão ${m.versao} (${m.data}); esperada ${esperada}`);
 let tudo = m.versao === esperada;
 
 for (const [plataforma, p] of Object.entries(m.pacotes || {})) {
@@ -31,20 +33,12 @@ for (const [plataforma, p] of Object.entries(m.pacotes || {})) {
   const b = Buffer.from(await r.arrayBuffer());
   const sha = createHash('sha256').update(b).digest('hex');
   const naLista = somas.split('\n').some((l) => l.trim() === `${sha}  ${p.ficheiro}`);
-  const linhas = Buffer.from(p.assinatura, 'base64').toString().split('\n');
-  const blob = Buffer.from(linhas[1], 'base64');
-  const alg = blob.subarray(0, 2).toString();
-  const idAssinatura = Buffer.from(blob.subarray(2, 10)).reverse().toString('hex').toUpperCase();
-  const assinatura = blob.subarray(10, 74);
-  const mensagem = alg === 'ED' ? createHash('blake2b512').update(b).digest() : b;
-  const okFicheiro = verify(null, mensagem, chave, assinatura);
-  const confianca = linhas[2].replace(/^trusted comment: /, '');
-  const okGlobal = verify(null, Buffer.concat([assinatura, Buffer.from(confianca)]), chave, Buffer.from(linhas[3], 'base64'));
-  const certo = r.ok && b.length === p.tamanho && sha === p.sha256 && naLista && okFicheiro && okGlobal && idAssinatura === idChave && p.ficheiro.includes(`_${esperada}_`);
+  const a = verificarAssinatura(chavePublica, p.assinatura, b);
+  const certo = r.ok && b.length === p.tamanho && sha === p.sha256 && naLista && a.ok && p.ficheiro.includes(`_${esperada}_`);
   tudo &&= certo;
   console.log(
-    `${certo ? 'certo ' : 'FALHOU'} ${plataforma} ${p.ficheiro} ${b.length} bytes · sha256 ${sha === p.sha256 ? 'igual' : 'DIFERENTE'} · lista ${naLista ? 'sim' : 'NÃO'} · ` +
-      `assinatura ${okFicheiro ? 'válida' : 'INVÁLIDA'} (${alg}, chave ${idAssinatura}) · global ${okGlobal ? 'válida' : 'INVÁLIDA'} · ${confianca}`,
+    `${certo ? 'certo ' : 'FALHOU'} ${plataforma} ${p.ficheiro} ${b.length} bytes · sha256 ${sha === p.sha256 ? 'igual' : 'DIFERENTE'} · ` +
+      `lista ${naLista ? 'sim' : 'NÃO'} · assinatura ${a.ok ? 'válida' : `RECUSADA (${a.motivo})`}`,
   );
   if (guardar && plataforma === 'macos-x86_64' && certo) {
     writeFileSync(join(guardar, p.ficheiro), b);
