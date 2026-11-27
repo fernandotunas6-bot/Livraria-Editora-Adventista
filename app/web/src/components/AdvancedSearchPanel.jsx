@@ -29,6 +29,20 @@ export default function AdvancedSearchPanel({
   const [expanded, setExpanded] = useState(false);
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
   const [sugestaoActiva, setSugestaoActiva] = useState(-1);
+  // No telemóvel o campo tem ~120 px de texto e «Título, autor, ISBN, código...» cortava-se em
+  // «Título, autor, IS» (revisão do estilo de 27/11): aí diz só o essencial. A pesquisa procura o
+  // mesmo nos dois casos.
+  const [ecraEstreito, setEcraEstreito] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 639px)')?.matches,
+  );
+  useEffect(() => {
+    const mq = typeof window !== 'undefined' ? window.matchMedia?.('(max-width: 639px)') : null;
+    if (!mq) return undefined;
+    const update = () => setEcraEstreito(!!mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
   const campoRef = useRef(null);
   const [local, setLocal] = useState({
     search: activeFilters.search || '',
@@ -156,7 +170,7 @@ export default function AdvancedSearchPanel({
                 setSugestaoActiva(-1);
               }
             }}
-            placeholder="Título, autor, ISBN, código..."
+            placeholder={ecraEstreito ? 'Título ou autor' : 'Título, autor, ISBN, código...'}
             aria-label="Pesquisar no catálogo"
             className={inputClass}
             role="combobox"

@@ -92,6 +92,11 @@ function ProductDetailPage() {
   // A biblioteca de quem tem sessão, só nos produtos com edição digital (para o "Já é seu").
   const [library, setLibrary] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // A proporção da fotografia à vista, medida quando carrega: a caixa toma-a (entre 0,6 e 1,6),
+  // para uma fotografia deitada não ficar no meio de uma caixa 3:4 com cinzento por cima e por
+  // baixo, e para o título caber no primeiro ecrã do telemóvel. Guarda-se com o endereço, para
+  // não se usar a proporção de outra fotografia ao mudar de imagem.
+  const [proporcaoDaFoto, setProporcaoDaFoto] = useState({ url: null, valor: null });
   // Separadores controlados: as estrelas do topo e o "Ler a descrição completa" abrem o
   // separador certo e levam o ecrã até lá.
   // O separador fica no endereço (`?tab=discussion`, ou `?tab=discussao`): a discussão de um
@@ -386,6 +391,7 @@ function ProductDetailPage() {
   ].filter(([, value]) => value);
 
   const currentImage = product.images[currentImageIndex];
+  const proporcao = proporcaoDaFoto.url === currentImage?.url ? proporcaoDaFoto.valor : null;
   const hasMultipleImages = product.images.length > 1;
 
   return (
@@ -425,7 +431,10 @@ function ProductDetailPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-3/4 max-h-[78vh] mx-auto w-full mb-4">
+            <div
+              className="relative overflow-hidden rounded-2xl bg-muted aspect-3/4 max-h-[78vh] mx-auto w-full mb-4"
+              style={proporcao ? { aspectRatio: String(proporcao) } : undefined}
+            >
               {/* A capa é o maior elemento da ficha (o LCP): pede-se antes das capas dos
                   relacionados. Minúsculas de propósito: o React 18 não conhece `fetchPriority`
                   e passa o atributo tal como está. */}
@@ -434,6 +443,10 @@ function ProductDetailPage() {
                 alt={product.title}
                 fetchpriority="high"
                 className="w-full h-full object-contain p-3"
+                onLoad={(e) => {
+                  const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                  if (w && h) setProporcaoDaFoto({ url: currentImage?.url, valor: Math.min(1.6, Math.max(0.6, w / h)) });
+                }}
               />
 
               {hasMultipleImages && (
