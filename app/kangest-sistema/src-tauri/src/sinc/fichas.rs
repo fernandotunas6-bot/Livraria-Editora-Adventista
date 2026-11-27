@@ -351,10 +351,13 @@ pub struct LivroParaOSite {
     pub item: Value,
 }
 
+/// Um artigo com o produto do site: o id, a referência, os dados do ramo, o código de barras e os dados do produto.
+type ArtigoComProduto = (i64, String, Option<String>, Option<String>, String);
+
 /// Os livros que podem ir: os artigos activos com um produto do site pela referência, a quem a ficha pode dar alguma
 /// coisa, e que ainda não foram com esta versão (os recusados e os erros voltam quando passar a espera).
 async fn escolher_livros(pool: &SqlitePool, agora: i64, limite: usize) -> AppResult<Vec<LivroParaOSite>> {
-    let pares: Vec<(i64, String, Option<String>, Option<String>, String)> = sqlx::query_as(
+    let pares: Vec<ArtigoComProduto> = sqlx::query_as(
         "SELECT a.id, TRIM(a.referencia), a.atributos, a.codigo_barras, MAX(p.dados)
            FROM artigos a JOIN loja_produtos p ON TRIM(p.referencia) = TRIM(a.referencia)
           WHERE TRIM(COALESCE(a.referencia, '')) <> '' AND a.ativo = 1
