@@ -74,12 +74,12 @@ describe('startTotpEnrollment', () => {
       error: null,
     });
     mfa.unenroll.mockResolvedValue({ data: {}, error: null });
-    mfa.enroll.mockResolvedValue({ data: { id: 'novo', totp: { qr_code: 'data:image/svg+xml;utf-8,<svg/>', secret: 'ABC' } }, error: null });
+    mfa.enroll.mockResolvedValue({ data: { id: 'novo', totp: { qr_code: 'data:image/svg+xml;utf-8,<svg/>', secret: 'ABC', uri: 'otpauth://totp/Livraria:eu?secret=ABC' } }, error: null });
     const out = await startTotpEnrollment();
     expect(mfa.unenroll).toHaveBeenCalledTimes(1);
     expect(mfa.unenroll).toHaveBeenCalledWith({ factorId: 'velho' });
     expect(mfa.enroll.mock.calls[0][0]).toMatchObject({ factorType: 'totp' });
-    expect(out).toEqual({ factorId: 'novo', qrCode: 'data:image/svg+xml;utf-8,<svg/>', secret: 'ABC' });
+    expect(out).toEqual({ factorId: 'novo', qrCode: 'data:image/svg+xml;utf-8,<svg/>', secret: 'ABC', uri: 'otpauth://totp/Livraria:eu?secret=ABC' });
   });
 });
 
