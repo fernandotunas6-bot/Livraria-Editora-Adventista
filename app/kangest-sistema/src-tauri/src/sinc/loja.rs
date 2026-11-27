@@ -367,6 +367,8 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "capas.pendentes" => super::capas::pendentes(st).await,
         "capas.descarregar" => super::capas::descarregar(st, serde_json::from_value(params.clone())?).await,
         "capas.falhou" => super::capas::falhou(st, serde_json::from_value(params.clone())?).await,
+        "capas.envio" => super::capas::envio(st).await,
+        "capas.envio_ligar" => super::capas::envio_ligar(st, serde_json::from_value(params.clone())?).await,
         "encomendas" => encomendas(st, filtro()?).await,
         "encomenda" => encomenda(st, serde_json::from_value(params.clone())?).await,
         "produtos" => produtos(st, filtro()?).await,

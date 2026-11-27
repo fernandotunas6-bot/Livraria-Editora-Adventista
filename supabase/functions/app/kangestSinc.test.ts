@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador, limparLivroStock, limparSessoesKanGest,
+  limparEstadoComputador, limparFotosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -347,5 +347,58 @@ describe("limparLivroStock (KANGEST ONE, B1)", () => {
     expect(limparLivroStock({ epoca: "x'; drop" })!.epoca).toBe("");
     const muitos = Array.from({ length: 2100 }, (_, i) => ({ mov_id: i + 1, armazem_id: 1, referencia: "R", quantidade: 1, tipo: "venda" }));
     expect(limparLivroStock({ movimentos: muitos })!.movimentos).toHaveLength(2000);
+  });
+});
+
+describe("limparFotosKanGest (as fotografias do KanGest para as capas do site)", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+  const webp = new Uint8Array([...enc.encode("RIFF"), 1, 0, 0, 0, ...enc.encode("WEBPVP8 "), 0, 0]);
+  const dataUrl = (tipo: string, b: Uint8Array) => `data:image/${tipo};base64,${paraB64(b)}`;
+
+  it("conhece JPEG, PNG e WebP pelos primeiros bytes, e mais nada", () => {
+    expect(tipoDaImagem(jpeg)).toEqual({ tipo: "image/jpeg", extensao: "jpg" });
+    expect(tipoDaImagem(png)).toEqual({ tipo: "image/png", extensao: "png" });
+    expect(tipoDaImagem(webp)).toEqual({ tipo: "image/webp", extensao: "webp" });
+    expect(tipoDaImagem(enc.encode("<svg onload=alert(1)></svg>"))).toBeNull();
+  });
+
+  it("sem fotografias (um KanGest antigo) é null", () => {
+    expect(limparFotosKanGest(undefined)).toBeNull();
+    expect(limparFotosKanGest([])).toBeNull();
+    expect(limparFotosKanGest({ artigo_id: 1 })).toBeNull();
+  });
+
+  it("aceita uma fotografia com a referência, a versão e os bytes conferidos", () => {
+    const l = limparFotosKanGest([{ artigo_id: 7, referencia: " LIV-001 ", versao: "2026-11-27T10:00:00.000", imagem: dataUrl("jpeg", jpeg) }]);
+    expect(l?.recusadas).toEqual([]);
+    expect(l?.fotos).toHaveLength(1);
+    expect(l?.fotos[0]).toMatchObject({ artigo_id: 7, referencia: "LIV-001", versao: "2026-11-27T10:00:00.000", tipo: "image/jpeg", extensao: "jpg" });
+    expect(Array.from(l!.fotos[0].bytes)).toEqual(Array.from(jpeg));
+  });
+
+  it("só uma por volta: o resto fica para a volta seguinte", () => {
+    const f = (id: number) => ({ artigo_id: id, referencia: `R${id}`, versao: "v", imagem: dataUrl("png", png) });
+    const l = limparFotosKanGest([f(1), f(2), f(3)]);
+    expect(l?.fotos.map((x) => x.artigo_id)).toEqual([1]);
+  });
+
+  it("recusa, com o motivo, o que não é uma imagem verdadeira ou é grande demais", () => {
+    const l = limparFotosKanGest([{ artigo_id: 1, referencia: "R1", versao: "v", imagem: dataUrl("png", jpeg) }]);
+    expect(l?.fotos).toEqual([]);
+    expect(l?.recusadas).toEqual([{ artigo_id: 1, estado: "recusada", erro: "Os bytes da fotografia não são do tipo que diz." }]);
+    const svg = limparFotosKanGest([{ artigo_id: 2, referencia: "R2", imagem: "data:image/svg+xml;base64,PHN2Zz4=" }]);
+    expect(svg?.recusadas[0]).toMatchObject({ artigo_id: 2, estado: "recusada" });
+    const sem = limparFotosKanGest([{ artigo_id: 3, referencia: "", imagem: dataUrl("webp", webp) }]);
+    expect(sem?.recusadas[0]?.erro).toBe("O artigo não tem referência.");
+    const grande = new Uint8Array(MAX_FOTO_BYTES + 10);
+    grande.set(jpeg);
+    const g = limparFotosKanGest([{ artigo_id: 4, referencia: "R4", imagem: dataUrl("jpeg", grande) }]);
+    expect(g?.recusadas[0]?.erro).toBe("A fotografia é grande demais para o site.");
+  });
+
+  it("ignora o que nem tem um artigo", () => {
+    const l = limparFotosKanGest([{ referencia: "R1", imagem: dataUrl("jpeg", jpeg) }, null, "x"]);
+    expect(l).toEqual({ fotos: [], recusadas: [] });
   });
 });

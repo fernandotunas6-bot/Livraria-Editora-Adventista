@@ -115,6 +115,37 @@ computador.
 Teste: `as_capas_do_site_nos_artigos`. Testes unitários: `o_endereco_da_capa`, `so_de_origens_conhecidas` e
 `o_tipo_pela_assinatura`.
 
+### As fotografias dos artigos para o site (o sentido contrário; 27/11)
+
+A fotografia de um artigo segue para o produto do site com a mesma referência quando esse produto não tem capa
+(`sinc/capas.rs`, `para_o_site`; migração 0074).
+
+**Como segue:**
+- **Uma por volta da sincronização,** no campo `fotos` do pedido, só se o pedido inteiro ficar abaixo de 700 kB antes
+  de cifrar. O limite do site é 1 MB, e a cifra acrescenta um terço. Uma fotografia maior do que 600 000 caracteres não
+  segue.
+- **Só vão as fotografias de artigos activos, com referência,** cujo produto do site (na cópia da Loja online) ainda não
+  tem capa.
+- **O que o site respondeu fica em `capas_enviadas`,** com a versão da fotografia (`artigo_fotos.alterado_em`):
+  - `posta`, `tem_capa` e `sem_produto` não voltam a seguir, a não ser que a fotografia mude;
+  - `recusada` tenta outra vez um dia depois;
+  - `erro` (ou um site sem resposta para ela) tenta outra vez cada vez mais tarde.
+
+**No site** (`capasDoKanGest` na Edge Function), a fotografia:
+- só é aceite do KanGest que manda no catálogo;
+- tem de ser JPEG, PNG ou WebP, conferido pelos primeiros bytes, com 750 kB no máximo;
+- vai para o Storage como as do painel (`media/stock_books/<id>/kangest-<resumo>.<ext>`);
+- passa a `cover_image` do produto só se ainda estiver vazio. Nunca se substitui uma capa.
+
+A alteração fica no registo de segurança, e a capa volta ao KanGest nas novidades. Não há volta em círculo: a capa do
+site só vem para artigos sem fotografia.
+
+**Automático, com a opção manual:** está ligado por omissão. Na Loja online, o cartão «As fotografias dos artigos para
+o site» mostra quantas já são capas, quantas esperam e o motivo das recusas. O interruptor «Enviar sozinho» desliga-o
+neste computador (`config` `sinc.fotos_para_o_site`).
+
+Testes: `as_fotos_dos_artigos_para_o_site` (Rust) e `limparFotosKanGest` (`kangestSinc.test.ts`).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;

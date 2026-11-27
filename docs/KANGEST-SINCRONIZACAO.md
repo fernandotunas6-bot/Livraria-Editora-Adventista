@@ -527,3 +527,19 @@ Testes:
 - `abaixo_da_versao_minima_do_site` (Rust);
 - `comparar_versoes` (Rust);
 - `saude.test.ts` (`compararVersoes`).
+
+## 17. As fotografias dos artigos para as capas do site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `fotos` vai no máximo uma fotografia por volta: `{ artigo_id, referencia, versao, imagem }`, em
+  que `imagem` é uma data URL. Vai só se o pedido inteiro ficar abaixo de 700 kB antes de cifrar (o limite do site é
+  1 MB).
+- **O site:**
+  - `limparFotosKanGest` confere o tipo pelos primeiros bytes (JPEG, PNG ou WebP) e o tamanho (750 kB);
+  - `capasDoKanGest` só aceita a fotografia do posto com `manda_catalogo`;
+  - o produto encontra-se pela referência (`kigest_ref`);
+  - o ficheiro vai para `media/stock_books/<id>/`, e o `cover_image` muda só se estiver vazio.
+- **A resposta** (`fotos`): para cada fotografia, `{ artigo_id, estado, erro? }`, com o estado `posta`, `tem_capa`,
+  `sem_produto`, `recusada` ou `erro`. O posto regista-a em `capas_enviadas` (migração 0074).
+- **Um site sem este campo** não responde à fotografia: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As fotografias dos artigos para o
+  site»).

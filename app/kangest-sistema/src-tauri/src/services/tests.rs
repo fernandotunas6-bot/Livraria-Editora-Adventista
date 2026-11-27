@@ -8541,3 +8541,77 @@ async fn as_capas_do_site_nos_artigos() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
+/// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
+/// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.
+#[tokio::test]
+async fn as_fotos_dos_artigos_para_o_site() {
+    use crate::sinc::capas;
+    let (st, pasta) = base_com_admin("fotos-para-o-site").await;
+    let artigo = |r: &'static str| {
+        let st = &st;
+        async move { rpc(st, "artigos.guardar", json!({ "descricao": format!("Livro {r}"), "referencia": r, "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap() }
+    };
+    let (a1, a2, a3) = (artigo("FOT-001").await, artigo("FOT-002").await, artigo("FOT-003").await);
+    // no site: o produto do 1 e o do 3 sem capa, o do 2 com capa
+    for (id, r, capa) in [("p1", "FOT-001", ""), ("p2", "FOT-002", "https://site.exemplo/capa.png"), ("p3", "FOT-003", "")] {
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, ?)")
+            .bind(id)
+            .bind(format!("Livro {r}"))
+            .bind(r)
+            .bind(json!({ "id": id, "referencia": r, "capa": capa }).to_string())
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    // com fotografia: o 1 e o 2 (o 3 não tem)
+    let png = "data:image/png;base64,iVBORw0KGgo=";
+    for a in [a1, a2] {
+        rpc(&st, "fotos.guardar", json!({ "artigo_id": a, "miniatura": png, "imagem": png })).await;
+    }
+    let agora = 1_800_000_000;
+    let proxima = |t: i64| {
+        let pool = st.pool.clone();
+        async move { capas::para_o_site(&pool, t).await.unwrap().map(|f| f.artigo_id) }
+    };
+    let f = capas::para_o_site(&st.pool, agora).await.unwrap().expect("a fotografia do artigo 1");
+    assert_eq!((f.artigo_id, f.item["referencia"].as_str(), f.item["imagem"].as_str()), (a1, Some("FOT-001"), Some(png)));
+    let e = rpc(&st, "loja.capas.envio", Value::Null).await;
+    assert_eq!((e["ligado"].as_bool(), e["por_enviar"].as_i64()), (Some(true), Some(1)), "só o artigo 1: {e}");
+
+    // um site sem resposta para a fotografia (antigo): erro, e espera antes de a mandar outra vez
+    capas::concluir_envio(&st.pool, &f, &Value::Null, agora).await.unwrap();
+    assert_eq!(proxima(agora).await, None);
+    assert_eq!(proxima(agora + 3 * 3600).await, Some(a1), "passada a espera, volta");
+    // posta: não volta a seguir, nem muito depois
+    capas::concluir_envio(&st.pool, &f, &json!([{ "artigo_id": a1, "estado": "posta", "produto": "p1" }]), agora).await.unwrap();
+    assert_eq!(proxima(agora + 30 * 86400).await, None);
+    let e = rpc(&st, "loja.capas.envio", Value::Null).await;
+    assert_eq!((e["postas"].as_i64(), e["por_enviar"].as_i64()), (Some(1), Some(0)), "{e}");
+
+    // uma fotografia nova do mesmo artigo (outra versão) volta a seguir
+    sqlx::query("UPDATE artigo_fotos SET alterado_em = '2099-01-01T00:00:00.000' WHERE artigo_id = ?").bind(a1).execute(&st.pool).await.unwrap();
+    assert_eq!(proxima(agora).await, Some(a1));
+    // recusada (este KanGest não manda no catálogo): tenta outra vez um dia depois
+    let f = capas::para_o_site(&st.pool, agora).await.unwrap().unwrap();
+    capas::concluir_envio(&st.pool, &f, &json!([{ "artigo_id": a1, "estado": "recusada", "erro": "não manda no catálogo" }]), agora).await.unwrap();
+    assert_eq!(proxima(agora + 3600).await, None);
+    assert_eq!(proxima(agora + 25 * 3600).await, Some(a1));
+    let e = rpc(&st, "loja.capas.envio", Value::Null).await;
+    assert_eq!((e["recusadas"].as_i64(), e["ultimo_erro"].as_str()), (Some(1), Some("não manda no catálogo")), "{e}");
+
+    // desligado neste computador: nenhuma; ligado outra vez, volta
+    let e = rpc(&st, "loja.capas.envio_ligar", json!({ "ligado": false })).await;
+    assert_eq!(e["ligado"].as_bool(), Some(false));
+    assert_eq!(proxima(agora + 25 * 3600).await, None);
+    rpc(&st, "loja.capas.envio_ligar", json!({ "ligado": true })).await;
+    assert_eq!(proxima(agora + 25 * 3600).await, Some(a1));
+    // uma fotografia grande demais para o pedido fica de fora
+    let grande = format!("data:image/png;base64,{}", "A".repeat(capas::MAX_DATA_URL as usize));
+    sqlx::query("UPDATE artigo_fotos SET imagem = ? WHERE artigo_id = ?").bind(grande).bind(a1).execute(&st.pool).await.unwrap();
+    assert_eq!(proxima(agora + 25 * 3600).await, None);
+    let _ = (a2, a3);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

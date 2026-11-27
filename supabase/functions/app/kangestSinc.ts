@@ -538,6 +538,65 @@ export function limparSessoesKanGest(l: unknown): Record<string, unknown>[] | nu
 
 const MAX_LIVRO = 2000;
 
+/** O tamanho máximo de uma fotografia do KanGest para o site, já descodificada (a do KanGest tem até 800 px). */
+export const MAX_FOTO_BYTES = 750_000;
+
+/** Uma fotografia de um artigo do KanGest, pronta para o Storage: o tipo vem dos primeiros bytes, não do que diz. */
+export interface FotoKanGest {
+  artigo_id: number;
+  referencia: string;
+  versao: string;
+  tipo: "image/jpeg" | "image/png" | "image/webp";
+  extensao: "jpg" | "png" | "webp";
+  bytes: Uint8Array;
+}
+
+/** O tipo de uma imagem pelos primeiros bytes (JPEG, PNG ou WebP), ou `null`. */
+export function tipoDaImagem(b: Uint8Array): Pick<FotoKanGest, "tipo" | "extensao"> | null {
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { tipo: "image/jpeg", extensao: "jpg" };
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { tipo: "image/png", extensao: "png" };
+  const ascii = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n));
+  if (b.length > 12 && ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") return { tipo: "image/webp", extensao: "webp" };
+  return null;
+}
+
+/**
+ * As fotografias dos artigos que o KanGest manda para os produtos do site sem capa (KANGEST ONE, integração total;
+ * sinc/capas.rs, `para_o_site`). No máximo uma por volta, para o pedido caber no limite. Cada uma tem de ser uma data
+ * URL de JPEG, PNG ou WebP, e os bytes têm de ser mesmo dessa imagem. O que não passa sai com o motivo em `recusadas`,
+ * para o posto não a mandar outra vez. Sem nada (um KanGest antigo), `null`.
+ */
+export function limparFotosKanGest(x: unknown): { fotos: FotoKanGest[]; recusadas: { artigo_id: number; estado: string; erro: string }[] } | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const fotos: FotoKanGest[] = [];
+  const recusadas: { artigo_id: number; estado: string; erro: string }[] = [];
+  for (const f of x.slice(0, 1)) {
+    if (!f || typeof f !== "object" || Array.isArray(f)) continue;
+    const v = f as Record<string, unknown>;
+    const artigo_id = typeof v.artigo_id === "number" && Number.isSafeInteger(v.artigo_id) && v.artigo_id > 0 ? v.artigo_id : 0;
+    if (!artigo_id) continue;
+    const recusar = (erro: string) => recusadas.push({ artigo_id, estado: "recusada", erro });
+    const referencia = typeof v.referencia === "string" ? v.referencia.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60) : "";
+    const versao = typeof v.versao === "string" ? v.versao.replace(/[^0-9A-Za-z:. T_-]/g, "").slice(0, 40) : "";
+    const imagem = typeof v.imagem === "string" ? v.imagem : "";
+    const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(imagem);
+    if (!referencia) { recusar("O artigo não tem referência."); continue; }
+    if (!m) { recusar("A fotografia não é uma imagem JPEG, PNG ou WebP."); continue; }
+    if (m[2].length > Math.ceil((MAX_FOTO_BYTES * 4) / 3) + 4) { recusar("A fotografia é grande demais para o site."); continue; }
+    let bytes: Uint8Array;
+    try {
+      bytes = deB64(m[2]);
+    } catch {
+      recusar("A fotografia não se pôde ler.");
+      continue;
+    }
+    const tipo = tipoDaImagem(bytes);
+    if (!tipo || tipo.tipo !== `image/${m[1]}`) { recusar("Os bytes da fotografia não são do tipo que diz."); continue; }
+    fotos.push({ artigo_id, referencia, versao, ...tipo, bytes });
+  }
+  return { fotos, recusadas };
+}
+
 /**
  * O que o KanGest manda para o livro de stock (sinc/livro.rs): as aberturas (a existência de cada artigo em cada
  * armazém, na primeira volta) e os movimentos novos (`movimentos_stock`, com o id local, o tipo e o documento). Só os

@@ -131,3 +131,51 @@ export function CapasDoSite({ automatico = false }: { automatico?: boolean }) {
     </Card>
   );
 }
+
+type Envio = { ligado: boolean; por_enviar: number; postas: number; recusadas: number; ultimo_erro: string | null };
+
+/**
+ * O sentido contrário (src-tauri/src/sinc/capas.rs, `para_o_site`): a fotografia de um artigo segue sozinha, uma por
+ * volta da sincronização, para o produto do site que ainda não tem capa. No site só a aceita o KanGest que manda no
+ * catálogo, e nunca substitui uma capa. Aqui vê-se o que já foi e o que espera, e desliga-se neste computador.
+ */
+export function FotosParaOSite() {
+  const pode = useSession((s) => s.tem)("artigos.editar");
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["capas-para-o-site"],
+    queryFn: () => call<Envio>("loja.capas.envio"),
+    enabled: pode,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const e = q.data;
+  if (!pode || !e || (!e.por_enviar && !e.postas && !e.recusadas && e.ligado)) return null;
+  async function ligar(ligado: boolean) {
+    try {
+      qc.setQueryData(["capas-para-o-site"], await call<Envio>("loja.capas.envio_ligar", { ligado }));
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+  const partes = [
+    e.postas ? `${e.postas} já são capas no site` : "",
+    e.por_enviar ? `${e.por_enviar} à espera (uma por volta da sincronização)` : "",
+    e.recusadas ? `${e.recusadas} não foram aceites${e.ultimo_erro ? `: ${e.ultimo_erro}` : ""}` : "",
+  ].filter(Boolean);
+  return (
+    <Card className="mb-4 flex flex-wrap items-center gap-3 p-4 text-[13.5px]" aria-label="As fotografias para o site">
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">As fotografias dos artigos para o site</div>
+        <div className="text-ink-3">
+          {e.ligado ? "Os produtos do site sem capa recebem a fotografia do artigo." : "Desligado neste computador."}
+          {partes.length ? ` ${partes.join("; ")}.` : ""}
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-ink-2">
+        <input type="checkbox" checked={e.ligado} onChange={(ev) => void ligar(ev.target.checked)} />
+        Enviar sozinho
+      </label>
+    </Card>
+  );
+}

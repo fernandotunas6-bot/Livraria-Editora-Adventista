@@ -305,7 +305,23 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
         eprintln!("Livro de stock: a abertura fica para a volta seguinte ({e}).");
     }
     let livro_devidos = livro::devidos(pool, agora).await.unwrap_or_default();
-    let dados = json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas, "stock_livro": &livro_devidos.dados });
+    let mut dados = json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas, "stock_livro": &livro_devidos.dados });
+    // uma fotografia de um artigo para o produto do site sem capa (capas.rs), se o pedido ainda a levar dentro do limite
+    // do site. Nunca impede o resto da volta.
+    let foto = match capas::para_o_site(pool, agora).await {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Fotografias para o site: ficam para a volta seguinte ({e}).");
+            None
+        }
+    };
+    let foto = foto.filter(|f| {
+        let pedido = serde_json::to_string(&dados).map(|t| t.len()).unwrap_or(usize::MAX);
+        pedido.saturating_add(f.item["imagem"].as_str().map_or(0, str::len)).saturating_add(512) <= capas::MAX_PEDIDO
+    });
+    if let Some(f) = &foto {
+        dados["fotos"] = json!([f.item]);
+    }
     match enviar(l, &dados).await {
         Ok(r) => {
             // o painel pediu o fim de alguma: termina-se primeiro, antes de tudo o resto
@@ -314,6 +330,11 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 eprintln!("Sincronização: {revogadas} sessão(ões) terminada(s) a pedido do painel do site.");
             }
             livro::concluir(pool, &livro_devidos, &r["stock_livro"], agora).await?;
+            if let Some(f) = &foto {
+                if let Err(e) = capas::concluir_envio(pool, f, &r["fotos"], agora).await {
+                    eprintln!("Fotografias para o site: a resposta não se registou ({e}).");
+                }
+            }
             // a versão mínima do KanGest que o site aceita (versao.rs)
             versao::guardar(pool, r["kangest_min_version"].as_str()).await?;
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
