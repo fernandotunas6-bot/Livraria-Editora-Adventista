@@ -63,7 +63,7 @@ mod modos;
 // trazer os dados do KanGest oficial deste computador
 mod oficial;
 mod quadro;
-mod ramos;
+pub(crate) mod ramos;
 #[cfg(test)]
 mod tests;
 

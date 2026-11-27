@@ -146,6 +146,31 @@ neste computador (`config` `sinc.fotos_para_o_site`).
 
 Testes: `as_fotos_dos_artigos_para_o_site` (Rust) e `limparFotosKanGest` (`kangestSinc.test.ts`).
 
+### Os dados dos livros do site nas fichas dos artigos (27/11)
+
+As novidades do site trazem, de cada livro, o autor, a editora, o idioma, o ano e as páginas, além do ISBN que já
+traziam. Um artigo activo com a mesma referência completa a ficha com eles (`sinc/fichas.rs`; migração 0075):
+- **os dados do livro** (os mesmos campos da ficha de uma livraria): só os que faltam. O ano e as páginas só quando o
+  site tem mais do que 0;
+- **o código de barras:** o ISBN do site, em ISBN-13, se o artigo não tiver nenhum, se o ISBN for válido e se nenhum
+  outro artigo já o usar. Não volta ao site, que é de onde veio.
+
+**Nunca se substitui o que está na ficha.** O que veio fica em `fichas_do_site`, campo a campo:
+- um campo que já veio uma vez não volta;
+- se alguém o apagar à mão, fica apagado.
+
+Cada vez que se completam fichas, fica uma linha na auditoria (`FICHA_DO_SITE`).
+
+**Automático, com a opção manual:** corre depois de cada volta da sincronização que traga produtos. Na Loja online, o
+cartão «Os dados dos livros do site» mostra quantos artigos podem receber alguma coisa, com dois comandos:
+- «Completar agora», para completar na hora;
+- «Completar sozinho», que o desliga neste computador (`config` `sinc.dados_dos_livros`).
+
+Na primeira volta depois de actualizar, o KanGest volta a pedir o catálogo do site, para conhecer estes dados dos
+produtos que já tinha.
+
+Testes: `os_dados_dos_livros_do_site_nas_fichas` e `fichas::testes` (Rust), e `kangest-central.mjs` (PGlite).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
