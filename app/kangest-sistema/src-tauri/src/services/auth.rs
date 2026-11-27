@@ -638,13 +638,22 @@ pub struct GoogleIn {
     trocar: bool,
 }
 
-/// A entrada com o Google é só no programa deste computador: abre o navegador do sistema, e o retorno chega por uma
-/// ligação kangest://, que um posto ligado pela rede ou um browser não recebem.
+/// A entrada pelo navegador (o Google ou a sessão do site) é só no programa deste computador: abre o navegador do
+/// sistema, e o retorno chega por uma ligação kangest://, que um posto ligado pela rede ou um browser não recebem.
 fn so_neste_computador() -> AppResult<()> {
     if crate::state::contexto().is_some() {
-        return Err(AppError::msg("A entrada com o Google é só no programa instalado neste computador. Aqui, entre com o email e a senha da conta do site."));
+        return Err(AppError::msg("A entrada pelo navegador é só no programa instalado neste computador. Aqui, entre com o email e a senha da conta do site."));
     }
     Ok(())
+}
+
+/// «Entrar com a sessão do site» (pedido do dono a 27/11: «o login deve funcionar para os dois»; sinc/entrada.rs): abre
+/// a página do site no navegador do sistema; quem lá tem a sessão aberta confirma, e o KanGest entra com essa conta.
+pub async fn site_iniciar(st: &AppState) -> AppResult<Value> {
+    so_neste_computador()?;
+    let url = crate::sinc::entrada::site_iniciar(&st.pool).await?;
+    super::licenca::abrir_no_navegador(&url)?;
+    Ok(json!({ "aberto": true }))
 }
 
 /// «Entrar com o Google» (KANGEST ONE, fase A; sinc/entrada.rs): abre a entrada do Google no navegador do sistema.
@@ -655,27 +664,34 @@ pub async fn google_iniciar(st: &AppState) -> AppResult<Value> {
     Ok(json!({ "aberto": true }))
 }
 
-/// O retorno do Google (o `code`) ou, na segunda volta, o código dos dois passos. Depois de o site confirmar, é a mesma
-/// entrada da conta do site, sem mudar a cópia local da senha. Sem Internet não há entrada com o Google.
+/// O retorno do navegador (o `code` do Google, ou o código de uso único do site) ou, na segunda volta, o código dos
+/// dois passos. Depois de o site confirmar, é a mesma entrada da conta do site, sem mudar a cópia local da senha. Sem
+/// Internet não há entrada pelo navegador.
 pub async fn google_concluir(st: &AppState, i: GoogleIn) -> AppResult<Value> {
-    use crate::sinc::entrada::{self, Validacao};
+    use crate::sinc::entrada::{self, Validacao, Via};
     so_neste_computador()?;
+    let via = entrada::via_em_curso().unwrap_or(Via::Google);
+    let botao = via.botao();
+    let (nome, como) = match via {
+        Via::Google => ("Google", "com o Google"),
+        Via::Site => ("Sessão do site", "pela sessão do site"),
+    };
     if !entrada::estado_valido(&i.estado) {
-        return Err(AppError::msg("Esta entrada com o Google não é válida: carregue outra vez em «Entrar com o Google»."));
+        return Err(AppError::msg(format!("Esta entrada não é válida: carregue outra vez em {botao}.")));
     }
     match entrada::google_concluir(&st.pool, &i.estado, i.code.as_deref(), i.codigo.as_deref()).await? {
         Validacao::PedirCodigo => Ok(json!({ "dois_passos": true })),
         Validacao::Recusada(m) => {
-            registar(st, None, "Google", "FALHA", Some(format!("entrada com o Google recusada: {m}"))).await;
+            registar(st, None, nome, "FALHA", Some(format!("entrada {como} recusada: {m}"))).await;
             Err(AppError::msg(m))
         }
         Validacao::SemLigacao(m) => Err(AppError::msg(format!(
-            "Sem ligação ao site ({m}): entrar com o Google precisa de Internet. Sem Internet, entre com o email e a senha da conta do site."
+            "Sem ligação ao site ({m}): {botao} precisa de Internet. Sem Internet, entre com o email e a senha da conta do site."
         ))),
         Validacao::Confirmada { pessoa, tokens } => {
             let email = pessoa.email.trim().to_lowercase();
             if email.is_empty() {
-                return Err(AppError::msg("A conta Google não deu o email: entre com o email e a senha da conta do site."));
+                return Err(AppError::msg("A conta não deu o email: entre com o email e a senha da conta do site."));
             }
             let guardada = sqlx::query("SELECT * FROM utilizadores WHERE login = ? AND conta_site IS NOT NULL").bind(&email).fetch_optional(&st.pool).await?;
             if let Some(row) = &guardada {
@@ -691,7 +707,7 @@ pub async fn google_concluir(st: &AppState, i: GoogleIn) -> AppResult<Value> {
                 return Err(AppError::msg("Esta conta está desactivada neste KanGest. Fale com o administrador."));
             }
             conta_diferente(st, id, &email, i.trocar).await?;
-            entrar(st, &row, "conta do site (Google)").await
+            entrar(st, &row, if via == Via::Site { "conta do site (sessão do site)" } else { "conta do site (Google)" }).await
         }
     }
 }

@@ -64,6 +64,8 @@ const ColporteurVerifyPage = lazy(() => import('@/pages/ColporteurVerifyPage.jsx
 const ColporteurAreaPage = lazy(() => import('@/pages/ColporteurAreaPage.jsx'));
 const NovidadesPage = lazy(() => import('@/pages/NovidadesPage.jsx'));
 const AppDownloadPage = lazy(() => import('@/pages/AppDownloadPage.jsx'));
+const KanGestAbrirPage = lazy(() => import('@/pages/KanGestAbrirPage.jsx'));
+const KanGestEntrarComOSitePage = lazy(() => import('@/pages/KanGestEntrarComOSitePage.jsx'));
 
 const PwaInstallBanner = lazy(() => import('@/components/PwaInstallBanner.jsx'));
 // "Nova versão disponível — Actualizar" e "App actualizada" (lib/appVersion.js).
@@ -321,6 +323,10 @@ function App() {
               <Route path="/colportor/verificar/:codigo" element={<ColporteurVerifyPage />} />
               <Route path="/ser-colportor" element={<Navigate to="/colportor/candidatura" replace />} />
               <Route path="/colportores" element={<Navigate to="/colportor/candidatura" replace />} />
+
+              {/* a entrada nos dois sentidos com o KanGest (pedido do dono a 27/11) */}
+              <Route path="/kangest/abrir" element={<KanGestAbrirPage />} />
+              <Route path="/kangest/entrar-com-o-site" element={<KanGestEntrarComOSitePage />} />
 
               <Route path="/admin" element={<StaffMfaGate><AdminPage /></StaffMfaGate>} />
               <Route path="/admin.html" element={<Navigate to="/admin" replace />} />

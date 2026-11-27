@@ -119,6 +119,52 @@ o servidor recusa ali a entrada com o Google.
 `https://livrariaadventista.ao/kangest/entrar/**` em Supabase → Authentication → URL Configuration → Redirect URLs. O
 site já usa o retorno para qualquer página dele, por isso deve estar aceite.
 
+## A entrada nos dois sentidos (27/11)
+
+Pedido do dono: «o login deve funcionar para os dois». Quem tem a sessão de um lado entra no outro sem escrever a
+senha outra vez.
+
+### Do site para o KanGest: «Entrar com a sessão do site»
+
+No ecrã de entrada, ao lado do Google, com o KanGest ligado e com Internet (`sinc/entrada.rs`, `site_iniciar`):
+
+1. O KanGest gera o verificador do PKCE e o estado, só em memória, e abre no navegador do sistema
+   `/kangest/entrar-com-o-site?e=<estado>&d=<desafio S256>`.
+2. A página do site (`KanGestEntrarComOSitePage.jsx`) precisa da sessão do site; sem ela, manda entrar primeiro e
+   volta. Mostra com que conta se vai entrar e só segue quando a pessoa carrega em «Entrar no KanGest».
+3. O site (`POST /kangest/entrar-com-o-site/codigo`, com a permissão Caixa ou Gestor do KanGest) dá um código de uso
+   único preso ao desafio. Na base fica só o resumo SHA-256, por dois minutos (`private.kangest_entradas`, migração
+   20261127170000).
+4. A página devolve o código ao KanGest pela mesma ligação do Google (`kangest://auth?e=…&code=…`).
+5. O KanGest troca o código com o verificador (`POST /kangest/entrar-com-o-site/trocar`):
+   - o código gasta-se na primeira tentativa, certa ou errada;
+   - o site só responde se o SHA-256 do verificador bater com o desafio. Quem apanhar o código na ligação não o
+     consegue usar, porque o verificador nunca saiu do KanGest.
+6. O site devolve o resumo de um link de entrada da conta (`admin.generateLink`, sem email). O KanGest troca-o no Auth
+   (`/auth/v1/verify`) por uma sessão só sua, em memória.
+7. Daí em diante é a entrada da conta do site, como com o Google: os dois passos no KanGest, se a conta os tem;
+   `kangest_eu`; e a mesma conta local, sem mudar a cópia local da senha.
+
+### Do KanGest para o site: abrir o painel já com a sessão
+
+Os botões que abrem o painel do site (a encomenda, o produto, os pagamentos, o atendimento) usam `abrirNoSite`
+(`src/lib/site.ts`):
+
+1. O KanGest pede ao site, com a sessão da pessoa (`loja.conta.abrir_no_site` →
+   `POST /kangest/abrir-no-site`, com a permissão Caixa ou Gestor), um endereço para a página.
+2. **Só as páginas permitidas** (`destinoNoSite`, em `supabase/functions/app/kangestEntrada.ts`): o painel, a gestão, o
+   perfil, a loja, um produto, o rastreio, as lojas, a comunidade e as novidades. Nunca outro endereço.
+3. O site devolve `/kangest/abrir#t=<resumo>&d=<destino>`, com o resumo de um link de entrada da **própria conta**:
+   - o fragmento (`#`) não chega a nenhum servidor nem fica nos registos;
+   - a página (`KanGestAbrirPage.jsx`) tira-o logo do endereço, troca-o por uma sessão (`verifyOtp`) e segue para o
+     destino. Só serve uma vez.
+4. **No programa, abre no navegador do KanGest em sessão privada:** a sessão do site não fica guardada no computador da
+   loja para a pessoa seguinte.
+5. **Sem a sessão do site** (entrou com a senha local, ou está sem Internet), a página abre como antes e o site pede a
+   entrada.
+6. **A sessão que o navegador recebe é de um só passo:** quem tem os dois passos escreve o código no painel, como em
+   qualquer entrada.
+
 ## Testes
 
 - `sinc/entrada.rs`:
