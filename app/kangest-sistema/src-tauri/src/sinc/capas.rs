@@ -186,6 +186,133 @@ pub async fn falhou(st: &AppState, i: FalhouIn) -> AppResult<Value> {
     Ok(json!({ "ok": true }))
 }
 
+// ─── O sentido contrário: as fotografias dos artigos para os produtos do site sem capa (migração 0074) ───
+
+/// A chave em `config` que desliga o envio neste computador ("0"). Por omissão está ligado.
+pub const CHAVE_ENVIAR: &str = "sinc.fotos_para_o_site";
+/// A maior fotografia que segue (a data URL): o pedido da volta tem 1 MB no site e vai cifrado.
+pub const MAX_DATA_URL: i64 = 600_000;
+/// O pedido inteiro da volta, já com a fotografia e antes de cifrar, não passa disto; senão a fotografia espera.
+pub const MAX_PEDIDO: usize = 700_000;
+
+/// Uma fotografia a caminho do site: o artigo, a versão (`artigo_fotos.alterado_em`) e o item do pedido.
+pub struct ParaOSite {
+    pub artigo_id: i64,
+    pub versao: String,
+    pub item: Value,
+}
+
+async fn envio_ligado(pool: &SqlitePool) -> bool {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(CHAVE_ENVIAR).fetch_optional(pool).await.ok().flatten();
+    v.as_deref() != Some("0")
+}
+
+/// As fotografias que podem ir para o site: um artigo activo, com referência e com fotografia que caiba, cujo produto do
+/// site (na cópia da Loja online) não tem capa, e cuja fotografia ainda não foi com esta versão (os erros e as recusas
+/// voltam quando passar o tempo de espera).
+const CANDIDATAS: &str = "FROM artigo_fotos f JOIN artigos a ON a.id = f.artigo_id
+     WHERE TRIM(COALESCE(a.referencia, '')) <> '' AND a.ativo = 1 AND LENGTH(f.imagem) <= ?
+       AND EXISTS (SELECT 1 FROM loja_produtos p WHERE TRIM(p.referencia) = TRIM(a.referencia)
+                    AND TRIM(COALESCE(json_extract(p.dados, '$.capa'), '')) = '')
+       AND NOT EXISTS (SELECT 1 FROM capas_enviadas c WHERE c.artigo_id = f.artigo_id AND c.versao = f.alterado_em
+                        AND (c.estado NOT IN ('erro', 'recusada') OR c.proximo_em > ?))";
+
+/// A fotografia seguinte para o site, uma por volta (sinc/mod.rs junta-a ao pedido, se couber). Desligado neste
+/// computador, nenhuma.
+pub async fn para_o_site(pool: &SqlitePool, agora: i64) -> AppResult<Option<ParaOSite>> {
+    if !envio_ligado(pool).await {
+        return Ok(None);
+    }
+    let linha: Option<(i64, String, String, String)> =
+        sqlx::query_as(&format!("SELECT f.artigo_id, TRIM(a.referencia), f.imagem, f.alterado_em {CANDIDATAS} ORDER BY f.artigo_id LIMIT 1"))
+            .bind(MAX_DATA_URL)
+            .bind(agora)
+            .fetch_optional(pool)
+            .await?;
+    Ok(linha.map(|(artigo_id, referencia, imagem, versao)| ParaOSite {
+        artigo_id,
+        item: json!({ "artigo_id": artigo_id, "referencia": referencia, "versao": versao, "imagem": imagem }),
+        versao,
+    }))
+}
+
+/// O que o site respondeu à fotografia da volta. Sem resposta para ela (um site antigo), conta como erro e espera.
+pub async fn concluir_envio(pool: &SqlitePool, enviada: &ParaOSite, resposta: &Value, agora: i64) -> AppResult<()> {
+    let r = resposta.as_array().and_then(|l| l.iter().find(|x| x["artigo_id"].as_i64() == Some(enviada.artigo_id)));
+    let (estado, erro) = match r {
+        Some(x) => (x["estado"].as_str().unwrap_or("erro"), x["erro"].as_str().unwrap_or("")),
+        None => ("erro", "O site não respondeu à fotografia."),
+    };
+    let estado = match estado {
+        "posta" | "tem_capa" | "sem_produto" | "recusada" => estado,
+        _ => "erro",
+    };
+    let antes: i64 = sqlx::query_scalar("SELECT tentativas FROM capas_enviadas WHERE artigo_id = ? AND versao = ?")
+        .bind(enviada.artigo_id)
+        .bind(&enviada.versao)
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or(0);
+    let proximo = match estado {
+        "erro" => super::proxima_tentativa(antes, agora),
+        "recusada" => agora + 24 * 3600,
+        _ => 0,
+    };
+    sqlx::query(
+        "INSERT INTO capas_enviadas (artigo_id, versao, estado, erro, tentativas, proximo_em, em) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(artigo_id) DO UPDATE SET versao = excluded.versao, estado = excluded.estado, erro = excluded.erro,
+           tentativas = excluded.tentativas, proximo_em = excluded.proximo_em, em = excluded.em",
+    )
+    .bind(enviada.artigo_id)
+    .bind(&enviada.versao)
+    .bind(estado)
+    .bind(erro.chars().take(300).collect::<String>())
+    .bind(antes + 1)
+    .bind(proximo)
+    .bind(db::agora())
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// O estado do envio para o ecrã (o cartão da Loja online): se está ligado, quantas esperam, e o que o site respondeu.
+pub async fn envio(st: &AppState) -> AppResult<Value> {
+    st.exigir_perm("artigos.editar")?;
+    let pool = &st.pool;
+    let agora = super::agora_s();
+    let por_enviar: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) {CANDIDATAS}")).bind(MAX_DATA_URL).bind(agora).fetch_one(pool).await?;
+    let contar = |estado: &'static str| async move {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM capas_enviadas WHERE estado = ?").bind(estado).fetch_one(pool).await
+    };
+    let erro: Option<String> =
+        sqlx::query_scalar("SELECT erro FROM capas_enviadas WHERE estado IN ('erro', 'recusada') AND erro <> '' ORDER BY em DESC LIMIT 1")
+            .fetch_optional(pool)
+            .await?;
+    Ok(json!({
+        "ligado": envio_ligado(pool).await,
+        "por_enviar": por_enviar,
+        "postas": contar("posta").await?,
+        "recusadas": contar("recusada").await? + contar("erro").await?,
+        "ultimo_erro": erro,
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct LigarIn {
+    ligado: bool,
+}
+
+/// Liga ou desliga o envio das fotografias para o site neste computador (o automático, com a opção manual ao lado).
+pub async fn envio_ligar(st: &AppState, i: LigarIn) -> AppResult<Value> {
+    st.exigir_perm("artigos.editar")?;
+    sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
+        .bind(CHAVE_ENVIAR)
+        .bind(if i.ligado { "1" } else { "0" })
+        .execute(&st.pool)
+        .await?;
+    envio(st).await
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
