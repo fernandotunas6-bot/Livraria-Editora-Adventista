@@ -373,6 +373,8 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "fichas.estado" => super::fichas::estado(st).await,
         "fichas.completar" => super::fichas::completar_agora(st).await,
         "fichas.ligar" => super::fichas::ligar(st, serde_json::from_value(params.clone())?).await,
+        "fichas.generos" => super::fichas::generos_estado(st).await,
+        "fichas.ligar_genero" => super::fichas::ligar_genero(st, serde_json::from_value(params.clone())?).await,
         // as promoções dos artigos no site (promocoes.rs)
         "promocoes.estado" => super::promocoes::estado(st).await,
         "promocoes.ligar" => super::promocoes::ligar(st, serde_json::from_value(params.clone())?).await,

@@ -8782,6 +8782,66 @@ async fn as_promocoes_dos_artigos_para_o_site() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// As famílias do KanGest e os géneros do site (sinc/fichas.rs, migração 0078): a ligação pelo nome ou à mão; o artigo na
+/// «Geral» recebe a família do género do produto (uma vez só); o produto em «Catálogo Geral» recebe o género da família.
+#[tokio::test]
+async fn as_familias_e_os_generos_do_site() {
+    use crate::sinc::fichas;
+    let (st, pasta) = base_com_admin("familias-e-generos").await;
+    let familia = |d: &'static str| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>("INSERT INTO familias (descricao) VALUES (?) RETURNING id").bind(d).fetch_one(&pool).await.unwrap() }
+    };
+    let (fe, literatura) = (familia("FÉ E DOUTRINA").await, familia("Literatura").await);
+    let geral: i64 = sqlx::query_scalar("SELECT id FROM familias WHERE descricao = 'Geral'").fetch_one(&st.pool).await.unwrap();
+    let artigo = |r: &'static str, f: i64| {
+        let st = &st;
+        async move { rpc(st, "artigos.guardar", json!({ "descricao": format!("Livro {r}"), "referencia": r, "taxa_iva_id": 1, "preco1": 100, "familia_id": f })).await["id"].as_i64().unwrap() }
+    };
+    let (a1, a2, a3) = (artigo("FAM-001", geral).await, artigo("FAM-002", literatura).await, artigo("FAM-003", geral).await);
+    for (r, genero) in [("FAM-001", "Fé & Doutrina"), ("FAM-002", "Catálogo Geral"), ("FAM-003", "Bíblias"), ("OUTRO", "Família & Relacionamentos")] {
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, ?)")
+            .bind(r)
+            .bind(r)
+            .bind(r)
+            .bind(json!({ "id": r, "referencia": r, "genero": genero }).to_string())
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    // pelo nome: «FÉ E DOUTRINA» liga-se a «Fé & Doutrina»; a «Literatura» liga-se à mão
+    let e = rpc(&st, "loja.fichas.ligar_genero", json!({ "familia_id": literatura, "genero": "Família & Relacionamentos" })).await;
+    let de = |e: &Value, f: i64| e["familias"].as_array().unwrap().iter().find(|x| x["id"].as_i64() == Some(f)).cloned().unwrap();
+    assert_eq!((de(&e, fe)["genero"].as_str(), de(&e, fe)["a_mao"].as_bool()), (Some("Fé & Doutrina"), Some(false)), "{e}");
+    assert_eq!((de(&e, literatura)["genero"].as_str(), de(&e, literatura)["a_mao"].as_bool()), (Some("Família & Relacionamentos"), Some(true)));
+    assert_eq!(de(&e, geral)["geral"].as_bool(), Some(true));
+
+    // o artigo na «Geral» com o produto em «Fé & Doutrina» passa à família ligada; o do género sem família fica
+    let f = fichas::completar(&st.pool).await.unwrap();
+    assert_eq!(f.familias, 1, "{f:?}");
+    let familia_de = |id: i64| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, Option<i64>>("SELECT familia_id FROM artigos WHERE id = ?").bind(id).fetch_one(&pool).await.unwrap() }
+    };
+    assert_eq!((familia_de(a1).await, familia_de(a3).await), (Some(fe), Some(geral)));
+    // posto de volta na «Geral» à mão, fica lá
+    sqlx::query("UPDATE artigos SET familia_id = ? WHERE id = ?").bind(geral).bind(a1).execute(&st.pool).await.unwrap();
+    assert_eq!(fichas::completar(&st.pool).await.unwrap().familias, 0);
+    assert_eq!(familia_de(a1).await, Some(geral));
+
+    // o produto em «Catálogo Geral» recebe o género da família do artigo
+    let l = fichas::livros_para_o_site(&st.pool, 1_800_000_000).await.unwrap();
+    assert_eq!(l.iter().map(|x| (x.artigo_id, x.item["genero"].as_str().map(str::to_string))).collect::<Vec<_>>(), vec![(a2, Some("Família & Relacionamentos".to_string()))]);
+
+    // «não ligar» desfaz a ligação pelo nome; null volta a ela
+    let e = rpc(&st, "loja.fichas.ligar_genero", json!({ "familia_id": fe, "genero": "" })).await;
+    assert!(de(&e, fe)["genero"].is_null(), "{e}");
+    let e = rpc(&st, "loja.fichas.ligar_genero", json!({ "familia_id": fe, "genero": null })).await;
+    assert_eq!(de(&e, fe)["genero"].as_str(), Some("Fé & Doutrina"));
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.

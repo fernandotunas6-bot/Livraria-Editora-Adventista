@@ -420,13 +420,13 @@ describe("limparLivrosKanGest (os dados das fichas do KanGest para os produtos d
 
   it("limpa os textos, os números e o ISBN, e deixa de fora o que não serve", () => {
     const l = limparLivrosKanGest([
-      { artigo_id: 7, referencia: " LIV-001 ", autor: "  Ellen\n G.   White ", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "978-85-345-2077-5" },
+      { artigo_id: 7, referencia: " LIV-001 ", autor: "  Ellen\n G.   White ", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "978-85-345-2077-5", genero: " Fé & Doutrina " },
       { artigo_id: 8, referencia: "LIV-002", ano: 0, paginas: 2.5, isbn: "9788534520776", autor: "" },
       { artigo_id: 9, referencia: "", autor: "Sem referência" },
       { referencia: "LIV-003", autor: "Sem artigo" },
     ]);
     expect(l).toEqual([
-      { artigo_id: 7, referencia: "LIV-001", autor: "Ellen G. White", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "9788534520775" },
+      { artigo_id: 7, referencia: "LIV-001", autor: "Ellen G. White", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "9788534520775", genero: "Fé & Doutrina" },
     ]);
   });
 

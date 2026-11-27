@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { call } from "@/lib/api";
 import { prepararFoto } from "@/lib/fotos";
 import { useSession } from "@/store/session";
-import { Button, Card } from "@/components/ui";
+import { Badge, Button, Card, Modal, Select } from "@/components/ui";
 
 type Pendente = { artigo_id: number; referencia: string; descricao: string };
 type Pendentes = { capas: Pendente[]; falhadas: number };
@@ -185,7 +185,7 @@ type Fichas = {
   por_completar: number;
   completadas: number;
   ultima: string | null;
-  agora?: { fichas: number; dados: number; codigos: number };
+  agora?: { fichas: number; dados: number; codigos: number; familias: number };
   para_o_site: { ligado: boolean; por_enviar: number; enviados: number; recusados: number; ultimo_erro: string | null };
 };
 
@@ -221,7 +221,7 @@ export function DadosDosLivros() {
       const a = r.agora;
       toast.success(
         a?.fichas
-          ? `${a.fichas} ficha(s) completada(s) com os dados do site (${a.dados} dado(s) do livro, ${a.codigos} código(s) de barras).`
+          ? `${a.fichas} ficha(s) completada(s) com os dados do site (${a.dados} dado(s) do livro, ${a.codigos} código(s) de barras, ${a.familias} família(s)).`
           : "Não havia nada a completar.",
       );
       await qc.invalidateQueries({ queryKey: ["artigos"] });
@@ -322,6 +322,106 @@ export function PromocoesParaOSite() {
         <input type="checkbox" checked={e.ligado} onChange={(ev) => void ligar(ev.target.checked)} />
         Enviar sozinho
       </label>
+    </Card>
+  );
+}
+
+type LigacaoGeneros = {
+  generos: { genero: string; produtos: number }[];
+  familias: { id: number; descricao: string; artigos: number; genero: string | null; a_mao: boolean; geral: boolean }[];
+};
+
+/** O valor do quadro: «sozinho» (pelo nome), «não ligar» ou um género. */
+const PELO_NOME = "__pelo_nome__";
+const NAO_LIGAR = "__nao_ligar__";
+
+/**
+ * As famílias do KanGest e os géneros do site (src-tauri/src/sinc/fichas.rs, `generos`). Cada família liga-se sozinha ao
+ * género com o mesmo nome; aqui liga-se à mão, ou desliga-se. Com a ligação, um artigo na «Geral» recebe a família do
+ * género do seu produto, e um produto em «Catálogo Geral» recebe o género da família do artigo.
+ */
+export function FamiliasEGeneros() {
+  const pode = useSession((s) => s.tem)("artigos.editar");
+  const qc = useQueryClient();
+  const [aberto, setAberto] = useState(false);
+  const q = useQuery({
+    queryKey: ["familias-e-generos"],
+    queryFn: () => call<LigacaoGeneros>("loja.fichas.generos"),
+    enabled: pode,
+    retry: false,
+  });
+  const d = q.data;
+  if (!pode || !d || !d.generos.length) return null;
+  const ligadas = d.familias.filter((f) => f.genero).length;
+  async function ligar(familia_id: number, valor: string) {
+    const genero = valor === PELO_NOME ? null : valor === NAO_LIGAR ? "" : valor;
+    try {
+      qc.setQueryData(["familias-e-generos"], await call<LigacaoGeneros>("loja.fichas.ligar_genero", { familia_id, genero }));
+      await qc.invalidateQueries({ queryKey: ["dados-dos-livros"] });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+  return (
+    <Card className="mb-4 flex flex-wrap items-center gap-3 p-4 text-[13.5px]" aria-label="As famílias e os géneros do site">
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">As famílias e os géneros do site</div>
+        <div className="text-ink-3">
+          {ligadas
+            ? `${ligadas} família(s) ligada(s) a um género do site. Os artigos na «Geral» recebem a família do género do produto, e os produtos em «Catálogo Geral», o género da família.`
+            : "Nenhuma família está ligada a um género do site. Ligam-se sozinhas quando o nome é igual, ou aqui, à mão."}
+        </div>
+      </div>
+      <Button variant="secondary" onClick={() => setAberto(true)}>
+        Ligar famílias
+      </Button>
+      {aberto && (
+        <Modal open onClose={() => setAberto(false)} title="As famílias e os géneros do site" width="max-w-2xl">
+          <p className="mb-3 text-[13px] text-ink-3">
+            «Pelo nome» liga a família ao género do site com o mesmo nome, se houver. Só se usam géneros que o site já tem.
+          </p>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-left text-ink-3">
+                  <th className="py-1.5 pr-3 font-medium">Família</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Artigos</th>
+                  <th className="py-1.5 font-medium">Género do site</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.familias.map((f) => (
+                  <tr key={f.id} className="border-t border-line">
+                    <td className="py-1.5 pr-3">
+                      {f.descricao} {f.geral && <Badge>a «Geral»</Badge>}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{f.artigos}</td>
+                    <td className="py-1.5">
+                      {f.geral ? (
+                        <span className="text-ink-3">não se liga</span>
+                      ) : (
+                        <Select
+                          aria-label={`Género do site para ${f.descricao}`}
+                          value={!f.a_mao ? PELO_NOME : f.genero ?? NAO_LIGAR}
+                          onChange={(e) => void ligar(f.id, e.target.value)}
+                        >
+                          <option value={PELO_NOME}>Pelo nome{!f.a_mao && f.genero ? ` (${f.genero})` : ""}</option>
+                          <option value={NAO_LIGAR}>Não ligar</option>
+                          {d.generos.map((g) => (
+                            <option key={g.genero} value={g.genero}>
+                              {g.genero} ({g.produtos})
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Modal>
+      )}
     </Card>
   );
 }

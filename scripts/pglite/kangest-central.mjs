@@ -304,6 +304,15 @@ await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', autor: 'Outro Autor', i
 const depois = (await q(`select author, isbn from public.stock_books where id = $1`, [livroS.id]))[0];
 check('livros: o que o site já tem nunca se substitui; o ISBN livre entra', depois.author === 'Ellen G. White' && depois.isbn === '9788534525183', depois);
 await recusa('livros: as contas não executam', () => como('authenticated', admin, `select public.kangest_dados_dos_livros('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
+// o género da família do artigo (20261127130000): só num produto em «Catálogo Geral» e só um género que o site tenha
+await q(`insert into public.stock_books (title, price, stock, active, genre) values ('Com o género', 100, 0, false, 'Fé & Doutrina')`);
+await q(`update public.stock_books set genre = 'Catálogo Geral' where id = $1`, [livroS.id]);
+await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', genero: 'Género Inventado' }]);
+check('géneros: um género que o site não tem não entra', (await q(`select genre from public.stock_books where id = $1`, [livroS.id]))[0].genre === 'Catálogo Geral');
+await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', genero: 'Fé & Doutrina' }]);
+check('géneros: o produto em «Catálogo Geral» recebe o género da família', (await q(`select genre from public.stock_books where id = $1`, [livroS.id]))[0].genre === 'Fé & Doutrina');
+await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', genero: 'Catálogo Geral' }]);
+check('géneros: um produto com género não muda', (await q(`select genre from public.stock_books where id = $1`, [livroS.id]))[0].genre === 'Fé & Doutrina');
 // as promoções do KanGest no site (20261127120000): a regra do preço, mas nunca por cima de uma do painel
 const promos = async (p, itens) => (await q(`select public.kangest_promocoes_do_posto($1, $2::jsonb) r`, [p, JSON.stringify(itens)]))[0].r;
 const promoDe = async (id) => (await q(`select sale_price::numeric::text sp, to_char(sale_starts_at at time zone 'Africa/Luanda', 'YYYY-MM-DD HH24:MI') ini,

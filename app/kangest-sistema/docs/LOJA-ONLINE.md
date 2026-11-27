@@ -202,6 +202,24 @@ foram, quantos esperam e o motivo das recusas. O interruptor «Enviar para o sit
 Testes: `os_dados_das_fichas_para_o_site` e `fichas::testes` (Rust), `limparLivrosKanGest` (`kangestSinc.test.ts`) e
 `kangest-central.mjs` (PGlite).
 
+### As famílias do KanGest e os géneros do site (27/11)
+
+As famílias dos artigos e os géneros do site (as categorias públicas, como «Fé & Doutrina» ou «Bíblias») ligam-se
+(`sinc/fichas.rs`, `generos`; migração 0078):
+- **sozinhas,** quando o nome é igual (sem maiúsculas nem acentos, e «&» vale «e»);
+- **à mão,** no quadro «Ligar famílias» da Loja online: um género do site, «Não ligar», ou «Pelo nome» para voltar à
+  ligação sozinha (`familias_no_site`).
+
+**O que a ligação faz:**
+- **Do site para o KanGest:** um artigo na família «Geral» (ou sem família) recebe a família ligada ao género do seu
+  produto. Só quando uma família, e só uma, está ligada a esse género, e só uma vez por artigo: se alguém o puser outra
+  vez na «Geral», fica lá. A subfamília sai, porque era da família anterior.
+- **Do KanGest para o site:** o produto em «Catálogo Geral» (o género por omissão) ou sem género recebe o género da
+  família do artigo, no campo `genero` dos livros para o site. O site só aceita um género que já tenha: o KanGest não
+  cria categorias públicas novas.
+
+A família «Geral» nunca se liga, e o género «Catálogo Geral» também não.
+
 ### As promoções dos artigos no site (27/11)
 
 **A regra é a do preço:** o KanGest que manda no catálogo manda também nas promoções dos produtos do site ligados aos

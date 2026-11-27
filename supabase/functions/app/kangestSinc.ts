@@ -610,6 +610,8 @@ export interface LivroKanGest {
   ano?: number;
   paginas?: number;
   isbn?: string;
+  /** o género do site ligado à família do artigo (o site só aceita um género que já tenha) */
+  genero?: string;
 }
 
 /** Um ISBN-13 só com algarismos, começado por 978 ou 979 e com o algarismo de controlo certo. */
@@ -650,6 +652,8 @@ export function limparLivrosKanGest(x: unknown): LivroKanGest[] | null {
     if (ano) livro.ano = ano;
     if (paginas) livro.paginas = paginas;
     if (isbn13Valido(isbn)) livro.isbn = isbn;
+    const genero = texto(v.genero, 80);
+    if (genero) livro.genero = genero;
     if (Object.keys(livro).length > 2) out.push(livro);
   }
   return out.length ? out : null;

@@ -561,13 +561,14 @@ Testes:
 ## 19. Os dados das fichas nos produtos do site (KANGEST ONE, integração total)
 
 - **O pedido:** no campo `livros` vão até 50 livros por volta:
-  `{ artigo_id, referencia, autor?, editora?, idioma?, ano?, paginas?, isbn? }`. Vão só os campos que a ficha tem e o
-  produto do site (na cópia da Loja online) não.
+  `{ artigo_id, referencia, autor?, editora?, idioma?, ano?, paginas?, isbn?, genero? }`. Vão só os campos que a ficha
+  tem e o produto do site (na cópia da Loja online) não. O `genero` é o do site ligado à família do artigo, e só vai
+  para um produto em «Catálogo Geral» ou sem género.
 - **O site:**
   - `limparLivrosKanGest` limpa os textos e confere os números e o ISBN-13;
   - um posto que não manda no catálogo é recusado;
-  - `public.kangest_dados_dos_livros` (20261127110000) preenche só o que está vazio. O ISBN só entra se nenhum outro
-    produto o tiver.
+  - `public.kangest_dados_dos_livros` (20261127110000; o género na 20261127130000) preenche só o que está vazio. O ISBN
+    só entra se nenhum outro produto o tiver, e o género só se o site já o tiver.
 - **A resposta** (`livros`): para cada livro, `{ artigo_id, estado, erro? }`, com o estado `feito`, `sem_produto`,
   `recusado` ou `erro`. O posto regista-a em `livros_enviados` (migração 0076).
 - **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
