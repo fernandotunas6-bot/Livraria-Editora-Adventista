@@ -453,7 +453,7 @@ pub async fn login(st: &AppState, i: LoginIn) -> AppResult<Value> {
 }
 
 /// Entrar com a conta do site (parte J): o site confirma a senha (e o código dos dois passos) e diz o perfil; sem
-/// Internet, vale a cópia local até 7 dias depois da última confirmação. O perfil Administrador nunca vem do site.
+/// Internet, vale a cópia local até 7 dias depois da última confirmação. O perfil é o mesmo papel do site.
 async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> AppResult<Value> {
     use crate::sinc::entrada::{self, Validacao};
     let guardada = sqlx::query("SELECT * FROM utilizadores WHERE login = ? AND conta_site IS NOT NULL").bind(email).fetch_optional(&st.pool).await?;
@@ -526,7 +526,7 @@ async fn confirmar_conta_site(
         )),
         None => Some((
             "conta do site sem acesso ao KanGest",
-            "A sua conta do site não tem acesso ao KanGest: peça a permissão «KanGest: caixa» ou «KanGest: gestor» no site.",
+            "A sua conta do site não tem acesso ao KanGest: só a equipa do site (administradores e gestores) entra aqui.",
         )),
         Some("CAIXA") if pessoa.posto_na_ficha == Some(false) => Some((
             "conta do site: caixa de outra loja",
@@ -559,12 +559,13 @@ async fn confirmar_conta_site(
         (Some((id, perfil_antes)), _) => {
             // o perfil manda o site; se mudou, as permissões próprias de cá deixam de valer (nunca ficam a mais)
             sqlx::query(
-                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = COALESCE(?, senha_hash), perfil = ?, conta_site_validada_em = ?, mudar_senha = 0,
-                   permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
+                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, telefone = COALESCE(?, telefone), senha_hash = COALESCE(?, senha_hash), perfil = ?,
+                   conta_site_validada_em = ?, mudar_senha = 0, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
             )
             .bind(&pessoa.nome)
             .bind(email)
             .bind(&pessoa.email)
+            .bind(&pessoa.telefone)
             .bind(&resumo)
             .bind(perfil)
             .bind(&agora)
@@ -578,12 +579,13 @@ async fn confirmar_conta_site(
         // uma conta local que o administrador mandou ligar a este email: passa a ser a da pessoa, com o histórico
         (None, Some((id, perfil_antes))) => {
             sqlx::query(
-                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = COALESCE(?, senha_hash), perfil = ?, conta_site = ?, conta_site_validada_em = ?,
-                   mudar_senha = 0, ligar_conta_site = NULL, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
+                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, telefone = COALESCE(?, telefone), senha_hash = COALESCE(?, senha_hash), perfil = ?, conta_site = ?,
+                   conta_site_validada_em = ?, mudar_senha = 0, ligar_conta_site = NULL, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
             )
             .bind(&pessoa.nome)
             .bind(email)
             .bind(&pessoa.email)
+            .bind(&pessoa.telefone)
             .bind(&resumo)
             .bind(perfil)
             .bind(&pessoa.id)
@@ -598,12 +600,13 @@ async fn confirmar_conta_site(
         }
         (None, None) => {
             let id = sqlx::query(
-                "INSERT INTO utilizadores (nome, login, email, senha_hash, perfil, ativo, mudar_senha, conta_site, conta_site_validada_em)
-                 VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)",
+                "INSERT INTO utilizadores (nome, login, email, telefone, senha_hash, perfil, ativo, mudar_senha, conta_site, conta_site_validada_em)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)",
             )
             .bind(&pessoa.nome)
             .bind(email)
             .bind(&pessoa.email)
+            .bind(&pessoa.telefone)
             .bind(match &resumo {
                 Some(r) => r.clone(),
                 None => hash_senha(&format!("{:032x}", rand::random::<u128>()))?,

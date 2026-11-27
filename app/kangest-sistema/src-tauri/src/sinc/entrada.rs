@@ -8,7 +8,8 @@
 //! pergunta quem é a pessoa (`public.kangest_eu`, com a sessão dela). A sessão do programa, a cópia local e as regras
 //! de sempre (bloqueio por tentativas, conta desactivada, troca de conta) ficam em services/auth.rs.
 //!
-//! O perfil Administrador nunca vem do site: fica sempre a conta ADMIN local de recurso.
+//! O perfil é o mesmo papel do site (pedido do dono a 27/11): o administrador do site é Administrador aqui, o gestor é
+//! Gestor e quem tem só «KanGest: caixa» é Caixa (public.kangest_eu). A conta ADMIN local de recurso continua.
 //!
 //! **Entrar com o Google** (KANGEST ONE, fase A; o Google está ligado no Supabase Auth do site): o KanGest abre a
 //! entrada do Google no navegador do sistema, com PKCE. O Auth devolve o código à página `/kangest/entrar` do site, que
@@ -37,8 +38,10 @@ pub struct PessoaSite {
     pub id: String,
     pub nome: String,
     pub email: String,
-    /// GESTOR, CAIXA ou nenhum (sem acesso ao KanGest, ou faltam os dois passos)
+    /// ADMIN, GESTOR, CAIXA ou nenhum (sem acesso ao KanGest, ou faltam os dois passos)
     pub perfil: Option<String>,
+    /// O telefone do perfil do site (os mesmos dados nos dois lados)
+    pub telefone: Option<String>,
     /// Os dois passos estão cumpridos (falso: a conta tem de os activar no site; o perfil vem então vazio)
     pub mfa: bool,
     /// Este posto é da loja da ficha de funcionário? `None` sem ficha com loja (decisão do dono, 2026-11-26: como
@@ -59,9 +62,11 @@ pub enum Validacao {
     SemLigacao(String),
 }
 
-/// O perfil do KanGest que vem do site: só Gestor ou Caixa. Qualquer outro valor (incluindo ADMIN) não dá acesso.
+/// O perfil do KanGest que vem do site: o mesmo papel (Administrador, Gestor ou Caixa). Qualquer outro valor não dá
+/// acesso.
 pub fn perfil_do_site(p: Option<&str>) -> Option<&'static str> {
     match p {
+        Some("ADMIN") => Some("ADMIN"),
         Some("GESTOR") => Some("GESTOR"),
         Some("CAIXA") => Some("CAIXA"),
         _ => None,
@@ -170,6 +175,7 @@ async fn concluir(pool: &SqlitePool, a: &pessoa::Auth, mut tokens: Tokens, v: &V
         nome: eu["nome"].as_str().filter(|n| !n.trim().is_empty()).unwrap_or(email).trim().to_string(),
         email: eu["email"].as_str().unwrap_or(email).trim().to_lowercase(),
         perfil: eu["perfil"].as_str().map(str::to_string),
+        telefone: eu["telefone"].as_str().map(str::trim).filter(|t| !t.is_empty()).map(|t| t.chars().take(40).collect()),
         mfa: eu["mfa"].as_bool().unwrap_or(true),
         posto_na_ficha: eu["posto_na_ficha"].as_bool(),
     };
@@ -426,10 +432,11 @@ mod testes {
     }
 
     #[test]
-    fn o_perfil_do_site_so_e_gestor_ou_caixa() {
+    fn o_perfil_do_site_e_o_mesmo_papel() {
+        assert_eq!(perfil_do_site(Some("ADMIN")), Some("ADMIN"), "o administrador do site é Administrador aqui");
         assert_eq!(perfil_do_site(Some("GESTOR")), Some("GESTOR"));
         assert_eq!(perfil_do_site(Some("CAIXA")), Some("CAIXA"));
-        assert_eq!(perfil_do_site(Some("ADMIN")), None, "o administrador nunca vem do site");
+        assert_eq!(perfil_do_site(Some("SUPER")), None);
         assert_eq!(perfil_do_site(Some("gestor")), None);
         assert_eq!(perfil_do_site(None), None);
     }

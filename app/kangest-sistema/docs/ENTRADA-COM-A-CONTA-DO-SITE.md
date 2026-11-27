@@ -5,15 +5,19 @@ tem os dois passos, o código da aplicação. É a parte J do plano (decisões d
 
 ## Quem entra e com que perfil
 
-Decide-se no site, em *Utilizadores → Permissões* ou nos cargos, área *Sistema*:
-- **KanGest: caixa** dá o perfil Caixa (o POS);
-- **KanGest: gestor** dá o perfil Gestor: vendas, compras, stock e relatórios, sem a administração do programa;
-- **o administrador do site** entra como Gestor;
-- **o perfil Administrador do KanGest nunca vem do site.** Fica sempre a **conta ADMIN local** de recurso, que entra
-  com o nome de acesso e a senha de cá, como antes.
+**O mesmo papel do site** (pedido do dono a 27/11: «se é admin no site, também é admin no KanGest; se for gestor no
+site, também gestor no KanGest; os mesmos dados»). Vale para a senha, o Google e a sessão do site:
+- **o administrador do site** entra como Administrador;
+- **o gestor do site** (o papel «Gestor», `manager`) entra como Gestor: vendas, compras, stock e relatórios;
+- **a opção manual:** quem tem só **KanGest: caixa** (em *Utilizadores → Permissões* ou nos cargos, área *Sistema*)
+  entra como Caixa, só nos postos da loja da ficha. **KanGest: gestor** continua a dar Gestor;
+- **um cliente** nunca entra («A sua conta do site não tem acesso ao KanGest»);
+- **os mesmos dados:** o nome, o email e o telefone do perfil do site passam para a conta do KanGest a cada entrada. Se
+  o papel mudar no site, muda aqui na entrada seguinte, e as permissões próprias de cá deixam de valer;
+- **a conta ADMIN local de recurso continua,** com o nome de acesso e a senha de cá, para quando não há Internet.
 
-Sem nenhuma das duas permissões, a conta do site não entra («A sua conta do site não tem acesso ao KanGest»). O site
-responde pela `public.kangest_eu(p_posto)` (migrações `20261126100000` e `20261126120000`, docs/KANGEST.md §5.4).
+O site responde pela `public.kangest_eu(p_posto)` (migrações `20261126100000`, `20261126120000` e `20261127172000`,
+docs/KANGEST.md §5.4).
 
 - **Os dois passos:** desde 27/11 são opcionais também para a equipa (decisão do dono; o site pode voltar a torná-los
   obrigatórios no painel). Quem os activou entra com o código. Só com a obrigação ligada, uma conta da equipa sem
@@ -170,7 +174,7 @@ Os botões que abrem o painel do site (a encomenda, o produto, os pagamentos, o 
 - `sinc/entrada.rs`:
   - o desafio do PKCE (o exemplo da RFC 7636), o estado e a página de retorno (só em HTTPS);
   - uma entrada com o Google que não começou aqui, com outro estado ou fora do prazo, é recusada sem perguntar ao site;
-  - o perfil (só Gestor ou Caixa, nunca Administrador);
+  - o perfil (o mesmo papel do site: Administrador, Gestor ou Caixa);
   - a validade da cópia (7 dias, e não com o relógio atrasado);
   - o factor dos dois passos.
 - `services/tests.rs` (`entrar_com_a_conta_do_site`), com um site falso:

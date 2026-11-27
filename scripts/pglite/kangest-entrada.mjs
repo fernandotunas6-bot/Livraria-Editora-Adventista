@@ -49,13 +49,16 @@ const atendimento = await pessoa('atendimento@x.ao', 'Rui Atendimento', 'manager
 const cliente = await pessoa('cliente@x.ao', 'Cliente', 'member', { kangest_gestor: true });
 await q(`insert into public.staff_members (full_name, profile_id, store_id) values ('Ana Caixa', $1, $2)`, [caixa, loja.id]);
 
+// o mesmo papel do site (20261127172000): o administrador é Administrador e o gestor é Gestor
 const a = await eu(admin);
-check('o administrador do site entra como Gestor, nunca Administrador', a.perfil === 'GESTOR', a);
+check('o administrador do site entra como Administrador', a.perfil === 'ADMIN', a);
 check('o gestor com a permissão entra como Gestor', (await eu(gestor)).perfil === 'GESTOR');
 const c = await eu(caixa);
 check('a caixa entra como Caixa, com o nome, o email e a loja da ficha', c.perfil === 'CAIXA' && c.nome === 'Ana Caixa' && c.email === 'caixa@x.ao'
   && c.lojas.length === 1 && c.lojas[0] === loja.id, c);
-check('quem não tem a permissão não tem perfil', (await eu(atendimento)).perfil === null);
+check('o gestor do site sem as permissões do KanGest entra como Gestor', (await eu(atendimento)).perfil === 'GESTOR');
+await q(`update public.profiles set phone = '923 000 111' where id = $1`, [gestor]);
+check('os mesmos dados: o telefone do perfil do site', (await eu(gestor)).telefone === '923 000 111');
 check('um cliente nunca entra (as permissões só valem nos gestores)', (await eu(cliente)).perfil === null);
 
 // --- os cargos levam as permissões ---------------------------------------------------------------------------------
