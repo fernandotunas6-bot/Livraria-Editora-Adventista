@@ -50,7 +50,11 @@ export const openHeaderSearch = () => {
   window.dispatchEvent(new Event(OPEN_HEADER_SEARCH_EVENT));
 };
 
-const Header = ({ onCartOpen, pinned = false }) => {
+// `overHero`: só na página inicial, cujo herói foi desenhado para correr por baixo do
+// cabeçalho (a fila de setas e pontos conta com isso, ver `.heroi-subida`). Nas outras
+// páginas, no computador o cabeçalho está sempre à vista (ver `useHeaderReveal`) e por isso
+// fica no fluxo, como nas páginas com `pinned`.
+const Header = ({ onCartOpen, pinned = false, overHero = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartItems } = useCart();
@@ -298,7 +302,13 @@ const Header = ({ onCartOpen, pinned = false }) => {
         // Onde a página abre com conteúdo normal — ficha de livro, perfil, confirmação de
         // encomenda — não há imagem para descobrir, e escondê-lo só deixava o texto colado
         // ao topo, sem navegação. Aí fica `sticky`, no fluxo, como sempre esteve.
-        pinned ? 'sticky' : 'fixed inset-x-0 transition-transform duration-base ease-brand',
+        //
+        // No computador (a partir de 1024 px) o cabeçalho já não sai de cena — o menu é a porta
+        // de entrada da loja — e, sendo `fixed`, tapava a linha de cima das faixas: «Lojas
+        // físicas», o caminho «Início › Loja» (revisão de estilo de 2026-11-27). Aí fica no
+        // fluxo, `sticky`, e as faixas descem a altura dele. A página inicial é a excepção
+        // (`overHero`).
+        pinned ? 'sticky' : cn('fixed inset-x-0 transition-transform duration-base ease-brand', !overHero && 'lg:sticky'),
         // Com o menu aberto o cabeçalho pode passar da altura do ecrã; aí desloca-se por
         // dentro em vez de cortar o fim da lista.
         mobileOpen && 'max-h-dvh overflow-y-auto',

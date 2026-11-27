@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { BOOK_GENRES, BOOK_LANGUAGES } from '@/lib/bookConstants';
 import { buildSearchSuggestions } from '@/lib/searchUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function AdvancedSearchPanel({
   activeFilters,
@@ -30,6 +31,8 @@ export default function AdvancedSearchPanel({
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
   const [sugestaoActiva, setSugestaoActiva] = useState(-1);
   const campoRef = useRef(null);
+  // No telemóvel o campo é estreito e «Título, autor, ISBN, código...» cortava em «IS».
+  const isMobile = useIsMobile();
   const [local, setLocal] = useState({
     search: activeFilters.search || '',
     author: activeFilters.author || '',
@@ -156,7 +159,7 @@ export default function AdvancedSearchPanel({
                 setSugestaoActiva(-1);
               }
             }}
-            placeholder="Título, autor, ISBN, código..."
+            placeholder={isMobile ? 'Pesquisar livros' : 'Título, autor, ISBN, código...'}
             aria-label="Pesquisar no catálogo"
             className={inputClass}
             role="combobox"

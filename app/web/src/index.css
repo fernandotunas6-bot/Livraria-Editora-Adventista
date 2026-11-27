@@ -608,12 +608,14 @@
     height: 85svh;
   }
 
-  /* Banners do topo das páginas (PageBannerSlider): no telemóvel a barra fina do cabeçalho
-     (56 px, mais a área segura do iPhone) fica por cima deles. */
+  /* Banners do topo das páginas (PageBannerSlider): abaixo de 1024 px a barra fina do
+     cabeçalho (56 px, mais a área segura do iPhone) fica por cima deles. A partir de 1024 px o
+     cabeçalho completo está sempre à vista e no fluxo (Header.jsx), e o banner começa por baixo
+     dele. O corte estava nos 768 px, e entre 768 e 1023 a barra fina tapava o topo do banner. */
   .pt-below-thin-bar {
     padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
   }
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .pt-below-thin-bar {
       padding-top: 0;
     }

@@ -29,7 +29,7 @@ const HomePage = () => {
         <meta name="description" content={`${BRAND.name} — literatura cristã adventista, educação e inspiração.`} />
       </Helmet>
 
-      <Header onCartOpen={openCart} />
+      <Header overHero onCartOpen={openCart} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <main>

@@ -41,12 +41,14 @@ export default function CatalogToolbar({
   const mostraIntervalo = Number.isFinite(shownTo) && total > (shownCount ?? shownTo ?? 0);
 
   return (
-    // No telemóvel, uma linha só (Filtros, contagem e ordenação): eram três, e com o herói e a
-    // pesquisa empurravam o primeiro livro para os ~690 px, tapado pela barra inferior. A troca
-    // grelha/lista e o "a mostrar 1–24" ficam do `sm` para cima; no telemóvel é a grelha, a vista
-    // por omissão. Num ecrã onde nem assim cabe (320 px), a ordenação desce para outra linha.
-    <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-wrap sm:gap-3 sm:p-4 ${className}`}>
-      <div className="flex min-w-0 items-center gap-2 sm:flex-wrap">
+    // No telemóvel, os controlos numa linha só — Filtros, a ordem e o tipo — e o total por baixo,
+    // em letra pequena. Filtros, total, tipo e ordem lado a lado não cabiam em 360 px: partiam-se
+    // em duas linhas desequilibradas, com um vazio à esquerda (revisão de estilo de 2026-11-27).
+    // A ordenação estica para ocupar o que sobra. Para isso, no telemóvel o grupo da esquerda
+    // desfaz-se (`contents`) e o total vai para o fim (`order-last`), a toda a largura. A troca
+    // grelha/lista e o "a mostrar 1–24" ficam do `sm` para cima; no telemóvel é a grelha.
+    <div className={`flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3 shadow-xs sm:justify-between sm:gap-3 sm:p-4 ${className}`}>
+      <div className="contents sm:flex sm:min-w-0 sm:items-center sm:gap-2 sm:flex-wrap">
         {onOpenFilters && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -58,21 +60,21 @@ export default function CatalogToolbar({
             <TooltipContent side="top">Filtrar catálogo</TooltipContent>
           </Tooltip>
         )}
-        <p className="whitespace-nowrap text-sm text-muted-foreground" aria-live="polite">
+        <p className="order-last basis-full whitespace-nowrap text-xs text-muted-foreground sm:order-none sm:basis-auto sm:text-sm" aria-live="polite">
           <strong className="text-foreground">{total}</strong>
           {` ${total === 1 ? noun : nounPlural}`}
           {mostraIntervalo && <span className="hidden sm:inline">{` · a mostrar ${shownFrom}–${shownTo}`}</span>}
         </p>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:flex-wrap">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:ml-auto sm:flex-none sm:shrink-0 sm:flex-wrap">
         {canGroup && onGroupedChange && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant={grouped ? 'secondary' : 'outline'}
                 size="sm"
-                className="h-11 w-11 px-0 sm:h-9 sm:w-auto sm:px-3"
+                className="order-last h-11 w-11 shrink-0 px-0 sm:order-none sm:h-9 sm:w-auto sm:px-3"
                 onClick={() => onGroupedChange(!grouped)}
                 aria-pressed={grouped}
                 aria-label="Por tipo"
@@ -125,7 +127,7 @@ export default function CatalogToolbar({
 
         <label htmlFor={sortId} className="sr-only">Ordenar por</label>
         <Select value={sortBy} onValueChange={onSortChange}>
-          <SelectTrigger id={sortId} className="h-11 w-[132px] sm:h-9 sm:w-[170px]" aria-label="Ordenar por">
+          <SelectTrigger id={sortId} className="h-11 w-full min-w-0 flex-1 sm:h-9 sm:w-[170px] sm:flex-none" aria-label="Ordenar por">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

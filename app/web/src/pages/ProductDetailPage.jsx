@@ -92,6 +92,11 @@ function ProductDetailPage() {
   // A biblioteca de quem tem sessão, só nos produtos com edição digital (para o "Já é seu").
   const [library, setLibrary] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // A forma da fotografia à vista (largura ÷ altura), lida quando carrega. A caixa toma essa
+  // forma em vez de ser sempre 3:4: uma fotografia deitada deixava cinzento vazio por cima e
+  // por baixo (revisão de estilo de 2026-11-27). Guarda-se com o endereço, para a fotografia
+  // seguinte começar em 3:4 e não com a forma da anterior.
+  const [imageShape, setImageShape] = useState({ src: null, ratio: null });
   // Separadores controlados: as estrelas do topo e o "Ler a descrição completa" abrem o
   // separador certo e levam o ecrã até lá.
   // O separador fica no endereço (`?tab=discussion`, ou `?tab=discussao`): a discussão de um
@@ -387,6 +392,8 @@ function ProductDetailPage() {
 
   const currentImage = product.images[currentImageIndex];
   const hasMultipleImages = product.images.length > 1;
+  const currentImageSrc = !currentImage?.url ? placeholderImage : currentImage.url;
+  const imageRatio = imageShape.src === currentImageSrc && imageShape.ratio ? imageShape.ratio : 3 / 4;
 
   return (
     <>
@@ -399,8 +406,10 @@ function ProductDetailPage() {
       <Header pinned onCartOpen={() => setIsCartOpen(true)} />
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
-      <main className="container-custom py-12">
-        <nav aria-label="Caminho" className="mb-8 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+      {/* No telemóvel, menos ar por cima: o título e o preço têm de caber no primeiro ecrã,
+          acima da barra de compra. */}
+      <main className="container-custom pt-4 pb-12 sm:py-12">
+        <nav aria-label="Caminho" className="mb-4 sm:mb-8 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
           <Link to="/" className="-my-1.5 shrink-0 py-1.5 transition-colors hover:text-primary">Início</Link>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
           <Link to="/shop" className="-my-1.5 shrink-0 py-1.5 transition-colors hover:text-primary">Loja</Link>
@@ -418,22 +427,35 @@ function ProductDetailPage() {
             recusa-se a encolher abaixo do conteúdo. Era o que empurrava a coluna para 399px
             dentro de um contentor de 343 e dava 40px de deslocamento horizontal no
             telemóvel — a página inteira arrastava-se para o lado. */}
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
           <motion.div
             className="min-w-0 lg:sticky lg:top-24 lg:self-start"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: MOTION.base }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-muted aspect-3/4 max-h-[78vh] mx-auto w-full mb-4">
+            {/* A caixa tem a forma da fotografia e um limite de altura (`--foto-max-h`): a
+                largura encolhe para caber nele, em vez de a fotografia flutuar numa caixa alta.
+                No telemóvel o limite é baixo, para o título e o preço aparecerem no primeiro
+                ecrã. */}
+            <div
+              className="relative overflow-hidden rounded-2xl bg-muted mx-auto mb-4 [--foto-max-h:40svh] sm:[--foto-max-h:60svh] lg:[--foto-max-h:78vh]"
+              style={{ aspectRatio: imageRatio, width: `min(100%, calc(var(--foto-max-h) * ${imageRatio}))` }}
+            >
               {/* A capa é o maior elemento da ficha (o LCP): pede-se antes das capas dos
                   relacionados. Minúsculas de propósito: o React 18 não conhece `fetchPriority`
                   e passa o atributo tal como está. */}
               <img
-                src={!currentImage?.url ? placeholderImage : currentImage.url}
+                src={currentImageSrc}
                 alt={product.title}
                 fetchpriority="high"
                 className="w-full h-full object-contain p-3"
+                onLoad={(event) => {
+                  const { naturalWidth, naturalHeight } = event.currentTarget;
+                  if (naturalWidth > 0 && naturalHeight > 0) {
+                    setImageShape({ src: currentImageSrc, ratio: naturalWidth / naturalHeight });
+                  }
+                }}
               />
 
               {hasMultipleImages && (
@@ -478,7 +500,7 @@ function ProductDetailPage() {
                     onClick={() => setCurrentImageIndex(index)}
                     aria-label={`Ver imagem ${index + 1} de ${product.images.length}`}
                     aria-current={index === currentImageIndex ? 'true' : undefined}
-                    className={`shrink-0 w-16 h-20 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                    className={`shrink-0 w-12 h-14 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-colors ${
                       index === currentImageIndex ? 'border-primary' : 'border-border hover:border-primary/50'
                     }`}
                   >
@@ -499,7 +521,7 @@ function ProductDetailPage() {
             transition={{ duration: MOTION.base, delay: 0.2 }}
             className="flex flex-col min-w-0"
           >
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 text-foreground text-balance">{product.title}</h1>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 text-foreground text-balance">{product.title}</h1>
             {product.marketing_hook && (
               <p className="text-lg text-primary font-medium mb-2">{product.marketing_hook}</p>
             )}
