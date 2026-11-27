@@ -15,13 +15,16 @@ export const isStaffRole = (user) => user?.role === 'admin' || user?.role === 'm
 
 /**
  * O que mostrar, a partir de `public.staff_mfa_status()` (migração dois_passos_obrigatorio_equipa):
- * - `none`: não é da equipa, já activou o código, ou não se sabe (sem a migração, sem rede);
+ * - `none`: não é da equipa, já activou o código, a política é opcional (`obrigatoria` desligado), ou não se sabe
+ *   (sem a migração, sem rede);
  * - `notice`: falta activar, e ainda está dentro do prazo — aviso com a data;
  * - `gate`: o prazo passou — o servidor já trata a conta como a de um cliente, por isso o painel
  *   dá lugar ao ecrã de activação.
  */
 export function staffMfaView(status) {
   if (!status || status.staff !== true || status.has_factor === true) return 'none';
+  // opcional para a equipa (decisão do dono a 27/11; `obrigatoria` desligado no painel): nem ecrã nem aviso
+  if (status.obrigatoria === false) return 'none';
   return status.enforced === true ? 'gate' : 'notice';
 }
 
@@ -86,7 +89,7 @@ export default function StaffMfaGate({ children, notice = true }) {
   if (view === 'gate') {
     return (
       <main className="min-h-dvh bg-muted/40 px-4 py-10 flex items-start justify-center">
-        <div className="w-full max-w-lg">
+        <div className="w-full max-w-2xl">
           <div className="rounded-xl border bg-card p-6">
             <h1 className="font-serif text-2xl font-bold flex items-center gap-2">
               <ShieldAlert className="h-6 w-6 text-primary" aria-hidden="true" />

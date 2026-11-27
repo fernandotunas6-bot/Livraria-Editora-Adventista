@@ -41,7 +41,20 @@ await factor(adminComCodigo);
 const [pol] = await q(`select enforce_after > now() + interval '6 days' and enforce_after < now() + interval '8 days' as ok from private.staff_mfa_policy`);
 check('o prazo fica a 7 dias da migração', pol?.ok === true, pol);
 
+// 0. A decisão do dono de 27/11 (20261127150000): opcional, também para a equipa -------------------------
+const [inicio] = await q(`select obrigatoria from private.staff_mfa_policy`);
+check('a migração de 27/11 deixa os dois passos opcionais', inicio?.obrigatoria === false, inicio);
+await prazo(`now() - interval '1 minute'`);
 let r = await poderes(admin);
+check('opcional: depois do prazo, admin sem código mantém o painel', r.admin && r.staff && r.orders, r);
+check('opcional: o site não mostra o ecrã que obriga nem o aviso', r.estado.obrigatoria === false && r.estado.enforced === false, r.estado);
+r = await poderes(adminComCodigo, 'aal1');
+check('opcional: quem activou o código continua a precisar dele', !r.admin && !r.staff, r);
+// os casos de baixo provam o modo obrigatório, que o administrador pode voltar a ligar
+await q(`update private.staff_mfa_policy set obrigatoria = true`);
+await prazo(`now() + interval '7 days'`);
+
+r = await poderes(admin);
 check('dentro do prazo, admin sem código mantém o painel', r.admin && r.staff && r.orders, r);
 check('dentro do prazo, o site sabe que falta activar e a data', r.estado.staff === true && r.estado.has_factor === false && r.estado.enforced === false, r.estado);
 r = await poderes(gestor);
@@ -83,6 +96,25 @@ await raises('a data para a Edge Function é só da service role', () => as(db, 
 await raises('um visitante não pergunta pelo estado', () => as(db, { role: 'anon' }, (tx) => tx.query(`select public.staff_mfa_status()`)), /permission denied/);
 const [svc] = await as(db, { role: 'service_role' }, async (tx) => (await tx.query(`select public.staff_mfa_deadline() > now() as ok`)).rows);
 check('a service role lê a data', svc?.ok === true, svc);
+
+// 5. O administrador liga e desliga a obrigação no painel (20261127150000) -------------------------------
+await q(`update private.staff_mfa_policy set obrigatoria = false`);
+await raises('um gestor não muda a política', () => as(db, { sub: gestor }, (tx) => tx.query(`select public.staff_mfa_politica_definir(true, 0)`)), /Só um administrador/);
+await raises('um admin com o código activado mas sem ele (aal1) não muda a política', () => as(db, { sub: adminComCodigo, aal: 'aal1' }, (tx) =>
+  tx.query(`select public.staff_mfa_politica_definir(true, 0)`)), /Só um administrador/);
+let e = (await sessao(adminComCodigo, 'aal2', `select public.staff_mfa_politica_definir(true, 0) as e`)).e;
+check('ligada com 0 dias de prazo, vale já', e.obrigatoria === true && e.enforced === true, e);
+r = await poderes(gestor);
+check('ligada: o gestor sem código perde as permissões', !r.staff && !r.orders, r);
+e = (await sessao(adminComCodigo, 'aal2', `select public.staff_mfa_politica_definir(false) as e`)).e;
+check('desligada: opcional outra vez', e.obrigatoria === false && e.enforced === false, e);
+r = await poderes(gestor);
+check('desligada: o gestor sem código volta a ter as permissões', r.staff && r.orders, r);
+e = (await sessao(adminComCodigo, 'aal2', `select public.staff_mfa_politica_definir(true, 7) as e`)).e;
+const [prazoNovo] = await q(`select enforce_after > now() + interval '6 days' as ok from private.staff_mfa_policy`);
+check('ligada com 7 dias: o prazo conta a partir de agora, e ainda não vale', e.obrigatoria === true && e.enforced === false && prazoNovo?.ok === true, { e, prazoNovo });
+const [registo] = await q(`select count(*)::int n, count(*) filter (where alerted)::int alertas from public.security_audit_log where table_name = 'staff_mfa_policy'`);
+check('cada mudança fica no registo de segurança; o alerta vai uma vez em cada 10 minutos', registo?.n === 3 && registo?.alertas === 1, registo);
 
 console.log(`\n${ok} cenários certos, ${fail} falhados`);
 if (fail) process.exit(1);
