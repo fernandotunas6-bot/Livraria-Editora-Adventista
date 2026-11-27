@@ -3415,6 +3415,25 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
   });
 });
 
+/** Os produtos das novidades sem `capa` (endereço externo) mas com `cover_image` no Storage: o endereço público. */
+async function completarCapas(novidades: unknown): Promise<void> {
+  const produtos = (novidades as Row | null)?.produtos;
+  if (!Array.isArray(produtos)) return;
+  const sem = produtos.filter((p: Row) => p && typeof p.id === "string" && !String(p.capa ?? "").trim()).map((p: Row) => p.id as string);
+  if (!sem.length) return;
+  const { data, error } = await db.from("stock_books").select("id, cover_image").in("id", sem.slice(0, 500));
+  if (error) {
+    console.error("KanGest: as capas do Storage", error.message);
+    return;
+  }
+  const ficheiro = new Map((data || []).filter((b: Row) => String(b.cover_image ?? "").trim()).map((b: Row) => [b.id, String(b.cover_image).trim()]));
+  const base = SUPABASE_URL.replace(/\/+$/, "");
+  for (const p of produtos as Row[]) {
+    const f = ficheiro.get(p?.id);
+    if (f && !String(p.capa ?? "").trim()) p.capa = `${base}/storage/v1/object/public/media/stock_books/${p.id}/${encodeURIComponent(f)}`;
+  }
+}
+
 route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest Livraria (a chave do emparelhamento), hora e nonce, conferidos no handler"), async ({ req, raw, ip }) => {
   const chaves = chavesSinc();
   const cifra = await cifraDadosKanGest();
@@ -3501,6 +3520,9 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     const { data, error } = await db.rpc("kangest_novidades", { p_posto: posto, p_cursores: cursores, p_limite: 200 });
     if (error) throw new Error(error.message);
     novidades = data;
+    // as capas que só estão no Storage (cover_image): o KanGest recebe o endereço público delas, para as trazer como
+    // fotografia do artigo (KANGEST ONE, integração total; app/kangest-sistema/src-tauri/src/sinc/capas.rs)
+    await completarCapas(novidades);
   }
   // os documentos das encomendas online que este KanGest tem de emitir (só com «Emitir os documentos das encomendas
   // online» ligado no painel): a NE, a FR, a NC e as anulações, com os mesmos corpos da ligação antiga

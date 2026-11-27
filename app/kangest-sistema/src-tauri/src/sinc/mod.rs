@@ -20,6 +20,7 @@
 
 pub mod atendimento;
 pub mod avisos;
+pub mod capas;
 pub mod catalogo;
 pub mod cifra;
 pub mod encomendas;

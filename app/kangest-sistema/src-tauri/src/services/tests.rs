@@ -8453,3 +8453,91 @@ async fn a_saude_do_servidor_central_no_kangest() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// Um servidor falso de capas: uma PNG verdadeira e uma página que não é imagem.
+fn servidor_de_capas() -> u16 {
+    use std::io::{Read, Write};
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let porta = l.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for f in l.incoming().flatten() {
+            let mut f = f;
+            let mut b = [0u8; 4096];
+            let n = f.read(&mut b).unwrap_or(0);
+            let pedido = String::from_utf8_lossy(&b[..n]).to_string();
+            let caminho = pedido.split_whitespace().nth(1).unwrap_or("").to_string();
+            let (tipo, corpo): (&str, Vec<u8>) = if caminho.starts_with("/media/ok.png") {
+                // uma PNG de 1×1 (os primeiros bytes são o que conta)
+                ("image/png", b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89".to_vec())
+            } else {
+                ("text/html", b"<html>nao e uma capa</html>".to_vec())
+            };
+            let cab = format!("HTTP/1.1 200 OK\r\nContent-Type: {tipo}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", corpo.len());
+            let _ = f.write_all(cab.as_bytes());
+            let _ = f.write_all(&corpo);
+        }
+    });
+    porta
+}
+
+/// KANGEST ONE (integração total, pedido do dono a 27/11): as capas dos livros do site como fotografias dos artigos. Os
+/// artigos sem fotografia com um produto do site com capa aparecem; a capa descarrega-se só de origens conhecidas e só se
+/// for uma imagem; o que falha fica registado e sai da lista; um artigo com fotografia nunca aparece.
+#[tokio::test]
+async fn as_capas_do_site_nos_artigos() {
+    let (st, pasta) = base_com_admin("capas-site").await;
+    let porta = servidor_de_capas();
+    let artigo = |r: &'static str| {
+        let st = &st;
+        async move { rpc(st, "artigos.guardar", json!({ "descricao": format!("Livro {r}"), "referencia": r, "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap() }
+    };
+    let (a1, a2, a3) = (artigo("LIV-001").await, artigo("LIV-002").await, artigo("LIV-003").await);
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em, auth_url, auth_apikey)
+         VALUES (1, ?, '00000000-0000-4000-8000-000000000001', 'x', '1', 'y', '2026-11-25T10:00:00', ?, 'chave-publica')",
+    )
+    .bind(format!("http://127.0.0.1:{porta}/functions/v1/app"))
+    .bind(format!("http://127.0.0.1:{porta}"))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    for (id, r, capa) in [
+        ("p1", "LIV-001", format!("http://127.0.0.1:{porta}/media/ok.png")),
+        ("p2", "LIV-002", format!("http://127.0.0.1:{porta}/media/pagina")),
+        ("p3", "LIV-003", "https://outro.exemplo.com/capa.png".to_string()),
+    ] {
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, ?)")
+            .bind(id)
+            .bind(format!("Livro {r}"))
+            .bind(r)
+            .bind(json!({ "id": id, "referencia": r, "capa": capa }).to_string())
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    let ids = |v: Value| v["capas"].as_array().unwrap().iter().filter_map(|c| c["artigo_id"].as_i64()).collect::<Vec<_>>();
+    let mut p = ids(rpc(&st, "loja.capas.pendentes", Value::Null).await);
+    p.sort();
+    assert_eq!(p, vec![a1, a2, a3]);
+
+    // a capa boa: uma data URL com a imagem
+    let d = rpc(&st, "loja.capas.descarregar", json!({ "artigo_id": a1 })).await;
+    assert!(d["dados"].as_str().is_some_and(|x| x.starts_with("data:image/png;base64,")), "{d}");
+    // o que não é imagem e a origem desconhecida: recusados e registados
+    assert!(rpc_err(&st, "loja.capas.descarregar", json!({ "artigo_id": a2 })).await.contains("não é uma imagem"));
+    assert!(rpc_err(&st, "loja.capas.descarregar", json!({ "artigo_id": a3 })).await.contains("não descarrega"));
+    let r = rpc(&st, "loja.capas.pendentes", Value::Null).await;
+    assert_eq!((ids(r.clone()), r["falhadas"].as_i64()), (vec![a1], Some(2)), "as falhadas saem da lista: {r}");
+
+    // guardada a fotografia (o ecrã reduz e chama fotos.guardar), o artigo sai da lista; nunca se substitui
+    let png = d["dados"].as_str().unwrap().to_string();
+    rpc(&st, "fotos.guardar", json!({ "artigo_id": a1, "miniatura": png, "imagem": png })).await;
+    assert!(ids(rpc(&st, "loja.capas.pendentes", Value::Null).await).is_empty());
+    // uma capa que não se pôde reduzir no ecrã fica registada
+    sqlx::query("DELETE FROM capas_tentadas").execute(&st.pool).await.unwrap();
+    rpc(&st, "loja.capas.falhou", json!({ "artigo_id": a2, "erro": "imagem vazia" })).await;
+    let e: String = sqlx::query_scalar("SELECT erro FROM capas_tentadas WHERE artigo_id = ?").bind(a2).fetch_one(&st.pool).await.unwrap();
+    assert_eq!(e, "imagem vazia");
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
