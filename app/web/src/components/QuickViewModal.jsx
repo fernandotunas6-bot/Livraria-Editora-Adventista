@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Eye, MessageCircle, BookOpen, Minimize2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { capaGerada } from '@/lib/capaGerada';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -15,8 +16,6 @@ import { FloatingScrollTop } from '@/components/ui/FloatingScrollTop';
 import SampleReaderModal from '@/components/SampleReaderModal';
 import { MOTION } from '@/lib/motion';
 import { hasReadingSample, needsVariantChoice, variantNames } from '@/lib/productTypes';
-
-const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
 export default function QuickViewModal({ product, open, onClose, onCartOpen, loading = false }) {
   const { addToCart } = useCart();
@@ -133,7 +132,7 @@ export default function QuickViewModal({ product, open, onClose, onCartOpen, loa
             ) : (
               <div className="grid sm:grid-cols-2 gap-0 overflow-y-auto flex-1">
                 <div className="bg-muted aspect-3/4 sm:aspect-auto sm:min-h-[320px] relative">
-                  <img src={product.image || PLACEHOLDER} alt={product.title} className="w-full h-full object-cover" />
+                  <img src={product.image || capaGerada(product)} alt={product.title} className="w-full h-full object-cover" />
                   {product.book_code && (
                     <span className="absolute bottom-3 left-3 text-[10px] font-mono px-2 py-1 rounded-full bg-black/60 text-white backdrop-blur-sm">
                       {product.book_code}

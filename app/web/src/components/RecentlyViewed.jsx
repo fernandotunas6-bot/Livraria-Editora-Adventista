@@ -5,9 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { capaGerada } from '@/lib/capaGerada';
 import { clearRecentlyViewed, getRecentlyViewed, recentExcluding } from '@/lib/recentlyViewed';
-
-const PLACEHOLDER = '/images/site/capa-indisponivel.webp';
 
 /**
  * Fila dos livros vistos há pouco.
@@ -59,12 +58,12 @@ export default function RecentlyViewed({ currentId = null, title = 'Vistos há p
               >
                 <div className="aspect-3/4 overflow-hidden bg-muted">
                   <img
-                    src={item.image || PLACEHOLDER}
+                    src={item.image || capaGerada(item)}
                     alt={item.title}
                     loading="lazy"
                     decoding="async"
                     className="media-zoom h-full w-full object-cover"
-                    onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER; }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = capaGerada(item); }}
                   />
                 </div>
                 <div className="p-2">

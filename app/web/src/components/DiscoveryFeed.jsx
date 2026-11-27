@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, MessageCircle, Package, Sparkles, Star } from 'lucide-react';
 import ProductsList from '@/components/ProductsList.jsx';
+import { capaGerada } from '@/lib/capaGerada';
 import CatalogInfiniteTail from '@/components/CatalogInfiniteTail';
 import { getProducts } from '@/api/EcommerceApi';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -30,7 +31,7 @@ function MiniBook({ product }) {
   const { price } = displayPrice(product);
   return (
     <Link to={`/product/${product.id}`} className="group flex items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted">
-      <img src={product.image} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />
+      <img src={product.image || capaGerada(product)} alt="" loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded object-cover shadow-xs" />
       <span className="min-w-0">
         <span className="line-clamp-2 text-xs font-medium leading-snug group-hover:text-primary">{product.title}</span>
         {price && <span className="mt-0.5 block text-xs font-bold text-brand-ink tabular-nums">{price}</span>}

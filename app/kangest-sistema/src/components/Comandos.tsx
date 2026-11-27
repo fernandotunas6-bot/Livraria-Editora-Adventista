@@ -9,6 +9,7 @@ import {
   Clock,
   CornerDownLeft,
   FileText,
+  Globe,
   KeyRound,
   LayoutDashboard,
   Lock,
@@ -108,6 +109,11 @@ export function PaletaComandos({
   return <Paleta onFechar={onFechar} onAbrirDocumento={onAbrirDocumento} onAlterarSenha={onAlterarSenha} onSair={onSair} visivel={visivel} />;
 }
 
+/** Uma encomenda do site na cópia local (loja.encomendas). */
+type EncomendaSite = { id: string; numero: string; cliente: string; total: number; criada_em?: string };
+/** Um produto do site na cópia local (loja.produtos), com o artigo deste KanGest, se o há. */
+type ProdutoSite = { id: string; titulo: string; referencia: string; preco: number; activo: boolean; artigo_id: number | null };
+
 function Paleta({
   onFechar,
   onAbrirDocumento,
@@ -144,6 +150,23 @@ function Paleta({
     enabled: remota && verEntidades,
     staleTime: 30_000,
   });
+  // a loja do site (pedido do dono a 27/11: «que se pesquise tudo do sistema»): as encomendas e os produtos do site,
+  // da cópia local da Loja online (src-tauri/src/sinc/loja.rs), com a mesma permissão desse ecrã
+  const verLoja = tem("sistema.api") || tem("relatorios.ver") || tem("vendas.fatura_recibo");
+  const encs = useQuery({
+    queryKey: ["paleta", "loja-encomendas", dq],
+    queryFn: () => call<EncomendaSite[]>("loja.encomendas", { q: dq }),
+    enabled: remota && verLoja,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const prods = useQuery({
+    queryKey: ["paleta", "loja-produtos", dq],
+    queryFn: () => call<ProdutoSite[]>("loja.produtos", { q: dq }),
+    enabled: remota && verLoja,
+    staleTime: 30_000,
+    retry: false,
+  });
   const arts = useQuery({
     queryKey: ["paleta", "artigos", dq],
     queryFn: () => call<Artigo[]>("artigos.listar", { q: dq, limite: 6 }),
@@ -159,7 +182,7 @@ function Paleta({
     staleTime: 30_000,
     retry: false,
   });
-  const aCarregar = (remota && (docs.isFetching || ents.isFetching || arts.isFetching)) || (podePerguntar && dq.length >= 3 && pergunta.isFetching);
+  const aCarregar = (remota && (docs.isFetching || ents.isFetching || arts.isFetching || encs.isFetching || prods.isFetching)) || (podePerguntar && dq.length >= 3 && pergunta.isFetching);
 
   const fechar = (f: () => void) => () => {
     onFechar();
@@ -261,13 +284,33 @@ function Paleta({
         executar: fechar(() => nav(`/artigos?id=${a.id}`)),
       }));
       if (as.length) out.push({ titulo: "Artigos", itens: as });
+
+      const en = (encs.data ?? []).slice(0, 5).map<Item>((e) => ({
+        id: "enc:" + e.id,
+        titulo: `Encomenda ${e.numero}`,
+        detalhe: `Site · ${e.cliente || "sem nome"}${e.criada_em ? ` · ${data(e.criada_em)}` : ""}`,
+        direita: kz(Math.round(Number(e.total || 0) * 100)),
+        icone: Globe,
+        executar: fechar(() => nav(`/loja-online?encomenda=${encodeURIComponent(e.id)}`)),
+      }));
+      if (en.length) out.push({ titulo: "Encomendas do site", itens: en });
+
+      const ps = (prods.data ?? []).slice(0, 5).map<Item>((p) => ({
+        id: "prod:" + p.id,
+        titulo: p.titulo,
+        detalhe: `Site · ${p.referencia || "sem referência"}${p.activo ? "" : " · oculto"}`,
+        direita: kz(Math.round(Number(p.preco || 0) * 100)),
+        icone: Globe,
+        executar: fechar(() => nav(p.artigo_id ? `/artigos?id=${p.artigo_id}` : `/loja-online?q=${encodeURIComponent(p.titulo)}`)),
+      }));
+      if (ps.length) out.push({ titulo: "Produtos do site", itens: ps });
     }
 
     const ac = accoes.filter((a) => pontuar(palavras, `${a.titulo} ${a.detalhe ?? ""}`) > 0);
     if (ac.length) out.push({ titulo: "Acções", itens: ac });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, dq, remota, docs.data, ents.data, arts.data, pergunta.data, favoritos, recentes, temaEfectivo, densidade]);
+  }, [q, dq, remota, docs.data, ents.data, arts.data, encs.data, prods.data, pergunta.data, favoritos, recentes, temaEfectivo, densidade]);
 
   const itens = seccoes.flatMap((s) => s.itens);
   useEffect(() => setSel(0), [q]);

@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { capaDoArtigo } from "@/lib/capaGerada";
 import { Camera, Copy, FileSpreadsheet, Image as ImageIcon, Layers, Package, Plus, Search, Tags, Trash2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { call } from "@/lib/api";
@@ -283,8 +284,8 @@ export default function Artigos() {
                   <Td className="font-mono text-[12.5px] text-ink-2">{a.referencia}</Td>
                   <Td>
                     <div className="flex items-start gap-2.5">
-                    {miniaturas[a.id] ? (
-                      <img src={miniaturas[a.id]} alt="" className="size-9 shrink-0 rounded-md border border-line object-cover" loading="lazy" />
+                    {miniaturas[a.id] || capaDoArtigo(a) ? (
+                      <img src={miniaturas[a.id] || capaDoArtigo(a) || ""} alt="" className="h-9 w-7 shrink-0 rounded-md border border-line object-cover" loading="lazy" />
                     ) : null}
                     <div className="min-w-0">
                     <div className="font-medium">

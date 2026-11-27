@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_SUGGESTIONS,
   buildSearchSuggestions,
+  searchSitePages,
   getSearchRelevance,
   matchesTokenizedSearch,
   normalizeForSearch,
@@ -144,5 +145,25 @@ describe('buildSearchSuggestions', () => {
     expect(buildSearchSuggestions(null, 'profecia')).toEqual([]);
     expect(buildSearchSuggestions([null, undefined, {}], 'profecia')).toEqual([]);
     expect(() => buildSearchSuggestions([{ id: '1' }], 'profecia')).not.toThrow();
+  });
+});
+
+describe('a pesquisa de tudo do site (27/11)', () => {
+  it('encontra as páginas pelas palavras com que se procuram', () => {
+    expect(searchSitePages('rastrear').map((p) => p.rota)).toContain('/track');
+    expect(searchSitePages('huambo').map((p) => p.rota)).toEqual(['/lojas']);
+    expect(searchSitePages('autenticador').map((p) => p.rota)).toEqual(['/profile']);
+    expect(searchSitePages('x')).toEqual([]);
+  });
+
+  it('sugere o género e guarda lugar às páginas no fim', () => {
+    const catalogo = [
+      { id: 'b1', title: 'Saúde em Família', genre: 'Saúde & Estilo de Vida', author: 'A' },
+      { id: 'b2', title: 'Outro', genre: 'Saúde & Estilo de Vida', author: 'B' },
+    ];
+    const s = buildSearchSuggestions(catalogo, 'saude');
+    expect(s.some((x) => x.tipo === 'genero' && x.texto === 'Saúde & Estilo de Vida')).toBe(true);
+    const lojas = buildSearchSuggestions(catalogo, 'lojas');
+    expect(lojas[lojas.length - 1]).toEqual({ tipo: 'pagina', texto: 'Lojas físicas', rota: '/lojas' });
   });
 });

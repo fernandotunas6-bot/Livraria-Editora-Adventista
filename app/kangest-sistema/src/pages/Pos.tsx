@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { capaDoArtigo } from "@/lib/capaGerada";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -1144,7 +1145,9 @@ export default function Pos() {
                       {semStock && <span className="absolute right-2 top-2 z-[1] rounded-md bg-danger-50 px-1.5 py-0.5 text-[10.5px] font-medium text-danger">Sem stock</span>}
                       <span className="flex min-w-0 items-start gap-2">
                         <span className="line-clamp-2 min-w-0 flex-1 text-[13.5px] font-medium leading-snug">{a.descricao}</span>
-                        {miniaturas[a.id] && <img src={miniaturas[a.id]} alt="" className={cn("size-11 shrink-0 rounded-lg object-cover", semStock && "opacity-50")} loading="lazy" />}
+                        {(miniaturas[a.id] || capaDoArtigo(a)) && (
+                          <img src={miniaturas[a.id] || capaDoArtigo(a) || ""} alt="" className={cn("h-12 w-9 shrink-0 rounded-md object-cover", semStock && "opacity-50")} loading="lazy" />
+                        )}
                       </span>
                       <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-3">
                         <span className="truncate">{resumoAtributos(a, ramo) || a.referencia}</span>

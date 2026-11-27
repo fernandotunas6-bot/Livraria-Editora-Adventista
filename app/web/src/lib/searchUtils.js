@@ -135,6 +135,39 @@ const MIN_QUERY = 2;
  * Os títulos vêm primeiro porque é o que se procura quase sempre; autores e editoras a
  * seguir, para quem anda à procura de tudo o que há de alguém.
  */
+/**
+ * As páginas do site que a pesquisa também encontra (pedido do dono a 27/11: «que se pesquise tudo do sistema»), com
+ * as palavras por que alguém as procura. Só rotas que existem (App.jsx).
+ */
+export const PAGINAS_DO_SITE = [
+  { texto: 'Lojas físicas', rota: '/lojas', palavras: 'lojas loja morada horário levantar levantamento luanda benguela huambo lubango bié mapa direcções' },
+  { texto: 'Rastrear encomenda', rota: '/track', palavras: 'rastrear rastreio encomenda pedido estado entrega onde está' },
+  { texto: 'Envios e devoluções', rota: '/envios-devolucoes', palavras: 'envio envios entrega portes devolução devoluções troca prazo' },
+  { texto: 'Perguntas frequentes', rota: '/faq', palavras: 'perguntas frequentes ajuda dúvidas pagamento como comprar' },
+  { texto: 'Contacto', rota: '/contacto', palavras: 'contacto contactos telefone whatsapp email falar apoio' },
+  { texto: 'Colecções', rota: '/colecoes', palavras: 'colecções coleções categorias séries' },
+  { texto: 'Novidades', rota: '/novidades', palavras: 'novidades novos lançamentos chegou' },
+  { texto: 'Comunidade', rota: '/comunidade', palavras: 'comunidade leitores publicações partilhar' },
+  { texto: 'Materiais para descarregar', rota: '/materiais', palavras: 'materiais descarregar download pdf gratuitos' },
+  { texto: 'Sugestões', rota: '/sugestoes', palavras: 'sugestões sugerir pedir livro ideia' },
+  { texto: 'A minha conta', rota: '/profile', palavras: 'conta perfil minhas encomendas palavra-passe segurança dois passos autenticador' },
+  { texto: 'Ser colportor', rota: '/ser-colportor', palavras: 'colportor colportagem vender livros candidatura' },
+  { texto: 'Descarregar a aplicação', rota: '/app', palavras: 'aplicação app telemóvel android iphone instalar' },
+  { texto: 'Sobre a livraria', rota: '/sobre', palavras: 'sobre quem somos história editora' },
+  { texto: 'Termos e condições', rota: '/termos', palavras: 'termos condições regras' },
+  { texto: 'Política de privacidade', rota: '/privacidade', palavras: 'privacidade dados pessoais' },
+];
+
+/** As páginas do site que respondem a uma pesquisa (no máximo `max`). */
+export function searchSitePages(query, max = 3) {
+  const termo = normalizeForSearch(query).trim();
+  if (termo.length < MIN_QUERY) return [];
+  return PAGINAS_DO_SITE
+    .filter((p) => matchesTokenizedSearch(`${p.texto} ${p.palavras}`, termo))
+    .slice(0, max)
+    .map((p) => ({ tipo: 'pagina', texto: p.texto, rota: p.rota }));
+}
+
 export function buildSearchSuggestions(products, query, limit = MAX_SUGGESTIONS) {
   const termo = normalizeForSearch(query).trim();
   if (termo.length < MIN_QUERY) return [];
@@ -142,6 +175,7 @@ export function buildSearchSuggestions(products, query, limit = MAX_SUGGESTIONS)
   const livros = [];
   const autores = new Map();
   const editoras = new Map();
+  const generos = new Map();
 
   for (const p of products || []) {
     if (!p) continue;
@@ -169,6 +203,13 @@ export function buildSearchSuggestions(products, query, limit = MAX_SUGGESTIONS)
       if (!autores.has(key)) autores.set(key, { tipo: 'autor', texto: author, relevance: getSearchRelevance({ title: '', author }, termo) });
     }
 
+    // o género (a categoria da Loja): leva à Loja filtrada por ele
+    const genre = String(p.genre || p.type?.value || '').trim();
+    if (genre && matchesTokenizedSearch(genre, termo)) {
+      const key = normalizeForSearch(genre);
+      if (!generos.has(key)) generos.set(key, { tipo: 'genero', texto: genre, relevance: getSearchRelevance({ title: genre }, termo) });
+    }
+
     const publisher = String(p.publisher || '').trim();
     if (publisher && matchesTokenizedSearch(publisher, termo)) {
       const key = normalizeForSearch(publisher);
@@ -177,7 +218,11 @@ export function buildSearchSuggestions(products, query, limit = MAX_SUGGESTIONS)
   }
 
   livros.sort((a, b) => b.relevance - a.relevance || a.texto.localeCompare(b.texto));
-  const extras = [...autores.values(), ...editoras.values()]
+  const extras = [...generos.values(), ...autores.values(), ...editoras.values()]
     .sort((a, b) => b.relevance - a.relevance || a.texto.localeCompare(b.texto));
-  return [...livros, ...extras].slice(0, limit).map(({ relevance: _relevance, ...suggestion }) => suggestion);
+  // as páginas do site têm sempre lugar no fim (até 2), para a pesquisa servir também para encontrar o site
+  const paginas = searchSitePages(query, 2);
+  return [...livros, ...extras].slice(0, Math.max(0, limit - paginas.length))
+    .map(({ relevance: _relevance, ...suggestion }) => suggestion)
+    .concat(paginas);
 }
