@@ -41,12 +41,15 @@ export default function CatalogToolbar({
   const mostraIntervalo = Number.isFinite(shownTo) && total > (shownCount ?? shownTo ?? 0);
 
   return (
-    // No telemóvel, uma linha só (Filtros, contagem e ordenação): eram três, e com o herói e a
-    // pesquisa empurravam o primeiro livro para os ~690 px, tapado pela barra inferior. A troca
-    // grelha/lista e o "a mostrar 1–24" ficam do `sm` para cima; no telemóvel é a grelha, a vista
-    // por omissão. Num ecrã onde nem assim cabe (320 px), a ordenação desce para outra linha.
+    // No telemóvel, os botões numa linha só (Filtros, «Por tipo» e a ordenação) e a contagem por
+    // baixo: com o «Por tipo», Filtros + contagem + ordenação já não cabiam em 360 px, e a barra
+    // partia-se em duas linhas tortas, com um vazio à esquerda (revisão do estilo de 27/11). O
+    // grupo da esquerda é `contents` no telemóvel, para a contagem poder ir para o fim
+    // (`order-last`, a toda a largura); do `sm` para cima volta a ser um grupo, como antes. A troca
+    // grelha/lista e o "a mostrar 1–24" ficam do `sm` para cima. Num ecrã de 320 px, a ordenação
+    // desce para outra linha.
     <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-wrap sm:gap-3 sm:p-4 ${className}`}>
-      <div className="flex min-w-0 items-center gap-2 sm:flex-wrap">
+      <div className="contents sm:flex sm:min-w-0 sm:flex-wrap sm:items-center sm:gap-2">
         {onOpenFilters && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -58,7 +61,7 @@ export default function CatalogToolbar({
             <TooltipContent side="top">Filtrar catálogo</TooltipContent>
           </Tooltip>
         )}
-        <p className="whitespace-nowrap text-sm text-muted-foreground" aria-live="polite">
+        <p className="order-last w-full whitespace-nowrap text-sm text-muted-foreground sm:order-none sm:w-auto" aria-live="polite">
           <strong className="text-foreground">{total}</strong>
           {` ${total === 1 ? noun : nounPlural}`}
           {mostraIntervalo && <span className="hidden sm:inline">{` · a mostrar ${shownFrom}–${shownTo}`}</span>}

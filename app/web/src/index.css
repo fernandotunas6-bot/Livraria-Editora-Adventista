@@ -618,6 +618,14 @@
       padding-top: 0;
     }
   }
+  /* A partir de 1024 px o cabeçalho completo fica sempre à vista (useHeaderReveal, WIDE_QUERY)
+     e por cima do banner: o texto desce a altura real dele (`--header-offset`, medida no
+     Header). Sem isto, a linha de cima do banner («Lojas físicas», o caminho) ficava por trás. */
+  @media (min-width: 1024px) {
+    .pt-below-thin-bar {
+      padding-top: var(--header-offset, 0px);
+    }
+  }
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
