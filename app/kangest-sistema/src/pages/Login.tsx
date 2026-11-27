@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CloudOff, ShieldCheck } from "lucide-react";
-import { call } from "@/lib/api";
+import { NA_APP, call } from "@/lib/api";
 import { useSession } from "@/store/session";
 import type { Sessao } from "@/lib/types";
 import { useOcultarValores } from "@/lib/privacidade";
@@ -48,6 +48,83 @@ export default function Login({ empresa }: { empresa: string | null }) {
     setHumano(t);
     if (t) setErro((e) => (e.startsWith("Confirme que não é um robô") ? "" : e));
   }, []);
+  // entrar com o Google (src-tauri/src/sinc/entrada.rs): o navegador do sistema abre a entrada do Google e o retorno
+  // chega pela ligação kangest://auth («kangest-google»). O estado da entrada fica guardado para a volta do código.
+  const [google, setGoogle] = useState<"parado" | "a_espera">("parado");
+  const [estadoGoogle, setEstadoGoogle] = useState<string | null>(null);
+  const googleRef = useRef(google);
+  useEffect(() => {
+    googleRef.current = google;
+  }, [google]);
+
+  async function concluirGoogle(params: { estado: string; code?: string; codigo?: string }) {
+    setBusy(true);
+    setErro("");
+    try {
+      const s = await call<Sessao | { dois_passos: true }>("auth.google_concluir", params);
+      if ("dois_passos" in s) {
+        setEstadoGoogle(params.estado);
+        setPedirCodigo(true);
+        setTocado(false);
+        return;
+      }
+      setSessao(s);
+      nav(inicioDe(s), { replace: true });
+    } catch (err) {
+      setErro((err as Error).message);
+      setEstadoGoogle(null);
+      setPedirCodigo(false);
+      setCodigo("");
+    } finally {
+      setBusy(false);
+      setGoogle("parado");
+    }
+  }
+
+  useEffect(() => {
+    if (!NA_APP) return;
+    let desligar: (() => void) | undefined;
+    let fechado = false;
+    void import("@tauri-apps/api/event").then(({ listen }) =>
+      listen<{ estado: string; code: string | null; erro: string | null }>("kangest-google", (ev) => {
+        const r = ev.payload;
+        if (googleRef.current !== "a_espera") return;
+        if (r.erro || !r.code) {
+          setGoogle("parado");
+          setErro(r.erro ? `O Google não deixou entrar: ${r.erro}` : "O Google não devolveu a entrada: tente outra vez.");
+          return;
+        }
+        void concluirGoogle({ estado: r.estado, code: r.code });
+      }).then((f) => {
+        if (fechado) f();
+        else desligar = f;
+      }),
+    );
+    return () => {
+      fechado = true;
+      desligar?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function iniciarGoogle() {
+    setErro("");
+    setBusy(true);
+    try {
+      await call("auth.google_iniciar");
+      setGoogle("a_espera");
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function cancelarGoogle() {
+    void call("auth.google_cancelar").catch(() => {});
+    setGoogle("parado");
+    setEstadoGoogle(null);
+  }
 
   async function entrar(metodo: "auth.login" | "auth.loginPin", params: object) {
     setBusy(true);
@@ -84,7 +161,9 @@ export default function Login({ empresa }: { empresa: string | null }) {
     e.preventDefault();
     setTocado(true);
     if (pedirCodigo) {
-      if (codigo.trim()) entrar("auth.login", { login, senha, codigo });
+      if (!codigo.trim()) return;
+      if (estadoGoogle) void concluirGoogle({ estado: estadoGoogle, codigo });
+      else entrar("auth.login", { login, senha, codigo });
       return;
     }
     if (!login.trim() || !senha) return;
@@ -96,6 +175,7 @@ export default function Login({ empresa }: { empresa: string | null }) {
   }
 
   function recomecar() {
+    if (estadoGoogle) cancelarGoogle();
     setPedirCodigo(false);
     setCodigo("");
     setSenha("");
@@ -227,6 +307,7 @@ export default function Login({ empresa }: { empresa: string | null }) {
             <Button variant="accent" size="lg" className="h-12 w-full text-[15px]" loading={busy}>
               Entrar <ArrowRight className="size-4" />
             </Button>
+            <EntrarComGoogle esperar={google === "a_espera"} ocupado={busy} onIniciar={() => void iniciarGoogle()} onCancelar={cancelarGoogle} />
           </form>
         )}
 
@@ -238,6 +319,55 @@ export default function Login({ empresa }: { empresa: string | null }) {
 }
 
 type LigacaoEntrada = { ligado: boolean; loja?: string; em_linha?: boolean; versao?: string };
+
+/**
+ * «Entrar com o Google» (KANGEST ONE, fase A): só no programa instalado e com o KanGest ligado ao site e em linha (sem
+ * Internet não há Google; entra-se com o email e a senha). Enquanto o navegador está aberto, diz-se o que fazer e dá
+ * para desistir.
+ */
+function EntrarComGoogle({ esperar, ocupado, onIniciar, onCancelar }: { esperar: boolean; ocupado: boolean; onIniciar: () => void; onCancelar: () => void }) {
+  const q = useQuery({
+    queryKey: ["entrada", "ligacao"],
+    queryFn: async () => (await call<{ ligacao?: LigacaoEntrada }>("setup.estado")).ligacao ?? null,
+    enabled: NA_APP,
+    refetchInterval: 30_000,
+  });
+  if (!NA_APP || !q.data?.ligado || !q.data.em_linha) return null;
+  if (esperar) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-sunken px-3 py-2.5 text-[13px] text-ink-2" role="status">
+        <span>Continue no navegador: escolha a sua conta Google. Depois, o KanGest abre sozinho.</span>
+        <button type="button" onClick={onCancelar} className="shrink-0 font-medium text-ink underline underline-offset-2 hover:text-brand">
+          Cancelar
+        </button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="flex items-center gap-3 text-[12px] text-ink-3" aria-hidden>
+        <span className="h-px flex-1 bg-line" />
+        ou
+        <span className="h-px flex-1 bg-line" />
+      </div>
+      <Button type="button" variant="secondary" size="lg" className="h-12 w-full text-[15px]" disabled={ocupado} onClick={onIniciar}>
+        <LogoGoogle /> Entrar com o Google
+      </Button>
+    </>
+  );
+}
+
+/** O «G» do Google, com as cores dele (as regras de marca do Google pedem o logótipo tal como é). */
+function LogoGoogle() {
+  return (
+    <svg viewBox="0 0 48 48" className="size-[18px]" aria-hidden>
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
 
 /**
  * Por baixo da entrada (KANGEST ONE): a ligação ao servidor central e a versão. Ligado e com a última volta certa:

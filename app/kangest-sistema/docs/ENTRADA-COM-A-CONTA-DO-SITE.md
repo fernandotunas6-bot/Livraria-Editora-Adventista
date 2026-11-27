@@ -88,9 +88,41 @@ Num KanGest **isolado** (sem ligação ao site), nada disto muda.
 **O painel do site vê quem está dentro** de cada KanGest e pode terminar uma sessão; cada entrada do ADMIN de recurso
 avisa os administradores (docs/KANGEST-SINCRONIZACAO.md §14).
 
+## Entrar com o Google (27/11)
+
+O Google está ligado no Supabase Auth do site. No programa instalado, com o KanGest ligado ao site e com Internet, o
+ecrã de entrada tem «Entrar com o Google» (`sinc/entrada.rs`, `google_iniciar` e `google_concluir`).
+
+**Como funciona:**
+1. O KanGest gera um verificador do PKCE e um estado, e guarda-os só em memória, por dez minutos. Depois abre no
+   navegador do sistema a entrada do Google do Auth do site (`/auth/v1/authorize`, com o desafio S256).
+2. Depois do Google, o Auth devolve o código à página `/kangest/entrar/` do site (`app/web/public/kangest/entrar/`), com
+   o estado no endereço.
+3. Essa página não fala com o site nem guarda nada: passa o estado e o código ao KanGest pela ligação
+   `kangest://auth` e limpa o endereço.
+4. O KanGest (`ligacoes.rs`, `retorno_google`) avisa o ecrã de entrada («kangest-google»), e este pede a sessão.
+5. Só uma entrada começada neste computador, com o mesmo estado e dentro do prazo, troca o código pela sessão
+   (`grant_type=pkce`, com o verificador que nunca saiu daqui).
+
+**Depois, é a entrada da conta do site:**
+- os dois passos, se a conta os tem (a sessão do Google espera o código só em memória);
+- quem é a pessoa (`kangest_eu`) e o perfil;
+- a mesma conta local ligada a ela, com os bloqueios de sempre.
+- **A cópia local da senha não muda:** sem Internet entra-se com a senha, e quem nunca entrou com ela só entra com a
+  Internet.
+
+**Só no programa deste computador.** Um posto ligado pela rede, ou um browser, não recebe a ligação `kangest://`, por isso
+o servidor recusa ali a entrada com o Google.
+
+**Se o Google voltar ao início do site em vez de abrir o KanGest,** o Auth não aceitou o retorno. Nesse caso, junta-se
+`https://livrariaadventista.ao/kangest/entrar/**` em Supabase → Authentication → URL Configuration → Redirect URLs. O
+site já usa o retorno para qualquer página dele, por isso deve estar aceite.
+
 ## Testes
 
 - `sinc/entrada.rs`:
+  - o desafio do PKCE (o exemplo da RFC 7636), o estado e a página de retorno (só em HTTPS);
+  - uma entrada com o Google que não começou aqui, com outro estado ou fora do prazo, é recusada sem perguntar ao site;
   - o perfil (só Gestor ou Caixa, nunca Administrador);
   - a validade da cópia (7 dias, e não com o relógio atrasado);
   - o factor dos dois passos.
@@ -106,3 +138,6 @@ avisa os administradores (docs/KANGEST-SINCRONIZACAO.md §14).
   - isolado, a conta local entra sem avisos;
   - ligado, a conta local entra com o aviso até à data e só consulta depois dela;
   - a conta local nova recusada, o ADMIN de recurso aceite e sem restrições.
+- `ligacoes.rs`: o retorno `kangest://auth` só com um estado válido, e um código com caracteres estranhos não passa.
+- `app/web/src/lib/kangestEntrar.test.js`: a página de retorno passa o estado e o código (ou o erro), e recusa um endereço
+  sem estado.

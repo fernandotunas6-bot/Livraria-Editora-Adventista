@@ -45,10 +45,30 @@ pub fn destino(url: &tauri::Url) -> Option<String> {
     }
 }
 
+/// O retorno da entrada com o Google (`kangest://auth?e=<estado>&code=<código>`, ou `&erro=…`), vindo da página
+/// `/kangest/entrar` do site. Não faz nada sozinho: o ecrã de entrada recebe-o e pede a sessão
+/// (`auth.google_concluir`), que só sai com uma entrada começada neste computador e com o mesmo estado.
+pub fn retorno_google(url: &tauri::Url) -> Option<serde_json::Value> {
+    if url.scheme() != "kangest" || url.host_str() != Some("auth") {
+        return None;
+    }
+    let par = |k: &str| url.query_pairs().find(|(n, _)| n == k).map(|(_, v)| v.chars().take(300).collect::<String>());
+    let estado = par("e").filter(|e| crate::sinc::entrada::estado_valido(e))?;
+    let code = par("code").filter(|c| !c.is_empty() && c.chars().all(|x| x.is_ascii_alphanumeric() || "-_.".contains(x)));
+    let erro = par("erro").map(|e| e.chars().filter(|c| !c.is_control()).take(200).collect::<String>());
+    Some(serde_json::json!({ "estado": estado, "code": code, "erro": erro }))
+}
+
 /// Chegaram ligações (no arranque ou com o KanGest aberto): a janela vem para a frente e o último destino fica à espera
-/// do ecrã, que é avisado («kangest-ligacao») e o vai buscar (`tirar_pendente`).
+/// do ecrã, que é avisado («kangest-ligacao») e o vai buscar (`tirar_pendente`). O retorno do Google vai para o ecrã de
+/// entrada («kangest-google»).
 pub fn abrir(app: &tauri::AppHandle, urls: &[tauri::Url]) {
     use tauri::Emitter;
+    if let Some(r) = urls.iter().rev().find_map(retorno_google) {
+        crate::servico::mostrar(app);
+        let _ = app.emit_to("main", "kangest-google", r);
+        return;
+    }
     if let Some(d) = urls.iter().rev().find_map(destino) {
         *PENDENTE.lock().unwrap_or_else(|e| e.into_inner()) = Some(d);
     }
@@ -84,6 +104,24 @@ mod testes {
         assert_eq!(d("kangest://documentos/anular/12"), None);
         assert_eq!(d("https://loja-online/encomenda/abc"), None);
         assert_eq!(d("kangest://"), None);
+    }
+
+    #[test]
+    fn o_retorno_do_google_so_com_um_estado_valido() {
+        let r = |s: &str| retorno_google(&tauri::Url::parse(s).unwrap());
+        let e = "aBcDeFgHiJkLmNoPqRsTuVwX";
+        assert_eq!(
+            r(&format!("kangest://auth?e={e}&code=0b4c1a6e-1234-4f00-9abc-1234567890ab")),
+            Some(serde_json::json!({ "estado": e, "code": "0b4c1a6e-1234-4f00-9abc-1234567890ab", "erro": null }))
+        );
+        assert_eq!(r(&format!("kangest://auth?e={e}&erro=Acesso%20negado")).unwrap()["erro"], "Acesso negado");
+        // um código com caracteres estranhos não passa; sem estado, ou com outro destino, não é retorno do Google
+        assert_eq!(r(&format!("kangest://auth?e={e}&code=a%20b")).unwrap()["code"], serde_json::Value::Null);
+        assert_eq!(r("kangest://auth?code=abc"), None);
+        assert_eq!(r("kangest://auth?e=curto&code=abc"), None);
+        assert_eq!(r(&format!("kangest://loja-online?e={e}&code=abc")), None);
+        // e o retorno do Google não é um ecrã
+        assert_eq!(destino(&tauri::Url::parse(&format!("kangest://auth?e={e}&code=abc")).unwrap()), None);
     }
 
     #[test]
