@@ -313,6 +313,11 @@ export default function BookFormModal({ open, onClose, onSave, editing, template
                     <div>
                       <p className="text-sm font-semibold">Promoção</p>
                       <p className="text-xs text-muted-foreground">O checkout cobra o preço promocional entre as datas indicadas (vazias = sem limite). Deixe o preço vazio para não haver promoção.</p>
+                      {editing?.kangest_promocao && (
+                        <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">
+                          Esta promoção veio do KanGest da loja. Se a alterar aqui, passa a ser do painel e o KanGest deixa de lhe tocar.
+                        </p>
+                      )}
                     </div>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <div className="space-y-1.5">

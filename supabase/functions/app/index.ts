@@ -69,9 +69,9 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador, limparLivroStock, limparSessoesKanGest,
+  limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
-  type CifraDados,
+  type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
 import { describeDevice, deviceKey } from "./devices.ts";
 import { type Estado, compararVersoes, estadoDoPosto, estadoDosEmails, pior, redact } from "./saude.ts";
@@ -3415,6 +3415,69 @@ route("POST", "/kangest/emparelhar", segredo("código de emparelhamento de uso �
   });
 });
 
+/**
+ * As fotografias dos artigos do KanGest como capas dos produtos do site que não têm nenhuma (KANGEST ONE, integração
+ * total; app/kangest-sistema/src-tauri/src/sinc/capas.rs, `para_o_site`):
+ * - só do posto que manda no catálogo (o mesmo dos preços e dos artigos novos);
+ * - o produto encontra-se pela referência do KanGest (`kigest_ref`, única);
+ * - nunca se substitui uma capa: com `cover` ou `cover_image`, fica como está (`tem_capa`);
+ * - o ficheiro vai para o Storage como os do painel (`media/stock_books/<id>/…`). O `cover_image` muda só se ainda
+ *   estiver vazio quando se grava; se entretanto alguém pôs um, o ficheiro sai do Storage.
+ * A alteração do produto fica no registo de segurança (o gatilho de `stock_books`).
+ */
+async function capasDoKanGest(p: Row, l: { fotos: FotoKanGest[]; recusadas: Row[] }): Promise<Row[]> {
+  const out: Row[] = [...l.recusadas];
+  for (const f of l.fotos) {
+    if (!p.manda_catalogo) {
+      out.push({ artigo_id: f.artigo_id, estado: "recusada", erro: "Este KanGest não manda no catálogo do site (painel → Configurações → KanGest → Postos)." });
+      continue;
+    }
+    try {
+      const { data: b, error } = await db.from("stock_books").select("id, cover, cover_image").eq("kigest_ref", f.referencia).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!b) { out.push({ artigo_id: f.artigo_id, estado: "sem_produto" }); continue; }
+      if (String(b.cover ?? "").trim() || String(b.cover_image ?? "").trim()) { out.push({ artigo_id: f.artigo_id, estado: "tem_capa" }); continue; }
+      const ficheiro = `kangest-${(await resumoSinc(f.bytes)).slice(0, 16)}.${f.extensao}`;
+      const caminho = `stock_books/${b.id}/${ficheiro}`;
+      const envio = await db.storage.from("media").upload(caminho, f.bytes, { contentType: f.tipo, upsert: true, cacheControl: "31536000" });
+      if (envio.error) throw new Error(envio.error.message);
+      const { data: feito, error: e2 } = await db.from("stock_books").update({ cover_image: ficheiro })
+        .eq("id", b.id).or("cover_image.is.null,cover_image.eq.").select("id");
+      if (e2) throw new Error(e2.message);
+      if (!feito?.length) {
+        await db.storage.from("media").remove([caminho]);
+        out.push({ artigo_id: f.artigo_id, estado: "tem_capa" });
+        continue;
+      }
+      console.log("KanGest: a capa do produto", b.id, "veio do artigo", f.artigo_id, "do posto", p.id);
+      out.push({ artigo_id: f.artigo_id, estado: "posta", produto: b.id });
+    } catch (e) {
+      console.error("KanGest: fotografia do artigo", f.artigo_id, "do posto", p.id, (e as Error).message);
+      out.push({ artigo_id: f.artigo_id, estado: "erro", erro: (e as Error).message.slice(0, 300) });
+    }
+  }
+  return out;
+}
+
+/** Os produtos das novidades sem `capa` (endereço externo) mas com `cover_image` no Storage: o endereço público. */
+async function completarCapas(novidades: unknown): Promise<void> {
+  const produtos = (novidades as Row | null)?.produtos;
+  if (!Array.isArray(produtos)) return;
+  const sem = produtos.filter((p: Row) => p && typeof p.id === "string" && !String(p.capa ?? "").trim()).map((p: Row) => p.id as string);
+  if (!sem.length) return;
+  const { data, error } = await db.from("stock_books").select("id, cover_image").in("id", sem.slice(0, 500));
+  if (error) {
+    console.error("KanGest: as capas do Storage", error.message);
+    return;
+  }
+  const ficheiro = new Map((data || []).filter((b: Row) => String(b.cover_image ?? "").trim()).map((b: Row) => [b.id, String(b.cover_image).trim()]));
+  const base = SUPABASE_URL.replace(/\/+$/, "");
+  for (const p of produtos as Row[]) {
+    const f = ficheiro.get(p?.id);
+    if (f && !String(p.capa ?? "").trim()) p.capa = `${base}/storage/v1/object/public/media/stock_books/${p.id}/${encodeURIComponent(f)}`;
+  }
+}
+
 route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest Livraria (a chave do emparelhamento), hora e nonce, conferidos no handler"), async ({ req, raw, ip }) => {
   const chaves = chavesSinc();
   const cifra = await cifraDadosKanGest();
@@ -3427,7 +3490,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   if (!uuidValido(posto) || !nonceValido(nonce) || !assinatura) throw new HttpError(401, "Pedido sem assinatura válida.");
   if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
   const { data: p } = await db.from("kangest_postos")
-    .select("id, nome, estado, chave_publica, store_id, topico, emitir_encomendas, artigo_portes, artigo_generico, pagamentos")
+    .select("id, nome, estado, chave_publica, store_id, topico, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, manda_catalogo")
     .eq("id", posto).maybeSingle();
   if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
   if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
@@ -3469,6 +3532,11 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
       stockLivro = { erro: error.message.slice(0, 300) };
     } else stockLivro = data;
   }
+  // as fotografias dos artigos para os produtos do site sem capa (KANGEST ONE, integração total; sinc/capas.rs). Nunca
+  // impedem o resto da volta: o que falhar volta na resposta e o posto tenta outra vez mais tarde.
+  let fotos: unknown = null;
+  const fotosDoPosto = limparFotosKanGest(aberto.dados?.fotos);
+  if (fotosDoPosto) fotos = await capasDoKanGest(p, fotosDoPosto);
   let resultado = null;
   const tudo = Array.isArray(aberto.dados?.lote) ? aberto.dados.lote : [];
   // o que o KanGest fez com as tarefas da volta anterior (os documentos das encomendas online, §11): primeiro, para a
@@ -3493,6 +3561,43 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   } else {
     await db.from("kangest_postos").update({ ultima_sinc: new Date().toISOString() }).eq("id", posto);
   }
+  // os dados das fichas do KanGest nos produtos do site que não os têm (KANGEST ONE, integração total; sinc/fichas.rs;
+  // public.kangest_dados_dos_livros). Depois do lote, para um artigo novo já ter o rascunho. Nunca impedem o resto da
+  // volta: o que falhar volta na resposta e o posto tenta outra vez mais tarde.
+  let livros: unknown = null;
+  const livrosDoPosto = limparLivrosKanGest(aberto.dados?.livros);
+  if (livrosDoPosto) {
+    if (!p.manda_catalogo) {
+      livros = livrosDoPosto.map((l) => ({
+        artigo_id: l.artigo_id, estado: "recusado",
+        erro: "Este KanGest não manda no catálogo do site (painel → Configurações → KanGest → Postos).",
+      }));
+    } else {
+      const { data, error } = await db.rpc("kangest_dados_dos_livros", { p_posto: posto, p_itens: livrosDoPosto });
+      if (error) {
+        console.error("KanGest: os dados dos livros do posto", posto, error.message);
+        livros = livrosDoPosto.map((l) => ({ artigo_id: l.artigo_id, estado: "erro", erro: error.message.slice(0, 300) }));
+      } else livros = data;
+    }
+  }
+  // as promoções do KanGest que manda no catálogo (sinc/promocoes.rs; public.kangest_promocoes_do_posto): a regra do
+  // preço, mas nunca por cima de uma promoção do painel. Também depois do lote, e também nunca impedem a volta.
+  let promocoes: unknown = null;
+  const promocoesDoPosto = limparPromocoesKanGest(aberto.dados?.promocoes);
+  if (promocoesDoPosto) {
+    if (!p.manda_catalogo) {
+      promocoes = promocoesDoPosto.map((l) => ({
+        artigo_id: l.artigo_id, estado: "recusada",
+        erro: "Este KanGest não manda no catálogo do site (painel → Configurações → KanGest → Postos).",
+      }));
+    } else {
+      const { data, error } = await db.rpc("kangest_promocoes_do_posto", { p_posto: posto, p_itens: promocoesDoPosto });
+      if (error) {
+        console.error("KanGest: as promoções do posto", posto, error.message);
+        promocoes = promocoesDoPosto.map((l) => ({ artigo_id: l.artigo_id, estado: "erro", erro: error.message.slice(0, 300) }));
+      } else promocoes = data;
+    }
+  }
   // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
   // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
   let novidades = null;
@@ -3501,6 +3606,9 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     const { data, error } = await db.rpc("kangest_novidades", { p_posto: posto, p_cursores: cursores, p_limite: 200 });
     if (error) throw new Error(error.message);
     novidades = data;
+    // as capas que só estão no Storage (cover_image): o KanGest recebe o endereço público delas, para as trazer como
+    // fotografia do artigo (KANGEST ONE, integração total; app/kangest-sistema/src-tauri/src/sinc/capas.rs)
+    await completarCapas(novidades);
   }
   // os documentos das encomendas online que este KanGest tem de emitir (só com «Emitir os documentos das encomendas
   // online» ligado no painel): a NE, a FR, a NC e as anulações, com os mesmos corpos da ligação antiga
@@ -3516,7 +3624,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro,
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros, promocoes,
     // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
     kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
     site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },

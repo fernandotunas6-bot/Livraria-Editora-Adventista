@@ -528,9 +528,73 @@ Testes:
 - `comparar_versoes` (Rust);
 - `saude.test.ts` (`compararVersoes`).
 
-## 17. A fase B3: o stock à venda a sair do livro (rascunho, desligado)
+## 17. As fotografias dos artigos para as capas do site (KANGEST ONE, integração total)
 
-Migração `20261127100000`.
+- **O pedido:** no campo `fotos` vai no máximo uma fotografia por volta: `{ artigo_id, referencia, versao, imagem }`, em
+  que `imagem` é uma data URL. Vai só se o pedido inteiro ficar abaixo de 700 kB antes de cifrar (o limite do site é
+  1 MB).
+- **O site:**
+  - `limparFotosKanGest` confere o tipo pelos primeiros bytes (JPEG, PNG ou WebP) e o tamanho (750 kB);
+  - `capasDoKanGest` só aceita a fotografia do posto com `manda_catalogo`;
+  - o produto encontra-se pela referência (`kigest_ref`);
+  - o ficheiro vai para `media/stock_books/<id>/`, e o `cover_image` muda só se estiver vazio.
+- **A resposta** (`fotos`): para cada fotografia, `{ artigo_id, estado, erro? }`, com o estado `posta`, `tem_capa`,
+  `sem_produto`, `recusada` ou `erro`. O posto regista-a em `capas_enviadas` (migração 0074).
+- **Um site sem este campo** não responde à fotografia: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As fotografias dos artigos para o
+  site»).
+
+## 18. Os dados dos livros nas fichas dos artigos (KANGEST ONE, integração total)
+
+- **As novidades** (`kangest_novidades`, 20261127100000): cada produto leva também `autor`, `editora`, `idioma`, `ano` e
+  `paginas`. Um campo vazio, e o ano ou as páginas a 0, seguem como `null`.
+- **O posto** (`sinc/fichas.rs`), depois de aplicar uma volta com produtos:
+  - completa os dados do livro que faltam na ficha do artigo com a mesma referência;
+  - põe o ISBN como código de barras de um artigo sem nenhum, se o ISBN for válido e nenhum outro artigo o usar. Este
+    código não volta ao site: a linha que o gatilho do catálogo criaria sai na mesma transacção.
+- **O que veio fica em `fichas_do_site`** (migração 0075), campo a campo, e não volta. Nunca se substitui o que está na
+  ficha.
+- **A migração 0075 apaga o cursor dos produtos:** o catálogo vem todo uma vez, já com os dados novos.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados dos livros do site nas
+  fichas dos artigos»).
+
+## 19. Os dados das fichas nos produtos do site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `livros` vão até 50 livros por volta:
+  `{ artigo_id, referencia, autor?, editora?, idioma?, ano?, paginas?, isbn?, genero? }`. Vão só os campos que a ficha
+  tem e o produto do site (na cópia da Loja online) não. O `genero` é o do site ligado à família do artigo, e só vai
+  para um produto em «Catálogo Geral» ou sem género.
+- **O site:**
+  - `limparLivrosKanGest` limpa os textos e confere os números e o ISBN-13;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_dados_dos_livros` (20261127110000; o género na 20261127130000) preenche só o que está vazio. O ISBN
+    só entra se nenhum outro produto o tiver, e o género só se o site já o tiver.
+- **A resposta** (`livros`): para cada livro, `{ artigo_id, estado, erro? }`, com o estado `feito`, `sem_produto`,
+  `recusado` ou `erro`. O posto regista-a em `livros_enviados` (migração 0076).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados das fichas para os
+  produtos do site»).
+
+## 20. As promoções dos artigos no site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `promocoes` vão até 50 por volta:
+  `{ artigo_id, referencia, desconto, inicio?, fim?, preco1_iva? }`. Um `desconto` de 0 pede para retirar a promoção
+  que o KanGest pôs.
+- **O site:**
+  - `limparPromocoesKanGest` aceita a percentagem entre 0 e 99,99, as datas só se existirem e o PVP em cêntimos;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_promocoes_do_posto` (20261127120000) põe ou retira o `sale_price` e as datas. Nunca toca numa
+    promoção do painel: a coluna `kangest_promocao` diz de quem é, e o gatilho `stock_books_promocao_do_painel` passa-a
+    para o painel quando alguém a muda lá.
+- **A resposta** (`promocoes`): para cada artigo, `{ artigo_id, estado, erro? }`, com o estado `feita`, `retirada`,
+  `sem_produto`, `tem_promocao`, `recusada` ou `erro`. O posto regista-a em `promocoes_enviadas` (migração 0077).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As promoções dos artigos no
+  site»).
+
+## 21. A fase B3: o stock à venda a sair do livro (rascunho, desligado)
+
+Migração `20261127140000`.
 
 **A fonte do stock** (`private.stock_livro_definicoes`, `fonte`) diz de onde sai o stock à venda:
 - **`fotografias`** (por omissão): como até aqui, das fotografias de cada posto (§10).

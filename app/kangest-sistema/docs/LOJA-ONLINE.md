@@ -91,6 +91,165 @@ ligado pela referência: o título, o preço e se está à vista ou oculto (`loj
 
 Teste: `o_artigo_no_site_pela_ficha` (`services/tests.rs`, com o site falso).
 
+### As capas dos livros do site (KANGEST ONE, integração total; 27/11)
+
+Cada artigo sem fotografia cuja referência tem um produto do site com capa recebe essa capa como fotografia
+(`sinc/capas.rs`, `components/CapasDoSite.tsx`, migração 0073).
+
+**De onde vêm:** a cópia da Loja online já traz a capa de cada produto. As que só estão no Storage do site
+(`cover_image`) chegam com o endereço público, que a Edge Function completa nas novidades. A migração 0073 faz os
+produtos virem outra vez uma vez, para estas chegarem.
+
+**Como se trazem:**
+- **O programa descarrega a capa só de origens conhecidas:** o Supabase e o site da livraria, e o Google Drive, sempre
+  por HTTPS. Confere que é mesmo uma imagem, pelos primeiros bytes, com 8 MB no máximo.
+- **O endereço nunca vem do ecrã:** é sempre o do produto com a referência do artigo.
+- **O ecrã reduz a imagem como a qualquer fotografia** (miniatura e imagem) e guarda-a.
+- **Uma fotografia escolhida à mão nunca é substituída.**
+- **O que falha fica em `capas_tentadas`** e só se tenta outra vez quando a capa mudar no site.
+
+**Automático com opção manual:** corre sozinho em segundo plano, para quem tem `artigos.editar`. Na Loja online há o
+cartão «As capas dos livros do site», com «Trazer agora» e o interruptor «Trazer sozinho», que vale só para este
+computador.
+
+Teste: `as_capas_do_site_nos_artigos`. Testes unitários: `o_endereco_da_capa`, `so_de_origens_conhecidas` e
+`o_tipo_pela_assinatura`.
+
+### As fotografias dos artigos para o site (o sentido contrário; 27/11)
+
+A fotografia de um artigo segue para o produto do site com a mesma referência quando esse produto não tem capa
+(`sinc/capas.rs`, `para_o_site`; migração 0074).
+
+**Como segue:**
+- **Uma por volta da sincronização,** no campo `fotos` do pedido, só se o pedido inteiro ficar abaixo de 700 kB antes
+  de cifrar. O limite do site é 1 MB, e a cifra acrescenta um terço. Uma fotografia maior do que 600 000 caracteres não
+  segue.
+- **Só vão as fotografias de artigos activos, com referência,** cujo produto do site (na cópia da Loja online) ainda não
+  tem capa.
+- **O que o site respondeu fica em `capas_enviadas`,** com a versão da fotografia (`artigo_fotos.alterado_em`):
+  - `posta`, `tem_capa` e `sem_produto` não voltam a seguir, a não ser que a fotografia mude;
+  - `recusada` tenta outra vez um dia depois;
+  - `erro` (ou um site sem resposta para ela) tenta outra vez cada vez mais tarde.
+
+**No site** (`capasDoKanGest` na Edge Function), a fotografia:
+- só é aceite do KanGest que manda no catálogo;
+- tem de ser JPEG, PNG ou WebP, conferido pelos primeiros bytes, com 750 kB no máximo;
+- vai para o Storage como as do painel (`media/stock_books/<id>/kangest-<resumo>.<ext>`);
+- passa a `cover_image` do produto só se ainda estiver vazio. Nunca se substitui uma capa.
+
+A alteração fica no registo de segurança, e a capa volta ao KanGest nas novidades. Não há volta em círculo: a capa do
+site só vem para artigos sem fotografia.
+
+**Automático, com a opção manual:** está ligado por omissão. Na Loja online, o cartão «As fotografias dos artigos para
+o site» mostra quantas já são capas, quantas esperam e o motivo das recusas. O interruptor «Enviar sozinho» desliga-o
+neste computador (`config` `sinc.fotos_para_o_site`).
+
+Testes: `as_fotos_dos_artigos_para_o_site` (Rust) e `limparFotosKanGest` (`kangestSinc.test.ts`).
+
+### Os dados dos livros do site nas fichas dos artigos (27/11)
+
+As novidades do site trazem, de cada livro, o autor, a editora, o idioma, o ano e as páginas, além do ISBN que já
+traziam. Um artigo activo com a mesma referência completa a ficha com eles (`sinc/fichas.rs`; migração 0075):
+- **os dados do livro** (os mesmos campos da ficha de uma livraria): só os que faltam. O ano e as páginas só quando o
+  site tem mais do que 0;
+- **o código de barras:** o ISBN do site, em ISBN-13, se o artigo não tiver nenhum, se o ISBN for válido e se nenhum
+  outro artigo já o usar. Não volta ao site, que é de onde veio.
+
+**Nunca se substitui o que está na ficha.** O que veio fica em `fichas_do_site`, campo a campo:
+- um campo que já veio uma vez não volta;
+- se alguém o apagar à mão, fica apagado.
+
+Cada vez que se completam fichas, fica uma linha na auditoria (`FICHA_DO_SITE`).
+
+**Automático, com a opção manual:** corre depois de cada volta da sincronização que traga produtos. Na Loja online, o
+cartão «Os dados dos livros do site» mostra quantos artigos podem receber alguma coisa, com dois comandos:
+- «Completar agora», para completar na hora;
+- «Completar sozinho», que o desliga neste computador (`config` `sinc.dados_dos_livros`).
+
+Na primeira volta depois de actualizar, o KanGest volta a pedir o catálogo do site, para conhecer estes dados dos
+produtos que já tinha.
+
+Testes: `os_dados_dos_livros_do_site_nas_fichas` e `fichas::testes` (Rust), e `kangest-central.mjs` (PGlite).
+
+### Os dados das fichas para os produtos do site (o sentido contrário; 27/11)
+
+O que a ficha de um artigo tem e o produto do site com a mesma referência não tem segue na volta da sincronização
+(`sinc/fichas.rs`, `livros_para_o_site`; migração 0076):
+- **o que vai:** o autor, a editora, o idioma, o ano e as páginas da ficha, e o ISBN, que é o código de barras quando
+  este for um ISBN válido;
+- **como se sabe o que falta no site:** pela cópia da Loja online, que traz estes dados desde a 20261127100000;
+- **até 50 livros por volta,** no campo `livros` do pedido. Se forem 50, a volta seguinte vem logo a seguir.
+
+**O que o site respondeu fica em `livros_enviados`,** com a versão (o que foi, em texto):
+- `feito` e `sem_produto` não voltam a seguir, a não ser que a ficha mude;
+- `recusado` tenta outra vez um dia depois;
+- `erro` (ou um site sem resposta para eles) tenta outra vez cada vez mais tarde.
+
+**No site** (`limparLivrosKanGest` e `public.kangest_dados_dos_livros`):
+- só se aceitam do KanGest que manda no catálogo;
+- os textos ficam numa linha e com o tamanho das colunas. O ano e as páginas só entram como números inteiros razoáveis,
+  e o ISBN só se for um ISBN-13 válido;
+- **só se preenche o que está vazio** (o ano e as páginas a 0 contam como vazios). O ISBN só entra se nenhum outro
+  produto o tiver. A editora que o site põe nos rascunhos («Livraria e Editora Adventista») não se substitui.
+
+O produto muda de data de alteração e volta ao KanGest nas novidades. Não há volta em círculo: cada sentido só mexe no
+que o outro lado não tem.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «Os dados dos livros do site» mostra quantos
+foram, quantos esperam e o motivo das recusas. O interruptor «Enviar para o site» desliga-o neste computador (`config`
+`sinc.dados_para_o_site`).
+
+Testes: `os_dados_das_fichas_para_o_site` e `fichas::testes` (Rust), `limparLivrosKanGest` (`kangestSinc.test.ts`) e
+`kangest-central.mjs` (PGlite).
+
+### As famílias do KanGest e os géneros do site (27/11)
+
+As famílias dos artigos e os géneros do site (as categorias públicas, como «Fé & Doutrina» ou «Bíblias») ligam-se
+(`sinc/fichas.rs`, `generos`; migração 0078):
+- **sozinhas,** quando o nome é igual (sem maiúsculas nem acentos, e «&» vale «e»);
+- **à mão,** no quadro «Ligar famílias» da Loja online: um género do site, «Não ligar», ou «Pelo nome» para voltar à
+  ligação sozinha (`familias_no_site`).
+
+**O que a ligação faz:**
+- **Do site para o KanGest:** um artigo na família «Geral» (ou sem família) recebe a família ligada ao género do seu
+  produto. Só quando uma família, e só uma, está ligada a esse género, e só uma vez por artigo: se alguém o puser outra
+  vez na «Geral», fica lá. A subfamília sai, porque era da família anterior.
+- **Do KanGest para o site:** o produto em «Catálogo Geral» (o género por omissão) ou sem género recebe o género da
+  família do artigo, no campo `genero` dos livros para o site. O site só aceita um género que já tenha: o KanGest não
+  cria categorias públicas novas.
+
+A família «Geral» nunca se liga, e o género «Catálogo Geral» também não.
+
+### As promoções dos artigos no site (27/11)
+
+**A regra é a do preço:** o KanGest que manda no catálogo manda também nas promoções dos produtos do site ligados aos
+seus artigos (`sinc/promocoes.rs`; migração 0077). A promoção de um artigo é a mesma que a venda aplica: a percentagem
+entre duas datas, as duas incluídas.
+
+**Como segue:**
+- **até 50 por volta,** no campo `promocoes` do pedido;
+- **com promoção:** o site põe o preço promocional, calculado sobre o PVP com IVA, desde as 00:00 do primeiro dia até às
+  00:00 do dia a seguir ao último, na hora de Angola;
+- **sem promoção, ou já acabada,** depois de uma ter ido: o site retira a que o KanGest pôs;
+- **o que o site respondeu fica em `promocoes_enviadas`,** com a versão (a promoção e o PVP). Uma promoção ou um preço
+  que mude volta a seguir.
+
+**No site** (`limparPromocoesKanGest` e `public.kangest_promocoes_do_posto`, 20261127120000):
+- só se aceitam do KanGest que manda no catálogo;
+- **uma promoção posta no painel nunca é substituída:** responde `tem_promocao`, e o KanGest tenta outra vez um dia
+  depois;
+- o KanGest só retira as promoções que ele próprio pôs (`stock_books.kangest_promocao`);
+- uma promoção do KanGest que alguém altere no painel passa a ser do painel, e o KanGest deixa de lhe tocar. O
+  formulário do produto no painel avisa;
+- a auditoria dos preços do site regista cada mudança do preço promocional.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «As promoções dos artigos no site» mostra quantas
+estão no site, quantas esperam, quantas ficaram com a promoção do painel e o motivo das recusas. «Enviar sozinho»
+desliga-o neste computador (`config` `sinc.promocoes_para_o_site`).
+
+Testes: `as_promocoes_dos_artigos_para_o_site` e `promocoes::testes` (Rust), `limparPromocoesKanGest`
+(`kangestSinc.test.ts`) e `kangest-central.mjs` (PGlite).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;

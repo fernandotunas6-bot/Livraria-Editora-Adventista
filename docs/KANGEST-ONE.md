@@ -61,21 +61,28 @@ Restrições de segurança, palavra por palavra:
 
 | Fase | O que faz | PR | Em produção |
 |---|---|---|---|
-| A1 | a sessão do site no KanGest só em memória: não há tabela `sessoes_site`, e nenhum token vai para o disco | #151 | KanGest 1.4.9 (por publicar) |
+| A1 | a sessão do site no KanGest só em memória: não há tabela `sessoes_site`, e nenhum token vai para o disco | #151 | KanGest 1.4.9 |
 | A2 | uma só identidade: num KanGest ligado, as contas locais têm data-limite (30 dias a contar da ligação ao site) e depois só lêem; contas locais novas, só o ADMIN; o modo sem Internet | #152, #167 | KanGest 1.4.9 |
 | A3 | as sessões abertas no painel do site, com «Terminar»; o ADMIN de recurso entra no registo de segurança com aviso; o ecrã de entrada mostra a ligação | #153 | sim (20261126180000); o KanGest na 1.4.9 |
 | F | o staging antes da produção no `deploy-supabase.yml` (passa à frente sem staging) | #154 | sim; o staging é do dono |
 | B1 | o livro de stock em sombra: as aberturas por época e os movimentos do KanGest (só dos artigos que o livro segue) | #155, #167 | sim (20261126190000); o KanGest na 1.4.9 |
 | B2 | as encomendas do site no livro: reserva no checkout, libertação no cancelamento ou na FR do posto; o resumo do painel conta só as encomendas em curso | #156, #167 | sim (20261126200000); 20261126230000 com o #167 |
-| B3 | o stock à venda passa a sair do livro | — | **por fazer:** espera pelo staging |
+| B3 | o stock à venda passa a sair do livro | #173 (rascunho, desligado; migração 20261127140000) | **por fazer:** espera pelo staging |
 | C1–C3 | a API v1 com as 17 famílias, o contrato OpenAPI, o `Idempotency-Key` e as leituras pelo RLS | #157, #158, #160 | sim (20261126210000) |
 | D | o artigo no site a partir da ficha do artigo, nunca a 0 Kz | #159 | KanGest 1.4.9 |
 | E | a saúde do ecossistema: a API, o painel e o `redact()` | #161 | sim (20261126220000) |
 | E2 | a versão mínima do KanGest (`KANGEST_MIN_VERSION`) e o cartão «Servidor central» | #162 | KanGest 1.4.9; o segredo é do dono |
 | G1 | os tokens partilhados com o contraste AA conferido | #163 | sim (o site) e KanGest 1.4.9 |
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
+| §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10 |
+| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
+| Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | #177 | KanGest 1.4.10 |
+| Dados dos livros | o autor, a editora, o idioma, o ano, as páginas e o ISBN (como código de barras) do site nas fichas dos artigos que não os têm | #178 | sim (20261127100000, a partir do merge); KanGest 1.4.10 |
+| Dados para o site | o sentido contrário: o que a ficha tem e o produto do site não, só do posto que manda no catálogo e só nos campos vazios | #179 | sim (20261127110000, a partir do merge); KanGest 1.4.10 |
+| Promoções | as promoções dos artigos no site, com a regra do preço (o posto que manda no catálogo), sem nunca mexer numa promoção do painel | #180 | sim (20261127120000, a partir do merge); KanGest 1.4.10 |
+| Categorias | as famílias do KanGest ligadas aos géneros do site (pelo nome ou à mão): o artigo na «Geral» recebe a família do género, e o produto em «Catálogo Geral», o género da família | o PR das famílias | sim (20261127130000, a partir do merge); KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
-| Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
+| Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente; a volta dos postos sem assinatura recusada (27/11) | #166 | corrido contra a produção: 8 de 8 (27/11) |
 
 ## 5. Os 14 testes de aceitação e a prova de cada um
 

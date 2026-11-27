@@ -538,6 +538,176 @@ export function limparSessoesKanGest(l: unknown): Record<string, unknown>[] | nu
 
 const MAX_LIVRO = 2000;
 
+/** O tamanho máximo de uma fotografia do KanGest para o site, já descodificada (a do KanGest tem até 800 px). */
+export const MAX_FOTO_BYTES = 750_000;
+
+/** Uma fotografia de um artigo do KanGest, pronta para o Storage: o tipo vem dos primeiros bytes, não do que diz. */
+export interface FotoKanGest {
+  artigo_id: number;
+  referencia: string;
+  versao: string;
+  tipo: "image/jpeg" | "image/png" | "image/webp";
+  extensao: "jpg" | "png" | "webp";
+  bytes: Bytes;
+}
+
+/** O tipo de uma imagem pelos primeiros bytes (JPEG, PNG ou WebP), ou `null`. */
+export function tipoDaImagem(b: Uint8Array): Pick<FotoKanGest, "tipo" | "extensao"> | null {
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { tipo: "image/jpeg", extensao: "jpg" };
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { tipo: "image/png", extensao: "png" };
+  const ascii = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n));
+  if (b.length > 12 && ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") return { tipo: "image/webp", extensao: "webp" };
+  return null;
+}
+
+/**
+ * As fotografias dos artigos que o KanGest manda para os produtos do site sem capa (KANGEST ONE, integração total;
+ * sinc/capas.rs, `para_o_site`). No máximo uma por volta, para o pedido caber no limite. Cada uma tem de ser uma data
+ * URL de JPEG, PNG ou WebP, e os bytes têm de ser mesmo dessa imagem. O que não passa sai com o motivo em `recusadas`,
+ * para o posto não a mandar outra vez. Sem nada (um KanGest antigo), `null`.
+ */
+export function limparFotosKanGest(x: unknown): { fotos: FotoKanGest[]; recusadas: { artigo_id: number; estado: string; erro: string }[] } | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const fotos: FotoKanGest[] = [];
+  const recusadas: { artigo_id: number; estado: string; erro: string }[] = [];
+  for (const f of x.slice(0, 1)) {
+    if (!f || typeof f !== "object" || Array.isArray(f)) continue;
+    const v = f as Record<string, unknown>;
+    const artigo_id = typeof v.artigo_id === "number" && Number.isSafeInteger(v.artigo_id) && v.artigo_id > 0 ? v.artigo_id : 0;
+    if (!artigo_id) continue;
+    const recusar = (erro: string) => recusadas.push({ artigo_id, estado: "recusada", erro });
+    const referencia = typeof v.referencia === "string" ? v.referencia.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60) : "";
+    const versao = typeof v.versao === "string" ? v.versao.replace(/[^0-9A-Za-z:. T_-]/g, "").slice(0, 40) : "";
+    const imagem = typeof v.imagem === "string" ? v.imagem : "";
+    const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(imagem);
+    if (!referencia) { recusar("O artigo não tem referência."); continue; }
+    if (!m) { recusar("A fotografia não é uma imagem JPEG, PNG ou WebP."); continue; }
+    if (m[2].length > Math.ceil((MAX_FOTO_BYTES * 4) / 3) + 4) { recusar("A fotografia é grande demais para o site."); continue; }
+    let bytes: Bytes;
+    try {
+      bytes = deB64(m[2]);
+    } catch {
+      recusar("A fotografia não se pôde ler.");
+      continue;
+    }
+    const tipo = tipoDaImagem(bytes);
+    if (!tipo || tipo.tipo !== `image/${m[1]}`) { recusar("Os bytes da fotografia não são do tipo que diz."); continue; }
+    fotos.push({ artigo_id, referencia, versao, ...tipo, bytes });
+  }
+  return { fotos, recusadas };
+}
+
+/** Os livros que o KanGest manda numa volta (sinc/fichas.rs, `MAX_LIVROS`). */
+export const MAX_LIVROS = 50;
+
+/** O que a ficha de um artigo do KanGest tem e o produto do site não (só os campos que vêm). */
+export interface LivroKanGest {
+  artigo_id: number;
+  referencia: string;
+  autor?: string;
+  editora?: string;
+  idioma?: string;
+  ano?: number;
+  paginas?: number;
+  isbn?: string;
+  /** o género do site ligado à família do artigo (o site só aceita um género que já tenha) */
+  genero?: string;
+}
+
+/** Um ISBN-13 só com algarismos, começado por 978 ou 979 e com o algarismo de controlo certo. */
+export function isbn13Valido(s: string): boolean {
+  if (!/^97[89][0-9]{10}$/.test(s)) return false;
+  const soma = [...s.slice(0, 12)].reduce((t, c, i) => t + Number(c) * (i % 2 ? 3 : 1), 0);
+  return (10 - (soma % 10)) % 10 === Number(s[12]);
+}
+
+/**
+ * Os dados das fichas do KanGest para os produtos do site que não os têm (KANGEST ONE, integração total; sinc/fichas.rs,
+ * `livros_para_o_site`; docs/KANGEST-SINCRONIZACAO.md §19). No máximo `MAX_LIVROS` por volta. Os textos ficam numa
+ * linha e com o tamanho das colunas, o ano e as páginas só como inteiros dentro do razoável, e o ISBN só se for um
+ * ISBN-13 válido. Um livro sem nada que sirva sai. Sem nada (um KanGest antigo), `null`.
+ */
+export function limparLivrosKanGest(x: unknown): LivroKanGest[] | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const texto = (v: unknown, max: number) =>
+    typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "";
+  const inteiro = (v: unknown, max: number) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 1 && v <= max ? v : 0);
+  const out: LivroKanGest[] = [];
+  for (const l of x.slice(0, MAX_LIVROS)) {
+    if (!l || typeof l !== "object" || Array.isArray(l)) continue;
+    const v = l as Record<string, unknown>;
+    const artigo_id = inteiro(v.artigo_id, Number.MAX_SAFE_INTEGER);
+    const referencia = texto(v.referencia, 60);
+    if (!artigo_id || !referencia) continue;
+    const livro: LivroKanGest = { artigo_id, referencia };
+    const autor = texto(v.autor, 300);
+    const editora = texto(v.editora, 300);
+    const idioma = texto(v.idioma, 60);
+    const ano = inteiro(v.ano, 3000);
+    const paginas = inteiro(v.paginas, 100_000);
+    const isbn = typeof v.isbn === "string" ? v.isbn.replace(/[^0-9]/g, "") : "";
+    if (autor) livro.autor = autor;
+    if (editora) livro.editora = editora;
+    if (idioma) livro.idioma = idioma;
+    if (ano) livro.ano = ano;
+    if (paginas) livro.paginas = paginas;
+    if (isbn13Valido(isbn)) livro.isbn = isbn;
+    const genero = texto(v.genero, 80);
+    if (genero) livro.genero = genero;
+    if (Object.keys(livro).length > 2) out.push(livro);
+  }
+  return out.length ? out : null;
+}
+
+/** As promoções que o KanGest manda numa volta (sinc/promocoes.rs, `MAX`). */
+export const MAX_PROMOCOES = 50;
+
+/** A promoção de um artigo do KanGest: a percentagem (0 retira a que o KanGest pôs), as datas e o PVP com IVA. */
+export interface PromocaoKanGest {
+  artigo_id: number;
+  referencia: string;
+  desconto: number;
+  inicio: string | null;
+  fim: string | null;
+  preco1_iva: number | null;
+}
+
+/** Uma data AAAA-MM-DD que existe mesmo no calendário, ou `null`. */
+export function dataValida(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
+
+/**
+ * As promoções dos artigos do KanGest para os produtos do site (KANGEST ONE, integração total; sinc/promocoes.rs;
+ * docs/KANGEST-SINCRONIZACAO.md §20). No máximo `MAX_PROMOCOES` por volta. A percentagem fica entre 0 e 99,99 (0
+ * retira), as datas só se existirem no calendário e o PVP só como inteiro de cêntimos. Sem nada (um KanGest antigo),
+ * `null`.
+ */
+export function limparPromocoesKanGest(x: unknown): PromocaoKanGest[] | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const out: PromocaoKanGest[] = [];
+  for (const l of x.slice(0, MAX_PROMOCOES)) {
+    if (!l || typeof l !== "object" || Array.isArray(l)) continue;
+    const v = l as Record<string, unknown>;
+    const artigo_id = typeof v.artigo_id === "number" && Number.isSafeInteger(v.artigo_id) && v.artigo_id > 0 ? v.artigo_id : 0;
+    const referencia = typeof v.referencia === "string" ? v.referencia.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60) : "";
+    if (!artigo_id || !referencia) continue;
+    const d = typeof v.desconto === "number" && Number.isFinite(v.desconto) ? Math.round(v.desconto * 100) / 100 : 0;
+    const pvp = typeof v.preco1_iva === "number" && Number.isSafeInteger(v.preco1_iva) && v.preco1_iva > 0 ? v.preco1_iva : null;
+    out.push({
+      artigo_id,
+      referencia,
+      desconto: d > 0 && d < 100 ? d : 0,
+      inicio: dataValida(v.inicio),
+      fim: dataValida(v.fim),
+      preco1_iva: pvp,
+    });
+  }
+  return out.length ? out : null;
+}
+
 /**
  * O que o KanGest manda para o livro de stock (sinc/livro.rs): as aberturas (a existência de cada artigo em cada
  * armazém, na primeira volta) e os movimentos novos (`movimentos_stock`, com o id local, o tipo e o documento). Só os

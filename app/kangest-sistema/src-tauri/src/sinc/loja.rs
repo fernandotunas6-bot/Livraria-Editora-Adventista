@@ -363,6 +363,21 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
     let filtro = || -> AppResult<Filtro> { if params.is_null() { Ok(Filtro::default()) } else { Ok(serde_json::from_value(params.clone())?) } };
     match metodo {
         "estado" => estado(st).await,
+        // as capas dos livros do site como fotografias dos artigos (capas.rs)
+        "capas.pendentes" => super::capas::pendentes(st).await,
+        "capas.descarregar" => super::capas::descarregar(st, serde_json::from_value(params.clone())?).await,
+        "capas.falhou" => super::capas::falhou(st, serde_json::from_value(params.clone())?).await,
+        "capas.envio" => super::capas::envio(st).await,
+        "capas.envio_ligar" => super::capas::envio_ligar(st, serde_json::from_value(params.clone())?).await,
+        // os dados dos livros do site nas fichas dos artigos (fichas.rs)
+        "fichas.estado" => super::fichas::estado(st).await,
+        "fichas.completar" => super::fichas::completar_agora(st).await,
+        "fichas.ligar" => super::fichas::ligar(st, serde_json::from_value(params.clone())?).await,
+        "fichas.generos" => super::fichas::generos_estado(st).await,
+        "fichas.ligar_genero" => super::fichas::ligar_genero(st, serde_json::from_value(params.clone())?).await,
+        // as promoções dos artigos no site (promocoes.rs)
+        "promocoes.estado" => super::promocoes::estado(st).await,
+        "promocoes.ligar" => super::promocoes::ligar(st, serde_json::from_value(params.clone())?).await,
         "encomendas" => encomendas(st, filtro()?).await,
         "encomenda" => encomenda(st, serde_json::from_value(params.clone())?).await,
         "produtos" => produtos(st, filtro()?).await,

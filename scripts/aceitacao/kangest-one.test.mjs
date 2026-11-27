@@ -8,6 +8,7 @@ const resposta = (status, corpo) => ({ status, json: async () => corpo });
 const site = (comSessao) => async (url, opcoes) => {
   const autorizado = !!opcoes?.headers?.Authorization;
   const c = new URL(url).pathname.replace(/^\/functions\/v1\/app/, '');
+  if (opcoes?.method === 'POST' && c === '/kangest/sinc') return resposta(401, { message: 'Pedido sem assinatura válida.', status: 401 });
   if (c === '/api/v1') return resposta(200, { data: { versao: '1', familias: ['auth', 'users', 'permissions', 'system', 'integrations', 'synchronization'] } });
   if (c === '/api/v1/system/info') return resposta(200, { data: { api: '1', kangest_min_version: null } });
   if (c === '/api/v1/products') return resposta(200, { data: [{ id: 'p1' }], next_cursor: null });
@@ -44,6 +45,13 @@ describe('a aceitação do KANGEST ONE', () => {
     const r = await aceitacao({ base: BASE, fetchFn: aberto });
     expect(r.ok).toBe(false);
     expect(relatorio(BASE, r)).toContain('**falhou**');
+  });
+
+  it('a volta dos postos tem de recusar o pedido sem assinatura', async () => {
+    const aberta = async (url, o) => (o?.method === 'POST' ? resposta(200, { resultado: null }) : site(false)(url, o));
+    const r = await aceitacao({ base: BASE, fetchFn: aberta });
+    expect(r.ok).toBe(false);
+    expect(r.passos.find((p) => p.id === '13')?.ok).toBe(false);
   });
 
   it('sem endereço não corre', async () => {

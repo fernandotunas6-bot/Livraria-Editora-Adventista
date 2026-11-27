@@ -17,9 +17,13 @@ export async function aceitacao({ base, token = '', fetchFn = fetch }) {
   const url = String(base || '').trim().replace(/\/+$/, '');
   const passos = [];
   const passo = (id, nome, ok, detalhe = '') => passos.push({ id, nome, ok: !!ok, detalhe: String(detalhe).slice(0, 300) });
-  const pedir = async (caminho, comToken = false) => {
+  const pedir = async (caminho, comToken = false, corpoPost = undefined) => {
     try {
-      const r = await fetchFn(`${url}${caminho}`, { headers: comToken && token ? { Authorization: `Bearer ${token}` } : {} });
+      const headers = comToken && token ? { Authorization: `Bearer ${token}` } : {};
+      const opcoes = corpoPost === undefined
+        ? { headers }
+        : { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(corpoPost) };
+      const r = await fetchFn(`${url}${caminho}`, opcoes);
       const corpo = await r.json().catch(() => null);
       return { status: r.status, corpo };
     } catch (e) {
@@ -46,6 +50,10 @@ export async function aceitacao({ base, token = '', fetchFn = fetch }) {
     `${produtos.corpo?.data?.length ?? 0} produto(s)`);
   const livroSemSessao = await pedir('/api/v1/stock-movements');
   passo('10', 'O livro de stock sem sessão é recusado', [401, 403].includes(livroSemSessao.status), `estado ${livroSemSessao.status}`);
+  // a volta dos postos (os documentos, o stock, os livros, as fotografias e as promoções) só com a assinatura do posto:
+  // um pedido sem ela é recusado antes de mexer em nada
+  const voltaSemAssinatura = await pedir('/kangest/sinc', false, {});
+  passo('13', 'A volta dos postos sem a assinatura de um posto é recusada', voltaSemAssinatura.status === 401, `estado ${voltaSemAssinatura.status}`);
 
   if (token) {
     const eu = await pedir('/api/v1/auth/me', true);

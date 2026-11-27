@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador, limparLivroStock, limparSessoesKanGest,
+  isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -347,5 +348,125 @@ describe("limparLivroStock (KANGEST ONE, B1)", () => {
     expect(limparLivroStock({ epoca: "x'; drop" })!.epoca).toBe("");
     const muitos = Array.from({ length: 2100 }, (_, i) => ({ mov_id: i + 1, armazem_id: 1, referencia: "R", quantidade: 1, tipo: "venda" }));
     expect(limparLivroStock({ movimentos: muitos })!.movimentos).toHaveLength(2000);
+  });
+});
+
+describe("limparFotosKanGest (as fotografias do KanGest para as capas do site)", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+  const webp = new Uint8Array([...enc.encode("RIFF"), 1, 0, 0, 0, ...enc.encode("WEBPVP8 "), 0, 0]);
+  const dataUrl = (tipo: string, b: Uint8Array) => `data:image/${tipo};base64,${paraB64(b)}`;
+
+  it("conhece JPEG, PNG e WebP pelos primeiros bytes, e mais nada", () => {
+    expect(tipoDaImagem(jpeg)).toEqual({ tipo: "image/jpeg", extensao: "jpg" });
+    expect(tipoDaImagem(png)).toEqual({ tipo: "image/png", extensao: "png" });
+    expect(tipoDaImagem(webp)).toEqual({ tipo: "image/webp", extensao: "webp" });
+    expect(tipoDaImagem(enc.encode("<svg onload=alert(1)></svg>"))).toBeNull();
+  });
+
+  it("sem fotografias (um KanGest antigo) é null", () => {
+    expect(limparFotosKanGest(undefined)).toBeNull();
+    expect(limparFotosKanGest([])).toBeNull();
+    expect(limparFotosKanGest({ artigo_id: 1 })).toBeNull();
+  });
+
+  it("aceita uma fotografia com a referência, a versão e os bytes conferidos", () => {
+    const l = limparFotosKanGest([{ artigo_id: 7, referencia: " LIV-001 ", versao: "2026-11-27T10:00:00.000", imagem: dataUrl("jpeg", jpeg) }]);
+    expect(l?.recusadas).toEqual([]);
+    expect(l?.fotos).toHaveLength(1);
+    expect(l?.fotos[0]).toMatchObject({ artigo_id: 7, referencia: "LIV-001", versao: "2026-11-27T10:00:00.000", tipo: "image/jpeg", extensao: "jpg" });
+    expect(Array.from(l!.fotos[0].bytes)).toEqual(Array.from(jpeg));
+  });
+
+  it("só uma por volta: o resto fica para a volta seguinte", () => {
+    const f = (id: number) => ({ artigo_id: id, referencia: `R${id}`, versao: "v", imagem: dataUrl("png", png) });
+    const l = limparFotosKanGest([f(1), f(2), f(3)]);
+    expect(l?.fotos.map((x) => x.artigo_id)).toEqual([1]);
+  });
+
+  it("recusa, com o motivo, o que não é uma imagem verdadeira ou é grande demais", () => {
+    const l = limparFotosKanGest([{ artigo_id: 1, referencia: "R1", versao: "v", imagem: dataUrl("png", jpeg) }]);
+    expect(l?.fotos).toEqual([]);
+    expect(l?.recusadas).toEqual([{ artigo_id: 1, estado: "recusada", erro: "Os bytes da fotografia não são do tipo que diz." }]);
+    const svg = limparFotosKanGest([{ artigo_id: 2, referencia: "R2", imagem: "data:image/svg+xml;base64,PHN2Zz4=" }]);
+    expect(svg?.recusadas[0]).toMatchObject({ artigo_id: 2, estado: "recusada" });
+    const sem = limparFotosKanGest([{ artigo_id: 3, referencia: "", imagem: dataUrl("webp", webp) }]);
+    expect(sem?.recusadas[0]?.erro).toBe("O artigo não tem referência.");
+    const grande = new Uint8Array(MAX_FOTO_BYTES + 10);
+    grande.set(jpeg);
+    const g = limparFotosKanGest([{ artigo_id: 4, referencia: "R4", imagem: dataUrl("jpeg", grande) }]);
+    expect(g?.recusadas[0]?.erro).toBe("A fotografia é grande demais para o site.");
+  });
+
+  it("ignora o que nem tem um artigo", () => {
+    const l = limparFotosKanGest([{ referencia: "R1", imagem: dataUrl("jpeg", jpeg) }, null, "x"]);
+    expect(l).toEqual({ fotos: [], recusadas: [] });
+  });
+});
+
+describe("limparLivrosKanGest (os dados das fichas do KanGest para os produtos do site)", () => {
+  it("confere o ISBN-13 pelo algarismo de controlo", () => {
+    expect(isbn13Valido("9788534520775")).toBe(true);
+    expect(isbn13Valido("9788534520776")).toBe(false);
+    expect(isbn13Valido("5601234567890")).toBe(false);
+    expect(isbn13Valido("978853452077")).toBe(false);
+  });
+
+  it("sem livros (um KanGest antigo) é null", () => {
+    expect(limparLivrosKanGest(undefined)).toBeNull();
+    expect(limparLivrosKanGest([])).toBeNull();
+    expect(limparLivrosKanGest({ artigo_id: 1 })).toBeNull();
+  });
+
+  it("limpa os textos, os números e o ISBN, e deixa de fora o que não serve", () => {
+    const l = limparLivrosKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", autor: "  Ellen\n G.   White ", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "978-85-345-2077-5", genero: " Fé & Doutrina " },
+      { artigo_id: 8, referencia: "LIV-002", ano: 0, paginas: 2.5, isbn: "9788534520776", autor: "" },
+      { artigo_id: 9, referencia: "", autor: "Sem referência" },
+      { referencia: "LIV-003", autor: "Sem artigo" },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", autor: "Ellen G. White", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "9788534520775", genero: "Fé & Doutrina" },
+    ]);
+  });
+
+  it(`no máximo ${MAX_LIVROS} por volta, e os textos com o tamanho das colunas`, () => {
+    const muitos = Array.from({ length: MAX_LIVROS + 5 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, autor: "A".repeat(400) }));
+    const l = limparLivrosKanGest(muitos)!;
+    expect(l).toHaveLength(MAX_LIVROS);
+    expect(l[0].autor).toHaveLength(300);
+  });
+});
+
+describe("limparPromocoesKanGest (as promoções do KanGest para os produtos do site)", () => {
+  it("só datas que existem no calendário", () => {
+    expect(dataValida("2026-12-24")).toBe("2026-12-24");
+    expect(dataValida("2026-02-30")).toBeNull();
+    expect(dataValida("24/12/2026")).toBeNull();
+    expect(dataValida(null)).toBeNull();
+  });
+
+  it("sem promoções (um KanGest antigo) é null", () => {
+    expect(limparPromocoesKanGest(undefined)).toBeNull();
+    expect(limparPromocoesKanGest([])).toBeNull();
+  });
+
+  it("limpa a percentagem, as datas e o PVP; 0 retira, e o que não tem artigo sai", () => {
+    const l = limparPromocoesKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", desconto: 12.345, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 100, inicio: "ontem", fim: "2026-02-30", preco1_iva: 12.5 },
+      { artigo_id: 9, referencia: "LIV-003", desconto: -5 },
+      { referencia: "LIV-004", desconto: 10 },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", desconto: 12.35, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+      { artigo_id: 9, referencia: "LIV-003", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+    ]);
+  });
+
+  it(`no máximo ${MAX_PROMOCOES} por volta`, () => {
+    const muitas = Array.from({ length: MAX_PROMOCOES + 3 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, desconto: 5 }));
+    expect(limparPromocoesKanGest(muitas)).toHaveLength(MAX_PROMOCOES);
   });
 });

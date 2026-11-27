@@ -2,7 +2,7 @@
 // © 2026 Valentino Canguele. Todos os direitos reservados. Proibido copiar, alterar ou redistribuir sem autorização escrita do autor.
 
 // A fase B3 (rascunho): o stock à venda a sair do livro único de stock, com o interruptor desligado por omissão
-// (migração 20261127100000_stock_livro_b3):
+// (migração 20261127140000_stock_livro_b3):
 //   PGLITE_MODULE=… node scripts/pglite/stock-livro-b3.mjs supabase/migrations
 // O que se confere: com a fonte «fotografias» nada muda; com «livro», o stock à venda é a soma do livro dos postos que
 // contam para o site com as reservas do site, e o «temos / não temos» de cada loja sai do livro; mudar a fonte fica no

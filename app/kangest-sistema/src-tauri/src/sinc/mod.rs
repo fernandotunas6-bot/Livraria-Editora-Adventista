@@ -20,18 +20,21 @@
 
 pub mod atendimento;
 pub mod avisos;
+pub mod capas;
 pub mod catalogo;
 pub mod cifra;
 pub mod encomendas;
 pub mod entrada;
 pub mod estado;
 pub mod fechos;
+pub mod fichas;
 pub mod financeiro;
 pub mod livro;
 pub mod loja;
 pub mod pagamentos;
 pub mod pessoa;
 pub mod produtos;
+pub mod promocoes;
 pub mod saude;
 pub mod sessoes;
 pub mod tempo_real;
@@ -304,7 +307,39 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
         eprintln!("Livro de stock: a abertura fica para a volta seguinte ({e}).");
     }
     let livro_devidos = livro::devidos(pool, agora).await.unwrap_or_default();
-    let dados = json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas, "stock_livro": &livro_devidos.dados });
+    let mut dados = json!({ "lote": lote, "cursores": &cursores, "estado": estado_pc, "sessoes": sessoes_abertas, "stock_livro": &livro_devidos.dados });
+    // os dados das fichas para os produtos do site que não os têm (fichas.rs). Nunca impedem o resto da volta.
+    let livros = fichas::livros_para_o_site(pool, agora).await.unwrap_or_else(|e| {
+        eprintln!("Dados dos livros para o site: ficam para a volta seguinte ({e}).");
+        Vec::new()
+    });
+    if !livros.is_empty() {
+        dados["livros"] = Value::Array(livros.iter().map(|l| l.item.clone()).collect());
+    }
+    // as promoções dos artigos para os produtos do site (promocoes.rs). Também nunca impedem o resto da volta.
+    let promos = promocoes::para_o_site(pool, agora).await.unwrap_or_else(|e| {
+        eprintln!("Promoções para o site: ficam para a volta seguinte ({e}).");
+        Vec::new()
+    });
+    if !promos.is_empty() {
+        dados["promocoes"] = Value::Array(promos.iter().map(|p| p.item.clone()).collect());
+    }
+    // uma fotografia de um artigo para o produto do site sem capa (capas.rs), se o pedido ainda a levar dentro do limite
+    // do site. Nunca impede o resto da volta.
+    let foto = match capas::para_o_site(pool, agora).await {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Fotografias para o site: ficam para a volta seguinte ({e}).");
+            None
+        }
+    };
+    let foto = foto.filter(|f| {
+        let pedido = serde_json::to_string(&dados).map(|t| t.len()).unwrap_or(usize::MAX);
+        pedido.saturating_add(f.item["imagem"].as_str().map_or(0, str::len)).saturating_add(512) <= capas::MAX_PEDIDO
+    });
+    if let Some(f) = &foto {
+        dados["fotos"] = json!([f.item]);
+    }
     match enviar(l, &dados).await {
         Ok(r) => {
             // o painel pediu o fim de alguma: termina-se primeiro, antes de tudo o resto
@@ -313,6 +348,21 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 eprintln!("Sincronização: {revogadas} sessão(ões) terminada(s) a pedido do painel do site.");
             }
             livro::concluir(pool, &livro_devidos, &r["stock_livro"], agora).await?;
+            if let Some(f) = &foto {
+                if let Err(e) = capas::concluir_envio(pool, f, &r["fotos"], agora).await {
+                    eprintln!("Fotografias para o site: a resposta não se registou ({e}).");
+                }
+            }
+            if !livros.is_empty() {
+                if let Err(e) = fichas::concluir_livros(pool, &livros, &r["livros"], agora).await {
+                    eprintln!("Dados dos livros para o site: a resposta não se registou ({e}).");
+                }
+            }
+            if !promos.is_empty() {
+                if let Err(e) = promocoes::concluir(pool, &promos, &r["promocoes"], agora).await {
+                    eprintln!("Promoções para o site: a resposta não se registou ({e}).");
+                }
+            }
             // a versão mínima do KanGest que o site aceita (versao.rs)
             versao::guardar(pool, r["kangest_min_version"].as_str()).await?;
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
@@ -362,6 +412,12 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             let novas = if primeira { Vec::new() } else { loja::encomendas_novas(pool, &r["novidades"]).await? };
             let (encomendas, produtos) = loja::aplicar(pool, &r["novidades"]).await?;
             avisar_encomendas_novas(&novas);
+            // os dados dos livros do site nas fichas dos artigos que não os têm (fichas.rs)
+            if produtos > 0 && fichas::ligado(pool).await {
+                if let Err(e) = fichas::completar(pool).await {
+                    eprintln!("Dados dos livros do site: ficam para a volta seguinte ({e}).");
+                }
+            }
             if encomendas > 0 || produtos > 0 {
                 crate::nativo::avisar_ecra("loja-novidades");
             }
@@ -382,6 +438,8 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                     || fin_pendentes.len() as i64 == financeiro::LOTE
                     || por_seguir > 0
                     || livro_devidos.cheio()
+                    || livros.len() == fichas::MAX_LIVROS
+                    || promos.len() == promocoes::MAX
                     || mais,
             })
         }
