@@ -494,109 +494,7 @@ async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> 
             }
             (row, false)
         }
-        Validacao::Confirmada { pessoa, tokens } => {
-            let perfil = entrada::perfil_do_site(pessoa.perfil.as_deref());
-            // sem acesso, ou como Caixa num posto que não é da loja da ficha: não entra, e a cópia local deixa de valer
-            let recusa = match perfil {
-                None if !pessoa.mfa => Some((
-                    "conta do site sem os dois passos",
-                    "A sua conta do site precisa dos dois passos: entre no painel do site, active-os (o painel pede-os) e volte a entrar aqui com o código.",
-                )),
-                None => Some((
-                    "conta do site sem acesso ao KanGest",
-                    "A sua conta do site não tem acesso ao KanGest: peça a permissão «KanGest: caixa» ou «KanGest: gestor» no site.",
-                )),
-                Some("CAIXA") if pessoa.posto_na_ficha == Some(false) => Some((
-                    "conta do site: caixa de outra loja",
-                    "A sua ficha de funcionário é de outra loja: como Caixa, entra só nos postos da sua loja.",
-                )),
-                _ => None,
-            };
-            if let Some((motivo, mensagem)) = recusa {
-                if let Some(row) = &guardada {
-                    sqlx::query("UPDATE utilizadores SET conta_site_validada_em = NULL WHERE id = ?").bind(row.get::<i64, _>("id")).execute(&st.pool).await?;
-                }
-                registar(st, None, email, "FALHA", Some(motivo.into())).await;
-                return Err(AppError::msg(mensagem));
-            }
-            let Some(perfil) = perfil else { return Err(AppError::msg("A sua conta do site não tem acesso ao KanGest.")) };
-            let agora = db::agora();
-            let resumo = hash_senha(&i.senha)?;
-            let unico = |e: sqlx::Error| -> AppError {
-                if e.to_string().contains("UNIQUE") {
-                    AppError::msg("Já há um utilizador local com este email como nome de acesso: o administrador tem de o mudar.")
-                } else {
-                    e.into()
-                }
-            };
-            let existente: Option<(i64, String)> = sqlx::query_as("SELECT id, perfil FROM utilizadores WHERE conta_site = ?").bind(&pessoa.id).fetch_optional(&st.pool).await?;
-            // uma conta local que o administrador mandou ligar a este email (só se ainda não há conta ligada a esta pessoa)
-            let pendente = if existente.is_none() { pendente_de_ligar(&st.pool, email).await? } else { None };
-            let id = match (existente, pendente) {
-                (Some((id, perfil_antes)), _) => {
-                    // o perfil manda o site; se mudou, as permissões próprias de cá deixam de valer (nunca ficam a mais)
-                    sqlx::query(
-                        "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = ?, perfil = ?, conta_site_validada_em = ?, mudar_senha = 0,
-                           permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
-                    )
-                    .bind(&pessoa.nome)
-                    .bind(email)
-                    .bind(&pessoa.email)
-                    .bind(&resumo)
-                    .bind(perfil)
-                    .bind(&agora)
-                    .bind(perfil_antes != perfil)
-                    .bind(id)
-                    .execute(&st.pool)
-                    .await
-                    .map_err(unico)?;
-                    id
-                }
-                // uma conta local que o administrador mandou ligar a este email: passa a ser a da pessoa, com o histórico
-                (None, Some((id, perfil_antes))) => {
-                    sqlx::query(
-                        "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = ?, perfil = ?, conta_site = ?, conta_site_validada_em = ?,
-                           mudar_senha = 0, ligar_conta_site = NULL, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
-                    )
-                    .bind(&pessoa.nome)
-                    .bind(email)
-                    .bind(&pessoa.email)
-                    .bind(&resumo)
-                    .bind(perfil)
-                    .bind(&pessoa.id)
-                    .bind(&agora)
-                    .bind(perfil_antes != perfil)
-                    .bind(id)
-                    .execute(&st.pool)
-                    .await
-                    .map_err(unico)?;
-                    registar(st, Some(id), email, "CONTA_SITE", Some(format!("conta local ligada à conta do site, como {perfil}"))).await;
-                    id
-                }
-                (None, None) => {
-                    let id = sqlx::query(
-                        "INSERT INTO utilizadores (nome, login, email, senha_hash, perfil, ativo, mudar_senha, conta_site, conta_site_validada_em)
-                         VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)",
-                    )
-                    .bind(&pessoa.nome)
-                    .bind(email)
-                    .bind(&pessoa.email)
-                    .bind(&resumo)
-                    .bind(perfil)
-                    .bind(&pessoa.id)
-                    .bind(&agora)
-                    .execute(&st.pool)
-                    .await
-                    .map_err(unico)?
-                    .last_insert_rowid();
-                    registar(st, Some(id), email, "CONTA_SITE", Some(format!("criado ao entrar com a conta do site, como {perfil}"))).await;
-                    id
-                }
-            };
-            // a sessão do site fica para a Loja online (não pede a conta outra vez)
-            crate::sinc::pessoa::guardar(&st.pool, id, &pessoa.email, &tokens, "", chrono::Utc::now().timestamp()).await?;
-            (sqlx::query("SELECT * FROM utilizadores WHERE id = ?").bind(id).fetch_one(&st.pool).await?, true)
-        }
+        Validacao::Confirmada { pessoa, tokens } => (confirmar_conta_site(st, email, guardada.as_ref(), pessoa, tokens, Some(&i.senha)).await?, true),
     };
     let id: i64 = row.get("id");
     if row.get::<i64, _>("ativo") != 1 {
@@ -605,6 +503,197 @@ async fn login_site(st: &AppState, pol: &Politica, email: &str, i: &LoginIn) -> 
     }
     conta_diferente(st, id, email, i.trocar).await?;
     entrar(st, &row, if com_internet { "conta do site" } else { "conta do site (sem Internet, cópia local)" }).await
+}
+
+/// Depois de o site confirmar a pessoa (pela senha ou pelo Google): o perfil que o site diz, a conta local ligada a ela
+/// (criada, actualizada ou a que o administrador mandou ligar) e a sessão do site em memória para a Loja online. Com
+/// `senha`, a cópia local da senha também muda; sem ela (o Google), fica a que havia.
+async fn confirmar_conta_site(
+    st: &AppState,
+    email: &str,
+    guardada: Option<&sqlx::sqlite::SqliteRow>,
+    pessoa: crate::sinc::entrada::PessoaSite,
+    tokens: crate::sinc::pessoa::Tokens,
+    senha: Option<&str>,
+) -> AppResult<sqlx::sqlite::SqliteRow> {
+    use crate::sinc::entrada;
+    let perfil = entrada::perfil_do_site(pessoa.perfil.as_deref());
+    // sem acesso, ou como Caixa num posto que não é da loja da ficha: não entra, e a cópia local deixa de valer
+    let recusa = match perfil {
+        None if !pessoa.mfa => Some((
+            "conta do site sem os dois passos",
+            "A sua conta do site precisa dos dois passos: entre no painel do site, active-os (o painel pede-os) e volte a entrar aqui com o código.",
+        )),
+        None => Some((
+            "conta do site sem acesso ao KanGest",
+            "A sua conta do site não tem acesso ao KanGest: peça a permissão «KanGest: caixa» ou «KanGest: gestor» no site.",
+        )),
+        Some("CAIXA") if pessoa.posto_na_ficha == Some(false) => Some((
+            "conta do site: caixa de outra loja",
+            "A sua ficha de funcionário é de outra loja: como Caixa, entra só nos postos da sua loja.",
+        )),
+        _ => None,
+    };
+    if let Some((motivo, mensagem)) = recusa {
+        if let Some(row) = guardada {
+            sqlx::query("UPDATE utilizadores SET conta_site_validada_em = NULL WHERE id = ?").bind(row.get::<i64, _>("id")).execute(&st.pool).await?;
+        }
+        registar(st, None, email, "FALHA", Some(motivo.into())).await;
+        return Err(AppError::msg(mensagem));
+    }
+    let Some(perfil) = perfil else { return Err(AppError::msg("A sua conta do site não tem acesso ao KanGest.")) };
+    let agora = db::agora();
+    // a cópia local da senha (para o modo sem Internet) só muda numa entrada com a senha; com o Google fica a que havia
+    let resumo = senha.map(hash_senha).transpose()?;
+    let unico = |e: sqlx::Error| -> AppError {
+        if e.to_string().contains("UNIQUE") {
+            AppError::msg("Já há um utilizador local com este email como nome de acesso: o administrador tem de o mudar.")
+        } else {
+            e.into()
+        }
+    };
+    let existente: Option<(i64, String)> = sqlx::query_as("SELECT id, perfil FROM utilizadores WHERE conta_site = ?").bind(&pessoa.id).fetch_optional(&st.pool).await?;
+    // uma conta local que o administrador mandou ligar a este email (só se ainda não há conta ligada a esta pessoa)
+    let pendente = if existente.is_none() { pendente_de_ligar(&st.pool, email).await? } else { None };
+    let id = match (existente, pendente) {
+        (Some((id, perfil_antes)), _) => {
+            // o perfil manda o site; se mudou, as permissões próprias de cá deixam de valer (nunca ficam a mais)
+            sqlx::query(
+                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = COALESCE(?, senha_hash), perfil = ?, conta_site_validada_em = ?, mudar_senha = 0,
+                   permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
+            )
+            .bind(&pessoa.nome)
+            .bind(email)
+            .bind(&pessoa.email)
+            .bind(&resumo)
+            .bind(perfil)
+            .bind(&agora)
+            .bind(perfil_antes != perfil)
+            .bind(id)
+            .execute(&st.pool)
+            .await
+            .map_err(unico)?;
+            id
+        }
+        // uma conta local que o administrador mandou ligar a este email: passa a ser a da pessoa, com o histórico
+        (None, Some((id, perfil_antes))) => {
+            sqlx::query(
+                "UPDATE utilizadores SET nome = ?, login = ?, email = ?, senha_hash = COALESCE(?, senha_hash), perfil = ?, conta_site = ?, conta_site_validada_em = ?,
+                   mudar_senha = 0, ligar_conta_site = NULL, permissoes = CASE WHEN ? THEN NULL ELSE permissoes END WHERE id = ?",
+            )
+            .bind(&pessoa.nome)
+            .bind(email)
+            .bind(&pessoa.email)
+            .bind(&resumo)
+            .bind(perfil)
+            .bind(&pessoa.id)
+            .bind(&agora)
+            .bind(perfil_antes != perfil)
+            .bind(id)
+            .execute(&st.pool)
+            .await
+            .map_err(unico)?;
+            registar(st, Some(id), email, "CONTA_SITE", Some(format!("conta local ligada à conta do site, como {perfil}"))).await;
+            id
+        }
+        (None, None) => {
+            let id = sqlx::query(
+                "INSERT INTO utilizadores (nome, login, email, senha_hash, perfil, ativo, mudar_senha, conta_site, conta_site_validada_em)
+                 VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)",
+            )
+            .bind(&pessoa.nome)
+            .bind(email)
+            .bind(&pessoa.email)
+            .bind(match &resumo {
+                Some(r) => r.clone(),
+                None => hash_senha(&format!("{:032x}", rand::random::<u128>()))?,
+            })
+            .bind(perfil)
+            .bind(&pessoa.id)
+            .bind(&agora)
+            .execute(&st.pool)
+            .await
+            .map_err(unico)?
+            .last_insert_rowid();
+            registar(st, Some(id), email, "CONTA_SITE", Some(format!("criado ao entrar com a conta do site, como {perfil}"))).await;
+            id
+        }
+    };
+    // a sessão do site fica para a Loja online (não pede a conta outra vez)
+    crate::sinc::pessoa::guardar(&st.pool, id, &pessoa.email, &tokens, "", chrono::Utc::now().timestamp()).await?;
+    Ok(sqlx::query("SELECT * FROM utilizadores WHERE id = ?").bind(id).fetch_one(&st.pool).await?)
+}
+
+#[derive(Deserialize)]
+pub struct GoogleIn {
+    /// o estado da entrada começada aqui (vem no retorno kangest://auth)
+    estado: String,
+    /// o código do retorno do Auth (a primeira volta)
+    #[serde(default)]
+    code: Option<String>,
+    /// o código dos dois passos (a segunda volta)
+    #[serde(default)]
+    codigo: Option<String>,
+    #[serde(default)]
+    trocar: bool,
+}
+
+/// A entrada com o Google é só no programa deste computador: abre o navegador do sistema, e o retorno chega por uma
+/// ligação kangest://, que um posto ligado pela rede ou um browser não recebem.
+fn so_neste_computador() -> AppResult<()> {
+    if crate::state::contexto().is_some() {
+        return Err(AppError::msg("A entrada com o Google é só no programa instalado neste computador. Aqui, entre com o email e a senha da conta do site."));
+    }
+    Ok(())
+}
+
+/// «Entrar com o Google» (KANGEST ONE, fase A; sinc/entrada.rs): abre a entrada do Google no navegador do sistema.
+pub async fn google_iniciar(st: &AppState) -> AppResult<Value> {
+    so_neste_computador()?;
+    let url = crate::sinc::entrada::google_iniciar(&st.pool).await?;
+    super::licenca::abrir_no_navegador(&url)?;
+    Ok(json!({ "aberto": true }))
+}
+
+/// O retorno do Google (o `code`) ou, na segunda volta, o código dos dois passos. Depois de o site confirmar, é a mesma
+/// entrada da conta do site, sem mudar a cópia local da senha. Sem Internet não há entrada com o Google.
+pub async fn google_concluir(st: &AppState, i: GoogleIn) -> AppResult<Value> {
+    use crate::sinc::entrada::{self, Validacao};
+    so_neste_computador()?;
+    if !entrada::estado_valido(&i.estado) {
+        return Err(AppError::msg("Esta entrada com o Google não é válida: carregue outra vez em «Entrar com o Google»."));
+    }
+    match entrada::google_concluir(&st.pool, &i.estado, i.code.as_deref(), i.codigo.as_deref()).await? {
+        Validacao::PedirCodigo => Ok(json!({ "dois_passos": true })),
+        Validacao::Recusada(m) => {
+            registar(st, None, "Google", "FALHA", Some(format!("entrada com o Google recusada: {m}"))).await;
+            Err(AppError::msg(m))
+        }
+        Validacao::SemLigacao(m) => Err(AppError::msg(format!(
+            "Sem ligação ao site ({m}): entrar com o Google precisa de Internet. Sem Internet, entre com o email e a senha da conta do site."
+        ))),
+        Validacao::Confirmada { pessoa, tokens } => {
+            let email = pessoa.email.trim().to_lowercase();
+            if email.is_empty() {
+                return Err(AppError::msg("A conta Google não deu o email: entre com o email e a senha da conta do site."));
+            }
+            let guardada = sqlx::query("SELECT * FROM utilizadores WHERE login = ? AND conta_site IS NOT NULL").bind(&email).fetch_optional(&st.pool).await?;
+            if let Some(row) = &guardada {
+                if let Some(ate) = bloqueada_ate(row) {
+                    registar(st, Some(row.get("id")), &email, "FALHA", Some("conta bloqueada".into())).await;
+                    return Err(AppError::msg(format!("Conta bloqueada por tentativas falhadas até às {}. Peça ao administrador para a desbloquear.", hora(&ate))));
+                }
+            }
+            let row = confirmar_conta_site(st, &email, guardada.as_ref(), pessoa, tokens, None).await?;
+            let id: i64 = row.get("id");
+            if row.get::<i64, _>("ativo") != 1 {
+                registar(st, Some(id), &email, "FALHA", Some("conta desactivada".into())).await;
+                return Err(AppError::msg("Esta conta está desactivada neste KanGest. Fale com o administrador."));
+            }
+            conta_diferente(st, id, &email, i.trocar).await?;
+            entrar(st, &row, "conta do site (Google)").await
+        }
+    }
 }
 
 /// Falhas seguidas de entrada por PIN em cada posto (um PIN de 4 dígitos não pode ser adivinhado à força).

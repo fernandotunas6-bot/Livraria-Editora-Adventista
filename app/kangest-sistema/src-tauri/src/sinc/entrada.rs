@@ -9,13 +9,24 @@
 //! de sempre (bloqueio por tentativas, conta desactivada, troca de conta) ficam em services/auth.rs.
 //!
 //! O perfil Administrador nunca vem do site: fica sempre a conta ADMIN local de recurso.
+//!
+//! **Entrar com o Google** (KANGEST ONE, fase A; o Google está ligado no Supabase Auth do site): o KanGest abre a
+//! entrada do Google no navegador do sistema, com PKCE. O Auth devolve o código à página `/kangest/entrar` do site, que
+//! o passa ao KanGest pela ligação `kangest://auth`. Só uma entrada começada neste computador, com o mesmo `estado` e há
+//! menos de dez minutos, troca o código pela sessão: o verificador do PKCE nunca sai daqui, e fica só em memória. Os dois
+//! passos e a pergunta «quem é» são os da entrada com a senha.
 
+use std::sync::Mutex;
+
+use base64::Engine;
 use chrono::NaiveDateTime;
+use rand::RngCore;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 use super::pessoa::{self, Erro, Tokens};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 /// Sem Internet, a cópia local de uma conta do site vale estes dias desde a última entrada confirmada pelo site.
 pub const DIAS_DA_COPIA: i64 = 7;
@@ -111,11 +122,16 @@ pub async fn validar(pool: &SqlitePool, email: &str, senha: &str, codigo: Option
         Ok(r) => r,
         Err(x) => return Ok(x.into()),
     };
-    let Some(mut tokens) = pessoa::tokens_da_resposta(&v).filter(|_| estado == 200) else {
+    let Some(tokens) = pessoa::tokens_da_resposta(&v).filter(|_| estado == 200) else {
         return Ok(Validacao::Recusada(pessoa::mensagem(&v, estado)));
     };
+    concluir(pool, &a, tokens, &v, codigo, email).await
+}
+
+/// Com a sessão do site já dada (pela senha ou pelo Google): os dois passos, se a conta os tem, e quem é a pessoa.
+async fn concluir(pool: &SqlitePool, a: &pessoa::Auth, mut tokens: Tokens, v: &Value, codigo: Option<&str>, email: &str) -> AppResult<Validacao> {
     // com os dois passos, a sessão só serve depois do código (aal2), como no painel
-    if let Some(factor) = factor_totp(&v) {
+    if let Some(factor) = factor_totp(v) {
         let codigo: String = codigo.unwrap_or_default().chars().filter(char::is_ascii_digit).collect();
         if codigo.len() != 6 {
             return Ok(Validacao::PedirCodigo);
@@ -160,9 +176,168 @@ pub async fn validar(pool: &SqlitePool, email: &str, senha: &str, codigo: Option
     Ok(Validacao::Confirmada { pessoa, tokens })
 }
 
+// -----------------------------------------------------------------------------------------------------------------
+// Entrar com o Google (PKCE pelo navegador do sistema)
+// -----------------------------------------------------------------------------------------------------------------
+
+/// Uma entrada com o Google começada aqui vale estes segundos.
+pub const GOOGLE_VALIDADE: i64 = 10 * 60;
+
+/// A entrada com o Google que está a decorrer neste computador: uma de cada vez, e só em memória.
+#[derive(Clone)]
+enum Google {
+    /// À espera do retorno do navegador.
+    Iniciada { verificador: String, estado: String, em: i64 },
+    /// O site já deu a sessão; falta o código dos dois passos.
+    PorCodigo { estado: String, tokens: Tokens, resposta: Value, em: i64 },
+}
+
+static GOOGLE: Mutex<Option<Google>> = Mutex::new(None);
+
+fn agora_s() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+/// O desafio do PKCE (S256): o SHA-256 do verificador, em base64url sem `=` (RFC 7636).
+pub fn desafio_pkce(verificador: &str) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verificador.as_bytes()))
+}
+
+/// `n` bytes aleatórios, em base64url sem `=`.
+fn aleatorio(n: usize) -> String {
+    let mut b = vec![0u8; n];
+    rand::thread_rng().fill_bytes(&mut b);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b)
+}
+
+/// O estado de uma entrada: só letras, algarismos, `-` e `_`, com o tamanho dos que se geram aqui.
+pub fn estado_valido(e: &str) -> bool {
+    (20..=64).contains(&e.len()) && e.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// A página do site que recebe o retorno do Auth e o passa ao KanGest (`/kangest/entrar/`). Só um site em HTTPS (ou o
+/// próprio computador, num ensaio).
+pub fn pagina_de_retorno(site: &str, estado: &str) -> Option<String> {
+    let site = site.trim().trim_end_matches('/');
+    let local = site.starts_with("http://127.0.0.1") || site.starts_with("http://localhost");
+    if !(site.starts_with("https://") || local) || site.contains(['?', '#', ' ']) {
+        return None;
+    }
+    Some(format!("{site}/kangest/entrar/?e={estado}"))
+}
+
+/// Começa uma entrada com o Google: guarda o verificador e o estado em memória e devolve o endereço que o navegador do
+/// sistema abre. Uma entrada que já estivesse a decorrer é substituída.
+pub async fn google_iniciar(pool: &SqlitePool) -> AppResult<String> {
+    let a = pessoa::auth(pool).await.map_err(|_| AppError::msg("Para entrar com o Google, este KanGest tem de estar ligado ao site."))?;
+    let site: String = sqlx::query_scalar("SELECT site_url FROM sinc_ligacao WHERE id = 1 AND ativa = 1").fetch_optional(pool).await?.unwrap_or_default();
+    let verificador = aleatorio(32);
+    let estado = aleatorio(18);
+    let retorno = pagina_de_retorno(&site, &estado)
+        .ok_or_else(|| AppError::msg("A ligação ao site não tem o endereço do site: ligue este KanGest outra vez em Livraria → Ligação ao site."))?;
+    let url = tauri::Url::parse_with_params(
+        &format!("{}/auth/v1/authorize", a.url),
+        &[("provider", "google"), ("redirect_to", retorno.as_str()), ("code_challenge", desafio_pkce(&verificador).as_str()), ("code_challenge_method", "s256")],
+    )
+    .map_err(|e| AppError::msg(format!("O endereço do site não é válido ({e}).")))?;
+    *GOOGLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(Google::Iniciada { verificador, estado, em: agora_s() });
+    Ok(url.to_string())
+}
+
+/// Conclui a entrada com o Google: com o `code` do retorno (a primeira volta) ou com o código dos dois passos (a
+/// segunda). Só vale uma entrada começada aqui, com o mesmo estado e dentro do prazo; depois de confirmada ou recusada,
+/// acaba.
+pub async fn google_concluir(pool: &SqlitePool, estado: &str, code: Option<&str>, codigo: Option<&str>) -> AppResult<Validacao> {
+    let actual = GOOGLE.lock().unwrap_or_else(|e| e.into_inner()).take();
+    let fora = || Ok(Validacao::Recusada("Esta entrada com o Google não foi começada neste KanGest, ou já passou o tempo: carregue outra vez em «Entrar com o Google».".into()));
+    let fresca = |em: i64| agora_s() - em <= GOOGLE_VALIDADE;
+    let a = match pessoa::auth(pool).await {
+        Ok(a) => a,
+        Err(e) => return Ok(Validacao::SemLigacao(e.to_string())),
+    };
+    let (tokens, resposta, em) = match actual {
+        Some(Google::Iniciada { verificador, estado: e, em }) if e == estado && fresca(em) => {
+            let Some(code) = code.map(str::trim).filter(|c| !c.is_empty() && c.len() <= 200) else { return fora() };
+            let (st, v) = match pedir(
+                "POST",
+                format!("{}/auth/v1/token?grant_type=pkce", a.url),
+                &a.apikey,
+                None,
+                json!({ "auth_code": code, "code_verifier": verificador }),
+            )
+            .await
+            {
+                Ok(r) => r,
+                Err(x) => return Ok(x.into()),
+            };
+            let Some(t) = pessoa::tokens_da_resposta(&v).filter(|_| st == 200) else {
+                return Ok(Validacao::Recusada(pessoa::mensagem(&v, st)));
+            };
+            (t, v, em)
+        }
+        Some(Google::PorCodigo { estado: e, tokens, resposta, em }) if e == estado && fresca(em) => (tokens, resposta, em),
+        _ => return fora(),
+    };
+    let email = resposta["user"]["email"].as_str().unwrap_or_default().trim().to_lowercase();
+    let r = concluir(pool, &a, tokens.clone(), &resposta, codigo, &email).await?;
+    if matches!(r, Validacao::PedirCodigo) {
+        // a sessão do Google fica à espera do código, só em memória e só até ao fim do prazo
+        *GOOGLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(Google::PorCodigo { estado: estado.to_string(), tokens, resposta, em });
+    }
+    Ok(r)
+}
+
+/// Desiste da entrada com o Google que estiver a decorrer.
+pub fn google_cancelar() {
+    *GOOGLE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn o_desafio_do_pkce_e_o_da_norma() {
+        // o exemplo da RFC 7636, apêndice B
+        assert_eq!(desafio_pkce("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        let v = aleatorio(32);
+        assert_eq!(v.len(), 43, "32 bytes dão 43 caracteres em base64url");
+        assert_ne!(v, aleatorio(32));
+    }
+
+    #[test]
+    fn o_estado_e_a_pagina_de_retorno() {
+        let e = aleatorio(18);
+        assert!(estado_valido(&e), "{e}");
+        assert!(!estado_valido("curto"));
+        assert!(!estado_valido("tem um espaço e é comprido demais para passar"));
+        assert!(!estado_valido("aaaaaaaaaaaaaaaaaaaaaaaa&x=1"));
+        assert_eq!(pagina_de_retorno("https://livrariaadventista.ao/", "abc").as_deref(), Some("https://livrariaadventista.ao/kangest/entrar/?e=abc"));
+        assert_eq!(pagina_de_retorno("http://127.0.0.1:3010", "abc").as_deref(), Some("http://127.0.0.1:3010/kangest/entrar/?e=abc"));
+        assert_eq!(pagina_de_retorno("http://livrariaadventista.ao", "abc"), None, "sem HTTPS, não");
+        assert_eq!(pagina_de_retorno("", "abc"), None);
+        assert_eq!(pagina_de_retorno("https://x.ao/?a=1", "abc"), None);
+    }
+
+    #[tokio::test]
+    async fn uma_entrada_com_o_google_que_nao_comecou_aqui_e_recusada() {
+        google_cancelar();
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query("CREATE TABLE sinc_ligacao (id INTEGER, url TEXT, auth_url TEXT, auth_apikey TEXT, ativa INTEGER)").execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO sinc_ligacao VALUES (1, 'http://127.0.0.1:9/functions/v1/app', 'http://127.0.0.1:9', 'chave-publica', 1)").execute(&pool).await.unwrap();
+        // sem nada começado: recusa, sem perguntar nada ao site
+        let r = google_concluir(&pool, "estado-que-ninguem-pediu-aqui", Some("codigo"), None).await.unwrap();
+        assert!(matches!(r, Validacao::Recusada(ref m) if m.contains("não foi começada")), "{r:?}");
+        // começada com outro estado: também, e a entrada acaba
+        *GOOGLE.lock().unwrap() = Some(Google::Iniciada { verificador: aleatorio(32), estado: "o-estado-certo-desta-vez".into(), em: agora_s() });
+        let r = google_concluir(&pool, "outro-estado-qualquer-aqui", Some("codigo"), None).await.unwrap();
+        assert!(matches!(r, Validacao::Recusada(_)), "{r:?}");
+        assert!(GOOGLE.lock().unwrap().is_none());
+        // fora do prazo: também
+        *GOOGLE.lock().unwrap() = Some(Google::Iniciada { verificador: aleatorio(32), estado: "o-estado-certo-desta-vez".into(), em: agora_s() - GOOGLE_VALIDADE - 1 });
+        let r = google_concluir(&pool, "o-estado-certo-desta-vez", Some("codigo"), None).await.unwrap();
+        assert!(matches!(r, Validacao::Recusada(_)), "{r:?}");
+    }
 
     #[test]
     fn o_perfil_do_site_so_e_gestor_ou_caixa() {

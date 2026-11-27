@@ -125,6 +125,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         metodo,
         "setup.estado" | "setup.inicializar" | "setup.restaurar" | "setup.importarOficial" | "auth.login" | "auth.loginPin" | "auth.logout" | "auth.sessao" | "auth.alterarSenha" | "auth.desbloquear" | "seguranca.politica"
             | "auth.recuperarVerificar" | "auth.recuperarConcluir"
+            | "auth.google_iniciar" | "auth.google_concluir" | "auth.google_cancelar"
     );
     if !livre {
         if let Some(s) = st.sessao_opcional() {
@@ -179,6 +180,13 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         // o KanGest oficial deste computador, no primeiro arranque (services/oficial.rs)
         "setup.importarOficial" => Box::pin(oficial::importar_inicial(st)).await,
         "auth.login" => auth::login(st, p(params)?).await,
+        // entrar com o Google (sinc/entrada.rs): só no programa deste computador
+        "auth.google_iniciar" => auth::google_iniciar(st).await,
+        "auth.google_concluir" => auth::google_concluir(st, p(params)?).await,
+        "auth.google_cancelar" => {
+            crate::sinc::entrada::google_cancelar();
+            Ok(Value::Null)
+        }
         "auth.logout" => auth::logout(st).await,
         "auth.loginPin" => auth::login_pin(st, p(params)?).await,
         "auth.recuperarVerificar" => auth::recuperar_verificar(st, p(params)?).await,

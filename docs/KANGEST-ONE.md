@@ -74,6 +74,7 @@ Restrições de segurança, palavra por palavra:
 | E2 | a versão mínima do KanGest (`KANGEST_MIN_VERSION`) e o cartão «Servidor central» | #162 | KanGest 1.4.9; o segredo é do dono |
 | G1 | os tokens partilhados com o contraste AA conferido | #163 | sim (o site) e KanGest 1.4.9 |
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
+| Google | entrar no KanGest com o Google: PKCE pelo navegador do sistema, os dois passos e a mesma conta do site; só no programa instalado | o PR do Google | a página de retorno, a partir do merge; KanGest 1.4.10 |
 | G3 | a revisão do estilo do site: as cinco escolhas do dono (as acções com os cantos dos campos, um só filtro em pílula, os rótulos, o botão do chat e a faixa da Loja), com as capturas antes e depois | o PR do estilo | sim, a partir do merge |
 | §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10 |
 | Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
@@ -132,5 +133,5 @@ Restrições de segurança, palavra por palavra:
 | 5 | A | ✅ (ligação com o histórico; o convite por email espera pelo envio de email) **«Ligar a uma conta do site»** no ecrã Utilizadores: o convite por email e, à primeira entrada com essa conta, a conta local fica ligada (com o histórico) | — |
 | 6 | B3 | **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
 | 7 | G | ✅ no site (G3, a revisão de 27/11; SPEC-COMPONENTES §7b). **No KanGest,** as capturas na 1.4.10 instalada. **Os componentes de todos os dias com a mesma linguagem nos dois lados,** e as capturas antes e depois | a 1.4.10 |
-| 8 | A | **O Google Login no KanGest** | o Google ligado no Supabase Auth |
+| 8 | A | ✅ (o PR do Google; KanGest 1.4.10) **O Google Login no KanGest:** PKCE pelo navegador do sistema, com o retorno pela página `/kangest/entrar/` do site e a ligação `kangest://auth` | — (o Google já está ligado no Supabase Auth) |
 | 9 | F | **A aceitação contra o staging** (com token) | o staging |
