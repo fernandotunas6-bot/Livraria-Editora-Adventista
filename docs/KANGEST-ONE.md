@@ -82,7 +82,7 @@ Restrições de segurança, palavra por palavra:
 | Promoções | as promoções dos artigos no site, com a regra do preço (o posto que manda no catálogo), sem nunca mexer numa promoção do painel | #180 | sim (20261127120000, a partir do merge); KanGest 1.4.10 |
 | Categorias | as famílias do KanGest ligadas aos géneros do site (pelo nome ou à mão): o artigo na «Geral» recebe a família do género, e o produto em «Catálogo Geral», o género da família | o PR das famílias | sim (20261127130000, a partir do merge); KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
-| Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
+| Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente; a volta dos postos sem assinatura recusada (27/11) | #166 | corrido contra a produção: 8 de 8 (27/11) |
 
 ## 5. Os 14 testes de aceitação e a prova de cada um
 
