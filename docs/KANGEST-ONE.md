@@ -67,7 +67,7 @@ Restrições de segurança, palavra por palavra:
 | F | o staging antes da produção no `deploy-supabase.yml` (passa à frente sem staging) | #154 | sim; o staging é do dono |
 | B1 | o livro de stock em sombra: as aberturas por época e os movimentos do KanGest (só dos artigos que o livro segue) | #155, #167 | sim (20261126190000); o KanGest na 1.4.9 |
 | B2 | as encomendas do site no livro: reserva no checkout, libertação no cancelamento ou na FR do posto; o resumo do painel conta só as encomendas em curso | #156, #167 | sim (20261126200000); 20261126230000 com o #167 |
-| B3 | o stock à venda passa a sair do livro | — | **por fazer:** espera pelo staging |
+| B3 | o stock à venda passa a sair do livro | #173 (rascunho, desligado; migração 20261127140000) | **por fazer:** espera pelo staging |
 | C1–C3 | a API v1 com as 17 famílias, o contrato OpenAPI, o `Idempotency-Key` e as leituras pelo RLS | #157, #158, #160 | sim (20261126210000) |
 | D | o artigo no site a partir da ficha do artigo, nunca a 0 Kz | #159 | KanGest 1.4.9 |
 | E | a saúde do ecossistema: a API, o painel e o `redact()` | #161 | sim (20261126220000) |
@@ -129,7 +129,7 @@ Restrições de segurança, palavra por palavra:
 | 3 | B | ✅ (#169) **O alerta de «stock negativo»:** o livro de um posto que fica abaixo de zero tem de aparecer no painel para acerto, e nunca ser uma perda silenciosa | — |
 | 4 | E | ✅ (#170) **O «Servidor central» do KanGest com a saúde do site** (`/api/v1/system/health`), com a conta do site da pessoa. Hoje mostra o estado do lado do KanGest | — |
 | 5 | A | ✅ (ligação com o histórico; o convite por email espera pelo envio de email) **«Ligar a uma conta do site»** no ecrã Utilizadores: o convite por email e, à primeira entrada com essa conta, a conta local fica ligada (com o histórico) | — |
-| 6 | B3 | **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
+| 6 | B3 | (rascunho, desligado: o PR da B3) **O stock à venda a sair do livro:** `stock_por_loja`, a reserva só com disponibilidade (`FOR UPDATE`) e as novidades com o stock do livro | o staging |
 | 7 | G | **Os componentes de todos os dias com a mesma linguagem nos dois lados,** e as capturas antes e depois | a revisão do dono |
 | 8 | A | **O Google Login no KanGest** | o Google ligado no Supabase Auth |
 | 9 | F | **A aceitação contra o staging** (com token) | o staging |

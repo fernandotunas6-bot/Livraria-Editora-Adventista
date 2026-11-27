@@ -591,3 +591,23 @@ Testes:
 - **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As promoções dos artigos no
   site»).
+
+## 21. A fase B3: o stock à venda a sair do livro (rascunho, desligado)
+
+Migração `20261127140000`.
+
+**A fonte do stock** (`private.stock_livro_definicoes`, `fonte`) diz de onde sai o stock à venda:
+- **`fotografias`** (por omissão): como até aqui, das fotografias de cada posto (§10).
+- **`livro`:** o disponível de uma referência é a soma do livro dos postos que contam para o site (`stock_online`) com as
+  reservas do site ainda por libertar. O «temos / não temos» de cada loja sai da soma do livro dessa loja. Nunca fica
+  negativo à venda.
+
+**Como se muda:** só com `stock_livro_mudar_fonte(fonte)`, pelo servidor. Recalcula todos os produtos e fica no registo
+de segurança, com aviso. Com a fonte «livro», cada linha nova do livro recalcula a referência dela.
+
+**Antes de mudar para «livro»:**
+1. o ensaio no staging (docs/AMBIENTES.md);
+2. numa cópia da produção, a soma do livro tem de bater com o stock de hoje, loja a loja: «bate certo com o posto» no
+   painel, sem stock negativo.
+
+Teste: `scripts/pglite/stock-livro-b3.mjs`, com as duas fontes, o registo de segurança e a recusa de fora.
