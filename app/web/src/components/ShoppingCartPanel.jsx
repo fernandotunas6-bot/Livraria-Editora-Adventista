@@ -9,6 +9,7 @@ import {
   Library, Store,
 } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
+import { capaGerada } from '@/lib/capaGerada';
 import { Button } from '@/components/ui/button';
 import StoreThumb from '@/components/StoreThumb';
 import { Input } from '@/components/ui/input';
@@ -735,7 +736,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                     {cartItems.map((item) => (
                       <div key={item.variant.id} className="flex gap-3 bg-muted/30 border border-border p-3 rounded-xl">
                         <img
-                          src={item.product.image}
+                          src={item.product.image || capaGerada(item.product)}
                           alt={item.product.title}
                           className="w-16 h-20 object-cover rounded-lg shrink-0 bg-muted"
                           onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="80" fill="%23e5e7eb"%3E%3Crect width="100%25" height="100%25"/%3E%3C/svg%3E'; }}

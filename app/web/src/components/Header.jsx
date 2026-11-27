@@ -183,6 +183,10 @@ const Header = ({ onCartOpen, pinned = false }) => {
     setActiveSuggestion(-1);
     if (suggestion.tipo === 'livro' && suggestion.id) {
       navigate(`/product/${suggestion.id}`);
+    } else if (suggestion.tipo === 'pagina' && suggestion.rota) {
+      navigate(suggestion.rota);
+    } else if (suggestion.tipo === 'genero') {
+      navigate(`/shop?category=${encodeURIComponent(suggestion.texto)}`);
     } else {
       navigate(`/shop?search=${encodeURIComponent(suggestion.texto)}`);
     }
@@ -505,7 +509,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                   >
                     <span className="min-w-0 flex-1 truncate font-medium">{suggestion.texto}</span>
                     <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {suggestion.tipo === 'livro' ? 'livro' : suggestion.tipo === 'autor' ? 'autor' : 'editora'}
+                      {({ livro: 'livro', autor: 'autor', editora: 'editora', genero: 'género', pagina: 'página' })[suggestion.tipo] || suggestion.tipo}
                     </span>
                   </button>
                 </li>

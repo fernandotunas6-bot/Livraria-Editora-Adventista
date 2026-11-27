@@ -4,6 +4,7 @@
 import React, { useState, useEffect, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { displayPrice } from '@/lib/productSort';
+import { capaGerada } from '@/lib/capaGerada';
 import { ShoppingCart, Loader2, Eye, MessageCircle, Heart, Star, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -17,8 +18,6 @@ import QuickViewModal from '@/components/QuickViewModal';
 import { MOTION } from '@/lib/motion';
 import { PRODUCT_GRID_CLASS, discountPercent } from '@/lib/productGrid';
 import { needsVariantChoice, variantNames } from '@/lib/productTypes';
-
-const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
 function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuickView }) {
   const { addToCart } = useCart();
@@ -154,7 +153,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
           <div className={`relative overflow-hidden bg-muted shrink-0 ${isList ? 'w-28 h-36' : 'aspect-2/3 sm:aspect-3/4'}`}>
             <Link to={`/product/${product.id}`} onClick={handleQuickView} className="block h-full">
             <img
-              src={product.image || PLACEHOLDER}
+              src={product.image || capaGerada(product)}
               alt={product.title}
               className="media-zoom w-full h-full object-cover"
               /* As primeiras da grelha carregam já — uma delas é o maior elemento visível e
@@ -163,7 +162,7 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
                  ao mesmo tempo, e a maioria fica abaixo da dobra. */
               loading={index < 6 ? 'eager' : 'lazy'}
               decoding="async"
-              onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER; }}
+              onError={(e) => { e.target.onerror = null; e.target.src = capaGerada(product); }}
             />
             </Link>
             {/* Ícones, não autocolantes de texto: o mesmo cartão chegava a dizer o stock
@@ -285,12 +284,12 @@ function ProductCard({ product, onCartOpen, index = 0, viewMode = 'grid', onQuic
         <div className="relative aspect-2/3 shrink-0 overflow-hidden bg-muted">
           <Link to={`/product/${product.id}`} onClick={handleQuickView} className="block h-full" tabIndex={-1} aria-hidden="true">
             <img
-              src={product.image || PLACEHOLDER}
+              src={product.image || capaGerada(product)}
               alt=""
               className="media-zoom h-full w-full object-cover"
               loading={index < 6 ? 'eager' : 'lazy'}
               decoding="async"
-              onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER; }}
+              onError={(e) => { e.target.onerror = null; e.target.src = capaGerada(product); }}
             />
           </Link>
 

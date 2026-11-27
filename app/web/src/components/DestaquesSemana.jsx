@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, BookOpen } from 'lucide-react';
 import { getFeaturedProducts, formatCurrency } from '@/api/EcommerceApi';
+import { capaGerada } from '@/lib/capaGerada';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/hooks/useCart';
@@ -14,8 +15,6 @@ import { useNavigate } from 'react-router-dom';
 import { needsVariantChoice, variantNames } from '@/lib/productTypes';
 import { inStock, sortProducts } from '@/lib/productSort';
 import { useSwipe } from '@/hooks/useSwipe';
-
-const PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
 export default function DestaquesSemana({ onCartOpen }) {
   const [books, setBooks] = useState([]);
@@ -160,7 +159,7 @@ export default function DestaquesSemana({ onCartOpen }) {
                   className="group relative block aspect-3/4 w-64 md:w-full max-w-[280px] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(14,165,201,0.25)] border border-slate-800 text-left"
                 >
                   <img
-                    src={currentBook.image || PLACEHOLDER}
+                    src={currentBook.image || capaGerada(currentBook)}
                     alt={currentBook.title}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-slow"
                   />

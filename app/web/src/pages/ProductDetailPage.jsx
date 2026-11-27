@@ -6,6 +6,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { m as motion } from 'framer-motion';
 import { formatCurrency, getProduct, trackBookView } from '@/api/EcommerceApi';
+import { capaGerada } from '@/lib/capaGerada';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { buildBookShareMessage, buildWhatsAppShareUrl, shareBookOnWhatsApp } from '@/lib/whatsapp';
 import { copyText, nativeShare } from '@/lib/nativeShare';
@@ -74,7 +75,6 @@ const StarRating = ({ rating, size = 16, interactive = false, onChange }) => {
   );
 };
 
-const placeholderImage = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
 function ProductDetailPage() {
   const { id } = useParams();
@@ -439,7 +439,7 @@ function ProductDetailPage() {
                   relacionados. Minúsculas de propósito: o React 18 não conhece `fetchPriority`
                   e passa o atributo tal como está. */}
               <img
-                src={!currentImage?.url ? placeholderImage : currentImage.url}
+                src={!currentImage?.url ? capaGerada(product) : currentImage.url}
                 alt={product.title}
                 fetchpriority="high"
                 className="w-full h-full object-contain p-3"
@@ -496,7 +496,7 @@ function ProductDetailPage() {
                     }`}
                   >
                     <img
-                      src={!image.url ? placeholderImage : image.url}
+                      src={!image.url ? capaGerada(product) : image.url}
                       alt={`${product.title} ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
