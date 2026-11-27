@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
-  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, tipoDaImagem,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, prepararRegistos, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -468,5 +468,40 @@ describe("limparPromocoesKanGest (as promoções do KanGest para os produtos do 
   it(`no máximo ${MAX_PROMOCOES} por volta`, () => {
     const muitas = Array.from({ length: MAX_PROMOCOES + 3 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, desconto: 5 }));
     expect(limparPromocoesKanGest(muitas)).toHaveLength(MAX_PROMOCOES);
+  });
+});
+
+describe("prepararRegistos (as fichas do KanGest para a base central)", () => {
+  const segredo = Buffer.alloc(32, 7).toString("base64");
+
+  it("sem fichas (um KanGest antigo) é null", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    expect(await prepararRegistos(undefined, c)).toBeNull();
+    expect(await prepararRegistos([], c)).toBeNull();
+  });
+
+  it("cifra os dados pessoais das entidades e deixa o resto em claro", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const r = (await prepararRegistos([
+      { registo: "entidade", chave: 7, dados: { id: 7, nome: "Igreja Central", tipo: "C", nif: "5000123456", telefone: "923000000", email: "x@y.ao", localidade: "Huambo", endereco: "" } },
+    ], c))!;
+    expect(r).toHaveLength(1);
+    expect(r[0].dados).toEqual({ id: 7, nome: "Igreja Central", tipo: "C", localidade: "Huambo" });
+    expect(JSON.parse(await decifrarCampo(c, r[0].pessoais_cifrado))).toEqual({ nif: "5000123456", telefone: "923000000", email: "x@y.ao" });
+  });
+
+  it("tira as senhas e os segredos de qualquer ficha, e deixa de fora o que não serve", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const r = (await prepararRegistos([
+      { registo: "utilizador", chave: 2, dados: { nome: "Ana", perfil: "CAIXA", senha_hash: "x", pin_hash: "y", totp_segredo: "z" } },
+      { registo: "artigo", chave: 3, dados: { referencia: "LIV-1", preco1: 100 } },
+      { registo: "outra-coisa", chave: 4, dados: {} },
+      { registo: "artigo", chave: -1, dados: {} },
+      { registo: "artigo", chave: 5, dados: "texto" },
+      { registo: "artigo", chave: 6, dados: { grande: "x".repeat(25_000) } },
+    ], c))!;
+    expect(r.map((x) => [x.registo, x.chave])).toEqual([["utilizador", 2], ["artigo", 3]]);
+    expect(r[0].dados).toEqual({ nome: "Ana", perfil: "CAIXA" });
+    expect(r[0].pessoais_cifrado).toBe("");
   });
 });

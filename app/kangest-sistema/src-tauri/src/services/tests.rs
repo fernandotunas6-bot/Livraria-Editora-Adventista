@@ -8842,6 +8842,62 @@ async fn as_familias_e_os_generos_do_site() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// As fichas para a base central (sinc/registos.rs, migração 0079): os gatilhos marcam a ficha que muda, a volta leva o
+/// estado de agora (nunca as senhas), o que o site aceitou sai da fila e o que recusou espera.
+#[tokio::test]
+async fn as_fichas_para_a_base_central() {
+    use crate::sinc::registos;
+    let (st, pasta) = base_com_admin("fichas-base-central").await;
+    let artigo = rpc(&st, "artigos.guardar", json!({ "descricao": "Livro REG-1", "referencia": "REG-1", "taxa_iva_id": 1, "preco1": 100 })).await["id"].as_i64().unwrap();
+    let entidade: i64 = sqlx::query_scalar("INSERT INTO entidades (tipo, nome, nif, telefone) VALUES ('C', 'Igreja Central', '5000123456', '923000000') RETURNING id")
+        .fetch_one(&st.pool)
+        .await
+        .unwrap();
+    // sem ligação ao site, nada vai para a fila
+    let fila = |pool: sqlx::SqlitePool| async move { sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sinc_registos").fetch_one(&pool).await.unwrap() };
+    assert_eq!(fila(st.pool.clone()).await, 0);
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    // com a ligação, a ficha que muda entra pelo gatilho; ao ligar, entram todas
+    sqlx::query("UPDATE entidades SET telefone = '924000000' WHERE id = ?").bind(entidade).execute(&st.pool).await.unwrap();
+    // o `mudou` só tem de existir e subir: o gatilho de `alterado_em` (0025) muda a ficha outra vez dentro do mesmo UPDATE,
+    // e a marca conta as duas
+    let marcada: Option<i64> = sqlx::query_scalar("SELECT mudou FROM sinc_registos WHERE tipo = 'entidade' AND chave = ?").bind(entidade).fetch_optional(&st.pool).await.unwrap();
+    assert!(marcada.is_some_and(|m| m >= 1), "{marcada:?}");
+    registos::enfileirar_tudo(&st.pool).await.unwrap();
+    let agora = 1_800_000_000;
+    let (pendentes, itens) = registos::devidos(&st.pool, agora, registos::LOTE).await.unwrap();
+    let de = |tipo: &str, chave: i64| itens.iter().find(|i| i["registo"] == tipo && i["chave"] == chave).cloned().unwrap();
+    assert_eq!(de("entidade", entidade)["dados"]["telefone"], "924000000");
+    assert_eq!(de("artigo", artigo)["dados"]["referencia"], "REG-1");
+    let utilizador = itens.iter().find(|i| i["registo"] == "utilizador").unwrap();
+    for proibido in ["senha_hash", "pin_hash", "totp_segredo", "totp_recuperacao"] {
+        assert!(utilizador["dados"].get(proibido).is_none(), "{proibido} não pode seguir: {utilizador}");
+    }
+    assert!(!itens.iter().any(|i| i["registo"] == "entidade" && i["chave"] == 1), "o Consumidor Final não segue");
+
+    // o site aceitou tudo menos o artigo: este espera, o resto sai
+    registos::concluir(&st.pool, &pendentes, &json!({ "recebidos": pendentes.len() - 1, "erros": [{ "registo": "artigo", "chave": artigo, "erro": "recusado" }] }), agora)
+        .await
+        .unwrap();
+    let restam: Vec<(String, i64, String)> = sqlx::query_as("SELECT tipo, chave, erro FROM sinc_registos").fetch_all(&st.pool).await.unwrap();
+    assert_eq!(restam, vec![("artigo".to_string(), artigo, "recusado".to_string())]);
+    assert!(registos::devidos(&st.pool, agora, registos::LOTE).await.unwrap().0.is_empty(), "espera antes de ir outra vez");
+    // um site antigo (sem resposta às fichas): conta como erro e espera
+    let (p2, _) = registos::devidos(&st.pool, agora + 3600, registos::LOTE).await.unwrap();
+    registos::concluir(&st.pool, &p2, &Value::Null, agora + 3600).await.unwrap();
+    assert_eq!(fila(st.pool.clone()).await, 1);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.
