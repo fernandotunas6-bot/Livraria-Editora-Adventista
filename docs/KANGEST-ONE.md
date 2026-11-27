@@ -61,7 +61,7 @@ Restrições de segurança, palavra por palavra:
 
 | Fase | O que faz | PR | Em produção |
 |---|---|---|---|
-| A1 | a sessão do site no KanGest só em memória: não há tabela `sessoes_site`, e nenhum token vai para o disco | #151 | KanGest 1.4.9 (por publicar) |
+| A1 | a sessão do site no KanGest só em memória: não há tabela `sessoes_site`, e nenhum token vai para o disco | #151 | KanGest 1.4.9 |
 | A2 | uma só identidade: num KanGest ligado, as contas locais têm data-limite (30 dias a contar da ligação ao site) e depois só lêem; contas locais novas, só o ADMIN; o modo sem Internet | #152, #167 | KanGest 1.4.9 |
 | A3 | as sessões abertas no painel do site, com «Terminar»; o ADMIN de recurso entra no registo de segurança com aviso; o ecrã de entrada mostra a ligação | #153 | sim (20261126180000); o KanGest na 1.4.9 |
 | F | o staging antes da produção no `deploy-supabase.yml` (passa à frente sem staging) | #154 | sim; o staging é do dono |
@@ -74,7 +74,8 @@ Restrições de segurança, palavra por palavra:
 | E2 | a versão mínima do KanGest (`KANGEST_MIN_VERSION`) e o cartão «Servidor central» | #162 | KanGest 1.4.9; o segredo é do dono |
 | G1 | os tokens partilhados com o contraste AA conferido | #163 | sim (o site) e KanGest 1.4.9 |
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
-| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | o PR das capas | KanGest 1.4.10 |
+| §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10 |
+| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
 | Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
 
