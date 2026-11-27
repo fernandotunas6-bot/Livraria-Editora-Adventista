@@ -335,6 +335,9 @@ export const kangestPostos = () => pb.send('/admin/kangest/postos', { method: 'G
 export const sistemaSaude = () => pb.send('/api/v1/system/health', { method: 'GET' });
 /** Onde o livro de stock do posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1). */
 export const kangestPostoLivro = (id) => pb.send(`/admin/kangest/postos/livro?id=${encodeURIComponent(id)}`, { method: 'GET' });
+/** As configurações que o posto guardou na base central: as versões e a fotografia de uma (a mais recente, sem `versao`). */
+export const kangestPostoConfiguracoes = (id, versao) =>
+  pb.send(`/admin/kangest/postos/configuracoes?id=${encodeURIComponent(id)}${versao ? `&versao=${encodeURIComponent(versao)}` : ''}`, { method: 'GET' });
 /** Cria um posto e devolve o código de emparelhamento (uso único, 10 minutos). */
 export const kangestPostoCriar = ({ nome, store_id }) => pb.send('/admin/kangest/postos', { method: 'POST', body: { nome, store_id } });
 /** Outro código para o posto (computador novo, chave perdida ou rodar a chave): a chave actual deixa de valer. */

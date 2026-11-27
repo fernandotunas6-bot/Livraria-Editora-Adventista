@@ -23,6 +23,7 @@ pub mod avisos;
 pub mod capas;
 pub mod catalogo;
 pub mod cifra;
+pub mod configuracoes;
 pub mod encomendas;
 pub mod entrada;
 pub mod estado;
@@ -159,14 +160,14 @@ async fn post(url: String, cabecalhos: Vec<(&'static str, String)>, corpo: Vec<u
 // A fila e o lote
 // ---------------------------------------------------------------------------------------------------------------
 
-/// Põe na fila todos os documentos deste KanGest que ainda não seguiram (os importados do KIGEST ficam de fora, como
-/// nos avisos). O centro ignora os que já tiver.
+/// Põe na fila todos os documentos deste KanGest que ainda não seguiram, também o histórico importado do KIGEST (pedido
+/// do dono a 27/11: «migrar todos os dados actuais da loja»; segue marcado como importado). O centro ignora os que já
+/// tiver.
 pub async fn enfileirar_tudo(pool: &SqlitePool) -> AppResult<i64> {
     let r = sqlx::query(
         "INSERT INTO sinc_saida (documento_id, operacao)
          SELECT d.id, 'emitido' FROM documentos d
-          WHERE d.importado = 0
-            AND NOT EXISTS (SELECT 1 FROM sinc_saida s WHERE s.documento_id = d.id AND s.operacao = 'emitido')
+          WHERE NOT EXISTS (SELECT 1 FROM sinc_saida s WHERE s.documento_id = d.id AND s.operacao = 'emitido')
           ORDER BY d.id",
     )
     .execute(pool)
@@ -180,7 +181,7 @@ pub async fn item_do_documento(pool: &SqlitePool, id: i64) -> AppResult<Option<V
     let Some(d) = sqlx::query(
         "SELECT d.id, d.tipo_codigo, t.grupo, d.serie, d.numero, d.numero_doc, d.data_emissao, d.data_hora, d.entidade_nif,
                 d.entidade_nome, d.total_liquido, d.total_iva, d.total, d.estado, d.motivo_anulacao, d.referencia, d.hash,
-                d.hash_controlo, d.hash_versao, d.armazem_id,
+                d.hash_controlo, d.hash_versao, d.armazem_id, d.importado,
                 COALESCE((SELECT a.hash FROM documentos a
                            WHERE a.tipo_codigo = d.tipo_codigo AND a.serie = d.serie AND a.numero = d.numero - 1), '') AS hash_anterior,
                 -- para os relatórios do site (1.4.5): de onde veio a venda, quem a fez, o vencimento, o que falta
@@ -330,6 +331,19 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     if !reg_itens.is_empty() {
         dados["registos"] = Value::Array(reg_itens);
     }
+    // as configurações (configuracoes.rs), só quando mudaram e se o pedido ainda as levar dentro do limite do site. Nunca
+    // impedem o resto da volta.
+    let config = configuracoes::para_enviar(pool, agora).await.unwrap_or_else(|e| {
+        eprintln!("Configurações para o site: ficam para a volta seguinte ({e}).");
+        None
+    });
+    let config = config.filter(|(_, f)| {
+        let pedido = serde_json::to_string(&dados).map(|t| t.len()).unwrap_or(usize::MAX);
+        pedido.saturating_add(serde_json::to_string(f).map_or(usize::MAX, |t| t.len())) <= capas::MAX_PEDIDO
+    });
+    if let Some((resumo, f)) = &config {
+        dados["configuracoes"] = json!({ "resumo": resumo, "dados": f });
+    }
     // uma fotografia de um artigo para o produto do site sem capa (capas.rs), se o pedido ainda a levar dentro do limite
     // do site. Nunca impede o resto da volta.
     let foto = match capas::para_o_site(pool, agora).await {
@@ -367,6 +381,11 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             if !promos.is_empty() {
                 if let Err(e) = promocoes::concluir(pool, &promos, &r["promocoes"], agora).await {
                     eprintln!("Promoções para o site: a resposta não se registou ({e}).");
+                }
+            }
+            if let Some((resumo, _)) = &config {
+                if let Err(e) = configuracoes::concluir(pool, resumo, &r["configuracoes"], agora).await {
+                    eprintln!("Configurações para o site: a resposta não se registou ({e}).");
                 }
             }
             // a versão mínima do KanGest que o site aceita (versao.rs)
@@ -469,6 +488,9 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             }
             catalogo::adiar(pool, &cat_pendentes, agora).await?;
             registos::adiar(pool, &reg_pendentes, agora, "O site recusou o pedido.").await?;
+            if config.is_some() {
+                configuracoes::adiar(pool, agora, "O site recusou o pedido.").await?;
+            }
             anotar_erro(pool, &m).await?;
             Ok(Volta::Falhou(m))
         }
@@ -640,6 +662,8 @@ async fn guardar_ligacao(st: &AppState, url: &str, semente: &[u8; 32], v: &Value
         livro::apagar(&st.pool).await?;
         registos::apagar(&st.pool).await?;
     }
+    // as configurações seguem na primeira volta (também ao ligar outra vez ao mesmo posto)
+    configuracoes::repetir(&st.pool).await?;
     enfileirar_tudo(&st.pool).await?;
     // as fichas (entidades, artigos completos, utilizadores) seguem todas uma vez
     registos::enfileirar_tudo(&st.pool).await?;
@@ -805,6 +829,7 @@ async fn estado(st: &AppState) -> AppResult<Value> {
         "erros": erros,
         "catalogo": catalogo::contagem(&st.pool).await?,
         "registos": registos::contagem(&st.pool).await?,
+        "configuracoes": configuracoes::estado(&st.pool).await?,
         "livro": livro::contagem(&st.pool).await?,
         "intervalo": INTERVALO,
     }))
@@ -823,6 +848,7 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
     sqlx::query("UPDATE sinc_saida SET estado = 'pendente', tentativas = 0, proximo_em = 0 WHERE estado = 'erro'").execute(&st.pool).await?;
     catalogo::repetir(&st.pool).await?;
     registos::repetir(&st.pool).await?;
+    configuracoes::repetir(&st.pool).await?;
     estado(st).await
 }
 

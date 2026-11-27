@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
-  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, prepararRegistos, tipoDaImagem,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, prepararRegistos, tipoDaImagem, limparConfiguracoes, MAX_CONFIGURACOES,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -273,6 +273,34 @@ describe("prepararLote: os movimentos da tesouraria (o ERP central)", () => {
     });
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 8, data: "26/11/2026", valor: 1 } }], c!)).rejects.toThrow(/data/);
     await expect(prepararLote([{ tipo: "movimento", movimento: { movimento_id: 9, data: "2026-11-26", valor: -1 } }], c!)).rejects.toThrow(/negativo/);
+  });
+});
+
+describe("o histórico importado e as configurações (tudo na base central, 27/11)", () => {
+  it("um documento importado do KIGEST segue marcado; os do KanGest não levam a marca", async () => {
+    const c = await lerCifraDados(paraB64(seq(32, 9)));
+    const doc = (importado: unknown) => ({
+      tipo: "documento",
+      documento: { id: 1, tipo_codigo: "FR", serie: "K", numero: 1, numero_doc: "FR K/1", data_emissao: "2025-03-10", entidade_nif: "999999999", total: 1140, estado: "N", importado },
+      linhas: [],
+    });
+    const [a] = await prepararLote([doc(1)], c!);
+    const [b] = await prepararLote([doc(0)], c!);
+    expect((a.documento as Record<string, unknown>).importado).toBe(true);
+    expect("importado" in (b.documento as Record<string, unknown>)).toBe(false);
+  });
+
+  it("as configurações: o resumo SHA-256, sem segredos a qualquer profundidade, e com tamanho limitado", () => {
+    const resumo = "a".repeat(64);
+    const c = limparConfiguracoes({
+      resumo,
+      dados: { config: { "vendas.precos_com_iva": "1", "email.senha": "x" }, tabelas: { postos: [{ id: 1, opcoes: "{}", api_token: "y" }] } },
+    });
+    expect(c).toEqual({ resumo, dados: { config: { "vendas.precos_com_iva": "1" }, tabelas: { postos: [{ id: 1, opcoes: "{}" }] } } });
+    expect(limparConfiguracoes({ resumo: "abc", dados: {} })).toBeNull();
+    expect(limparConfiguracoes({ resumo, dados: [] })).toBeNull();
+    expect(limparConfiguracoes({ resumo, dados: { x: "y".repeat(MAX_CONFIGURACOES) } })).toBeNull();
+    expect(limparConfiguracoes(null)).toBeNull();
   });
 });
 

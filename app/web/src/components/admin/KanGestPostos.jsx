@@ -3,9 +3,13 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, BookOpenCheck, Copy, Cpu, KeyRound, Link2, LogOut, Plus, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Copy, Cpu, Download, KeyRound, Link2, LogOut, Plus, Settings2, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { kangestPostoCodigo, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos, kangestSessaoTerminar } from '@/api/PlatformApi';
+import {
+  kangestPostoCodigo, kangestPostoConfiguracoes, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos,
+  kangestSessaoTerminar,
+} from '@/api/PlatformApi';
+import { resumoDasConfiguracoes } from '@/lib/kangestConfiguracoes';
 import { cn } from '@/lib/utils';
 import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
@@ -219,6 +223,7 @@ export default function KanGestPostos({ lojas = [] }) {
                   {p.fichas && (p.fichas.entidade || p.fichas.artigo || p.fichas.utilizador)
                     ? ` · fichas: ${p.fichas.entidade || 0} cliente(s) e fornecedor(es), ${p.fichas.artigo || 0} artigo(s), ${p.fichas.utilizador || 0} utilizador(es)`
                     : ''}
+                  {p.importados ? ` · ${p.importados} do histórico do KIGEST` : ''}
                   {' '}· última sincronização {dataHora(p.ultima_sinc)}
                   {p.versao_programa ? ` · ${p.versao_programa}` : ''}
                 </p>
@@ -226,6 +231,7 @@ export default function KanGestPostos({ lojas = [] }) {
                 {p.estado !== 'revogado' && <Computador p={p} />}
                 {p.estado !== 'revogado' && <SessoesDoPosto p={p} onTerminada={carregar} />}
                 {p.estado === 'activo' && <LivroDoPosto p={p} />}
+                {p.estado !== 'revogado' && <ConfiguracoesDoPosto p={p} />}
                 {p.estado !== 'revogado' && (
                   <div className="flex w-full flex-wrap gap-x-5 gap-y-1 text-xs">
                     <label className="inline-flex items-center gap-1.5">
@@ -405,6 +411,76 @@ export function SessoesDoPosto({ p, onTerminada }) {
             ))}
           </ul>
         </details>
+      )}
+    </div>
+  );
+}
+
+/**
+ * As configurações que o posto guardou na base central (pedido do dono a 27/11; sinc/configuracoes.rs): quando chegou a
+ * última, o que tem, as versões anteriores e a descarga da fotografia (sem segredos: o posto e o servidor tiram-nos).
+ */
+export function ConfiguracoesDoPosto({ p }) {
+  const [aberto, setAberto] = useState(null);
+  const [aVer, setAVer] = useState(false);
+  const c = p.configuracoes;
+
+  async function ver(versao) {
+    setAVer(true);
+    try {
+      setAberto(await kangestPostoConfiguracoes(p.id, versao));
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível ler as configurações.');
+    } finally {
+      setAVer(false);
+    }
+  }
+
+  function descarregar() {
+    if (!aberto?.dados) return;
+    const blob = new Blob([JSON.stringify(aberto.dados, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `kangest-configuracoes-${(p.nome || 'posto').replace(/[^\w-]+/g, '-')}-${String(aberto.versao?.recebido_em || '').slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const resumo = aberto?.dados ? resumoDasConfiguracoes(aberto.dados) : null;
+  return (
+    <div className="w-full space-y-1 text-xs">
+      <p className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+        <Settings2 className="h-3.5 w-3.5" />
+        {c ? <span>Configurações guardadas no site a {dataHora(c.recebido_em)}</span> : <span>Configurações: ainda não chegaram (o KanGest 1.4.11 manda-as na volta seguinte).</span>}
+        {c && (
+          <button type="button" className="font-medium text-foreground underline underline-offset-2" onClick={() => (aberto ? setAberto(null) : ver())} disabled={aVer}>
+            {aberto ? 'Fechar' : aVer ? 'A abrir…' : 'Ver'}
+          </button>
+        )}
+      </p>
+      {aberto && (
+        <div className="space-y-2 rounded-lg border bg-muted/20 p-2">
+          {resumo && (
+            <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              {resumo.map((r) => <li key={r.rotulo}><span className="text-muted-foreground">{r.rotulo}:</span> {r.valor}</li>)}
+            </ul>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="sr-only" htmlFor={`cfg-versao-${p.id}`}>Versão</label>
+            <select
+              id={`cfg-versao-${p.id}`}
+              className="h-7 rounded-md border bg-background px-2"
+              value={aberto.versao?.id || ''}
+              onChange={(e) => ver(Number(e.target.value))}
+            >
+              {(aberto.versoes || []).map((v) => <option key={v.id} value={v.id}>{dataHora(v.recebido_em)}</option>)}
+            </select>
+            <Button size="sm" variant="outline" className="h-7" onClick={descarregar}>
+              <Download className="mr-1 h-3.5 w-3.5" />Descarregar (JSON)
+            </Button>
+            <span className="text-muted-foreground">{(aberto.versoes || []).length} versão(ões) guardada(s), sem senhas nem chaves.</span>
+          </div>
+        </div>
       )}
     </div>
   );
