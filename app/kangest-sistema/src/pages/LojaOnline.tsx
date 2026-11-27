@@ -17,7 +17,7 @@ import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
 import { useSession } from "@/store/session";
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Table, Td, Th, cn } from "@/components/ui";
-import { CapasDoSite, FotosParaOSite } from "@/components/CapasDoSite";
+import { CapasDoSite, DadosDosLivros, FotosParaOSite } from "@/components/CapasDoSite";
 
 type Tom = "neutral" | "brand" | "ok" | "danger" | "accent";
 
@@ -122,7 +122,7 @@ export default function LojaOnline() {
     let desligar: (() => void) | undefined;
     let fechado = false;
     void listen("loja-novidades", () => {
-      for (const k of ["loja-estado", "loja-encomendas", "loja-produtos", "loja-encomenda", "loja-conta"]) qc.invalidateQueries({ queryKey: [k] });
+      for (const k of ["loja-estado", "loja-encomendas", "loja-produtos", "loja-encomenda", "loja-conta", "dados-dos-livros"]) qc.invalidateQueries({ queryKey: [k] });
     }).then((f) => {
       if (fechado) f();
       else desligar = f;
@@ -142,6 +142,7 @@ export default function LojaOnline() {
       <PageHeader title="Loja online" subtitle="As encomendas desta loja e o catálogo do site, da última sincronização" />
       <CapasDoSite />
       <FotosParaOSite />
+      <DadosDosLivros />
       {!e ? (
         <Card className="max-w-3xl">
           <div className="p-6 text-ink-3">{estado.error ? (estado.error as Error).message : "A carregar…"}</div>

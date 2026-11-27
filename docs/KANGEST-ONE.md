@@ -76,7 +76,8 @@ Restrições de segurança, palavra por palavra:
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
 | §8, 1–5 | o modo sem Internet diz porquê; o estado da ligação na barra para todos; o stock negativo no painel; a saúde do site no «Servidor central»; ligar uma conta local à do site | #169, #170, #171 | sim (20261126240000); KanGest 1.4.10 |
 | Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
-| Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | o PR das fotografias | KanGest 1.4.10 |
+| Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | #177 | KanGest 1.4.10 |
+| Dados dos livros | o autor, a editora, o idioma, o ano, as páginas e o ISBN (como código de barras) do site nas fichas dos artigos que não os têm | o PR dos dados dos livros | sim (20261127100000, a partir do merge); KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
 | Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
 

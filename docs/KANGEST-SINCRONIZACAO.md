@@ -543,3 +543,17 @@ Testes:
 - **Um site sem este campo** não responde à fotografia: o posto conta como erro e espera cada vez mais.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As fotografias dos artigos para o
   site»).
+
+## 18. Os dados dos livros nas fichas dos artigos (KANGEST ONE, integração total)
+
+- **As novidades** (`kangest_novidades`, 20261127100000): cada produto leva também `autor`, `editora`, `idioma`, `ano` e
+  `paginas`. Um campo vazio, e o ano ou as páginas a 0, seguem como `null`.
+- **O posto** (`sinc/fichas.rs`), depois de aplicar uma volta com produtos:
+  - completa os dados do livro que faltam na ficha do artigo com a mesma referência;
+  - põe o ISBN como código de barras de um artigo sem nenhum, se o ISBN for válido e nenhum outro artigo o usar. Este
+    código não volta ao site: a linha que o gatilho do catálogo criaria sai na mesma transacção.
+- **O que veio fica em `fichas_do_site`** (migração 0075), campo a campo, e não volta. Nunca se substitui o que está na
+  ficha.
+- **A migração 0075 apaga o cursor dos produtos:** o catálogo vem todo uma vez, já com os dados novos.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados dos livros do site nas
+  fichas dos artigos»).

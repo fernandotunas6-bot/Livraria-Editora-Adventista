@@ -27,6 +27,7 @@ pub mod encomendas;
 pub mod entrada;
 pub mod estado;
 pub mod fechos;
+pub mod fichas;
 pub mod financeiro;
 pub mod livro;
 pub mod loja;
@@ -384,6 +385,12 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             let novas = if primeira { Vec::new() } else { loja::encomendas_novas(pool, &r["novidades"]).await? };
             let (encomendas, produtos) = loja::aplicar(pool, &r["novidades"]).await?;
             avisar_encomendas_novas(&novas);
+            // os dados dos livros do site nas fichas dos artigos que não os têm (fichas.rs)
+            if produtos > 0 && fichas::ligado(pool).await {
+                if let Err(e) = fichas::completar(pool).await {
+                    eprintln!("Dados dos livros do site: ficam para a volta seguinte ({e}).");
+                }
+            }
             if encomendas > 0 || produtos > 0 {
                 crate::nativo::avisar_ecra("loja-novidades");
             }

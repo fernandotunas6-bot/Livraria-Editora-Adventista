@@ -8542,6 +8542,98 @@ async fn as_capas_do_site_nos_artigos() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// Os dados dos livros do site nas fichas dos artigos (KANGEST ONE, sinc/fichas.rs): só o que falta à ficha, o ISBN como
+/// código de barras (sem repetir o de outro artigo e sem voltar ao site), e o que já veio uma vez não volta.
+#[tokio::test]
+async fn os_dados_dos_livros_do_site_nas_fichas() {
+    use crate::sinc::fichas;
+    let (st, pasta) = base_com_admin("dados-dos-livros").await;
+    let artigo = |extra: Value| {
+        let st = &st;
+        async move {
+            let mut a = json!({ "taxa_iva_id": 1, "preco1": 100 });
+            for (k, v) in extra.as_object().unwrap() {
+                a[k] = v.clone();
+            }
+            rpc(st, "artigos.guardar", a).await["id"].as_i64().unwrap()
+        }
+    };
+    let a1 = artigo(json!({ "descricao": "Patriarcas e Profetas", "referencia": "FIC-001" })).await;
+    let a2 = artigo(json!({ "descricao": "O Desejado", "referencia": "FIC-002", "codigo_barras": "5601234567890", "atributos": { "autor": "Outro" } })).await;
+    let a3 = artigo(json!({ "descricao": "Sem livro no site", "referencia": "FIC-003" })).await;
+    let a4 = artigo(json!({ "descricao": "Outra edição", "referencia": "FIC-004" })).await;
+    // no site: o 1 com tudo (as páginas a null), o 2 com outro autor, o 4 com o mesmo ISBN do 1; o 3 não está
+    for (id, r, dados) in [
+        ("p1", "FIC-001", json!({ "autor": "Ellen G. White", "editora": "CPB", "idioma": "Português", "ano": 2024, "paginas": null, "isbn": "978-85-345-2077-5" })),
+        ("p2", "FIC-002", json!({ "autor": "Ellen G. White", "editora": "CPB", "isbn": "9788534525183" })),
+        ("p4", "FIC-004", json!({ "isbn": "9788534520775" })),
+    ] {
+        let mut d = dados;
+        d["id"] = json!(id);
+        d["referencia"] = json!(r);
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, ?)")
+            .bind(id)
+            .bind(r)
+            .bind(r)
+            .bind(d.to_string())
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    let e = rpc(&st, "loja.fichas.estado", Value::Null).await;
+    assert_eq!((e["ligado"].as_bool(), e["por_completar"].as_i64(), e["completadas"].as_i64()), (Some(true), Some(3), Some(0)), "o 1, o 2 e o 4: {e}");
+
+    // com o KanGest ligado ao site, o código de barras que veio do site não volta para lá
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    sqlx::query("DELETE FROM sinc_catalogo").execute(&st.pool).await.unwrap();
+    let f = fichas::completar(&st.pool).await.unwrap();
+    assert_eq!((f.fichas, f.dados, f.codigos), (2, 5, 1), "{f:?}");
+    let ficha = |id: i64| {
+        let pool = st.pool.clone();
+        async move {
+            let (atr, cod): (Option<String>, Option<String>) =
+                sqlx::query_as("SELECT atributos, codigo_barras FROM artigos WHERE id = ?").bind(id).fetch_one(&pool).await.unwrap();
+            (atr.map(|t| serde_json::from_str::<Value>(&t).unwrap()).unwrap_or(Value::Null), cod)
+        }
+    };
+    assert_eq!(
+        ficha(a1).await,
+        (json!({ "autor": "Ellen G. White", "editora": "CPB", "idioma": "Português", "ano": 2024 }), Some("9788534520775".to_string()))
+    );
+    assert_eq!(ficha(a2).await, (json!({ "autor": "Outro", "editora": "CPB" }), Some("5601234567890".to_string())), "o autor da ficha fica");
+    assert_eq!(ficha(a3).await, (Value::Null, None));
+    assert_eq!(ficha(a4).await.1, None, "o ISBN do 1 não se repete no 4");
+    let fila: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sinc_catalogo WHERE tipo = 'artigo'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(fila, 0, "o ISBN veio do site: não volta para lá");
+    let auditadas: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auditoria WHERE acao = 'FICHA_DO_SITE'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(auditadas, 1);
+    sqlx::query("DELETE FROM sinc_ligacao").execute(&st.pool).await.unwrap();
+
+    // o autor apagado à mão não volta; e já não há nada a completar
+    sqlx::query("UPDATE artigos SET atributos = json_remove(atributos, '$.autor') WHERE id = ?").bind(a1).execute(&st.pool).await.unwrap();
+    assert_eq!(fichas::completar(&st.pool).await.unwrap(), fichas::Completadas::default());
+    assert_eq!(ficha(a1).await.0.get("autor"), None);
+    let e = rpc(&st, "loja.fichas.estado", Value::Null).await;
+    assert_eq!((e["por_completar"].as_i64(), e["completadas"].as_i64()), (Some(0), Some(2)), "{e}");
+
+    // desliga-se e liga-se neste computador
+    let e = rpc(&st, "loja.fichas.ligar", json!({ "ligado": false })).await;
+    assert_eq!(e["ligado"].as_bool(), Some(false));
+    assert!(!fichas::ligado(&st.pool).await);
+    rpc(&st, "loja.fichas.ligar", json!({ "ligado": true })).await;
+    assert!(fichas::ligado(&st.pool).await);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.

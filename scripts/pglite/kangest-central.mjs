@@ -165,6 +165,12 @@ check('a encomenda alterada volta a vir, com o estado novo', n4.encomendas.lengt
 const totalProdutos = (await q(`select count(*)::int n from public.stock_books`))[0].n;
 const cat = await novidades({}, 500);
 check('o catálogo vem todo, com os ocultos', cat.produtos.length === Math.min(totalProdutos, 500) && cat.produtos.some((x) => x.activo === false), { vieram: cat.produtos.length, totalProdutos });
+// os dados do livro para as fichas dos artigos (20261127100000): o ano e as páginas a 0 não seguem
+const [livroD] = await q(`insert into public.stock_books (title, price, stock, active, kigest_ref, author, publisher, language, year, pages)
+  values ('Patriarcas e Profetas', 6200, 2, true, 'LIV-DADOS', ' Ellen G. White ', 'CPB', 'Português', 2024, 0) returning id`);
+const comDados = (await novidades({}, 500)).produtos.find((x) => x.id === livroD.id);
+check('o livro leva o autor, a editora, o idioma e o ano; as páginas a 0 não', comDados && comDados.autor === 'Ellen G. White' && comDados.editora === 'CPB'
+  && comDados.idioma === 'Português' && comDados.ano === 2024 && comDados.paginas === null, comDados);
 // as igrejas do registo da Igreja (20261126160000): todas, paginadas, e a alterada volta a vir
 for (const [cn, nome] of [['101', 'Igreja Central de Exemplo'], ['102', 'Grupo do Bairro Exemplo'], ['103', 'Companhia da Vila Exemplo']]) {
   await q(`insert into public.churches (cn, name, address, delegate_name) values ($1, $2, 'Rua Exemplo', 'Delegado Exemplo')`, [cn, nome]);

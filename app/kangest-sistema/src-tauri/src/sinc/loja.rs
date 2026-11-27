@@ -369,6 +369,10 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "capas.falhou" => super::capas::falhou(st, serde_json::from_value(params.clone())?).await,
         "capas.envio" => super::capas::envio(st).await,
         "capas.envio_ligar" => super::capas::envio_ligar(st, serde_json::from_value(params.clone())?).await,
+        // os dados dos livros do site nas fichas dos artigos (fichas.rs)
+        "fichas.estado" => super::fichas::estado(st).await,
+        "fichas.completar" => super::fichas::completar_agora(st).await,
+        "fichas.ligar" => super::fichas::ligar(st, serde_json::from_value(params.clone())?).await,
         "encomendas" => encomendas(st, filtro()?).await,
         "encomenda" => encomenda(st, serde_json::from_value(params.clone())?).await,
         "produtos" => produtos(st, filtro()?).await,

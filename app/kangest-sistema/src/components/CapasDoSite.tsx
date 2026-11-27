@@ -179,3 +179,77 @@ export function FotosParaOSite() {
     </Card>
   );
 }
+
+type Fichas = {
+  ligado: boolean;
+  por_completar: number;
+  completadas: number;
+  ultima: string | null;
+  agora?: { fichas: number; dados: number; codigos: number };
+};
+
+/**
+ * Os dados dos livros do site nas fichas dos artigos (src-tauri/src/sinc/fichas.rs): o autor, a editora, o idioma, o ano
+ * e as páginas, e o ISBN como código de barras, só nos artigos que não os têm. Corre sozinho depois de cada volta da
+ * sincronização que traga produtos; aqui completa-se já ou desliga-se neste computador. Nunca substitui o que está na
+ * ficha, e um dado que já veio uma vez não volta.
+ */
+export function DadosDosLivros() {
+  const pode = useSession((s) => s.tem)("artigos.editar");
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["dados-dos-livros"],
+    queryFn: () => call<Fichas>("loja.fichas.estado"),
+    enabled: pode,
+    retry: false,
+  });
+  const [aCorrer, setACorrer] = useState(false);
+  const f = q.data;
+  if (!pode || !f || (!f.por_completar && !f.completadas && f.ligado)) return null;
+  async function completar() {
+    setACorrer(true);
+    try {
+      const r = await call<Fichas>("loja.fichas.completar");
+      qc.setQueryData(["dados-dos-livros"], r);
+      const a = r.agora;
+      toast.success(
+        a?.fichas
+          ? `${a.fichas} ficha(s) completada(s) com os dados do site (${a.dados} dado(s) do livro, ${a.codigos} código(s) de barras).`
+          : "Não havia nada a completar.",
+      );
+      await qc.invalidateQueries({ queryKey: ["artigos"] });
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setACorrer(false);
+    }
+  }
+  async function ligar(ligado: boolean) {
+    try {
+      qc.setQueryData(["dados-dos-livros"], await call<Fichas>("loja.fichas.ligar", { ligado }));
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+  return (
+    <Card className="mb-4 flex flex-wrap items-center gap-3 p-4 text-[13.5px]" aria-label="Os dados dos livros do site">
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">Os dados dos livros do site</div>
+        <div className="text-ink-3">
+          {f.por_completar
+            ? `${f.por_completar} artigo(s) podem receber do site o autor, a editora, o idioma, o ano, as páginas ou o ISBN como código de barras.`
+            : "As fichas dos artigos já têm o que o site sabe dos livros."}
+          {f.completadas ? ` ${f.completadas} já foram completadas.` : ""}
+          {f.ligado ? "" : " Desligado neste computador."}
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-ink-2">
+        <input type="checkbox" checked={f.ligado} onChange={(ev) => void ligar(ev.target.checked)} />
+        Completar sozinho
+      </label>
+      <Button variant="secondary" loading={aCorrer} disabled={!f.por_completar} onClick={() => void completar()}>
+        Completar agora
+      </Button>
+    </Card>
+  );
+}
