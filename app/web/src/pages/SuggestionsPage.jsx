@@ -113,7 +113,7 @@ export default function SuggestionsPage() {
                   <p className="mb-4 text-muted-foreground">
                     Entre na sua conta para as sugestões contarem também com a lista de desejos e as compras, em qualquer dispositivo.
                   </p>
-                  <button type="button" onClick={() => openAuth()} className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:bg-primary/90">
+                  <button type="button" onClick={() => openAuth()} className="inline-flex items-center rounded-md bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:bg-primary/90">
                     Entrar ou criar conta
                   </button>
                 </div>

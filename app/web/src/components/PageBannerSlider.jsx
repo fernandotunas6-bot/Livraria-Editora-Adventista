@@ -17,6 +17,16 @@ export const SHOP_BANNER_IMAGES = [
   '/images/site/opcoes/loja-prateleira.webp',
 ];
 
+/**
+ * O véu dos banners com livros (revisão do estilo de 27/11, escolha 8): mais escuro do lado do texto e mais claro do lado
+ * dos livros, para o texto se ler e as capas se verem.
+ */
+export function veuDoLadoDoTexto(opacidade) {
+  const o = Number.isFinite(opacidade) ? Math.min(1, Math.max(0, opacidade)) : 0.55;
+  const cor = (a) => `rgba(12, 74, 110, ${Math.round(a * 1000) / 1000})`;
+  return `linear-gradient(90deg, ${cor(Math.min(1, o + 0.25))} 0%, ${cor(o)} 45%, ${cor(o * 0.45)} 100%)`;
+}
+
 export default function PageBannerSlider({
   children,
   images = SHOP_BANNER_IMAGES,
@@ -30,6 +40,10 @@ export default function PageBannerSlider({
   // No telemóvel, mais baixo e sem os pontos (a imagem continua a mudar sozinha): na loja, os
   // livros têm de aparecer no primeiro ecrã (análise crítica de 2026-11-20).
   compactOnMobile = false,
+  // Na loja, os livros ficam à direita, longe do texto, e o véu escurece o lado do texto (revisão do estilo de 27/11).
+  // No computador, a imagem ocupa só a parte da direita e desvanece para a cor da faixa; no telemóvel, o enquadramento
+  // leva os livros para a beira direita.
+  livrosADireita = false,
 }) {
   const configuredSlides = [...new Set((images || []).filter(Boolean))];
   const slides = configuredSlides.length > 0 ? configuredSlides : fallbackImages;
@@ -76,7 +90,9 @@ export default function PageBannerSlider({
             src={slides[activeIndex]}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
+            className={livrosADireita
+              ? 'absolute inset-0 h-full w-full object-cover object-[20%_center] md:left-[38%] md:w-[62%] md:object-[65%_center] md:[mask-image:linear-gradient(to_right,transparent,#000_30%)] md:[-webkit-mask-image:linear-gradient(to_right,transparent,#000_30%)]'
+              : 'absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center'}
             initial={{ opacity: 0, scale: reducedMotion ? 1 : 1.03 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
@@ -89,7 +105,9 @@ export default function PageBannerSlider({
       <div
         className="absolute inset-0"
         style={{
-          background: `linear-gradient(90deg, rgba(12, 74, 110, ${overlayOpacity}) 0%, rgba(12, 74, 110, ${overlayOpacity * 0.82}) 58%, rgba(12, 74, 110, ${overlayOpacity * 0.68}) 100%)`,
+          background: livrosADireita
+            ? veuDoLadoDoTexto(overlayOpacity)
+            : `linear-gradient(90deg, rgba(12, 74, 110, ${overlayOpacity}) 0%, rgba(12, 74, 110, ${overlayOpacity * 0.82}) 58%, rgba(12, 74, 110, ${overlayOpacity * 0.68}) 100%)`,
         }}
       />
 

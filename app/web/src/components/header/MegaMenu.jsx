@@ -85,7 +85,7 @@ function ImageCard({ to, image, title, subtitle, onNavigate, tall = false, srcSe
 function ShortcutList({ title, items, onNavigate }) {
   return (
     <div>
-      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">{title}</p>
+      <p className="rotulo text-muted-foreground mb-3">{title}</p>
       <ul className="space-y-1">
         {items.map(({ to, href, label, description, icon: Icon }) => {
           const content = (
@@ -200,7 +200,7 @@ export default function MegaMenu() {
               ))}
             </div>
             <div className="border-l border-border pl-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Categorias</p>
+              <p className="rotulo text-muted-foreground mb-2">Categorias</p>
               <ul className="space-y-0.5">
                 {SHOWCASE_CATEGORIES.filter((c) => !['stock', 'destaques'].includes(c.id)).map((c) => (
                   <li key={c.id}>

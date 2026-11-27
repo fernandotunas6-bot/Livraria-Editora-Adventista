@@ -446,7 +446,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                     setActiveSuggestion(-1);
                   }
                 }}
-                className="min-w-0 flex-1 rounded-full bg-white/10 border-white/10 text-white placeholder-white/50 focus-visible:ring-[#22d3ee]"
+                className="min-w-0 flex-1 rounded-md bg-white/10 border-white/10 text-white placeholder-white/50 focus-visible:ring-[#22d3ee]"
                 aria-label="Pesquisar livros, autores e coleções"
                 role="combobox"
                 aria-expanded={searchSuggestionsOpen && searchSuggestions.length > 0}
@@ -455,7 +455,7 @@ const Header = ({ onCartOpen, pinned = false }) => {
                 aria-autocomplete="list"
                 tabIndex={searchOpen ? 0 : -1}
               />
-              <Button type="submit" className="rounded-full bg-[#22d3ee] text-neutral-950 hover:bg-[#22d3ee]/90">
+              <Button type="submit" className="rounded-md bg-[#22d3ee] text-neutral-950 hover:bg-[#22d3ee]/90">
                 Pesquisar
               </Button>
             </div>

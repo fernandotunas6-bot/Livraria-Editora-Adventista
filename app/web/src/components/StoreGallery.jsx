@@ -75,7 +75,7 @@ export default function StoreGallery({ photos, storeName, className = '' }) {
 
   return (
     <div className={className}>
-      <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="rotulo mb-3 flex items-center gap-1.5 text-muted-foreground">
         <Camera className="h-3.5 w-3.5" aria-hidden /> Fotografias da loja
         <span className="ml-auto font-semibold normal-case tracking-normal text-muted-foreground/80">
           {total === 1 ? '1 fotografia' : `${total} fotografias`}

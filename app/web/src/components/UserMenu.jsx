@@ -28,7 +28,7 @@ import { getUserDisplayName, getUserFirstName } from '@/lib/userUtils';
 import { cn } from '@/lib/utils';
 import { ROLES } from '@/lib/permissions';
 
-const groupLabel = 'px-2 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
+const groupLabel = 'rotulo px-2 pt-1.5 pb-1 text-muted-foreground';
 
 /** O nível de leitor, por baixo do nome (pergunta quando o menu abre; depois fica guardado). */
 function ReaderLevelLine() {
@@ -183,7 +183,7 @@ export function GuestAuthButton({ className, fullWidth = false }) {
       <Button
         variant="outline"
         size="sm"
-        className={cn('rounded-full bg-transparent border-marca/30 hover:bg-marca/10', fullWidth && 'w-full')}
+        className={cn('rounded-md bg-transparent border-marca/30 hover:bg-marca/10', fullWidth && 'w-full')}
         onClick={() => openAuth({ mode: 'login' })}
       >
         <User className="h-4 w-4 mr-2" />
@@ -191,7 +191,7 @@ export function GuestAuthButton({ className, fullWidth = false }) {
       </Button>
       <Button
         size="sm"
-        className={cn('btn-primary rounded-full hidden sm:inline-flex', fullWidth && 'w-full sm:flex')}
+        className={cn('btn-primary rounded-md hidden sm:inline-flex', fullWidth && 'w-full sm:flex')}
         onClick={() => openAuth({ mode: 'signup' })}
       >
         Criar conta

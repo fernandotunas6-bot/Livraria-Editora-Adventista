@@ -8,6 +8,7 @@ import Header from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Input } from '@/components/ui/input';
 import { getPhysicalStores } from '@/api/PlatformApi';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -120,7 +121,7 @@ export default function StoresPage() {
       <ShoppingCart isCartOpen={isCartOpen} setIsCartOpen={setIsCartOpen} />
 
       <PageBannerSlider images={fotosDoBanner} fallbackImages={[]} ariaLabel="Fotografias das lojas" contentClassName="text-left">
-        <p className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/80"><Store className="h-4 w-4" /> Lojas físicas</p>
+        <p className="mb-2 flex items-center gap-2 text-sm font-medium text-white/80"><Store className="h-4 w-4" /> Lojas físicas</p>
         <h1 className="mb-3 font-serif text-3xl font-bold leading-tight sm:text-4xl/10 md:text-5xl/none">Visite-nos</h1>
         <p className="max-w-xl text-sm text-white/85 sm:text-base">
           Encontre a loja mais perto de si, veja o horário e combine o levantamento das suas encomendas.
@@ -143,9 +144,9 @@ export default function StoresPage() {
                 {provinces.length > 1 && (
                   <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por província">
                     {['', ...provinces].map((p) => (
-                      <Button key={p || 'all'} type="button" size="sm" variant={province === p ? 'default' : 'outline'} onClick={() => setProvince(p)} className={province === p ? 'bg-primary hover:bg-marca/90' : ''}>
+                      <FilterChip key={p || 'all'} active={province === p} onClick={() => setProvince(p)}>
                         {p || 'Todas'}
-                      </Button>
+                      </FilterChip>
                     ))}
                   </div>
                 )}
@@ -213,7 +214,7 @@ export default function StoresPage() {
                               {/* A distância ganha lugar próprio em vez de ir pendurada na
                                   província, onde se lia como parte do nome do sítio. */}
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-primary">{s.province}</p>
+                                <p className="rotulo text-primary">{s.province}</p>
                                 {formatarDistancia(s.distancia) && (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                                     <Navigation className="h-3 w-3" aria-hidden />

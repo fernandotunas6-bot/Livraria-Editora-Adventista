@@ -102,6 +102,23 @@ Regras:
 - **Os elementos antigos** (o `CodeChip`, a `Pill`) passam para os estados quando forem tocados, no mesmo commit que
   muda esta secção.
 
+## 7b. A forma dos controlos (a revisão do estilo de 27/11, escolhas do dono)
+
+O dono escolheu as cinco propostas da revisão do estilo do site, a 27/11. Valem para o site público e são a mesma
+linguagem do KanGest.
+
+| O quê | Regra | Onde |
+|---|---|---|
+| **Acções** (botões e ligações que fazem alguma coisa) | Os cantos dos campos: `rounded-md`, como o `Button` e o `Input`. Nunca em pílula. | o `Button` por omissão; o cabeçalho, a faixa do Início, a pesquisa, «Entrar» e «Criar conta», o «Carregar mais» |
+| **Filtros** | Em pílula, sempre com o mesmo componente: `FilterChip` (`components/ui/filter-chip.jsx`), que diz o estado no `aria-pressed`. | os géneros da Loja, as províncias das Lojas |
+| **Etiquetas** (contagens, descontos, sugestões, selos) | Em pílula. | as que já existem |
+| **Rótulos pequenos** (os grupos dos filtros, dos menus e das listas) | O utilitário `rotulo`: a letra do texto, a 13 px, em meio-negrito, sem maiúsculas nem espaçamento. A letra dos títulos fica só nos títulos. | os filtros da Loja, o menu grande, o menu da conta, as Lojas e a sua galeria, o rodapé, as Coleções, os documentos legais |
+| **Botão do chat** | 44 px no telemóvel (o mínimo para o dedo) e 40 px no computador. Recolhe-se enquanto a página desce e volta quando pára ou sobe (`useRecolherAoDescer`). | `LivrariaAssistant` |
+| **Faixa com livros** | Na Loja, os livros ficam à direita, longe do texto (`PageBannerSlider` com `livrosADireita`). No computador, a imagem ocupa a parte da direita e desvanece para a cor da faixa; o véu é mais escuro do lado do texto (`veuDoLadoDoTexto`). | a Loja |
+
+A comunidade tem a sua própria linguagem editorial (as cores `editorial-*` e os botões em pílula) e ficou fora desta
+revisão.
+
 ## 8. Ficha de produto
 
 Ordem, de cima para baixo, no telemóvel e no computador:
@@ -126,7 +143,7 @@ A capa mostra-se **inteira**: `aspect-[3/4]` com `object-contain`, em todos os t
 
 ### Botões flutuantes
 
-O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A regra está em `lib/floatingButtons.js` (`isFloatingHidden`), e a escolha é do painel: Configurações → Assistente IA → **Botões flutuantes**, com uma caixa por página para cada botão (marcado = aparece). Por omissão ficam fora da ficha do produto, da encomenda feita e do rastreio, e de entrar e recuperar a palavra-passe, onde tapavam os botões de compra, os avisos de stock e o formulário de pagamento. O regresso ao topo ao mudar de página acontece sempre; só o botão é que se esconde.
+O botão do chat recolhe-se enquanto a página desce (§7b). O assistente (chat) e o "Voltar ao topo" não aparecem em todas as páginas. A regra está em `lib/floatingButtons.js` (`isFloatingHidden`), e a escolha é do painel: Configurações → Assistente IA → **Botões flutuantes**, com uma caixa por página para cada botão (marcado = aparece). Por omissão ficam fora da ficha do produto, da encomenda feita e do rastreio, e de entrar e recuperar a palavra-passe, onde tapavam os botões de compra, os avisos de stock e o formulário de pagamento. O regresso ao topo ao mudar de página acontece sempre; só o botão é que se esconde.
 
 ### Comunidade
 

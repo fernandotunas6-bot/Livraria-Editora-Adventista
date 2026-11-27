@@ -128,8 +128,8 @@ export default function AdvancedSearchPanel({
 
   const isHero = variant === 'hero';
   const inputClass = isHero
-    ? 'pl-10 rounded-full bg-white/15 border-white/25 text-white placeholder:text-white/60 focus-visible:ring-white/40 backdrop-blur-xs'
-    : 'pl-9 rounded-full bg-muted/40 border-border/60 glass-surface';
+    ? 'pl-10 rounded-md bg-white/15 border-white/25 text-white placeholder:text-white/60 focus-visible:ring-white/40 backdrop-blur-xs'
+    : 'pl-9 rounded-md bg-muted/40 border-border/60 glass-surface';
 
   const advancedCount = [
     local.author, local.isbn, local.publisher, local.language, local.collection,
@@ -210,13 +210,13 @@ export default function AdvancedSearchPanel({
             </ul>
           )}
         </div>
-        <Button onClick={apply} className={`rounded-full px-5 shrink-0 ${isHero ? 'bg-white text-(--brand-dark) hover:bg-white/90' : 'btn-primary'}`}>
+        <Button onClick={apply} className={`rounded-md px-5 shrink-0 ${isHero ? 'bg-white text-(--brand-dark) hover:bg-white/90' : 'btn-primary'}`}>
           Pesquisar
         </Button>
         <Button
           variant="outline"
           size="icon"
-          className={`rounded-full shrink-0 relative ${expanded ? 'border-(--brand-primary) bg-[rgb(var(--brand-primary-rgb)/0.1)]' : ''} ${isHero ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
+          className={`rounded-md shrink-0 relative ${expanded ? 'border-(--brand-primary) bg-[rgb(var(--brand-primary-rgb)/0.1)]' : ''} ${isHero ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
           onClick={() => setExpanded(!expanded)}
           title="Mais opções de pesquisa"
           aria-label="Mais opções de pesquisa"

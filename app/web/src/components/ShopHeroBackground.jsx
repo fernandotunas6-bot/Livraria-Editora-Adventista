@@ -7,7 +7,7 @@ import { getShopSlides } from '@/api/EcommerceApi';
 import { sortSlides, getTransition, getSlideDuration } from '@/lib/slideTransitions';
 import { resolveShopBgMode } from '@/lib/shopTheme';
 import ShopHeroMotion from '@/components/ShopHeroMotion';
-import PageBannerSlider, { SHOP_BANNER_IMAGES } from '@/components/PageBannerSlider';
+import PageBannerSlider, { SHOP_BANNER_IMAGES, veuDoLadoDoTexto } from '@/components/PageBannerSlider';
 import { playableVideoUrl } from '@/lib/videoUrl';
 
 function ShopSlideMedia({ slide }) {
@@ -74,8 +74,10 @@ export default function ShopHeroBackground({ settings, children }) {
       <PageBannerSlider
         images={[settings.shop_bg_image_url, ...SHOP_BANNER_IMAGES]}
         overlayOpacity={overlay}
-        contentClassName="text-left"
+        // o texto encostado à esquerda (a 80 px no computador, longe da seta) e os livros à direita
+        contentClassName="text-left w-full md:pl-20"
         compactOnMobile
+        livrosADireita
       >
         {children}
       </PageBannerSlider>
@@ -111,7 +113,7 @@ export default function ShopHeroBackground({ settings, children }) {
       {mode === 'video' && playableVideoUrl(settings.shop_bg_video_url) && (
         <>
           <video src={playableVideoUrl(settings.shop_bg_video_url)} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline poster={settings.shop_bg_image_url || undefined} />
-          <div className="absolute inset-0" style={{ background: `rgba(12, 74, 110, ${overlay})` }} />
+          <div className="absolute inset-0" style={{ background: veuDoLadoDoTexto(overlay) }} />
         </>
       )}
 
@@ -119,7 +121,7 @@ export default function ShopHeroBackground({ settings, children }) {
         <AnimatePresence mode="wait">
           <motion.div key={slide.id} className="absolute inset-0" {...(transition?.bg || {})}>
             <ShopSlideMedia slide={slide} />
-            <div className="absolute inset-0" style={{ background: `rgba(12, 74, 110, ${overlay})` }} />
+            <div className="absolute inset-0" style={{ background: veuDoLadoDoTexto(overlay) }} />
           </motion.div>
         </AnimatePresence>
       )}
