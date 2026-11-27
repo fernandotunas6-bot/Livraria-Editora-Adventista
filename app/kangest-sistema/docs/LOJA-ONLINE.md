@@ -171,6 +171,85 @@ produtos que já tinha.
 
 Testes: `os_dados_dos_livros_do_site_nas_fichas` e `fichas::testes` (Rust), e `kangest-central.mjs` (PGlite).
 
+### Os dados das fichas para os produtos do site (o sentido contrário; 27/11)
+
+O que a ficha de um artigo tem e o produto do site com a mesma referência não tem segue na volta da sincronização
+(`sinc/fichas.rs`, `livros_para_o_site`; migração 0076):
+- **o que vai:** o autor, a editora, o idioma, o ano e as páginas da ficha, e o ISBN, que é o código de barras quando
+  este for um ISBN válido;
+- **como se sabe o que falta no site:** pela cópia da Loja online, que traz estes dados desde a 20261127100000;
+- **até 50 livros por volta,** no campo `livros` do pedido. Se forem 50, a volta seguinte vem logo a seguir.
+
+**O que o site respondeu fica em `livros_enviados`,** com a versão (o que foi, em texto):
+- `feito` e `sem_produto` não voltam a seguir, a não ser que a ficha mude;
+- `recusado` tenta outra vez um dia depois;
+- `erro` (ou um site sem resposta para eles) tenta outra vez cada vez mais tarde.
+
+**No site** (`limparLivrosKanGest` e `public.kangest_dados_dos_livros`):
+- só se aceitam do KanGest que manda no catálogo;
+- os textos ficam numa linha e com o tamanho das colunas. O ano e as páginas só entram como números inteiros razoáveis,
+  e o ISBN só se for um ISBN-13 válido;
+- **só se preenche o que está vazio** (o ano e as páginas a 0 contam como vazios). O ISBN só entra se nenhum outro
+  produto o tiver. A editora que o site põe nos rascunhos («Livraria e Editora Adventista») não se substitui.
+
+O produto muda de data de alteração e volta ao KanGest nas novidades. Não há volta em círculo: cada sentido só mexe no
+que o outro lado não tem.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «Os dados dos livros do site» mostra quantos
+foram, quantos esperam e o motivo das recusas. O interruptor «Enviar para o site» desliga-o neste computador (`config`
+`sinc.dados_para_o_site`).
+
+Testes: `os_dados_das_fichas_para_o_site` e `fichas::testes` (Rust), `limparLivrosKanGest` (`kangestSinc.test.ts`) e
+`kangest-central.mjs` (PGlite).
+
+### As famílias do KanGest e os géneros do site (27/11)
+
+As famílias dos artigos e os géneros do site (as categorias públicas, como «Fé & Doutrina» ou «Bíblias») ligam-se
+(`sinc/fichas.rs`, `generos`; migração 0078):
+- **sozinhas,** quando o nome é igual (sem maiúsculas nem acentos, e «&» vale «e»);
+- **à mão,** no quadro «Ligar famílias» da Loja online: um género do site, «Não ligar», ou «Pelo nome» para voltar à
+  ligação sozinha (`familias_no_site`).
+
+**O que a ligação faz:**
+- **Do site para o KanGest:** um artigo na família «Geral» (ou sem família) recebe a família ligada ao género do seu
+  produto. Só quando uma família, e só uma, está ligada a esse género, e só uma vez por artigo: se alguém o puser outra
+  vez na «Geral», fica lá. A subfamília sai, porque era da família anterior.
+- **Do KanGest para o site:** o produto em «Catálogo Geral» (o género por omissão) ou sem género recebe o género da
+  família do artigo, no campo `genero` dos livros para o site. O site só aceita um género que já tenha: o KanGest não
+  cria categorias públicas novas.
+
+A família «Geral» nunca se liga, e o género «Catálogo Geral» também não.
+
+### As promoções dos artigos no site (27/11)
+
+**A regra é a do preço:** o KanGest que manda no catálogo manda também nas promoções dos produtos do site ligados aos
+seus artigos (`sinc/promocoes.rs`; migração 0077). A promoção de um artigo é a mesma que a venda aplica: a percentagem
+entre duas datas, as duas incluídas.
+
+**Como segue:**
+- **até 50 por volta,** no campo `promocoes` do pedido;
+- **com promoção:** o site põe o preço promocional, calculado sobre o PVP com IVA, desde as 00:00 do primeiro dia até às
+  00:00 do dia a seguir ao último, na hora de Angola;
+- **sem promoção, ou já acabada,** depois de uma ter ido: o site retira a que o KanGest pôs;
+- **o que o site respondeu fica em `promocoes_enviadas`,** com a versão (a promoção e o PVP). Uma promoção ou um preço
+  que mude volta a seguir.
+
+**No site** (`limparPromocoesKanGest` e `public.kangest_promocoes_do_posto`, 20261127120000):
+- só se aceitam do KanGest que manda no catálogo;
+- **uma promoção posta no painel nunca é substituída:** responde `tem_promocao`, e o KanGest tenta outra vez um dia
+  depois;
+- o KanGest só retira as promoções que ele próprio pôs (`stock_books.kangest_promocao`);
+- uma promoção do KanGest que alguém altere no painel passa a ser do painel, e o KanGest deixa de lhe tocar. O
+  formulário do produto no painel avisa;
+- a auditoria dos preços do site regista cada mudança do preço promocional.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «As promoções dos artigos no site» mostra quantas
+estão no site, quantas esperam, quantas ficaram com a promoção do painel e o motivo das recusas. «Enviar sozinho»
+desliga-o neste computador (`config` `sinc.promocoes_para_o_site`).
+
+Testes: `as_promocoes_dos_artigos_para_o_site` e `promocoes::testes` (Rust), `limparPromocoesKanGest`
+(`kangestSinc.test.ts`) e `kangest-central.mjs` (PGlite).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;

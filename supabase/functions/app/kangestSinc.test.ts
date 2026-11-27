@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador, limparFotosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES, tipoDaImagem,
+  isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -400,5 +401,72 @@ describe("limparFotosKanGest (as fotografias do KanGest para as capas do site)",
   it("ignora o que nem tem um artigo", () => {
     const l = limparFotosKanGest([{ referencia: "R1", imagem: dataUrl("jpeg", jpeg) }, null, "x"]);
     expect(l).toEqual({ fotos: [], recusadas: [] });
+  });
+});
+
+describe("limparLivrosKanGest (os dados das fichas do KanGest para os produtos do site)", () => {
+  it("confere o ISBN-13 pelo algarismo de controlo", () => {
+    expect(isbn13Valido("9788534520775")).toBe(true);
+    expect(isbn13Valido("9788534520776")).toBe(false);
+    expect(isbn13Valido("5601234567890")).toBe(false);
+    expect(isbn13Valido("978853452077")).toBe(false);
+  });
+
+  it("sem livros (um KanGest antigo) é null", () => {
+    expect(limparLivrosKanGest(undefined)).toBeNull();
+    expect(limparLivrosKanGest([])).toBeNull();
+    expect(limparLivrosKanGest({ artigo_id: 1 })).toBeNull();
+  });
+
+  it("limpa os textos, os números e o ISBN, e deixa de fora o que não serve", () => {
+    const l = limparLivrosKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", autor: "  Ellen\n G.   White ", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "978-85-345-2077-5", genero: " Fé & Doutrina " },
+      { artigo_id: 8, referencia: "LIV-002", ano: 0, paginas: 2.5, isbn: "9788534520776", autor: "" },
+      { artigo_id: 9, referencia: "", autor: "Sem referência" },
+      { referencia: "LIV-003", autor: "Sem artigo" },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", autor: "Ellen G. White", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "9788534520775", genero: "Fé & Doutrina" },
+    ]);
+  });
+
+  it(`no máximo ${MAX_LIVROS} por volta, e os textos com o tamanho das colunas`, () => {
+    const muitos = Array.from({ length: MAX_LIVROS + 5 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, autor: "A".repeat(400) }));
+    const l = limparLivrosKanGest(muitos)!;
+    expect(l).toHaveLength(MAX_LIVROS);
+    expect(l[0].autor).toHaveLength(300);
+  });
+});
+
+describe("limparPromocoesKanGest (as promoções do KanGest para os produtos do site)", () => {
+  it("só datas que existem no calendário", () => {
+    expect(dataValida("2026-12-24")).toBe("2026-12-24");
+    expect(dataValida("2026-02-30")).toBeNull();
+    expect(dataValida("24/12/2026")).toBeNull();
+    expect(dataValida(null)).toBeNull();
+  });
+
+  it("sem promoções (um KanGest antigo) é null", () => {
+    expect(limparPromocoesKanGest(undefined)).toBeNull();
+    expect(limparPromocoesKanGest([])).toBeNull();
+  });
+
+  it("limpa a percentagem, as datas e o PVP; 0 retira, e o que não tem artigo sai", () => {
+    const l = limparPromocoesKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", desconto: 12.345, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 100, inicio: "ontem", fim: "2026-02-30", preco1_iva: 12.5 },
+      { artigo_id: 9, referencia: "LIV-003", desconto: -5 },
+      { referencia: "LIV-004", desconto: 10 },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", desconto: 12.35, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+      { artigo_id: 9, referencia: "LIV-003", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+    ]);
+  });
+
+  it(`no máximo ${MAX_PROMOCOES} por volta`, () => {
+    const muitas = Array.from({ length: MAX_PROMOCOES + 3 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, desconto: 5 }));
+    expect(limparPromocoesKanGest(muitas)).toHaveLength(MAX_PROMOCOES);
   });
 });

@@ -557,3 +557,37 @@ Testes:
 - **A migração 0075 apaga o cursor dos produtos:** o catálogo vem todo uma vez, já com os dados novos.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados dos livros do site nas
   fichas dos artigos»).
+
+## 19. Os dados das fichas nos produtos do site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `livros` vão até 50 livros por volta:
+  `{ artigo_id, referencia, autor?, editora?, idioma?, ano?, paginas?, isbn?, genero? }`. Vão só os campos que a ficha
+  tem e o produto do site (na cópia da Loja online) não. O `genero` é o do site ligado à família do artigo, e só vai
+  para um produto em «Catálogo Geral» ou sem género.
+- **O site:**
+  - `limparLivrosKanGest` limpa os textos e confere os números e o ISBN-13;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_dados_dos_livros` (20261127110000; o género na 20261127130000) preenche só o que está vazio. O ISBN
+    só entra se nenhum outro produto o tiver, e o género só se o site já o tiver.
+- **A resposta** (`livros`): para cada livro, `{ artigo_id, estado, erro? }`, com o estado `feito`, `sem_produto`,
+  `recusado` ou `erro`. O posto regista-a em `livros_enviados` (migração 0076).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados das fichas para os
+  produtos do site»).
+
+## 20. As promoções dos artigos no site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `promocoes` vão até 50 por volta:
+  `{ artigo_id, referencia, desconto, inicio?, fim?, preco1_iva? }`. Um `desconto` de 0 pede para retirar a promoção
+  que o KanGest pôs.
+- **O site:**
+  - `limparPromocoesKanGest` aceita a percentagem entre 0 e 99,99, as datas só se existirem e o PVP em cêntimos;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_promocoes_do_posto` (20261127120000) põe ou retira o `sale_price` e as datas. Nunca toca numa
+    promoção do painel: a coluna `kangest_promocao` diz de quem é, e o gatilho `stock_books_promocao_do_painel` passa-a
+    para o painel quando alguém a muda lá.
+- **A resposta** (`promocoes`): para cada artigo, `{ artigo_id, estado, erro? }`, com o estado `feita`, `retirada`,
+  `sem_produto`, `tem_promocao`, `recusada` ou `erro`. O posto regista-a em `promocoes_enviadas` (migração 0077).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As promoções dos artigos no
+  site»).

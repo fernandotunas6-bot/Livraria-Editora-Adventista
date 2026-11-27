@@ -16,6 +16,11 @@
 //!
 //! Automático com opção manual: corre depois de cada volta da sincronização que traga produtos; na Loja online há o
 //! cartão com «Completar agora» e o interruptor para o desligar neste computador (`sinc.dados_dos_livros` = "0").
+//!
+//! **As famílias e os géneros do site** (migração 0078): cada família liga-se a um género do site, sozinha quando os
+//! nomes são iguais, ou à mão (`familias_no_site`). Um artigo na família «Geral» (ou sem família) recebe a família ligada
+//! ao género do produto, se só uma família estiver ligada a esse género; e, no sentido contrário, o produto em «Catálogo
+//! Geral» (ou sem género) recebe o género da família do artigo.
 
 use std::collections::{HashMap, HashSet};
 
@@ -45,12 +50,92 @@ pub struct Falta {
     pub dados: Vec<(String, Value)>,
     /// o ISBN-13 para o código de barras
     pub codigo_barras: Option<String>,
+    /// a família ligada ao género do produto, para um artigo na família «Geral» ou sem família
+    pub familia: Option<i64>,
 }
 
 impl Falta {
     pub fn vazia(&self) -> bool {
-        self.dados.is_empty() && self.codigo_barras.is_none()
+        self.dados.is_empty() && self.codigo_barras.is_none() && self.familia.is_none()
     }
+}
+
+/// O campo de `fichas_do_site` para a família.
+pub const FAMILIA: &str = "familia";
+/// O género por omissão do site: um produto nele recebe o género da família do artigo.
+const GENERO_GERAL: &str = "Catálogo Geral";
+
+/// Um nome para comparar famílias e géneros: sem maiúsculas, sem acentos, «&» como «e» e só letras e algarismos.
+pub fn nome_normal(t: &str) -> String {
+    let mut s = String::new();
+    for c in t.to_lowercase().replace('&', " e ").chars() {
+        let c = match c {
+            'á' | 'à' | 'â' | 'ã' | 'ä' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ó' | 'ò' | 'ô' | 'õ' | 'ö' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            'ñ' => 'n',
+            c if c.is_alphanumeric() => c,
+            _ => ' ',
+        };
+        s.push(c);
+    }
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// A ligação das famílias aos géneros do site.
+#[derive(Debug, Default)]
+pub struct Generos {
+    /// família → género do site
+    pub da_familia: HashMap<i64, String>,
+    /// género do site (normalizado) → a única família ligada a ele
+    pub familia_do_genero: HashMap<String, i64>,
+    /// as famílias «Geral»
+    pub gerais: HashSet<i64>,
+}
+
+/// A ligação de agora: à mão (`familias_no_site`; um género vazio é «não ligar») ou, sem nada à mão, pelo nome igual a
+/// um género que o site tenha.
+pub async fn generos(pool: &SqlitePool) -> AppResult<Generos> {
+    let familias: Vec<(i64, String)> = sqlx::query_as("SELECT id, descricao FROM familias").fetch_all(pool).await?;
+    let mut mao: HashMap<i64, String> = HashMap::new();
+    for (f, g) in sqlx::query_as::<_, (i64, String)>("SELECT familia_id, genero FROM familias_no_site").fetch_all(pool).await? {
+        mao.insert(f, g);
+    }
+    let do_site: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT TRIM(json_extract(dados, '$.genero')) FROM loja_produtos WHERE TRIM(COALESCE(json_extract(dados, '$.genero'), '')) <> ''",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut g = Generos::default();
+    for (id, descricao) in &familias {
+        let n = nome_normal(descricao);
+        if n == "geral" {
+            g.gerais.insert(*id);
+        }
+        let genero = match mao.get(id) {
+            Some(m) => Some(m.trim().to_string()).filter(|m| !m.is_empty()),
+            None => do_site.iter().find(|x| nome_normal(x) == n && n != "geral").cloned(),
+        };
+        if let Some(genero) = genero.filter(|x| nome_normal(x) != nome_normal(GENERO_GERAL)) {
+            g.da_familia.insert(*id, genero);
+        }
+    }
+    let mut contagem: HashMap<String, Vec<i64>> = HashMap::new();
+    for (f, genero) in &g.da_familia {
+        contagem.entry(nome_normal(genero)).or_default().push(*f);
+    }
+    for (genero, lista) in contagem {
+        // só quando uma família está ligada a esse género (com duas, não se sabe qual)
+        if let [f] = lista.as_slice() {
+            if !g.gerais.contains(f) {
+                g.familia_do_genero.insert(genero, *f);
+            }
+        }
+    }
+    Ok(g)
 }
 
 /// Um dado do ramo conta como vazio quando não está, é texto vazio ou é o número 0.
@@ -106,16 +191,20 @@ struct Plano {
     falta: Falta,
 }
 
+/// Uma ficha com o produto do site: o id, os dados do ramo, o código de barras, os dados do produto e a família.
+type FichaComProduto = (i64, Option<String>, Option<String>, String, Option<i64>);
+
 /// As fichas dos artigos activos com um livro do site pela referência, e o que falta a cada uma.
 async fn planear(pool: &SqlitePool) -> AppResult<Vec<Plano>> {
-    let pares: Vec<(i64, Option<String>, Option<String>, String)> = sqlx::query_as(
-        "SELECT a.id, a.atributos, a.codigo_barras, MAX(p.dados)
+    let pares: Vec<FichaComProduto> = sqlx::query_as(
+        "SELECT a.id, a.atributos, a.codigo_barras, MAX(p.dados), a.familia_id
            FROM artigos a JOIN loja_produtos p ON TRIM(p.referencia) = TRIM(a.referencia)
           WHERE TRIM(COALESCE(a.referencia, '')) <> '' AND a.ativo = 1
           GROUP BY a.id ORDER BY a.id",
     )
     .fetch_all(pool)
     .await?;
+    let ligacao = generos(pool).await?;
     // um código de barras que outro artigo já usa não serve (o leitor só encontraria um deles)
     let codigos: HashSet<String> =
         sqlx::query_scalar::<_, String>("SELECT TRIM(codigo_barras) FROM artigos WHERE TRIM(COALESCE(codigo_barras, '')) <> ''").fetch_all(pool).await?.into_iter().collect();
@@ -125,15 +214,22 @@ async fn planear(pool: &SqlitePool) -> AppResult<Vec<Plano>> {
     }
     let nada = HashSet::new();
     let mut planos = Vec::new();
-    for (artigo_id, atributos, codigo_barras, dados) in pares {
+    for (artigo_id, atributos, codigo_barras, dados, familia_id) in pares {
         let atributos = atributos
             .and_then(|t| serde_json::from_str::<Value>(&t).ok())
             .and_then(|v| v.as_object().cloned())
             .unwrap_or_default();
         let site: Value = serde_json::from_str(&dados).unwrap_or(Value::Null);
-        let mut falta = o_que_falta(&atributos, codigo_barras.as_deref(), &site, vieram.get(&artigo_id).unwrap_or(&nada));
+        let ja_veio = vieram.get(&artigo_id).unwrap_or(&nada);
+        let mut falta = o_que_falta(&atributos, codigo_barras.as_deref(), &site, ja_veio);
         if falta.codigo_barras.as_ref().is_some_and(|c| codigos.contains(c)) {
             falta.codigo_barras = None;
+        }
+        // a família do género do produto, para um artigo na «Geral» ou sem família (uma vez só)
+        let na_geral = familia_id.is_none_or(|f| ligacao.gerais.contains(&f));
+        if na_geral && !ja_veio.contains(FAMILIA) {
+            let genero = nome_normal(site["genero"].as_str().unwrap_or(""));
+            falta.familia = ligacao.familia_do_genero.get(&genero).copied().filter(|f| Some(*f) != familia_id);
         }
         if !falta.vazia() {
             planos.push(Plano { artigo_id, atributos, falta });
@@ -148,6 +244,7 @@ pub struct Completadas {
     pub fichas: i64,
     pub dados: i64,
     pub codigos: i64,
+    pub familias: i64,
 }
 
 /// Completa as fichas que podem receber alguma coisa do site, numa só transacção.
@@ -199,6 +296,19 @@ pub async fn completar(pool: &SqlitePool) -> AppResult<Completadas> {
                 }
             }
         }
+        if let Some(f) = p.falta.familia {
+            let r = sqlx::query("UPDATE artigos SET familia_id = ?, subfamilia_id = NULL WHERE id = ? AND familia_id IS NOT ?")
+                .bind(f)
+                .bind(p.artigo_id)
+                .bind(f)
+                .execute(&mut *tx)
+                .await?;
+            if r.rows_affected() > 0 {
+                let nome: String = sqlx::query_scalar("SELECT descricao FROM familias WHERE id = ?").bind(f).fetch_one(&mut *tx).await?;
+                vieram.push((FAMILIA.to_string(), nome));
+                feito.familias += 1;
+            }
+        }
         if vieram.is_empty() {
             continue;
         }
@@ -216,8 +326,8 @@ pub async fn completar(pool: &SqlitePool) -> AppResult<Completadas> {
     if feito.fichas > 0 {
         sqlx::query("INSERT INTO auditoria (utilizador_id, acao, detalhe) VALUES (NULL, 'FICHA_DO_SITE', ?)")
             .bind(format!(
-                "Completou {} ficha(s) de artigos com os dados dos livros do site: {} dado(s) do livro e {} código(s) de barras (ISBN).",
-                feito.fichas, feito.dados, feito.codigos
+                "Completou {} ficha(s) de artigos com os dados dos livros do site: {} dado(s) do livro, {} código(s) de barras (ISBN) e {} família(s).",
+                feito.fichas, feito.dados, feito.codigos, feito.familias
             ))
             .execute(&mut *tx)
             .await?;
@@ -226,19 +336,46 @@ pub async fn completar(pool: &SqlitePool) -> AppResult<Completadas> {
     Ok(feito)
 }
 
-/// Completa sozinho? (por omissão, sim)
-pub async fn ligado(pool: &SqlitePool) -> bool {
-    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(CHAVE).fetch_optional(pool).await.ok().flatten();
+/// Um interruptor deste computador (por omissão, ligado; "0" desliga).
+async fn interruptor(pool: &SqlitePool, chave: &str) -> bool {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(chave).fetch_optional(pool).await.ok().flatten();
     v.as_deref() != Some("0")
 }
 
-/// O cartão da Loja online: se está ligado, quantas fichas podem receber alguma coisa e quantas já receberam.
+/// Completa sozinho? (por omissão, sim)
+pub async fn ligado(pool: &SqlitePool) -> bool {
+    interruptor(pool, CHAVE).await
+}
+
+/// O cartão da Loja online: se está ligado, quantas fichas podem receber alguma coisa e quantas já receberam; e o
+/// sentido contrário (`para_o_site`): quantos livros esperam, quantos já foram e o que o site recusou.
 pub async fn estado(st: &AppState) -> AppResult<Value> {
     st.exigir_perm("artigos.editar")?;
-    let por_completar = planear(&st.pool).await?.len();
+    let pool = &st.pool;
+    let por_completar = planear(pool).await?.len();
     let (completadas, ultima): (i64, Option<String>) =
-        sqlx::query_as("SELECT COUNT(DISTINCT artigo_id), MAX(em) FROM fichas_do_site").fetch_one(&st.pool).await?;
-    Ok(json!({ "ligado": ligado(&st.pool).await, "por_completar": por_completar, "completadas": completadas, "ultima": ultima }))
+        sqlx::query_as("SELECT COUNT(DISTINCT artigo_id), MAX(em) FROM fichas_do_site").fetch_one(pool).await?;
+    let por_enviar = escolher_livros(pool, super::agora_s(), usize::MAX).await?.len();
+    let contar = |estados: &'static str| async move {
+        sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM livros_enviados WHERE estado IN ({estados})")).fetch_one(pool).await
+    };
+    let erro: Option<String> =
+        sqlx::query_scalar("SELECT erro FROM livros_enviados WHERE estado IN ('erro', 'recusado') AND erro <> '' ORDER BY em DESC LIMIT 1")
+            .fetch_optional(pool)
+            .await?;
+    Ok(json!({
+        "ligado": ligado(pool).await,
+        "por_completar": por_completar,
+        "completadas": completadas,
+        "ultima": ultima,
+        "para_o_site": {
+            "ligado": interruptor(pool, CHAVE_PARA_O_SITE).await,
+            "por_enviar": por_enviar,
+            "enviados": contar("'feito'").await?,
+            "recusados": contar("'recusado', 'erro'").await?,
+            "ultimo_erro": erro,
+        },
+    }))
 }
 
 /// «Completar agora».
@@ -246,24 +383,253 @@ pub async fn completar_agora(st: &AppState) -> AppResult<Value> {
     st.exigir_perm("artigos.editar")?;
     let f = completar(&st.pool).await?;
     let mut e = estado(st).await?;
-    e["agora"] = json!({ "fichas": f.fichas, "dados": f.dados, "codigos": f.codigos });
+    e["agora"] = json!({ "fichas": f.fichas, "dados": f.dados, "codigos": f.codigos, "familias": f.familias });
     Ok(e)
 }
 
 #[derive(Deserialize)]
 pub struct LigarIn {
-    ligado: bool,
+    /// completar as fichas com os dados do site
+    #[serde(default)]
+    ligado: Option<bool>,
+    /// mandar os dados das fichas para os produtos do site
+    #[serde(default)]
+    para_o_site: Option<bool>,
 }
 
-/// Liga ou desliga neste computador.
+/// Liga ou desliga, neste computador, um sentido ou os dois.
 pub async fn ligar(st: &AppState, i: LigarIn) -> AppResult<Value> {
     st.exigir_perm("artigos.editar")?;
-    sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
-        .bind(CHAVE)
-        .bind(if i.ligado { "1" } else { "0" })
-        .execute(&st.pool)
-        .await?;
+    for (chave, valor) in [(CHAVE, i.ligado), (CHAVE_PARA_O_SITE, i.para_o_site)] {
+        let Some(v) = valor else { continue };
+        sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
+            .bind(chave)
+            .bind(if v { "1" } else { "0" })
+            .execute(&st.pool)
+            .await?;
+    }
     estado(st).await
+}
+
+/// O quadro da ligação das famílias aos géneros do site: os géneros que o site tem (com quantos produtos) e, para cada
+/// família, o género ligado, se é à mão e quantos artigos tem.
+pub async fn generos_estado(st: &AppState) -> AppResult<Value> {
+    st.exigir_perm("artigos.editar")?;
+    let pool = &st.pool;
+    let ligacao = generos(pool).await?;
+    let do_site = db::query_json(
+        pool,
+        "SELECT TRIM(json_extract(dados, '$.genero')) AS genero, COUNT(*) AS produtos FROM loja_produtos
+          WHERE TRIM(COALESCE(json_extract(dados, '$.genero'), '')) <> '' GROUP BY 1 ORDER BY 2 DESC, 1",
+    )
+    .await?;
+    let familias: Vec<(i64, String, i64, Option<String>)> = sqlx::query_as(
+        "SELECT f.id, f.descricao, (SELECT COUNT(*) FROM artigos a WHERE a.familia_id = f.id AND a.ativo = 1),
+                (SELECT m.genero FROM familias_no_site m WHERE m.familia_id = f.id)
+           FROM familias f ORDER BY f.descricao COLLATE NOCASE",
+    )
+    .fetch_all(pool)
+    .await?;
+    let familias: Vec<Value> = familias
+        .into_iter()
+        .map(|(id, descricao, artigos, mao)| {
+            json!({
+                "id": id, "descricao": descricao, "artigos": artigos,
+                "genero": ligacao.da_familia.get(&id),
+                "a_mao": mao.is_some(),
+                "geral": ligacao.gerais.contains(&id),
+            })
+        })
+        .collect();
+    Ok(json!({ "generos": do_site, "familias": familias }))
+}
+
+#[derive(Deserialize)]
+pub struct GeneroIn {
+    familia_id: i64,
+    /// o género do site; vazio é «não ligar»; `null` volta à ligação sozinha (pelo nome)
+    genero: Option<String>,
+}
+
+/// Liga (ou desliga) uma família a um género do site, à mão.
+pub async fn ligar_genero(st: &AppState, i: GeneroIn) -> AppResult<Value> {
+    st.exigir_perm("artigos.editar")?;
+    match i.genero {
+        None => {
+            sqlx::query("DELETE FROM familias_no_site WHERE familia_id = ?").bind(i.familia_id).execute(&st.pool).await?;
+        }
+        Some(g) => {
+            sqlx::query(
+                "INSERT INTO familias_no_site (familia_id, genero, em) VALUES (?, ?, ?)
+                 ON CONFLICT(familia_id) DO UPDATE SET genero = excluded.genero, em = excluded.em",
+            )
+            .bind(i.familia_id)
+            .bind(g.trim().chars().take(80).collect::<String>())
+            .bind(db::agora())
+            .execute(&st.pool)
+            .await?;
+        }
+    }
+    generos_estado(st).await
+}
+
+// -----------------------------------------------------------------------------------------------------------------
+// O sentido contrário: os dados das fichas para os produtos do site que não os têm (KANGEST-SINCRONIZACAO §19).
+// -----------------------------------------------------------------------------------------------------------------
+
+/// A chave na `config` deste computador para o envio: "0" desliga.
+pub const CHAVE_PARA_O_SITE: &str = "sinc.dados_para_o_site";
+/// Livros por volta (o site aceita até 50).
+pub const MAX_LIVROS: usize = 50;
+
+/// Um texto da ficha numa linha, com o tamanho da coluna do site, ou nada.
+fn texto_da_ficha(v: Option<&Value>) -> Option<String> {
+    let t = v?.as_str()?.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!t.is_empty()).then(|| t.chars().take(MAX_TEXTO).collect())
+}
+
+/// Um número da ficha maior do que 0.
+fn numero_da_ficha(v: Option<&Value>) -> Option<i64> {
+    let v = v?;
+    let n = v.as_i64().or_else(|| v.as_f64().map(|f| f.round() as i64)).or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))?;
+    (n > 0).then_some(n)
+}
+
+/// O que a ficha tem e o produto do site (na cópia da Loja online) não: os dados do livro, o ISBN (que é o código de
+/// barras quando este for um ISBN válido) e o género da família do artigo, para um produto em «Catálogo Geral» ou sem
+/// género.
+pub fn para_o_site(atributos: &Map<String, Value>, codigo_barras: Option<&str>, genero: Option<&str>, site: &Value) -> Map<String, Value> {
+    let mut m = Map::new();
+    let do_site = nome_normal(site["genero"].as_str().unwrap_or(""));
+    if let Some(g) = genero.map(str::trim).filter(|g| !g.is_empty()) {
+        if (do_site.is_empty() || do_site == nome_normal(GENERO_GERAL)) && nome_normal(g) != do_site {
+            m.insert("genero".to_string(), Value::String(g.chars().take(80).collect()));
+        }
+    }
+    for c in TEXTOS {
+        if let Some(t) = texto_da_ficha(atributos.get(c)).filter(|_| vazio(site.get(c))) {
+            m.insert(c.to_string(), Value::String(t));
+        }
+    }
+    for c in NUMEROS {
+        if let Some(n) = numero_da_ficha(atributos.get(c)).filter(|_| vazio(site.get(c))) {
+            m.insert(c.to_string(), json!(n));
+        }
+    }
+    if let Some(isbn) = codigo_barras.filter(|c| ramos::parece_isbn(c)).and_then(ramos::isbn13).filter(|_| vazio(site.get("isbn"))) {
+        m.insert("isbn".to_string(), Value::String(isbn));
+    }
+    m
+}
+
+/// Um livro para o site: o artigo, a versão (o que vai, em texto: muda quando a ficha muda) e o item do pedido.
+#[derive(Debug, Clone)]
+pub struct LivroParaOSite {
+    pub artigo_id: i64,
+    pub versao: String,
+    pub item: Value,
+}
+
+/// Um artigo com o produto do site: o id, a referência, os dados do ramo, o código de barras, os dados do produto e a
+/// família.
+type ArtigoComProduto = (i64, String, Option<String>, Option<String>, String, Option<i64>);
+
+/// Os livros que podem ir: os artigos activos com um produto do site pela referência, a quem a ficha pode dar alguma
+/// coisa, e que ainda não foram com esta versão (os recusados e os erros voltam quando passar a espera).
+async fn escolher_livros(pool: &SqlitePool, agora: i64, limite: usize) -> AppResult<Vec<LivroParaOSite>> {
+    let pares: Vec<ArtigoComProduto> = sqlx::query_as(
+        "SELECT a.id, TRIM(a.referencia), a.atributos, a.codigo_barras, MAX(p.dados), a.familia_id
+           FROM artigos a JOIN loja_produtos p ON TRIM(p.referencia) = TRIM(a.referencia)
+          WHERE TRIM(COALESCE(a.referencia, '')) <> '' AND a.ativo = 1
+          GROUP BY a.id ORDER BY a.id",
+    )
+    .fetch_all(pool)
+    .await?;
+    let ligacao = generos(pool).await?;
+    let mut enviados: HashMap<i64, (String, String, i64)> = HashMap::new();
+    for (a, v, e, p) in sqlx::query_as::<_, (i64, String, String, i64)>("SELECT artigo_id, versao, estado, proximo_em FROM livros_enviados").fetch_all(pool).await? {
+        enviados.insert(a, (v, e, p));
+    }
+    let mut livros = Vec::new();
+    for (artigo_id, referencia, atributos, codigo_barras, dados, familia_id) in pares {
+        if livros.len() >= limite {
+            break;
+        }
+        let atributos = atributos
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+            .and_then(|v| v.as_object().cloned())
+            .unwrap_or_default();
+        let site: Value = serde_json::from_str(&dados).unwrap_or(Value::Null);
+        let genero = familia_id.and_then(|f| ligacao.da_familia.get(&f)).map(String::as_str);
+        let falta = para_o_site(&atributos, codigo_barras.as_deref(), genero, &site);
+        if falta.is_empty() {
+            continue;
+        }
+        let versao = Value::Object(falta.clone()).to_string();
+        if let Some((v, estado, proximo)) = enviados.get(&artigo_id) {
+            // a mesma versão: já foi (feito, sem produto), ou espera ainda (recusado, erro)
+            if *v == versao && (estado == "feito" || estado == "sem_produto" || *proximo > agora) {
+                continue;
+            }
+        }
+        let mut item = Value::Object(falta);
+        item["artigo_id"] = json!(artigo_id);
+        item["referencia"] = json!(referencia);
+        livros.push(LivroParaOSite { artigo_id, versao, item });
+    }
+    Ok(livros)
+}
+
+/// Os livros desta volta (no máximo `MAX_LIVROS`), se o envio estiver ligado neste computador.
+pub async fn livros_para_o_site(pool: &SqlitePool, agora: i64) -> AppResult<Vec<LivroParaOSite>> {
+    if !interruptor(pool, CHAVE_PARA_O_SITE).await {
+        return Ok(Vec::new());
+    }
+    escolher_livros(pool, agora, MAX_LIVROS).await
+}
+
+/// Regista o que o site respondeu a cada livro (`livros` na resposta): feito, sem_produto, recusado (tenta outra vez um
+/// dia depois) ou erro (cada vez mais tarde). Um livro sem resposta (um site antigo) conta como erro.
+pub async fn concluir_livros(pool: &SqlitePool, enviados: &[LivroParaOSite], resposta: &Value, agora: i64) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    for l in enviados {
+        let r = resposta.as_array().and_then(|v| v.iter().find(|x| x["artigo_id"].as_i64() == Some(l.artigo_id)));
+        let (estado, erro) = match r {
+            Some(x) => (x["estado"].as_str().unwrap_or("erro"), x["erro"].as_str().unwrap_or("")),
+            None => ("erro", "O site não respondeu aos dados do livro."),
+        };
+        let estado = match estado {
+            "feito" | "sem_produto" | "recusado" => estado,
+            _ => "erro",
+        };
+        let antes: i64 = sqlx::query_scalar("SELECT tentativas FROM livros_enviados WHERE artigo_id = ? AND versao = ?")
+            .bind(l.artigo_id)
+            .bind(&l.versao)
+            .fetch_optional(&mut *tx)
+            .await?
+            .unwrap_or(0);
+        let proximo = match estado {
+            "erro" => super::proxima_tentativa(antes, agora),
+            "recusado" => agora + 24 * 3600,
+            _ => 0,
+        };
+        sqlx::query(
+            "INSERT INTO livros_enviados (artigo_id, versao, estado, erro, tentativas, proximo_em, em) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(artigo_id) DO UPDATE SET versao = excluded.versao, estado = excluded.estado, erro = excluded.erro,
+               tentativas = excluded.tentativas, proximo_em = excluded.proximo_em, em = excluded.em",
+        )
+        .bind(l.artigo_id)
+        .bind(&l.versao)
+        .bind(estado)
+        .bind(erro.chars().take(300).collect::<String>())
+        .bind(antes + 1)
+        .bind(proximo)
+        .bind(db::agora())
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -300,5 +666,32 @@ mod testes {
         // um ISBN que não bate certo não serve de código de barras
         let f = o_que_falta(&Map::new(), None, &json!({ "isbn": "9788534520776" }), &nada);
         assert!(f.vazia());
+    }
+
+    #[test]
+    fn para_o_site_so_o_que_o_site_nao_tem() {
+        let ficha = obj(json!({ "autor": " Ellen  G. White ", "editora": "CPB", "idioma": "", "ano": 2024.0, "paginas": "128" }));
+        // o site sem nada: vai tudo o que a ficha tem (o ISBN do código de barras, em ISBN-13)
+        let m = para_o_site(&ficha, Some("978-85-345-2077-5"), None, &json!({ "autor": null, "editora": "", "isbn": "" }));
+        assert_eq!(
+            Value::Object(m),
+            json!({ "autor": "Ellen G. White", "editora": "CPB", "ano": 2024, "paginas": 128, "isbn": "9788534520775" })
+        );
+        // o site já tem o autor e o ISBN; um código de barras que não é ISBN não vai
+        let m = para_o_site(&ficha, Some("5601234567890"), None, &json!({ "autor": "Outro", "editora": "Outra", "ano": 1999, "paginas": 0, "isbn": "" }));
+        assert_eq!(Value::Object(m), json!({ "paginas": 128 }));
+        // o género da família só vai para um produto em «Catálogo Geral» ou sem género
+        let nada = Map::new();
+        assert_eq!(Value::Object(para_o_site(&nada, None, Some("Fé & Doutrina"), &json!({ "genero": "Catálogo Geral" }))), json!({ "genero": "Fé & Doutrina" }));
+        assert_eq!(Value::Object(para_o_site(&nada, None, Some("Fé & Doutrina"), &json!({ "genero": "" }))), json!({ "genero": "Fé & Doutrina" }));
+        assert!(para_o_site(&nada, None, Some("Fé & Doutrina"), &json!({ "genero": "Bíblias" })).is_empty());
+    }
+
+    #[test]
+    fn os_nomes_das_familias_e_dos_generos() {
+        assert_eq!(nome_normal("Fé & Doutrina"), "fe e doutrina");
+        assert_eq!(nome_normal("FÉ E DOUTRINA"), "fe e doutrina");
+        assert_eq!(nome_normal("  Saúde & Estilo de Vida "), "saude e estilo de vida");
+        assert_eq!(nome_normal("Catálogo Geral"), "catalogo geral");
     }
 }

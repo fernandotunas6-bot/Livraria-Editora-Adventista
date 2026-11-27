@@ -17,7 +17,7 @@ import { kz } from "@/lib/format";
 import { navegador } from "@/lib/navegador";
 import { useSession } from "@/store/session";
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Table, Td, Th, cn } from "@/components/ui";
-import { CapasDoSite, DadosDosLivros, FotosParaOSite } from "@/components/CapasDoSite";
+import { CapasDoSite, DadosDosLivros, FamiliasEGeneros, FotosParaOSite, PromocoesParaOSite } from "@/components/CapasDoSite";
 
 type Tom = "neutral" | "brand" | "ok" | "danger" | "accent";
 
@@ -143,6 +143,8 @@ export default function LojaOnline() {
       <CapasDoSite />
       <FotosParaOSite />
       <DadosDosLivros />
+      <FamiliasEGeneros />
+      <PromocoesParaOSite />
       {!e ? (
         <Card className="max-w-3xl">
           <div className="p-6 text-ink-3">{estado.error ? (estado.error as Error).message : "A carregar…"}</div>
