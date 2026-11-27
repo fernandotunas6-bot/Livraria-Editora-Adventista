@@ -69,7 +69,7 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
+  limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest, prepararRegistos,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3279,7 +3279,13 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
       const { count } = await q;
       return count ?? 0;
     };
-    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), sessoes: [] as Row[], livro: null as Row | null });
+    // as fichas que o posto mandou (entidades, artigos completos, utilizadores; 20261127160000)
+    const fichas: Record<string, number> = {};
+    for (const tipo of ["entidade", "artigo", "utilizador"]) {
+      const { count } = await db.from("kangest_registos").select("chave", { count: "exact", head: true }).eq("posto_id", p.id).eq("tipo", tipo);
+      fichas[tipo] = count ?? 0;
+    }
+    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), fichas, sessoes: [] as Row[], livro: null as Row | null });
   }
   // o livro único de stock (KANGEST ONE, B1): os movimentos e as diferenças com a fotografia, por posto
   const { data: livros, error: eLivros } = await db.rpc("stock_livro_resumo");
@@ -3636,6 +3642,23 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
       } else promocoes = data;
     }
   }
+  // as fichas do posto (entidades, artigos completos, utilizadores; sinc/registos.rs): os dados pessoais das entidades
+  // seguem cifrados; nunca impedem o resto da volta (o que falhar volta nos erros e o posto tenta outra vez)
+  let registos: unknown = null;
+  if (Array.isArray(aberto.dados?.registos) && aberto.dados.registos.length) {
+    try {
+      const fichas = await prepararRegistos(aberto.dados.registos, cifra);
+      if (fichas) {
+        const { data, error } = await db.rpc("kangest_registos_receber", { p_posto: posto, p_itens: fichas });
+        if (error) throw new Error(error.message);
+        registos = data;
+      } else registos = { recebidos: 0, erros: [] };
+    } catch (e) {
+      console.error("KanGest: as fichas do posto", posto, (e as Error).message);
+      const erro = (e as Error).message.slice(0, 300);
+      registos = { recebidos: 0, erros: (aberto.dados.registos as Row[]).slice(0, 200).map((r) => ({ registo: r?.registo, chave: r?.chave, erro })) };
+    }
+  }
   // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
   // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
   let novidades = null;
@@ -3662,7 +3685,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros, promocoes,
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros, promocoes, registos,
     // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
     kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
     site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },

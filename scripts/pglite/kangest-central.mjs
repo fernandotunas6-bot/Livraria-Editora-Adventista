@@ -339,6 +339,24 @@ check('promoções: mudada no painel, passa a ser do painel', r[0].estado === 'f
 await q(`update public.stock_books set sale_price = null where id = $1`, [livroS.id]);
 r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 10, inicio: '2026-12-10', fim: '2026-12-01' }]);
 check('promoções: a que acaba antes de começar é recusada, sem estragar o lote', r[0].estado === 'recusada' && (await promoDe(livroS.id)).sp === null, r);
+// as fichas do posto (20261127160000): o estado de agora, uma ficha estragada não leva as outras
+const fichas = async (p, itens) => (await q(`select public.kangest_registos_receber($1, $2::jsonb) r`, [p, JSON.stringify(itens)]))[0].r;
+r = await fichas(pA, [
+  { registo: 'entidade', chave: 7, dados: { nome: 'Igreja Central', tipo: 'C' }, pessoais_cifrado: 'v1:xyz' },
+  { registo: 'artigo', chave: 3, dados: { referencia: 'LIV-1', preco1: 100 } },
+  { registo: 'utilizador', chave: 'x', dados: {} },
+  { registo: 'outra', chave: 1, dados: {} },
+]);
+check('fichas: as boas entram e as estragadas vão para os erros', r.recebidos === 2 && r.erros.length === 2, r);
+r = await fichas(pA, [{ registo: 'artigo', chave: 3, dados: { referencia: 'LIV-1', preco1: 200 } }]);
+const [art] = await q(`select dados->>'preco1' p from public.kangest_registos where posto_id = $1 and tipo = 'artigo' and chave = 3`, [pA]);
+check('fichas: a mesma ficha fica com o estado de agora', r.recebidos === 1 && art?.p === '200', art);
+const [ent] = await q(`select pessoais_cifrado c, dados->>'nome' n from public.kangest_registos where posto_id = $1 and tipo = 'entidade'`, [pA]);
+check('fichas: os dados pessoais ficam cifrados à parte', ent?.c === 'v1:xyz' && ent?.n === 'Igreja Central', ent);
+await recusa('fichas: as contas não executam', () => como('authenticated', admin, `select public.kangest_registos_receber('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
+const [clienteFichas] = await q(`insert into auth.users (email, email_confirmed_at) values ('cliente-fichas@x.ao', now()) returning id`);
+check('fichas: um cliente não as vê', (await como('authenticated', clienteFichas.id, `select * from public.kangest_registos`)).length === 0);
+check('fichas: a equipa com «Gerir configurações» vê-as', (await como('authenticated', admin, `select * from public.kangest_registos`)).length === 2);
 await recusa('promoções: as contas não executam', () => como('authenticated', admin, `select public.kangest_promocoes_do_posto('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
 c = await conf(pB, null, true);
 check('configurar: só um posto manda no catálogo', c.manda_catalogo === true && (await q(`select manda_catalogo from public.kangest_postos where id = $1`, [pA]))[0].manda_catalogo === false);

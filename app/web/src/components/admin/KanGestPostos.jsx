@@ -215,7 +215,11 @@ export default function KanGestPostos({ lojas = [] }) {
                 </span>
                 <p className="w-full text-xs text-muted-foreground">
                   {p.estado === 'activo' ? <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-estado-ok" /> : <Link2 className="mr-1 inline h-3.5 w-3.5" />}
-                  {p.documentos} documento(s) recebido(s) · última sincronização {dataHora(p.ultima_sinc)}
+                  {p.documentos} documento(s) recebido(s)
+                  {p.fichas && (p.fichas.entidade || p.fichas.artigo || p.fichas.utilizador)
+                    ? ` · fichas: ${p.fichas.entidade || 0} cliente(s) e fornecedor(es), ${p.fichas.artigo || 0} artigo(s), ${p.fichas.utilizador || 0} utilizador(es)`
+                    : ''}
+                  {' '}· última sincronização {dataHora(p.ultima_sinc)}
                   {p.versao_programa ? ` · ${p.versao_programa}` : ''}
                 </p>
                 {p.ultimo_erro && <p className="w-full text-xs text-estado-erro">{p.ultimo_erro}</p>}

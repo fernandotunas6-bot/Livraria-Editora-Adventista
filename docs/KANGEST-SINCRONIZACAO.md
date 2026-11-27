@@ -593,3 +593,27 @@ Testes:
 - **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As promoções dos artigos no
   site»).
+
+## 22. As fichas para a base central (KANGEST ONE, «enviar todos os dados»)
+
+- **O que já seguia:** os documentos (as vendas, as facturas de compra, os recibos e as guias, com as linhas), o stock,
+  o catálogo e os preços, os fechos de caixa, a tesouraria e o livro de stock.
+- **O que passa a seguir** (KanGest 1.4.11, migração 0079, `sinc/registos.rs`):
+  - as entidades (os clientes e os fornecedores; o «Consumidor Final» não);
+  - os artigos com todos os campos (a família, os custos, os quatro preços, os mínimos, os dados do ramo e o stock
+    total);
+  - os utilizadores e as permissões, nunca as senhas, os PIN nem os segredos dos dois passos.
+- **A fila:**
+  - os gatilhos marcam a ficha em `sinc_registos`, na mesma transacção que a muda e só com a ligação activa;
+  - sem Internet, a ficha espera aí;
+  - cada volta leva até 100 fichas, no campo `registos`, com o estado de agora;
+  - ao ligar, seguem todas uma vez.
+- **O site** (`prepararRegistos` e `public.kangest_registos_receber`, 20261127160000):
+  - só aceita os três tipos;
+  - tira qualquer campo de senha ou de segredo;
+  - cifra os dados pessoais das entidades, com a mesma chave do NIF dos documentos (`pessoais_cifrado`: o NIF, os
+    telefones, o email, a morada, a pessoa de contacto e as observações);
+  - guarda o estado de agora em `public.kangest_registos`, que só a equipa com «Gerir configurações» lê.
+- **A resposta** (`registos`): `{ recebidos, erros: [{ registo, chave, erro }] }`. O que foi aceite sai da fila, se não
+  mudou entretanto. O recusado espera cada vez mais, e um site sem resposta conta como erro.
+- **No painel,** cada posto mostra quantas fichas chegaram de cada tipo.

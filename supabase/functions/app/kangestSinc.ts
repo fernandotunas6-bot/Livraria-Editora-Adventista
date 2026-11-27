@@ -749,3 +749,56 @@ export function limparLivroStock(x: unknown): { epoca: string; aberturas: Record
   const epoca = typeof v.epoca === "string" && /^[0-9A-Za-z:.+_-]{1,40}$/.test(v.epoca) ? v.epoca : "";
   return { epoca, aberturas, movimentos };
 }
+
+/** As fichas que o KanGest manda numa volta (sinc/registos.rs, `LOTE` = 100; o site aceita até 200). */
+export const MAX_REGISTOS = 200;
+/** O tamanho máximo dos dados de uma ficha, em texto. */
+const MAX_DADOS_REGISTO = 20_000;
+/** Os dados pessoais de uma entidade, que se guardam cifrados (a mesma chave do NIF dos documentos). */
+export const PESSOAIS_DA_ENTIDADE = ["nif", "telefone", "telefone2", "email", "endereco", "pessoa_contacto", "observacoes"];
+/** Nomes de campos que nunca entram na base, mesmo que um KanGest os mande por engano. */
+const CAMPO_PROIBIDO = /hash|segredo|totp|pin|senha|password|token|recuperacao/i;
+
+/** Uma ficha pronta para `kangest_registos_receber`. */
+export interface RegistoKanGest {
+  registo: "entidade" | "artigo" | "utilizador";
+  chave: number;
+  dados: Record<string, unknown>;
+  pessoais_cifrado: string;
+}
+
+/**
+ * As fichas do KanGest (entidades, artigos completos, utilizadores; sinc/registos.rs; docs/KANGEST-SINCRONIZACAO.md
+ * §22), limpas: só os três tipos, o número inteiro, os dados num objecto razoável, sem campos de senhas ou segredos, e,
+ * numa entidade, os dados pessoais cifrados à parte. Sem fichas (um KanGest antigo), `null`.
+ */
+export async function prepararRegistos(x: unknown, cifra: CifraDados): Promise<RegistoKanGest[] | null> {
+  if (!Array.isArray(x) || !x.length) return null;
+  const out: RegistoKanGest[] = [];
+  for (const item of x.slice(0, MAX_REGISTOS)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const v = item as Record<string, unknown>;
+    const registo = v.registo;
+    if (registo !== "entidade" && registo !== "artigo" && registo !== "utilizador") continue;
+    const chave = typeof v.chave === "number" && Number.isSafeInteger(v.chave) && v.chave > 0 ? v.chave : 0;
+    if (!chave || !v.dados || typeof v.dados !== "object" || Array.isArray(v.dados)) continue;
+    if (JSON.stringify(v.dados).length > MAX_DADOS_REGISTO) continue;
+    const dados: Record<string, unknown> = {};
+    for (const [k, valor] of Object.entries(v.dados as Record<string, unknown>)) {
+      if (!CAMPO_PROIBIDO.test(k)) dados[k] = valor;
+    }
+    let pessoais_cifrado = "";
+    if (registo === "entidade") {
+      const pessoais: Record<string, unknown> = {};
+      for (const k of PESSOAIS_DA_ENTIDADE) {
+        if (k in dados) {
+          if (dados[k] !== null && dados[k] !== "") pessoais[k] = dados[k];
+          delete dados[k];
+        }
+      }
+      pessoais_cifrado = Object.keys(pessoais).length ? await cifrarCampo(cifra, JSON.stringify(pessoais)) : "";
+    }
+    out.push({ registo, chave, dados, pessoais_cifrado });
+  }
+  return out.length ? out : null;
+}
