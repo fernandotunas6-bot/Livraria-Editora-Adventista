@@ -275,3 +275,53 @@ export function DadosDosLivros() {
     </Card>
   );
 }
+
+type Promocoes = { ligado: boolean; por_enviar: number; no_site: number; do_painel: number; recusadas: number; ultimo_erro: string | null };
+
+/**
+ * As promoções dos artigos no site (src-tauri/src/sinc/promocoes.rs): a regra do preço. O KanGest que manda no catálogo
+ * põe a promoção do artigo no produto do site e retira-a quando acaba, mas nunca mexe numa promoção do painel.
+ */
+export function PromocoesParaOSite() {
+  const pode = useSession((s) => s.tem)("artigos.editar");
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["promocoes-para-o-site"],
+    queryFn: () => call<Promocoes>("loja.promocoes.estado"),
+    enabled: pode,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const e = q.data;
+  if (!pode || !e || (!e.por_enviar && !e.no_site && !e.do_painel && !e.recusadas && e.ligado)) return null;
+  async function ligar(ligado: boolean) {
+    try {
+      qc.setQueryData(["promocoes-para-o-site"], await call<Promocoes>("loja.promocoes.ligar", { ligado }));
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+  const partes = [
+    e.no_site ? `${e.no_site} em promoção no site` : "",
+    e.por_enviar ? `${e.por_enviar} à espera (até 50 por volta da sincronização)` : "",
+    e.do_painel ? `${e.do_painel} ficaram com a promoção do painel do site` : "",
+    e.recusadas ? `${e.recusadas} não foram aceites${e.ultimo_erro ? `: ${e.ultimo_erro}` : ""}` : "",
+  ].filter(Boolean);
+  return (
+    <Card className="mb-4 flex flex-wrap items-center gap-3 p-4 text-[13.5px]" aria-label="As promoções no site">
+      <div className="min-w-0 flex-1">
+        <div className="font-medium">As promoções dos artigos no site</div>
+        <div className="text-ink-3">
+          {e.ligado
+            ? "A promoção de cada artigo passa ao produto do site, e sai quando acaba. Uma promoção do painel do site fica."
+            : "Desligado neste computador."}
+          {partes.length ? ` ${partes.join("; ")}.` : ""}
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-ink-2">
+        <input type="checkbox" checked={e.ligado} onChange={(ev) => void ligar(ev.target.checked)} />
+        Enviar sozinho
+      </label>
+    </Card>
+  );
+}

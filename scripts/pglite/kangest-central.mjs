@@ -304,11 +304,40 @@ await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', autor: 'Outro Autor', i
 const depois = (await q(`select author, isbn from public.stock_books where id = $1`, [livroS.id]))[0];
 check('livros: o que o site já tem nunca se substitui; o ISBN livre entra', depois.author === 'Ellen G. White' && depois.isbn === '9788534525183', depois);
 await recusa('livros: as contas não executam', () => como('authenticated', admin, `select public.kangest_dados_dos_livros('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
+// as promoções do KanGest no site (20261127120000): a regra do preço, mas nunca por cima de uma do painel
+const promos = async (p, itens) => (await q(`select public.kangest_promocoes_do_posto($1, $2::jsonb) r`, [p, JSON.stringify(itens)]))[0].r;
+const promoDe = async (id) => (await q(`select sale_price::numeric::text sp, to_char(sale_starts_at at time zone 'Africa/Luanda', 'YYYY-MM-DD HH24:MI') ini,
+  to_char(sale_ends_at at time zone 'Africa/Luanda', 'YYYY-MM-DD HH24:MI') fim, kangest_promocao k from public.stock_books where id = $1`, [id]))[0];
+await q(`update public.stock_books set price = 3000, sale_price = null, sale_starts_at = null, sale_ends_at = null where id = $1`, [livroS.id]);
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 10, inicio: '2026-12-01', fim: '2026-12-24', preco1_iva: 300000 }, { artigo_id: 9, referencia: 'NAO-EXISTE', desconto: 5 }]);
+let pr = await promoDe(livroS.id);
+check('promoções: a do KanGest passa a preço promocional, do primeiro dia às 00:00 até ao dia a seguir ao último',
+  JSON.stringify(r.map((x) => [x.artigo_id, x.estado])) === '[[7,"feita"],[9,"sem_produto"]]' && Number(pr.sp) === 2700
+  && pr.ini === '2026-12-01 00:00' && pr.fim === '2026-12-25 00:00' && pr.k === true, { r, pr });
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 0 }]);
+pr = await promoDe(livroS.id);
+check('promoções: sem promoção no KanGest, sai a que ele pôs', r[0].estado === 'retirada' && pr.sp === null && pr.k === false, { r, pr });
+await q(`update public.stock_books set sale_price = 2500 where id = $1`, [livroS.id]);
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 20, preco1_iva: 300000 }]);
+pr = await promoDe(livroS.id);
+check('promoções: a do painel fica, e a do KanGest não a substitui', r[0].estado === 'tem_promocao' && Number(pr.sp) === 2500 && pr.k === false, { r, pr });
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 0 }]);
+check('promoções: e o KanGest não retira a do painel', r[0].estado === 'feita' && Number((await promoDe(livroS.id)).sp) === 2500, r);
+await q(`update public.stock_books set sale_price = null where id = $1`, [livroS.id]);
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 15, preco1_iva: 300000 }]);
+await q(`update public.stock_books set sale_price = 2400 where id = $1`, [livroS.id]);
+check('promoções: mudada no painel, passa a ser do painel', r[0].estado === 'feita' && (await promoDe(livroS.id)).k === false);
+await q(`update public.stock_books set sale_price = null where id = $1`, [livroS.id]);
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 10, inicio: '2026-12-10', fim: '2026-12-01' }]);
+check('promoções: a que acaba antes de começar é recusada, sem estragar o lote', r[0].estado === 'recusada' && (await promoDe(livroS.id)).sp === null, r);
+await recusa('promoções: as contas não executam', () => como('authenticated', admin, `select public.kangest_promocoes_do_posto('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
 c = await conf(pB, null, true);
 check('configurar: só um posto manda no catálogo', c.manda_catalogo === true && (await q(`select manda_catalogo from public.kangest_postos where id = $1`, [pA]))[0].manda_catalogo === false);
 r = await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', paginas: 300 }]);
 check('livros: o posto que não manda no catálogo é recusado', r[0].estado === 'recusado'
   && (await q(`select pages::int pg from public.stock_books where id = $1`, [livroS.id]))[0].pg === 128, r);
+r = await promos(pA, [{ artigo_id: 7, referencia: 'LIV-STK', desconto: 10, preco1_iva: 300000 }]);
+check('promoções: o posto que não manda no catálogo é recusado', r[0].estado === 'recusada' && (await promoDe(livroS.id)).sp === null, r);
 r = await receber(pA, [{ tipo: 'outra-coisa', artigo_id: 3 }]);
 check('lote: um tipo desconhecido é um erro desse item', r.erros.length === 1 && /Tipo desconhecido/.test(r.erros[0].erro) && r.erros[0].artigo_id === 3, r);
 

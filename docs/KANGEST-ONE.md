@@ -78,7 +78,8 @@ Restrições de segurança, palavra por palavra:
 | Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | #172 | sim (a Edge Function); KanGest 1.4.10 |
 | Fotografias | o sentido contrário: a fotografia do artigo como capa do produto do site sem capa, só do posto que manda no catálogo e nunca por cima de uma capa | #177 | KanGest 1.4.10 |
 | Dados dos livros | o autor, a editora, o idioma, o ano, as páginas e o ISBN (como código de barras) do site nas fichas dos artigos que não os têm | #178 | sim (20261127100000, a partir do merge); KanGest 1.4.10 |
-| Dados para o site | o sentido contrário: o que a ficha tem e o produto do site não, só do posto que manda no catálogo e só nos campos vazios | o PR dos dados para o site | sim (20261127110000, a partir do merge); KanGest 1.4.10 |
+| Dados para o site | o sentido contrário: o que a ficha tem e o produto do site não, só do posto que manda no catálogo e só nos campos vazios | #179 | sim (20261127110000, a partir do merge); KanGest 1.4.10 |
+| Promoções | as promoções dos artigos no site, com a regra do preço (o posto que manda no catálogo), sem nunca mexer numa promoção do painel | o PR das promoções | sim (20261127120000, a partir do merge); KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
 | Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
 

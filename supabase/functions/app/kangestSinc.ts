@@ -655,6 +655,55 @@ export function limparLivrosKanGest(x: unknown): LivroKanGest[] | null {
   return out.length ? out : null;
 }
 
+/** As promoções que o KanGest manda numa volta (sinc/promocoes.rs, `MAX`). */
+export const MAX_PROMOCOES = 50;
+
+/** A promoção de um artigo do KanGest: a percentagem (0 retira a que o KanGest pôs), as datas e o PVP com IVA. */
+export interface PromocaoKanGest {
+  artigo_id: number;
+  referencia: string;
+  desconto: number;
+  inicio: string | null;
+  fim: string | null;
+  preco1_iva: number | null;
+}
+
+/** Uma data AAAA-MM-DD que existe mesmo no calendário, ou `null`. */
+export function dataValida(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
+
+/**
+ * As promoções dos artigos do KanGest para os produtos do site (KANGEST ONE, integração total; sinc/promocoes.rs;
+ * docs/KANGEST-SINCRONIZACAO.md §20). No máximo `MAX_PROMOCOES` por volta. A percentagem fica entre 0 e 99,99 (0
+ * retira), as datas só se existirem no calendário e o PVP só como inteiro de cêntimos. Sem nada (um KanGest antigo),
+ * `null`.
+ */
+export function limparPromocoesKanGest(x: unknown): PromocaoKanGest[] | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const out: PromocaoKanGest[] = [];
+  for (const l of x.slice(0, MAX_PROMOCOES)) {
+    if (!l || typeof l !== "object" || Array.isArray(l)) continue;
+    const v = l as Record<string, unknown>;
+    const artigo_id = typeof v.artigo_id === "number" && Number.isSafeInteger(v.artigo_id) && v.artigo_id > 0 ? v.artigo_id : 0;
+    const referencia = typeof v.referencia === "string" ? v.referencia.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60) : "";
+    if (!artigo_id || !referencia) continue;
+    const d = typeof v.desconto === "number" && Number.isFinite(v.desconto) ? Math.round(v.desconto * 100) / 100 : 0;
+    const pvp = typeof v.preco1_iva === "number" && Number.isSafeInteger(v.preco1_iva) && v.preco1_iva > 0 ? v.preco1_iva : null;
+    out.push({
+      artigo_id,
+      referencia,
+      desconto: d > 0 && d < 100 ? d : 0,
+      inicio: dataValida(v.inicio),
+      fim: dataValida(v.fim),
+      preco1_iva: pvp,
+    });
+  }
+  return out.length ? out : null;
+}
+
 /**
  * O que o KanGest manda para o livro de stock (sinc/livro.rs): as aberturas (a existência de cada artigo em cada
  * armazém, na primeira volta) e os movimentos novos (`movimentos_stock`, com o id local, o tipo e o documento). Só os

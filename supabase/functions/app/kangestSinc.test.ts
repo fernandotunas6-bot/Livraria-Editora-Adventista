@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
-  MAX_LIVROS, tipoDaImagem,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -435,5 +435,38 @@ describe("limparLivrosKanGest (os dados das fichas do KanGest para os produtos d
     const l = limparLivrosKanGest(muitos)!;
     expect(l).toHaveLength(MAX_LIVROS);
     expect(l[0].autor).toHaveLength(300);
+  });
+});
+
+describe("limparPromocoesKanGest (as promoções do KanGest para os produtos do site)", () => {
+  it("só datas que existem no calendário", () => {
+    expect(dataValida("2026-12-24")).toBe("2026-12-24");
+    expect(dataValida("2026-02-30")).toBeNull();
+    expect(dataValida("24/12/2026")).toBeNull();
+    expect(dataValida(null)).toBeNull();
+  });
+
+  it("sem promoções (um KanGest antigo) é null", () => {
+    expect(limparPromocoesKanGest(undefined)).toBeNull();
+    expect(limparPromocoesKanGest([])).toBeNull();
+  });
+
+  it("limpa a percentagem, as datas e o PVP; 0 retira, e o que não tem artigo sai", () => {
+    const l = limparPromocoesKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", desconto: 12.345, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 100, inicio: "ontem", fim: "2026-02-30", preco1_iva: 12.5 },
+      { artigo_id: 9, referencia: "LIV-003", desconto: -5 },
+      { referencia: "LIV-004", desconto: 10 },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", desconto: 12.35, inicio: "2026-12-01", fim: "2026-12-24", preco1_iva: 570000 },
+      { artigo_id: 8, referencia: "LIV-002", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+      { artigo_id: 9, referencia: "LIV-003", desconto: 0, inicio: null, fim: null, preco1_iva: null },
+    ]);
+  });
+
+  it(`no máximo ${MAX_PROMOCOES} por volta`, () => {
+    const muitas = Array.from({ length: MAX_PROMOCOES + 3 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, desconto: 5 }));
+    expect(limparPromocoesKanGest(muitas)).toHaveLength(MAX_PROMOCOES);
   });
 });

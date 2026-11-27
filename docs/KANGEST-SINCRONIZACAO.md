@@ -573,3 +573,20 @@ Testes:
 - **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados das fichas para os
   produtos do site»).
+
+## 20. As promoções dos artigos no site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `promocoes` vão até 50 por volta:
+  `{ artigo_id, referencia, desconto, inicio?, fim?, preco1_iva? }`. Um `desconto` de 0 pede para retirar a promoção
+  que o KanGest pôs.
+- **O site:**
+  - `limparPromocoesKanGest` aceita a percentagem entre 0 e 99,99, as datas só se existirem e o PVP em cêntimos;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_promocoes_do_posto` (20261127120000) põe ou retira o `sale_price` e as datas. Nunca toca numa
+    promoção do painel: a coluna `kangest_promocao` diz de quem é, e o gatilho `stock_books_promocao_do_painel` passa-a
+    para o painel quando alguém a muda lá.
+- **A resposta** (`promocoes`): para cada artigo, `{ artigo_id, estado, erro? }`, com o estado `feita`, `retirada`,
+  `sem_produto`, `tem_promocao`, `recusada` ou `erro`. O posto regista-a em `promocoes_enviadas` (migração 0077).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («As promoções dos artigos no
+  site»).

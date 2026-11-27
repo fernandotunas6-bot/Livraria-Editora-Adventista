@@ -8709,6 +8709,79 @@ async fn os_dados_das_fichas_para_o_site() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// As promoções dos artigos no site (sinc/promocoes.rs, migração 0077): só vai a promoção que mudou (ou o PVP); sem
+/// promoção só vai depois de ter ido uma, para a retirar; as do painel e as recusas esperam um dia; e desliga-se.
+#[tokio::test]
+async fn as_promocoes_dos_artigos_para_o_site() {
+    use crate::sinc::promocoes;
+    let (st, pasta) = base_com_admin("promocoes-para-o-site").await;
+    let artigo = |r: &'static str| {
+        let st = &st;
+        async move { rpc(st, "artigos.guardar", json!({ "descricao": format!("Livro {r}"), "referencia": r, "taxa_iva_id": 1, "preco1": 1000 })).await["id"].as_i64().unwrap() }
+    };
+    let (a1, a2, a3) = (artigo("PRO-001").await, artigo("PRO-002").await, artigo("PRO-003").await);
+    for r in ["PRO-001", "PRO-002"] {
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, '{}')").bind(r).bind(r).bind(r).execute(&st.pool).await.unwrap();
+    }
+    // o 1 com promoção até ao fim do ano; o 2 sem nenhuma; o 3 com promoção mas sem produto no site
+    sqlx::query("UPDATE artigos SET promo_desconto = 10, promo_inicio = '2026-01-01', promo_fim = '2099-12-31' WHERE id IN (?, ?)")
+        .bind(a1)
+        .bind(a3)
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    let agora = 1_800_000_000;
+    let ids = |t: i64| {
+        let pool = st.pool.clone();
+        async move { promocoes::para_o_site(&pool, t).await.unwrap().iter().map(|p| p.artigo_id).collect::<Vec<_>>() }
+    };
+    let l = promocoes::para_o_site(&st.pool, agora).await.unwrap();
+    assert_eq!(l.len(), 1, "só o 1: o 2 não tem promoção, o 3 não está no site");
+    assert_eq!((l[0].artigo_id, l[0].item["desconto"].as_f64(), l[0].item["fim"].as_str(), l[0].item["referencia"].as_str()), (a1, Some(10.0), Some("2099-12-31"), Some("PRO-001")));
+    assert!(l[0].item["preco1_iva"].as_i64().unwrap_or(0) >= 1000, "o PVP com IVA: {}", l[0].item);
+    let e = rpc(&st, "loja.promocoes.estado", Value::Null).await;
+    assert_eq!((e["ligado"].as_bool(), e["por_enviar"].as_i64()), (Some(true), Some(1)), "{e}");
+
+    // sem resposta: erro, e espera; feita: não volta
+    promocoes::concluir(&st.pool, &l, &Value::Null, agora).await.unwrap();
+    assert_eq!(ids(agora).await, Vec::<i64>::new());
+    assert_eq!(ids(agora + 3 * 3600).await, vec![a1]);
+    promocoes::concluir(&st.pool, &l, &json!([{ "artigo_id": a1, "estado": "feita" }]), agora).await.unwrap();
+    assert_eq!(ids(agora + 30 * 86400).await, Vec::<i64>::new());
+    let e = rpc(&st, "loja.promocoes.estado", Value::Null).await;
+    assert_eq!(e["no_site"].as_i64(), Some(1), "{e}");
+
+    // o PVP mudou: a promoção volta a ir, com o preço novo
+    rpc(&st, "artigos.guardar", json!({ "id": a1, "descricao": "Livro PRO-001", "referencia": "PRO-001", "taxa_iva_id": 1, "preco1": 2000 })).await;
+    let l = promocoes::para_o_site(&st.pool, agora).await.unwrap();
+    assert_eq!(l.iter().map(|p| p.artigo_id).collect::<Vec<_>>(), vec![a1]);
+    // a promoção saiu do KanGest: vai «sem promoção», para o site a retirar
+    sqlx::query("UPDATE artigos SET promo_desconto = 0 WHERE id = ?").bind(a1).execute(&st.pool).await.unwrap();
+    let l = promocoes::para_o_site(&st.pool, agora).await.unwrap();
+    assert_eq!(l[0].item["desconto"].as_f64(), Some(0.0));
+    promocoes::concluir(&st.pool, &l, &json!([{ "artigo_id": a1, "estado": "retirada" }]), agora).await.unwrap();
+    assert_eq!(ids(agora + 30 * 86400).await, Vec::<i64>::new());
+
+    // o painel tem uma promoção: espera um dia
+    sqlx::query("UPDATE artigos SET promo_desconto = 15, promo_inicio = NULL, promo_fim = NULL WHERE id = ?").bind(a1).execute(&st.pool).await.unwrap();
+    let l = promocoes::para_o_site(&st.pool, agora).await.unwrap();
+    promocoes::concluir(&st.pool, &l, &json!([{ "artigo_id": a1, "estado": "tem_promocao", "erro": "do painel" }]), agora).await.unwrap();
+    assert_eq!(ids(agora + 3600).await, Vec::<i64>::new());
+    assert_eq!(ids(agora + 25 * 3600).await, vec![a1]);
+    let e = rpc(&st, "loja.promocoes.estado", Value::Null).await;
+    assert_eq!(e["do_painel"].as_i64(), Some(1), "{e}");
+
+    // desligado neste computador: nada vai
+    let e = rpc(&st, "loja.promocoes.ligar", json!({ "ligado": false })).await;
+    assert_eq!(e["ligado"].as_bool(), Some(false));
+    assert_eq!(ids(agora + 25 * 3600).await, Vec::<i64>::new());
+    rpc(&st, "loja.promocoes.ligar", json!({ "ligado": true })).await;
+    assert_eq!(ids(agora + 25 * 3600).await, vec![a1]);
+    let _ = (a2, a3);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.

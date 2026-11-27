@@ -202,6 +202,36 @@ foram, quantos esperam e o motivo das recusas. O interruptor «Enviar para o sit
 Testes: `os_dados_das_fichas_para_o_site` e `fichas::testes` (Rust), `limparLivrosKanGest` (`kangestSinc.test.ts`) e
 `kangest-central.mjs` (PGlite).
 
+### As promoções dos artigos no site (27/11)
+
+**A regra é a do preço:** o KanGest que manda no catálogo manda também nas promoções dos produtos do site ligados aos
+seus artigos (`sinc/promocoes.rs`; migração 0077). A promoção de um artigo é a mesma que a venda aplica: a percentagem
+entre duas datas, as duas incluídas.
+
+**Como segue:**
+- **até 50 por volta,** no campo `promocoes` do pedido;
+- **com promoção:** o site põe o preço promocional, calculado sobre o PVP com IVA, desde as 00:00 do primeiro dia até às
+  00:00 do dia a seguir ao último, na hora de Angola;
+- **sem promoção, ou já acabada,** depois de uma ter ido: o site retira a que o KanGest pôs;
+- **o que o site respondeu fica em `promocoes_enviadas`,** com a versão (a promoção e o PVP). Uma promoção ou um preço
+  que mude volta a seguir.
+
+**No site** (`limparPromocoesKanGest` e `public.kangest_promocoes_do_posto`, 20261127120000):
+- só se aceitam do KanGest que manda no catálogo;
+- **uma promoção posta no painel nunca é substituída:** responde `tem_promocao`, e o KanGest tenta outra vez um dia
+  depois;
+- o KanGest só retira as promoções que ele próprio pôs (`stock_books.kangest_promocao`);
+- uma promoção do KanGest que alguém altere no painel passa a ser do painel, e o KanGest deixa de lhe tocar. O
+  formulário do produto no painel avisa;
+- a auditoria dos preços do site regista cada mudança do preço promocional.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «As promoções dos artigos no site» mostra quantas
+estão no site, quantas esperam, quantas ficaram com a promoção do painel e o motivo das recusas. «Enviar sozinho»
+desliga-o neste computador (`config` `sinc.promocoes_para_o_site`).
+
+Testes: `as_promocoes_dos_artigos_para_o_site` e `promocoes::testes` (Rust), `limparPromocoesKanGest`
+(`kangestSinc.test.ts`) e `kangest-central.mjs` (PGlite).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
