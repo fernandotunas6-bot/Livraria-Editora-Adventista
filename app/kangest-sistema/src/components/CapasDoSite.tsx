@@ -186,6 +186,7 @@ type Fichas = {
   completadas: number;
   ultima: string | null;
   agora?: { fichas: number; dados: number; codigos: number };
+  para_o_site: { ligado: boolean; por_enviar: number; enviados: number; recusados: number; ultimo_erro: string | null };
 };
 
 /**
@@ -193,6 +194,9 @@ type Fichas = {
  * e as páginas, e o ISBN como código de barras, só nos artigos que não os têm. Corre sozinho depois de cada volta da
  * sincronização que traga produtos; aqui completa-se já ou desliga-se neste computador. Nunca substitui o que está na
  * ficha, e um dado que já veio uma vez não volta.
+ *
+ * E o sentido contrário: o que a ficha tem e o produto do site não segue na volta (até 50 de cada vez). No site só o
+ * aceita o KanGest que manda no catálogo, e só preenche o que lá está vazio.
  */
 export function DadosDosLivros() {
   const pode = useSession((s) => s.tem)("artigos.editar");
@@ -201,11 +205,14 @@ export function DadosDosLivros() {
     queryKey: ["dados-dos-livros"],
     queryFn: () => call<Fichas>("loja.fichas.estado"),
     enabled: pode,
+    refetchInterval: 60_000,
     retry: false,
   });
   const [aCorrer, setACorrer] = useState(false);
   const f = q.data;
-  if (!pode || !f || (!f.por_completar && !f.completadas && f.ligado)) return null;
+  const o = f?.para_o_site;
+  if (!pode || !f || !o) return null;
+  if (!f.por_completar && !f.completadas && f.ligado && !o.por_enviar && !o.enviados && !o.recusados && o.ligado) return null;
   async function completar() {
     setACorrer(true);
     try {
@@ -224,13 +231,18 @@ export function DadosDosLivros() {
       setACorrer(false);
     }
   }
-  async function ligar(ligado: boolean) {
+  async function ligar(qual: "ligado" | "para_o_site", valor: boolean) {
     try {
-      qc.setQueryData(["dados-dos-livros"], await call<Fichas>("loja.fichas.ligar", { ligado }));
+      qc.setQueryData(["dados-dos-livros"], await call<Fichas>("loja.fichas.ligar", { [qual]: valor }));
     } catch (err) {
       toast.error((err as Error).message);
     }
   }
+  const paraOSite = [
+    o.enviados ? `${o.enviados} já foram para o site` : "",
+    o.por_enviar ? `${o.por_enviar} à espera (até 50 por volta da sincronização)` : "",
+    o.recusados ? `${o.recusados} não foram aceites${o.ultimo_erro ? `: ${o.ultimo_erro}` : ""}` : "",
+  ].filter(Boolean);
   return (
     <Card className="mb-4 flex flex-wrap items-center gap-3 p-4 text-[13.5px]" aria-label="Os dados dos livros do site">
       <div className="min-w-0 flex-1">
@@ -242,10 +254,20 @@ export function DadosDosLivros() {
           {f.completadas ? ` ${f.completadas} já foram completadas.` : ""}
           {f.ligado ? "" : " Desligado neste computador."}
         </div>
+        <div className="text-ink-3">
+          {o.ligado
+            ? "Para o site: o que a ficha tem e o produto do site não."
+            : "Para o site: desligado neste computador."}
+          {paraOSite.length ? ` ${paraOSite.join("; ")}.` : ""}
+        </div>
       </div>
       <label className="flex items-center gap-2 text-ink-2">
-        <input type="checkbox" checked={f.ligado} onChange={(ev) => void ligar(ev.target.checked)} />
+        <input type="checkbox" checked={f.ligado} onChange={(ev) => void ligar("ligado", ev.target.checked)} />
         Completar sozinho
+      </label>
+      <label className="flex items-center gap-2 text-ink-2">
+        <input type="checkbox" checked={o.ligado} onChange={(ev) => void ligar("para_o_site", ev.target.checked)} />
+        Enviar para o site
       </label>
       <Button variant="secondary" loading={aCorrer} disabled={!f.por_completar} onClick={() => void completar()}>
         Completar agora

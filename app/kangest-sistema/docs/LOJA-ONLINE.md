@@ -171,6 +171,37 @@ produtos que já tinha.
 
 Testes: `os_dados_dos_livros_do_site_nas_fichas` e `fichas::testes` (Rust), e `kangest-central.mjs` (PGlite).
 
+### Os dados das fichas para os produtos do site (o sentido contrário; 27/11)
+
+O que a ficha de um artigo tem e o produto do site com a mesma referência não tem segue na volta da sincronização
+(`sinc/fichas.rs`, `livros_para_o_site`; migração 0076):
+- **o que vai:** o autor, a editora, o idioma, o ano e as páginas da ficha, e o ISBN, que é o código de barras quando
+  este for um ISBN válido;
+- **como se sabe o que falta no site:** pela cópia da Loja online, que traz estes dados desde a 20261127100000;
+- **até 50 livros por volta,** no campo `livros` do pedido. Se forem 50, a volta seguinte vem logo a seguir.
+
+**O que o site respondeu fica em `livros_enviados`,** com a versão (o que foi, em texto):
+- `feito` e `sem_produto` não voltam a seguir, a não ser que a ficha mude;
+- `recusado` tenta outra vez um dia depois;
+- `erro` (ou um site sem resposta para eles) tenta outra vez cada vez mais tarde.
+
+**No site** (`limparLivrosKanGest` e `public.kangest_dados_dos_livros`):
+- só se aceitam do KanGest que manda no catálogo;
+- os textos ficam numa linha e com o tamanho das colunas. O ano e as páginas só entram como números inteiros razoáveis,
+  e o ISBN só se for um ISBN-13 válido;
+- **só se preenche o que está vazio** (o ano e as páginas a 0 contam como vazios). O ISBN só entra se nenhum outro
+  produto o tiver. A editora que o site põe nos rascunhos («Livraria e Editora Adventista») não se substitui.
+
+O produto muda de data de alteração e volta ao KanGest nas novidades. Não há volta em círculo: cada sentido só mexe no
+que o outro lado não tem.
+
+**Automático, com a opção manual:** está ligado por omissão. O cartão «Os dados dos livros do site» mostra quantos
+foram, quantos esperam e o motivo das recusas. O interruptor «Enviar para o site» desliga-o neste computador (`config`
+`sinc.dados_para_o_site`).
+
+Testes: `os_dados_das_fichas_para_o_site` e `fichas::testes` (Rust), `limparLivrosKanGest` (`kangestSinc.test.ts`) e
+`kangest-central.mjs` (PGlite).
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;

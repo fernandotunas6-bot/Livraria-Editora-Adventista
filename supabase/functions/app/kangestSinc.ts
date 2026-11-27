@@ -597,6 +597,64 @@ export function limparFotosKanGest(x: unknown): { fotos: FotoKanGest[]; recusada
   return { fotos, recusadas };
 }
 
+/** Os livros que o KanGest manda numa volta (sinc/fichas.rs, `MAX_LIVROS`). */
+export const MAX_LIVROS = 50;
+
+/** O que a ficha de um artigo do KanGest tem e o produto do site não (só os campos que vêm). */
+export interface LivroKanGest {
+  artigo_id: number;
+  referencia: string;
+  autor?: string;
+  editora?: string;
+  idioma?: string;
+  ano?: number;
+  paginas?: number;
+  isbn?: string;
+}
+
+/** Um ISBN-13 só com algarismos, começado por 978 ou 979 e com o algarismo de controlo certo. */
+export function isbn13Valido(s: string): boolean {
+  if (!/^97[89][0-9]{10}$/.test(s)) return false;
+  const soma = [...s.slice(0, 12)].reduce((t, c, i) => t + Number(c) * (i % 2 ? 3 : 1), 0);
+  return (10 - (soma % 10)) % 10 === Number(s[12]);
+}
+
+/**
+ * Os dados das fichas do KanGest para os produtos do site que não os têm (KANGEST ONE, integração total; sinc/fichas.rs,
+ * `livros_para_o_site`; docs/KANGEST-SINCRONIZACAO.md §19). No máximo `MAX_LIVROS` por volta. Os textos ficam numa
+ * linha e com o tamanho das colunas, o ano e as páginas só como inteiros dentro do razoável, e o ISBN só se for um
+ * ISBN-13 válido. Um livro sem nada que sirva sai. Sem nada (um KanGest antigo), `null`.
+ */
+export function limparLivrosKanGest(x: unknown): LivroKanGest[] | null {
+  if (!Array.isArray(x) || !x.length) return null;
+  const texto = (v: unknown, max: number) =>
+    typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "";
+  const inteiro = (v: unknown, max: number) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 1 && v <= max ? v : 0);
+  const out: LivroKanGest[] = [];
+  for (const l of x.slice(0, MAX_LIVROS)) {
+    if (!l || typeof l !== "object" || Array.isArray(l)) continue;
+    const v = l as Record<string, unknown>;
+    const artigo_id = inteiro(v.artigo_id, Number.MAX_SAFE_INTEGER);
+    const referencia = texto(v.referencia, 60);
+    if (!artigo_id || !referencia) continue;
+    const livro: LivroKanGest = { artigo_id, referencia };
+    const autor = texto(v.autor, 300);
+    const editora = texto(v.editora, 300);
+    const idioma = texto(v.idioma, 60);
+    const ano = inteiro(v.ano, 3000);
+    const paginas = inteiro(v.paginas, 100_000);
+    const isbn = typeof v.isbn === "string" ? v.isbn.replace(/[^0-9]/g, "") : "";
+    if (autor) livro.autor = autor;
+    if (editora) livro.editora = editora;
+    if (idioma) livro.idioma = idioma;
+    if (ano) livro.ano = ano;
+    if (paginas) livro.paginas = paginas;
+    if (isbn13Valido(isbn)) livro.isbn = isbn;
+    if (Object.keys(livro).length > 2) out.push(livro);
+  }
+  return out.length ? out : null;
+}
+
 /**
  * O que o KanGest manda para o livro de stock (sinc/livro.rs): as aberturas (a existência de cada artigo em cada
  * armazém, na primeira volta) e os movimentos novos (`movimentos_stock`, com o id local, o tipo e o documento). Só os

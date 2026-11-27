@@ -226,19 +226,46 @@ pub async fn completar(pool: &SqlitePool) -> AppResult<Completadas> {
     Ok(feito)
 }
 
-/// Completa sozinho? (por omissão, sim)
-pub async fn ligado(pool: &SqlitePool) -> bool {
-    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(CHAVE).fetch_optional(pool).await.ok().flatten();
+/// Um interruptor deste computador (por omissão, ligado; "0" desliga).
+async fn interruptor(pool: &SqlitePool, chave: &str) -> bool {
+    let v: Option<String> = sqlx::query_scalar("SELECT valor FROM config WHERE chave = ?").bind(chave).fetch_optional(pool).await.ok().flatten();
     v.as_deref() != Some("0")
 }
 
-/// O cartão da Loja online: se está ligado, quantas fichas podem receber alguma coisa e quantas já receberam.
+/// Completa sozinho? (por omissão, sim)
+pub async fn ligado(pool: &SqlitePool) -> bool {
+    interruptor(pool, CHAVE).await
+}
+
+/// O cartão da Loja online: se está ligado, quantas fichas podem receber alguma coisa e quantas já receberam; e o
+/// sentido contrário (`para_o_site`): quantos livros esperam, quantos já foram e o que o site recusou.
 pub async fn estado(st: &AppState) -> AppResult<Value> {
     st.exigir_perm("artigos.editar")?;
-    let por_completar = planear(&st.pool).await?.len();
+    let pool = &st.pool;
+    let por_completar = planear(pool).await?.len();
     let (completadas, ultima): (i64, Option<String>) =
-        sqlx::query_as("SELECT COUNT(DISTINCT artigo_id), MAX(em) FROM fichas_do_site").fetch_one(&st.pool).await?;
-    Ok(json!({ "ligado": ligado(&st.pool).await, "por_completar": por_completar, "completadas": completadas, "ultima": ultima }))
+        sqlx::query_as("SELECT COUNT(DISTINCT artigo_id), MAX(em) FROM fichas_do_site").fetch_one(pool).await?;
+    let por_enviar = escolher_livros(pool, super::agora_s(), usize::MAX).await?.len();
+    let contar = |estados: &'static str| async move {
+        sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM livros_enviados WHERE estado IN ({estados})")).fetch_one(pool).await
+    };
+    let erro: Option<String> =
+        sqlx::query_scalar("SELECT erro FROM livros_enviados WHERE estado IN ('erro', 'recusado') AND erro <> '' ORDER BY em DESC LIMIT 1")
+            .fetch_optional(pool)
+            .await?;
+    Ok(json!({
+        "ligado": ligado(pool).await,
+        "por_completar": por_completar,
+        "completadas": completadas,
+        "ultima": ultima,
+        "para_o_site": {
+            "ligado": interruptor(pool, CHAVE_PARA_O_SITE).await,
+            "por_enviar": por_enviar,
+            "enviados": contar("'feito'").await?,
+            "recusados": contar("'recusado', 'erro'").await?,
+            "ultimo_erro": erro,
+        },
+    }))
 }
 
 /// «Completar agora».
@@ -252,18 +279,172 @@ pub async fn completar_agora(st: &AppState) -> AppResult<Value> {
 
 #[derive(Deserialize)]
 pub struct LigarIn {
-    ligado: bool,
+    /// completar as fichas com os dados do site
+    #[serde(default)]
+    ligado: Option<bool>,
+    /// mandar os dados das fichas para os produtos do site
+    #[serde(default)]
+    para_o_site: Option<bool>,
 }
 
-/// Liga ou desliga neste computador.
+/// Liga ou desliga, neste computador, um sentido ou os dois.
 pub async fn ligar(st: &AppState, i: LigarIn) -> AppResult<Value> {
     st.exigir_perm("artigos.editar")?;
-    sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
-        .bind(CHAVE)
-        .bind(if i.ligado { "1" } else { "0" })
-        .execute(&st.pool)
-        .await?;
+    for (chave, valor) in [(CHAVE, i.ligado), (CHAVE_PARA_O_SITE, i.para_o_site)] {
+        let Some(v) = valor else { continue };
+        sqlx::query("INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor")
+            .bind(chave)
+            .bind(if v { "1" } else { "0" })
+            .execute(&st.pool)
+            .await?;
+    }
     estado(st).await
+}
+
+// -----------------------------------------------------------------------------------------------------------------
+// O sentido contrário: os dados das fichas para os produtos do site que não os têm (KANGEST-SINCRONIZACAO §19).
+// -----------------------------------------------------------------------------------------------------------------
+
+/// A chave na `config` deste computador para o envio: "0" desliga.
+pub const CHAVE_PARA_O_SITE: &str = "sinc.dados_para_o_site";
+/// Livros por volta (o site aceita até 50).
+pub const MAX_LIVROS: usize = 50;
+
+/// Um texto da ficha numa linha, com o tamanho da coluna do site, ou nada.
+fn texto_da_ficha(v: Option<&Value>) -> Option<String> {
+    let t = v?.as_str()?.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!t.is_empty()).then(|| t.chars().take(MAX_TEXTO).collect())
+}
+
+/// Um número da ficha maior do que 0.
+fn numero_da_ficha(v: Option<&Value>) -> Option<i64> {
+    let v = v?;
+    let n = v.as_i64().or_else(|| v.as_f64().map(|f| f.round() as i64)).or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))?;
+    (n > 0).then_some(n)
+}
+
+/// O que a ficha tem e o produto do site (na cópia da Loja online) não: os dados do livro e o ISBN, que é o código de
+/// barras quando este for um ISBN válido.
+pub fn para_o_site(atributos: &Map<String, Value>, codigo_barras: Option<&str>, site: &Value) -> Map<String, Value> {
+    let mut m = Map::new();
+    for c in TEXTOS {
+        if let Some(t) = texto_da_ficha(atributos.get(c)).filter(|_| vazio(site.get(c))) {
+            m.insert(c.to_string(), Value::String(t));
+        }
+    }
+    for c in NUMEROS {
+        if let Some(n) = numero_da_ficha(atributos.get(c)).filter(|_| vazio(site.get(c))) {
+            m.insert(c.to_string(), json!(n));
+        }
+    }
+    if let Some(isbn) = codigo_barras.filter(|c| ramos::parece_isbn(c)).and_then(ramos::isbn13).filter(|_| vazio(site.get("isbn"))) {
+        m.insert("isbn".to_string(), Value::String(isbn));
+    }
+    m
+}
+
+/// Um livro para o site: o artigo, a versão (o que vai, em texto: muda quando a ficha muda) e o item do pedido.
+#[derive(Debug, Clone)]
+pub struct LivroParaOSite {
+    pub artigo_id: i64,
+    pub versao: String,
+    pub item: Value,
+}
+
+/// Os livros que podem ir: os artigos activos com um produto do site pela referência, a quem a ficha pode dar alguma
+/// coisa, e que ainda não foram com esta versão (os recusados e os erros voltam quando passar a espera).
+async fn escolher_livros(pool: &SqlitePool, agora: i64, limite: usize) -> AppResult<Vec<LivroParaOSite>> {
+    let pares: Vec<(i64, String, Option<String>, Option<String>, String)> = sqlx::query_as(
+        "SELECT a.id, TRIM(a.referencia), a.atributos, a.codigo_barras, MAX(p.dados)
+           FROM artigos a JOIN loja_produtos p ON TRIM(p.referencia) = TRIM(a.referencia)
+          WHERE TRIM(COALESCE(a.referencia, '')) <> '' AND a.ativo = 1
+          GROUP BY a.id ORDER BY a.id",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut enviados: HashMap<i64, (String, String, i64)> = HashMap::new();
+    for (a, v, e, p) in sqlx::query_as::<_, (i64, String, String, i64)>("SELECT artigo_id, versao, estado, proximo_em FROM livros_enviados").fetch_all(pool).await? {
+        enviados.insert(a, (v, e, p));
+    }
+    let mut livros = Vec::new();
+    for (artigo_id, referencia, atributos, codigo_barras, dados) in pares {
+        if livros.len() >= limite {
+            break;
+        }
+        let atributos = atributos
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+            .and_then(|v| v.as_object().cloned())
+            .unwrap_or_default();
+        let site: Value = serde_json::from_str(&dados).unwrap_or(Value::Null);
+        let falta = para_o_site(&atributos, codigo_barras.as_deref(), &site);
+        if falta.is_empty() {
+            continue;
+        }
+        let versao = Value::Object(falta.clone()).to_string();
+        if let Some((v, estado, proximo)) = enviados.get(&artigo_id) {
+            // a mesma versão: já foi (feito, sem produto), ou espera ainda (recusado, erro)
+            if *v == versao && (estado == "feito" || estado == "sem_produto" || *proximo > agora) {
+                continue;
+            }
+        }
+        let mut item = Value::Object(falta);
+        item["artigo_id"] = json!(artigo_id);
+        item["referencia"] = json!(referencia);
+        livros.push(LivroParaOSite { artigo_id, versao, item });
+    }
+    Ok(livros)
+}
+
+/// Os livros desta volta (no máximo `MAX_LIVROS`), se o envio estiver ligado neste computador.
+pub async fn livros_para_o_site(pool: &SqlitePool, agora: i64) -> AppResult<Vec<LivroParaOSite>> {
+    if !interruptor(pool, CHAVE_PARA_O_SITE).await {
+        return Ok(Vec::new());
+    }
+    escolher_livros(pool, agora, MAX_LIVROS).await
+}
+
+/// Regista o que o site respondeu a cada livro (`livros` na resposta): feito, sem_produto, recusado (tenta outra vez um
+/// dia depois) ou erro (cada vez mais tarde). Um livro sem resposta (um site antigo) conta como erro.
+pub async fn concluir_livros(pool: &SqlitePool, enviados: &[LivroParaOSite], resposta: &Value, agora: i64) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    for l in enviados {
+        let r = resposta.as_array().and_then(|v| v.iter().find(|x| x["artigo_id"].as_i64() == Some(l.artigo_id)));
+        let (estado, erro) = match r {
+            Some(x) => (x["estado"].as_str().unwrap_or("erro"), x["erro"].as_str().unwrap_or("")),
+            None => ("erro", "O site não respondeu aos dados do livro."),
+        };
+        let estado = match estado {
+            "feito" | "sem_produto" | "recusado" => estado,
+            _ => "erro",
+        };
+        let antes: i64 = sqlx::query_scalar("SELECT tentativas FROM livros_enviados WHERE artigo_id = ? AND versao = ?")
+            .bind(l.artigo_id)
+            .bind(&l.versao)
+            .fetch_optional(&mut *tx)
+            .await?
+            .unwrap_or(0);
+        let proximo = match estado {
+            "erro" => super::proxima_tentativa(antes, agora),
+            "recusado" => agora + 24 * 3600,
+            _ => 0,
+        };
+        sqlx::query(
+            "INSERT INTO livros_enviados (artigo_id, versao, estado, erro, tentativas, proximo_em, em) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(artigo_id) DO UPDATE SET versao = excluded.versao, estado = excluded.estado, erro = excluded.erro,
+               tentativas = excluded.tentativas, proximo_em = excluded.proximo_em, em = excluded.em",
+        )
+        .bind(l.artigo_id)
+        .bind(&l.versao)
+        .bind(estado)
+        .bind(erro.chars().take(300).collect::<String>())
+        .bind(antes + 1)
+        .bind(proximo)
+        .bind(db::agora())
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -300,5 +481,19 @@ mod testes {
         // um ISBN que não bate certo não serve de código de barras
         let f = o_que_falta(&Map::new(), None, &json!({ "isbn": "9788534520776" }), &nada);
         assert!(f.vazia());
+    }
+
+    #[test]
+    fn para_o_site_so_o_que_o_site_nao_tem() {
+        let ficha = obj(json!({ "autor": " Ellen  G. White ", "editora": "CPB", "idioma": "", "ano": 2024.0, "paginas": "128" }));
+        // o site sem nada: vai tudo o que a ficha tem (o ISBN do código de barras, em ISBN-13)
+        let m = para_o_site(&ficha, Some("978-85-345-2077-5"), &json!({ "autor": null, "editora": "", "isbn": "" }));
+        assert_eq!(
+            Value::Object(m),
+            json!({ "autor": "Ellen G. White", "editora": "CPB", "ano": 2024, "paginas": 128, "isbn": "9788534520775" })
+        );
+        // o site já tem o autor e o ISBN; um código de barras que não é ISBN não vai
+        let m = para_o_site(&ficha, Some("5601234567890"), &json!({ "autor": "Outro", "editora": "Outra", "ano": 1999, "paginas": 0, "isbn": "" }));
+        assert_eq!(Value::Object(m), json!({ "paginas": 128 }));
     }
 }

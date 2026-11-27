@@ -287,8 +287,28 @@ const novo = (await q(`select title, price::int p, active, kangest_novo_em is no
 check('artigo: um artigo que o site não tem entra oculto, à espera de fotografia', novo && novo.active === false && novo.novo && novo.title === 'Nosso Hinário' && novo.p === 4500, novo);
 await receber(pA, [artigo({ referencia: 'LIV-SERV', descricao: 'Portes', tipo: 'S', preco1_iva: 100000 }), artigo({ referencia: 'LIV-INACT', descricao: 'Velho', ativo: false })]);
 check('artigo: os serviços e os inactivos não dão produto', (await q(`select count(*)::int n from public.stock_books where kigest_ref in ('LIV-SERV', 'LIV-INACT')`))[0].n === 0);
+// os dados das fichas do KanGest nos produtos do site (20261127110000): só o que está vazio, e o ISBN sem repetir
+const livros = async (p, itens) => (await q(`select public.kangest_dados_dos_livros($1, $2::jsonb) r`, [p, JSON.stringify(itens)]))[0].r;
+await q(`update public.stock_books set author = '', publisher = 'Casa Publicadora', language = '', year = 0, pages = 0, isbn = '' where id = $1`, [livroS.id]);
+await q(`insert into public.stock_books (title, price, stock, active, isbn) values ('Outro com ISBN', 100, 0, false, '978-85-345-2077-5')`);
+r = await livros(pA, [
+  { artigo_id: 7, referencia: 'LIV-STK', autor: 'Ellen G. White', editora: 'CPB', idioma: 'Português', ano: 2020, paginas: 128, isbn: '9788534520775' },
+  { artigo_id: 8, referencia: 'NAO-EXISTE', autor: 'Alguém' },
+]);
+const comFicha = (await q(`select author, publisher, language, year::int y, pages::int pg, isbn from public.stock_books where id = $1`, [livroS.id]))[0];
+check('livros: o vazio enche-se, a editora do site fica, e o ISBN de outro produto não se repete',
+  comFicha.author === 'Ellen G. White' && comFicha.publisher === 'Casa Publicadora' && comFicha.language === 'Português'
+  && comFicha.y === 2020 && comFicha.pg === 128 && comFicha.isbn === '', comFicha);
+check('livros: a resposta por livro', JSON.stringify(r.map((x) => [x.artigo_id, x.estado])) === '[[7,"feito"],[8,"sem_produto"]]', r);
+await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', autor: 'Outro Autor', isbn: '9788534525183' }]);
+const depois = (await q(`select author, isbn from public.stock_books where id = $1`, [livroS.id]))[0];
+check('livros: o que o site já tem nunca se substitui; o ISBN livre entra', depois.author === 'Ellen G. White' && depois.isbn === '9788534525183', depois);
+await recusa('livros: as contas não executam', () => como('authenticated', admin, `select public.kangest_dados_dos_livros('${pA}'::uuid, '[]'::jsonb)`), /permission denied/);
 c = await conf(pB, null, true);
 check('configurar: só um posto manda no catálogo', c.manda_catalogo === true && (await q(`select manda_catalogo from public.kangest_postos where id = $1`, [pA]))[0].manda_catalogo === false);
+r = await livros(pA, [{ artigo_id: 7, referencia: 'LIV-STK', paginas: 300 }]);
+check('livros: o posto que não manda no catálogo é recusado', r[0].estado === 'recusado'
+  && (await q(`select pages::int pg from public.stock_books where id = $1`, [livroS.id]))[0].pg === 128, r);
 r = await receber(pA, [{ tipo: 'outra-coisa', artigo_id: 3 }]);
 check('lote: um tipo desconhecido é um erro desse item', r.erros.length === 1 && /Tipo desconhecido/.test(r.erros[0].erro) && r.erros[0].artigo_id === 3, r);
 

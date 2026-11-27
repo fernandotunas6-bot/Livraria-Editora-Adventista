@@ -8634,6 +8634,81 @@ async fn os_dados_dos_livros_do_site_nas_fichas() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// O sentido contrário dos dados dos livros (sinc/fichas.rs, migração 0076): o que a ficha tem e o produto do site não
+/// vai na volta, com a versão; não volta depois de feito a não ser que a ficha mude; os erros e as recusas esperam; e o
+/// envio desliga-se neste computador.
+#[tokio::test]
+async fn os_dados_das_fichas_para_o_site() {
+    use crate::sinc::fichas;
+    let (st, pasta) = base_com_admin("dados-para-o-site").await;
+    let artigo = |extra: Value| {
+        let st = &st;
+        async move {
+            let mut a = json!({ "taxa_iva_id": 1, "preco1": 100 });
+            for (k, v) in extra.as_object().unwrap() {
+                a[k] = v.clone();
+            }
+            rpc(st, "artigos.guardar", a).await["id"].as_i64().unwrap()
+        }
+    };
+    let a1 = artigo(json!({ "descricao": "Patriarcas", "referencia": "FIC-101", "codigo_barras": "9788534520775",
+                            "atributos": { "autor": "Ellen G. White", "editora": "CPB", "ano": 2020 } }))
+    .await;
+    let a2 = artigo(json!({ "descricao": "O Desejado", "referencia": "FIC-102", "atributos": { "autor": "Outro" } })).await;
+    let a3 = artigo(json!({ "descricao": "Sem produto", "referencia": "FIC-103", "atributos": { "autor": "Alguém" } })).await;
+    for (id, r, dados) in [("p1", "FIC-101", json!({ "autor": null, "editora": "Casa", "isbn": "" })), ("p2", "FIC-102", json!({ "autor": "Alguém" }))] {
+        let mut d = dados;
+        d["id"] = json!(id);
+        d["referencia"] = json!(r);
+        sqlx::query("INSERT INTO loja_produtos (id, titulo, referencia, dados) VALUES (?, ?, ?, ?)")
+            .bind(id)
+            .bind(r)
+            .bind(r)
+            .bind(d.to_string())
+            .execute(&st.pool)
+            .await
+            .unwrap();
+    }
+    let agora = 1_800_000_000;
+    let ids = |t: i64| {
+        let pool = st.pool.clone();
+        async move { fichas::livros_para_o_site(&pool, t).await.unwrap().iter().map(|l| l.artigo_id).collect::<Vec<_>>() }
+    };
+    let l = fichas::livros_para_o_site(&st.pool, agora).await.unwrap();
+    assert_eq!(l.len(), 1, "só o 1: o 2 já tem autor no site, o 3 não tem produto");
+    assert_eq!(l[0].item, json!({ "artigo_id": a1, "referencia": "FIC-101", "autor": "Ellen G. White", "ano": 2020, "isbn": "9788534520775" }));
+    let e = rpc(&st, "loja.fichas.estado", Value::Null).await;
+    assert_eq!((e["para_o_site"]["ligado"].as_bool(), e["para_o_site"]["por_enviar"].as_i64()), (Some(true), Some(1)), "{e}");
+
+    // um site sem resposta (antigo): erro, e espera antes de ir outra vez
+    fichas::concluir_livros(&st.pool, &l, &Value::Null, agora).await.unwrap();
+    assert_eq!(ids(agora).await, Vec::<i64>::new());
+    assert_eq!(ids(agora + 3 * 3600).await, vec![a1]);
+    // feito: não volta, nem muito depois
+    fichas::concluir_livros(&st.pool, &l, &json!([{ "artigo_id": a1, "estado": "feito" }]), agora).await.unwrap();
+    assert_eq!(ids(agora + 30 * 86400).await, Vec::<i64>::new());
+    // a ficha mudou (as páginas): volta, já com elas
+    sqlx::query("UPDATE artigos SET atributos = json_set(atributos, '$.paginas', 300) WHERE id = ?").bind(a1).execute(&st.pool).await.unwrap();
+    let l = fichas::livros_para_o_site(&st.pool, agora).await.unwrap();
+    assert_eq!(l[0].item["paginas"].as_i64(), Some(300));
+    // recusado (este KanGest não manda no catálogo): um dia depois
+    fichas::concluir_livros(&st.pool, &l, &json!([{ "artigo_id": a1, "estado": "recusado", "erro": "não manda no catálogo" }]), agora).await.unwrap();
+    assert_eq!(ids(agora + 3600).await, Vec::<i64>::new());
+    assert_eq!(ids(agora + 25 * 3600).await, vec![a1]);
+    let e = rpc(&st, "loja.fichas.estado", Value::Null).await;
+    assert_eq!((e["para_o_site"]["recusados"].as_i64(), e["para_o_site"]["ultimo_erro"].as_str()), (Some(1), Some("não manda no catálogo")), "{e}");
+
+    // desligado neste computador: nada vai; o outro sentido fica como estava
+    let e = rpc(&st, "loja.fichas.ligar", json!({ "para_o_site": false })).await;
+    assert_eq!((e["para_o_site"]["ligado"].as_bool(), e["ligado"].as_bool()), (Some(false), Some(true)), "{e}");
+    assert_eq!(ids(agora + 25 * 3600).await, Vec::<i64>::new());
+    rpc(&st, "loja.fichas.ligar", json!({ "para_o_site": true })).await;
+    assert_eq!(ids(agora + 25 * 3600).await, vec![a1]);
+    let _ = (a2, a3);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.

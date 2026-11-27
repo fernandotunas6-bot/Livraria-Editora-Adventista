@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  limparEstadoComputador, limparFotosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES, tipoDaImagem,
+  isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
+  MAX_LIVROS, tipoDaImagem,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -400,5 +401,39 @@ describe("limparFotosKanGest (as fotografias do KanGest para as capas do site)",
   it("ignora o que nem tem um artigo", () => {
     const l = limparFotosKanGest([{ referencia: "R1", imagem: dataUrl("jpeg", jpeg) }, null, "x"]);
     expect(l).toEqual({ fotos: [], recusadas: [] });
+  });
+});
+
+describe("limparLivrosKanGest (os dados das fichas do KanGest para os produtos do site)", () => {
+  it("confere o ISBN-13 pelo algarismo de controlo", () => {
+    expect(isbn13Valido("9788534520775")).toBe(true);
+    expect(isbn13Valido("9788534520776")).toBe(false);
+    expect(isbn13Valido("5601234567890")).toBe(false);
+    expect(isbn13Valido("978853452077")).toBe(false);
+  });
+
+  it("sem livros (um KanGest antigo) é null", () => {
+    expect(limparLivrosKanGest(undefined)).toBeNull();
+    expect(limparLivrosKanGest([])).toBeNull();
+    expect(limparLivrosKanGest({ artigo_id: 1 })).toBeNull();
+  });
+
+  it("limpa os textos, os números e o ISBN, e deixa de fora o que não serve", () => {
+    const l = limparLivrosKanGest([
+      { artigo_id: 7, referencia: " LIV-001 ", autor: "  Ellen\n G.   White ", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "978-85-345-2077-5" },
+      { artigo_id: 8, referencia: "LIV-002", ano: 0, paginas: 2.5, isbn: "9788534520776", autor: "" },
+      { artigo_id: 9, referencia: "", autor: "Sem referência" },
+      { referencia: "LIV-003", autor: "Sem artigo" },
+    ]);
+    expect(l).toEqual([
+      { artigo_id: 7, referencia: "LIV-001", autor: "Ellen G. White", editora: "CPB", idioma: "Português", ano: 2024, paginas: 128, isbn: "9788534520775" },
+    ]);
+  });
+
+  it(`no máximo ${MAX_LIVROS} por volta, e os textos com o tamanho das colunas`, () => {
+    const muitos = Array.from({ length: MAX_LIVROS + 5 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, autor: "A".repeat(400) }));
+    const l = limparLivrosKanGest(muitos)!;
+    expect(l).toHaveLength(MAX_LIVROS);
+    expect(l[0].autor).toHaveLength(300);
   });
 });

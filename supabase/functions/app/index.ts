@@ -69,7 +69,7 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador, limparFotosKanGest, limparLivroStock, limparSessoesKanGest,
+  limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3561,6 +3561,25 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   } else {
     await db.from("kangest_postos").update({ ultima_sinc: new Date().toISOString() }).eq("id", posto);
   }
+  // os dados das fichas do KanGest nos produtos do site que não os têm (KANGEST ONE, integração total; sinc/fichas.rs;
+  // public.kangest_dados_dos_livros). Depois do lote, para um artigo novo já ter o rascunho. Nunca impedem o resto da
+  // volta: o que falhar volta na resposta e o posto tenta outra vez mais tarde.
+  let livros: unknown = null;
+  const livrosDoPosto = limparLivrosKanGest(aberto.dados?.livros);
+  if (livrosDoPosto) {
+    if (!p.manda_catalogo) {
+      livros = livrosDoPosto.map((l) => ({
+        artigo_id: l.artigo_id, estado: "recusado",
+        erro: "Este KanGest não manda no catálogo do site (painel → Configurações → KanGest → Postos).",
+      }));
+    } else {
+      const { data, error } = await db.rpc("kangest_dados_dos_livros", { p_posto: posto, p_itens: livrosDoPosto });
+      if (error) {
+        console.error("KanGest: os dados dos livros do posto", posto, error.message);
+        livros = livrosDoPosto.map((l) => ({ artigo_id: l.artigo_id, estado: "erro", erro: error.message.slice(0, 300) }));
+      } else livros = data;
+    }
+  }
   // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
   // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
   let novidades = null;
@@ -3587,7 +3606,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
-    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos,
+    resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros,
     // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
     kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
     site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },

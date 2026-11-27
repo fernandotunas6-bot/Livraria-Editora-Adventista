@@ -557,3 +557,19 @@ Testes:
 - **A migração 0075 apaga o cursor dos produtos:** o catálogo vem todo uma vez, já com os dados novos.
 - O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados dos livros do site nas
   fichas dos artigos»).
+
+## 19. Os dados das fichas nos produtos do site (KANGEST ONE, integração total)
+
+- **O pedido:** no campo `livros` vão até 50 livros por volta:
+  `{ artigo_id, referencia, autor?, editora?, idioma?, ano?, paginas?, isbn? }`. Vão só os campos que a ficha tem e o
+  produto do site (na cópia da Loja online) não.
+- **O site:**
+  - `limparLivrosKanGest` limpa os textos e confere os números e o ISBN-13;
+  - um posto que não manda no catálogo é recusado;
+  - `public.kangest_dados_dos_livros` (20261127110000) preenche só o que está vazio. O ISBN só entra se nenhum outro
+    produto o tiver.
+- **A resposta** (`livros`): para cada livro, `{ artigo_id, estado, erro? }`, com o estado `feito`, `sem_produto`,
+  `recusado` ou `erro`. O posto regista-a em `livros_enviados` (migração 0076).
+- **Um site sem este campo** não responde: o posto conta como erro e espera cada vez mais.
+- O pormenor está em [LOJA-ONLINE.md](../app/kangest-sistema/docs/LOJA-ONLINE.md) («Os dados das fichas para os
+  produtos do site»).
