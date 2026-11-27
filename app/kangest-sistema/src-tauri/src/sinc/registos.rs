@@ -81,7 +81,8 @@ pub async fn enfileirar_tudo(pool: &SqlitePool) -> AppResult<i64> {
         ("artigo", "SELECT id FROM artigos"),
         ("utilizador", "SELECT id FROM utilizadores"),
     ] {
-        let r = sqlx::query(&format!("INSERT INTO sinc_registos (tipo, chave) SELECT '{tipo}', id FROM ({sql}) ON CONFLICT (tipo, chave) DO NOTHING"))
+        // o `WHERE true` é da gramática do SQLite: sem ele, o `ON` do conflito lê-se como o de uma junção
+        let r = sqlx::query(&format!("INSERT INTO sinc_registos (tipo, chave) SELECT '{tipo}', id FROM ({sql}) WHERE true ON CONFLICT (tipo, chave) DO NOTHING"))
             .execute(pool)
             .await?;
         n += r.rows_affected() as i64;
