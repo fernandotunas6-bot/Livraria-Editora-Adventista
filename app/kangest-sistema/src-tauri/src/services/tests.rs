@@ -8867,8 +8867,10 @@ async fn as_fichas_para_a_base_central() {
     .unwrap();
     // com a ligação, a ficha que muda entra pelo gatilho; ao ligar, entram todas
     sqlx::query("UPDATE entidades SET telefone = '924000000' WHERE id = ?").bind(entidade).execute(&st.pool).await.unwrap();
+    // o `mudou` só tem de existir e subir: o gatilho de `alterado_em` (0025) muda a ficha outra vez dentro do mesmo UPDATE,
+    // e a marca conta as duas
     let marcada: Option<i64> = sqlx::query_scalar("SELECT mudou FROM sinc_registos WHERE tipo = 'entidade' AND chave = ?").bind(entidade).fetch_optional(&st.pool).await.unwrap();
-    assert_eq!(marcada, Some(1));
+    assert!(marcada.is_some_and(|m| m >= 1), "{marcada:?}");
     registos::enfileirar_tudo(&st.pool).await.unwrap();
     let agora = 1_800_000_000;
     let (pendentes, itens) = registos::devidos(&st.pool, agora, registos::LOTE).await.unwrap();
