@@ -56,10 +56,13 @@ async fn ligado(pool: &SqlitePool) -> bool {
     v.as_deref() != Some("0")
 }
 
+/// Um artigo com a promoção: o id, a referência, a percentagem, o início, o fim e o PVP com IVA em cêntimos.
+type ArtigoComPromocao = (i64, String, f64, Option<String>, Option<String>, i64);
+
 /// As promoções que podem ir: os artigos activos com um produto do site pela referência, cuja promoção (ou o PVP)
 /// mudou desde a última que foi. Um artigo sem promoção só vai se já tiver ido uma (para a retirar).
 async fn escolher(pool: &SqlitePool, agora: i64, hoje: &str, limite: usize) -> AppResult<Vec<PromocaoParaOSite>> {
-    let artigos: Vec<(i64, String, f64, Option<String>, Option<String>, i64)> = sqlx::query_as(
+    let artigos: Vec<ArtigoComPromocao> = sqlx::query_as(
         "SELECT a.id, TRIM(a.referencia), a.promo_desconto, a.promo_inicio, a.promo_fim,
                 CAST(ROUND(a.preco1 * (1 + t.percentagem / 100.0)) AS INTEGER)
            FROM artigos a JOIN taxas_iva t ON t.id = a.taxa_iva_id
@@ -84,13 +87,13 @@ async fn escolher(pool: &SqlitePool, agora: i64, hoje: &str, limite: usize) -> A
         match enviadas.get(&artigo_id) {
             // nunca foi nenhuma: sem promoção, não há nada a retirar
             None if sem => continue,
-            None => {}
             // a mesma versão: já está (feita, retirada, sem produto), ou espera ainda (as outras)
-            Some((v, estado, proximo)) => {
-                if *v == versao && (matches!(estado.as_str(), "feita" | "retirada" | "sem_produto") || *proximo > agora) {
-                    continue;
-                }
+            Some((v, estado, proximo))
+                if *v == versao && (matches!(estado.as_str(), "feita" | "retirada" | "sem_produto") || *proximo > agora) =>
+            {
+                continue
             }
+            _ => {}
         }
         let mut item = d;
         item["artigo_id"] = json!(artigo_id);
