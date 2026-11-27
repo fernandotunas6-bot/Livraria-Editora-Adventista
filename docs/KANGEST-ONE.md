@@ -74,6 +74,7 @@ Restrições de segurança, palavra por palavra:
 | E2 | a versão mínima do KanGest (`KANGEST_MIN_VERSION`) e o cartão «Servidor central» | #162 | KanGest 1.4.9; o segredo é do dono |
 | G1 | os tokens partilhados com o contraste AA conferido | #163 | sim (o site) e KanGest 1.4.9 |
 | G2 | o ecossistema no painel inicial do KanGest | #164 | KanGest 1.4.9 |
+| Capas | as capas dos livros do site como fotografias dos artigos do KanGest (pedido do dono a 27/11) | o PR das capas | KanGest 1.4.10 |
 | Teste 13 | nenhuma credencial privilegiada no site nem no ecrã do KanGest compilados (o CI) | #165 | sim (CI) |
 | Aceitação | `scripts/aceitacao/kangest-one.mjs` contra um ambiente | #166 | corrido contra a produção: 7 de 7 |
 

@@ -16,6 +16,7 @@ import { Logo } from "@/components/Logo";
 import { bloquearSessao } from "@/components/Sessao";
 import { AvisoLicenca } from "@/components/AvisoLicenca";
 import { AvisoIdentidade } from "@/components/AvisoIdentidade";
+import { CapasDoSite } from "@/components/CapasDoSite";
 import { EstadoLivraria } from "@/components/EstadoLivraria";
 import { PaletaComandos } from "@/components/Comandos";
 import DocumentoModal from "@/components/DocumentoModal";
@@ -297,6 +298,8 @@ export default function AppShell() {
           <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-5 lg:px-8 lg:py-6">
             {loc.pathname !== "/licenca" && <AvisoLicenca />}
             <AvisoIdentidade />
+            {/* as capas dos livros do site como fotografias dos artigos, sozinhas (components/CapasDoSite.tsx) */}
+            <CapasDoSite automatico />
             <Outlet />
           </div>
         </main>

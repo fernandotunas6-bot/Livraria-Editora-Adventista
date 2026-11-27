@@ -91,6 +91,30 @@ ligado pela referência: o título, o preço e se está à vista ou oculto (`loj
 
 Teste: `o_artigo_no_site_pela_ficha` (`services/tests.rs`, com o site falso).
 
+### As capas dos livros do site (KANGEST ONE, integração total; 27/11)
+
+Cada artigo sem fotografia cuja referência tem um produto do site com capa recebe essa capa como fotografia
+(`sinc/capas.rs`, `components/CapasDoSite.tsx`, migração 0073).
+
+**De onde vêm:** a cópia da Loja online já traz a capa de cada produto. As que só estão no Storage do site
+(`cover_image`) chegam com o endereço público, que a Edge Function completa nas novidades. A migração 0073 faz os
+produtos virem outra vez uma vez, para estas chegarem.
+
+**Como se trazem:**
+- **O programa descarrega a capa só de origens conhecidas:** o Supabase e o site da livraria, e o Google Drive, sempre
+  por HTTPS. Confere que é mesmo uma imagem, pelos primeiros bytes, com 8 MB no máximo.
+- **O endereço nunca vem do ecrã:** é sempre o do produto com a referência do artigo.
+- **O ecrã reduz a imagem como a qualquer fotografia** (miniatura e imagem) e guarda-a.
+- **Uma fotografia escolhida à mão nunca é substituída.**
+- **O que falha fica em `capas_tentadas`** e só se tenta outra vez quando a capa mudar no site.
+
+**Automático com opção manual:** corre sozinho em segundo plano, para quem tem `artigos.editar`. Na Loja online há o
+cartão «As capas dos livros do site», com «Trazer agora» e o interruptor «Trazer sozinho», que vale só para este
+computador.
+
+Teste: `as_capas_do_site_nos_artigos`. Testes unitários: `o_endereco_da_capa`, `so_de_origens_conhecidas` e
+`o_tipo_pela_assinatura`.
+
 ## Tempo real
 
 O servidor da loja fica ligado ao Realtime do site e ouve o tópico secreto deste posto (`src/sinc/tempo_real.rs`;
