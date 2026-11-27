@@ -11,6 +11,17 @@ livraria). Do lado do site, o protocolo, as tabelas e o painel estão em
 
 ## Ligar (uma vez)
 
+**Automático, com a conta do site (desde a 1.4.11, pedido do dono a 27/11):** em **Livraria → Ligação ao site**, «Ligar
+com a conta do site».
+- Escreve-se o email e a senha de quem tem «Gerir configurações» no site (e o código dos dois passos, se o tiver), e
+  escolhe-se a loja.
+- O KanGest pergunta o Auth do site (`GET /kangest/auth`, o endereço e a chave pública) ao site da compilação
+  (`KANGEST_SITE_PADRAO`, por omissão o da produção), e entra com a pessoa.
+- Manda a sua chave pública a `POST /kangest/ligar-com-a-conta`: o site cria o posto e emparelha-o no mesmo pedido.
+- A sessão da pessoa só serve para isto e não se guarda.
+
+**Ou com o código do painel:**
+
 1. No painel do site, em **Sistema → Ligação ao KanGest → Postos do KanGest Livraria**, crie o posto desta loja. O
    painel mostra o endereço da ligação e um código de 8 letras, que serve uma vez durante 10 minutos.
 2. Aqui, em **Livraria → Ligação ao site**, escreva o endereço e o código e carregue em **Ligar à livraria**. É preciso

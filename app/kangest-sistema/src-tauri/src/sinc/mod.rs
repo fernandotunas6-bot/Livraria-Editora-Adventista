@@ -576,6 +576,12 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
     if r.estado != 200 {
         return Err(AppError::msg(mensagem_do_site(&v, r.estado)));
     }
+    guardar_ligacao(st, &url, &semente, &v).await
+}
+
+/// Guarda a ligação que o site deu (o posto, a chave do centro e o Auth) e põe tudo na fila: o mesmo para o código do
+/// painel e para a ligação com a conta do site.
+async fn guardar_ligacao(st: &AppState, url: &str, semente: &[u8; 32], v: &Value) -> AppResult<Value> {
     let (Some(posto_id), Some(kid), Some(centro)) = (v["posto"]["id"].as_str(), v["centro"]["kid"].as_str(), v["centro"]["chave_publica"].as_str()) else {
         return Err(AppError::msg("O site respondeu sem o posto ou sem a chave do centro."));
     };
@@ -594,7 +600,7 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
            chave_assinatura = excluded.chave_assinatura, centro_kid = excluded.centro_kid, centro_chave = excluded.centro_chave, ativa = 1,
            emparelhado_em = excluded.emparelhado_em, ultimo_erro = ''",
     )
-    .bind(&url)
+    .bind(url)
     .bind(posto_id)
     .bind(v["posto"]["nome"].as_str().unwrap_or_default())
     .bind(v["posto"]["loja"].as_str().unwrap_or_default())
@@ -634,6 +640,128 @@ async fn emparelhar(st: &AppState, e: EmparelharIn) -> AppResult<Value> {
         e["aviso"] = json!("A hora deste computador está diferente da hora certa: acerte o relógio, senão o site recusa os envios.");
     }
     Ok(e)
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// A ligação automática com a conta do site (pedido do dono a 27/11)
+// ---------------------------------------------------------------------------------------------------------------
+
+/// O site da livraria (a Edge Function) que um KanGest por ligar conhece: o da compilação (`KANGEST_SITE_PADRAO`) ou o da
+/// produção. Não é segredo: é o mesmo endereço que o painel mostra.
+pub const SITE_PADRAO: &str = match option_env!("KANGEST_SITE_PADRAO") {
+    Some(s) => s,
+    None => "https://bggqkjjqbjhbjsckzopj.supabase.co/functions/v1/app",
+};
+
+#[derive(Deserialize, Default)]
+struct SiteIn {
+    #[serde(default)]
+    url: Option<String>,
+}
+
+/// O Auth do site (o endereço e a chave pública), pela rota pública `/kangest/auth`.
+async fn auth_do_site(url: &str) -> AppResult<(String, String)> {
+    let (estado, v) = pessoa::pedido("GET", format!("{url}/kangest/auth"), vec![("Accept", "application/json".to_string())], None)
+        .await
+        .map_err(|e| AppError::msg(format!("Sem ligação ao site: {}", e.texto())))?;
+    match (v["auth"]["url"].as_str(), v["auth"]["apikey"].as_str()) {
+        (Some(u), Some(k)) if estado == 200 && u.starts_with("http") && !k.is_empty() => Ok((u.trim_end_matches('/').to_string(), k.to_string())),
+        _ => Err(AppError::msg("O site ainda não tem a ligação automática: ligue com o código do painel (em baixo).")),
+    }
+}
+
+/// Para o ecrã da ligação automática: o site (o de omissão ou o escrito) e as lojas dele, para escolher a desta.
+async fn ligar_inicio(st: &AppState, i: SiteIn) -> AppResult<Value> {
+    st.exigir_perm(PERMISSAO)?;
+    let url = normalizar_url(i.url.as_deref().filter(|u| !u.trim().is_empty()).unwrap_or(SITE_PADRAO))?;
+    let (auth_url, apikey) = auth_do_site(&url).await?;
+    let lojas = match pessoa::pedido(
+        "GET",
+        format!("{auth_url}/rest/v1/physical_stores?select=id,name,province&active=eq.true&order=name"),
+        pessoa::cabecalhos(&apikey, None),
+        None,
+    )
+    .await
+    {
+        Ok((200, l)) if l.is_array() => l,
+        _ => json!([]),
+    };
+    Ok(json!({ "url": url, "lojas": lojas }))
+}
+
+#[derive(Deserialize)]
+struct ComContaIn {
+    #[serde(default)]
+    url: Option<String>,
+    email: String,
+    senha: String,
+    /// o código dos dois passos, na segunda volta
+    #[serde(default)]
+    codigo: Option<String>,
+    #[serde(default)]
+    store_id: Option<String>,
+    #[serde(default)]
+    nome: Option<String>,
+}
+
+/// Liga este KanGest com a conta do site de quem tem «Gerir configurações»: entra no Auth do site (com os dois passos,
+/// se os tem), e o site cria o posto e emparelha-o no mesmo pedido, com a chave pública que se gera aqui. A sessão da
+/// pessoa serve só para este pedido e nunca se guarda.
+async fn ligar_com_a_conta(st: &AppState, i: ComContaIn) -> AppResult<Value> {
+    st.exigir_perm(PERMISSAO)?;
+    let url = normalizar_url(i.url.as_deref().filter(|u| !u.trim().is_empty()).unwrap_or(SITE_PADRAO))?;
+    let email = i.email.trim().to_lowercase();
+    if !email.contains('@') || i.senha.is_empty() {
+        return Err(AppError::msg("Escreva o email e a senha da sua conta do site."));
+    }
+    let (auth_url, apikey) = auth_do_site(&url).await?;
+    let pedir = |metodo: &'static str, caminho: String, token: Option<String>, corpo: Value| {
+        let apikey = apikey.clone();
+        let auth_url = auth_url.clone();
+        async move {
+            pessoa::pedido(metodo, format!("{auth_url}{caminho}"), pessoa::cabecalhos(&apikey, token.as_deref()), Some(corpo))
+                .await
+                .map_err(|e| AppError::msg(format!("Sem ligação ao site: {}", e.texto())))
+        }
+    };
+    let (estado, v) = pedir("POST", "/auth/v1/token?grant_type=password".into(), None, json!({ "email": email, "password": i.senha })).await?;
+    let Some(mut token) = v["access_token"].as_str().filter(|_| estado == 200).map(str::to_string) else {
+        return Err(AppError::msg(pessoa::mensagem(&v, estado)));
+    };
+    // com os dois passos, a sessão só serve depois do código (aal2), como no painel
+    if let Some(factor) = entrada::factor_totp(&v) {
+        let codigo: String = i.codigo.unwrap_or_default().chars().filter(char::is_ascii_digit).collect();
+        if codigo.len() != 6 {
+            return Ok(json!({ "dois_passos": true }));
+        }
+        let (estado, d) = pedir("POST", format!("/auth/v1/factors/{factor}/challenge"), Some(token.clone()), json!({})).await?;
+        let Some(desafio) = d["id"].as_str().filter(|_| estado == 200).map(str::to_string) else {
+            return Err(AppError::msg(pessoa::mensagem(&d, estado)));
+        };
+        let (estado, t) = pedir("POST", format!("/auth/v1/factors/{factor}/verify"), Some(token.clone()), json!({ "challenge_id": desafio, "code": codigo })).await?;
+        match t["access_token"].as_str().filter(|_| estado == 200) {
+            Some(novo) => token = novo.to_string(),
+            None => return Err(AppError::msg(pessoa::mensagem(&t, estado))),
+        }
+    }
+    let semente = cifra::nova_semente()?;
+    let corpo = serde_json::to_vec(&json!({
+        "chave_publica": cifra::chave_publica(&semente)?,
+        "versao": format!("{} Livraria", env!("CARGO_PKG_VERSION")),
+        "store_id": i.store_id.unwrap_or_default(),
+        "nome": i.nome.unwrap_or_default(),
+    }))?;
+    let cabecalhos = vec![
+        ("Content-Type", "application/json".to_string()),
+        ("Accept", "application/json".to_string()),
+        ("Authorization", format!("Bearer {token}")),
+    ];
+    let r = post(format!("{url}/kangest/ligar-com-a-conta"), cabecalhos, corpo).await.map_err(|e| AppError::msg(format!("Sem ligação ao site: {e}")))?;
+    let v: Value = serde_json::from_slice(&r.corpo).unwrap_or(Value::Null);
+    if r.estado != 200 {
+        return Err(AppError::msg(mensagem_do_site(&v, r.estado)));
+    }
+    guardar_ligacao(st, &url, &semente, &v).await
 }
 
 async fn estado(st: &AppState) -> AppResult<Value> {
@@ -709,6 +837,9 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
     match metodo {
         "estado" => estado(st).await,
         "emparelhar" => emparelhar(st, serde_json::from_value(params)?).await,
+        // a ligação automática com a conta do site
+        "ligar_inicio" => ligar_inicio(st, serde_json::from_value(params).unwrap_or_default()).await,
+        "ligar_com_a_conta" => ligar_com_a_conta(st, serde_json::from_value(params)?).await,
         "agora" => agora(st).await,
         "repetir" => repetir(st).await,
         "desligar" => desligar(st).await,
@@ -722,6 +853,12 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn o_site_por_omissao_e_um_endereco_valido() {
+        let u = normalizar_url(SITE_PADRAO).unwrap();
+        assert!(u.starts_with("https://") && u.ends_with("/functions/v1/app"), "{u}");
+    }
 
     #[test]
     fn tentativas_cada_vez_mais_espacadas_ate_6_horas() {
