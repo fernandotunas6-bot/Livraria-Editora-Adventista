@@ -8,10 +8,8 @@ import {
 } from '@/lib/kangestRecibo';
 
 // Os documentos do KanGest como o KanGest os imprime: o talão de 80 mm (Ticket) e o A4 (A4), copiados de
-// app/kangest-sistema/src/components/DocumentoPrint.tsx. Preto sobre branco, em Arial, também no modo escuro do
-// painel: é o papel. `d` vem de montarDocumento (lib/kangestRecibo.js).
-
-const ARIAL = { fontFamily: 'Arial, Helvetica, sans-serif' };
+// app/kangest-sistema/src/components/DocumentoPrint.tsx. Preto sobre branco, também no modo escuro do painel: é o
+// papel. A letra é a do site (font-sans; src/lib/fontes.test.js). `d` vem de montarDocumento (lib/kangestRecibo.js).
 
 /** O logótipo da empresa, só se for uma imagem (a fotografia das configurações marca os ficheiros grandes). */
 const logoDe = (e) => (typeof e?.logo === 'string' && /^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(e.logo) ? e.logo : '');
@@ -46,7 +44,7 @@ export function Talao({ d, via = 'Original', reimpressao }) {
   const logo = logoDe(e);
   const rodape = rodapeAgt(doc);
   return (
-    <div className="recibo-kangest mx-auto w-[300px] bg-white p-3 text-[11px] leading-[1.3] text-black" style={ARIAL} data-ficheiro={nomeDoDocumento(d)}>
+    <div className="recibo-kangest mx-auto w-[300px] bg-white p-3 font-sans text-[11px] leading-[1.3] text-black" data-ficheiro={nomeDoDocumento(d)}>
       <div className="text-right font-bold">{via}</div>
       <div className="text-center">
         {logo && <img src={logo} alt="" className="mx-auto mb-1 max-h-12 max-w-[160px] object-contain grayscale" />}
@@ -194,8 +192,8 @@ export function FolhaA4({ d, via = 'Original', reimpressao }) {
 
   return (
     <div
-      className="recibo-kangest mx-auto flex min-h-[272mm] w-[190mm] flex-col bg-white p-1 text-[10px] leading-snug text-black"
-      style={{ ...ARIAL, ...(doc.formato === 'A5' ? { zoom: 134 / 190 } : {}) }}
+      className="recibo-kangest mx-auto flex min-h-[272mm] w-[190mm] flex-col bg-white p-1 font-sans text-[10px] leading-snug text-black"
+      style={doc.formato === 'A5' ? { zoom: 134 / 190 } : undefined}
       data-ficheiro={nomeDoDocumento(d)}
     >
       <div className="grid grid-cols-2 gap-8">
