@@ -69,7 +69,8 @@ import {
 } from "./kangest.ts";
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
-  limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest, prepararRegistos,
+  limparConfiguracoes, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
+  prepararRegistos,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3285,7 +3286,14 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
       const { count } = await db.from("kangest_registos").select("chave", { count: "exact", head: true }).eq("posto_id", p.id).eq("tipo", tipo);
       fichas[tipo] = count ?? 0;
     }
-    postos.push({ ...p, documentos: await conta(false), partidas: await conta(true), fichas, sessoes: [] as Row[], livro: null as Row | null });
+    // as configurações guardadas (20261127180000): quando chegou a última e o histórico importado do KIGEST
+    const { data: cfg } = await db.from("kangest_configuracoes").select("id, recebido_em").eq("posto_id", p.id)
+      .order("recebido_em", { ascending: false }).limit(1).maybeSingle();
+    const { count: importados } = await db.from("kangest_documentos").select("id", { count: "exact", head: true }).eq("posto_id", p.id).eq("importado", true);
+    postos.push({
+      ...p, documentos: await conta(false), partidas: await conta(true), fichas, importados: importados ?? 0,
+      configuracoes: cfg ? { id: cfg.id, recebido_em: cfg.recebido_em } : null, sessoes: [] as Row[], livro: null as Row | null,
+    });
   }
   // o livro único de stock (KANGEST ONE, B1): os movimentos e as diferenças com a fotografia, por posto
   const { data: livros, error: eLivros } = await db.rpc("stock_livro_resumo");
@@ -3313,6 +3321,22 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
 });
 
 // Onde o livro de stock de um posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1): até 200 linhas.
+// As configurações que um posto guardou (20261127180000): as versões (as 50 últimas) e a fotografia de uma delas (a mais
+// recente, sem `versao`). Só quem gere as configurações; a fotografia já vem sem segredos.
+route("GET", "/admin/kangest/postos/configuracoes", permissao("manage_settings"), async ({ url }) => {
+  const id = url.searchParams.get("id") || "";
+  if (!uuidValido(id)) throw bad("Indique o posto.");
+  const { data: versoes, error } = await db.from("kangest_configuracoes").select("id, resumo, recebido_em").eq("posto_id", id)
+    .order("recebido_em", { ascending: false }).limit(50);
+  if (error) throw new Error(error.message);
+  const pedida = Number(url.searchParams.get("versao") || 0);
+  const escolhida = (versoes || []).find((v) => v.id === pedida) || (versoes || [])[0];
+  if (!escolhida) return json({ versoes: [], versao: null, dados: null });
+  const { data: f, error: eF } = await db.from("kangest_configuracoes").select("dados").eq("id", escolhida.id).maybeSingle();
+  if (eF) throw new Error(eF.message);
+  return json({ versoes: versoes || [], versao: escolhida, dados: f?.dados ?? null });
+});
+
 route("GET", "/admin/kangest/postos/livro", permissao("manage_settings"), async ({ url }) => {
   const id = url.searchParams.get("id") || "";
   if (!uuidValido(id)) throw bad("Indique o posto.");
@@ -3659,6 +3683,20 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
       registos = { recebidos: 0, erros: (aberto.dados.registos as Row[]).slice(0, 200).map((r) => ({ registo: r?.registo, chave: r?.chave, erro })) };
     }
   }
+  // as configurações do posto (sinc/configuracoes.rs): uma fotografia sem segredos, guardada como versão; nunca impedem
+  // o resto da volta (sem «guardadas», o posto manda outra vez mais tarde)
+  let configuracoes: unknown = null;
+  if (aberto.dados?.configuracoes) {
+    const c = limparConfiguracoes(aberto.dados.configuracoes);
+    if (!c) configuracoes = { guardadas: false, erro: "As configurações não vieram na forma certa ou são grandes demais." };
+    else {
+      const { data, error } = await db.rpc("kangest_configuracoes_receber", { p_posto: posto, p_resumo: c.resumo, p_dados: c.dados });
+      if (error) {
+        console.error("KanGest: as configurações do posto", posto, error.message);
+        configuracoes = { guardadas: false, erro: error.message.slice(0, 300) };
+      } else configuracoes = data;
+    }
+  }
   // As novidades para a cópia local do KanGest (Livraria → Loja online): as encomendas da loja do posto e o catálogo,
   // só o que mudou desde os cursores que o posto mandou (public.kangest_novidades; docs/KANGEST-SINCRONIZACAO.md §7).
   let novidades = null;
@@ -3686,6 +3724,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
     resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros, promocoes, registos,
+    configuracoes,
     // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
     kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
     site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },

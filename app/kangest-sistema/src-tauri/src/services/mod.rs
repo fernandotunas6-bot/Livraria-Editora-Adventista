@@ -3,7 +3,7 @@
 
 pub mod acesso_web;
 mod aparencia;
-mod auditoria;
+pub(crate) mod auditoria;
 mod dois_passos;
 pub mod atualizacao;
 mod avencas;

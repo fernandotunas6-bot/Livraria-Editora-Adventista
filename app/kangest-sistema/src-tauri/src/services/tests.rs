@@ -8898,6 +8898,83 @@ async fn as_fichas_para_a_base_central() {
     let _ = std::fs::remove_dir_all(&pasta);
 }
 
+/// Tudo na base central (pedido do dono a 27/11; migração 0080): o histórico importado do KIGEST segue (marcado), e as
+/// configurações seguem numa fotografia sem segredos, só quando mudam.
+#[tokio::test]
+async fn o_historico_importado_e_as_configuracoes_para_a_base_central() {
+    use crate::sinc::configuracoes;
+    let (st, pasta) = base_com_admin("tudo-na-base-central").await;
+    let admin: i64 = sqlx::query_scalar("SELECT id FROM utilizadores ORDER BY id LIMIT 1").fetch_one(&st.pool).await.unwrap();
+    let importado = |numero: i64| {
+        let pool = st.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO documentos (tipo_codigo, serie, numero, numero_doc, data_emissao, data_hora, entidade_nome, entidade_nif, utilizador_id,
+                    estado, total_bruto, total_liquido, total_iva, total, valor_entregue, importado, origem)
+                 VALUES ('FR', 'K', ?1, 'FR K/' || ?1, '2025-03-10', '2025-03-10T10:00:00', 'Consumidor Final', '999999999', ?2,
+                    'N', 1000, 1000, 140, 1140, 1140, 1, 'I') RETURNING id",
+            )
+            .bind(numero)
+            .bind(admin)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    // antes de ligar: o histórico do KIGEST já está no computador
+    let antigo = importado(1).await;
+    sqlx::query("INSERT OR REPLACE INTO config (chave, valor) VALUES ('email.senha', 'segredo-que-nao-sai'), ('vendas.precos_com_iva', '1')")
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-25T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    // ao ligar, o histórico importado entra na fila, e o que se importar depois também (pelo gatilho)
+    assert!(crate::sinc::enfileirar_tudo(&st.pool).await.unwrap() >= 1);
+    let novo = importado(2).await;
+    for id in [antigo, novo] {
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sinc_saida WHERE documento_id = ? AND operacao = 'emitido'").bind(id).fetch_one(&st.pool).await.unwrap();
+        assert_eq!(n, 1, "o documento importado {id} na fila uma vez");
+    }
+    let item = crate::sinc::item_do_documento(&st.pool, antigo).await.unwrap().unwrap();
+    assert_eq!(item["documento"]["importado"], 1, "{item}");
+
+    // as configurações: a primeira fotografia segue, sem os segredos e sem o que muda sozinho
+    sqlx::query("INSERT OR IGNORE INTO series (tipo_codigo, serie, ultimo_numero, ultimo_hash) VALUES ('FR', 'CFG', 7, 'h7')").execute(&st.pool).await.unwrap();
+    let agora = 1_800_000_000;
+    let (resumo, f) = configuracoes::para_enviar(&st.pool, agora).await.unwrap().expect("a primeira fotografia");
+    assert_eq!(f["config"]["vendas.precos_com_iva"], "1");
+    assert!(f["config"].get("email.senha").is_none(), "a senha do email não sai: {}", f["config"]);
+    assert!(!f.to_string().contains("segredo-que-nao-sai"));
+    assert!(f["tabelas"]["series"].as_array().unwrap().iter().all(|x| x.get("ultimo_numero").is_none() && x.get("ultimo_hash").is_none()));
+    assert!(f["tabelas"]["taxas_iva"].as_array().is_some_and(|l| !l.is_empty()));
+    // guardada no site: não volta a seguir até mudar
+    configuracoes::concluir(&st.pool, &resumo, &json!({ "guardadas": true }), agora).await.unwrap();
+    assert!(configuracoes::para_enviar(&st.pool, agora).await.unwrap().is_none());
+    // uma venda nova muda o último número da série, mas não a fotografia
+    sqlx::query("UPDATE series SET ultimo_numero = ultimo_numero + 1, ultimo_hash = 'h8', data_ultimo = '2026-11-27' WHERE serie = 'CFG'")
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    assert!(configuracoes::para_enviar(&st.pool, agora).await.unwrap().is_none(), "o último número das séries não conta");
+    // mudou uma configuração: segue outra vez; o site recusou: espera
+    sqlx::query("UPDATE config SET valor = '0' WHERE chave = 'vendas.precos_com_iva'").execute(&st.pool).await.unwrap();
+    let (r2, _) = configuracoes::para_enviar(&st.pool, agora).await.unwrap().expect("a fotografia mudou");
+    assert_ne!(r2, resumo);
+    configuracoes::concluir(&st.pool, &r2, &Value::Null, agora).await.unwrap();
+    assert!(configuracoes::para_enviar(&st.pool, agora).await.unwrap().is_none(), "espera depois do erro");
+    assert!(configuracoes::para_enviar(&st.pool, agora + 3600).await.unwrap().is_some());
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}
+
 /// O sentido contrário das capas (KANGEST ONE, integração total; sinc/capas.rs, migração 0074): a fotografia de um
 /// artigo segue para o produto do site sem capa, uma por volta, e não volta a seguir depois de o site responder, a não ser
 /// que a fotografia mude. Os erros esperam, e o envio desliga-se neste computador.

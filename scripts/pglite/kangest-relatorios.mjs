@@ -177,5 +177,35 @@ check('fechos: o gerente vê só os da loja dele', fg.length === 1 && fg[0].stor
 check('fechos: um cliente não vê nenhum', (await como(cliente, `select count(*)::int n from public.kangest_fechos`))[0].n === 0);
 await recusa('fechos: a função de receber não se chama pela API', () => como(direccao, `select public.kangest_receber_fecho($1, null, '{}'::jsonb)`, [posto]), /permission denied/);
 
+// --- o histórico importado do KIGEST (20261127180000) ------------------------------------------------------------
+const mesDe = async (p, l, ano, m) => (await q(`select total::float8 total, docs from public.kangest_vendas where ligacao = $1 and store_id = $2 and ano = $3 and mes = $4 and canal = 'balcao'`, [`posto:${p}`, l, ano, m]))[0];
+// a ligação antiga já pôs Março de 2025 nos relatórios; Abril de 2025 não tem nada
+await q(`insert into public.kangest_vendas (ligacao, store_id, ano, mes, canal, total, docs, actualizado) values ('kigest-antiga', $1, 2025, 3, 'balcao', 999, 9, now())`, [loja.id]);
+const importada = (id, numero, data) => doc(id, 'FR', numero, { serie: 'KIG', numero_doc: `FR KIG/${numero}`, data_emissao: data, data_hora: `${data}T09:00:00`, hash: `K${id}`, hash_anterior: 'nao-bate', importado: true });
+const ri = await receber(posto, [importada(9001, 7, '2025-03-10'), importada(9002, 8, '2025-04-02')]);
+check("importados: entram os dois", ri.recebidos === 2, ri);
+const imp = await q(`select documento_id, importado, cadeia from public.kangest_documentos where posto_id = $1 and documento_id in (9001, 9002) order by documento_id`, [posto]);
+check('importados: marcados e fora da cadeia do KanGest', imp.length === 2 && imp.every((d) => d.importado === true && d.cadeia === 'importada'), imp);
+check('importados: num mês que a ligação antiga já tem, não contam outra vez', !(await aoVivo(posto, 9001)) && !(await mesDe(posto, loja.id, 2025, 3))?.docs, await mesDe(posto, loja.id, 2025, 3));
+check('importados: num mês sem nada, entram nos relatórios', !!(await aoVivo(posto, 9002)) && (await mesDe(posto, loja.id, 2025, 4))?.docs === 1, await mesDe(posto, loja.id, 2025, 4));
+check('importados: os do KanGest continuam na cadeia', (await q(`select count(*)::int n from public.kangest_documentos where posto_id = $1 and not importado and cadeia = 'importada'`, [posto]))[0].n === 0);
+
+// --- as configurações do posto (20261127180000) ----------------------------------------------------------------
+const R1 = 'a'.repeat(64);
+const R2 = 'b'.repeat(64);
+const guardar = async (resumo, dados) => (await q(`select public.kangest_configuracoes_receber($1, $2, $3::jsonb) r`, [posto, resumo, JSON.stringify(dados)]))[0].r;
+check('configurações: guardadas', (await guardar(R1, { config: { 'vendas.precos_com_iva': '1' } })).guardadas === true);
+await guardar(R1, { config: { 'vendas.precos_com_iva': '1' } });
+check('configurações: a mesma fotografia não se repete', (await q(`select count(*)::int n from public.kangest_configuracoes where posto_id = $1`, [posto]))[0].n === 1);
+await guardar(R2, { config: { 'vendas.precos_com_iva': '0' } });
+check('configurações: outra versão fica ao lado', (await q(`select count(*)::int n from public.kangest_configuracoes where posto_id = $1`, [posto]))[0].n === 2);
+for (let i = 0; i < 55; i++) await guardar(i.toString(16).padStart(64, 'c'), { i });
+check('configurações: ficam as 50 mais recentes', (await q(`select count(*)::int n from public.kangest_configuracoes where posto_id = $1`, [posto]))[0].n === 50);
+await recusa('configurações: um resumo que não é SHA-256', () => guardar('abc', {}), /inválidas/);
+await recusa('configurações: as contas não as mandam', () => como(direccao, `select public.kangest_configuracoes_receber($1, $2, '{}'::jsonb)`, [posto, R1]), /permission denied/);
+check('configurações: quem só vê relatórios não as lê', (await como(direccao, `select count(*)::int n from public.kangest_configuracoes`))[0].n === 0);
+const config = await pessoa('config@x.ao', 'manager', { manage_settings: true });
+check('configurações: quem gere as configurações lê-as', (await como(config, `select count(*)::int n from public.kangest_configuracoes`))[0].n === 50);
+
 console.log(`kangest-relatorios: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

@@ -617,3 +617,47 @@ Testes:
 - **A resposta** (`registos`): `{ recebidos, erros: [{ registo, chave, erro }] }`. O que foi aceite sai da fila, se não
   mudou entretanto. O recusado espera cada vez mais, e um site sem resposta conta como erro.
 - **No painel,** cada posto mostra quantas fichas chegaram de cada tipo.
+
+## 23. Tudo na base central: o histórico do KIGEST e as configurações (27/11)
+
+Pedido do dono: «migrar todos os dados actuais da loja Huambo, se o domínio estiver cadastrado, como é o caso do
+livrariaadventista.ao, para o banco de dados e guardar lá: recibos, livros, vendas, fecho, clientes, configurações
+todas… e permita que as configurações sejam guardadas no banco de dados».
+
+**O que segue ao ligar o KanGest ao site** (`guardar_ligacao`, uma vez; depois, pelas filas):
+
+| O quê | Como | Desde |
+|---|---|---|
+| Vendas, recibos, notas, compras e guias feitas no KanGest | `sinc_saida` (documentos) | 1.4.x |
+| **O histórico importado do KIGEST** | `sinc_saida`, marcado `importado` | **1.4.11 (0080)** |
+| Fechos de caixa | `sinc_fechos` | 1.4.8 |
+| Tesouraria | `sinc_financeiro` — **toda** (antes, só o último ano) | **1.4.11 (0080)** |
+| Stock e preços | `sinc_catalogo` | 1.4.x |
+| Clientes, fornecedores, artigos completos, utilizadores | `sinc_registos` (§22) | 1.4.11 (0079) |
+| **As configurações** | fotografia em `sinc_ligacao` | **1.4.11 (0080)** |
+
+**O histórico importado do KIGEST** (`documentos.importado = 1` no KanGest):
+- chega a `kangest_documentos` com `importado = true` e `cadeia = 'importada'`. Tem a assinatura do KIGEST, por isso não
+  se confere na cadeia do KanGest nem aparece como «partida»;
+- nos relatórios (as vendas ao vivo e o total do mês), só conta num mês que a ligação antiga do KIGEST
+  (`kangest_vendas` sem «posto:», desligada a 25/11) não tenha já: assim, nenhum mês conta duas vezes;
+- uma importação feita depois de ligar segue sozinha (`trg_sinc_documento_importado`), e também o que falta pagar de uma
+  factura importada (`trg_sinc_pendente_importado`).
+
+**As configurações** (`sinc/configuracoes.rs` → `kangest_configuracoes`, migração 20261127180000):
+- **o que levam:** a empresa (com o logótipo até 200 KB), as chaves da `config` e as tabelas de referência (armazéns,
+  séries, famílias, taxas de IVA, modos de pagamento, moedas, unidades, prazos, isenções, retenções, centros de custo,
+  tipos de documento, perfis, postos, contas, cupões, comissões, regras de aprovação e de promoção, modelos de
+  relatório);
+- **nunca levam:**
+  - os segredos (`segredos::CHAVES`, as senhas, os PIN, os tokens, as chaves privadas e as da AGT);
+  - o que é interno (a licença, o selo da auditoria);
+  - o que muda a cada venda (o último número e o último hash das séries, as utilizações dos cupões).
+
+  O servidor volta a tirar, a qualquer profundidade, as chaves com cara de segredo (`limparConfiguracoes`);
+- **quando seguem:** só quando a fotografia muda (o resumo SHA-256 é outro). Sem Internet, ou com erro, esperam cada
+  vez mais;
+- **no site:** ficam as últimas 50 versões por posto, que só quem tem «Gerir configurações» lê. No painel
+  (Configurações → KanGest → Postos), «Ver» mostra o resumo e as versões, e «Descarregar (JSON)» guarda a fotografia,
+  para comparar ou repor num computador novo.
+

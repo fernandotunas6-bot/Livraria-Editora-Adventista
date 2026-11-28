@@ -414,6 +414,8 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
         ...(typeof d.vencimento === "string" && /^\d{4}-\d{2}-\d{2}/.test(d.vencimento) ? { vencimento: d.vencimento.slice(0, 10) } : {}),
         ...(d.valor_pendente != null ? { valor_pendente: inteiro(d.valor_pendente) } : {}),
         ...(d.doc_origem != null ? { doc_origem: texto(d.doc_origem, 60) } : {}),
+        // o histórico importado do KIGEST (0080 do KanGest): fora da cadeia do KanGest e, nos relatórios, sem contar a dobrar
+        ...(d.importado === 1 || d.importado === true ? { importado: true } : {}),
       },
       linhas: linhas.map((l: Row) => ({
         linha: inteiro(l.linha),
@@ -801,4 +803,35 @@ export async function prepararRegistos(x: unknown, cifra: CifraDados): Promise<R
     out.push({ registo, chave, dados, pessoais_cifrado });
   }
   return out.length ? out : null;
+}
+
+/** O tamanho máximo da fotografia das configurações de um posto (sinc/configuracoes.rs, `MAX_FOTOGRAFIA`, com folga). */
+export const MAX_CONFIGURACOES = 400_000;
+
+/** Tira, a qualquer profundidade, as chaves com cara de segredo (o posto já as tirou; aqui é por cautela). */
+function semSegredos(v: unknown, profundidade = 0): unknown {
+  if (profundidade > 8) return null;
+  if (Array.isArray(v)) return v.map((x) => semSegredos(x, profundidade + 1));
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (!CAMPO_PROIBIDO.test(k)) out[k] = semSegredos(x, profundidade + 1);
+    }
+    return out;
+  }
+  return v;
+}
+
+/**
+ * As configurações de um posto (pedido do dono a 27/11: «permita que as configurações sejam guardadas no banco de
+ * dados»; sinc/configuracoes.rs): o resumo SHA-256 e a fotografia, sem segredos. `null` se não tiver a forma certa ou
+ * passar do tamanho.
+ */
+export function limparConfiguracoes(x: unknown): { resumo: string; dados: Record<string, unknown> } | null {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return null;
+  const v = x as Record<string, unknown>;
+  const resumo = typeof v.resumo === "string" && /^[0-9a-f]{64}$/.test(v.resumo) ? v.resumo : "";
+  if (!resumo || !v.dados || typeof v.dados !== "object" || Array.isArray(v.dados)) return null;
+  if (JSON.stringify(v.dados).length > MAX_CONFIGURACOES) return null;
+  return { resumo, dados: semSegredos(v.dados) as Record<string, unknown> };
 }
