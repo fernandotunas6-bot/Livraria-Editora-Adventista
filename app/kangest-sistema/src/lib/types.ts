@@ -450,6 +450,8 @@ export interface CaixaResumo {
   documentos_lista?: { id: number; numero_doc: string; tipo_codigo: string; data_hora: string; cliente: string | null; estado: string; total: number; pagamento: string | null }[];
   /** As vendas online da loja, à parte: não contam para o numerário da gaveta (services/caixa_fechos.rs). */
   online?: VendasOnlineFecho;
+  /** O relatório completo do Z (services/caixa.rs, `analise_da_sessao`); um fecho de antes não o tem. */
+  analise?: AnaliseFecho;
   /** O arquivo do fecho (só num fecho): o selo, se é reconstruído, as impressões e o ficheiro. */
   arquivo?: {
     id: number;
@@ -463,6 +465,17 @@ export interface CaixaResumo {
     ficheiro_gravado?: string;
     erro_ficheiro?: string;
   };
+}
+
+/** As análises do relatório completo do fecho: as notas de crédito abatem; sem os nomes dos clientes. */
+export interface AnaliseFecho {
+  resumo?: { vendas: number; vendido: number; devolucoes: number; devolvido: number; com_desconto: number; descontos: number; primeira: string | null; ultima: string | null };
+  por_tipo?: { codigo: string; descricao: string; documentos: number; anulados: number; total: number }[];
+  por_operador?: { nome: string; documentos: number; total: number }[];
+  por_hora?: { hora: string; documentos: number; total: number }[];
+  por_familia?: { familia: string; quantidade: number; total: number }[];
+  iva?: { taxa: number; motivo_isencao: string; base: number; iva: number }[];
+  anulados?: { numero_doc: string; data_hora: string; total: number; motivo: string }[];
 }
 
 export interface VendasOnlineFecho {
