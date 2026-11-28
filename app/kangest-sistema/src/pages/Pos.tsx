@@ -790,8 +790,11 @@ export default function Pos() {
       // ESC/POS: o talão (e a gaveta) saem directamente, sem diálogo do sistema
       const chamada = imprime ? call("impressao.talao", { id, vias: opcoes.vias }) : call("impressao.gaveta", { documento_id: id });
       chamada.catch((e) => toast.error((e as Error).message));
-    } else if (imprime) {
-      setImpressaoAuto(id);
+    } else {
+      // um tipo em A4 num posto com a térmica directa: a folha sai pelo diálogo do sistema, e a gaveta abre na mesma
+      // (o servidor só a abre quando o documento leva numerário, como no talão)
+      if (termica) call("impressao.gaveta", { documento_id: id }).catch((e) => toast.error((e as Error).message));
+      if (imprime) setImpressaoAuto(id);
     }
   }
 
