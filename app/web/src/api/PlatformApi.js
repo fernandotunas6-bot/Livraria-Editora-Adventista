@@ -338,6 +338,18 @@ export const kangestPostoLivro = (id) => pb.send(`/admin/kangest/postos/livro?id
 /** As configurações que o posto guardou na base central: as versões e a fotografia de uma (a mais recente, sem `versao`). */
 export const kangestPostoConfiguracoes = (id, versao) =>
   pb.send(`/admin/kangest/postos/configuracoes?id=${encodeURIComponent(id)}${versao ? `&versao=${encodeURIComponent(versao)}` : ''}`, { method: 'GET' });
+/**
+ * Os documentos do KanGest na base central (GET /admin/kangest/documentos): por período, posto, loja, tipo, estado e
+ * pesquisa (n.º do documento ou NIF), 50 de cada vez, com o nome do cliente já decifrado.
+ */
+export const kangestDocumentos = (filtros = {}) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(filtros)) if (v !== '' && v != null) q.set(k, String(v));
+  const s = q.toString();
+  return pb.send(`/admin/kangest/documentos${s ? `?${s}` : ''}`, { method: 'GET' });
+};
+/** Um documento do KanGest completo, para o mostrar como o KanGest o imprime (o talão e o A4). */
+export const kangestDocumento = (id) => pb.send(`/admin/kangest/documentos/ver?id=${encodeURIComponent(id)}`, { method: 'GET' });
 /** Cria um posto e devolve o código de emparelhamento (uso único, 10 minutos). */
 export const kangestPostoCriar = ({ nome, store_id }) => pb.send('/admin/kangest/postos', { method: 'POST', body: { nome, store_id } });
 /** Outro código para o posto (computador novo, chave perdida ou rodar a chave): a chave actual deixa de valer. */

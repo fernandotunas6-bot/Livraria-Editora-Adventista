@@ -274,6 +274,66 @@ export const MAX_RESUMO_FECHO = 200_000;
 const inteiro = (v: unknown) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : 0);
 const texto = (v: unknown, max: number) => String(v ?? "").slice(0, max);
 const numero = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const lista = (v: unknown, max: number): Row[] =>
+  (Array.isArray(v) ? v.slice(0, max) : []).map((x) => (x && typeof x === "object" && !Array.isArray(x) ? x as Row : {}));
+
+/** Os modos de pagamento de um documento (um talão tem um ou dois; isto só trava o absurdo). */
+export const MAX_PAGAMENTOS = 20;
+
+/**
+ * O que o site precisa para mostrar um documento como o KanGest o imprime, no talão e no A4 (sinc/mod.rs,
+ * `impressao_do_documento`; pedido do dono a 27/11: «visualizar os recibos igual ao do KanGest»):
+ * - o tipo, o desconto, o que se entregou, o troco e a moeda;
+ * - o que se pagou com cada modo;
+ * - os documentos que um recibo liquida;
+ * - a unidade, a isenção e o lote de cada linha;
+ * - o n.º do certificado.
+ *
+ * Só os campos conhecidos, com os tamanhos limitados. Sem os dados do cliente (seguem cifrados, à parte). Um posto
+ * antigo não a manda: o documento mostra-se sem os pagamentos.
+ */
+export function limparImpressao(v: unknown): Row {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const i = v as Row;
+  const talvez = (x: unknown) => (x == null || x === "" ? null : numero(x));
+  return {
+    tipo_desc: texto(i.tipo_desc, 80),
+    classe: texto(i.classe, 20),
+    prefixo_extenso: texto(i.prefixo_extenso, 40),
+    texto_rodape: texto(i.texto_rodape, 300),
+    total_bruto: inteiro(i.total_bruto),
+    total_desconto: inteiro(i.total_desconto),
+    total_retencao: inteiro(i.total_retencao),
+    valor_entregue: inteiro(i.valor_entregue),
+    troco: inteiro(i.troco),
+    moeda: texto(i.moeda, 3).toUpperCase(),
+    cambio: talvez(i.cambio),
+    total_moeda: talvez(i.total_moeda),
+    motivo: texto(i.motivo, 300),
+    certificado: texto(i.certificado, 40),
+    pagamentos: lista(i.pagamentos, MAX_PAGAMENTOS).map((p) => ({
+      modo_codigo: texto(p.modo_codigo, 10),
+      descricao: texto(p.descricao, 80),
+      valor: inteiro(p.valor),
+      moeda: texto(p.moeda, 3).toUpperCase(),
+      valor_moeda: talvez(p.valor_moeda),
+      cambio: talvez(p.cambio),
+    })),
+    liquidacoes: lista(i.liquidacoes, MAX_LINHAS).map((l) => ({
+      numero_doc: texto(l.numero_doc, 60),
+      data_emissao: texto(l.data_emissao, 10),
+      total: inteiro(l.total),
+      valor: inteiro(l.valor),
+    })),
+    linhas: lista(i.linhas, MAX_LINHAS).map((l) => ({
+      linha: inteiro(l.linha),
+      unidade: texto(l.unidade, 12),
+      motivo_isencao: texto(l.motivo_isencao, 10),
+      lote: texto(l.lote, 40),
+      validade: texto(l.validade, 10),
+    })),
+  };
+}
 
 /**
  * O lote como entra na base (public.kangest_receber): só os campos conhecidos, com os tamanhos limitados e os dados
@@ -429,6 +489,7 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
         valor_iva: inteiro(l.valor_iva),
         total: inteiro(l.total),
       })),
+      impressao: limparImpressao(item.impressao),
     });
   }
   return out;
@@ -539,6 +600,38 @@ export function limparSessoesKanGest(l: unknown): Record<string, unknown>[] | nu
 // ------------------------------------------------------------------ o livro único de stock (KANGEST ONE, B1)
 
 const MAX_LIVRO = 2000;
+
+/**
+ * O que se escreveu na pesquisa dos documentos do KanGest no painel: um NIF (procura-se pelo índice cego, sem decifrar
+ * nada) ou parte do número do documento («FR», «K2026/15»). Outra coisa não procura.
+ */
+export function pesquisaDeDocumentos(q: unknown): { nif: string } | { numero: string } | null {
+  const s = String(q ?? "").trim();
+  if (!s) return null;
+  const nif = s.replace(/[\s.-]/g, "").toUpperCase();
+  if (/^\d{9,10}$/.test(nif) || /^\d{9}[A-Z]{2}\d{3}$/.test(nif)) return { nif };
+  // só letras, algarismos, espaço, «/» e «-»: entra num filtro ilike sem caracteres especiais
+  const numero = s.replace(/\s+/g, " ").slice(0, 40);
+  return /^[\p{L}\d /-]+$/u.test(numero) ? { numero } : null;
+}
+
+/** O cliente de um documento do KanGest, decifrado para o painel. Um campo que não abra fica «(cifrado)». */
+export async function clienteDoDocumento(
+  cifra: CifraDados | null,
+  d: { consumidor_final?: boolean; entidade_nome_cifrado?: string; entidade_nif_cifrado?: string },
+): Promise<{ nome: string; nif: string }> {
+  if (d.consumidor_final !== false) return { nome: "Consumidor final", nif: "999999999" };
+  const abrir = async (v?: string) => {
+    if (!v) return "";
+    if (!cifra) return "(cifrado)";
+    try {
+      return await decifrarCampo(cifra, v);
+    } catch {
+      return "(cifrado)";
+    }
+  };
+  return { nome: await abrir(d.entidade_nome_cifrado), nif: await abrir(d.entidade_nif_cifrado) };
+}
 
 /** O tamanho máximo de uma fotografia do KanGest para o site, já descodificada (a do KanGest tem até 800 px). */
 export const MAX_FOTO_BYTES = 750_000;

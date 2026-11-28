@@ -661,3 +661,40 @@ todas… e permita que as configurações sejam guardadas no banco de dados».
   (Configurações → KanGest → Postos), «Ver» mostra o resumo e as versões, e «Descarregar (JSON)» guarda a fotografia,
   para comparar ou repor num computador novo.
 
+
+## 24. Os documentos do KanGest no painel, como o KanGest os imprime (28/11)
+
+Pedido do dono (27/11): «implementar o estilo de recibos do KanGest na livraria, e a lógica de visualizar os recibos
+igual à do KanGest».
+
+**Onde:** no painel, Relatórios → **Documentos do KanGest** (`?tab=documentos-kangest`), para quem vê os relatórios de
+vendas («Ver relatórios» ou «Editar relatórios de vendas»). É a mesma regra das dívidas, porque os nomes dos clientes se
+decifram.
+
+**Como no ecrã Documentos do KanGest:**
+- **a lista** filtra pelo período, pela loja, pelo tipo, pelo estado e pelo n.º do documento ou o NIF. O NIF procura-se
+  pelo índice cego, sem decifrar nada. As marcas na lista são «Anulado», «Do KIGEST» e «Assinatura por conferir»;
+- **abrir um documento** mostra-o como sai da impressora da loja:
+  - o **talão de 80 mm** ou o **A4**, com o mesmo desenho do KanGest (`KanGestRecibo.jsx`, copiado de
+    `DocumentoPrint.tsx`). O formato escolhido fica lembrado no navegador;
+  - a **2.ª via**: «2.ª via em conformidade com o original» e «Reimpresso por … em …»;
+  - «Imprimir 2.ª via» manda só o documento para a impressora, com a folha certa (80 mm ou A4), ou guarda-o em PDF;
+  - o documento de origem e os que saíram dele (uma nota de crédito, por exemplo) abrem-se a partir do documento.
+
+**De onde vêm os dados:**
+
+| No impresso | Na base central |
+|---|---|
+| O documento, as linhas e os totais | `kangest_documentos`, `kangest_documento_linhas` |
+| O cliente (o nome e o NIF) | cifrados no documento; a Edge Function decifra-os só para o painel |
+| O tipo, o desconto, os pagamentos, o troco, as liquidações de um recibo, a unidade e a isenção das linhas, o certificado | `kangest_documentos.impressao` (**1.4.11**; migração 20261128100000) |
+| A empresa (o nome, o NIF, a morada, o logótipo, o rodapé, os bancos) e os tipos de documento | a última fotografia das configurações do posto (§23) |
+
+**A impressão** (`sinc/mod.rs`, `impressao_do_documento` → `limparImpressao` → `kangest_receber`):
+- segue com cada documento, sem os dados do cliente nem as observações livres;
+- não faz parte do documento assinado. Um documento que chegou de um posto anterior à 1.4.11 mostra-se sem os
+  pagamentos, com um aviso. Se o posto o mandar outra vez, a impressão completa-se. O resto do documento continua sem
+  se alterar.
+
+**As rotas:** `GET /admin/kangest/documentos` (a lista, 50 de cada vez) e `GET /admin/kangest/documentos/ver?id=` (o
+documento completo). As duas exigem `view_reports` ou `edit_reports`.

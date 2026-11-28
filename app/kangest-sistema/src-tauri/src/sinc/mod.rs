@@ -207,7 +207,62 @@ pub async fn item_do_documento(pool: &SqlitePool, id: i64) -> AppResult<Option<V
         id,
     )
     .await?;
-    Ok(Some(json!({ "tipo": "documento", "documento": db::row_json(&d), "linhas": linhas })))
+    let impressao = impressao_do_documento(pool, id).await?;
+    Ok(Some(json!({ "tipo": "documento", "documento": db::row_json(&d), "linhas": linhas, "impressao": impressao })))
+}
+
+/// O que o site precisa para mostrar o documento como o KanGest o imprime, no talão e no A4 (pedido do dono a 27/11:
+/// «implementar o estilo de recibos do KanGest na livraria… visualizar os recibos igual ao do KanGest»):
+/// - o nome e a classe do tipo de documento;
+/// - o desconto, o que se entregou, o troco e a moeda;
+/// - o que se pagou com cada modo de pagamento;
+/// - num recibo, os documentos que liquida;
+/// - em cada linha, a unidade, a isenção e o lote;
+/// - o n.º do certificado com que foi processado (o do KanGest, ou o do KIGEST no histórico importado).
+///
+/// Não leva os dados do cliente (seguem cifrados, à parte) nem as observações livres.
+pub async fn impressao_do_documento(pool: &SqlitePool, id: i64) -> AppResult<Value> {
+    let cabecalho = db::query_json_bind(
+        pool,
+        "SELECT t.descricao AS tipo_desc, t.classe, t.prefixo_extenso, t.texto_rodape, d.total_bruto, d.total_desconto,
+                d.total_retencao, d.valor_entregue, d.troco, d.moeda, d.cambio, d.total_moeda, d.motivo, d.importado
+           FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo WHERE d.id = ?",
+        id,
+    )
+    .await?;
+    let mut i = cabecalho.as_array().and_then(|l| l.first().cloned()).unwrap_or_else(|| json!({}));
+    let importado = i["importado"].as_i64() == Some(1);
+    let certificado = if importado {
+        sqlx::query_scalar::<_, String>("SELECT valor FROM config WHERE chave = 'agt.certificado_anterior'")
+            .fetch_optional(pool)
+            .await?
+            .unwrap_or_default()
+    } else {
+        crate::agt::certificado(pool).await?
+    };
+    i["certificado"] = json!(certificado.trim());
+    i["pagamentos"] = db::query_json_bind(
+        pool,
+        "SELECT p.modo_codigo, COALESCE(m.descricao, p.modo_codigo) AS descricao, p.valor, p.moeda, p.valor_moeda, p.cambio
+           FROM documento_pagamentos p LEFT JOIN modos_pagamento m ON m.codigo = p.modo_codigo
+          WHERE p.documento_id = ? ORDER BY p.id",
+        id,
+    )
+    .await?;
+    i["liquidacoes"] = db::query_json_bind(
+        pool,
+        "SELECT d.numero_doc, d.data_emissao, d.total, r.valor FROM recibo_documentos r
+           JOIN documentos d ON d.id = r.documento_id WHERE r.recibo_id = ? ORDER BY d.data_emissao, d.id",
+        id,
+    )
+    .await?;
+    i["linhas"] = db::query_json_bind(
+        pool,
+        "SELECT linha, unidade, motivo_isencao, lote, validade FROM documento_linhas WHERE documento_id = ? ORDER BY linha",
+        id,
+    )
+    .await?;
+    Ok(i)
 }
 
 enum Falha {

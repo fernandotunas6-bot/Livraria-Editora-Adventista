@@ -18,7 +18,7 @@ import {
   Activity, ArrowLeftRight, Award, Ban, Banknote, BarChart3, Bell, Bike, BookHeart, BookOpen, Brush, Building2, CalendarClock,
   Church, ClipboardList, CreditCard, Factory, FileDown, FileUp, Flag, HandCoins, Hash, IdCard, Image, Inbox, KeyRound,
   LayoutDashboard, LayoutTemplate, Layers, Link2, Mail, Map as MapIcon, Megaphone,
-  MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageCheck, PackageSearch, Palette, PanelTop, Percent, Phone, Plug,
+  MessageCircle, MessageSquare, MessagesSquare, Newspaper, PackageCheck, PackageSearch, Palette, PanelTop, Percent, Phone, Plug, ReceiptText,
   Rocket, Scale, Settings, Settings2, ShieldCheck, ShoppingBag, Siren, Smartphone, Star, Store, TrendingUp, Truck, UserCheck,
   UserCog, UserPlus, UserRound, Users, UsersRound, Wallet,
 } from 'lucide-react';
@@ -31,7 +31,7 @@ export const ADMIN_GROUPS = [
   { id: 'catalogo', label: 'Catálogo', sections: ['books', 'disponibilidade', 'collections', 'slides', 'downloads'] },
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
-  { id: 'relatorios', label: 'Relatórios', sections: ['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
+  { id: 'relatorios', label: 'Relatórios', sections: ['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'documentos-kangest', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
   { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
@@ -158,6 +158,14 @@ export const ADMIN_SECTIONS = {
     description: 'O painel de cada loja: os 12 meses, a comparação com o ano anterior, a projecção, a apresentação e o vídeo.',
     allowed: (p) => p.salesReports,
     readOnly: (p) => !p.salesReportsEdit,
+  },
+  // As facturas, os recibos e as notas do KanGest, como o KanGest os imprime (KanGestDocumentos.jsx, migração
+  // 20261128100000). A mesma regra das dívidas: quem vê os relatórios de vendas (os nomes dos clientes decifram-se).
+  'documentos-kangest': {
+    label: 'Documentos do KanGest', title: 'Documentos do KanGest', icon: ReceiptText,
+    keywords: 'recibos facturas faturas talao talão segunda via reimprimir notas de credito balcao nif documentos kangest kigest',
+    description: 'As facturas, os recibos e as notas das lojas, como saíram da impressora (o talão ou o A4), e a 2.ª via.',
+    allowed: (p) => p.salesReports,
   },
   // As imagens e os mais vendidos dos vídeos dos relatórios (ImagensVideosTab.jsx, docs/RELATORIOS.md).
   'imagens-videos': {
