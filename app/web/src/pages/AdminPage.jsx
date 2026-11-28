@@ -74,6 +74,7 @@ const RelatoriosLojasTab = lazy(() => import('@/components/admin/RelatoriosLojas
 const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage'));
 const OrderKanGest = lazy(() => import('@/components/admin/OrderKanGest'));
 const KanGestTab = lazy(() => import('@/components/admin/KanGestTab'));
+const KanGestDocumentos = lazy(() => import('@/components/admin/KanGestDocumentos'));
 const ImagensVideosTab = lazy(() => import('@/components/admin/ImagensVideosTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -185,6 +186,8 @@ const AdminPage = () => {
   const canManageCatalog = perms.catalog;
   const canManageOrders = perms.orders;
   const canManageSettings = perms.settings;
+  // Os documentos do KanGest: quem vê os relatórios de vendas (a mesma regra da rota GET /admin/kangest/documentos).
+  const canReadSalesReports = perms.salesReports;
   const canManageUsers = perms.users;
   const canManagePayments = perms.payments;
   // Confirmar dinheiro é separado de gerir os métodos (IBAN, links): migração pagamentos_registados.
@@ -843,6 +846,13 @@ const AdminPage = () => {
               <AdminSection active={activeTab} value="vendas-huambo">
                 <Suspense fallback={spinner}>
                   <VendasHuamboTab />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canReadSalesReports && (
+              <AdminSection active={activeTab} value="documentos-kangest">
+                <Suspense fallback={spinner}>
+                  <KanGestDocumentos />
                 </Suspense>
               </AdminSection>
             )}

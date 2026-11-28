@@ -8,6 +8,7 @@ import {
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
+  clienteDoDocumento, limparImpressao, MAX_PAGAMENTOS, pesquisaDeDocumentos,
 } from "./kangestSinc.ts";
 
 const enc = new TextEncoder();
@@ -531,5 +532,54 @@ describe("prepararRegistos (as fichas do KanGest para a base central)", () => {
     expect(r.map((x) => [x.registo, x.chave])).toEqual([["utilizador", 2], ["artigo", 3]]);
     expect(r[0].dados).toEqual({ nome: "Ana", perfil: "CAIXA" });
     expect(r[0].pessoais_cifrado).toBe("");
+  });
+});
+
+describe("os recibos do KanGest no site, como o KanGest os imprime", () => {
+  const segredo = paraB64(seq(32, 7));
+
+  it("a impressão: só os campos conhecidos, com os tamanhos limitados, e nada do cliente", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const impressao = {
+      tipo_desc: "Factura/Recibo", classe: "VENDA", total_bruto: 12000, total_desconto: 600, troco: 600, valor_entregue: 12000,
+      moeda: "aoa", cambio: null, certificado: "123/AGT/2024", entidade_nome: "Ana Silva", observacoes: "nota livre",
+      pagamentos: [{ modo_codigo: "NU", descricao: "Numerário", valor: 11400, senha: "x" }, "lixo"],
+      liquidacoes: [{ numero_doc: "FT K2026/2", data_emissao: "2026-11-20T00:00:00", total: 5000, valor: 5000 }],
+      linhas: [{ linha: 1, unidade: "UN", motivo_isencao: "M00", lote: "", validade: null }],
+    };
+    const [d] = await prepararLote([{ tipo: "documento", documento: { id: 1, tipo_codigo: "FR", numero_doc: "FR K2026/1" }, linhas: [], impressao }], c);
+    expect(d.impressao).toMatchObject({ tipo_desc: "Factura/Recibo", classe: "VENDA", total_desconto: 600, troco: 600, moeda: "AOA", cambio: null, certificado: "123/AGT/2024" });
+    expect(d.impressao.pagamentos).toEqual([
+      { modo_codigo: "NU", descricao: "Numerário", valor: 11400, moeda: "", valor_moeda: null, cambio: null },
+      { modo_codigo: "", descricao: "", valor: 0, moeda: "", valor_moeda: null, cambio: null },
+    ]);
+    expect(d.impressao.liquidacoes).toEqual([{ numero_doc: "FT K2026/2", data_emissao: "2026-11-20", total: 5000, valor: 5000 }]);
+    expect(d.impressao.linhas).toEqual([{ linha: 1, unidade: "UN", motivo_isencao: "M00", lote: "", validade: "" }]);
+    expect(JSON.stringify(d.impressao)).not.toContain("Ana Silva");
+    expect(JSON.stringify(d.impressao)).not.toContain("nota livre");
+    // um posto antigo não a manda: fica vazia
+    const [antigo] = await prepararLote([{ tipo: "documento", documento: { id: 2 } }], c);
+    expect(antigo.impressao).toEqual({});
+    expect(limparImpressao([1, 2])).toEqual({});
+    expect(limparImpressao({ pagamentos: Array.from({ length: 50 }, () => ({ valor: 1 })) }).pagamentos).toHaveLength(MAX_PAGAMENTOS);
+  });
+
+  it("a pesquisa: um NIF procura-se pelo índice; o número do documento, por parte", () => {
+    expect(pesquisaDeDocumentos("5000 123 456")).toEqual({ nif: "5000123456" });
+    expect(pesquisaDeDocumentos("004512345la041")).toEqual({ nif: "004512345LA041" });
+    expect(pesquisaDeDocumentos(" FR  K2026/15 ")).toEqual({ numero: "FR K2026/15" });
+    expect(pesquisaDeDocumentos("")).toBeNull();
+    for (const mau of ["a%b", "x,numero_doc.eq.1", "(a)", "_"]) expect(pesquisaDeDocumentos(mau), mau).toBeNull();
+  });
+
+  it("o cliente decifra-se para o painel; o Consumidor final não tem nada a decifrar", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const nome = await cifrarCampo(c, "Ana Silva");
+    const nif = await cifrarCampo(c, "5000123456");
+    expect(await clienteDoDocumento(c, { consumidor_final: false, entidade_nome_cifrado: nome, entidade_nif_cifrado: nif })).toEqual({ nome: "Ana Silva", nif: "5000123456" });
+    expect(await clienteDoDocumento(c, { consumidor_final: true })).toEqual({ nome: "Consumidor final", nif: "999999999" });
+    const outra = (await lerCifraDados(paraB64(seq(32, 8))))!;
+    expect(await clienteDoDocumento(outra, { consumidor_final: false, entidade_nome_cifrado: nome })).toEqual({ nome: "(cifrado)", nif: "" });
+    expect(await clienteDoDocumento(null, { consumidor_final: false, entidade_nome_cifrado: nome })).toEqual({ nome: "(cifrado)", nif: "" });
   });
 });

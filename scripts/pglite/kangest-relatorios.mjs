@@ -207,5 +207,25 @@ check('configurações: quem só vê relatórios não as lê', (await como(direc
 const config = await pessoa('config@x.ao', 'manager', { manage_settings: true });
 check('configurações: quem gere as configurações lê-as', (await como(config, `select count(*)::int n from public.kangest_configuracoes`))[0].n === 50);
 
+// --- a impressão de cada documento, para o painel o mostrar como o KanGest (20261128100000) ----------------------
+const IMPRESSAO = { tipo_desc: 'Factura/Recibo', classe: 'VENDA', troco: 600, pagamentos: [{ modo_codigo: 'NU', descricao: 'Numerário', valor: 11400 }] };
+const comImpressao = { ...doc(9101, 'FR', 101, { serie: 'IMP', numero_doc: 'FR IMP/101' }), impressao: IMPRESSAO };
+check('impressão: o documento entra', (await receber(posto, [comImpressao])).recebidos === 1);
+const impDe = async (id) => (await q(`select impressao from public.kangest_documentos where posto_id = $1 and documento_id = $2`, [posto, id]))[0]?.impressao;
+check('impressão: fica guardada com o documento', (await impDe(9101))?.pagamentos?.[0]?.valor === 11400, await impDe(9101));
+// um documento de um posto antigo chega sem ela; quando o posto o manda outra vez, completa-se
+const semImpressao = doc(9102, 'FR', 102, { serie: 'IMP', numero_doc: 'FR IMP/102' });
+await receber(posto, [semImpressao]);
+check('impressão: um posto antigo deixa-a vazia', JSON.stringify(await impDe(9102)) === '{}', await impDe(9102));
+const rr = await receber(posto, [{ ...semImpressao, impressao: IMPRESSAO }]);
+check('impressão: o documento repetido completa-a, sem contar como novo', rr.repetidos === 1 && (await impDe(9102))?.tipo_desc === 'Factura/Recibo', { rr, i: await impDe(9102) });
+await receber(posto, [{ ...comImpressao, impressao: { tipo_desc: 'Outra' } }]);
+check('impressão: a que já lá está não muda', (await impDe(9101))?.tipo_desc === 'Factura/Recibo', await impDe(9101));
+await receber(posto, [{ ...doc(9103, 'FR', 103, { serie: 'IMP', numero_doc: 'FR IMP/103' }), impressao: [1, 2] }]);
+check('impressão: o que não é um objecto fica vazio', JSON.stringify(await impDe(9103)) === '{}', await impDe(9103));
+await recusa('impressão: o documento assinado continua sem mudar', () => q(`update public.kangest_documentos set total = 1 where posto_id = $1 and documento_id = 9101`, [posto]), /não se altera/);
+check('impressão: quem vê os relatórios lê-a', (await como(direccao, `select count(*)::int n from public.kangest_documentos where impressao ? 'pagamentos'`))[0].n >= 2);
+await recusa('impressão: a função de limpeza não se chama pela API', () => como(direccao, `select private.kangest_impressao_limpa('{}'::jsonb)`), /permission denied/);
+
 console.log(`kangest-relatorios: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);

@@ -70,7 +70,7 @@ import {
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
   limparConfiguracoes, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
-  prepararRegistos,
+  clienteDoDocumento, indiceCego, pesquisaDeDocumentos, prepararRegistos,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3404,6 +3404,98 @@ route("GET", "/admin/relatorios/dividas", permissao("view_reports", "edit_report
   const { data, error } = await db.rpc("dividas_por_loja", { p_loja: loja || null });
   if (error) throw new Error(error.message);
   return json({ dividas: await dividasParaOPainel(data || [], await cifraDadosKanGest()) });
+});
+
+// Os documentos do KanGest no painel, como o KanGest os imprime (migração 20261128100000; pedido do dono a 27/11:
+// «implementar o estilo de recibos do KanGest na livraria, e a lógica de visualizar os recibos igual à do KanGest»).
+// A lista e o documento são de quem vê os relatórios, como as dívidas: os nomes e os NIF dos clientes chegam cifrados e
+// só se decifram aqui. A pesquisa por NIF usa o índice cego, sem decifrar nada.
+const DOCUMENTOS_POR_PAGINA = 50;
+const dataDoFiltro = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : "");
+
+route("GET", "/admin/kangest/documentos", permissao("view_reports", "edit_reports"), async ({ url }) => {
+  const s = url.searchParams;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const ate = dataDoFiltro(s.get("ate")) || hoje;
+  const de = dataDoFiltro(s.get("de")) || new Date(Date.parse(ate) - 30 * 86_400_000).toISOString().slice(0, 10);
+  if (de > ate) throw bad("A data inicial é depois da final.");
+  if (Date.parse(ate) - Date.parse(de) > 400 * 86_400_000) throw bad("O período tem no máximo 400 dias.");
+  const pagina = Math.min(1000, Math.max(0, Math.floor(Number(s.get("pagina")) || 0)));
+  const cifra = await cifraDadosKanGest();
+  let q = db.from("kangest_documentos")
+    .select("id, posto_id, tipo_codigo, serie, numero, numero_doc, data_emissao, data_hora, store_id, consumidor_final, entidade_nome_cifrado, total, estado, cadeia, importado, canal, operador, tipo_desc:impressao->>tipo_desc", { count: "exact" })
+    .gte("data_emissao", de).lte("data_emissao", ate)
+    .order("data_hora", { ascending: false }).order("id", { ascending: false })
+    .range(pagina * DOCUMENTOS_POR_PAGINA, pagina * DOCUMENTOS_POR_PAGINA + DOCUMENTOS_POR_PAGINA - 1);
+  const posto = s.get("posto") || "";
+  if (uuidValido(posto)) q = q.eq("posto_id", posto);
+  const loja = cleanText(s.get("loja"), 60);
+  if (loja) q = q.eq("store_id", loja);
+  const tipo = cleanText(s.get("tipo"), 4).toUpperCase();
+  if (/^[A-Z]{2,3}$/.test(tipo)) q = q.eq("tipo_codigo", tipo);
+  const estado = s.get("estado") || "";
+  if (["N", "A", "F"].includes(estado)) q = q.eq("estado", estado);
+  const procura = pesquisaDeDocumentos(s.get("q"));
+  if (procura && "nif" in procura) {
+    // sem a chave dos dados não há índice: a pesquisa por NIF não encontra nada
+    q = q.eq("entidade_nif_indice", cifra ? await indiceCego(cifra, procura.nif) : "-");
+  } else if (procura) {
+    q = q.ilike("numero_doc", `%${procura.numero}%`);
+  }
+  const { data, error, count } = await q;
+  if (error) throw new Error(error.message);
+  const documentos = await Promise.all((data || []).map(async (d: Row) => {
+    const { entidade_nome_cifrado: _nome, ...resto } = d;
+    const cliente = await clienteDoDocumento(cifra, { consumidor_final: d.consumidor_final, entidade_nome_cifrado: d.entidade_nome_cifrado });
+    return { ...resto, cliente: cliente.nome };
+  }));
+  return json({ documentos, total: count ?? documentos.length, pagina, por_pagina: DOCUMENTOS_POR_PAGINA, de, ate });
+});
+
+route("GET", "/admin/kangest/documentos/ver", permissao("view_reports", "edit_reports"), async ({ url }) => {
+  const id = Number(url.searchParams.get("id"));
+  if (!Number.isSafeInteger(id) || id <= 0) throw bad("Indique o documento.");
+  const { data: d, error } = await db.from("kangest_documentos").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!d) throw new HttpError(404, "Documento não encontrado.");
+  const [linhas, posto, loja, config, derivados, origem] = await Promise.all([
+    db.from("kangest_documento_linhas")
+      .select("linha, referencia, descricao, quantidade, preco_unitario, desconto_pct, taxa_iva_pct, valor_liquido, valor_iva, total")
+      .eq("documento", id).order("linha"),
+    db.from("kangest_postos").select("id, nome").eq("id", d.posto_id).maybeSingle(),
+    d.store_id ? db.from("physical_stores").select("id, name").eq("id", d.store_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    // a empresa e os tipos de documento como estão no KanGest do posto (a última fotografia das configurações)
+    db.from("kangest_configuracoes").select("empresa:dados->empresa, tipos:dados->tabelas->tipos_documento, recebido_em")
+      .eq("posto_id", d.posto_id).order("recebido_em", { ascending: false }).limit(1).maybeSingle(),
+    // o que saiu deste documento (uma nota de crédito, a factura de uma proforma)
+    d.numero_doc
+      ? db.from("kangest_documentos").select("id, tipo_codigo, numero_doc, data_emissao, total, estado")
+        .eq("posto_id", d.posto_id).eq("doc_origem", d.numero_doc).order("data_hora").limit(20)
+      : Promise.resolve({ data: [], error: null }),
+    d.doc_origem
+      ? db.from("kangest_documentos").select("id, tipo_codigo, numero_doc").eq("posto_id", d.posto_id).eq("numero_doc", d.doc_origem).limit(1).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  for (const r of [linhas, posto, loja, config, derivados, origem]) if (r.error) throw new Error(r.error.message);
+  const cliente = await clienteDoDocumento(await cifraDadosKanGest(), d);
+  const { entidade_nome_cifrado: _n, entidade_nif_cifrado: _f, entidade_nif_indice: _i, hash: _h, hash_anterior: _a, ...documento } = d;
+  const empresa = (config.data as Row | null)?.empresa;
+  const tipos = (config.data as Row | null)?.tipos;
+  const tipo = Array.isArray(tipos) ? tipos.find((t: Row) => t?.codigo === d.tipo_codigo) ?? null : null;
+  let bancos: unknown = empresa?.bancos;
+  if (typeof bancos === "string") {
+    try { bancos = JSON.parse(bancos); } catch { bancos = []; }
+  }
+  return json({
+    documento: { ...documento, entidade_nome: cliente.nome, entidade_nif: cliente.nif },
+    linhas: linhas.data || [],
+    empresa: empresa && typeof empresa === "object" ? { ...empresa, bancos: Array.isArray(bancos) ? bancos : [] } : null,
+    tipo: tipo ? { descricao: tipo.descricao, classe: tipo.classe, prefixo_extenso: tipo.prefixo_extenso, texto_rodape: tipo.texto_rodape, formato: tipo.formato } : null,
+    posto: posto.data,
+    loja: loja.data,
+    origem: origem.data,
+    derivados: derivados.data || [],
+  });
 });
 
 // Os dois interruptores do posto (migração 20261125140000): o stock dele conta para o stock à venda no site, e os

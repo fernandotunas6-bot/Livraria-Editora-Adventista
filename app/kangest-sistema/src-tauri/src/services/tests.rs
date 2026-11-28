@@ -8943,8 +8943,17 @@ async fn o_historico_importado_e_as_configuracoes_para_a_base_central() {
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sinc_saida WHERE documento_id = ? AND operacao = 'emitido'").bind(id).fetch_one(&st.pool).await.unwrap();
         assert_eq!(n, 1, "o documento importado {id} na fila uma vez");
     }
+    // com o que o site precisa para o mostrar como o KanGest o imprime (o tipo, o que se pagou, o certificado do KIGEST)
+    sqlx::query("INSERT INTO documento_pagamentos (documento_id, modo_codigo, valor) VALUES (?, 'NU', 1140)").bind(antigo).execute(&st.pool).await.unwrap();
+    sqlx::query("INSERT OR REPLACE INTO config (chave, valor) VALUES ('agt.certificado_anterior', '123/AGT/2019')").execute(&st.pool).await.unwrap();
     let item = crate::sinc::item_do_documento(&st.pool, antigo).await.unwrap().unwrap();
     assert_eq!(item["documento"]["importado"], 1, "{item}");
+    assert_eq!(item["impressao"]["tipo_desc"], "Factura/Recibo", "{item}");
+    assert_eq!(item["impressao"]["classe"], "VENDA");
+    assert_eq!(item["impressao"]["pagamentos"][0]["descricao"], "Numerário");
+    assert_eq!(item["impressao"]["pagamentos"][0]["valor"], 1140);
+    assert_eq!(item["impressao"]["certificado"], "123/AGT/2019");
+    assert!(item["impressao"].get("entidade_nome").is_none(), "o cliente não vai na impressão: {}", item["impressao"]);
 
     // as configurações: a primeira fotografia segue, sem os segredos e sem o que muda sozinho
     sqlx::query("INSERT OR IGNORE INTO series (tipo_codigo, serie, ultimo_numero, ultimo_hash) VALUES ('FR', 'CFG', 7, 'h7')").execute(&st.pool).await.unwrap();
