@@ -14,6 +14,7 @@ import type { CaixaResumo } from "@/lib/types";
 import { useSession } from "@/store/session";
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Segmentado, Select, Stat, Table, Td, Th, cn } from "@/components/ui";
 import { PrintPortal } from "@/components/DocumentoPrint";
+import { FechoA4 } from "@/components/FechoA4";
 import { useEmpresa } from "@/components/PrintCabecalho";
 
 interface SessaoLista {
@@ -664,6 +665,8 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
   // a reimpressão de um fecho sai como 2.ª via (como os documentos): sabe-se pelo registo das impressões
   const [segundaVia, setSegundaVia] = useState((r.arquivo?.impressoes.total ?? 0) > 0);
   const [aImprimir, setAImprimir] = useState(false);
+  // o talão (curto, para o rolo) ou o relatório completo em A4, com as análises (pedido do dono a 27/11)
+  const [formato, setFormato] = useState<"talao" | "a4">("talao");
   const online = r.online;
   const nomeFicheiro = r.arquivo?.ficheiro.replace(/\.html$/, "");
 
@@ -674,7 +677,7 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
     }
     setAImprimir(true);
     try {
-      const i = await call<{ segunda_via: boolean }>("caixa.fechoImpressao", { id: r.sessao.id, formato: t58 ? "talao58" : "talao80" });
+      const i = await call<{ segunda_via: boolean }>("caixa.fechoImpressao", { id: r.sessao.id, formato: formato === "a4" ? "a4" : t58 ? "talao58" : "talao80" });
       setSegundaVia(i.segunda_via);
       // depois de o talão mostrar a via certa
       window.setTimeout(() => imprimir(i.segunda_via ? `${nomeFicheiro} (2.ª via)` : nomeFicheiro), 60);
@@ -826,12 +829,13 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
       {r.arquivo && <div className="mt-2 break-all text-[0.8em]">Arquivado em {dataHora(r.arquivo.criado_em)} · selo {r.arquivo.selo.slice(0, 16)}</div>}
     </div>
   );
+  const impresso = formato === "a4" ? <FechoA4 r={r} e={e} comDocumentos={comDocumentos} /> : conteudo;
   return (
     <Modal
       open
       onClose={onClose}
       title="Relatório de fecho"
-      width="max-w-md"
+      width={formato === "a4" ? "max-w-4xl" : "max-w-md"}
       footer={
         <>
           {r.arquivo && (
@@ -845,7 +849,16 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
         </>
       }
     >
-      <div className="flex max-h-[60vh] justify-center overflow-y-auto rounded-xl bg-sunken p-4">{conteudo}</div>
+      <Segmentado
+        className="mb-3 w-fit"
+        valor={formato}
+        onChange={setFormato}
+        opcoes={[
+          { id: "talao", label: "Talão" },
+          { id: "a4", label: "Relatório completo (A4)" },
+        ]}
+      />
+      <div className="flex max-h-[60vh] justify-center overflow-auto rounded-xl bg-sunken p-4">{impresso}</div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {r.sessao.valor_contado !== null && dif !== 0 && <Badge tone={dif < 0 ? "danger" : "accent"}>Diferença de {kz(dif)}</Badge>}
         {r.arquivo && !r.arquivo.selo_confere && <Badge tone="danger">O selo do arquivo não confere</Badge>}
@@ -857,7 +870,7 @@ function RelatorioFecho({ r, onClose }: { r: CaixaResumo; onClose: () => void })
           </label>
         )}
       </div>
-      <PrintPortal>{conteudo}</PrintPortal>
+      <PrintPortal>{impresso}</PrintPortal>
     </Modal>
   );
 }

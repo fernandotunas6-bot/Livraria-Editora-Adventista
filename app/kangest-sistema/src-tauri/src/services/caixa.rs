@@ -91,6 +91,7 @@ pub(super) async fn calcular(con: &mut SqliteConnection, sid: i64) -> AppResult<
     .bind(sid)
     .fetch_all(&mut *con)
     .await?;
+    let analise = analise_da_sessao(&mut *con, sid).await?;
     let em_moeda_kz: i64 = estrangeiras.iter().map(|r| r.get::<i64, _>("kz")).sum();
     let numerario: i64 = por_modo.iter().filter(|r| r.get::<String, _>("codigo") == "NU").map(|r| r.get::<i64, _>("total")).sum::<i64>() - em_moeda_kz;
     let inicial: i64 = s.get("valor_inicial");
@@ -136,7 +137,104 @@ pub(super) async fn calcular(con: &mut SqliteConnection, sid: i64) -> AppResult<
         "numerario_esperado": esperado,
         "moedas_estrangeiras": db::rows_json(&estrangeiras),
         "conferencia": conferencia,
+        "analise": analise,
         "cego": false,
+    }))
+}
+
+/// As análises do relatório completo do fecho (pedido do dono a 27/11: «refinar o fecho da caixa com relatórios
+/// extensivos e arquivar»):
+/// - o resumo das vendas (quantas, quanto, as devoluções, os descontos, a primeira e a última);
+/// - as vendas por tipo de documento (com os anulados), por operador, por hora e por família;
+/// - o IVA por taxa;
+/// - os documentos anulados, com o motivo.
+///
+/// As notas de crédito abatem. Ficam no instantâneo do Z (arquivado e selado), no documento A4 do arquivo e no resumo
+/// que segue para o site. Não levam os nomes dos clientes.
+async fn analise_da_sessao(con: &mut SqliteConnection, sid: i64) -> AppResult<Value> {
+    let resumo = sqlx::query(
+        "SELECT COALESCE(SUM(CASE WHEN t.credito = 0 THEN 1 ELSE 0 END), 0) AS vendas,
+                COALESCE(SUM(CASE WHEN t.credito = 0 THEN d.total ELSE 0 END), 0) AS vendido,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN 1 ELSE 0 END), 0) AS devolucoes,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN d.total ELSE 0 END), 0) AS devolvido,
+                COALESCE(SUM(CASE WHEN t.credito = 0 AND d.total_desconto > 0 THEN 1 ELSE 0 END), 0) AS com_desconto,
+                COALESCE(SUM(CASE WHEN t.credito = 0 THEN d.total_desconto ELSE 0 END), 0) AS descontos,
+                MIN(d.data_hora) AS primeira, MAX(d.data_hora) AS ultima
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'",
+    )
+    .bind(sid)
+    .fetch_one(&mut *con)
+    .await?;
+    let por_tipo = sqlx::query(
+        "SELECT d.tipo_codigo AS codigo, t.descricao,
+                COALESCE(SUM(CASE WHEN d.estado <> 'A' THEN 1 ELSE 0 END), 0) AS documentos,
+                COALESCE(SUM(CASE WHEN d.estado = 'A' THEN 1 ELSE 0 END), 0) AS anulados,
+                COALESCE(SUM(CASE WHEN d.estado <> 'A' THEN CASE WHEN t.credito = 1 THEN -d.total ELSE d.total END ELSE 0 END), 0) AS total
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? GROUP BY d.tipo_codigo, t.descricao ORDER BY MIN(t.ordem), d.tipo_codigo",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    let por_operador = sqlx::query(
+        "SELECT COALESCE(u.nome, '—') AS nome, COUNT(*) AS documentos,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN -d.total ELSE d.total END), 0) AS total
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo LEFT JOIN utilizadores u ON u.id = d.utilizador_id
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'
+         GROUP BY d.utilizador_id, u.nome ORDER BY total DESC",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    let por_hora = sqlx::query(
+        "SELECT substr(d.data_hora, 12, 2) AS hora, COUNT(*) AS documentos,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN -d.total ELSE d.total END), 0) AS total
+         FROM documentos d JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'
+         GROUP BY substr(d.data_hora, 12, 2) ORDER BY hora",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    let por_familia = sqlx::query(
+        "SELECT COALESCE(f.descricao, 'Sem família') AS familia,
+                SUM(CASE WHEN t.credito = 1 THEN -l.quantidade ELSE l.quantidade END) AS quantidade,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN -l.total ELSE l.total END), 0) AS total
+         FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         LEFT JOIN artigos a ON a.id = l.artigo_id LEFT JOIN familias f ON f.id = a.familia_id
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'
+         GROUP BY COALESCE(f.descricao, 'Sem família') ORDER BY total DESC",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    let iva = sqlx::query(
+        "SELECT l.taxa_iva_pct AS taxa, COALESCE(l.motivo_isencao, '') AS motivo_isencao,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN -l.valor_liquido ELSE l.valor_liquido END), 0) AS base,
+                COALESCE(SUM(CASE WHEN t.credito = 1 THEN -l.valor_iva ELSE l.valor_iva END), 0) AS iva
+         FROM documento_linhas l JOIN documentos d ON d.id = l.documento_id JOIN tipos_documento t ON t.codigo = d.tipo_codigo
+         WHERE d.caixa_sessao_id = ? AND d.estado = 'N' AND t.classe = 'VENDA'
+         GROUP BY l.taxa_iva_pct, COALESCE(l.motivo_isencao, '') ORDER BY l.taxa_iva_pct DESC",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    let anulados = sqlx::query(
+        "SELECT d.numero_doc, d.data_hora, d.total, COALESCE(d.motivo_anulacao, '') AS motivo
+         FROM documentos d WHERE d.caixa_sessao_id = ? AND d.estado = 'A' ORDER BY d.data_hora, d.id",
+    )
+    .bind(sid)
+    .fetch_all(&mut *con)
+    .await?;
+    Ok(json!({
+        "resumo": db::row_json(&resumo),
+        "por_tipo": db::rows_json(&por_tipo),
+        "por_operador": db::rows_json(&por_operador),
+        "por_hora": db::rows_json(&por_hora),
+        "por_familia": db::rows_json(&por_familia),
+        "iva": db::rows_json(&iva),
+        "anulados": db::rows_json(&anulados),
     }))
 }
 
@@ -163,6 +261,7 @@ pub(crate) async fn resumo(st: &AppState, sid: i64) -> AppResult<Value> {
         v["artigos"] = json!([]);
         v["documentos_lista"] = json!([]);
         v["moedas_estrangeiras"] = json!([]);
+        v["analise"] = json!({});
         if let Some(modos) = v["por_modo"].as_array_mut() {
             for m in modos {
                 m["total"] = Value::Null;

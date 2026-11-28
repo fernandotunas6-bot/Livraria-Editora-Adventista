@@ -17,6 +17,35 @@ A regra é a de sempre: **tudo automático por omissão, e sempre com a opção 
   omissão. No de 58 mm escolhe-se, porque o talão fica comprido.
 - **As vendas online**, numa secção à parte (ver abaixo).
 
+## O relatório completo (1.4.11)
+
+Pedido do dono a 27/11: «refinar o fecho da caixa com relatórios extensivos e arquivar».
+
+**O Z guarda também as análises da sessão** (`analise_da_sessao` em `services/caixa.rs`). Ficam no arquivo selado, no
+ficheiro A4 e no resumo que segue para o site:
+- **o resumo das vendas:** quantas, o valor, o valor médio por venda, as devoluções, os descontos, a primeira e a
+  última venda;
+- **por tipo de documento**, com os anulados;
+- **por operador**, **por hora** e **por família**;
+- **o IVA por taxa** (a incidência e o imposto);
+- **os documentos anulados**, com a hora e o motivo.
+
+As notas de crédito abatem, como nos artigos. Um fecho de antes da 1.4.11 não tem as análises.
+
+**No ecrã:** o «Relatório de fecho» escolhe entre o **talão** (curto, para o rolo) e o **relatório completo (A4)**, que
+junta tudo:
+- a gaveta, a contagem e a conferência;
+- as análises;
+- os artigos, os documentos e os vales;
+- as vendas online;
+- o selo do arquivo.
+
+Imprime-se ou guarda-se em PDF como o talão, e a impressão fica registada com o formato («a4»). O componente é
+`components/FechoA4.tsx`.
+
+**No site:** em *Fechos de caixa dos postos*, «Relatório completo» mostra o mesmo A4 a partir do resumo que o posto
+mandou (`KanGestFechoA4.jsx`), e imprime-o. O arquivo dos fechos filtra também por período.
+
 ## O arquivo
 
 **Automático:**

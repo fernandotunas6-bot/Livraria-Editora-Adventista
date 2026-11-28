@@ -449,6 +449,104 @@ fn linha(rotulo: &str, valor: &str, forte: bool) -> String {
     format!("<tr{c}><td>{}</td><td class=\"n\">{}</td></tr>", esc(rotulo), esc(valor))
 }
 
+/// Uma tabela do relatório completo: o título, os cabeçalhos (com `true` nas colunas de números, à direita) e as linhas
+/// já em texto. Sem linhas, não aparece.
+fn tabela(h: &mut String, titulo: &str, cabecalhos: &[(&str, bool)], linhas: &[Vec<String>]) {
+    if linhas.is_empty() {
+        return;
+    }
+    let classe = |i: usize| if cabecalhos.get(i).is_some_and(|c| c.1) { " class=\"n\"" } else { "" };
+    h.push_str(&format!("<h2>{}</h2><table><tr>", esc(titulo)));
+    for (i, (c, _)) in cabecalhos.iter().enumerate() {
+        h.push_str(&format!("<th{}>{}</th>", classe(i), esc(c)));
+    }
+    h.push_str("</tr>");
+    for l in linhas {
+        h.push_str("<tr>");
+        for (i, c) in l.iter().enumerate() {
+            h.push_str(&format!("<td{}>{}</td>", classe(i), esc(c)));
+        }
+        h.push_str("</tr>");
+    }
+    h.push_str("</table>");
+}
+
+/// As análises do relatório completo (services/caixa.rs, `analise_da_sessao`): o resumo das vendas, por tipo de
+/// documento, por operador, por hora e por família, o IVA por taxa e os anulados. Um fecho de antes não as tem.
+fn analise_html(h: &mut String, a: &Value) {
+    let r = &a["resumo"];
+    if r.is_object() {
+        let vendas = r["vendas"].as_i64().unwrap_or(0);
+        let vendido = r["vendido"].as_i64().unwrap_or(0);
+        h.push_str("<h2>Resumo das vendas</h2><table>");
+        h.push_str(&linha("Vendas", &vendas.to_string(), false));
+        h.push_str(&linha("Valor vendido", &kz(&r["vendido"]), true));
+        if vendas > 0 {
+            h.push_str(&linha("Valor médio por venda", &crate::agt::valor_pt(vendido / vendas), false));
+        }
+        if r["devolucoes"].as_i64().unwrap_or(0) > 0 {
+            h.push_str(&linha(&format!("Devoluções ({})", r["devolucoes"].as_i64().unwrap_or(0)), &kz(&r["devolvido"]), false));
+        }
+        if r["com_desconto"].as_i64().unwrap_or(0) > 0 {
+            h.push_str(&linha(&format!("Descontos ({} venda(s))", r["com_desconto"].as_i64().unwrap_or(0)), &kz(&r["descontos"]), false));
+        }
+        if !txt(r, "primeira").is_empty() {
+            h.push_str(&linha("Primeira venda", &data_hora(txt(r, "primeira")), false));
+            h.push_str(&linha("Última venda", &data_hora(txt(r, "ultima")), false));
+        }
+        h.push_str("</table>");
+    }
+    let lista = |k: &str| a[k].as_array().cloned().unwrap_or_default();
+    let por_tipo: Vec<Vec<String>> = lista("por_tipo")
+        .iter()
+        .map(|x| {
+            vec![
+                format!("{} {}", txt(x, "codigo"), txt(x, "descricao")),
+                x["documentos"].as_i64().unwrap_or(0).to_string(),
+                x["anulados"].as_i64().unwrap_or(0).to_string(),
+                kz(&x["total"]),
+            ]
+        })
+        .collect();
+    tabela(h, "Por tipo de documento", &[("Tipo", false), ("Documentos", true), ("Anulados", true), ("Total", true)], &por_tipo);
+    let por_operador: Vec<Vec<String>> = lista("por_operador")
+        .iter()
+        .map(|x| vec![txt(x, "nome").to_string(), x["documentos"].as_i64().unwrap_or(0).to_string(), kz(&x["total"])])
+        .collect();
+    tabela(h, "Por operador", &[("Operador", false), ("Documentos", true), ("Total", true)], &por_operador);
+    let por_hora: Vec<Vec<String>> = lista("por_hora")
+        .iter()
+        .map(|x| vec![format!("{}h", txt(x, "hora")), x["documentos"].as_i64().unwrap_or(0).to_string(), kz(&x["total"])])
+        .collect();
+    tabela(h, "Por hora", &[("Hora", false), ("Documentos", true), ("Total", true)], &por_hora);
+    let por_familia: Vec<Vec<String>> = lista("por_familia")
+        .iter()
+        .map(|x| vec![txt(x, "familia").to_string(), quantidade(&x["quantidade"]), kz(&x["total"])])
+        .collect();
+    tabela(h, "Por família", &[("Família", false), ("Quantidade", true), ("Total", true)], &por_familia);
+    let iva: Vec<Vec<String>> = lista("iva")
+        .iter()
+        .map(|x| {
+            let isencao = txt(x, "motivo_isencao");
+            let nome = if isencao.is_empty() { format!("IVA {}%", quantidade(&x["taxa"])) } else { format!("Isento ({isencao})") };
+            vec![nome, kz(&x["base"]), kz(&x["iva"])]
+        })
+        .collect();
+    tabela(h, "IVA por taxa", &[("Taxa", false), ("Incidência", true), ("Imposto", true)], &iva);
+    let anulados: Vec<Vec<String>> = lista("anulados")
+        .iter()
+        .map(|x| {
+            vec![
+                txt(x, "numero_doc").to_string(),
+                txt(x, "data_hora").get(11..16).unwrap_or_default().to_string(),
+                txt(x, "motivo").to_string(),
+                kz(&x["total"]),
+            ]
+        })
+        .collect();
+    tabela(h, "Documentos anulados", &[("Documento", false), ("Hora", false), ("Motivo", false), ("Total", true)], &anulados);
+}
+
 /// O relatório Z como documento: o mesmo que o ecrã mostra, numa página A4, com o selo e a marca de reconstruído.
 pub(super) fn html(v: &Value) -> String {
     let s = &v["sessao"];
@@ -544,6 +642,7 @@ pub(super) fn html(v: &Value) -> String {
     if !txt(s, "observacoes").is_empty() {
         h.push_str(&format!("<p>Obs.: {}</p>", esc(txt(s, "observacoes"))));
     }
+    analise_html(&mut h, &v["analise"]);
     // os artigos vendidos (as devoluções abatem) e os documentos da sessão
     let artigos = v["artigos"].as_array().cloned().unwrap_or_default();
     if !artigos.is_empty() {
@@ -666,6 +765,34 @@ mod testes {
         assert!(hora_local("ontem").is_none());
         assert_eq!(centimos(&json!(1140.5)), 114050);
         assert_eq!(centimos(&json!("2500")), 250000);
+    }
+
+    #[test]
+    fn o_relatorio_completo_tem_as_analises() {
+        let v = json!({
+            "sessao": { "id": 1, "numero_z": 4 },
+            "analise": {
+                "resumo": { "vendas": 2, "vendido": 3000, "devolucoes": 1, "devolvido": 500, "com_desconto": 1, "descontos": 100,
+                            "primeira": "2026-11-28T09:15:00", "ultima": "2026-11-28T10:15:00" },
+                "por_tipo": [{ "codigo": "FR", "descricao": "Factura/Recibo", "documentos": 2, "anulados": 1, "total": 3000 }],
+                "por_operador": [{ "nome": "Ana <A>", "documentos": 3, "total": 2500 }],
+                "por_hora": [{ "hora": "09", "documentos": 1, "total": 1000 }],
+                "por_familia": [{ "familia": "Bíblias", "quantidade": 0.0, "total": 500 }],
+                "iva": [{ "taxa": 14.0, "motivo_isencao": "", "base": 2500, "iva": 0 }, { "taxa": 0.0, "motivo_isencao": "M00", "base": 10, "iva": 0 }],
+                "anulados": [{ "numero_doc": "FR T/3", "data_hora": "2026-11-28T11:15:00", "total": 700, "motivo": "erro" }]
+            }
+        });
+        let h = html(&v);
+        for s in [
+            "Resumo das vendas", "Valor médio por venda", "Devoluções (1)", "Descontos (1 venda(s))", "Primeira venda", "Por tipo de documento",
+            "FR Factura/Recibo", "Por operador", "Ana &lt;A&gt;", "Por hora", "09h", "Por família", "Bíblias", "IVA por taxa", "IVA 14%",
+            "Isento (M00)", "Documentos anulados", "erro",
+        ] {
+            assert!(h.contains(s), "falta «{s}»");
+        }
+        assert!(!h.contains("Ana <A>"));
+        // um fecho de antes, sem as análises, não as mostra
+        assert!(!html(&json!({ "sessao": { "id": 1 } })).contains("Resumo das vendas"));
     }
 
     #[test]

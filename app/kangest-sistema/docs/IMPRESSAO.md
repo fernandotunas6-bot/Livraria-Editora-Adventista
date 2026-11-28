@@ -8,6 +8,21 @@ Como o KanGest Livraria imprime as facturas e os outros documentos. Há três ca
 A regra é a de sempre no KanGest Livraria: **tudo automático por omissão, e sempre com a opção manual ao lado**. O que a lei
 exige não se desliga à mão.
 
+## O modo de cada tipo de documento (1.4.11)
+
+Pedido do dono a 27/11: «refinar as impressões, modos de impressão».
+
+- **Automático:** cada documento sai no formato do posto (o talão ou o A4).
+- **Manual, por tipo de documento:** em *Configurações → Postos → Impressão → Por tipo de documento*. Por exemplo, a FR
+  no talão e a FT, a PP e a GT em A4. «Como o posto» volta ao formato do posto.
+- **Na venda,** a impressão automática e o «Mostrar opções de impressão» usam o modo do tipo emitido
+  (`formatoDoDocumento`, em `src/lib/print.ts`):
+  - um tipo em A4 imprime as vias do tipo de documento;
+  - com a térmica directa (ESC/POS), só o talão vai pela térmica. Um tipo em A4 sai pelo diálogo do sistema, e a gaveta
+    abre na mesma.
+- **Ao abrir um documento** na lista, o diálogo começa no modo do tipo. Escolhe-se outro ali mesmo.
+- **A lista dos postos** mostra os tipos com um modo próprio.
+
 ## Vias
 
 **Automático:**

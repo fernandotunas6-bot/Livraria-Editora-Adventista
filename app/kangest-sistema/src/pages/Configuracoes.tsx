@@ -390,6 +390,10 @@ function Postos() {
               <Td className="font-mono text-[12.5px]">{x.serie_prefixo || "—"}</Td>
               <Td className="text-ink-2">
                 {(x.opcoes?.formato ?? "ticket") === "ticket" ? `Talão ${x.opcoes?.talao_mm ?? 80} mm` : "A4"} · {x.opcoes?.vias ?? 1} via(s)
+                {Object.keys(x.opcoes?.formatos ?? {}).length > 0 &&
+                  ` · ${Object.entries(x.opcoes?.formatos ?? {})
+                    .map(([k, v]) => `${k} ${v === "a4" ? "A4" : "talão"}`)
+                    .join(", ")}`}
                 {x.opcoes?.escpos?.ativo && (
                   <Badge tone="accent" className="ml-2">
                     <Printer className="mr-1 size-3" />
@@ -494,6 +498,37 @@ function Postos() {
               <Field label="Valor mínimo de impressão (Kz)" hint="Vendas abaixo deste valor não são impressas automaticamente">
                 <Input className="num text-right" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
               </Field>
+              {/* o modo de impressão de cada tipo de documento (pedido do dono a 27/11): por omissão, o do posto */}
+              <details className="rounded-lg border border-line px-3 py-2" open={Object.keys(o.formatos ?? {}).length > 0}>
+                <summary className="cursor-pointer text-[13px] font-medium">Por tipo de documento</summary>
+                <p className="mt-1 text-[12px] text-ink-3">Por exemplo, a factura-recibo no talão e a factura e a proforma em A4. «Como o posto» segue o formato acima.</p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {(t.data?.tipos_documento ?? [])
+                    .filter((x) => x.grupo === "VENDAS" && x.codigo !== "VD")
+                    .map((x) => (
+                      <label key={x.codigo} className="flex items-center justify-between gap-2 text-[12.5px]">
+                        <span className="truncate" title={x.descricao}>
+                          {x.codigo} · {x.descricao}
+                        </span>
+                        <Select
+                          className="w-28"
+                          value={o.formatos?.[x.codigo] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const formatos = { ...(o.formatos ?? {}) };
+                            if (v === "ticket" || v === "a4") formatos[x.codigo] = v;
+                            else delete formatos[x.codigo];
+                            setO({ formatos });
+                          }}
+                        >
+                          <option value="">Como o posto</option>
+                          <option value="ticket">Talão</option>
+                          <option value="a4">A4</option>
+                        </Select>
+                      </label>
+                    ))}
+                </div>
+              </details>
             </div>
           </div>
           <div className="mt-6 border-t border-line pt-4">

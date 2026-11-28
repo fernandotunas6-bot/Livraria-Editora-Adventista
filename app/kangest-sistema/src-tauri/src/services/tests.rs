@@ -231,6 +231,16 @@ async fn fluxo_completo() {
     assert_eq!(cx["numerario_esperado"], 1000000 + 342000 - 114000);
     let fecho = rpc(&st, "caixa.fechar", json!({ "valor_contado": 1228000 })).await;
     assert_eq!(fecho["sessao"]["estado"], "FECHADA");
+    // o relatório completo do Z: por tipo (a nota de crédito abate), por hora e o resumo das vendas, no arquivo e no A4
+    let analise = &fecho["analise"];
+    assert!(
+        analise["por_tipo"].as_array().is_some_and(|l| l.iter().any(|x| x["codigo"] == "NC" && x["total"].as_i64().is_some_and(|v| v < 0))),
+        "{analise}"
+    );
+    assert!(analise["por_hora"].as_array().is_some_and(|l| !l.is_empty()), "{analise}");
+    assert!(analise["resumo"]["vendas"].as_i64().is_some_and(|n| n >= 1), "{analise}");
+    let a4 = rpc(&st, "caixa.fechoFicheiro", json!({ "id": fecho["sessao"]["id"] })).await;
+    assert!(a4["conteudo"].as_str().is_some_and(|h| h.contains("Por tipo de documento") && h.contains("Resumo das vendas")));
     assert!(rpc(&st, "caixa.estado", Value::Null).await.is_null());
 
     // ---- painel e todos os relatórios executam ----
