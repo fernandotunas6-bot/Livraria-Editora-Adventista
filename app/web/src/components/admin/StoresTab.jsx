@@ -32,11 +32,15 @@ import {
   provinciasServidas, storeGallery,
 } from '@/lib/stores';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+import { codigoSugerido, codigoValido, lojaComOMesmoNome, soLetras } from '@/lib/lojasCodigos';
 
 const ANGOLA_PROVINCES = ANGOLA_PROVINCES_2024;
 
 const emptyStore = {
   name: '',
+  // vazio: a base dá-lhe um código livre (lib/lojasCodigos.js; migração 20261128130000)
+  codigo: '',
   province: 'Luanda',
   address: '',
   phone: '',
@@ -160,6 +164,7 @@ export default function StoresTab() {
     setMapsPaste('');
     setForm({
       name: s.name || '',
+      codigo: s.codigo || '',
       province: s.province || 'Luanda',
       address: s.address || '',
       phone: s.phone ? formatAngolaPhone(s.phone) : '',
@@ -206,6 +211,15 @@ export default function StoresTab() {
     );
   };
 
+  // O código da loja e o nome repetido (as mesmas regras da base, que é quem decide; docs/LOJAS.md).
+  const outrasLojas = useMemo(() => stores.filter((s) => s.id !== editing?.id), [stores, editing]);
+  const codigoAuto = useMemo(
+    () => codigoSugerido(form.province || form.name, outrasLojas.map((s) => s.codigo)),
+    [form.province, form.name, outrasLojas],
+  );
+  const codigoOcupado = !!form.codigo && outrasLojas.some((s) => s.codigo === form.codigo);
+  const nomeRepetido = useMemo(() => lojaComOMesmoNome(stores, form.name, editing?.id), [stores, form.name, editing]);
+
   // Confere se as coordenadas caem na província escolhida. Duas das três lojas estavam na
   // província errada e nada aqui o dizia, porque as coordenadas eram válidas — só não eram
   // as daquela loja.
@@ -221,6 +235,14 @@ export default function StoresTab() {
     const lng = form.longitude !== '' ? Number(form.longitude) : null;
     if ((lat === null) !== (lng === null) || (lat !== null && (Math.abs(lat) > 90 || Math.abs(lng) > 180))) {
       toast({ variant: 'destructive', title: 'Coordenadas GPS inválidas', description: 'Preencha latitude e longitude, ou deixe ambas vazias.' });
+      return;
+    }
+    if (nomeRepetido) {
+      toast({ variant: 'destructive', title: 'Nome repetido', description: `Já existe a loja «${nomeRepetido.name}». Dê outro nome à loja nova.` });
+      return;
+    }
+    if (form.codigo && (!codigoValido(form.codigo) || codigoOcupado)) {
+      toast({ variant: 'destructive', title: 'Código da loja', description: codigoOcupado ? `O código ${form.codigo} já é de outra loja.` : '2 a 6 letras ou algarismos, a começar por uma letra.' });
       return;
     }
     const problemaGaleria = erroDaGaleria(form.gallery);
@@ -396,7 +418,7 @@ export default function StoresTab() {
                     </div>
                   )}
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur-sm">{s.province}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/75 text-white backdrop-blur-sm">{s.province}{s.codigo ? ` · ${s.codigo}` : ''}</span>
                     {!hasCoords(s) && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem GPS</span>}
                     {!String(s.phone || s.whatsapp || '').trim() && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-700 text-white">Sem telefone</span>}
                     {storeGallery(s).length > 0 && (
@@ -468,6 +490,25 @@ export default function StoresTab() {
               <div className="space-y-2">
                 <Label>Nome da loja *</Label>
                 <Input value={form.name} onChange={(e) => set('name', e.target.value)} required placeholder="Ex.: Livraria Adventista — Huambo" />
+                {nomeRepetido && <p className="text-xs text-destructive">Já existe a loja «{nomeRepetido.name}». Dê outro nome à loja nova.</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store-codigo">Código da loja</Label>
+                <Input
+                  id="store-codigo"
+                  value={form.codigo}
+                  maxLength={6}
+                  onChange={(e) => set('codigo', soLetras(e.target.value).slice(0, 6))}
+                  placeholder={`Automático: ${codigoAuto}`}
+                  aria-invalid={!!form.codigo && (!codigoValido(form.codigo) || codigoOcupado)}
+                />
+                <p className={cn('text-xs', form.codigo && (!codigoValido(form.codigo) || codigoOcupado) ? 'text-destructive' : 'text-muted-foreground')}>
+                  {form.codigo && !codigoValido(form.codigo)
+                    ? '2 a 6 letras ou algarismos, a começar por uma letra.'
+                    : codigoOcupado
+                      ? `O código ${form.codigo} já é de outra loja.`
+                      : `Único em toda a rede: é a base das séries dos documentos do KanGest desta loja (FR ${form.codigo || codigoAuto}${new Date().getFullYear()}/1). Vazio, sai sozinho.`}
+                </p>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-2">

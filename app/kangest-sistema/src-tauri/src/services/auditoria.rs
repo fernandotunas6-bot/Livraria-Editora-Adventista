@@ -372,7 +372,7 @@ pub(super) async fn registar_nota(st: &AppState, tabela: &'static str, id: i64, 
 
 /// Um acontecimento numa ficha que não passa pelo `dispatch` com o antes e o depois (a abertura e o fecho do caixa, um
 /// vale, a reimpressão de um fecho): fica com a acção, a ficha e o que interessa em `depois`.
-pub(super) async fn registar_evento(st: &AppState, acao: &str, tabela: &'static str, id: i64, detalhe: &str, depois: Option<&Value>) -> AppResult<()> {
+pub(crate) async fn registar_evento(st: &AppState, acao: &str, tabela: &'static str, id: i64, detalhe: &str, depois: Option<&Value>) -> AppResult<()> {
     cadeia::registar(
         &st.pool,
         Linha {

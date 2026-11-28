@@ -38,6 +38,7 @@ pub mod produtos;
 pub mod promocoes;
 pub mod registos;
 pub mod saude;
+pub mod series;
 pub mod sessoes;
 pub mod tempo_real;
 pub mod versao;
@@ -490,6 +491,10 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
             .bind(r["tempo_real"]["topico"].as_str())
             .execute(pool)
             .await?;
+            // o prefixo das séries deste posto, único na rede (series.rs): nos postos sem prefixo, sozinho
+            if let Err(e) = series::aplicar(st, &r["posto"]).await {
+                eprintln!("KanGest: o prefixo das séries do site não ficou aplicado ({e}).");
+            }
             // as encomendas novas (não na primeira cópia, que traz todas de uma vez) avisam no computador da loja
             let primeira = cursores["encomendas"].as_object().is_none_or(|o| o.is_empty());
             let novas = if primeira { Vec::new() } else { loja::encomendas_novas(pool, &r["novidades"]).await? };
@@ -945,6 +950,9 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
         "encomendas" => encomendas::estado(st).await,
         "encomendas.configurar" => encomendas::configurar(st, serde_json::from_value(params)?).await,
         "encomendas.desligar" => encomendas::desligar(st).await,
+        // o prefixo das séries que o site deu (series.rs)
+        "series" => series::estado(st).await,
+        "series.usar_do_site" => series::usar_do_site(st).await,
         _ => Err(AppError::msg(format!("Método desconhecido: sinc.{metodo}"))),
     }
 }

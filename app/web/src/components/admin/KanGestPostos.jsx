@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, BookOpenCheck, Copy, Cpu, Download, Globe, KeyRound, Link2, LogOut, Plus, Settings2, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Copy, Cpu, Download, Globe, Hash, KeyRound, Link2, LogOut, Plus, Settings2, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   kangestPostoCodigo, kangestPostoConfiguracoes, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos,
@@ -176,6 +176,17 @@ export default function KanGestPostos({ lojas = [] }) {
         <span className="text-xs text-muted-foreground">as facturas da loja, já assinadas, chegam à base central cifradas e assinadas</span>
       </div>
       <LivroDoSite resumo={estado.livro_site} />
+      {(estado.colisoes || []).length > 0 && (
+        <div className="space-y-1 rounded-xl border border-estado-erro/30 bg-estado-erro-fundo p-3 text-sm text-estado-erro" role="alert">
+          <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" />Séries repetidas entre postos: os números repetem-se para a AGT</p>
+          {estado.colisoes.map((c) => (
+            <p key={`${c.tipo_codigo}-${c.serie}`} className="text-xs">
+              {c.tipo_codigo} {c.serie}: {(c.postos || []).join(' e ')} ({c.documentos} documento(s)).
+            </p>
+          ))}
+          <p className="text-xs">Em cada KanGest, em «Ligação à livraria», carregue em «Usar o prefixo do site». Os documentos novos saem cada um com a sua série.</p>
+        </div>
+      )}
       {!estado.configurado && (
         <p className="flex items-start gap-2 rounded-xl border border-estado-aviso/40 bg-estado-aviso-fundo p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-estado-aviso" />
@@ -246,6 +257,7 @@ export default function KanGestPostos({ lojas = [] }) {
                     {!p.store_id && !p.stock_online && <span className="text-muted-foreground">Sem loja e sem contar para o site: o stock dele não é usado.</span>}
                   </div>
                 )}
+                {p.estado !== 'revogado' && <SeriesDoPosto key={`${p.id}-${p.serie_prefixo || ''}`} p={p} onGuardado={carregar} />}
                 {p.estado !== 'revogado' && <EnderecoDoPosto key={`${p.id}-${p.endereco_web || ''}`} p={p} onGuardado={carregar} />}
                 {p.estado !== 'revogado' && p.store_id && (
                   <EncomendasDoPosto
@@ -287,6 +299,52 @@ export default function KanGestPostos({ lojas = [] }) {
         </Button>
       </form>
     </section>
+  );
+}
+
+/**
+ * O prefixo das séries do posto, único em toda a rede (migração 20261128130000): o KanGest dele emite FR HUA2026/1, e
+ * duas lojas com o mesmo NIF nunca repetem os números. Automático ao criar o posto (o código da loja, HUA2 no
+ * segundo…); à mão, outro livre. Um prefixo nunca se reutiliza, nem o de um posto revogado.
+ */
+export function SeriesDoPosto({ p, onGuardado }) {
+  const [valor, setValor] = useState(p.serie_prefixo || '');
+  const [aGuardar, setAGuardar] = useState(false);
+  const limpo = valor.trim().toUpperCase();
+  const valido = /^[A-Z0-9]{1,8}$/.test(limpo);
+  const mudou = limpo !== (p.serie_prefixo || '');
+  async function guardar(ev) {
+    ev.preventDefault();
+    if (!valido || !mudou) return;
+    setAGuardar(true);
+    try {
+      await kangestPostoConfigurar(p.id, { serie_prefixo: limpo });
+      toast.success(`O posto passa a ter o prefixo ${limpo}: o KanGest dele usa-o a partir da próxima volta.`);
+      onGuardado?.();
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível guardar.');
+    } finally {
+      setAGuardar(false);
+    }
+  }
+  return (
+    <form onSubmit={guardar} className="flex w-full flex-wrap items-center gap-2 text-xs">
+      <Hash className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+      <span className="text-muted-foreground">
+        Séries dos documentos: <strong>FR {p.serie_prefixo || '…'}{new Date().getFullYear()}/1</strong> (prefixo único na rede)
+      </span>
+      <label className="sr-only" htmlFor={`prefixo-${p.id}`}>Prefixo das séries</label>
+      <input
+        id={`prefixo-${p.id}`}
+        className={cn('h-7 w-24 rounded-md border bg-background px-2 uppercase', !valido && 'border-destructive')}
+        value={valor}
+        maxLength={8}
+        onChange={(e) => setValor(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+        aria-invalid={!valido}
+      />
+      <Button size="sm" variant="outline" className="h-7" type="submit" disabled={!mudou || !valido || aGuardar}>Guardar</Button>
+      {!valido && <span className="text-destructive">1 a 8 letras ou algarismos</span>}
+    </form>
   );
 }
 
