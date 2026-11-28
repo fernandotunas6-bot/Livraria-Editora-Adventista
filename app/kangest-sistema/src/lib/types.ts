@@ -59,6 +59,12 @@ export interface VisorOpcoes {
 
 export interface PostoOpcoes {
   formato: "ticket" | "a4";
+  /**
+   * O modo de impressão de cada tipo de documento, por cima do formato do posto (pedido do dono a 27/11: «refinar as
+   * impressões, modos de impressão»): por exemplo, a FR no talão e a factura e a proforma em A4. Sem a chave, o tipo
+   * segue o formato do posto.
+   */
+  formatos?: Partial<Record<string, "ticket" | "a4">>;
   vias: number;
   imprimir_auto: boolean;
   mostrar_opcoes_impressao: boolean;

@@ -100,3 +100,15 @@ export function imprimir(nome?: unknown) {
 }
 
 export const NOMES_VIAS = ["Original", "Duplicado", "Triplicado", "Quadruplicado"];
+
+/**
+ * O modo de impressão de um documento neste posto: o do tipo de documento, se o posto o escolheu (Configurações →
+ * Postos → Impressão → «Por tipo de documento»); senão, o formato do posto. Automático por omissão, com a escolha
+ * manual ao lado.
+ */
+export function formatoDoDocumento(opcoes: { formato?: "ticket" | "a4"; formatos?: Partial<Record<string, "ticket" | "a4">> } | null | undefined, tipo: string | null | undefined): "ticket" | "a4" {
+  const proprio = tipo ? opcoes?.formatos?.[tipo] : undefined;
+  if (proprio === "ticket" || proprio === "a4") return proprio;
+  return opcoes?.formato === "a4" ? "a4" : "ticket";
+}
+

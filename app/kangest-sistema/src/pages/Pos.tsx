@@ -49,6 +49,7 @@ import type { Artigo, CaixaResumo, DocCompleto, DocResumo, Entidade, Lote, Posto
 import { useSession } from "@/store/session";
 import { Badge, Button, Field, Input, Modal, cn } from "@/components/ui";
 import DocumentoModal, { ImpressaoAutomatica } from "@/components/DocumentoModal";
+import { formatoDoDocumento } from "@/lib/print";
 import { PinModal, Segmento, TecladoModal, TextoModal } from "@/components/PosDialogs";
 import { Logo } from "@/components/Logo";
 import { bloquearSessao } from "@/components/Sessao";
@@ -239,6 +240,8 @@ export default function Pos() {
   const [pedirCupao, setPedirCupao] = useState(false);
   const [docEmitido, setDocEmitido] = useState<number | null>(null);
   const [impressaoAuto, setImpressaoAuto] = useState<number | null>(null);
+  // o modo de impressão do último documento emitido (o do tipo de documento, ou o do posto)
+  const [formatoEmitido, setFormatoEmitido] = useState<"ticket" | "a4">(opcoes.formato === "a4" ? "a4" : "ticket");
   const buscaRef = useRef<HTMLInputElement>(null);
   const q = useDebounce(busca, 200);
   // equipamento: venda acabada mostrada no visor, ecrã inteiro e teclado no ecrã (terminais tácteis)
@@ -778,9 +781,12 @@ export default function Pos() {
     qc.invalidateQueries({ queryKey: ["artigos"] });
     const id = d.documento.id;
     const imprime = opcoes.imprimir_auto && d.documento.total >= (opcoes.valor_minimo_impressao || 0);
+    // o modo de impressão deste tipo de documento (a FR no talão, a factura em A4…), ou o do posto
+    const formato = formatoDoDocumento(opcoes, d.documento.tipo_codigo);
+    setFormatoEmitido(formato);
     if (opcoes.mostrar_opcoes_impressao) {
       setDocEmitido(id);
-    } else if (termica) {
+    } else if (termica && formato === "ticket") {
       // ESC/POS: o talão (e a gaveta) saem directamente, sem diálogo do sistema
       const chamada = imprime ? call("impressao.talao", { id, vias: opcoes.vias }) : call("impressao.gaveta", { documento_id: id });
       chamada.catch((e) => toast.error((e as Error).message));
@@ -1678,9 +1684,9 @@ export default function Pos() {
         />
       )}
 
-      <DocumentoModal id={docEmitido} formatoInicial={opcoes.formato} onClose={() => { setDocEmitido(null); focar(); }} />
+      <DocumentoModal id={docEmitido} formatoInicial={formatoEmitido} onClose={() => { setDocEmitido(null); focar(); }} />
       {impressaoAuto && (
-        <ImpressaoAutomatica id={impressaoAuto} formato={opcoes.formato} vias={opcoes.vias} onDone={() => setImpressaoAuto(null)} />
+        <ImpressaoAutomatica id={impressaoAuto} formato={formatoEmitido} vias={formatoEmitido === opcoes.formato ? opcoes.vias : 0} onDone={() => setImpressaoAuto(null)} />
       )}
     </div>
   );

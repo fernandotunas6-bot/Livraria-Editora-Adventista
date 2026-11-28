@@ -75,20 +75,22 @@ export function Copias({ d, formato, vias, segundaVia, reimpressao }: { d: DocCo
 }
 
 /** Impressão directa (sem pré-visualização), usada pelo POS quando "imprimir automaticamente" está activo. */
+/** `vias` a 0: as do tipo de documento (um tipo que imprime noutro formato que não o do posto, como a factura em A4). */
 export function ImpressaoAutomatica({ id, formato, vias, onDone }: { id: number; formato: Formato; vias: number; onDone: () => void }) {
   const { data: d } = useDocumento(id);
+  const n = vias > 0 ? vias : d?.documento.vias || 1;
   useEffect(() => {
     if (!d) return;
     imprimir();
     // a primeira impressão, logo a seguir à emissão: o Original (e o Duplicado…); a seguinte já sai como 2.ª via
-    void registarImpressao(id, nomesDasVias(vias), false, formato === "ticket" ? "talao" : (d.documento.formato || "A4").toLowerCase());
+    void registarImpressao(id, nomesDasVias(n), false, formato === "ticket" ? "talao" : (d.documento.formato || "A4").toLowerCase());
     const t = setTimeout(onDone, 1500);
     return () => clearTimeout(t);
-  }, [d, onDone, id, vias, formato]);
+  }, [d, onDone, id, n, formato]);
   if (!d) return null;
   return (
     <PrintPortal>
-      <Copias d={d} formato={formato} vias={vias} />
+      <Copias d={d} formato={formato} vias={n} />
     </PrintPortal>
   );
 }
@@ -151,6 +153,13 @@ export default function DocumentoModal({
   useEffect(() => {
     if (anularAoAbrir && d && d.documento.id === id && podeAnular) setAnular(true);
   }, [anularAoAbrir, d, id, podeAnular]);
+
+  // aberto fora do POS (a lista dos documentos): o modo de impressão do tipo de documento, se o posto o escolheu
+  const tipoAberto = d?.documento.tipo_codigo;
+  const formatoDoTipo = tipoAberto ? opcoes?.formatos?.[tipoAberto] : undefined;
+  useEffect(() => {
+    if (!formatoInicial && formatoDoTipo) setFormato(formatoDoTipo);
+  }, [formatoInicial, formatoDoTipo, atual]);
 
   // n.º de vias: o do posto (POS) ou o do tipo de documento
   useEffect(() => {
