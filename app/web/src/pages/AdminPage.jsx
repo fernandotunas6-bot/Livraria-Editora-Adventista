@@ -75,6 +75,7 @@ const PainelGestaoPage = lazy(() => import('@/pages/PainelGestaoPage'));
 const OrderKanGest = lazy(() => import('@/components/admin/OrderKanGest'));
 const KanGestTab = lazy(() => import('@/components/admin/KanGestTab'));
 const KanGestDocumentos = lazy(() => import('@/components/admin/KanGestDocumentos'));
+const KanGestFichas = lazy(() => import('@/components/admin/KanGestFichas'));
 const ImagensVideosTab = lazy(() => import('@/components/admin/ImagensVideosTab'));
 const OrderWatchPanel = lazy(() => import('@/components/admin/OrderWatchPanel'));
 const OpsTeamsPanel = lazy(() => import('@/components/admin/OpsTeamsPanel'));
@@ -186,8 +187,10 @@ const AdminPage = () => {
   const canManageCatalog = perms.catalog;
   const canManageOrders = perms.orders;
   const canManageSettings = perms.settings;
-  // Os documentos do KanGest: quem vê os relatórios de vendas (a mesma regra da rota GET /admin/kangest/documentos).
-  const canReadSalesReports = perms.salesReports;
+  // Os documentos e os fechos do KanGest: quem vê os relatórios de vendas, todas as lojas; o gerente de uma loja, a sua
+  // (a mesma regra das rotas GET /admin/kangest/documentos). As fichas do balcão: quem as gere, ou o gerente da loja.
+  const canSeeKanGestDocs = perms.salesReports || perms.storeDashboard;
+  const canSeeKanGestFichas = perms.settings || perms.users || perms.catalog || perms.storeDashboard;
   const canManageUsers = perms.users;
   const canManagePayments = perms.payments;
   // Confirmar dinheiro é separado de gerir os métodos (IBAN, links): migração pagamentos_registados.
@@ -849,10 +852,17 @@ const AdminPage = () => {
                 </Suspense>
               </AdminSection>
             )}
-            {canReadSalesReports && (
+            {canSeeKanGestDocs && (
               <AdminSection active={activeTab} value="documentos-kangest">
                 <Suspense fallback={spinner}>
                   <KanGestDocumentos />
+                </Suspense>
+              </AdminSection>
+            )}
+            {canSeeKanGestFichas && (
+              <AdminSection active={activeTab} value="fichas-kangest">
+                <Suspense fallback={spinner}>
+                  <KanGestFichas />
                 </Suspense>
               </AdminSection>
             )}

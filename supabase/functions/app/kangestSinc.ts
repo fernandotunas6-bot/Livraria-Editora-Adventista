@@ -615,6 +615,23 @@ export function pesquisaDeDocumentos(q: unknown): { nif: string } | { numero: st
   return /^[\p{L}\d /-]+$/u.test(numero) ? { numero } : null;
 }
 
+/**
+ * Os contactos de uma ficha de cliente ou fornecedor do KanGest (o NIF, os telefones, o email, a morada, a pessoa de
+ * contacto e as observações), decifrados para o painel. Sem a chave, ou se não abrir, `null`: a ficha mostra-se sem eles.
+ */
+export async function pessoaisDaEntidade(cifra: CifraDados | null, cifrado: unknown): Promise<Record<string, unknown> | null> {
+  if (!cifra || typeof cifrado !== "string" || !cifrado) return null;
+  try {
+    const v = JSON.parse(await decifrarCampo(cifra, cifrado));
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    const out: Record<string, unknown> = {};
+    for (const k of PESSOAIS_DA_ENTIDADE) if (k in v) out[k] = v[k];
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /** O cliente de um documento do KanGest, decifrado para o painel. Um campo que não abra fica «(cifrado)». */
 export async function clienteDoDocumento(
   cifra: CifraDados | null,

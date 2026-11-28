@@ -236,11 +236,11 @@ describe('permissões arrumadas pelas áreas do painel', () => {
 
   it('o que cada permissão abre sai do registo das secções', () => {
     const labels = (key) => sectionsOpenedBy(key).map((s) => s.id);
-    expect(labels('manage_catalog')).toEqual(['books', 'disponibilidade', 'collections', 'slides', 'downloads', 'imagens-videos', 'community']);
+    expect(labels('manage_catalog')).toEqual(['books', 'disponibilidade', 'collections', 'slides', 'downloads', 'imagens-videos', 'community', 'fichas-kangest']);
     // «Stock da loja» abre só a disponibilidade (migração lojas_donas_dos_dados).
     expect(labels('manage_store_stock')).toEqual(['disponibilidade']);
     expect(labels('manage_marketing')).toEqual(['contacts', 'notices']);
-    expect(labels('manage_settings')).toEqual(['stores', 'settings', 'notices', 'versoes', 'saude', 'kangest']);
+    expect(labels('manage_settings')).toEqual(['stores', 'fichas-kangest', 'settings', 'notices', 'versoes', 'saude', 'kangest']);
     expect(labels('manage_settings')).not.toContain('apps');
     // Produção, funcionários e finanças (migrações funcionarios, producao e saidas).
     expect(labels('manage_production')).toEqual(['producao']);
@@ -284,9 +284,9 @@ describe('relatórios de vendas: ver e editar', () => {
     expect(v.find((x) => x.id === 'vendas-huambo').readOnly).toBe(true);
   });
 
-  it('«Painel da sua loja» abre só o Painel de Gestão, de leitura', () => {
+  it('«Painel da sua loja» abre o Painel de Gestão, de leitura, e os documentos e as fichas do KanGest da sua loja', () => {
     const v = sectionsOpenedBy('view_store_dashboard');
-    expect(v.map((x) => x.id)).toEqual(['painel-gestao']);
+    expect(v.map((x) => x.id)).toEqual(['painel-gestao', 'documentos-kangest', 'fichas-kangest']);
     expect(v[0].readOnly).toBe(true);
   });
 

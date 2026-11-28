@@ -70,7 +70,7 @@ import {
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
   limparConfiguracoes, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
-  clienteDoDocumento, indiceCego, pesquisaDeDocumentos, prepararRegistos,
+  clienteDoDocumento, consumidorFinal, indiceCego, pesquisaDeDocumentos, pessoaisDaEntidade, prepararRegistos,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3413,7 +3413,24 @@ route("GET", "/admin/relatorios/dividas", permissao("view_reports", "edit_report
 const DOCUMENTOS_POR_PAGINA = 50;
 const dataDoFiltro = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : "");
 
-route("GET", "/admin/kangest/documentos", permissao("view_reports", "edit_reports"), async ({ url }) => {
+/**
+ * As lojas que a pessoa administra, com a regra da base (private.painel_ve_tudo e painel_lojas_proprias): quem vê os
+ * relatórios de vendas vê todas (`null`); o gerente com «Painel da sua loja» só as da sua ficha de funcionário (uma
+ * ficha de quem saiu não conta); os outros, nenhuma. Cada loja administra-se como no resto do painel.
+ */
+async function lojasDaPessoa(auth: Auth, verTudo = ["view_reports", "edit_reports"]): Promise<string[] | null> {
+  if (verTudo.some((k) => can(auth, k))) return null;
+  if (!auth || !can(auth, "view_store_dashboard")) return [];
+  const { data, error } = await db.from("staff_members").select("store_id").eq("profile_id", auth.id).neq("status", "saiu").not("store_id", "is", null);
+  if (error) throw new Error(error.message);
+  return [...new Set((data || []).map((x: Row) => String(x.store_id)))];
+}
+
+const SEM_LOJA = "A sua ficha de funcionário não tem loja: peça a quem gere o pessoal para a indicar.";
+
+route("GET", "/admin/kangest/documentos", permissao("view_reports", "edit_reports", "view_store_dashboard"), async ({ url, auth }) => {
+  const lojasProprias = await lojasDaPessoa(auth);
+  if (lojasProprias && !lojasProprias.length) throw new HttpError(403, SEM_LOJA);
   const s = url.searchParams;
   const hoje = new Date().toISOString().slice(0, 10);
   const ate = dataDoFiltro(s.get("ate")) || hoje;
@@ -3431,6 +3448,8 @@ route("GET", "/admin/kangest/documentos", permissao("view_reports", "edit_report
   if (uuidValido(posto)) q = q.eq("posto_id", posto);
   const loja = cleanText(s.get("loja"), 60);
   if (loja) q = q.eq("store_id", loja);
+  // o gerente de uma loja: só as suas
+  if (lojasProprias) q = q.in("store_id", lojasProprias);
   const tipo = cleanText(s.get("tipo"), 4).toUpperCase();
   if (/^[A-Z]{2,3}$/.test(tipo)) q = q.eq("tipo_codigo", tipo);
   const estado = s.get("estado") || "";
@@ -3452,12 +3471,14 @@ route("GET", "/admin/kangest/documentos", permissao("view_reports", "edit_report
   return json({ documentos, total: count ?? documentos.length, pagina, por_pagina: DOCUMENTOS_POR_PAGINA, de, ate });
 });
 
-route("GET", "/admin/kangest/documentos/ver", permissao("view_reports", "edit_reports"), async ({ url }) => {
+route("GET", "/admin/kangest/documentos/ver", permissao("view_reports", "edit_reports", "view_store_dashboard"), async ({ url, auth }) => {
   const id = Number(url.searchParams.get("id"));
   if (!Number.isSafeInteger(id) || id <= 0) throw bad("Indique o documento.");
   const { data: d, error } = await db.from("kangest_documentos").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!d) throw new HttpError(404, "Documento não encontrado.");
+  // o gerente de uma loja só abre os da sua (o de outra loja é como se não existisse)
+  const lojasProprias = await lojasDaPessoa(auth);
+  if (!d || (lojasProprias && !lojasProprias.includes(String(d.store_id)))) throw new HttpError(404, "Documento não encontrado.");
   const [linhas, posto, loja, config, derivados, origem] = await Promise.all([
     db.from("kangest_documento_linhas")
       .select("linha, referencia, descricao, quantidade, preco_unitario, desconto_pct, taxa_iva_pct, valor_liquido, valor_iva, total")
@@ -3496,6 +3517,99 @@ route("GET", "/admin/kangest/documentos/ver", permissao("view_reports", "edit_re
     origem: origem.data,
     derivados: derivados.data || [],
   });
+});
+
+// As fichas do balcão que os postos mandam (kangest_registos, migração 20261127160000): os clientes e fornecedores, os
+// artigos completos e os utilizadores de cada KanGest. Quem vê cada tipo:
+// - os clientes e fornecedores: quem gere as configurações ou os utilizadores e clientes;
+// - os artigos: quem gere as configurações ou o catálogo;
+// - os utilizadores: quem gere as configurações.
+// O gerente de uma loja («Painel da sua loja») vê os três, só dos postos da sua loja, como no resto do painel. Os
+// contactos dos clientes chegam cifrados e só se decifram aqui, na ficha.
+const VEEM_TUDO: Record<string, string[]> = {
+  entidade: ["manage_settings", "manage_users"],
+  artigo: ["manage_settings", "manage_catalog"],
+  utilizador: ["manage_settings"],
+};
+const POR_PAGINA_FICHAS = 50;
+
+/** Os postos que a pessoa vê num tipo de ficha: todos (`null`) ou os das suas lojas. */
+async function postosDasFichas(auth: Auth, tipo: string): Promise<Row[] | null> {
+  const lojas = await lojasDaPessoa(auth, VEEM_TUDO[tipo] ?? []);
+  if (lojas === null) return null;
+  if (!lojas.length) throw new HttpError(403, can(auth, "view_store_dashboard") ? SEM_LOJA : "Sem permissão para ver estas fichas.");
+  const { data, error } = await db.from("kangest_postos").select("id").in("store_id", lojas);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+route("GET", "/admin/kangest/fichas", permissao("manage_settings", "manage_users", "manage_catalog", "view_store_dashboard"), async ({ url, auth }) => {
+  const s = url.searchParams;
+  const tipo = s.get("tipo") || "";
+  if (!(tipo in VEEM_TUDO)) throw bad("Indique o tipo de ficha.");
+  const postos = await postosDasFichas(auth, tipo);
+  const pagina = Math.min(1000, Math.max(0, Math.floor(Number(s.get("pagina")) || 0)));
+  let q = db.from("kangest_registos").select("posto_id, chave, dados, recebido_em", { count: "exact" }).eq("tipo", tipo)
+    .order("recebido_em", { ascending: false }).order("chave", { ascending: false })
+    .range(pagina * POR_PAGINA_FICHAS, pagina * POR_PAGINA_FICHAS + POR_PAGINA_FICHAS - 1);
+  if (postos) q = q.in("posto_id", postos.map((p) => p.id));
+  const posto = s.get("posto") || "";
+  if (uuidValido(posto)) q = q.eq("posto_id", posto);
+  // clientes (C) ou fornecedores (F)
+  const classe = s.get("classe") || "";
+  if (tipo === "entidade" && (classe === "C" || classe === "F")) q = q.eq("dados->>tipo", classe);
+  if (s.get("activos") === "1") q = q.in("dados->>ativo", ["1", "true"]);
+  // a procura: o nome; nos artigos, também a referência e o código de barras (só letras, algarismos, espaço, «/» e «-»)
+  const procura = cleanText(s.get("q"), 40).replace(/\s+/g, " ").trim();
+  if (procura && /^[\p{L}\d /-]+$/u.test(procura)) {
+    q = tipo === "artigo"
+      ? q.or(`dados->>descricao.ilike.*${procura}*,dados->>referencia.ilike.*${procura}*,dados->>codigo_barras.ilike.*${procura}*`)
+      : q.ilike("dados->>nome", `%${procura}%`);
+  }
+  const { data, error, count } = await q;
+  if (error) throw new Error(error.message);
+  // o nome do posto e a loja de cada ficha
+  const ids = [...new Set((data || []).map((f: Row) => f.posto_id))];
+  const { data: ps } = ids.length ? await db.from("kangest_postos").select("id, nome, store_id").in("id", ids) : { data: [] };
+  const doPosto = new Map((ps || []).map((p: Row) => [p.id, p]));
+  const fichas = (data || []).map((f: Row) => ({ ...f, posto: doPosto.get(f.posto_id)?.nome ?? "", store_id: doPosto.get(f.posto_id)?.store_id ?? null }));
+  return json({ fichas, total: count ?? 0, pagina, por_pagina: POR_PAGINA_FICHAS });
+});
+
+route("GET", "/admin/kangest/fichas/ver", permissao("manage_settings", "manage_users", "manage_catalog", "view_store_dashboard"), async ({ url, auth }) => {
+  const s = url.searchParams;
+  const tipo = s.get("tipo") || "";
+  const posto = s.get("posto") || "";
+  const chave = Number(s.get("chave"));
+  if (!(tipo in VEEM_TUDO) || !uuidValido(posto) || !Number.isSafeInteger(chave) || chave <= 0) throw bad("Indique a ficha.");
+  const postos = await postosDasFichas(auth, tipo);
+  if (postos && !postos.some((p) => p.id === posto)) throw new HttpError(404, "Ficha não encontrada.");
+  const { data: r, error } = await db.from("kangest_registos").select("posto_id, tipo, chave, dados, pessoais_cifrado, recebido_em")
+    .eq("posto_id", posto).eq("tipo", tipo).eq("chave", chave).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!r) throw new HttpError(404, "Ficha não encontrada.");
+  const { data: p } = await db.from("kangest_postos").select("nome, store_id").eq("id", posto).maybeSingle();
+  const resposta: Row = { tipo, chave, posto: { id: posto, nome: p?.nome ?? "", store_id: p?.store_id ?? null }, dados: r.dados, recebido_em: r.recebido_em };
+  if (tipo === "entidade") {
+    // os contactos (cifrados à parte) e os documentos deste cliente nas lojas que a pessoa vê, pelo índice cego do NIF
+    const cifra = await cifraDadosKanGest();
+    const pessoais = await pessoaisDaEntidade(cifra, r.pessoais_cifrado);
+    resposta.pessoais = pessoais;
+    const nif = typeof pessoais?.nif === "string" ? pessoais.nif : "";
+    if (cifra && nif && !consumidorFinal(nif)) {
+      let dq = db.from("kangest_documentos")
+        .select("id, tipo_codigo, numero_doc, data_emissao, total, estado, valor_pendente, store_id", { count: "exact" })
+        .eq("entidade_nif_indice", await indiceCego(cifra, nif))
+        .order("data_emissao", { ascending: false }).order("id", { ascending: false }).limit(50);
+      const lojas = await lojasDaPessoa(auth, VEEM_TUDO.entidade);
+      if (lojas) dq = dq.in("store_id", lojas);
+      const { data: docs, count } = await dq;
+      resposta.documentos = docs || [];
+      resposta.documentos_total = count ?? 0;
+      resposta.em_divida = (docs || []).filter((d: Row) => d.estado !== "A").reduce((t: number, d: Row) => t + (Number(d.valor_pendente) || 0), 0);
+    }
+  }
+  return json(resposta);
 });
 
 // Os dois interruptores do posto (migração 20261125140000): o stock dele conta para o stock à venda no site, e os

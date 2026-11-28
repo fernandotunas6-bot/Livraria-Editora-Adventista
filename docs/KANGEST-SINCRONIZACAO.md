@@ -697,4 +697,38 @@ decifram.
   se alterar.
 
 **As rotas:** `GET /admin/kangest/documentos` (a lista, 50 de cada vez) e `GET /admin/kangest/documentos/ver?id=` (o
-documento completo). As duas exigem `view_reports` ou `edit_reports`.
+documento completo).
+
+**Cada loja administra-se como no resto do painel** (pedido do dono a 28/11: «permitir que cada loja seja administrada
+como já está»):
+- quem tem `view_reports` ou `edit_reports` vê todas as lojas;
+- o gerente com «Painel da sua loja» (`view_store_dashboard`) vê só as lojas da sua ficha de funcionário. É a mesma
+  regra de `private.painel_lojas_proprias`, e no servidor é `lojasDaPessoa`. Um documento de outra loja dá 404;
+- os fechos de caixa estão na mesma secção (a vista «Fechos de caixa»), com a regra que já tinham na base.
+
+## 26. As fichas do balcão no painel (28/11)
+
+**O que mostra:** as fichas que o KanGest de cada loja manda para a base central (§22, `kangest_registos`): os clientes
+e os fornecedores, os artigos completos e os utilizadores. Estão no painel em *Clientes → Fichas do balcão*
+(`KanGestFichas.jsx`), com três vistas. Só se lêem: mudam-se no KanGest e chegam na volta seguinte.
+
+**Quem vê cada vista:**
+
+| Vista | Todas as lojas | Só a sua loja |
+|---|---|---|
+| Clientes e fornecedores | «Gerir configurações» ou «Utilizadores e clientes» | o gerente com «Painel da sua loja» |
+| Artigos | «Gerir configurações» ou «Catálogo» | o gerente com «Painel da sua loja» |
+| Utilizadores | «Gerir configurações» | o gerente com «Painel da sua loja» |
+
+O gerente vê as fichas dos postos das lojas da sua ficha de funcionário, com a mesma regra dos documentos (§24).
+
+**A ficha de um cliente:**
+- os contactos (o NIF, os telefones, o email, a morada, a pessoa de contacto e as observações) chegam cifrados e só se
+  decifram no servidor, ao abrir a ficha (`pessoaisDaEntidade`);
+- traz os documentos desse cliente nas lojas que a pessoa vê, ligados pelo índice cego do NIF, e o que está em dívida.
+  Cada documento abre-se como o KanGest o imprime.
+
+**As rotas:**
+- `GET /admin/kangest/fichas?tipo=entidade|artigo|utilizador`, com a procura, os clientes ou os fornecedores, só as
+  activas e a página;
+- `GET /admin/kangest/fichas/ver?posto=&tipo=&chave=`.

@@ -8,7 +8,7 @@ import {
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
-  clienteDoDocumento, limparImpressao, MAX_PAGAMENTOS, pesquisaDeDocumentos,
+  clienteDoDocumento, limparImpressao, MAX_PAGAMENTOS, pesquisaDeDocumentos, pessoaisDaEntidade,
 } from "./kangestSinc.ts";
 
 const enc = new TextEncoder();
@@ -581,5 +581,17 @@ describe("os recibos do KanGest no site, como o KanGest os imprime", () => {
     const outra = (await lerCifraDados(paraB64(seq(32, 8))))!;
     expect(await clienteDoDocumento(outra, { consumidor_final: false, entidade_nome_cifrado: nome })).toEqual({ nome: "(cifrado)", nif: "" });
     expect(await clienteDoDocumento(null, { consumidor_final: false, entidade_nome_cifrado: nome })).toEqual({ nome: "(cifrado)", nif: "" });
+  });
+});
+
+describe("as fichas do balcão no painel", () => {
+  it("os contactos decifram-se só com a chave; sem ela, ou estragados, não aparecem", async () => {
+    const c = (await lerCifraDados(paraB64(seq(32, 7))))!;
+    const cifrado = await cifrarCampo(c, JSON.stringify({ nif: "5000123456", telefone: "923000000", outro: "fora" }));
+    expect(await pessoaisDaEntidade(c, cifrado)).toEqual({ nif: "5000123456", telefone: "923000000" });
+    expect(await pessoaisDaEntidade(null, cifrado)).toBeNull();
+    expect(await pessoaisDaEntidade((await lerCifraDados(paraB64(seq(32, 8))))!, cifrado)).toBeNull();
+    expect(await pessoaisDaEntidade(c, "")).toBeNull();
+    expect(await pessoaisDaEntidade(c, await cifrarCampo(c, "[1,2]"))).toBeNull();
   });
 });
