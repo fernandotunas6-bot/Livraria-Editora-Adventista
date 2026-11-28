@@ -162,14 +162,17 @@ export const ADMIN_SECTIONS = {
   // As facturas, os recibos e as notas do KanGest, como o KanGest os imprime (KanGestDocumentos.jsx, migração
   // 20261128100000). A mesma regra das dívidas: quem vê os relatórios de vendas (os nomes dos clientes decifram-se).
   'documentos-kangest': {
-    label: 'Documentos do KanGest', title: 'Documentos do KanGest', icon: ReceiptText,
-    keywords: 'recibos facturas faturas talao talão segunda via reimprimir notas de credito balcao nif documentos kangest kigest fecho z',
-    description: 'As facturas, os recibos e as notas das lojas, como saíram da impressora (o talão ou o A4), a 2.ª via e os fechos de caixa.',
+    label: 'Balcão das lojas', title: 'Balcão das lojas (KanGest)', icon: ReceiptText,
+    keywords: 'recibos facturas faturas talao talão segunda via reimprimir notas de credito balcao nif documentos kangest kigest fecho z dividas credito tesouraria dinheiro',
+    description: 'Os documentos de cada loja como saíram da impressora (o talão ou o A4) e a 2.ª via, os fechos de caixa, as dívidas e o dinheiro.',
     // como o resto do painel: quem vê os relatórios, todas as lojas; o gerente de uma loja, só a sua
     allowed: (p) => p.salesReports || p.storeDashboard,
     views: [
       { id: 'documentos', label: 'Documentos', icon: ReceiptText, keywords: 'talao a4 segunda via nif cliente', description: 'Cada documento como saiu da impressora, e a 2.ª via.' },
       { id: 'fechos', label: 'Fechos de caixa', icon: Wallet, keywords: 'fecho z relatorio completo gaveta diferenca', description: 'O Z de cada posto, com o relatório completo em A4.' },
+      { id: 'dividas', label: 'Dívidas', icon: HandCoins, keywords: 'credito por receber vencidas clientes', description: 'O que falta receber: as facturas a crédito do balcão e as encomendas do site.' },
+      // a tesouraria: quem lê os pagamentos (private.can_read_payments) ou o gerente da loja
+      { id: 'dinheiro', label: 'Dinheiro', icon: Banknote, keywords: 'tesouraria entradas saidas centro de custo saldo', description: 'As entradas e as saídas da tesouraria do KanGest, por loja e por centro de custo.', allowed: (p) => p.orders || p.confirmPayments || p.storeDashboard },
     ],
   },
   // As fichas que o KanGest de cada loja manda (KanGestFichas.jsx, migração 20261127160000): quem as gere no site vê
