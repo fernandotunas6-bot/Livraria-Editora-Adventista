@@ -13,6 +13,8 @@ import { kangestDocumento, kangestDocumentos } from '@/api/PlatformApi';
 import { TIPOS, data, hora, kz, montarDocumento, nomeDoDocumento, textoReimpressao } from '@/lib/kangestRecibo';
 import { PAGINAS, imprimirElemento } from '@/lib/imprimirElemento';
 import { FolhaA4, Talao } from './KanGestRecibo';
+import KanGestFechos from './KanGestFechos';
+import { AdminViewNav, useSectionView } from './shell/AdminViewNav';
 
 const FORMATO_KEY = 'kangest-documentos:formato';
 const hojeISO = () => new Date().toISOString().slice(0, 10);
@@ -23,11 +25,27 @@ const campo = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
  * Os documentos do KanGest no painel, como o KanGest os mostra (pedido do dono a 27/11: «implementar o estilo de
  * recibos do KanGest na livraria, e a lógica de visualizar os recibos igual à do KanGest»). A lista filtra-se como no
  * ecrã Documentos do KanGest: o período, a loja, o tipo, o estado e o n.º ou o NIF. Abrir um documento mostra o talão
- * de 80 mm ou o A4, como saem da impressora da loja, e imprime a 2.ª via. Quem vê: quem vê os relatórios de vendas.
- * Os nomes e os NIF dos clientes só se decifram no servidor.
+ * de 80 mm ou o A4, como saem da impressora da loja, e imprime a 2.ª via. A vista «Fechos de caixa» tem o arquivo dos Z.
+ * Quem vê: quem vê os relatórios de vendas, todas as lojas; o gerente de uma loja, só a sua (como no resto do painel;
+ * a regra está no servidor e na base). Os nomes e os NIF dos clientes só se decifram no servidor.
  */
 export default function KanGestDocumentos() {
+  // as vistas: os documentos e os fechos de caixa (lib/adminSections.js)
+  const sv = useSectionView('documentos-kangest');
   const [lojas, setLojas] = useState([]);
+  useEffect(() => {
+    supabase.from('physical_stores').select('id, name').order('name').then(({ data: ls }) => setLojas(ls || []));
+  }, []);
+  return (
+    <div className="space-y-4">
+      <AdminViewNav state={sv} className="mb-0" />
+      {sv.view === 'fechos' ? <KanGestFechos lojas={lojas} /> : <ListaDeDocumentos lojas={lojas} />}
+    </div>
+  );
+}
+
+/** A lista dos documentos, com os filtros, e o documento aberto. */
+function ListaDeDocumentos({ lojas }) {
   const [filtros, setFiltros] = useState({ de: diasAtras(30), ate: hojeISO(), loja: '', tipo: '', estado: '', q: '' });
   const [pesquisa, setPesquisa] = useState('');
   const [pagina, setPagina] = useState(0);
@@ -35,10 +53,6 @@ export default function KanGestDocumentos() {
   const [erro, setErro] = useState('');
   const [aCarregar, setACarregar] = useState(false);
   const [aberto, setAberto] = useState(null);
-
-  useEffect(() => {
-    supabase.from('physical_stores').select('id, name').order('name').then(({ data: ls }) => setLojas(ls || []));
-  }, []);
 
   useEffect(() => {
     let vivo = true;

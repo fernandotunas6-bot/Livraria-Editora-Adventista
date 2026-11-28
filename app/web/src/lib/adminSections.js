@@ -32,7 +32,7 @@ export const ADMIN_GROUPS = [
   { id: 'producao', label: 'Editora', sections: ['producao'] },
   { id: 'vendas', label: 'Vendas', sections: ['orders', 'acompanhamento', 'equipas', 'payments', 'stores'] },
   { id: 'relatorios', label: 'Relatórios', sections: ['painel-gestao', 'relatorios-lojas', 'vendas-huambo', 'documentos-kangest', 'imagens-videos', 'pagamentos-caixa', 'financas'] },
-  { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community'] },
+  { id: 'clientes', label: 'Clientes', sections: ['users', 'contacts', 'support', 'community', 'fichas-kangest'] },
   { id: 'funcionarios', label: 'Pessoal', sections: ['funcionarios'] },
   { id: 'igreja', label: 'Igreja', sections: ['colportagem', 'igreja'] },
   { id: 'sistema', label: 'Sistema', sections: ['settings', 'notices', 'versoes', 'saude', 'kangest', 'apps', 'seguranca'] },
@@ -163,9 +163,27 @@ export const ADMIN_SECTIONS = {
   // 20261128100000). A mesma regra das dívidas: quem vê os relatórios de vendas (os nomes dos clientes decifram-se).
   'documentos-kangest': {
     label: 'Documentos do KanGest', title: 'Documentos do KanGest', icon: ReceiptText,
-    keywords: 'recibos facturas faturas talao talão segunda via reimprimir notas de credito balcao nif documentos kangest kigest',
-    description: 'As facturas, os recibos e as notas das lojas, como saíram da impressora (o talão ou o A4), e a 2.ª via.',
-    allowed: (p) => p.salesReports,
+    keywords: 'recibos facturas faturas talao talão segunda via reimprimir notas de credito balcao nif documentos kangest kigest fecho z',
+    description: 'As facturas, os recibos e as notas das lojas, como saíram da impressora (o talão ou o A4), a 2.ª via e os fechos de caixa.',
+    // como o resto do painel: quem vê os relatórios, todas as lojas; o gerente de uma loja, só a sua
+    allowed: (p) => p.salesReports || p.storeDashboard,
+    views: [
+      { id: 'documentos', label: 'Documentos', icon: ReceiptText, keywords: 'talao a4 segunda via nif cliente', description: 'Cada documento como saiu da impressora, e a 2.ª via.' },
+      { id: 'fechos', label: 'Fechos de caixa', icon: Wallet, keywords: 'fecho z relatorio completo gaveta diferenca', description: 'O Z de cada posto, com o relatório completo em A4.' },
+    ],
+  },
+  // As fichas que o KanGest de cada loja manda (KanGestFichas.jsx, migração 20261127160000): quem as gere no site vê
+  // todas; o gerente de uma loja, as dos postos da sua.
+  'fichas-kangest': {
+    label: 'Fichas do balcão', title: 'Fichas do balcão (KanGest)', icon: IdCard,
+    keywords: 'clientes do balcao fornecedores artigos utilizadores kangest kigest fichas contactos dividas loja',
+    description: 'Os clientes, os fornecedores, os artigos e os utilizadores do KanGest de cada loja, como estão no programa.',
+    allowed: (p) => p.settings || p.users || p.catalog || p.storeDashboard,
+    views: [
+      { id: 'clientes', label: 'Clientes e fornecedores', icon: Users, keywords: 'contactos nif dividas documentos', description: 'Cada cliente e fornecedor do balcão, os contactos e os documentos.', allowed: (p) => p.settings || p.users || p.storeDashboard },
+      { id: 'artigos', label: 'Artigos', icon: PackageSearch, keywords: 'referencia codigo de barras precos stock familia', description: 'A ficha completa de cada artigo do KanGest.', allowed: (p) => p.settings || p.catalog || p.storeDashboard },
+      { id: 'utilizadores', label: 'Utilizadores', icon: UserCog, keywords: 'operadores perfis caixa gestor', description: 'Quem trabalha em cada KanGest, o perfil e a loja.', allowed: (p) => p.settings || p.storeDashboard },
+    ],
   },
   // As imagens e os mais vendidos dos vídeos dos relatórios (ImagensVideosTab.jsx, docs/RELATORIOS.md).
   'imagens-videos': {

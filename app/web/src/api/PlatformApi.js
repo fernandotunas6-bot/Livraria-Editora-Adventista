@@ -348,6 +348,18 @@ export const kangestDocumentos = (filtros = {}) => {
   const s = q.toString();
   return pb.send(`/admin/kangest/documentos${s ? `?${s}` : ''}`, { method: 'GET' });
 };
+/**
+ * As fichas do balcão (GET /admin/kangest/fichas): `tipo` entidade, artigo ou utilizador; a procura, a classe (C ou F),
+ * só as activas e a página. O gerente de uma loja recebe só as dos postos da sua.
+ */
+export const kangestFichas = (filtros = {}) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(filtros)) if (v !== '' && v != null && v !== false) q.set(k, v === true ? '1' : String(v));
+  return pb.send(`/admin/kangest/fichas?${q.toString()}`, { method: 'GET' });
+};
+/** Uma ficha do balcão, com os contactos decifrados e, num cliente, os seus documentos. */
+export const kangestFicha = (posto, tipo, chave) =>
+  pb.send(`/admin/kangest/fichas/ver?posto=${encodeURIComponent(posto)}&tipo=${encodeURIComponent(tipo)}&chave=${encodeURIComponent(chave)}`, { method: 'GET' });
 /** Um documento do KanGest completo, para o mostrar como o KanGest o imprime (o talão e o A4). */
 export const kangestDocumento = (id) => pb.send(`/admin/kangest/documentos/ver?id=${encodeURIComponent(id)}`, { method: 'GET' });
 /** Cria um posto e devolve o código de emparelhamento (uso único, 10 minutos). */
