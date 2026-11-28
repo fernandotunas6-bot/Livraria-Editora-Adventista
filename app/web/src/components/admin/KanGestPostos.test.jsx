@@ -16,7 +16,7 @@ vi.mock('@/api/PlatformApi', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { EnderecoDoPosto, LivroDoPosto, LivroDoSite, SessoesDoPosto } = await import('./KanGestPostos');
+const { EnderecoDoPosto, LivroDoPosto, LivroDoSite, SeriesDoPosto, SessoesDoPosto } = await import('./KanGestPostos');
 const api = await import('@/api/PlatformApi');
 
 let root;
@@ -162,6 +162,26 @@ describe('o endereço do KanGest na rede da loja', () => {
     await act(async () => host.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await flush();
     expect(api.kangestPostoConfigurar).toHaveBeenCalledWith('p1', { endereco_web: 'http://kangest-loja:7799' });
+    expect(guardado).toHaveBeenCalled();
+  });
+});
+
+describe('o prefixo das séries de cada posto', () => {
+  it('mostra a série que o posto emite e guarda outro prefixo à mão, em maiúsculas', async () => {
+    api.kangestPostoConfigurar.mockReset();
+    api.kangestPostoConfigurar.mockResolvedValue({});
+    const guardado = vi.fn();
+    await mount(<SeriesDoPosto p={{ id: 'p1', serie_prefixo: 'HUA' }} onGuardado={guardado} />);
+    expect(host.textContent).toContain(`FR HUA${new Date().getFullYear()}/1`);
+    const caixa = host.querySelector('input');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(caixa, 'hua-2');
+      caixa.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(caixa.value).toBe('HUA2');
+    await act(async () => host.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await flush();
+    expect(api.kangestPostoConfigurar).toHaveBeenCalledWith('p1', { serie_prefixo: 'HUA2' });
     expect(guardado).toHaveBeenCalled();
   });
 });

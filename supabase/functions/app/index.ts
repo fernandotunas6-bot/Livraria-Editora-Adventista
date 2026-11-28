@@ -3273,7 +3273,7 @@ const authParaPostos = () => {
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
-    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, estado_computador, estado_em, endereco_web")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, estado_computador, estado_em, endereco_web, serie_prefixo")
     .order("criado_em", { ascending: true });
   if (error) throw new Error(error.message);
   const postos = [];
@@ -3321,7 +3321,10 @@ route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => 
   if (eSite) console.error("KanGest: reservas do site no livro de stock", eSite.message);
   const r = (site || [])[0];
   const livroSite = r ? { reservas_abertas: Number(r.reservas_abertas), unidades: Number(r.unidades), encomendas: Number(r.encomendas) } : null;
-  return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos, livro_site: livroSite });
+  // as séries emitidas por mais de um posto (os números repetem-se entre lojas; migração 20261128130000)
+  const { data: colisoes, error: eCol } = await db.rpc("kangest_series_em_colisao");
+  if (eCol) console.error("KanGest: séries repetidas", eCol.message);
+  return json({ configurado: await sincConfigurada(), endereco: `${SUPABASE_URL}/functions/v1/app`, postos, livro_site: livroSite, colisoes: colisoes || [] });
 });
 
 // Onde o livro de stock de um posto não bate certo com a fotografia que ele mandou (KANGEST ONE, B1): até 200 linhas.
@@ -3657,6 +3660,14 @@ route("POST", "/admin/kangest/postos/configurar", permissao("manage_settings"), 
     if (r.error) throw bad(r.error.message);
     data = { ...data, ...r.data };
   }
+  // o prefixo das séries, à mão (sempre único: a base recusa o de outro posto)
+  if ("serie_prefixo" in body) {
+    const prefixo = typeof body.serie_prefixo === "string" ? body.serie_prefixo.trim().toUpperCase() : "";
+    if (!/^[A-Z0-9]{1,8}$/.test(prefixo)) throw bad("O prefixo das séries tem 1 a 8 letras ou algarismos (por exemplo HUA ou HUA2).");
+    const { error } = await db.from("kangest_postos").update({ serie_prefixo: prefixo }).eq("id", id);
+    if (error) throw bad(error.message);
+    data = { ...data, serie_prefixo: prefixo };
+  }
   // o endereço do KanGest na rede da loja, à mão (vazio: o que o posto diz), para «Abrir no KanGest» no painel
   if ("endereco_web" in body) {
     const endereco = typeof body.endereco_web === "string" ? body.endereco_web.trim().replace(/\/+$/, "") : "";
@@ -3872,7 +3883,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
   if (!uuidValido(posto) || !nonceValido(nonce) || !assinatura) throw new HttpError(401, "Pedido sem assinatura válida.");
   if (!horaValida(hora)) throw new HttpError(401, "A hora deste computador difere mais de 5 minutos da hora certa: acerte o relógio.");
   const { data: p } = await db.from("kangest_postos")
-    .select("id, nome, estado, chave_publica, store_id, topico, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, manda_catalogo")
+    .select("id, nome, estado, chave_publica, store_id, topico, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, manda_catalogo, serie_prefixo")
     .eq("id", posto).maybeSingle();
   if (!p || p.estado !== "activo" || !p.chave_publica) throw new HttpError(401, "Este posto não está ligado (ou foi revogado): emparelhe-o outra vez no painel.");
   if (!await assinaturaPostoValida(p.chave_publica, mensagemAssinada(posto, hora, nonce, await resumoSinc(raw)), assinatura)) {
@@ -4034,7 +4045,7 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
       console.error("KanGest: tarefas do posto", posto, (e as Error).message);
     }
   }
-  const { data: loja } = p.store_id ? await db.from("physical_stores").select("name").eq("id", p.store_id).maybeSingle() : { data: null };
+  const { data: loja } = p.store_id ? await db.from("physical_stores").select("name, codigo").eq("id", p.store_id).maybeSingle() : { data: null };
   const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
   return json(await selarResposta(aberto.chaveResposta, nonce, {
     resultado, novidades, tarefas, tarefas_feitas: tarefasFeitas, sessoes_revogar: sessoesRevogar, stock_livro: stockLivro, fotos, livros, promocoes, registos,
@@ -4042,7 +4053,10 @@ route("POST", "/kangest/sinc", segredo("assinatura Ed25519 do posto do KanGest L
     // a versão mínima do KanGest (fase E): abaixo dela, o KanGest avisa e só lê (sinc/versao.rs)
     kangest_min_version: (Deno.env.get("KANGEST_MIN_VERSION") || "").trim() || null,
     site, auth: authParaPostos(), tempo_real: { topico: p.topico ?? null },
-    posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null }, hora: Math.floor(Date.now() / 1000),
+    // o prefixo das séries deste posto, único na rede (migração 20261128130000): o KanGest usa-o nas séries automáticas
+    // (sinc/series.rs), para duas lojas nunca emitirem os mesmos números
+    posto: { id: p.id, nome: p.nome, loja: loja?.name ?? null, codigo_loja: loja?.codigo || null, serie_prefixo: p.serie_prefixo || null },
+    hora: Math.floor(Date.now() / 1000),
   }));
 });
 

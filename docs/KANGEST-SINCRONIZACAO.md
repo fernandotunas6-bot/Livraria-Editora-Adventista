@@ -778,3 +778,15 @@ O gerente vê as fichas dos postos das lojas da sua ficha de funcionário, com a
 - `GET /admin/kangest/fichas?tipo=entidade|artigo|utilizador`, com a procura, os clientes ou os fornecedores, só as
   activas e a página;
 - `GET /admin/kangest/fichas/ver?posto=&tipo=&chave=`.
+
+## 27. As séries de cada posto, únicas na rede (28/11)
+
+Cada posto tem um prefixo de séries único em toda a rede (`kangest_postos.serie_prefixo`, migração 20261128130000), e o
+site manda-o em cada volta (`posto.serie_prefixo` na resposta selada). O KanGest (`sinc/series.rs`, migração 0081)
+procede assim:
+- guarda o prefixo em `sinc_ligacao.serie_prefixo_site`;
+- põe-no sozinho nos postos sem prefixo, com a auditoria `SERIE_PREFIXO`;
+- num posto com outro prefixo, mostra o aviso e o botão «Usar o prefixo do site».
+
+O painel avisa das séries emitidas por mais de um posto (`kangest_series_em_colisao`). O módulo completo está em
+`docs/LOJAS.md` («Criar lojas novas sem colisões»).

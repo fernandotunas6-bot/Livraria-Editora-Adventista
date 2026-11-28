@@ -9069,3 +9069,46 @@ async fn as_fotos_dos_artigos_para_o_site() {
     st.pool.close().await;
     let _ = std::fs::remove_dir_all(&pasta);
 }
+
+/// O prefixo das séries que o site dá (sinc/series.rs): os postos sem prefixo passam a usá-lo sozinhos, com a
+/// auditoria; um posto com outro prefixo (o «N» do KIGEST) só muda com «Usar o prefixo do site»; e a série automática
+/// nova sai com ele.
+#[tokio::test]
+async fn o_prefixo_das_series_vem_do_site_sem_colisoes() {
+    let (st, pasta) = base_com_admin("series-da-rede").await;
+    sqlx::query(
+        "INSERT INTO sinc_ligacao (id, url, posto_id, chave_assinatura, centro_kid, centro_chave, emparelhado_em)
+         VALUES (1, 'http://127.0.0.1:9/functions/v1/app', '00000000-0000-4000-8000-000000000001', ?, '1', ?, '2026-11-28T10:00:00')",
+    )
+    .bind(B64.encode([0x11u8; 32]))
+    .bind(B64.encode([0x80u8; 32]))
+    .execute(&st.pool)
+    .await
+    .unwrap();
+    let segundo: i64 = sqlx::query_scalar("INSERT INTO postos (descricao, armazem_id, serie_prefixo) VALUES ('Caixa 2', 1, 'N') RETURNING id").fetch_one(&st.pool).await.unwrap();
+    sqlx::query("UPDATE postos SET serie_prefixo = '' WHERE id = 1").execute(&st.pool).await.unwrap();
+    // um prefixo estragado não faz nada
+    assert_eq!(crate::sinc::series::aplicar(&st, &json!({ "serie_prefixo": "hu a" })).await.unwrap(), 0);
+    // o do site: o posto sem prefixo passa a usá-lo; o do «N» fica, com o aviso
+    assert_eq!(crate::sinc::series::aplicar(&st, &json!({ "serie_prefixo": "HUA" })).await.unwrap(), 1);
+    let prefixo = |id: i64| {
+        let pool = st.pool.clone();
+        async move { sqlx::query_scalar::<_, String>("SELECT serie_prefixo FROM postos WHERE id = ?").bind(id).fetch_one(&pool).await.unwrap() }
+    };
+    assert_eq!(prefixo(1).await, "HUA");
+    assert_eq!(prefixo(segundo).await, "N");
+    let e = rpc(&st, "sinc.series", Value::Null).await;
+    assert_eq!(e["site"], "HUA", "{e}");
+    assert_eq!(e["diferentes"], 1, "{e}");
+    let auditoria: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auditoria WHERE acao = 'SERIE_PREFIXO'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(auditoria, 1);
+    // o posto desta máquina já usa o prefixo novo nas séries automáticas (documentos.rs, `escolher_serie`)
+    assert_eq!(st.posto().serie_prefixo, "HUA");
+    // «Usar o prefixo do site»: todos os postos
+    let r = rpc(&st, "sinc.series.usar_do_site", Value::Null).await;
+    assert_eq!(r["mudados"], 1, "{r}");
+    assert_eq!(prefixo(segundo).await, "HUA");
+    assert_eq!(rpc(&st, "sinc.series", Value::Null).await["diferentes"], 0);
+    st.pool.close().await;
+    let _ = std::fs::remove_dir_all(&pasta);
+}

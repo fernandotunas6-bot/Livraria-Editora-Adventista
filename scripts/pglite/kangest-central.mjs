@@ -245,7 +245,7 @@ const emparelhado = async (nome, loja_id, resumo, byte) => {
   await q(`select public.kangest_emparelhar($1, $2, '1.4.5')`, [resumo, Buffer.alloc(32, byte).toString('base64')]);
   return id;
 };
-const [lojaA] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Lubango', 'Huíla', 'Lubango', true) returning id`);
+const [lojaA] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Lubango (Mapunda)', 'Huíla', 'Mapunda', true) returning id`);
 const [lojaB] = await q(`insert into public.physical_stores (name, province, address, active) values ('Livraria — Bié', 'Bié', 'Cuíto', true) returning id`);
 const [livroS] = await q(`insert into public.stock_books (title, price, stock, active, kigest_ref) values ('Caminho a Cristo', 2500, 9, true, 'LIV-STK') returning id`);
 const pA = await emparelhado('Loja do Lubango', lojaA.id, 'resumo-stk-a', 11);

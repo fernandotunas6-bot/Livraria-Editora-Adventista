@@ -155,6 +155,70 @@ type Loja = { id: string; name: string; province?: string | null };
  * sem ir ao painel nem copiar códigos. O site cria o posto e emparelha-o no mesmo pedido (src-tauri/src/sinc/mod.rs,
  * `ligar_com_a_conta`); a sessão só serve para isso e não se guarda.
  */
+interface EstadoSeries {
+  site: string;
+  diferentes: number;
+  postos: { id: number; descricao: string; serie_prefixo: string; igual: boolean }[];
+}
+
+/**
+ * O prefixo das séries que o site deu a este KanGest (sinc/series.rs): único em toda a rede, para duas lojas nunca
+ * emitirem os mesmos números. Os postos sem prefixo usam-no sozinhos; um posto com outro prefixo (o «N» do KIGEST, um
+ * escolhido à mão) fica até alguém carregar em «Usar o prefixo do site».
+ */
+function SeriesDaRede() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["sinc-series"], queryFn: () => call<EstadoSeries>("sinc.series"), refetchInterval: 60000 });
+  const [aMudar, setAMudar] = useState(false);
+  const s = q.data;
+  if (!s?.site) return null;
+  async function usar() {
+    setAMudar(true);
+    try {
+      const r = await call<{ mudados: number; prefixo: string }>("sinc.series.usar_do_site");
+      toast.success(`As séries automáticas novas saem com ${r.prefixo} (${r.mudados} posto(s) mudado(s)).`);
+      qc.invalidateQueries({ queryKey: ["sinc-series"] });
+      qc.invalidateQueries({ queryKey: ["tabelas"] });
+      qc.invalidateQueries({ queryKey: ["postos"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setAMudar(false);
+    }
+  }
+  const ano = new Date().getFullYear();
+  return (
+    <Card>
+      <div className="space-y-2 px-5 py-4">
+        <h2 className="text-[15px] font-semibold text-ink">Séries dos documentos na rede das lojas</h2>
+        <p className="text-[13px] text-ink-3">
+          O site deu a este KanGest o prefixo <b className="text-ink">{s.site}</b>: as séries automáticas saem como FR {s.site}
+          {ano}/1. Assim, duas lojas com o mesmo NIF nunca emitem os mesmos números.
+        </p>
+        <div className="flex flex-wrap gap-2 text-[13px]">
+          {s.postos.map((p) => (
+            <Badge key={p.id} tone={p.igual ? "ok" : "accent"}>
+              {p.descricao}: {p.serie_prefixo || "sem prefixo"}
+            </Badge>
+          ))}
+        </div>
+        {s.diferentes > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent-50 px-3 py-2 text-[13px] text-accent-ink">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span className="flex-1">
+              {s.diferentes === 1 ? "Um posto usa" : `${s.diferentes} postos usam`} outro prefixo, que outra loja pode usar também. Os documentos já
+              emitidos ficam como estão; os novos passam a sair com {s.site}.
+            </span>
+            <Button size="sm" loading={aMudar} onClick={usar}>
+              Usar o prefixo do site
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function LigacaoAutomatica({ onLigado }: { onLigado: (r: EstadoSinc) => void }) {
   const inicio = useQuery({ queryKey: ["sinc", "inicio"], queryFn: () => call<{ url: string; lojas: Loja[] }>("sinc.ligar_inicio"), retry: false });
   const [email, setEmail] = useState("");
@@ -397,6 +461,8 @@ export default function LigacaoLivraria() {
               {e.configuracoes?.erro ? <span className="text-danger"> ({e.configuracoes.erro})</span> : null}
             </p>
           </Card>
+
+          <SeriesDaRede />
 
           {e.erros.length > 0 && (
             <Card>
