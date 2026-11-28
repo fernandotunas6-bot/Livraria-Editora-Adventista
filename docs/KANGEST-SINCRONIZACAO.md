@@ -698,3 +698,39 @@ decifram.
 
 **As rotas:** `GET /admin/kangest/documentos` (a lista, 50 de cada vez) e `GET /admin/kangest/documentos/ver?id=` (o
 documento completo). As duas exigem `view_reports` ou `edit_reports`.
+
+## 25. Abrir o KanGest a partir do painel pelo servidor da loja (28/11)
+
+Pedido do dono (27/11): «links… abrir sem protocolo com rotas permitidas», com a escolha «Pelo servidor da loja».
+
+**O problema:** a ligação `kangest://` faz o navegador perguntar sempre se pode abrir o programa, e só funciona no
+computador onde o KanGest está instalado.
+
+**Automático:**
+- o KanGest **servidor** da loja, com o **modo web** ligado e a correr, diz o seu endereço na rede da loja em cada volta
+  (`estado_computador.endereco_web`, `sinc/estado.rs`). Diz só um IPv4 privado, por exemplo `http://192.168.1.10:7799`.
+  O site volta a conferir (`enderecoWebDaLoja`): um endereço público nunca entra, para um posto não poder mandar a
+  equipa para outro sítio;
+- «Abrir no KanGest», na encomenda do painel, abre esse endereço num separador novo, com a rota no endereço e a marca
+  `origem=site`: `http://192.168.1.10:7799/#/loja-online?encomenda=LA-1&origem=site`;
+- o posto escolhe-se assim (`postoParaAbrir`): o que emite as encomendas da loja de levantamento, depois um que emita
+  encomendas, depois o da loja.
+
+**Manual, ao lado:**
+- **no painel:** em *Postos do KanGest Livraria*, cada posto tem «Abrir no KanGest pela loja», onde se escreve outro
+  endereço, como um nome da rede da loja ou outra porta (`kangest_postos.endereco_web`, migração 20261128110000). Vale
+  por cima do automático, e vazio volta ao automático;
+- **na encomenda:** «no programa» continua a abrir o KanGest deste computador pela ligação `kangest://`. Sem servidor,
+  é a única.
+
+**As rotas permitidas** são as mesmas das ligações `kangest://` (`ligacoes.rs`):
+- a encomenda na Loja online;
+- a Loja online, filtrada;
+- a ajuda.
+
+O KanGest no navegador confere-as outra vez (`src/lib/ligacoesWeb.ts`): uma rota marcada `origem=site` que não esteja
+na lista vai para o início, e a marca sai do endereço. Uma ligação só leva a um ecrã e nunca faz nada sozinha. O
+navegador precisa da chave de rede uma vez (o ecrã «Ligar ao servidor») e a pessoa entra como sempre.
+
+**A rota:** `GET /kangest/enderecos-web`, para quem tem «KanGest: caixa», «KanGest: gestor» ou gere as encomendas.
+Devolve os postos activos com o endereço, o da loja e se emitem as encomendas.

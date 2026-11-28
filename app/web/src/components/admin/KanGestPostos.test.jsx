@@ -16,7 +16,8 @@ vi.mock('@/api/PlatformApi', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { LivroDoPosto, LivroDoSite, SessoesDoPosto } = await import('./KanGestPostos');
+const { EnderecoDoPosto, LivroDoPosto, LivroDoSite, SessoesDoPosto } = await import('./KanGestPostos');
+const api = await import('@/api/PlatformApi');
 
 let root;
 let host;
@@ -139,5 +140,28 @@ describe('LivroDoPosto: o stock negativo (o que faltava, 26/11)', () => {
     await act(async () => botao.click());
     await flush();
     expect(host.textContent).toContain('LIV-001 (armazém 1: -2)');
+  });
+});
+
+describe('o endereço do KanGest na rede da loja', () => {
+  it('mostra o automático e guarda o escrito à mão; um endereço mal escrito não se guarda', async () => {
+    api.kangestPostoConfigurar.mockResolvedValue({});
+    const guardado = vi.fn();
+    await mount(<EnderecoDoPosto p={{ id: 'p1', endereco_web: '', estado_computador: { endereco_web: 'http://192.168.1.10:7799' } }} onGuardado={guardado} />);
+    expect(host.textContent).toContain('http://192.168.1.10:7799');
+    expect(host.textContent).toContain('(automático)');
+    const caixa = host.querySelector('input');
+    const escrever = (v) => act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(caixa, v);
+      caixa.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await escrever('192.168.1.10');
+    expect(host.textContent).toContain('Escreva como');
+    expect(host.querySelector('button').disabled).toBe(true);
+    await escrever('http://kangest-loja:7799');
+    await act(async () => host.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await flush();
+    expect(api.kangestPostoConfigurar).toHaveBeenCalledWith('p1', { endereco_web: 'http://kangest-loja:7799' });
+    expect(guardado).toHaveBeenCalled();
   });
 });

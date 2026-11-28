@@ -3,13 +3,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, BookOpenCheck, Copy, Cpu, Download, KeyRound, Link2, LogOut, Plus, Settings2, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Copy, Cpu, Download, Globe, KeyRound, Link2, LogOut, Plus, Settings2, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   kangestPostoCodigo, kangestPostoConfiguracoes, kangestPostoConfigurar, kangestPostoCriar, kangestPostoLivro, kangestPostoRevogar, kangestPostos,
   kangestSessaoTerminar,
 } from '@/api/PlatformApi';
 import { resumoDasConfiguracoes } from '@/lib/kangestConfiguracoes';
+import { enderecoManualValido } from '@/lib/kangestServidor';
 import { cn } from '@/lib/utils';
 import { problemasDoComputador, tamanho } from '@/lib/kangestComputadores';
 
@@ -245,6 +246,7 @@ export default function KanGestPostos({ lojas = [] }) {
                     {!p.store_id && !p.stock_online && <span className="text-muted-foreground">Sem loja e sem contar para o site: o stock dele não é usado.</span>}
                   </div>
                 )}
+                {p.estado !== 'revogado' && <EnderecoDoPosto key={`${p.id}-${p.endereco_web || ''}`} p={p} onGuardado={carregar} />}
                 {p.estado !== 'revogado' && p.store_id && (
                   <EncomendasDoPosto
                     key={`${p.id}-${p.emitir_encomendas}-${p.artigo_portes}-${p.artigo_generico}-${(p.pagamentos || {})['*'] || ''}`}
@@ -285,6 +287,55 @@ export default function KanGestPostos({ lojas = [] }) {
         </Button>
       </form>
     </section>
+  );
+}
+
+/**
+ * O endereço do KanGest na rede da loja, por onde «Abrir no KanGest» abre os ecrãs sem a ligação kangest:// (migração
+ * 20261128110000). Automático: o que o KanGest servidor diz (com o modo web ligado). Ao lado, escreve-se outro à mão
+ * (um nome da rede da loja, outra porta); vazio volta ao automático.
+ */
+export function EnderecoDoPosto({ p, onGuardado }) {
+  const automatico = p.estado_computador?.endereco_web || '';
+  const [valor, setValor] = useState(p.endereco_web || '');
+  const [aGuardar, setAGuardar] = useState(false);
+  const mudou = valor.trim().replace(/\/+$/, '') !== (p.endereco_web || '');
+  const valido = !valor.trim() || enderecoManualValido(valor);
+  async function guardar(ev) {
+    ev.preventDefault();
+    if (!valido) return;
+    setAGuardar(true);
+    try {
+      await kangestPostoConfigurar(p.id, { endereco_web: valor.trim() });
+      toast.success(valor.trim() ? 'Endereço do KanGest guardado.' : 'Volta ao endereço que o KanGest diz.');
+      onGuardado?.();
+    } catch (e) {
+      toast.error(e?.message || 'Não foi possível guardar.');
+    } finally {
+      setAGuardar(false);
+    }
+  }
+  return (
+    <form onSubmit={guardar} className="flex w-full flex-wrap items-center gap-2 text-xs">
+      <Globe className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+      <span className="text-muted-foreground">
+        Abrir no KanGest pela loja:{' '}
+        {p.endereco_web ? <strong>{p.endereco_web}</strong> : automatico ? <strong>{automatico}</strong> : 'sem servidor (abre o programa deste computador)'}
+        {!p.endereco_web && automatico ? ' (automático)' : ''}
+      </span>
+      <label className="sr-only" htmlFor={`endereco-${p.id}`}>Endereço do KanGest na rede da loja</label>
+      <input
+        id={`endereco-${p.id}`}
+        className={cn('h-7 w-56 rounded-md border bg-background px-2', !valido && 'border-destructive')}
+        placeholder={automatico || 'http://192.168.1.10:7799'}
+        value={valor}
+        maxLength={100}
+        onChange={(e) => setValor(e.target.value)}
+        aria-invalid={!valido}
+      />
+      <Button size="sm" variant="outline" className="h-7" type="submit" disabled={!mudou || !valido || aGuardar}>Guardar</Button>
+      {!valido && <span className="text-destructive">Escreva como http://192.168.1.10:7799</span>}
+    </form>
   );
 }
 

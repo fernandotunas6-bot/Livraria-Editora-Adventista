@@ -360,5 +360,7 @@ export const kangestPostoRevogar = (id) => pb.send('/admin/kangest/postos/revoga
 export const kangestSessaoTerminar = (posto, sessao) => pb.send('/admin/kangest/sessoes/revogar', { method: 'POST', body: { posto, sessao } });
 /** Os interruptores do posto: `{ stock_online?, manda_catalogo? }` (só um posto manda no catálogo). */
 export const kangestPostoConfigurar = (id, opcoes) => pb.send('/admin/kangest/postos/configurar', { method: 'POST', body: { id, ...opcoes } });
+/** Os KanGest servidores das lojas com o modo web (o endereço da rede da loja), para «Abrir no KanGest» no painel. */
+export const kangestEnderecosWeb = () => pb.send('/kangest/enderecos-web', { method: 'GET' });
 /** As dívidas por loja (o balcão dos postos e as encomendas do site), com os nomes dos clientes; só quem vê os relatórios. */
 export const relatorioDividas = (loja = '') => pb.send(`/admin/relatorios/dividas${loja ? `?loja=${encodeURIComponent(loja)}` : ''}`, { method: 'GET' });

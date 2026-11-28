@@ -529,6 +529,23 @@ const VERIFICACOES = ["ok", "avisos", "graves"] as const;
  * mostrar por posto (KanGestPostos.jsx). Só uma lista fechada de campos, com os tipos e os limites conferidos: números e
  * marcas do computador, nunca dados pessoais nem da loja. O que não for um objecto dá `null` (não se grava nada).
  */
+/**
+ * O endereço do modo web do KanGest servidor da loja (sinc/estado.rs, `endereco_web`; pedido do dono a 27/11: abrir os
+ * ecrãs do KanGest a partir do site «pelo servidor da loja», sem a ligação kangest://). Só um endereço da rede da loja:
+ * `http(s)://` com um IPv4 privado (10.x, 172.16–31.x, 192.168.x) e a porta. Um posto não consegue assim mandar a
+ * equipa para outro sítio da Internet. Outra coisa dá `null`.
+ */
+export function enderecoWebDaLoja(v: unknown): string | null {
+  if (typeof v !== "string" || v.length > 60) return null;
+  const m = /^(https?):\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})\/?$/.exec(v.trim());
+  if (!m) return null;
+  const [a, b, c, d] = [m[2], m[3], m[4], m[5]].map(Number);
+  const porta = Number(m[6]);
+  if ([a, b, c, d].some((x) => x > 255) || porta < 1 || porta > 65535) return null;
+  const privado = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return privado ? `${m[1]}://${a}.${b}.${c}.${d}:${porta}` : null;
+}
+
 export function limparEstadoComputador(e: unknown): Record<string, unknown> | null {
   if (!e || typeof e !== "object" || Array.isArray(e)) return null;
   const v = e as Record<string, unknown>;
@@ -552,6 +569,7 @@ export function limparEstadoComputador(e: unknown): Record<string, unknown> | nu
     verificacao: umDe(v.verificacao, VERIFICACOES),
     bandeja: marca(v.bandeja),
     acordado: marca(v.acordado),
+    endereco_web: enderecoWebDaLoja(v.endereco_web),
   };
   for (const k of Object.keys(limpo)) if (limpo[k] === null) delete limpo[k];
   return limpo;
