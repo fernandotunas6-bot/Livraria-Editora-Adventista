@@ -12,7 +12,8 @@ const hoje = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Lu
 /**
  * O ERP financeiro central (public.kangest_financeiro; migração 20261126170000): os movimentos da tesouraria de todas as
  * lojas, que cada KanGest manda (sem a descrição livre nem o cliente), por loja e por centro de custo. Os anulados ficam
- * de fora dos totais. Só para quem lê os pagamentos.
+ * de fora dos totais. Para quem lê os pagamentos (todas as lojas) e para o gerente de uma loja (só a sua; migração
+ * 20261128120000).
  */
 export default function KanGestFinanceiro() {
   const [de, setDe] = useState(() => `${hoje().slice(0, 8)}01`);
@@ -37,6 +38,7 @@ export default function KanGestFinanceiro() {
       {erro && <p className="text-sm text-red-700 dark:text-red-400">{erro}</p>}
       {r && (
         <>
+          {r.so_as_suas && <p className="text-xs text-muted-foreground">Só as lojas da sua ficha de funcionário.</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               ['Entradas', kz(r.total.entradas)],

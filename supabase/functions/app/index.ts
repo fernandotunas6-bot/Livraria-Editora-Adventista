@@ -3399,11 +3399,20 @@ route("POST", "/admin/kangest/postos/revogar", permissao("manage_settings"), asy
 
 // As dívidas por loja (migração 20261125170000): as facturas a crédito do balcão e as encomendas entregues ou pagas em
 // parte. Os nomes dos clientes do balcão chegam cifrados e só se decifram aqui, para quem vê os relatórios.
-route("GET", "/admin/relatorios/dividas", permissao("view_reports", "edit_reports"), async ({ url }) => {
+// O gerente de uma loja («Painel da sua loja») vê as da sua, como no resto do painel (pedido do dono a 28/11).
+route("GET", "/admin/relatorios/dividas", permissao("view_reports", "edit_reports", "view_store_dashboard"), async ({ url, auth }) => {
   const loja = (url.searchParams.get("loja") || "").trim();
-  const { data, error } = await db.rpc("dividas_por_loja", { p_loja: loja || null });
-  if (error) throw new Error(error.message);
-  return json({ dividas: await dividasParaOPainel(data || [], await cifraDadosKanGest()) });
+  const lojasProprias = await lojasDaPessoa(auth);
+  if (lojasProprias && !lojasProprias.length) throw new HttpError(403, SEM_LOJA);
+  // todas (quem vê os relatórios), ou cada uma das lojas do gerente (a pedida, se for dele)
+  const pedidas = lojasProprias ? (loja ? lojasProprias.filter((l) => l === loja) : lojasProprias) : [loja || null];
+  const linhas: Row[] = [];
+  for (const l of pedidas) {
+    const { data, error } = await db.rpc("dividas_por_loja", { p_loja: l });
+    if (error) throw new Error(error.message);
+    linhas.push(...(data || []));
+  }
+  return json({ dividas: await dividasParaOPainel(linhas, await cifraDadosKanGest()), so_as_suas: !!lojasProprias });
 });
 
 // Os documentos do KanGest no painel, como o KanGest os imprime (migração 20261128100000; pedido do dono a 27/11:

@@ -208,6 +208,18 @@ const resumoFin = (await como('authenticated', admin, `select public.kangest_fin
 check('o resumo financeiro: sem o anulado, por loja e por centro de custo', resumoFin.total.entradas === 0 && resumoFin.total.saidas === 120000 && resumoFin.anulados === 1
   && resumoFin.lojas.length === 1 && resumoFin.categorias.some((c) => c.categoria === 'Despesas'), resumoFin);
 await recusa('o resumo financeiro: só quem lê os pagamentos', () => como('authenticated', '00000000-0000-4000-8000-0000000000ff', `select public.kangest_financeiro('2026-11-01', '2026-11-30')`), /Sem acesso/);
+// o gerente de uma loja vê o dinheiro da sua (20261128120000), como no resto do painel
+const gerenteFin = (await q(`insert into auth.users (email, email_confirmed_at) values ('g-fin@x.ao', now()) returning id`))[0].id;
+await q(`update public.profiles set role = 'manager', permissions = '{"view_store_dashboard": true}'::jsonb where id = $1`, [gerenteFin]);
+const finDe = async (u) => (await como('authenticated', u, `select public.kangest_financeiro('2026-11-01', '2026-11-30') r`))[0].r;
+await recusa('o dinheiro: o gerente sem loja na ficha não vê nada', () => finDe(gerenteFin), /Sem acesso/);
+const [ficha] = await q(`insert into public.staff_members (full_name, profile_id, store_id) values ('Gerente do Lubango', $1, $2) returning id`, [gerenteFin, outraLoja.id]);
+const doLubango = await finDe(gerenteFin);
+check('o dinheiro: o gerente de outra loja não vê o desta', doLubango.so_as_suas === true && doLubango.total.saidas === 0 && doLubango.lojas.length === 0 && doLubango.anulados === 0, doLubango);
+await q(`update public.staff_members set store_id = $2 where id = $1`, [ficha.id, loja.id]);
+const doHuambo = await finDe(gerenteFin);
+check('o dinheiro: o gerente vê o da sua loja', doHuambo.total.saidas === 120000 && doHuambo.lojas.length === 1 && doHuambo.anulados === 1, doHuambo);
+check('o dinheiro: quem lê os pagamentos continua a ver todas', (await finDe(admin)).so_as_suas === false);
 
 // --- tempo real (20261125120000): o tópico secreto de cada posto e o sinal sem dados --------------------------------
 const topico = async (id) => (await q(`select topico from public.kangest_postos where id = $1`, [id]))[0].topico;

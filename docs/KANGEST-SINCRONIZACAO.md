@@ -706,6 +706,16 @@ como já está»):
   regra de `private.painel_lojas_proprias`, e no servidor é `lojasDaPessoa`. Um documento de outra loja dá 404;
 - os fechos de caixa estão na mesma secção (a vista «Fechos de caixa»), com a regra que já tinham na base.
 
+**O balcão das lojas** (28/11): a secção chama-se agora *Relatórios → Balcão das lojas* e tem quatro vistas, todas com
+a regra de cada loja:
+
+| Vista | Todas as lojas | Só a sua loja |
+|---|---|---|
+| Documentos | «Ver relatórios» ou «Editar relatórios de vendas» | o gerente com «Painel da sua loja» |
+| Fechos de caixa | os mesmos | o gerente da loja |
+| Dívidas: as facturas a crédito do balcão e as encomendas do site; as vencidas primeiro | os mesmos | o gerente da loja (`GET /admin/relatorios/dividas`) |
+| Dinheiro: a tesouraria do KanGest | quem lê os pagamentos | o gerente da loja (`kangest_financeiro`, migração 20261128120000) |
+
 ## 25. Abrir o KanGest a partir do painel pelo servidor da loja (28/11)
 
 Pedido do dono (27/11): «links… abrir sem protocolo com rotas permitidas», com a escolha «Pelo servidor da loja».

@@ -14,6 +14,8 @@ import { TIPOS, data, hora, kz, montarDocumento, nomeDoDocumento, textoReimpress
 import { PAGINAS, imprimirElemento } from '@/lib/imprimirElemento';
 import { FolhaA4, Talao } from './KanGestRecibo';
 import KanGestFechos from './KanGestFechos';
+import KanGestDividas from './KanGestDividas';
+import KanGestFinanceiro from './KanGestFinanceiro';
 import { AdminViewNav, useSectionView } from './shell/AdminViewNav';
 
 const FORMATO_KEY = 'kangest-documentos:formato';
@@ -30,7 +32,7 @@ const campo = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
  * a regra está no servidor e na base). Os nomes e os NIF dos clientes só se decifram no servidor.
  */
 export default function KanGestDocumentos() {
-  // as vistas: os documentos e os fechos de caixa (lib/adminSections.js)
+  // as vistas: os documentos, os fechos de caixa, as dívidas e o dinheiro (lib/adminSections.js)
   const sv = useSectionView('documentos-kangest');
   const [lojas, setLojas] = useState([]);
   useEffect(() => {
@@ -39,7 +41,10 @@ export default function KanGestDocumentos() {
   return (
     <div className="space-y-4">
       <AdminViewNav state={sv} className="mb-0" />
-      {sv.view === 'fechos' ? <KanGestFechos lojas={lojas} /> : <ListaDeDocumentos lojas={lojas} />}
+      {sv.view === 'fechos' ? <KanGestFechos lojas={lojas} />
+        : sv.view === 'dividas' ? <KanGestDividas lojas={lojas} />
+          : sv.view === 'dinheiro' ? <KanGestFinanceiro />
+            : <ListaDeDocumentos lojas={lojas} />}
     </div>
   );
 }
@@ -74,7 +79,7 @@ function ListaDeDocumentos({ lojas }) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="flex items-center gap-2 text-lg font-semibold"><ReceiptText className="h-5 w-5" aria-hidden="true" /> Documentos do KanGest</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><ReceiptText className="h-5 w-5" aria-hidden="true" /> Documentos das lojas</h2>
         <p className="text-sm text-muted-foreground">
           As facturas, os recibos e as notas que as lojas emitiram no KanGest, como saíram da impressora: o talão ou o A4.
           Daqui imprime-se a 2.ª via. Os documentos não se alteram: corrigem-se com uma nota de crédito no KanGest.
