@@ -133,7 +133,7 @@ impl Erro {
 pub(super) struct Auth {
     pub(super) url: String,
     pub(super) apikey: String,
-    funcoes: String,
+    pub(super) funcoes: String,
 }
 
 pub(super) async fn auth(pool: &SqlitePool) -> AppResult<Auth> {
@@ -535,9 +535,43 @@ async fn metodos(st: &AppState) -> AppResult<Value> {
     }
 }
 
+#[derive(Deserialize)]
+struct AbrirIn {
+    /// o caminho no site (`/admin?tab=orders&encomenda=…`); o site só aceita as páginas da sua lista
+    #[serde(default)]
+    destino: String,
+}
+
+/// O endereço que o site devolve para abrir já com a sessão: só do próprio site (HTTPS, ou o computador num ensaio) e
+/// só a página `/kangest/abrir`, com o resumo no fragmento.
+pub fn abertura_valida(u: &str) -> bool {
+    let site_ok = u.starts_with("https://") || u.starts_with("http://127.0.0.1") || u.starts_with("http://localhost");
+    site_ok && u.contains("/kangest/abrir#t=") && !u.contains(char::is_whitespace)
+}
+
+/// Abrir uma página do painel do site já com a sessão (pedido do dono a 27/11: «o login deve funcionar para os dois»):
+/// o site dá um endereço com o resumo de um link de entrada da conta da pessoa, de uso único. Sem a sessão do site neste
+/// KanGest (entrou com a senha local, ou está sem Internet), o `url` vem vazio e o ecrã abre a página sem a sessão.
+async fn abrir_no_site(st: &AppState, i: AbrirIn) -> AppResult<Value> {
+    let s = st.sessao()?;
+    let Ok(a) = auth(&st.pool).await else { return Ok(json!({ "url": null })) };
+    let token = match token_valido(&st.pool, &a, s.id).await {
+        Ok(t) => t,
+        Err(Erro::SemSessao(_)) => return Ok(json!({ "url": null })),
+        Err(e) => return Ok(json!({ "url": null, "erro": e.texto() })),
+    };
+    let destino: String = i.destino.chars().take(500).collect();
+    match pedido("POST", format!("{}/kangest/abrir-no-site", a.funcoes), cabecalhos(&a.apikey, Some(&token)), Some(json!({ "destino": destino }))).await {
+        Ok((200, v)) if v["url"].as_str().is_some_and(abertura_valida) => Ok(json!({ "url": v["url"] })),
+        Ok((estado, v)) => Ok(json!({ "url": null, "erro": mensagem(&v, estado) })),
+        Err(e) => Ok(json!({ "url": null, "erro": e.texto() })),
+    }
+}
+
 /// Despachante dos métodos `loja.conta.*` (loja.rs).
 pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value> {
     match metodo {
+        "abrir_no_site" => abrir_no_site(st, serde_json::from_value(params)?).await,
         "estado" => conta(st).await,
         "entrar" => entrar(st, serde_json::from_value(params)?).await,
         "codigo" => codigo(st, serde_json::from_value(params)?).await,
@@ -553,6 +587,16 @@ pub async fn despachar(st: &AppState, metodo: &str, params: Value) -> AppResult<
 #[cfg(test)]
 mod testes {
     use super::*;
+
+    #[test]
+    fn so_se_abre_a_pagina_de_abertura_do_proprio_site() {
+        assert!(abertura_valida("https://livrariaadventista.ao/kangest/abrir#t=abc&d=%2Fadmin"));
+        assert!(abertura_valida("http://127.0.0.1:3010/kangest/abrir#t=abc&d=%2Fadmin"));
+        assert!(!abertura_valida("http://livrariaadventista.ao/kangest/abrir#t=abc"), "sem HTTPS, não");
+        assert!(!abertura_valida("https://livrariaadventista.ao/admin"));
+        assert!(!abertura_valida("javascript:alert(1)//kangest/abrir#t="));
+        assert!(!abertura_valida("https://x.ao/kangest/abrir#t=a b"));
+    }
 
     #[test]
     fn accoes_e_estados_da_entrega() {

@@ -122,6 +122,8 @@ describe("o registo das rotas no index.ts", () => {
     // (docs/KANGEST-SINCRONIZACAO.md)
     expect(comSegredo).toContain("POST /kangest/emparelhar");
     expect(comSegredo).toContain("POST /kangest/sinc");
+    // «Entrar com o site» no KanGest: o código de uso único e o verificador PKCE que só o KanGest que o pediu tem
+    expect(comSegredo).toContain("POST /kangest/entrar-com-o-site/trocar");
     expect(rotas.filter((r) => r.rota.startsWith("POST /cron/") && r.tipo !== "segredo")).toEqual([]);
   });
 

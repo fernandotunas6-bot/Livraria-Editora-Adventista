@@ -125,7 +125,7 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         metodo,
         "setup.estado" | "setup.inicializar" | "setup.restaurar" | "setup.importarOficial" | "auth.login" | "auth.loginPin" | "auth.logout" | "auth.sessao" | "auth.alterarSenha" | "auth.desbloquear" | "seguranca.politica"
             | "auth.recuperarVerificar" | "auth.recuperarConcluir"
-            | "auth.google_iniciar" | "auth.google_concluir" | "auth.google_cancelar"
+            | "auth.google_iniciar" | "auth.google_concluir" | "auth.google_cancelar" | "auth.site_iniciar"
     );
     if !livre {
         if let Some(s) = st.sessao_opcional() {
@@ -182,6 +182,8 @@ async fn executar(st: &AppState, metodo: &str, params: Value) -> AppResult<Value
         "auth.login" => auth::login(st, p(params)?).await,
         // entrar com o Google (sinc/entrada.rs): só no programa deste computador
         "auth.google_iniciar" => auth::google_iniciar(st).await,
+        // entrar com a sessão que a pessoa já tem aberta no site (sinc/entrada.rs)
+        "auth.site_iniciar" => auth::site_iniciar(st).await,
         "auth.google_concluir" => auth::google_concluir(st, p(params)?).await,
         "auth.google_cancelar" => {
             crate::sinc::entrada::google_cancelar();

@@ -49,13 +49,16 @@ const atendimento = await pessoa('atendimento@x.ao', 'Rui Atendimento', 'manager
 const cliente = await pessoa('cliente@x.ao', 'Cliente', 'member', { kangest_gestor: true });
 await q(`insert into public.staff_members (full_name, profile_id, store_id) values ('Ana Caixa', $1, $2)`, [caixa, loja.id]);
 
+// o mesmo papel do site (20261127172000): o administrador é Administrador e o gestor é Gestor
 const a = await eu(admin);
-check('o administrador do site entra como Gestor, nunca Administrador', a.perfil === 'GESTOR', a);
+check('o administrador do site entra como Administrador', a.perfil === 'ADMIN', a);
 check('o gestor com a permissão entra como Gestor', (await eu(gestor)).perfil === 'GESTOR');
 const c = await eu(caixa);
 check('a caixa entra como Caixa, com o nome, o email e a loja da ficha', c.perfil === 'CAIXA' && c.nome === 'Ana Caixa' && c.email === 'caixa@x.ao'
   && c.lojas.length === 1 && c.lojas[0] === loja.id, c);
-check('quem não tem a permissão não tem perfil', (await eu(atendimento)).perfil === null);
+check('o gestor do site sem as permissões do KanGest entra como Gestor', (await eu(atendimento)).perfil === 'GESTOR');
+await q(`update public.profiles set phone = '923 000 111' where id = $1`, [gestor]);
+check('os mesmos dados: o telefone do perfil do site', (await eu(gestor)).telefone === '923 000 111');
 check('um cliente nunca entra (as permissões só valem nos gestores)', (await eu(cliente)).perfil === null);
 
 // --- os cargos levam as permissões ---------------------------------------------------------------------------------
@@ -81,6 +84,35 @@ check('sem posto: null, e os dois passos cumpridos', (await eu(caixa)).posto_na_
 // --- ninguém sem sessão ----------------------------------------------------------------------------------------------
 await recusa('o público não pergunta', () => como(null, `select public.kangest_eu()`, [], 'anon'), /permission denied/);
 await recusa('sem sessão, nada', () => como(null, `select public.kangest_eu()`), /Entre com a sua conta/);
+
+// --- «Entrar com o site» (migração 20261127170000): o código de uso único ------------------------------------------
+const resumo = (c) => c.repeat(64).slice(0, 64);
+const DESAFIO = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+const ESTADO = 'aBcDeFgHiJkLmNoPqRsTuVwX';
+const criar = (sub, r, desafio = DESAFIO, estado = ESTADO, role = 'service_role') =>
+  como(null, `select public.kangest_entrada_criar($1, $2, $3, $4)`, [sub, r, desafio, estado], role);
+const usar = (r, role = 'service_role') => como(null, `select public.kangest_entrada_usar($1) e`, [r], role);
+for (const role of ['anon', 'authenticated']) {
+  await recusa(`${role}: não cria códigos`, () => criar(caixa, resumo('a'), DESAFIO, ESTADO, role), /permission denied/);
+  await recusa(`${role}: não gasta códigos`, () => usar(resumo('a'), role), /permission denied/);
+  await recusa(`${role}: não lê a tabela`, () => como(null, `select * from private.kangest_entradas`, [], role), /permission denied/);
+}
+await criar(caixa, resumo('a'));
+const gasto = (await usar(resumo('a')))[0].e;
+check('o código dá a conta, o desafio e o estado', gasto.user_id === caixa && gasto.desafio === DESAFIO && gasto.estado === ESTADO, gasto);
+check('o mesmo código não serve duas vezes', (await usar(resumo('a')))[0].e === null);
+check('um código que ninguém pediu', (await usar(resumo('b')))[0].e === null);
+await criar(caixa, resumo('c'));
+await q(`update private.kangest_entradas set expira = now() - interval '1 second' where codigo_resumo = $1`, [resumo('c')]);
+check('passados os dois minutos, não', (await usar(resumo('c')))[0].e === null);
+check('e sai da tabela, mesmo fora do prazo', (await q(`select count(*)::int n from private.kangest_entradas where codigo_resumo = $1`, [resumo('c')]))[0].n === 0);
+await recusa('um resumo que não é SHA-256', () => criar(caixa, 'abc'), /inválido/);
+await recusa('um desafio que não é S256', () => criar(caixa, resumo('d'), 'curto'), /inválido/);
+await recusa('um estado com caracteres estranhos', () => criar(caixa, resumo('d'), DESAFIO, 'aaaaaaaaaaaaaaaaaaaaaaaa&x=1'), /inválido/);
+await criar(caixa, resumo('e'));
+await q(`update private.kangest_entradas set expira = now() - interval '1 second' where codigo_resumo = $1`, [resumo('e')]);
+await criar(caixa, resumo('f'));
+check('os códigos fora do prazo saem quando se cria outro', (await q(`select count(*)::int n from private.kangest_entradas`))[0].n === 1);
 
 console.log(`kangest-entrada: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);
