@@ -81,6 +81,10 @@ import { canalDeEnvio, emailEntrega, planearCanais } from "./campaigns.ts";
 import { LEGACY_PAYMENT_LABELS, deliveryAddressLine, paymentLabel } from "./orderFields.ts";
 import { type Auth, PERMISSION_KEYS, can, isStaff } from "./permissions.ts";
 import {
+  codigoDeEntrada, codigoValido, desafioPkce, desafioValido, destinoNoSite, enderecoDeAbertura, estadoValido, iguais,
+  verificadorValido,
+} from "./kangestEntrada.ts";
+import {
   type AcessoAberto, type AcessoComSessao, type Access, equipa, permissao, permissaoCom, publica, recusa, segredo, sessao,
 } from "./access.ts";
 import { createRateLimit, funcaoEmFalta } from "./rateLimit.ts";
@@ -3481,6 +3485,72 @@ route("POST", "/kangest/ligar-com-a-conta", permissao("manage_settings"), async 
     posto: data, centro: { kid: chaves[0].kid, chave_publica: chaves[0].publica }, auth: authParaPostos(),
     tempo_real: { topico: (data as Row)?.topico ?? null }, hora: Math.floor(Date.now() / 1000),
   });
+});
+
+// A entrada nos dois sentidos (pedido do dono a 27/11: «o login deve funcionar para os dois»; kangestEntrada.ts).
+
+/**
+ * Um resumo de link de entrada (magic link) para a conta: o que o navegador troca por uma sessão nova
+ * (`verifyOtp({ token_hash })`). Não manda email (é o `admin.generateLink`). A sessão que dá é de um só passo (aal1):
+ * quem tem os dois passos escreve o código no painel, como em qualquer entrada.
+ */
+async function resumoDeEntrada(email: string): Promise<string> {
+  const { data, error } = await db.auth.admin.generateLink({ type: "magiclink", email });
+  const resumo = data?.properties?.hashed_token;
+  if (error || !resumo) throw new Error(error?.message || "O Auth não deu o link de entrada.");
+  return resumo;
+}
+
+// Do KanGest para o site: a pessoa que entrou no KanGest com a conta do site abre uma página do painel já com a sessão,
+// sem escrever a senha outra vez. Só quem tem acesso ao KanGest, só para os destinos permitidos e só para a própria
+// conta (o email da sessão, nunca um vindo do pedido). O resumo vai no fragmento do endereço, que não chega a nenhum
+// servidor.
+route("POST", "/kangest/abrir-no-site", permissaoCom("Só quem tem acesso ao KanGest abre o painel a partir dele.", "kangest_caixa", "kangest_gestor"), async ({ body, auth }) => {
+  if (!await checkRateLimit("kangest-abrir-no-site", auth.id, 20)) throw tooMany("Demasiados pedidos. Espere um minuto.");
+  const destino = destinoNoSite(body.destino);
+  if (!destino) throw bad("Essa página do site não se abre a partir do KanGest.");
+  if (!auth.email) throw bad("A conta não tem email.");
+  const site = (emailBrand(await getSettings()).siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, "");
+  const url = enderecoDeAbertura(site, await resumoDeEntrada(auth.email), destino);
+  return json({ url });
+});
+
+// Do site para o KanGest («Entrar com o site»), 1.º passo: a página /kangest/entrar-com-o-site, com a sessão da pessoa e
+// depois de ela confirmar, pede um código de uso único preso ao desafio PKCE que o KanGest gerou. O código volta ao
+// KanGest pela ligação kangest://auth; na base só fica o resumo, por dois minutos.
+route("POST", "/kangest/entrar-com-o-site/codigo", permissaoCom("Esta conta não tem acesso ao KanGest (Caixa ou Gestor): peça-o a quem gere os utilizadores.", "kangest_caixa", "kangest_gestor"), async ({ body, auth }) => {
+  if (!await checkRateLimit("kangest-entrar-codigo", auth.id, 10)) throw tooMany("Demasiados pedidos. Espere um minuto.");
+  if (!estadoValido(body.estado) || !desafioValido(body.desafio)) {
+    throw bad("Este pedido de entrada não veio do KanGest: volte ao KanGest e carregue outra vez em «Entrar com a sessão do site».");
+  }
+  const codigo = codigoDeEntrada();
+  const { error } = await db.rpc("kangest_entrada_criar", {
+    p_user: auth.id, p_codigo_resumo: await resumoSinc(codigo), p_desafio: body.desafio, p_estado: body.estado,
+  });
+  if (error) throw bad(error.message);
+  return json({ codigo });
+});
+
+// 2.º passo: o KanGest troca o código pelo resumo de um link de entrada da conta, que troca no Auth por uma sessão
+// própria (só em memória). Prova-se com o verificador PKCE, que nunca saiu do KanGest: quem apanhar o código na ligação
+// não o consegue usar. O código gasta-se na primeira tentativa, certa ou errada.
+route("POST", "/kangest/entrar-com-o-site/trocar", segredo("código de uso único (dois minutos, só o resumo na base) preso ao desafio PKCE do KanGest; o verificador confere-se no handler; limite de pedidos"), async ({ body, ip }) => {
+  if (!await checkRateLimit("kangest-entrar-trocar", ip, 20)) throw tooMany("Demasiadas tentativas. Espere um minuto.");
+  if (!codigoValido(body.codigo) || !verificadorValido(body.verificador) || !estadoValido(body.estado)) {
+    throw new HttpError(401, "O código de entrada não é válido: carregue outra vez em «Entrar com a sessão do site».");
+  }
+  const { data, error } = await db.rpc("kangest_entrada_usar", { p_codigo_resumo: await resumoSinc(String(body.codigo)) });
+  if (error) throw new Error(error.message);
+  if (!data) throw new HttpError(401, "O código de entrada já foi usado ou passou o prazo: carregue outra vez em «Entrar com a sessão do site».");
+  const e = data as Row;
+  if (!iguais(String(e.estado ?? ""), String(body.estado)) || !iguais(String(e.desafio ?? ""), await desafioPkce(String(body.verificador)))) {
+    console.log("KanGest: código de entrada com o verificador ou o estado errados (gasto).");
+    throw new HttpError(401, "Este código de entrada não foi pedido por este KanGest: carregue outra vez em «Entrar com a sessão do site».");
+  }
+  const { data: u, error: eU } = await db.auth.admin.getUserById(String(e.user_id));
+  const email = u?.user?.email;
+  if (eU || !email) throw new HttpError(401, "A conta já não existe.");
+  return json({ token_hash: await resumoDeEntrada(email) });
 });
 
 /**

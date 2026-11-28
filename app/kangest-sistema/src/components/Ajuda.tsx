@@ -40,10 +40,10 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { call, NA_APP } from "@/lib/api";
+import { call } from "@/lib/api";
 import { kz, pct, qtd } from "@/lib/format";
 import { useKz } from "@/lib/privacidade";
-import { navegador } from "@/lib/navegador";
+import { abrirNoSite } from "@/lib/site";
 import { cn } from "@/components/ui";
 import { useSession } from "@/store/session";
 
@@ -171,16 +171,6 @@ function haQuanto(q: string | null) {
   if (min < 24 * 60) return `há ${Math.round(min / 60)} h`;
   if (min < 48 * 60) return "ontem";
   return new Date(t).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" });
-}
-
-/** Abre uma página do painel do site no navegador do KanGest (ou numa janela, no modo web). */
-async function abrirNoSite(url: string) {
-  try {
-    if (NA_APP) await navegador("abrir", { texto: url });
-    else window.open(url, "_blank", "noopener");
-  } catch (x) {
-    toast.error((x as Error).message);
-  }
 }
 
 const ORIGEM: Record<Aviso["origem"], string> = { kangest: "KanGest", loja: "Loja online", site: "Equipa do site" };

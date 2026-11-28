@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CloudOff, ShieldCheck } from "lucide-react";
+import { ArrowRight, CloudOff, Globe, ShieldCheck } from "lucide-react";
 import { NA_APP, call } from "@/lib/api";
 import { useSession } from "@/store/session";
 import type { Sessao } from "@/lib/types";
@@ -48,14 +48,18 @@ export default function Login({ empresa }: { empresa: string | null }) {
     setHumano(t);
     if (t) setErro((e) => (e.startsWith("Confirme que não é um robô") ? "" : e));
   }, []);
-  // entrar com o Google (src-tauri/src/sinc/entrada.rs): o navegador do sistema abre a entrada do Google e o retorno
-  // chega pela ligação kangest://auth («kangest-google»). O estado da entrada fica guardado para a volta do código.
+  // entrar pelo navegador (src-tauri/src/sinc/entrada.rs): com o Google, ou com a sessão que a pessoa já tem aberta no
+  // site (pedido do dono a 27/11: «o login deve funcionar para os dois»). O navegador do sistema abre a página e o
+  // retorno chega pela ligação kangest://auth («kangest-google»). O estado da entrada fica guardado para a volta do código.
   const [google, setGoogle] = useState<"parado" | "a_espera">("parado");
+  const [via, setVia] = useState<ViaNavegador>("google");
   const [estadoGoogle, setEstadoGoogle] = useState<string | null>(null);
   const googleRef = useRef(google);
+  const viaRef = useRef(via);
   useEffect(() => {
     googleRef.current = google;
-  }, [google]);
+    viaRef.current = via;
+  }, [google, via]);
 
   async function concluirGoogle(params: { estado: string; code?: string; codigo?: string }) {
     setBusy(true);
@@ -90,8 +94,9 @@ export default function Login({ empresa }: { empresa: string | null }) {
         const r = ev.payload;
         if (googleRef.current !== "a_espera") return;
         if (r.erro || !r.code) {
+          const quem = viaRef.current === "site" ? "O site" : "O Google";
           setGoogle("parado");
-          setErro(r.erro ? `O Google não deixou entrar: ${r.erro}` : "O Google não devolveu a entrada: tente outra vez.");
+          setErro(r.erro ? `${quem} não deixou entrar: ${r.erro}` : `${quem} não devolveu a entrada: tente outra vez.`);
           return;
         }
         void concluirGoogle({ estado: r.estado, code: r.code });
@@ -107,11 +112,12 @@ export default function Login({ empresa }: { empresa: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function iniciarGoogle() {
+  async function iniciarGoogle(por: ViaNavegador) {
     setErro("");
     setBusy(true);
     try {
-      await call("auth.google_iniciar");
+      await call(por === "site" ? "auth.site_iniciar" : "auth.google_iniciar");
+      setVia(por);
       setGoogle("a_espera");
     } catch (err) {
       setErro((err as Error).message);
@@ -307,7 +313,7 @@ export default function Login({ empresa }: { empresa: string | null }) {
             <Button variant="accent" size="lg" className="h-12 w-full text-[15px]" loading={busy}>
               Entrar <ArrowRight className="size-4" />
             </Button>
-            <EntrarComGoogle esperar={google === "a_espera"} ocupado={busy} onIniciar={() => void iniciarGoogle()} onCancelar={cancelarGoogle} />
+            <EntrarComGoogle esperar={google === "a_espera"} via={via} ocupado={busy} onIniciar={(por) => void iniciarGoogle(por)} onCancelar={cancelarGoogle} />
           </form>
         )}
 
@@ -319,13 +325,26 @@ export default function Login({ empresa }: { empresa: string | null }) {
 }
 
 type LigacaoEntrada = { ligado: boolean; loja?: string; em_linha?: boolean; versao?: string };
+type ViaNavegador = "google" | "site";
 
 /**
- * «Entrar com o Google» (KANGEST ONE, fase A): só no programa instalado e com o KanGest ligado ao site e em linha (sem
- * Internet não há Google; entra-se com o email e a senha). Enquanto o navegador está aberto, diz-se o que fazer e dá
- * para desistir.
+ * «Entrar com o Google» (KANGEST ONE, fase A) e «Entrar com a sessão do site» (pedido do dono a 27/11): só no programa
+ * instalado e com o KanGest ligado ao site e em linha (sem Internet, entra-se com o email e a senha). Enquanto o
+ * navegador está aberto, diz-se o que fazer e dá para desistir.
  */
-function EntrarComGoogle({ esperar, ocupado, onIniciar, onCancelar }: { esperar: boolean; ocupado: boolean; onIniciar: () => void; onCancelar: () => void }) {
+function EntrarComGoogle({
+  esperar,
+  via,
+  ocupado,
+  onIniciar,
+  onCancelar,
+}: {
+  esperar: boolean;
+  via: ViaNavegador;
+  ocupado: boolean;
+  onIniciar: (via: ViaNavegador) => void;
+  onCancelar: () => void;
+}) {
   const q = useQuery({
     queryKey: ["entrada", "ligacao"],
     queryFn: async () => (await call<{ ligacao?: LigacaoEntrada }>("setup.estado")).ligacao ?? null,
@@ -336,7 +355,11 @@ function EntrarComGoogle({ esperar, ocupado, onIniciar, onCancelar }: { esperar:
   if (esperar) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-sunken px-3 py-2.5 text-[13px] text-ink-2" role="status">
-        <span>Continue no navegador: escolha a sua conta Google. Depois, o KanGest abre sozinho.</span>
+        <span>
+          {via === "site"
+            ? "Continue no navegador: confirme a entrada na página do site (se ainda não entrou lá, entre primeiro). Depois, o KanGest abre sozinho."
+            : "Continue no navegador: escolha a sua conta Google. Depois, o KanGest abre sozinho."}
+        </span>
         <button type="button" onClick={onCancelar} className="shrink-0 font-medium text-ink underline underline-offset-2 hover:text-brand">
           Cancelar
         </button>
@@ -350,8 +373,19 @@ function EntrarComGoogle({ esperar, ocupado, onIniciar, onCancelar }: { esperar:
         ou
         <span className="h-px flex-1 bg-line" />
       </div>
-      <Button type="button" variant="secondary" size="lg" className="h-12 w-full text-[15px]" disabled={ocupado} onClick={onIniciar}>
+      <Button type="button" variant="secondary" size="lg" className="h-12 w-full text-[15px]" disabled={ocupado} onClick={() => onIniciar("google")}>
         <LogoGoogle /> Entrar com o Google
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        size="lg"
+        className="h-12 w-full text-[15px]"
+        disabled={ocupado}
+        onClick={() => onIniciar("site")}
+        title="Se já entrou no site neste computador, o KanGest entra com essa conta, sem escrever a senha"
+      >
+        <Globe className="size-[18px]" aria-hidden /> Entrar com a sessão do site
       </Button>
     </>
   );
