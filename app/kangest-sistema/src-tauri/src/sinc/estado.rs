@@ -5,6 +5,8 @@
 //! painel do site mostrar por posto: a versão, o sistema, os núcleos, a memória, o espaço livre, o tamanho da base, a
 //! última cópia de segurança, os documentos rejeitados pela AGT e por enviar, a última verificação da base e as opções
 //! da bandeja e do sono. **Só números e marcas do computador:** nunca nomes, NIF, caminhos de pastas nem dados da loja.
+//! A excepção é o endereço do modo web na rede da loja (um IPv4 privado), e só num servidor com o modo web a correr,
+//! para o painel abrir o KanGest por ele.
 //! O site ainda filtra por uma lista fechada de campos (supabase/functions/app/kangestSinc.ts, `limparEstadoComputador`).
 
 use serde_json::{json, Value};
