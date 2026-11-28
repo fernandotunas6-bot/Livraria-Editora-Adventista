@@ -7928,7 +7928,7 @@ async fn o_estado_do_computador_so_leva_numeros_e_marcas() {
         assert!(
             [
                 "versao", "sistema", "nucleos", "memoria", "espaco_livre", "base_bytes", "ultima_copia", "copia_externa_erro", "modo",
-                "fe_rejeitados", "por_enviar", "verificacao", "bandeja", "acordado",
+                "fe_rejeitados", "por_enviar", "verificacao", "bandeja", "acordado", "endereco_web",
             ]
             .contains(k),
             "campo fora da lista: {k}"
@@ -7938,6 +7938,8 @@ async fn o_estado_do_computador_so_leva_numeros_e_marcas() {
     assert!(e["nucleos"].as_u64().unwrap() >= 1);
     assert!(e["base_bytes"].as_u64().unwrap() > 0, "{e}");
     assert_eq!(e["fe_rejeitados"], 0);
+    // o endereço do modo web só num servidor com o modo web a correr: aqui (sozinho, sem servidor) não vai nenhum
+    assert!(e["endereco_web"].is_null(), "{e}");
     let texto = e.to_string();
     assert!(!texto.contains("Cliente Exemplo") && !texto.contains("5417000099") && !texto.contains(pasta.to_str().unwrap()), "{texto}");
     st.pool.close().await;

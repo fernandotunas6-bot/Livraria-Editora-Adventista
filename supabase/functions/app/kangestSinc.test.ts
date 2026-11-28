@@ -8,7 +8,7 @@ import {
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
-  clienteDoDocumento, limparImpressao, MAX_PAGAMENTOS, pesquisaDeDocumentos, pessoaisDaEntidade,
+  clienteDoDocumento, limparImpressao, MAX_PAGAMENTOS, pesquisaDeDocumentos, pessoaisDaEntidade, enderecoWebDaLoja,
 } from "./kangestSinc.ts";
 
 const enc = new TextEncoder();
@@ -593,5 +593,22 @@ describe("as fichas do balcão no painel", () => {
     expect(await pessoaisDaEntidade((await lerCifraDados(paraB64(seq(32, 8))))!, cifrado)).toBeNull();
     expect(await pessoaisDaEntidade(c, "")).toBeNull();
     expect(await pessoaisDaEntidade(c, await cifrarCampo(c, "[1,2]"))).toBeNull();
+  });
+});
+
+describe("abrir o KanGest pelo servidor da loja", () => {
+  it("só um endereço da rede da loja: um IPv4 privado e a porta", () => {
+    expect(enderecoWebDaLoja("http://192.168.1.10:7799")).toBe("http://192.168.1.10:7799");
+    expect(enderecoWebDaLoja("http://10.0.0.7:8000/")).toBe("http://10.0.0.7:8000");
+    expect(enderecoWebDaLoja("https://172.20.3.4:7799")).toBe("https://172.20.3.4:7799");
+    for (const mau of ["http://41.63.0.5:7799", "http://172.32.0.1:7799", "http://192.168.1.10", "http://192.168.1.300:7799",
+      "http://192.168.1.10:0", "javascript:alert(1)", "http://mau.example:7799", "http://192.168.1.10:7799/@mau.example", null, 7799]) {
+      expect(enderecoWebDaLoja(mau), String(mau)).toBeNull();
+    }
+  });
+
+  it("o estado do computador leva-o, limpo", () => {
+    expect(limparEstadoComputador({ versao: "1.4.11 Livraria", endereco_web: "http://192.168.1.10:7799" })).toEqual({ versao: "1.4.11 Livraria", endereco_web: "http://192.168.1.10:7799" });
+    expect(limparEstadoComputador({ endereco_web: "http://8.8.8.8:7799" })).toEqual({});
   });
 });

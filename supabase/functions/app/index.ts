@@ -70,7 +70,7 @@ import {
 import {
   aadDoPedido, abrirPedido, assinaturaValida as assinaturaPostoValida, codigoEmparelhamento, dividasParaOPainel, horaValida, lerChavesSinc, lerCifraDados,
   limparConfiguracoes, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparPromocoesKanGest, limparSessoesKanGest,
-  clienteDoDocumento, consumidorFinal, indiceCego, pesquisaDeDocumentos, pessoaisDaEntidade, prepararRegistos,
+  clienteDoDocumento, consumidorFinal, enderecoWebDaLoja, indiceCego, pesquisaDeDocumentos, pessoaisDaEntidade, prepararRegistos,
   MAX_DOCUMENTOS, mensagemAssinada, nonceValido, normalizarCodigo, prepararLote, selarResposta, sha256Hex as resumoSinc, uuidValido,
   type CifraDados, type FotoKanGest,
 } from "./kangestSinc.ts";
@@ -3273,7 +3273,7 @@ const authParaPostos = () => {
 
 route("GET", "/admin/kangest/postos", permissao("manage_settings"), async () => {
   const { data, error } = await db.from("kangest_postos")
-    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, estado_computador, estado_em")
+    .select("id, nome, store_id, estado, codigo_expira, versao_programa, criado_em, emparelhado_em, revogado_em, ultima_sinc, ultimo_erro, stock_online, manda_catalogo, emitir_encomendas, artigo_portes, artigo_generico, pagamentos, estado_computador, estado_em, endereco_web")
     .order("criado_em", { ascending: true });
   if (error) throw new Error(error.message);
   const postos = [];
@@ -3614,6 +3614,27 @@ route("GET", "/admin/kangest/fichas/ver", permissao("manage_settings", "manage_u
 
 // Os dois interruptores do posto (migração 20261125140000): o stock dele conta para o stock à venda no site, e os
 // preços e os artigos novos vêm dele (só um posto). Um campo que não venha fica como está.
+/** O endereço escrito à mão no painel: http(s), um IP ou um nome da rede da loja e a porta (a mesma regra da base). */
+const ENDERECO_WEB_MANUAL = /^https?:\/\/[A-Za-z0-9.-]{1,80}(:[0-9]{1,5})?$/;
+
+// Os endereços dos KanGest servidores das lojas (migração 20261128110000): «Abrir no KanGest» no painel abre o ecrã
+// por eles, sem a ligação kangest://. O manual do painel vale por cima do que o posto diz. Para quem abre o KanGest.
+route("GET", "/kangest/enderecos-web", permissaoCom("Só quem tem acesso ao KanGest o abre a partir do painel.", "kangest_caixa", "kangest_gestor", "manage_orders"), async () => {
+  const { data, error } = await db.from("kangest_postos")
+    .select("id, nome, store_id, emitir_encomendas, endereco_web, estado_computador")
+    .eq("estado", "activo");
+  if (error) throw new Error(error.message);
+  // o nome da loja também: as encomendas guardam a loja de levantamento pelo nome (orders.pickup_store)
+  const { data: lojas } = await db.from("physical_stores").select("id, name");
+  const nomeDaLoja = new Map((lojas || []).map((l: Row) => [l.id, l.name]));
+  const postos = (data || []).map((p: Row) => ({
+    posto_id: p.id, nome: p.nome, store_id: p.store_id, loja: nomeDaLoja.get(p.store_id) ?? "", emitir_encomendas: p.emitir_encomendas === true,
+    endereco: (p.endereco_web as string) || enderecoWebDaLoja(p.estado_computador?.endereco_web) || "",
+    manual: !!p.endereco_web,
+  })).filter((p) => p.endereco);
+  return json({ postos });
+});
+
 route("POST", "/admin/kangest/postos/configurar", permissao("manage_settings"), async ({ body }) => {
   const id = String(body.id ?? "");
   if (!uuidValido(id)) throw bad("Indique o posto.");
@@ -3626,6 +3647,14 @@ route("POST", "/admin/kangest/postos/configurar", permissao("manage_settings"), 
     });
     if (r.error) throw bad(r.error.message);
     data = { ...data, ...r.data };
+  }
+  // o endereço do KanGest na rede da loja, à mão (vazio: o que o posto diz), para «Abrir no KanGest» no painel
+  if ("endereco_web" in body) {
+    const endereco = typeof body.endereco_web === "string" ? body.endereco_web.trim().replace(/\/+$/, "") : "";
+    if (endereco && !ENDERECO_WEB_MANUAL.test(endereco)) throw bad("Escreva o endereço como http://192.168.1.10:7799 (o IP ou o nome do servidor da loja e a porta).");
+    const { error } = await db.from("kangest_postos").update({ endereco_web: endereco }).eq("id", id);
+    if (error) throw bad(error.message);
+    data = { ...data, endereco_web: endereco };
   }
   // os documentos das encomendas online (§11): o interruptor, os artigos dos portes e genérico e o modo de pagamento
   if (["emitir_encomendas", "artigo_portes", "artigo_generico", "modo_pagamento"].some((k) => k in body)) {

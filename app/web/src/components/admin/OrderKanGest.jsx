@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import { MonitorUp, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
-import { kangestRepetir } from '@/api/PlatformApi';
+import { kangestEnderecosWeb, kangestRepetir } from '@/api/PlatformApi';
+import { destinoDaEncomenda, ligacaoDoPrograma, ligacaoPeloServidor, postoParaAbrir } from '@/lib/kangestServidor';
 import { cn } from '@/lib/utils';
 
 const NOMES = { ne: 'Nota de encomenda', fr: 'Factura/Recibo', anular: 'Anulação da NE', nc: 'Nota de crédito' };
@@ -17,17 +18,33 @@ const ESTADOS = {
   ignorado: ['Não vai', 'bg-muted text-muted-foreground'],
 };
 
-/** A ligação que abre a encomenda no KanGest Livraria deste computador (app/kangest-sistema/src-tauri/src/ligacoes.rs). */
-const ligacaoKanGest = (orderId) => `kangest://loja-online/encomenda/${encodeURIComponent(orderId)}`;
+// os servidores das lojas: pedidos uma vez por página (mudam pouco); um erro deixa a ligação kangest://
+let servidores = null;
+const servidoresDasLojas = () => {
+  servidores ??= kangestEnderecosWeb().then((r) => r?.postos || []).catch(() => { servidores = null; return []; });
+  return servidores;
+};
 
 /**
  * Os documentos do KanGest de uma encomenda (public.kangest_da_encomenda): a NE, a FR, a anulação e a nota de
  * crédito, com o número e o estado; um documento com erro repete-se daqui (docs/KANGEST.md). Quem entra no KanGest
- * (as permissões «KanGest: caixa» ou «gestor») tem também «Abrir no KanGest», que abre a encomenda no programa deste
- * computador: a ligação só leva ao ecrã, não faz nada sozinha.
+ * (as permissões «KanGest: caixa» ou «gestor») tem também «Abrir no KanGest», que abre a encomenda no ecrã da Loja online:
+ * - **automático:** pelo servidor da loja (o modo web do KanGest, http://IP-DA-LOJA:7799), sem a pergunta do navegador;
+ * - **ao lado:** «no programa» abre o KanGest deste computador pela ligação kangest://, como antes. Sem servidor, é a
+ *   única.
+ * A ligação só leva ao ecrã, não faz nada sozinha, e o KanGest pede a entrada.
  */
-export default function OrderKanGest({ orderId, podeRepetir = false, podeAbrir = false }) {
+export default function OrderKanGest({ orderId, loja = null, podeRepetir = false, podeAbrir = false }) {
   const [docs, setDocs] = useState(null);
+  const [posto, setPosto] = useState(null);
+  useEffect(() => {
+    if (!podeAbrir) return undefined;
+    let vivo = true;
+    servidoresDasLojas().then((l) => { if (vivo) setPosto(postoParaAbrir(l, loja)); });
+    return () => { vivo = false; };
+  }, [podeAbrir, loja]);
+  const destino = destinoDaEncomenda(orderId);
+  const pelaLoja = posto ? ligacaoPeloServidor(posto.endereco, destino) : '';
   const carregar = useCallback(async () => {
     const { data, error } = await supabase.rpc('kangest_da_encomenda', { p_order_id: orderId });
     if (!error) setDocs(data || {});
@@ -48,9 +65,24 @@ export default function OrderKanGest({ orderId, podeRepetir = false, podeAbrir =
     <div className="rounded-lg border bg-muted/30 p-3 text-xs">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="font-semibold">KanGest</p>
-        {podeAbrir && (
+        {podeAbrir && pelaLoja && (
+          <span className="inline-flex items-center gap-2">
+            <a
+              href={pelaLoja}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Abre esta encomenda no KanGest pelo servidor da loja (${posto.nome}, ${posto.endereco}). Funciona na rede da loja.`}
+              className="inline-flex items-center gap-1 font-medium text-[#0a748f] hover:underline"
+            >
+              <MonitorUp className="h-3 w-3" />
+              Abrir no KanGest
+            </a>
+            <a href={ligacaoDoPrograma(destino)} title="Abre no KanGest instalado neste computador" className="text-muted-foreground hover:underline">no programa</a>
+          </span>
+        )}
+        {podeAbrir && !pelaLoja && (
           <a
-            href={ligacaoKanGest(orderId)}
+            href={ligacaoDoPrograma(destino)}
             title="Abre esta encomenda no KanGest Livraria deste computador (tem de estar instalado)"
             className="inline-flex items-center gap-1 font-medium text-[#0a748f] hover:underline"
           >
