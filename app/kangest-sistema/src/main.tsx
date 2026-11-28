@@ -10,6 +10,7 @@ import App from "./App";
 import VisorCliente from "./pages/VisorCliente";
 import { useAparencia } from "./lib/aparencia";
 import { registarServiceWorker } from "./lib/pwa";
+import { destinoDoSite } from "./lib/ligacoesWeb";
 import "./index.css";
 
 // crypto.randomUUID só existe em páginas seguras (https/localhost); no browser por http da rede local
@@ -27,6 +28,12 @@ if (typeof crypto !== "undefined" && !crypto.randomUUID) {
 }
 
 registarServiceWorker();
+
+// uma ligação do painel do site pelo servidor da loja (lib/ligacoesWeb.ts): só as rotas permitidas, sem a marca
+if (!("__TAURI_INTERNALS__" in window)) {
+  const destino = destinoDoSite(location.hash);
+  if (destino !== null) history.replaceState(null, "", `${location.pathname}${location.search}#${destino}`);
+}
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },

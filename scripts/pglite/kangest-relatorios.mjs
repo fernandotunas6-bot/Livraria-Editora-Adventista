@@ -227,5 +227,10 @@ await recusa('impressão: o documento assinado continua sem mudar', () => q(`upd
 check('impressão: quem vê os relatórios lê-a', (await como(direccao, `select count(*)::int n from public.kangest_documentos where impressao ? 'pagamentos'`))[0].n >= 2);
 await recusa('impressão: a função de limpeza não se chama pela API', () => como(direccao, `select private.kangest_impressao_limpa('{}'::jsonb)`), /permission denied/);
 
+// --- o endereço do KanGest na rede da loja, escrito à mão (20261128110000) ---------------------------------------
+await q(`update public.kangest_postos set endereco_web = 'http://192.168.1.10:7799' where id = $1`, [posto]);
+check('endereço: um endereço da loja guarda-se', (await q(`select endereco_web from public.kangest_postos where id = $1`, [posto]))[0].endereco_web === 'http://192.168.1.10:7799');
+await recusa('endereço: outra coisa não entra', () => q(`update public.kangest_postos set endereco_web = 'javascript:alert(1)' where id = $1`, [posto]), /endereco_web_check/);
+
 console.log(`kangest-relatorios: ${ok} ok, ${fail} falhas`);
 process.exit(fail ? 1 : 0);
