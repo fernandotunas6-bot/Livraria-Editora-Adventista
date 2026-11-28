@@ -70,7 +70,7 @@ export default function KanGestFechoA4({ f, loja }) {
   const dif = Number(contado ?? 0) - Number(esperado);
   const online = r.online;
   return (
-    <div className="recibo-kangest mx-auto w-[190mm] bg-white p-1 text-[10.5px] leading-snug text-black" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+    <div className="recibo-kangest mx-auto w-[190mm] bg-white p-1 font-sans text-[10.5px] leading-snug text-black">
       <div className="flex items-start justify-between gap-6">
         <div>
           <div className="text-[13px] font-bold">{loja || 'Livraria Adventista'}</div>
