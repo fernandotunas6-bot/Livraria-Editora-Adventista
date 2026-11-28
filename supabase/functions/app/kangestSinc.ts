@@ -414,6 +414,8 @@ export async function prepararLote(lote: unknown, cifra: CifraDados): Promise<Ro
         ...(typeof d.vencimento === "string" && /^\d{4}-\d{2}-\d{2}/.test(d.vencimento) ? { vencimento: d.vencimento.slice(0, 10) } : {}),
         ...(d.valor_pendente != null ? { valor_pendente: inteiro(d.valor_pendente) } : {}),
         ...(d.doc_origem != null ? { doc_origem: texto(d.doc_origem, 60) } : {}),
+        // o histórico importado do KIGEST (0080 do KanGest): fora da cadeia do KanGest e, nos relatórios, sem contar a dobrar
+        ...(d.importado === 1 || d.importado === true ? { importado: true } : {}),
       },
       linhas: linhas.map((l: Row) => ({
         linha: inteiro(l.linha),
@@ -748,4 +750,88 @@ export function limparLivroStock(x: unknown): { epoca: string; aberturas: Record
   // a época da abertura (a mesma em todas as aberturas dela): letras, algarismos e pouco mais
   const epoca = typeof v.epoca === "string" && /^[0-9A-Za-z:.+_-]{1,40}$/.test(v.epoca) ? v.epoca : "";
   return { epoca, aberturas, movimentos };
+}
+
+/** As fichas que o KanGest manda numa volta (sinc/registos.rs, `LOTE` = 100; o site aceita até 200). */
+export const MAX_REGISTOS = 200;
+/** O tamanho máximo dos dados de uma ficha, em texto. */
+const MAX_DADOS_REGISTO = 20_000;
+/** Os dados pessoais de uma entidade, que se guardam cifrados (a mesma chave do NIF dos documentos). */
+export const PESSOAIS_DA_ENTIDADE = ["nif", "telefone", "telefone2", "email", "endereco", "pessoa_contacto", "observacoes"];
+/** Nomes de campos que nunca entram na base, mesmo que um KanGest os mande por engano. */
+const CAMPO_PROIBIDO = /hash|segredo|totp|pin|senha|password|token|recuperacao/i;
+
+/** Uma ficha pronta para `kangest_registos_receber`. */
+export interface RegistoKanGest {
+  registo: "entidade" | "artigo" | "utilizador";
+  chave: number;
+  dados: Record<string, unknown>;
+  pessoais_cifrado: string;
+}
+
+/**
+ * As fichas do KanGest (entidades, artigos completos, utilizadores; sinc/registos.rs; docs/KANGEST-SINCRONIZACAO.md
+ * §22), limpas: só os três tipos, o número inteiro, os dados num objecto razoável, sem campos de senhas ou segredos, e,
+ * numa entidade, os dados pessoais cifrados à parte. Sem fichas (um KanGest antigo), `null`.
+ */
+export async function prepararRegistos(x: unknown, cifra: CifraDados): Promise<RegistoKanGest[] | null> {
+  if (!Array.isArray(x) || !x.length) return null;
+  const out: RegistoKanGest[] = [];
+  for (const item of x.slice(0, MAX_REGISTOS)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const v = item as Record<string, unknown>;
+    const registo = v.registo;
+    if (registo !== "entidade" && registo !== "artigo" && registo !== "utilizador") continue;
+    const chave = typeof v.chave === "number" && Number.isSafeInteger(v.chave) && v.chave > 0 ? v.chave : 0;
+    if (!chave || !v.dados || typeof v.dados !== "object" || Array.isArray(v.dados)) continue;
+    if (JSON.stringify(v.dados).length > MAX_DADOS_REGISTO) continue;
+    const dados: Record<string, unknown> = {};
+    for (const [k, valor] of Object.entries(v.dados as Record<string, unknown>)) {
+      if (!CAMPO_PROIBIDO.test(k)) dados[k] = valor;
+    }
+    let pessoais_cifrado = "";
+    if (registo === "entidade") {
+      const pessoais: Record<string, unknown> = {};
+      for (const k of PESSOAIS_DA_ENTIDADE) {
+        if (k in dados) {
+          if (dados[k] !== null && dados[k] !== "") pessoais[k] = dados[k];
+          delete dados[k];
+        }
+      }
+      pessoais_cifrado = Object.keys(pessoais).length ? await cifrarCampo(cifra, JSON.stringify(pessoais)) : "";
+    }
+    out.push({ registo, chave, dados, pessoais_cifrado });
+  }
+  return out.length ? out : null;
+}
+
+/** O tamanho máximo da fotografia das configurações de um posto (sinc/configuracoes.rs, `MAX_FOTOGRAFIA`, com folga). */
+export const MAX_CONFIGURACOES = 400_000;
+
+/** Tira, a qualquer profundidade, as chaves com cara de segredo (o posto já as tirou; aqui é por cautela). */
+function semSegredos(v: unknown, profundidade = 0): unknown {
+  if (profundidade > 8) return null;
+  if (Array.isArray(v)) return v.map((x) => semSegredos(x, profundidade + 1));
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (!CAMPO_PROIBIDO.test(k)) out[k] = semSegredos(x, profundidade + 1);
+    }
+    return out;
+  }
+  return v;
+}
+
+/**
+ * As configurações de um posto (pedido do dono a 27/11: «permita que as configurações sejam guardadas no banco de
+ * dados»; sinc/configuracoes.rs): o resumo SHA-256 e a fotografia, sem segredos. `null` se não tiver a forma certa ou
+ * passar do tamanho.
+ */
+export function limparConfiguracoes(x: unknown): { resumo: string; dados: Record<string, unknown> } | null {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return null;
+  const v = x as Record<string, unknown>;
+  const resumo = typeof v.resumo === "string" && /^[0-9a-f]{64}$/.test(v.resumo) ? v.resumo : "";
+  if (!resumo || !v.dados || typeof v.dados !== "object" || Array.isArray(v.dados)) return null;
+  if (JSON.stringify(v.dados).length > MAX_CONFIGURACOES) return null;
+  return { resumo, dados: semSegredos(v.dados) as Record<string, unknown> };
 }

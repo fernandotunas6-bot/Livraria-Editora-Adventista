@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isbn13Valido, limparEstadoComputador, limparFotosKanGest, limparLivrosKanGest, limparLivroStock, limparSessoesKanGest, MAX_FOTO_BYTES,
-  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, tipoDaImagem,
+  MAX_LIVROS, MAX_PROMOCOES, dataValida, limparPromocoesKanGest, prepararRegistos, tipoDaImagem, limparConfiguracoes, MAX_CONFIGURACOES,
   aadDoPedido, abrirPedido, abrirResposta, assinaturaValida, chavesDaSessao, cifrarAesGcm, cifrarCampo, codigoEmparelhamento,
   consumidorFinal, deB64, decifrarCampo, dividasParaOPainel, MAX_RESUMO_FECHO, horaValida, indiceCego, lerChavesSinc, lerCifraDados, mensagemAssinada, nonceValido,
   normalizarCodigo, paraB64, prepararLote, selarPedido, selarResposta, sha256Hex, type ChaveCentro,
@@ -276,6 +276,34 @@ describe("prepararLote: os movimentos da tesouraria (o ERP central)", () => {
   });
 });
 
+describe("o histórico importado e as configurações (tudo na base central, 27/11)", () => {
+  it("um documento importado do KIGEST segue marcado; os do KanGest não levam a marca", async () => {
+    const c = await lerCifraDados(paraB64(seq(32, 9)));
+    const doc = (importado: unknown) => ({
+      tipo: "documento",
+      documento: { id: 1, tipo_codigo: "FR", serie: "K", numero: 1, numero_doc: "FR K/1", data_emissao: "2025-03-10", entidade_nif: "999999999", total: 1140, estado: "N", importado },
+      linhas: [],
+    });
+    const [a] = await prepararLote([doc(1)], c!);
+    const [b] = await prepararLote([doc(0)], c!);
+    expect((a.documento as Record<string, unknown>).importado).toBe(true);
+    expect("importado" in (b.documento as Record<string, unknown>)).toBe(false);
+  });
+
+  it("as configurações: o resumo SHA-256, sem segredos a qualquer profundidade, e com tamanho limitado", () => {
+    const resumo = "a".repeat(64);
+    const c = limparConfiguracoes({
+      resumo,
+      dados: { config: { "vendas.precos_com_iva": "1", "email.senha": "x" }, tabelas: { postos: [{ id: 1, opcoes: "{}", api_token: "y" }] } },
+    });
+    expect(c).toEqual({ resumo, dados: { config: { "vendas.precos_com_iva": "1" }, tabelas: { postos: [{ id: 1, opcoes: "{}" }] } } });
+    expect(limparConfiguracoes({ resumo: "abc", dados: {} })).toBeNull();
+    expect(limparConfiguracoes({ resumo, dados: [] })).toBeNull();
+    expect(limparConfiguracoes({ resumo, dados: { x: "y".repeat(MAX_CONFIGURACOES) } })).toBeNull();
+    expect(limparConfiguracoes(null)).toBeNull();
+  });
+});
+
 describe("limparSessoesKanGest (KANGEST ONE, A3)", () => {
   it("passa só os campos da lista, sem tokens, e recusa as chaves inválidas ou repetidas", () => {
     const l = limparSessoesKanGest([
@@ -468,5 +496,40 @@ describe("limparPromocoesKanGest (as promoções do KanGest para os produtos do 
   it(`no máximo ${MAX_PROMOCOES} por volta`, () => {
     const muitas = Array.from({ length: MAX_PROMOCOES + 3 }, (_, i) => ({ artigo_id: i + 1, referencia: `R${i + 1}`, desconto: 5 }));
     expect(limparPromocoesKanGest(muitas)).toHaveLength(MAX_PROMOCOES);
+  });
+});
+
+describe("prepararRegistos (as fichas do KanGest para a base central)", () => {
+  const segredo = Buffer.alloc(32, 7).toString("base64");
+
+  it("sem fichas (um KanGest antigo) é null", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    expect(await prepararRegistos(undefined, c)).toBeNull();
+    expect(await prepararRegistos([], c)).toBeNull();
+  });
+
+  it("cifra os dados pessoais das entidades e deixa o resto em claro", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const r = (await prepararRegistos([
+      { registo: "entidade", chave: 7, dados: { id: 7, nome: "Igreja Central", tipo: "C", nif: "5000123456", telefone: "923000000", email: "x@y.ao", localidade: "Huambo", endereco: "" } },
+    ], c))!;
+    expect(r).toHaveLength(1);
+    expect(r[0].dados).toEqual({ id: 7, nome: "Igreja Central", tipo: "C", localidade: "Huambo" });
+    expect(JSON.parse(await decifrarCampo(c, r[0].pessoais_cifrado))).toEqual({ nif: "5000123456", telefone: "923000000", email: "x@y.ao" });
+  });
+
+  it("tira as senhas e os segredos de qualquer ficha, e deixa de fora o que não serve", async () => {
+    const c = (await lerCifraDados(segredo))!;
+    const r = (await prepararRegistos([
+      { registo: "utilizador", chave: 2, dados: { nome: "Ana", perfil: "CAIXA", senha_hash: "x", pin_hash: "y", totp_segredo: "z" } },
+      { registo: "artigo", chave: 3, dados: { referencia: "LIV-1", preco1: 100 } },
+      { registo: "outra-coisa", chave: 4, dados: {} },
+      { registo: "artigo", chave: -1, dados: {} },
+      { registo: "artigo", chave: 5, dados: "texto" },
+      { registo: "artigo", chave: 6, dados: { grande: "x".repeat(25_000) } },
+    ], c))!;
+    expect(r.map((x) => [x.registo, x.chave])).toEqual([["utilizador", 2], ["artigo", 3]]);
+    expect(r[0].dados).toEqual({ nome: "Ana", perfil: "CAIXA" });
+    expect(r[0].pessoais_cifrado).toBe("");
   });
 });

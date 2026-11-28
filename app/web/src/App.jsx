@@ -312,6 +312,7 @@ function App() {
               <Route path="/newsletter/confirmar" element={<NewsletterConfirmPage />} />
               <Route path="/cancelar-subscricao" element={<UnsubscribeAliasRedirect />} />
               <Route path="/rastreio" element={<Navigate to="/track" replace />} />
+              <Route path="/rastrear" element={<Navigate to="/track" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/perfil" element={<Navigate to="/profile" replace />} />
 

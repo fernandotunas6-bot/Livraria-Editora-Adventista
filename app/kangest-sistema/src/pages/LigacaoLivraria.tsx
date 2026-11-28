@@ -31,6 +31,10 @@ interface EstadoSinc {
   erros: ErroFila[];
   /** O stock e os artigos que mudaram e ainda não seguiram para o site (sinc/catalogo.rs). */
   catalogo?: { pendentes: number; com_erro: number };
+  /** As fichas (clientes, fornecedores, artigos, utilizadores) por enviar (sinc/registos.rs). */
+  registos?: { pendentes: number; com_erro: number };
+  /** Quando as configurações chegaram ao site da última vez (sinc/configuracoes.rs). */
+  configuracoes?: { guardadas_em: string | null; erro: string };
   intervalo: number;
   aviso?: string;
 }
@@ -382,6 +386,16 @@ export default function LigacaoLivraria() {
                 </div>
               ))}
             </div>
+            {/* tudo na base central (27/11): as fichas e as configurações também seguem, e esperam sem Internet */}
+            <p className="border-t border-line px-5 py-3 text-[13px] text-ink-3">
+              Fichas por enviar (clientes, fornecedores, artigos, utilizadores): <span className="font-medium text-ink">{e.registos?.pendentes ?? 0}</span>
+              {(e.registos?.com_erro ?? 0) > 0 && <span className="text-danger"> ({e.registos?.com_erro} com erro)</span>}
+              {" · "}
+              {e.configuracoes?.guardadas_em
+                ? `Configurações guardadas no site a ${new Date(e.configuracoes.guardadas_em).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" })}`
+                : "Configurações: seguem na próxima volta"}
+              {e.configuracoes?.erro ? <span className="text-danger"> ({e.configuracoes.erro})</span> : null}
+            </p>
           </Card>
 
           {e.erros.length > 0 && (

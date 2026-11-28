@@ -17,18 +17,11 @@ use crate::error::AppResult;
 
 /// Movimentos por pedido.
 pub const LOTE: i64 = 50;
-/// Ao ligar o posto, seguem também os movimentos destes últimos dias.
-const DIAS_AO_LIGAR: i64 = 400;
 
-/// Ao ligar o posto: os movimentos dos últimos `DIAS_AO_LIGAR` dias entram na fila, uma vez só.
+/// Ao ligar o posto: os movimentos todos entram na fila, uma vez só (pedido do dono a 27/11: «migrar todos os dados
+/// actuais da loja»; antes eram só os do último ano). O centro ignora os que já tiver.
 pub async fn enfileirar_tudo(pool: &SqlitePool) -> AppResult<i64> {
-    let r = sqlx::query(
-        "INSERT OR IGNORE INTO sinc_financeiro (movimento_id)
-         SELECT id FROM movimentos_tesouraria WHERE data >= date('now', 'localtime', ?) ORDER BY id",
-    )
-    .bind(format!("-{DIAS_AO_LIGAR} days"))
-    .execute(pool)
-    .await?;
+    let r = sqlx::query("INSERT OR IGNORE INTO sinc_financeiro (movimento_id) SELECT id FROM movimentos_tesouraria ORDER BY id").execute(pool).await?;
     Ok(r.rows_affected() as i64)
 }
 

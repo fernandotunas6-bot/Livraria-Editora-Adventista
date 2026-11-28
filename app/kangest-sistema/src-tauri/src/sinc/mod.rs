@@ -23,6 +23,7 @@ pub mod avisos;
 pub mod capas;
 pub mod catalogo;
 pub mod cifra;
+pub mod configuracoes;
 pub mod encomendas;
 pub mod entrada;
 pub mod estado;
@@ -35,6 +36,7 @@ pub mod pagamentos;
 pub mod pessoa;
 pub mod produtos;
 pub mod promocoes;
+pub mod registos;
 pub mod saude;
 pub mod sessoes;
 pub mod tempo_real;
@@ -158,14 +160,14 @@ async fn post(url: String, cabecalhos: Vec<(&'static str, String)>, corpo: Vec<u
 // A fila e o lote
 // ---------------------------------------------------------------------------------------------------------------
 
-/// Põe na fila todos os documentos deste KanGest que ainda não seguiram (os importados do KIGEST ficam de fora, como
-/// nos avisos). O centro ignora os que já tiver.
+/// Põe na fila todos os documentos deste KanGest que ainda não seguiram, também o histórico importado do KIGEST (pedido
+/// do dono a 27/11: «migrar todos os dados actuais da loja»; segue marcado como importado). O centro ignora os que já
+/// tiver.
 pub async fn enfileirar_tudo(pool: &SqlitePool) -> AppResult<i64> {
     let r = sqlx::query(
         "INSERT INTO sinc_saida (documento_id, operacao)
          SELECT d.id, 'emitido' FROM documentos d
-          WHERE d.importado = 0
-            AND NOT EXISTS (SELECT 1 FROM sinc_saida s WHERE s.documento_id = d.id AND s.operacao = 'emitido')
+          WHERE NOT EXISTS (SELECT 1 FROM sinc_saida s WHERE s.documento_id = d.id AND s.operacao = 'emitido')
           ORDER BY d.id",
     )
     .execute(pool)
@@ -179,7 +181,7 @@ pub async fn item_do_documento(pool: &SqlitePool, id: i64) -> AppResult<Option<V
     let Some(d) = sqlx::query(
         "SELECT d.id, d.tipo_codigo, t.grupo, d.serie, d.numero, d.numero_doc, d.data_emissao, d.data_hora, d.entidade_nif,
                 d.entidade_nome, d.total_liquido, d.total_iva, d.total, d.estado, d.motivo_anulacao, d.referencia, d.hash,
-                d.hash_controlo, d.hash_versao, d.armazem_id,
+                d.hash_controlo, d.hash_versao, d.armazem_id, d.importado,
                 COALESCE((SELECT a.hash FROM documentos a
                            WHERE a.tipo_codigo = d.tipo_codigo AND a.serie = d.serie AND a.numero = d.numero - 1), '') AS hash_anterior,
                 -- para os relatórios do site (1.4.5): de onde veio a venda, quem a fez, o vencimento, o que falta
@@ -286,6 +288,8 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     }
     // o catálogo que mudou (stock, preço, artigos), no mesmo pedido
     let (cat_pendentes, cat_itens) = catalogo::devidos(pool, agora, catalogo::LOTE).await?;
+    // as fichas (entidades, artigos completos, utilizadores; registos.rs): no campo `registos` do pedido
+    let (reg_pendentes, reg_itens) = registos::devidos(pool, agora, registos::LOTE).await?;
     lote.extend(cat_itens);
     // os fechos de caixa arquivados, para a cópia no site (sem os nomes dos clientes)
     let (fechos_pendentes, fechos_itens) = fechos::devidos(pool, agora, fechos::LOTE).await?;
@@ -323,6 +327,22 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
     });
     if !promos.is_empty() {
         dados["promocoes"] = Value::Array(promos.iter().map(|p| p.item.clone()).collect());
+    }
+    if !reg_itens.is_empty() {
+        dados["registos"] = Value::Array(reg_itens);
+    }
+    // as configurações (configuracoes.rs), só quando mudaram e se o pedido ainda as levar dentro do limite do site. Nunca
+    // impedem o resto da volta.
+    let config = configuracoes::para_enviar(pool, agora).await.unwrap_or_else(|e| {
+        eprintln!("Configurações para o site: ficam para a volta seguinte ({e}).");
+        None
+    });
+    let config = config.filter(|(_, f)| {
+        let pedido = serde_json::to_string(&dados).map(|t| t.len()).unwrap_or(usize::MAX);
+        pedido.saturating_add(serde_json::to_string(f).map_or(usize::MAX, |t| t.len())) <= capas::MAX_PEDIDO
+    });
+    if let Some((resumo, f)) = &config {
+        dados["configuracoes"] = json!({ "resumo": resumo, "dados": f });
     }
     // uma fotografia de um artigo para o produto do site sem capa (capas.rs), se o pedido ainda a levar dentro do limite
     // do site. Nunca impede o resto da volta.
@@ -363,9 +383,17 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                     eprintln!("Promoções para o site: a resposta não se registou ({e}).");
                 }
             }
+            if let Some((resumo, _)) = &config {
+                if let Err(e) = configuracoes::concluir(pool, resumo, &r["configuracoes"], agora).await {
+                    eprintln!("Configurações para o site: a resposta não se registou ({e}).");
+                }
+            }
             // a versão mínima do KanGest que o site aceita (versao.rs)
             versao::guardar(pool, r["kangest_min_version"].as_str()).await?;
             catalogo::concluir(pool, &cat_pendentes, &catalogo::erros_do_resultado(&r["resultado"]), agora).await?;
+            if !reg_pendentes.is_empty() {
+                registos::concluir(pool, &reg_pendentes, &r["registos"], agora).await?;
+            }
             fechos::concluir(pool, &fechos_pendentes, &fechos::erros_do_resultado(&r["resultado"]), agora).await?;
             financeiro::concluir(pool, &fin_pendentes, &financeiro::erros_do_resultado(&r["resultado"]), agora).await?;
             encomendas::marcar_enviados(pool, &tarefas_feitas).await?;
@@ -434,6 +462,7 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                 resultado: r["resultado"].clone(),
                 continuar: fila.len() as i64 == LOTE
                     || cat_pendentes.len() as i64 == catalogo::LOTE
+                    || reg_pendentes.len() as i64 == registos::LOTE
                     || fechos_pendentes.len() as i64 == fechos::LOTE
                     || fin_pendentes.len() as i64 == financeiro::LOTE
                     || por_seguir > 0
@@ -458,6 +487,10 @@ async fn volta(st: &AppState, l: &Ligacao) -> AppResult<Volta> {
                     .await?;
             }
             catalogo::adiar(pool, &cat_pendentes, agora).await?;
+            registos::adiar(pool, &reg_pendentes, agora, "O site recusou o pedido.").await?;
+            if config.is_some() {
+                configuracoes::adiar(pool, agora, "O site recusou o pedido.").await?;
+            }
             anotar_erro(pool, &m).await?;
             Ok(Volta::Falhou(m))
         }
@@ -497,6 +530,7 @@ async fn ciclo_com(st: &AppState, forcar: bool) -> AppResult<Value> {
             .fetch_one(pool)
             .await?
             + catalogo::devidos_agora(pool, agora_s()).await?
+            + registos::devidos_agora(pool, agora_s()).await?
             + encomendas::por_enviar(pool).await?;
         if devidos == 0 && !pessoa::ha_comandos(pool).await? && agora_s() - ULTIMA_SONDAGEM.load(Ordering::Relaxed) < SONDAGEM {
             return Ok(json!({ "ligada": true, "enviados": 0, "em_espera": true }));
@@ -626,8 +660,13 @@ async fn guardar_ligacao(st: &AppState, url: &str, semente: &[u8; 32], v: &Value
         fechos::apagar(&st.pool).await?;
         financeiro::apagar(&st.pool).await?;
         livro::apagar(&st.pool).await?;
+        registos::apagar(&st.pool).await?;
     }
+    // as configurações seguem na primeira volta (também ao ligar outra vez ao mesmo posto)
+    configuracoes::repetir(&st.pool).await?;
     enfileirar_tudo(&st.pool).await?;
+    // as fichas (entidades, artigos completos, utilizadores) seguem todas uma vez
+    registos::enfileirar_tudo(&st.pool).await?;
     // os fechos de caixa arquivados também seguem (o site guarda uma cópia)
     fechos::enfileirar_tudo(&st.pool).await?;
     // os movimentos da tesouraria (o ERP central: financeiro.rs), os do último ano
@@ -789,6 +828,8 @@ async fn estado(st: &AppState) -> AppResult<Value> {
         "feitos": conta("feito"),
         "erros": erros,
         "catalogo": catalogo::contagem(&st.pool).await?,
+        "registos": registos::contagem(&st.pool).await?,
+        "configuracoes": configuracoes::estado(&st.pool).await?,
         "livro": livro::contagem(&st.pool).await?,
         "intervalo": INTERVALO,
     }))
@@ -806,6 +847,8 @@ async fn repetir(st: &AppState) -> AppResult<Value> {
     st.exigir_perm(PERMISSAO)?;
     sqlx::query("UPDATE sinc_saida SET estado = 'pendente', tentativas = 0, proximo_em = 0 WHERE estado = 'erro'").execute(&st.pool).await?;
     catalogo::repetir(&st.pool).await?;
+    registos::repetir(&st.pool).await?;
+    configuracoes::repetir(&st.pool).await?;
     estado(st).await
 }
 
@@ -824,6 +867,7 @@ async fn desligar(st: &AppState) -> AppResult<Value> {
     financeiro::apagar(&st.pool).await?;
     // o livro de stock abre outra vez na ligação seguinte (só o que faltar entra no livro do site)
     livro::apagar(&st.pool).await?;
+    registos::apagar(&st.pool).await?;
     // sem ligação, a versão mínima do site deixa de valer
     versao::guardar(&st.pool, None).await?;
     // a cópia da Loja online tem dados de clientes, e as sessões do site são das pessoas: sem ligação, não ficam

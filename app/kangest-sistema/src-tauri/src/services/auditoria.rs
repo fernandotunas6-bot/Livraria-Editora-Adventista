@@ -182,13 +182,13 @@ fn chave_do_pedido(a: &Alvo, params: &Value) -> Option<String> {
 }
 
 /// Configurações que mudam sozinhas ou que não são do utilizador (licença, selo da própria auditoria).
-fn config_interna(chave: &str) -> bool {
+pub(crate) fn config_interna(chave: &str) -> bool {
     ["licenca.", "auditoria.", "rede.ultimo", "fe.ultimo", "atualizacao.ultima"].iter().any(|p| chave.starts_with(p))
 }
 
 /// Campos (e chaves da configuração) que nunca vão para o registo com o valor: senhas, PIN, segredos, chaves privadas
 /// e códigos de recuperação. Conta só o nome do campo, sem o prefixo da configuração («email.senha» → «senha»).
-fn secreto(campo: &str) -> bool {
+pub(crate) fn secreto(campo: &str) -> bool {
     let c = campo.to_ascii_lowercase();
     if crate::segredos::CHAVES.contains(&c.as_str()) {
         return true;
@@ -203,7 +203,7 @@ fn secreto(campo: &str) -> bool {
 }
 
 /// Campos que mudam sem ser o utilizador a mudá-los (contadores, últimos acessos).
-fn ignorado(campo: &str) -> bool {
+pub(crate) fn ignorado(campo: &str) -> bool {
     matches!(campo, "tentativas" | "bloqueado_ate" | "ultimo_acesso" | "actualizado_em" | "atualizado_em" | "alterado_em" | "totp_ultimo" | "ultimo_uso")
 }
 
