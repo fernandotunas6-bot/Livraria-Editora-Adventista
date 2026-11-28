@@ -7722,7 +7722,7 @@ fn site_falso_para_entrar() -> u16 {
 }
 
 /// Entrar com a conta do site (parte J; src/sinc/entrada.rs, migração 0065): o site confirma a senha e o código dos
-/// dois passos e diz o perfil (Caixa ou Gestor, nunca Administrador); a sessão do site fica para a Loja online; sem
+/// dois passos e diz o perfil (o mesmo papel do site); a sessão do site fica para a Loja online; sem
 /// Internet vale a cópia local até 7 dias, com a mesma senha; a conta ADMIN local entra sempre.
 #[tokio::test]
 async fn entrar_com_a_conta_do_site() {
@@ -7772,7 +7772,7 @@ async fn entrar_com_a_conta_do_site() {
     sqlx::query("UPDATE utilizadores SET conta_site_validada_em = '2026-01-01T00:00:00' WHERE login = 'caixa@x.ao'").execute(&st.pool).await.unwrap();
     assert!(erro("caixa@x.ao", "certa").await.contains("já não vale"));
 
-    // a conta ADMIN local entra sempre; o perfil Administrador nunca veio do site
+    // a conta ADMIN local de recurso entra sempre
     assert_eq!(login("admin", "1234", None).await["perfil"], "ADMIN");
     let lista = rpc(&st, "utilizadores.listar", Value::Null).await;
     let do_site: Vec<(String, String)> = lista

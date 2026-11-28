@@ -5,15 +5,19 @@ tem os dois passos, o código da aplicação. É a parte J do plano (decisões d
 
 ## Quem entra e com que perfil
 
-Decide-se no site, em *Utilizadores → Permissões* ou nos cargos, área *Sistema*:
-- **KanGest: caixa** dá o perfil Caixa (o POS);
-- **KanGest: gestor** dá o perfil Gestor: vendas, compras, stock e relatórios, sem a administração do programa;
-- **o administrador do site** entra como Gestor;
-- **o perfil Administrador do KanGest nunca vem do site.** Fica sempre a **conta ADMIN local** de recurso, que entra
-  com o nome de acesso e a senha de cá, como antes.
+**O mesmo papel do site** (pedido do dono a 27/11: «se é admin no site, também é admin no KanGest; se for gestor no
+site, também gestor no KanGest; os mesmos dados»). Vale para a senha, o Google e a sessão do site:
+- **o administrador do site** entra como Administrador;
+- **o gestor do site** (o papel «Gestor», `manager`) entra como Gestor: vendas, compras, stock e relatórios;
+- **a opção manual:** quem tem só **KanGest: caixa** (em *Utilizadores → Permissões* ou nos cargos, área *Sistema*)
+  entra como Caixa, só nos postos da loja da ficha. **KanGest: gestor** continua a dar Gestor;
+- **um cliente** nunca entra («A sua conta do site não tem acesso ao KanGest»);
+- **os mesmos dados:** o nome, o email e o telefone do perfil do site passam para a conta do KanGest a cada entrada. Se
+  o papel mudar no site, muda aqui na entrada seguinte, e as permissões próprias de cá deixam de valer;
+- **a conta ADMIN local de recurso continua,** com o nome de acesso e a senha de cá, para quando não há Internet.
 
-Sem nenhuma das duas permissões, a conta do site não entra («A sua conta do site não tem acesso ao KanGest»). O site
-responde pela `public.kangest_eu(p_posto)` (migrações `20261126100000` e `20261126120000`, docs/KANGEST.md §5.4).
+O site responde pela `public.kangest_eu(p_posto)` (migrações `20261126100000`, `20261126120000` e `20261127172000`,
+docs/KANGEST.md §5.4).
 
 - **Os dois passos:** desde 27/11 são opcionais também para a equipa (decisão do dono; o site pode voltar a torná-los
   obrigatórios no painel). Quem os activou entra com o código. Só com a obrigação ligada, uma conta da equipa sem
@@ -119,12 +123,58 @@ o servidor recusa ali a entrada com o Google.
 `https://livrariaadventista.ao/kangest/entrar/**` em Supabase → Authentication → URL Configuration → Redirect URLs. O
 site já usa o retorno para qualquer página dele, por isso deve estar aceite.
 
+## A entrada nos dois sentidos (27/11)
+
+Pedido do dono: «o login deve funcionar para os dois». Quem tem a sessão de um lado entra no outro sem escrever a
+senha outra vez.
+
+### Do site para o KanGest: «Entrar com a sessão do site»
+
+No ecrã de entrada, ao lado do Google, com o KanGest ligado e com Internet (`sinc/entrada.rs`, `site_iniciar`):
+
+1. O KanGest gera o verificador do PKCE e o estado, só em memória, e abre no navegador do sistema
+   `/kangest/entrar-com-o-site?e=<estado>&d=<desafio S256>`.
+2. A página do site (`KanGestEntrarComOSitePage.jsx`) precisa da sessão do site; sem ela, manda entrar primeiro e
+   volta. Mostra com que conta se vai entrar e só segue quando a pessoa carrega em «Entrar no KanGest».
+3. O site (`POST /kangest/entrar-com-o-site/codigo`, com a permissão Caixa ou Gestor do KanGest) dá um código de uso
+   único preso ao desafio. Na base fica só o resumo SHA-256, por dois minutos (`private.kangest_entradas`, migração
+   20261127170000).
+4. A página devolve o código ao KanGest pela mesma ligação do Google (`kangest://auth?e=…&code=…`).
+5. O KanGest troca o código com o verificador (`POST /kangest/entrar-com-o-site/trocar`):
+   - o código gasta-se na primeira tentativa, certa ou errada;
+   - o site só responde se o SHA-256 do verificador bater com o desafio. Quem apanhar o código na ligação não o
+     consegue usar, porque o verificador nunca saiu do KanGest.
+6. O site devolve o resumo de um link de entrada da conta (`admin.generateLink`, sem email). O KanGest troca-o no Auth
+   (`/auth/v1/verify`) por uma sessão só sua, em memória.
+7. Daí em diante é a entrada da conta do site, como com o Google: os dois passos no KanGest, se a conta os tem;
+   `kangest_eu`; e a mesma conta local, sem mudar a cópia local da senha.
+
+### Do KanGest para o site: abrir o painel já com a sessão
+
+Os botões que abrem o painel do site (a encomenda, o produto, os pagamentos, o atendimento) usam `abrirNoSite`
+(`src/lib/site.ts`):
+
+1. O KanGest pede ao site, com a sessão da pessoa (`loja.conta.abrir_no_site` →
+   `POST /kangest/abrir-no-site`, com a permissão Caixa ou Gestor), um endereço para a página.
+2. **Só as páginas permitidas** (`destinoNoSite`, em `supabase/functions/app/kangestEntrada.ts`): o painel, a gestão, o
+   perfil, a loja, um produto, o rastreio, as lojas, a comunidade e as novidades. Nunca outro endereço.
+3. O site devolve `/kangest/abrir#t=<resumo>&d=<destino>`, com o resumo de um link de entrada da **própria conta**:
+   - o fragmento (`#`) não chega a nenhum servidor nem fica nos registos;
+   - a página (`KanGestAbrirPage.jsx`) tira-o logo do endereço, troca-o por uma sessão (`verifyOtp`) e segue para o
+     destino. Só serve uma vez.
+4. **No programa, abre no navegador do KanGest em sessão privada:** a sessão do site não fica guardada no computador da
+   loja para a pessoa seguinte.
+5. **Sem a sessão do site** (entrou com a senha local, ou está sem Internet), a página abre como antes e o site pede a
+   entrada.
+6. **A sessão que o navegador recebe é de um só passo:** quem tem os dois passos escreve o código no painel, como em
+   qualquer entrada.
+
 ## Testes
 
 - `sinc/entrada.rs`:
   - o desafio do PKCE (o exemplo da RFC 7636), o estado e a página de retorno (só em HTTPS);
   - uma entrada com o Google que não começou aqui, com outro estado ou fora do prazo, é recusada sem perguntar ao site;
-  - o perfil (só Gestor ou Caixa, nunca Administrador);
+  - o perfil (o mesmo papel do site: Administrador, Gestor ou Caixa);
   - a validade da cópia (7 dias, e não com o relógio atrasado);
   - o factor dos dois passos.
 - `services/tests.rs` (`entrar_com_a_conta_do_site`), com um site falso:

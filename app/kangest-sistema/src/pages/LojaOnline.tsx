@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { CheckCircle2, CloudOff, Copy, ExternalLink, Eye, EyeOff, KeyRound, Link2, Package, Pencil, Plus, Search, ShoppingBag, Store, Trash2, UserRound, Users, Wallet, Church } from "lucide-react";
 import { call, NA_APP } from "@/lib/api";
 import { kz } from "@/lib/format";
-import { navegador } from "@/lib/navegador";
+import { abrirNoSite } from "@/lib/site";
 import { useSession } from "@/store/session";
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Table, Td, Th, cn } from "@/components/ui";
 import { CapasDoSite, DadosDosLivros, FamiliasEGeneros, FotosParaOSite, PromocoesParaOSite } from "@/components/CapasDoSite";
@@ -89,16 +89,6 @@ interface Encomenda {
 const quando = (d?: string | null) =>
   d ? new Date(d).toLocaleString("pt-PT", { timeZone: "Africa/Luanda", dateStyle: "short", timeStyle: "short" }) : "—";
 const emKz = (v: number | null | undefined) => kz(Math.round(Number(v ?? 0) * 100));
-
-/** Abre uma página do painel do site no navegador do KanGest (ou numa janela, no modo web). */
-async function abrirNoSite(url: string) {
-  try {
-    if (NA_APP) await navegador("abrir", { texto: url });
-    else window.open(url, "_blank", "noopener");
-  } catch (x) {
-    toast.error((x as Error).message);
-  }
-}
 
 function Contador({ rotulo, n, activo, onClick, tom }: { rotulo: string; n: number; activo: boolean; onClick: () => void; tom?: string }) {
   return (
